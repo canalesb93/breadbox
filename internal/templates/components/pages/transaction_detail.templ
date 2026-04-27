@@ -290,12 +290,15 @@ templ txdMain(p TransactionDetailProps) {
 	</div>
 }
 
+// txdActivity hosts the activity timeline section for the transaction
+// detail page. The visual chrome (section wrapper, rail, day separators,
+// row layouts) is provided by the generic primitives in
+// internal/templates/components/timeline.templ — this template wires the
+// transaction-specific data + Alpine bindings through that chrome.
 templ txdActivity(p TransactionDetailProps) {
 	<!-- Activity Timeline (GitHub-style) -->
-	<section
+	<div
 		id="activity"
-		aria-labelledby="activity-heading"
-		class="bb-card p-0 overflow-hidden"
 		x-data="txdCommentManager"
 		data-tx-id={ p.TransactionID }
 		data-max-comment-length={ strconv.Itoa(p.MaxCommentLength) }
@@ -304,25 +307,15 @@ templ txdActivity(p TransactionDetailProps) {
 		data-today={ p.Now.Format("2006-01-02") }
 		@bb-toggle-pin-review.window="if (!hasPendingReview) pinReview = !pinReview"
 	>
-		<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
-			<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
-			<h2 id="activity-heading" class="text-sm font-semibold text-base-content/60">Activity</h2>
-			if len(p.Activity) > 0 {
-				<span class="text-xs text-base-content/40 tabular-nums">{ fmt.Sprintf("%d events", len(p.Activity)) }</span>
-			}
-		</header>
 		if len(p.ActivityDays) > 0 {
-			<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label="Transaction activity timeline">
-				<!--
-					Continuous left rail. Top/bottom anchored so it threads
-					through every 24px tile (events + day separators) and the
-					composer. left-[28px]/[32px] = container padding (16/20px)
-					+ tile half-width (12px) — keeps the rail centered under
-					every circle on the timeline.
-				-->
-				<span class="absolute left-[28px] sm:left-[32px] top-2 bottom-12 w-px bg-base-200" aria-hidden="true"></span>
+			@components.Timeline(components.TimelineProps{
+				Heading:     "Activity",
+				HeadingIcon: "activity",
+				EventCount:  len(p.Activity),
+				AriaLabel:   "Transaction activity timeline",
+			}) {
 				for di, day := range p.ActivityDays {
-					@txdTimelineDay(day.Label, di == 0)
+					@components.TimelineDay(day.Label, di == 0)
 					for _, event := range day.Events {
 						if event.Type == "comment" {
 							@txdTimelineComment(event, p.Now)
@@ -332,26 +325,17 @@ templ txdActivity(p TransactionDetailProps) {
 					}
 				}
 				@txdTimelineComposer(p)
-			</ol>
+			}
 		} else {
-			@txdTimelineEmptyComposer(p)
+			<section class="bb-card p-0 overflow-hidden" aria-labelledby="activity-heading">
+				<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
+					<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
+					<h2 id="activity-heading" class="text-sm font-semibold text-base-content/60">Activity</h2>
+				</header>
+				@txdTimelineEmptyComposer(p)
+			</section>
 		}
-	</section>
-}
-
-// txdTimelineDay renders a horizontal day separator with a small dot anchored
-// on the rail. The dot sits in a 24px tile so its center aligns with the
-// rail (and with every other 24px tile on the timeline). The first day's
-// separator gets a tighter top margin so the timeline doesn't open with a
-// large gap.
-templ txdTimelineDay(label string, first bool) {
-	<li class={ "relative flex items-center gap-3 select-none", templ.KV("pt-1 pb-3", first), templ.KV("pt-5 pb-3", !first) } role="separator" aria-label={ label }>
-		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center" aria-hidden="true">
-			<span class="w-3 h-3 rounded-full bg-base-300 ring-4 ring-base-100"></span>
-		</div>
-		<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/40">{ label }</h3>
-		<span class="flex-1 h-px bg-base-200" aria-hidden="true"></span>
-	</li>
+	</div>
 }
 
 // txdTimelineSystem renders a compact one-liner row for tag / category /
@@ -1024,12 +1008,12 @@ type TimelineRowsProps struct {
 }
 
 // TimelineRows renders activity rows for the partial-render endpoint
-// (GET /-/transactions/{id}/timeline/rows). Reuses txdTimelineDay /
+// (GET /-/transactions/{id}/timeline/rows). Reuses components.TimelineDay /
 // txdTimelineSystem / txdTimelineComment so the row markup matches the
 // main page exactly — no client-side templating, no risk of drift.
 templ TimelineRows(p TimelineRowsProps) {
 	if p.DaySeparatorLabel != "" {
-		@txdTimelineDay(p.DaySeparatorLabel, false)
+		@components.TimelineDay(p.DaySeparatorLabel, false)
 	}
 	for _, e := range p.Entries {
 		if e.Type == "comment" {

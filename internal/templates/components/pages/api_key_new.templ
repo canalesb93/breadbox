@@ -2,11 +2,12 @@ package pages
 
 import "breadbox/internal/templates/components"
 
-// APIKeyNew renders the /api-keys/new page — a small form that creates a
-// new API key (name + scope). Hosts inside the base layout via
+// APIKeyNew renders the /settings/api-keys/new page — a small form that
+// creates a new API key (name + scope). Hosts inside the base layout via
 // TemplateRenderer.RenderWithTempl. The markup mirrors the previous
-// html/template version byte-for-byte; the form posts to /api-keys/new
-// which is handled by APIKeyCreatePageHandler in admin/apikeys.go.
+// html/template version byte-for-byte; the form posts to
+// /settings/api-keys/new which is handled by APIKeyCreatePageHandler in
+// admin/apikeys.go.
 templ APIKeyNew(p APIKeyNewProps) {
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div class="bb-page-header">
@@ -16,7 +17,7 @@ templ APIKeyNew(p APIKeyNewProps) {
 		</div>
 	</div>
 	<div class="bb-card p-6 max-w-lg">
-		<form method="POST" action="/api-keys/new">
+		<form method="POST" action="/settings/api-keys/new">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			<fieldset class="fieldset mb-5">
 				<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">Name</label>
@@ -35,7 +36,7 @@ templ APIKeyNew(p APIKeyNewProps) {
 				<button type="submit" class="btn btn-primary btn-sm rounded-xl">
 					<i data-lucide="plus" class="w-4 h-4"></i> Create API Key
 				</button>
-				<a href="/access" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+				<a href="/settings/api-keys" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
 			</div>
 		</form>
 	</div>

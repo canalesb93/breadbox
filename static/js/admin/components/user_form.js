@@ -1,4 +1,5 @@
-// User-form Alpine factories for /users/new (create) and /users/{id}/edit (edit).
+// User-form Alpine factories for /settings/household/new (create) and
+// /settings/household/{id}/edit (edit).
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 // Two factories ship from this module:
@@ -15,7 +16,7 @@
 // (so the alpine:init listener registers before Alpine fires the event).
 
 document.addEventListener('alpine:init', function () {
-  // Create flow — drives /users/new. Maintains local-only state for the
+  // Create flow — drives /settings/household/new. Maintains local-only state for the
   // name/email/login toggle, the avatar-preview seed, and the two-step
   // submit (user creation + optional login-account creation).
   Alpine.data('userForm', function () {
@@ -88,7 +89,7 @@ document.addEventListener('alpine:init', function () {
         .then(function (userData) {
           if (!self.createLogin) {
             // No login account needed -- redirect.
-            window.location.href = '/users?created=1';
+            window.location.href = '/settings/household?created=1';
             return;
           }
 
@@ -113,7 +114,7 @@ document.addEventListener('alpine:init', function () {
               // Re-initialize Lucide icons for the success state.
               self.$nextTick(function () { if (window.lucide) lucide.createIcons(); });
             } else {
-              window.location.href = '/users?created=1';
+              window.location.href = '/settings/household?created=1';
             }
           });
         })
@@ -128,7 +129,7 @@ document.addEventListener('alpine:init', function () {
     };
   });
 
-  // Edit flow — drives /users/{id}/edit. Reads the user's UUID and the
+  // Edit flow — drives /settings/household/{id}/edit. Reads the user's UUID and the
   // initial hasCustomAvatar boolean from data-* attributes on the x-data
   // root, so the factory body keeps the no-arg shape the convention
   // requires. Handles avatar upload/remove/regenerate plus the name/email
@@ -143,10 +144,26 @@ document.addEventListener('alpine:init', function () {
       formError: '',
       submitting: false,
 
+      // Endpoint base URLs — read from data-* attrs so the same factory
+      // drives /settings/household/{id}/edit (admin scope) and
+      // /settings/account (self scope). Defaults preserve the original
+      // /-/users/{id} behaviour when the page omits the attrs.
+      avatarEndpoint: '',
+      profileEndpoint: '',
+      successRedirect: '/settings/household',
+
       init: function () {
         this.userId = this.$el.dataset.userId || '';
         this.hasCustomAvatar = this.$el.dataset.hasCustomAvatar === 'true';
         this.avatarSrc = '/avatars/' + this.userId + '?v=' + Date.now();
+
+        this.avatarEndpoint = this.$el.dataset.avatarEndpoint
+          || ('/-/users/' + this.userId + '/avatar');
+        this.profileEndpoint = this.$el.dataset.profileEndpoint
+          || ('/-/users/' + this.userId);
+        if (this.$el.dataset.successRedirect) {
+          this.successRedirect = this.$el.dataset.successRedirect;
+        }
       },
 
       onFileSelect: function (e) {
@@ -170,7 +187,7 @@ document.addEventListener('alpine:init', function () {
         var fd = new FormData();
         fd.append('avatar', file);
 
-        fetch('/-/users/' + self.userId + '/avatar', { method: 'POST', body: fd })
+        fetch(self.avatarEndpoint, { method: 'POST', body: fd })
           .then(function (res) {
             if (!res.ok) return res.json().then(function (d) { throw d; });
             return res.json();
@@ -190,7 +207,7 @@ document.addEventListener('alpine:init', function () {
       removeAvatar: function () {
         var self = this;
         self.avatarError = '';
-        fetch('/-/users/' + self.userId + '/avatar', { method: 'DELETE' })
+        fetch(self.avatarEndpoint, { method: 'DELETE' })
           .then(function (res) {
             if (!res.ok) return res.json().then(function (d) { throw d; });
             self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
@@ -204,7 +221,7 @@ document.addEventListener('alpine:init', function () {
       regenerate: function () {
         var self = this;
         self.avatarError = '';
-        fetch('/-/users/' + self.userId + '/avatar/regenerate', { method: 'POST' })
+        fetch(self.avatarEndpoint + '/regenerate', { method: 'POST' })
           .then(function (res) {
             if (!res.ok) return res.json().then(function (d) { throw d; });
             return res.json();
@@ -231,14 +248,14 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         self.submitting = true;
 
-        fetch('/-/users/' + self.userId, {
+        fetch(self.profileEndpoint, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name, email: email || '' })
         })
         .then(function (res) {
           if (res.ok) {
-            window.location.href = '/users';
+            window.location.href = self.successRedirect;
           } else {
             return res.json().then(function (data) {
               self.submitting = false;

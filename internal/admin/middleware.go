@@ -76,7 +76,8 @@ func countPendingReviewsFromTags(ctx context.Context, queries *db.Queries) (int6
 }
 
 // pendingReviewsCount returns the count of transactions currently tagged
-// "needs-review". Shared across agent_wizard / agents_page / mcp_guide.
+// "needs-review". Shared across the agent-prompt cards on /agents and any
+// other surface that wants to highlight the review backlog.
 func pendingReviewsCount(ctx context.Context, svc pendingReviewCountSource) (int64, error) {
 	return svc.CountTransactionsTag(ctx, "needs-review")
 }

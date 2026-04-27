@@ -1,4 +1,4 @@
-// Users page scripts for /users.
+// Users page scripts for /settings/household.
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 // This page does not use a named Alpine.data() factory — the root <div>

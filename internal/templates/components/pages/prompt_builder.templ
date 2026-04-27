@@ -1,6 +1,6 @@
 package pages
 
-// PromptBuilder renders the /agent-wizard/{type} prompt builder page. Hosts
+// PromptBuilder renders the /agent-prompts/builder/{type} prompt builder page. Hosts
 // inside the base layout via TemplateRenderer.RenderWithTempl — the handler
 // passes the typed props and the bridge drops the rendered HTML into
 // base.html's TemplContent slot.
@@ -22,7 +22,7 @@ templ PromptBuilder(p PromptBuilderProps) {
 	<div class="bb-page-header">
 		<div>
 			<div class="flex items-center gap-2 text-sm text-base-content/50 mb-1">
-				<a href="/agents?tab=wizard" class="hover:text-base-content transition-colors">Prompt Library</a>
+				<a href="/agent-prompts" class="hover:text-base-content transition-colors">Agent Prompts</a>
 				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
 				<span class="text-base-content/70">Prompt Builder</span>
 			</div>

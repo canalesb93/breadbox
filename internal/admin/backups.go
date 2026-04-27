@@ -28,7 +28,7 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 				CSRFToken: GetCSRFToken(r),
 				Error:     "Backup service is not available. pg_dump may not be installed.",
 			}
-			renderBackups(w, r, tr, data, props)
+			renderBackups(w, r, sm, tr, data, props)
 			return
 		}
 
@@ -80,15 +80,13 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			})
 		}
 
-		renderBackups(w, r, tr, data, props)
+		renderBackups(w, r, sm, tr, data, props)
 	}
 }
 
-// renderBackups mirrors the renderLogs / renderCSVImport pattern: hands
-// the typed BackupsProps to the templ component and uses RenderWithTempl
-// to host it inside base.html.
-func renderBackups(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.BackupsProps) {
-	tr.RenderWithTempl(w, r, data, pages.Backups(props))
+// renderBackups wraps the Backups tab body in the unified Settings shell.
+func renderBackups(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.BackupsProps) {
+	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabBackups, pages.Backups(props))
 }
 
 // CreateBackupHandler serves POST /-/backups/create — triggers a manual backup.
@@ -97,19 +95,19 @@ func CreateBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		ctx := r.Context()
 
 		if a.BackupService == nil {
-			FlashRedirect(w, r, sm, "error", "Backup service is not available.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Backup service is not available.", "/settings/backups")
 			return
 		}
 
 		filename, err := a.BackupService.CreateBackup(ctx, "manual")
 		if err != nil {
 			a.Logger.Error("create backup", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to create backup: "+err.Error(), "/backups")
+			FlashRedirect(w, r, sm, "error", "Failed to create backup: "+err.Error(), "/settings/backups")
 			return
 		}
 
 		SetFlash(ctx, sm, "success", fmt.Sprintf("Backup created: %s", filename))
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -140,19 +138,19 @@ func DeleteBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		ctx := r.Context()
 
 		if a.BackupService == nil {
-			FlashRedirect(w, r, sm, "error", "Backup service not available.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Backup service not available.", "/settings/backups")
 			return
 		}
 
 		filename := chi.URLParam(r, "filename")
 		if err := a.BackupService.DeleteBackup(filename); err != nil {
 			a.Logger.Error("delete backup", "error", err, "filename", filename)
-			FlashRedirect(w, r, sm, "error", "Failed to delete backup.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Failed to delete backup.", "/settings/backups")
 			return
 		}
 
 		SetFlash(ctx, sm, "success", fmt.Sprintf("Backup deleted: %s", filename))
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -162,7 +160,7 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		ctx := r.Context()
 
 		if a.BackupService == nil {
-			FlashRedirect(w, r, sm, "error", "Backup service not available.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Backup service not available.", "/settings/backups")
 			return
 		}
 
@@ -175,19 +173,19 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		case "upload":
 			file, header, err := r.FormFile("backup_file")
 			if err != nil {
-				FlashRedirect(w, r, sm, "error", "No backup file provided.", "/backups")
+				FlashRedirect(w, r, sm, "error", "No backup file provided.", "/settings/backups")
 				return
 			}
 			defer file.Close()
 
 			if !strings.HasSuffix(header.Filename, ".sql.gz") {
-				FlashRedirect(w, r, sm, "error", "Invalid file type. Only .sql.gz files are supported.", "/backups")
+				FlashRedirect(w, r, sm, "error", "Invalid file type. Only .sql.gz files are supported.", "/settings/backups")
 				return
 			}
 
 			if err := a.BackupService.RestoreFromReader(ctx, file); err != nil {
 				a.Logger.Error("restore from upload", "error", err)
-				FlashRedirect(w, r, sm, "error", "Restore failed: "+err.Error(), "/backups")
+				FlashRedirect(w, r, sm, "error", "Restore failed: "+err.Error(), "/settings/backups")
 				return
 			}
 
@@ -196,13 +194,13 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		case "existing":
 			filename := r.FormValue("backup_filename")
 			if filename == "" {
-				FlashRedirect(w, r, sm, "error", "No backup file selected.", "/backups")
+				FlashRedirect(w, r, sm, "error", "No backup file selected.", "/settings/backups")
 				return
 			}
 
 			if err := a.BackupService.RestoreBackup(ctx, filename); err != nil {
 				a.Logger.Error("restore from existing", "error", err, "filename", filename)
-				FlashRedirect(w, r, sm, "error", "Restore failed: "+err.Error(), "/backups")
+				FlashRedirect(w, r, sm, "error", "Restore failed: "+err.Error(), "/settings/backups")
 				return
 			}
 
@@ -212,7 +210,7 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			SetFlash(ctx, sm, "error", "Invalid restore source.")
 		}
 
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -233,14 +231,14 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 			"weekly":    true,
 		}
 		if !validSchedules[schedule] {
-			FlashRedirect(w, r, sm, "error", "Invalid backup schedule.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Invalid backup schedule.", "/settings/backups")
 			return
 		}
 
 		// Validate retention.
 		retentionDays, err := strconv.Atoi(retentionStr)
 		if err != nil || retentionDays < 1 || retentionDays > 365 {
-			FlashRedirect(w, r, sm, "error", "Invalid retention period. Must be 1-365 days.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Invalid retention period. Must be 1-365 days.", "/settings/backups")
 			return
 		}
 
@@ -250,7 +248,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 			Value: pgconv.Text(schedule),
 		}); err != nil {
 			a.Logger.Error("save backup schedule", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to save backup schedule.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Failed to save backup schedule.", "/settings/backups")
 			return
 		}
 
@@ -260,7 +258,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 			Value: pgconv.Text(strconv.Itoa(retentionDays)),
 		}); err != nil {
 			a.Logger.Error("save backup retention", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to save retention setting.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Failed to save retention setting.", "/settings/backups")
 			return
 		}
 
@@ -269,7 +267,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		} else {
 			SetFlash(ctx, sm, "success", fmt.Sprintf("Backup schedule saved. Retention: %d days.", retentionDays))
 		}
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -279,18 +277,18 @@ func RestoreExistingBackupHandler(a *app.App, sm *scs.SessionManager) http.Handl
 		ctx := r.Context()
 
 		if a.BackupService == nil {
-			FlashRedirect(w, r, sm, "error", "Backup service not available.", "/backups")
+			FlashRedirect(w, r, sm, "error", "Backup service not available.", "/settings/backups")
 			return
 		}
 
 		filename := chi.URLParam(r, "filename")
 		if err := a.BackupService.RestoreBackup(ctx, filename); err != nil {
 			a.Logger.Error("restore backup", "error", err, "filename", filename)
-			FlashRedirect(w, r, sm, "error", "Restore failed: "+err.Error(), "/backups")
+			FlashRedirect(w, r, sm, "error", "Restore failed: "+err.Error(), "/settings/backups")
 			return
 		}
 
 		SetFlash(ctx, sm, "success", fmt.Sprintf("Database restored from %s. You may need to restart the server.", filename))
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }

@@ -12,7 +12,7 @@ import (
 )
 
 // changePasswordForAccount handles password change for any auth account.
-// Used by both /my-account/password and /settings/password.
+// Used by both /settings/account/password and /settings/password.
 func changePasswordForAccount(a *app.App, sm *scs.SessionManager, w http.ResponseWriter, r *http.Request, accountIDStr, redirectPath string) {
 	ctx := r.Context()
 

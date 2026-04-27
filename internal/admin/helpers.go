@@ -11,6 +11,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// redirectGET returns an http.HandlerFunc that 301-redirects to dest while
+// preserving any query string and fragment from the incoming request. Used
+// to retire old GET paths after a URL migration.
+func redirectGET(dest string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		target := dest
+		if raw := r.URL.RawQuery; raw != "" {
+			target = target + "?" + raw
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+	}
+}
+
+// redirectPreserveMethod returns an http.HandlerFunc that 308-redirects to
+// dest. 308 (Permanent Redirect) preserves the request method, so POST/PUT/
+// DELETE callers don't get downgraded to GET. Query string is preserved.
+func redirectPreserveMethod(dest string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		target := dest
+		if raw := r.URL.RawQuery; raw != "" {
+			target = target + "?" + raw
+		}
+		http.Redirect(w, r, target, http.StatusPermanentRedirect)
+	}
+}
+
 // parseURLUUIDOrNotFound extracts the named chi URL param and decodes it as a
 // UUID. On parse failure it renders the styled 404 page via tr and returns
 // ok=false. Used by HTML detail/edit handlers.

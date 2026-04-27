@@ -41,11 +41,11 @@ type AccessClientRow struct {
 // API key. Centralising it keeps the templ free of string concatenation in
 // `action={...}` slots — see the connections page for the same pattern.
 func accessAPIKeyRevokeURL(id string) string {
-	return "/api-keys/" + id + "/revoke"
+	return "/settings/api-keys/" + id + "/revoke"
 }
 
 // accessOAuthClientRevokeURL returns the POST endpoint that revokes the
 // given OAuth client.
 func accessOAuthClientRevokeURL(id string) string {
-	return "/oauth-clients/" + id + "/revoke"
+	return "/settings/oauth-clients/" + id + "/revoke"
 }

@@ -7,30 +7,61 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// Settings renders the admin settings page body. Hosts inside the base
-// layout via TemplateRenderer.RenderWithTempl — the handler passes the
-// typed props and the bridge drops the rendered HTML into base.html's
-// TemplContent slot.
-templ Settings(p SettingsProps) {
+// SettingsSync renders the Sync tab — schedule + retention. Lands at
+// both /settings (the default Settings entry) and /settings/sync.
+templ SettingsSync(p SettingsProps) {
 	<script src="/static/js/admin/components/settings.js"></script>
-	<!--
-		Set the shortcut-registry scope so the ? help modal reflects "This page"
-		accurately. Settings intentionally has no custom shortcuts — it's a
-		settings form and letter-key shortcuts would collide with form inputs.
-		Reset to 'global' on Alpine teardown.
-	-->
 	<div x-data x-init="$store.shortcuts.setScope('settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div class="bb-page-header">
 		<div>
-			<h1 class="bb-page-title">Settings</h1>
-			<p class="text-sm text-base-content/50 mt-1">Manage sync schedule, security, and system info</p>
+			<h1 class="bb-page-title">Sync</h1>
+			<p class="text-sm text-base-content/50 mt-1">Schedule and log retention</p>
 		</div>
 	</div>
-	<div class="grid gap-6 bb-stagger">
-		@settingsSyncCard(p)
-		@settingsSecurityCard(p)
+	<div class="grid gap-6 bb-stagger max-w-2xl">
+		@settingsSyncSchedule(p)
+		@settingsSyncRetention(p)
+	</div>
+}
+
+// SettingsSecurity renders the Security tab — encryption key status +
+// pointer to Account for password changes.
+templ SettingsSecurity(p SettingsProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Security</h1>
+			<p class="text-sm text-base-content/50 mt-1">Encryption key status</p>
+		</div>
+	</div>
+	<div class="grid gap-6 bb-stagger max-w-2xl">
+		@settingsSecurityCardFlat(p)
+	</div>
+}
+
+// SettingsSystem renders the System tab — version info + update badge.
+templ SettingsSystem(p SettingsProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">System</h1>
+			<p class="text-sm text-base-content/50 mt-1">Version and runtime information</p>
+		</div>
+	</div>
+	<div class="grid gap-6 bb-stagger max-w-2xl">
 		@settingsSystemCard(p)
-		@settingsHelpCard(p)
+	</div>
+}
+
+// SettingsHelp renders the Help tab — pointer to the Getting Started
+// wizard. The Documentation footer button covers external help.
+templ SettingsHelp(p SettingsProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Help</h1>
+			<p class="text-sm text-base-content/50 mt-1">Setup guide and resources</p>
+		</div>
+	</div>
+	<div class="grid gap-6 bb-stagger max-w-2xl">
+		@settingsHelpCardFlat(p)
 	</div>
 }
 
@@ -167,7 +198,7 @@ templ settingsSecurityCard(p SettingsProps) {
 				<p class="text-xs text-base-content/40" x-show="!expanded">
 					Encryption { encryptionStatus(p.HasEncryptionKey) }
 				</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption key status · Change password in <a href="/my-account" class="link link-hover">My Account</a></p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption key status · Change password in <a href="/settings/account" class="link link-hover">My Account</a></p>
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
@@ -193,7 +224,7 @@ templ settingsSecurityCard(p SettingsProps) {
 				}
 				<p class="text-xs text-base-content/40 mt-4">
 					Looking to change your password? Manage it in
-					<a href="/my-account" class="link link-hover font-medium">My Account</a>.
+					<a href="/settings/account" class="link link-hover font-medium">My Account</a>.
 				</p>
 			</div>
 		</div>
@@ -202,9 +233,22 @@ templ settingsSecurityCard(p SettingsProps) {
 
 templ settingsSystemCard(p SettingsProps) {
 	<div id="system" class="bb-card p-5">
-		<div class="flex items-center gap-3 mb-4">
-			<i data-lucide="cpu" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
-			<h2 class="font-semibold">System</h2>
+		<div class="flex items-center justify-between gap-3 mb-4">
+			<div class="flex items-center gap-3">
+				<i data-lucide="cpu" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+				<h2 class="font-semibold">System</h2>
+			</div>
+			if p.UpdateAvailable {
+				<a href={ templ.SafeURL(p.LatestURL) } target="_blank" rel="noopener" class="badge badge-warning badge-sm gap-1.5 no-underline" title={ "Release notes for v" + p.LatestVersion }>
+					<i data-lucide="arrow-up-circle" class="w-3 h-3"></i>
+					Update available — v{ p.LatestVersion }
+				</a>
+			} else if p.Version != "" {
+				<a href="https://github.com/canalesb93/breadbox/releases" target="_blank" rel="noopener" class="badge badge-ghost badge-sm gap-1 no-underline" title="View releases on GitHub">
+					<i data-lucide="github" class="w-3 h-3"></i>
+					Up to date
+				</a>
+			}
 		</div>
 		<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
 			<div><span class="text-base-content/40">Version</span> <span class="font-medium tabular-nums">{ p.Version }</span></div>
@@ -268,4 +312,168 @@ func encryptionStatus(has bool) string {
 		return "active"
 	}
 	return "not set"
+}
+
+// ---------------------------------------------------------------------
+// Flat (non-accordion) templs used by the new SettingsSync/Security/Help
+// tab pages. Each renders the same content the legacy accordion cards
+// did, but without the expand/collapse chrome — a tab page IS the
+// disclosure now.
+// ---------------------------------------------------------------------
+
+templ settingsSyncSchedule(p SettingsProps) {
+	<div class="bb-card p-5">
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="refresh-cw" class="w-4 h-4 text-base-content/60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">Schedule</h2>
+				<p class="text-xs text-base-content/45">
+					Every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) }
+					if p.NextSyncTime != "" {
+						· Next: { p.NextSyncTime }
+					}
+				</p>
+			</div>
+		</div>
+		<form method="POST" action="/settings/sync">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_interval_minutes">
+				Sync Interval
+				@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
+			</label>
+			<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+				@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
+				@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
+				@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
+				@syncIntervalOption(240, p.SyncIntervalMinutes, "Every 4 hours")
+				@syncIntervalOption(480, p.SyncIntervalMinutes, "Every 8 hours")
+				@syncIntervalOption(720, p.SyncIntervalMinutes, "Every 12 hours")
+				@syncIntervalOption(1440, p.SyncIntervalMinutes, "Every 24 hours")
+			</select>
+			if p.NextSyncTime != "" {
+				<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+					<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+					Next sync: { p.NextSyncTime }
+				</p>
+			}
+			<div class="mt-4">
+				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Schedule</button>
+			</div>
+		</form>
+	</div>
+}
+
+templ settingsSyncRetention(p SettingsProps) {
+	<div class="bb-card p-5">
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="archive" class="w-4 h-4 text-base-content/60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">Log Retention</h2>
+				<p class="text-xs text-base-content/45">{ fmt.Sprintf("%d logs stored", p.SyncLogCount) }</p>
+			</div>
+		</div>
+		<form method="POST" action="/settings/retention">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_log_retention_days">Keep logs for</label>
+			<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+				@retentionOption(7, p.SyncLogRetentionDays, "7 days")
+				@retentionOption(14, p.SyncLogRetentionDays, "14 days")
+				@retentionOption(30, p.SyncLogRetentionDays, "30 days")
+				@retentionOption(60, p.SyncLogRetentionDays, "60 days")
+				@retentionOption(90, p.SyncLogRetentionDays, "90 days (default)")
+				@retentionOption(180, p.SyncLogRetentionDays, "180 days")
+				@retentionOption(365, p.SyncLogRetentionDays, "1 year")
+				@retentionOption(0, p.SyncLogRetentionDays, "Keep forever")
+			</select>
+			<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+				<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+				Cleanup runs daily at 3:00 AM
+			</p>
+			<div class="mt-4">
+				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Retention</button>
+			</div>
+		</form>
+	</div>
+}
+
+templ settingsSecurityCardFlat(p SettingsProps) {
+	<div class="bb-card p-5">
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="shield" class="w-4 h-4 text-base-content/60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">Encryption Key</h2>
+				<p class="text-xs text-base-content/45">Required for storing bank credentials</p>
+			</div>
+		</div>
+		<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
+			<div class="flex items-center gap-2.5">
+				<i data-lucide="key-round" class="w-4 h-4 text-base-content/50"></i>
+				<span class="text-sm font-medium">ENCRYPTION_KEY</span>
+			</div>
+			if p.HasEncryptionKey {
+				<span class="badge badge-success badge-sm">Active</span>
+			} else {
+				<span class="badge badge-error badge-sm">Not Set</span>
+			}
+		</div>
+		if !p.HasEncryptionKey {
+			<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
+				<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+				Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
+			</div>
+		}
+		<p class="text-xs text-base-content/40 mt-4">
+			Looking to change your password? Manage it in
+			<a href="/settings/account" class="link link-hover font-medium">Account</a>.
+		</p>
+	</div>
+}
+
+templ settingsHelpCardFlat(p SettingsProps) {
+	<div class="bb-card p-5">
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="life-buoy" class="w-4 h-4 text-base-content/60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">Resources</h2>
+				<p class="text-xs text-base-content/45">Walkthroughs and reference</p>
+			</div>
+		</div>
+		<div class="flex flex-col gap-3">
+			<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
+				<div class="flex items-center gap-2.5">
+					<i data-lucide="compass" class="w-4 h-4 text-base-content/50"></i>
+					<div>
+						<span class="text-sm font-medium">Getting Started Guide</span>
+						<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
+					</div>
+				</div>
+				if p.OnboardingDismissed {
+					<form method="POST" action="/getting-started/reopen">
+						<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+						<button type="submit" class="btn btn-ghost btn-sm rounded-xl">Re-open</button>
+					</form>
+				} else {
+					<a href="/getting-started" class="btn btn-ghost btn-sm rounded-xl">Open</a>
+				}
+			</div>
+			<a href="https://docs.breadbox.sh" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
+				<div class="flex items-center gap-2.5">
+					<i data-lucide="book-open" class="w-4 h-4 text-base-content/50"></i>
+					<div>
+						<span class="text-sm font-medium">Documentation</span>
+						<p class="text-xs text-base-content/40">docs.breadbox.sh</p>
+					</div>
+				</div>
+				<i data-lucide="square-arrow-out-up-right" class="w-4 h-4 text-base-content/40"></i>
+			</a>
+		</div>
+	</div>
 }

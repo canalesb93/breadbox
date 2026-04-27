@@ -9,8 +9,8 @@ import "fmt"
 templ Access(p AccessProps) {
 	<div class="bb-page-header">
 		<div>
-			<h1 class="bb-page-title">Access</h1>
-			<p class="text-sm text-base-content/50 mt-1">Manage API keys and OAuth clients for external access</p>
+			<h1 class="bb-page-title">API Keys</h1>
+			<p class="text-sm text-base-content/50 mt-1">API keys and OAuth clients for external access</p>
 		</div>
 	</div>
 	@accessOAuthClientsSection(p)
@@ -37,7 +37,7 @@ templ accessOAuthClientsSection(p AccessProps) {
 					<span class="hidden sm:inline text-xs text-base-content/40 truncate">External connector access (e.g., Claude)</span>
 				}
 			</div>
-			<a href="/oauth-clients/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
+			<a href="/settings/oauth-clients/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
 				<i data-lucide="plus" class="w-4 h-4"></i>
 				Create Client
 			</a>
@@ -75,7 +75,7 @@ templ accessOAuthClientsSection(p AccessProps) {
 					</div>
 					<h3 class="text-base font-semibold mb-1">No OAuth clients yet</h3>
 					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Create an OAuth client to connect external AI services to your Breadbox MCP server.</p>
-					<a href="/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl gap-2">
+					<a href="/settings/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl gap-2">
 						<i data-lucide="plus" class="w-4 h-4"></i>
 						Create your first client
 					</a>
@@ -168,7 +168,7 @@ templ accessAPIKeysSection(p AccessProps) {
 					<span class="hidden sm:inline text-xs text-base-content/40 truncate">Direct REST API and MCP access</span>
 				}
 			</div>
-			<a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
+			<a href="/settings/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
 				<i data-lucide="plus" class="w-4 h-4"></i>
 				Create Key
 			</a>
@@ -206,7 +206,7 @@ templ accessAPIKeysSection(p AccessProps) {
 					</div>
 					<h3 class="text-base font-semibold mb-1">No API keys yet</h3>
 					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Create an API key to connect MCP agents or integrate with external tools.</p>
-					<a href="/api-keys/new" class="btn btn-primary btn-sm rounded-xl gap-2">
+					<a href="/settings/api-keys/new" class="btn btn-primary btn-sm rounded-xl gap-2">
 						<i data-lucide="plus" class="w-4 h-4"></i>
 						Create your first key
 					</a>

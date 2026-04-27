@@ -29,54 +29,103 @@ func formatNextSync(nextRun time.Time) string {
 	return "in " + formatUptime(d)
 }
 
-// SettingsGetHandler serves GET /admin/settings.
+// buildSettingsProps assembles the typed SettingsProps shared by every
+// /settings/* General-family tab (Sync, Security, System, Help). Each
+// tab handler builds full props (cheap — a few DB lookups + version
+// check) and renders only the section it owns.
+func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[string]any) {
+	ctx := r.Context()
+
+	// System info.
+	var pgVersionRaw string
+	_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersionRaw)
+	pgVersionRaw = strings.TrimPrefix(pgVersionRaw, "PostgreSQL ")
+	pgVersion := pgVersionRaw
+	if idx := strings.IndexByte(pgVersionRaw, ' '); idx > 0 {
+		pgVersion = pgVersionRaw[:idx]
+	}
+
+	retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
+	syncLogCount, _ := a.Service.CountSyncLogs(ctx)
+	onboardingDismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
+
+	nextSyncTime := ""
+	if a.Scheduler != nil {
+		nextSyncTime = formatNextSync(a.Scheduler.NextRun())
+	}
+
+	props := pages.SettingsProps{
+		CSRFToken:            GetCSRFToken(r),
+		SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
+		SyncLogRetentionDays: retentionDays,
+		SyncLogCount:         syncLogCount,
+		Version:              a.Config.Version,
+		GoVersion:            runtime.Version(),
+		PostgresVersion:      pgVersion,
+		Uptime:               formatUptime(time.Since(a.Config.StartTime)),
+		ProviderCount:        len(a.Providers),
+		HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
+		OnboardingDismissed:  onboardingDismissed,
+		NextSyncTime:         nextSyncTime,
+		ConfigSources:        a.Config.ConfigSources,
+	}
+	if a.VersionChecker != nil {
+		if updateAvailable, latest, err := a.VersionChecker.CheckForUpdate(ctx); err == nil && updateAvailable != nil && *updateAvailable && latest != nil {
+			props.UpdateAvailable = true
+			props.LatestVersion = latest.Version
+			props.LatestURL = latest.URL
+		}
+	}
+
+	data := map[string]any{
+		"CSRFToken": GetCSRFToken(r),
+		"Flash":     nil,
+	}
+	return props, data
+}
+
+// SettingsGetHandler serves GET /settings — the Sync tab is the default
+// landing for the Settings entry. /settings/sync renders the same.
 func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+		props, data := buildSettingsProps(a, r)
+		data["PageTitle"] = "Sync"
+		data["CurrentPage"] = "sync"
+		data["Flash"] = GetFlash(r.Context(), sm)
+		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabSync, pages.SettingsSync(props))
+	}
+}
 
-		// System info.
-		var pgVersionRaw string
-		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersionRaw)
-		pgVersionRaw = strings.TrimPrefix(pgVersionRaw, "PostgreSQL ")
-		// Extract just the version number (e.g., "16.13") from the full string.
-		pgVersion := pgVersionRaw
-		if idx := strings.IndexByte(pgVersionRaw, ' '); idx > 0 {
-			pgVersion = pgVersionRaw[:idx]
-		}
+// SecuritySettingsHandler serves GET /settings/security.
+func SecuritySettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		props, data := buildSettingsProps(a, r)
+		data["PageTitle"] = "Security"
+		data["CurrentPage"] = "security"
+		data["Flash"] = GetFlash(r.Context(), sm)
+		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabSecurity, pages.SettingsSecurity(props))
+	}
+}
 
-		// Sync log retention.
-		retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
-		syncLogCount, _ := a.Service.CountSyncLogs(ctx)
+// SystemSettingsHandler serves GET /settings/system.
+func SystemSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		props, data := buildSettingsProps(a, r)
+		data["PageTitle"] = "System"
+		data["CurrentPage"] = "system"
+		data["Flash"] = GetFlash(r.Context(), sm)
+		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabSystem, pages.SettingsSystem(props))
+	}
+}
 
-		// Check onboarding dismissed state for help section.
-		onboardingDismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
-
-		nextSyncTime := ""
-		if a.Scheduler != nil {
-			nextSyncTime = formatNextSync(a.Scheduler.NextRun())
-		}
-		data := map[string]any{
-			"PageTitle":   "Settings",
-			"CurrentPage": "settings",
-			"CSRFToken":   GetCSRFToken(r),
-			"Flash":       GetFlash(ctx, sm),
-		}
-		body := pages.Settings(pages.SettingsProps{
-			CSRFToken:            GetCSRFToken(r),
-			SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
-			SyncLogRetentionDays: retentionDays,
-			SyncLogCount:         syncLogCount,
-			Version:              a.Config.Version,
-			GoVersion:            runtime.Version(),
-			PostgresVersion:      pgVersion,
-			Uptime:               formatUptime(time.Since(a.Config.StartTime)),
-			ProviderCount:        len(a.Providers),
-			HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
-			OnboardingDismissed:  onboardingDismissed,
-			NextSyncTime:         nextSyncTime,
-			ConfigSources:        a.Config.ConfigSources,
-		})
-		tr.RenderWithTempl(w, r, data, body)
+// HelpSettingsHandler serves GET /settings/help.
+func HelpSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		props, data := buildSettingsProps(a, r)
+		data["PageTitle"] = "Help"
+		data["CurrentPage"] = "help"
+		data["Flash"] = GetFlash(r.Context(), sm)
+		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabHelp, pages.SettingsHelp(props))
 	}
 }
 

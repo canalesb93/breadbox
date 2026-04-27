@@ -271,6 +271,57 @@ Standard pattern for "no data" screens:
 
 For filtered "no results" states (e.g., transactions with active filters), a compact version with just icon + text is acceptable.
 
+### Timeline
+
+GitHub-style activity timelines (continuous left rail threading through 24px icon tiles, day separators, sentence rows, comment bubbles) are assembled from generic templ primitives in `internal/templates/components/timeline.templ`. Use them whenever a surface needs to show a chronological feed — transactions, account links, reviews, sync runs — regardless of the underlying data shape.
+
+**Primitives**
+
+| Component | Purpose |
+| --- | --- |
+| `Timeline(TimelineProps)` | Section wrapper: optional heading + event count, ordered list, the absolutely-positioned rail. Body via `{ children... }`. |
+| `TimelineDay(label, first)` | Horizontal day separator with a small dot anchored on the rail. Pass `first=true` for the topmost separator to tighten the leading gap. |
+| `TimelineSystemRow(TimelineRowProps)` | Compact one-liner row: 24px icon tile (driven by `IconTone`) + sentence body via `{ children... }` + optional `Origin` and relative `Timestamp`. |
+| `TimelineSystemRowCustomTile(timestamp, origin, tile, body)` | Same row chrome but the caller supplies the entire 24px tile as a templ component. Use when the icon tile is data-driven (per-category colour, multi-shade status badge). |
+| `TimelineCommentRow(actor, timestamp)` | Chat-bubble row with the default "`Name` commented · `time`" meta line; bubble body via `{ children... }`. |
+| `TimelineCommentRowRaw(avatar)` | Escape hatch for callers that need a custom avatar or to inject controls (e.g. an inline delete button) inside the meta line. Both the avatar and the right-hand body are component slots. |
+| `TimelineEmpty(message)` | Compact "no activity yet" treatment: clock glyph + muted message. Caller wraps any composer or CTA above it. |
+
+**`IconTone` palette** — drives the small (24px) tile background + icon colour on `TimelineSystemRow`:
+
+| Tone | Background | Icon colour | Typical use |
+| --- | --- | --- | --- |
+| `neutral` (default) | `bg-base-200` | `text-base-content/40` | comments, generic system events |
+| `info` | `bg-info/15` | `text-info` | rule applications, automation hits |
+| `success` | `bg-success/15` | `text-success` | additive events (tag added, review approved) |
+| `warning` | `bg-warning/15` | `text-warning` | review skipped, soft warnings |
+| `error` | `bg-error/15` | `text-error` | tag removed, review rejected, failures |
+| `custom` | — | — | sentinel: caller renders the tile itself |
+
+**Reference call site** — the transaction-detail timeline lives in `internal/templates/components/pages/transaction_detail.templ` and uses `TimelineSystemRowCustomTile` (because individual rows render category-specific colours and 10/15% alpha review tints) plus `TimelineCommentRowRaw` (because comment rows host an inline trash button on hover):
+
+```go
+@components.Timeline(components.TimelineProps{
+    Heading: "Activity", HeadingIcon: "activity",
+    EventCount: len(p.Activity),
+    AriaLabel: "Transaction activity timeline",
+}) {
+    for di, day := range p.ActivityDays {
+        @components.TimelineDay(day.Label, di == 0)
+        for _, event := range day.Events {
+            if event.Type == "comment" {
+                @txdTimelineComment(event)        // wraps TimelineCommentRowRaw
+            } else {
+                @txdTimelineSystem(event)         // wraps TimelineSystemRowCustomTile
+            }
+        }
+    }
+    @txdTimelineComposer(p)                       // page-specific composer
+}
+```
+
+The composer (textarea + submit) is intentionally **not** a primitive — comment-creation UX is too tied to its caller (Alpine bindings, max-length, "also flag for review" toggle, keyboard shortcuts). Keep composer markup in the page template and slot it into the timeline children list at the tail.
+
 ## 5. Layout Patterns
 
 ### Base Layout (Drawer Sidebar)

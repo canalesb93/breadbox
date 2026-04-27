@@ -85,14 +85,29 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// shortcut point at a stable, meaningful URL.
 		r.Get("/reviews", ReviewsAliasHandler)
 
-		// Member account self-service pages.
-		r.Get("/my-account", MyAccountHandler(a, sm, tr, svc))
-		r.Post("/my-account/password", MyAccountChangePasswordHandler(a, sm))
-		r.Post("/my-account/avatar", UploadMyAvatarHandler(a, sm))
-		r.Delete("/my-account/avatar", DeleteMyAvatarHandler(a, sm))
-		r.Post("/my-account/avatar/regenerate", RegenerateMyAvatarHandler(a, sm))
-		r.Post("/my-account/link-user", LinkAdminToUserHandler(a, sm))
-		r.Post("/my-account/wipe-data", MyAccountWipeDataHandler(a, sm))
+		// Member account self-service pages — canonical paths under
+		// /settings/account/*. Old /my-account/* paths are kept as
+		// 301/308 redirects so any straggling external bookmarks or in-
+		// flight forms continue to work.
+		r.Get("/settings/account", MyAccountHandler(a, sm, tr))
+		r.Get("/settings/profile", MyProfileHandler(a, sm, tr))
+		r.Post("/settings/account/password", MyAccountChangePasswordHandler(a, sm))
+		r.Put("/settings/account/profile", MyAccountUpdateProfileHandler(a, sm))
+		r.Post("/settings/account/avatar", UploadMyAvatarHandler(a, sm))
+		r.Delete("/settings/account/avatar", DeleteMyAvatarHandler(a, sm))
+		r.Post("/settings/account/avatar/regenerate", RegenerateMyAvatarHandler(a, sm))
+		r.Post("/settings/account/link-user", LinkAdminToUserHandler(a, sm))
+		r.Post("/settings/account/wipe-data", MyAccountWipeDataHandler(a, sm))
+
+		// Legacy /my-account/* redirects.
+		r.Get("/my-account", redirectGET("/settings/account"))
+		r.Post("/my-account/password", redirectPreserveMethod("/settings/account/password"))
+		r.Put("/my-account/profile", redirectPreserveMethod("/settings/account/profile"))
+		r.Post("/my-account/avatar", redirectPreserveMethod("/settings/account/avatar"))
+		r.Delete("/my-account/avatar", redirectPreserveMethod("/settings/account/avatar"))
+		r.Post("/my-account/avatar/regenerate", redirectPreserveMethod("/settings/account/avatar/regenerate"))
+		r.Post("/my-account/link-user", redirectPreserveMethod("/settings/account/link-user"))
+		r.Post("/my-account/wipe-data", redirectPreserveMethod("/settings/account/wipe-data"))
 
 		// Password change works for both admin and member sessions.
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
@@ -109,22 +124,20 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/tags", TagsPageHandler(svc, sm, tr))
 
-		// Access page (API Keys + OAuth Clients) — editors can view and create.
-		r.Get("/access", AccessPageHandler(svc, sm, tr))
+		// API Keys + OAuth Clients page (Settings → API Keys tab).
+		// Editors can view and create.
+		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
 
-		r.Route("/api-keys", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
-			})
+		r.Route("/settings/api-keys", func(r chi.Router) {
 			r.Get("/new", APIKeyNewPageHandler(sm, tr))
 			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
 			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
 			// Revoke is admin-only — handled in the admin group below.
 		})
 
-		r.Route("/oauth-clients", func(r chi.Router) {
+		r.Route("/settings/oauth-clients", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
+				http.Redirect(w, r, "/settings/api-keys", http.StatusMovedPermanently)
 			})
 			r.Get("/new", OAuthClientNewPageHandler(sm, tr))
 			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
@@ -132,11 +145,42 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Revoke is admin-only — handled in the admin group below.
 		})
 
-		// Agents page — editors can view.
-		r.Get("/agents", AgentsPageHandler(svc, mcpServer, sm, tr))
-		r.Get("/agents/sessions/{id}", SessionDetailHandler(svc, sm, tr))
-		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
-		r.Get("/agent-wizard/{type}/copy", PromptCopyHandler())
+		// Legacy /access, /api-keys, /oauth-clients redirects.
+		r.Get("/access", redirectGET("/settings/api-keys"))
+		r.Get("/api-keys", redirectGET("/settings/api-keys"))
+		r.Get("/api-keys/new", redirectGET("/settings/api-keys/new"))
+		r.Post("/api-keys/new", redirectPreserveMethod("/settings/api-keys/new"))
+		r.Get("/api-keys/{id}/created", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/settings/api-keys/"+chi.URLParam(r, "id")+"/created", http.StatusMovedPermanently)
+		})
+		r.Get("/oauth-clients", redirectGET("/settings/api-keys"))
+		r.Get("/oauth-clients/new", redirectGET("/settings/oauth-clients/new"))
+		r.Post("/oauth-clients/new", redirectPreserveMethod("/settings/oauth-clients/new"))
+		r.Get("/oauth-clients/{id}/created", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/settings/oauth-clients/"+chi.URLParam(r, "id")+"/created", http.StatusMovedPermanently)
+		})
+
+		// Agent Prompts page (formerly /agents) — editors can view.
+		// Per-session detail lives under /activity/sessions/{id} since
+		// session data is hosted on the Activity page's Sessions tab;
+		// it's registered here under the editor+ scope to preserve the
+		// previous /agents/sessions/{id} permission level.
+		r.Get("/agent-prompts", AgentsPageHandler(svc, sm, tr))
+		r.Get("/agent-prompts/builder/{type}", PromptBuilderHandler(sm, tr))
+		r.Get("/agent-prompts/builder/{type}/copy", PromptCopyHandler())
+		r.Get("/activity/sessions/{id}", SessionDetailHandler(svc, sm, tr))
+
+		// Legacy /agents and /agent-wizard redirects.
+		r.Get("/agents", redirectGET("/agent-prompts"))
+		r.Get("/agents/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/activity/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
+		})
+		r.Get("/agent-wizard/{type}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type"), http.StatusMovedPermanently)
+		})
+		r.Get("/agent-wizard/{type}/copy", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type")+"/copy", http.StatusMovedPermanently)
+		})
 	})
 
 	// Admin-only authenticated routes (HTML pages).
@@ -149,24 +193,51 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Legacy onboarding dismiss route — redirect to new handler.
 		r.Post("/onboarding/dismiss", DismissGettingStartedHandler(a, sm))
 
-		r.Route("/users", func(r chi.Router) {
+		r.Route("/settings/household", func(r chi.Router) {
 			r.Get("/", UsersListHandler(a, sm, tr))
 			r.Get("/new", NewUserHandler(a, sm, tr))
 			r.Get("/{id}/edit", EditUserHandler(a, sm, tr))
 			r.Get("/{id}/create-login", CreateLoginPageHandler(a, tr))
 		})
 
-		// API key and OAuth client revoke — admin only.
-		r.Post("/api-keys/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
-		r.Post("/oauth-clients/{id}/revoke", OAuthClientRevokePageHandler(svc, sm))
-
-		r.Get("/logs", LogsPageHandler(a, svc, sm, tr))
-		r.Get("/sync-logs", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/logs?tab=syncs", http.StatusMovedPermanently)
+		// Legacy /users redirects.
+		r.Get("/users", redirectGET("/settings/household"))
+		r.Get("/users/new", redirectGET("/settings/household/new"))
+		r.Get("/users/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/settings/household/"+chi.URLParam(r, "id")+"/edit", http.StatusMovedPermanently)
 		})
-		r.Get("/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
+		r.Get("/users/{id}/create-login", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/settings/household/"+chi.URLParam(r, "id")+"/create-login", http.StatusMovedPermanently)
+		})
+
+		// API key and OAuth client revoke — admin only.
+		r.Post("/settings/api-keys/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
+		r.Post("/settings/oauth-clients/{id}/revoke", OAuthClientRevokePageHandler(svc, sm))
+		r.Post("/api-keys/{id}/revoke", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/settings/api-keys/"+chi.URLParam(r, "id")+"/revoke", http.StatusPermanentRedirect)
+		})
+		r.Post("/oauth-clients/{id}/revoke", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/settings/oauth-clients/"+chi.URLParam(r, "id")+"/revoke", http.StatusPermanentRedirect)
+		})
+
+		// Activity page (formerly /logs) — sync history, webhook events,
+		// agent sessions tabs. The per-sync-log detail page lives under
+		// /activity/sync-logs/{id}; the per-session detail page lives
+		// under /activity/sessions/{id} (since session data is on the
+		// activity page's Sessions tab).
+		r.Get("/activity", LogsPageHandler(a, svc, sm, tr))
+		r.Get("/activity/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
+
+		// Legacy /logs and /sync-logs redirects.
+		r.Get("/logs", redirectGET("/activity"))
+		r.Get("/sync-logs", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/activity?tab=syncs", http.StatusMovedPermanently)
+		})
+		r.Get("/sync-logs/{id}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/activity/sync-logs/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
+		})
 		r.Get("/webhook-events", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/logs?tab=webhooks", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/activity?tab=webhooks", http.StatusMovedPermanently)
 		})
 
 		r.Get("/account-links", func(w http.ResponseWriter, r *http.Request) {
@@ -177,14 +248,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reports/{id}", ReportDetailHandler(a, svc, sm, tr))
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agents?tab=settings", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/settings/mcp", http.StatusMovedPermanently)
 		})
-		r.Get("/mcp-getting-started", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agents?tab=guide", http.StatusMovedPermanently)
-		})
-		r.Get("/agent-wizard", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agents?tab=wizard", http.StatusMovedPermanently)
-		})
+
+		// MCP tab inside the Settings shell — MCP server instructions,
+		// review guidelines, report format, and per-tool toggles. POST
+		// targets remain at /-/mcp-settings/* (registered below).
+		r.Get("/settings/mcp", AgentsSettingsHandler(svc, mcpServer, sm, tr))
+		r.Get("/agents-settings", redirectGET("/settings/mcp"))
+		r.Get("/mcp-getting-started", redirectGET("/agent-prompts"))
+		r.Get("/agent-wizard", redirectGET("/agent-prompts"))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 		r.Get("/rules/new", RuleFormPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
@@ -203,7 +276,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Route("/mcp-settings", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "/agents?tab=settings", http.StatusMovedPermanently)
+				http.Redirect(w, r, "/settings/mcp", http.StatusMovedPermanently)
 			})
 			r.Post("/mode", MCPSaveModeHandler(svc, sm))
 			r.Post("/tools", MCPSaveToolsHandler(svc, mcpServer, sm))
@@ -212,13 +285,21 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/report-format", MCPSaveReportFormatHandler(svc, sm))
 		})
 
-		r.Get("/providers", ProvidersGetHandler(a, svc, sm, tr))
-		r.Post("/providers/plaid", ProvidersSavePlaidHandler(a, sm))
-		r.Post("/providers/teller", ProvidersSaveTellerHandler(a, sm))
+		r.Get("/settings/providers", ProvidersGetHandler(a, svc, sm, tr))
+		r.Post("/settings/providers/plaid", ProvidersSavePlaidHandler(a, sm))
+		r.Post("/settings/providers/teller", ProvidersSaveTellerHandler(a, sm))
+		r.Get("/providers", redirectGET("/settings/providers"))
+		r.Post("/providers/plaid", redirectPreserveMethod("/settings/providers/plaid"))
+		r.Post("/providers/teller", redirectPreserveMethod("/settings/providers/teller"))
 
-		r.Get("/backups", BackupsPageHandler(a, sm, tr))
+		r.Get("/settings/backups", BackupsPageHandler(a, sm, tr))
+		r.Get("/backups", redirectGET("/settings/backups"))
 
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
+		r.Get("/settings/sync", SettingsGetHandler(a, sm, tr))
+		r.Get("/settings/security", SecuritySettingsHandler(a, sm, tr))
+		r.Get("/settings/system", SystemSettingsHandler(a, sm, tr))
+		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 	})

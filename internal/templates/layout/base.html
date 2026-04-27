@@ -1489,22 +1489,22 @@
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
         { id: 'nav-connections', shortcutId: 'global.go.c', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
-        { id: 'nav-agents', group: 'Manage', title: 'Agents', desc: 'Agent setup, prompts, and MCP settings', icon: 'bot', href: '/agents', keywords: 'getting started mcp connect agent setup guide wizard prompt tools permissions instructions' },
+        { id: 'nav-agents', shortcutId: 'global.go.h', group: 'Manage', title: 'Agent Prompts', desc: 'Agent setup, prompts, and MCP settings', icon: 'bot', href: '/agent-prompts', keywords: 'getting started mcp connect agent setup guide wizard prompt tools permissions instructions' },
         { id: 'nav-rules', shortcutId: 'global.go.u', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
         { id: 'nav-categories', shortcutId: 'global.go.a', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
         { id: 'nav-tags', group: 'Manage', title: 'Tags', desc: 'Tag transactions and triage review queue', icon: 'tags', href: '/tags', keywords: 'labels needs-review triage annotations' },
-        { id: 'nav-users', shortcutId: 'global.go.f', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/users', keywords: 'people family members' },
+        { id: 'nav-users', shortcutId: 'global.go.f', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/settings/household', keywords: 'people family members' },
         // System
-        { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
-        { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
-        { id: 'sys-logs', shortcutId: 'global.go.l', group: 'System', title: 'Logs', desc: 'Sync logs and webhook events', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events' },
-        { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/backups', keywords: 'backup restore database dump export' },
+        { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'API Keys', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/settings/api-keys', keywords: 'tokens authentication api keys oauth connector claude access' },
+        { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/settings/providers', keywords: 'plaid teller csv bank setup' },
+        { id: 'sys-logs', shortcutId: 'global.go.v', group: 'System', title: 'Activity', desc: 'Sync logs, webhook events, agent sessions', icon: 'scroll-text', href: '/activity', keywords: 'sync history errors status webhooks events sessions logs' },
+        { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/settings/backups', keywords: 'backup restore database dump export' },
         { id: 'sys-settings', shortcutId: 'global.go.s', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
         // Quick Actions
         { id: 'act-connect', shortcutId: 'global.new.c', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
         { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
-        { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },
-        { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/users/new', keywords: 'new person family' },
+        { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/settings/api-keys/new', keywords: 'new token' },
+        { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/settings/household/new', keywords: 'new person family' },
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
@@ -2064,26 +2064,28 @@
       // "Go to" navigation — source of truth for `g+<x>` chords. Still exported
       // as plain maps so M0.5 can reuse them to seed palette entries.
       var goRoutes = {
-        d: { path: '/',             label: 'Go to Dashboard' },
-        t: { path: '/transactions', label: 'Go to Transactions' },
-        c: { path: '/connections',  label: 'Go to Connections' },
-        r: { path: '/reviews',      label: 'Go to Reviews' },
-        u: { path: '/rules',        label: 'Go to Rules' },
-        a: { path: '/categories',   label: 'Go to Categories' },
-        l: { path: '/sync-logs',    label: 'Go to Sync Logs' },
-        b: { path: '/backups',      label: 'Go to Backups' },
-        s: { path: '/settings',     label: 'Go to Settings' },
-        p: { path: '/providers',    label: 'Go to Providers' },
-        m: { path: '/mcp-settings', label: 'Go to MCP Settings' },
-        k: { path: '/access',       label: 'Go to Access' },
-        f: { path: '/users',        label: 'Go to Users' }
+        d: { path: '/',                   label: 'Go to Dashboard' },
+        t: { path: '/transactions',       label: 'Go to Transactions' },
+        c: { path: '/connections',        label: 'Go to Connections' },
+        r: { path: '/reviews',            label: 'Go to Reviews' },
+        u: { path: '/rules',              label: 'Go to Rules' },
+        a: { path: '/categories',         label: 'Go to Categories' },
+        v: { path: '/activity',           label: 'Go to Activity' },
+        l: { path: '/activity',           label: 'Go to Activity' },
+        b: { path: '/settings/backups',   label: 'Go to Backups' },
+        s: { path: '/settings',           label: 'Go to Settings' },
+        p: { path: '/settings/providers', label: 'Go to Providers' },
+        m: { path: '/settings/mcp',       label: 'Go to MCP Settings' },
+        k: { path: '/settings/api-keys',  label: 'Go to API Keys' },
+        f: { path: '/settings/household', label: 'Go to Household' },
+        h: { path: '/agent-prompts',      label: 'Go to Agent Prompts' }
       };
 
       var newRoutes = {
-        c: { path: '/connections/new',        label: 'New Connection' },
-        i: { path: '/connections/import-csv', label: 'Import CSV' },
-        k: { path: '/api-keys/new',           label: 'New API Key' },
-        u: { path: '/users/new',              label: 'New User' }
+        c: { path: '/connections/new',         label: 'New Connection' },
+        i: { path: '/connections/import-csv',  label: 'Import CSV' },
+        k: { path: '/settings/api-keys/new',   label: 'New API Key' },
+        u: { path: '/settings/household/new',  label: 'New Household Member' }
       };
 
       // Soft page-out before a chord-triggered full-page nav. Matches the

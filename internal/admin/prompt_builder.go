@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// PromptCopyHandler serves GET /admin/agent-wizard/{type}/copy — returns the default composed prompt as plain text.
+// PromptCopyHandler serves GET /admin/agent-prompts/builder/{type}/copy — returns the default composed prompt as plain text.
 func PromptCopyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		agentType := chi.URLParam(r, "type")
@@ -43,7 +43,7 @@ func PromptCopyHandler() http.HandlerFunc {
 	}
 }
 
-// PromptBuilderHandler serves GET /admin/agent-wizard/{type}.
+// PromptBuilderHandler serves GET /admin/agent-prompts/builder/{type}.
 func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		agentType := chi.URLParam(r, "type")
@@ -60,7 +60,7 @@ func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 			return
 		}
 
-		data := BaseTemplateData(r, sm, "agents", cfg.Label+" — Prompt Library")
+		data := BaseTemplateData(r, sm, "agent-prompts", cfg.Label+" — Prompt Library")
 		data["AgentType"] = agentType
 		data["AgentLabel"] = cfg.Label
 		data["AgentDescription"] = cfg.Description

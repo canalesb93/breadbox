@@ -17,4 +17,10 @@ type SettingsProps struct {
 	NextSyncTime         string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
+
+	// Update-availability fields, folded into the General tab when the
+	// sidebar footer's version badge moved here.
+	UpdateAvailable bool
+	LatestVersion   string
+	LatestURL       string
 }

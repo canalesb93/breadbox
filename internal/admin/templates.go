@@ -191,6 +191,7 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		SessionUserID:        str("SessionUserID"),
 		SessionAvatarVersion: str("SessionAvatarVersion"),
 		AdminUsername:        str("AdminUsername"),
+		UserName:             str("SessionUserName"),
 		RoleDisplay:          str("RoleDisplay"),
 		CSRFToken:            str("CSRFToken"),
 		AppVersion:           str("AppVersion"),
@@ -336,12 +337,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// both render via RenderWithTempl using the _templ_shell template
 		// key (see pages.OAuthClientNew and pages.OAuthClientCreated).
 		// pages/agents.html, pages/mcp_guide.html, pages/agent_wizard.html, and
-		// pages/mcp_settings.html removed — the four panes now render together
-		// via RenderWithTempl using the _templ_shell template key (see
-		// pages.Agents which composes pages.MCPGuide, pages.AgentWizard, and
-		// pages.MCPSettings). The standalone routes for the three subpages
-		// (/mcp-getting-started, /agent-wizard, /review-instructions) still
-		// redirect to /agents?tab=...
+		// pages/mcp_settings.html removed — agent prompts now render via
+		// RenderWithTempl using pages.AgentWizard. MCP Settings moved to the
+		// unified Settings shell at /settings/mcp.
 		// pages/prompt_builder.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.PromptBuilder).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
@@ -444,6 +442,9 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 			}
 			if _, exists := m["SessionAvatarVersion"]; !exists {
 				m["SessionAvatarVersion"] = tr.sm.GetString(r.Context(), sessionKeyAvatarVersion)
+			}
+			if _, exists := m["SessionUserName"]; !exists {
+				m["SessionUserName"] = tr.sm.GetString(r.Context(), sessionKeyUserName)
 			}
 		}
 		// Cache assembled NavProps so navPropsFromData can type-assert it

@@ -2,7 +2,7 @@ package pages
 
 import "breadbox/internal/templates/components"
 
-// APIKeyCreated renders the /api-keys/{id}/created page — shown once after
+// APIKeyCreated renders the /settings/api-keys/{id}/created page — shown once after
 // creating a new API key, displaying the plaintext key for a one-time copy.
 // Hosts inside the base layout via TemplateRenderer.RenderWithTempl. The
 // markup mirrors the previous html/template version byte-for-byte: same
@@ -40,7 +40,7 @@ templ APIKeyCreated(p APIKeyCreatedProps) {
 			<p class="text-xs text-base-content/40">
 				Use in the <code class="font-mono text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded">X-API-Key</code> header for API requests.
 			</p>
-			<a href="/access" class="btn btn-ghost btn-sm rounded-xl">Done</a>
+			<a href="/settings/api-keys" class="btn btn-ghost btn-sm rounded-xl">Done</a>
 		</div>
 	</div>
 }

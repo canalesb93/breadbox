@@ -114,9 +114,9 @@ templ gsStep1(p GettingStartedProps) {
 			</div>
 			<div class="flex-shrink-0">
 				if p.HasMember {
-					<a href="/users" class="btn btn-ghost btn-sm rounded-xl">View Members</a>
+					<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">View Members</a>
 				} else {
-					<a href="/users/new" class="btn btn-primary btn-sm rounded-xl">Add Member</a>
+					<a href="/settings/household/new" class="btn btn-primary btn-sm rounded-xl">Add Member</a>
 				}
 			</div>
 		</div>
@@ -148,9 +148,9 @@ templ gsStep2(p GettingStartedProps) {
 			</div>
 			<div class="flex-shrink-0">
 				if p.HasProvider {
-					<a href="/providers" class="btn btn-ghost btn-sm rounded-xl">View Providers</a>
+					<a href="/settings/providers" class="btn btn-ghost btn-sm rounded-xl">View Providers</a>
 				} else {
-					<a href="/providers" class="btn btn-primary btn-sm rounded-xl">Configure</a>
+					<a href="/settings/providers" class="btn btn-primary btn-sm rounded-xl">Configure</a>
 				}
 			</div>
 		</div>
@@ -223,7 +223,7 @@ templ gsStep4(p GettingStartedProps) {
 				if p.HasSync {
 					<a href="/transactions" class="btn btn-ghost btn-sm rounded-xl">View Transactions</a>
 				} else if p.HasConnection {
-					<a href="/logs" class="btn btn-ghost btn-sm rounded-xl">View Logs</a>
+					<a href="/activity" class="btn btn-ghost btn-sm rounded-xl">View Activity</a>
 				} else {
 					<span class="btn btn-sm btn-disabled rounded-xl">View Logs</span>
 				}
@@ -257,9 +257,9 @@ templ gsStep5(p GettingStartedProps) {
 			</div>
 			<div class="flex-shrink-0">
 				if p.HasAPIKey {
-					<a href="/agents" class="btn btn-ghost btn-sm rounded-xl">View Agents</a>
+					<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">View Agents</a>
 				} else {
-					<a href="/agents" class="btn btn-primary btn-sm rounded-xl">Set Up Agents</a>
+					<a href="/agent-prompts" class="btn btn-primary btn-sm rounded-xl">Set Up Agents</a>
 				}
 			</div>
 		</div>

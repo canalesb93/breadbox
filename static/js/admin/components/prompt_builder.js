@@ -1,4 +1,4 @@
-// Prompt builder Alpine component for /agent-wizard/{type}.
+// Prompt builder Alpine component for /agent-prompts/builder/{type}.
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 // Initial blocks payload is rendered server-side as
