@@ -262,7 +262,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		if err != nil {
 			return nil, err
 		}
-		cursorUUID, err := parseUUID(cursorID)
+		cursorUUID, err := pgconv.ParseUUID(cursorID)
 		if err != nil {
 			return nil, ErrInvalidCursor
 		}
@@ -465,7 +465,7 @@ func (s *Service) attachTagsToTransactions(ctx context.Context, txns []Transacti
 	ids := make([]pgtype.UUID, 0, len(txns))
 	idx := make(map[string]int, len(txns))
 	for i, t := range txns {
-		uid, err := parseUUID(t.ID)
+		uid, err := pgconv.ParseUUID(t.ID)
 		if err != nil {
 			continue
 		}
@@ -697,7 +697,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	needAccountJoin = true
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := pgconv.ParseUUID(*params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
@@ -711,7 +711,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}
 
 	if params.ConnectionID != nil {
-		cid, err := parseUUID(*params.ConnectionID)
+		cid, err := pgconv.ParseUUID(*params.ConnectionID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid connection id: %w", err)
 		}
@@ -723,7 +723,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := pgconv.ParseUUID(*params.AccountID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid account id: %w", err)
 		}

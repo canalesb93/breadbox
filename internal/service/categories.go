@@ -596,7 +596,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	if err != nil {
 		return nil, fmt.Errorf("%w: target category %q not found", ErrCategoryNotFound, params.TargetCategorySlug)
 	}
-	targetUID, err := parseUUID(targetCat.ID)
+	targetUID, err := pgconv.ParseUUID(targetCat.ID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid target category ID: %w", err)
 	}

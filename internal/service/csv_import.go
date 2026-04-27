@@ -46,7 +46,7 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		params.AccountName = "CSV Import"
 	}
 
-	userID, err := parseUUID(params.UserID)
+	userID, err := pgconv.ParseUUID(params.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
@@ -56,7 +56,7 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 
 	if params.ConnectionID != "" {
 		// Re-import: load existing connection and get first account.
-		connID, err = parseUUID(params.ConnectionID)
+		connID, err = pgconv.ParseUUID(params.ConnectionID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid connection ID: %w", err)
 		}

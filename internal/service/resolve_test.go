@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"testing"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// validUUID is a well-formed UUID for testing parseUUID passthrough.
+// validUUID is a well-formed UUID for testing UUID passthrough.
 const validUUID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 
 // mockLookupOK returns a fixed UUID, simulating a successful short ID query.
 func mockLookupOK(_ context.Context, _ string) (pgtype.UUID, error) {
-	uid, _ := parseUUID(validUUID)
+	uid, _ := pgconv.ParseUUID(validUUID)
 	return uid, nil
 }
 

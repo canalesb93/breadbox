@@ -9,7 +9,6 @@ import (
 	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (s *Service) ListAccounts(ctx context.Context, userID *string) ([]AccountResponse, error) {
@@ -78,7 +77,7 @@ func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccoun
 
 	if acct.ConnectionID != nil {
 		detail.ConnectionID = *acct.ConnectionID
-		connID, err := parseUUID(*acct.ConnectionID)
+		connID, err := pgconv.ParseUUID(*acct.ConnectionID)
 		if err == nil {
 			conn, err := s.Queries.GetBankConnection(ctx, connID)
 			if err == nil {
@@ -164,6 +163,3 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 	}
 }
 
-func parseUUID(s string) (pgtype.UUID, error) {
-	return pgconv.ParseUUID(s)
-}

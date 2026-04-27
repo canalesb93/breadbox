@@ -241,7 +241,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		}
 
 		accountIDStr := SessionAccountID(sm, r)
-		accountID, err := parseUUID(accountIDStr)
+		accountID, err := pgconv.ParseUUID(accountIDStr)
 		if err != nil {
 			FlashRedirect(w, r, sm, "error", "Invalid session.", "/settings/account")
 			return
@@ -270,7 +270,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 				FlashRedirect(w, r, sm, "error", "Please select a household member.", "/settings/account")
 				return
 			}
-			parsed, err := parseUUID(uid)
+			parsed, err := pgconv.ParseUUID(uid)
 			if err != nil {
 				FlashRedirect(w, r, sm, "error", "Invalid user selected.", "/settings/account")
 				return

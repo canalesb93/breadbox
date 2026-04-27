@@ -123,7 +123,7 @@ func (s *Service) ListOAuthClients(ctx context.Context) ([]OAuthClientResponse, 
 
 // RevokeOAuthClient revokes an OAuth client and all its access tokens.
 func (s *Service) RevokeOAuthClient(ctx context.Context, id string) error {
-	uid, err := parseUUID(id)
+	uid, err := pgconv.ParseUUID(id)
 	if err != nil {
 		return ErrNotFound
 	}

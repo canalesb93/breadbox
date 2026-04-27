@@ -79,7 +79,7 @@ func (s *Service) ListAPIKeys(ctx context.Context) ([]APIKeyResponse, error) {
 }
 
 func (s *Service) RevokeAPIKey(ctx context.Context, id string) error {
-	uid, err := parseUUID(id)
+	uid, err := pgconv.ParseUUID(id)
 	if err != nil {
 		return ErrNotFound
 	}
