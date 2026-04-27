@@ -241,11 +241,13 @@ func enrichOne(a Annotation, tagDisplay, categoryDisplay func(string) string) An
 
 	case "rule_applied":
 		ruleName, _ := a.Payload["rule_name"].(string)
+		ruleShortID, _ := a.Payload["rule_id"].(string)
 		field, _ := a.Payload["action_field"].(string)
 		value, _ := a.Payload["action_value"].(string)
 		appliedBy, _ := a.Payload["applied_by"].(string)
 		a.Action = "applied"
 		a.RuleName = ruleName
+		a.RuleShortID = ruleShortID
 		a.Origin = formatRuleOrigin(appliedBy)
 		// Surface the targeted resource ref so callers can cross-link
 		// without parsing payload.

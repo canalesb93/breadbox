@@ -252,7 +252,12 @@ templ txdMain(p TransactionDetailProps) {
 				</div>
 				<div class="flex flex-wrap gap-1.5 min-h-[1.5rem] items-center">
 					<template x-for="t in tags" :key="t.slug">
-						<span class="bb-tag" :style="t.color ? ('--tag-color:' + t.color) : ''">
+						<span
+							class="bb-tag"
+							:class="t.displayName && t.displayName !== t.slug ? 'tooltip tooltip-top' : ''"
+							:data-tip="t.displayName && t.displayName !== t.slug ? t.slug : null"
+							:style="t.color ? ('--tag-color:' + t.color) : ''"
+						>
 							<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
 							<a :href="'/transactions?tags=' + t.slug" class="hover:underline" x-text="t.displayName || t.slug"></a>
 							<button
@@ -361,17 +366,15 @@ templ txdTimelineSystem(e service.ActivityEntry, now time.Time) {
 }
 
 // txdSystemSentence assembles the actor-verb-object phrase shown next to a
-// system-event icon. For rule rows the prebuilt Summary is rendered as-is
-// (optionally linked to /rules/<id>); for actor-driven rows we compose:
+// system-event icon. Rule rows render as: rule-name link + verb + chip,
+// matching the bolding pattern of user-driven rows so a rule firing reads
+// the same as a person doing the equivalent action. For actor-driven rows
+// we compose:
 //   <strong>Alice</strong> added the <chip>food</chip>
-//   <strong>Alice</strong> set category to <em>Groceries</em>
+//   <strong>Alice</strong> set category to <chip>Groceries</chip>
 templ txdSystemSentence(e service.ActivityEntry) {
 	if e.Type == "rule" {
-		if e.RuleID != "" {
-			<a href={ templ.SafeURL("/rules/" + e.RuleID) } class="font-medium text-base-content hover:text-primary transition-colors break-words">{ e.Summary }</a>
-		} else {
-			<span class="font-medium text-base-content break-words">{ e.Summary }</span>
-		}
+		@txdRuleSentence(e)
 	} else if e.Type == "sync" {
 		<span class="font-medium text-base-content break-words">{ e.Summary }</span>
 	} else if e.Type == "tag" {
@@ -396,11 +399,11 @@ templ txdSystemSentence(e service.ActivityEntry) {
 	} else if e.Type == "category" {
 		if e.ActorName != "" {
 			@txdActorInline(e)
-			<span>set category to </span>
+			<span>set the category to </span>
 		} else {
-			<span class="font-medium text-base-content">Set category to </span>
+			<span class="font-medium text-base-content">Set the category to </span>
 		}
-		<span class="font-medium text-base-content">{ e.CategoryName }</span>
+		@txdInlineCategoryChip(e)
 	} else {
 		<!-- Review (legacy) and any unknown kind: fall back to Summary -->
 		if e.Summary != "" {
@@ -631,10 +634,14 @@ templ txdTimelineEmptyComposer(p TransactionDetailProps) {
 
 // txdComposerCard is the textarea + submit card. Mirrors the chat-bubble
 // shape of comment rows (rounded-2xl, flat top-left corner pointing at the
-// composer icon on the rail). Carries the "Toggle Needs Review" affordance
+// composer icon on the rail). Carries the "Add Needs Review" affordance
 // from #846 — when on, posting also tags the transaction needs-review.
+//
+// The root carries `data-composer-anchor` so transaction_detail.js can
+// pin the composer to its pre-insertion viewport y-position when a
+// comment is added (preserves the user's view of the textarea).
 templ txdComposerCard(p TransactionDetailProps) {
-	<div class="rounded-2xl rounded-tl-md border border-base-200 bg-base-100 overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition">
+	<div data-composer-anchor class="rounded-2xl rounded-tl-md border border-base-200 bg-base-100 overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition">
 		<label for="bb-txd-comment" class="sr-only">Add a comment</label>
 		<textarea
 			id="bb-txd-comment"
@@ -676,8 +683,8 @@ templ txdComposerCard(p TransactionDetailProps) {
 			>
 				<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
 				<span class="text-xs font-medium">
-					<span class="sm:hidden">Needs review</span>
-					<span class="hidden sm:inline">Toggle Needs Review</span>
+					<span class="sm:hidden">Add Needs Review</span>
+					<span class="hidden sm:inline">Add Needs Review</span>
 				</span>
 			</label>
 			<button
@@ -688,11 +695,91 @@ templ txdComposerCard(p TransactionDetailProps) {
 			>
 				<i data-lucide="message-square" class="w-3.5 h-3.5" x-show="!pinReview" aria-hidden="true"></i>
 				<i data-lucide="message-square-x" class="w-3.5 h-3.5" x-show="pinReview" x-cloak aria-hidden="true"></i>
-				<span class="text-xs font-medium" x-text="pinReview ? 'Comment &amp; flag' : 'Comment'"></span>
+				<span class="text-xs font-medium" x-text="pinReview ? 'Comment and tag' : 'Comment'"></span>
 				<span class="hidden sm:inline ml-0.5 text-[10px] opacity-70 border border-current/30 rounded px-1 leading-none py-0.5" x-show="!$store.device.isTouch">⌘↵</span>
 			</button>
 		</div>
 	</div>
+}
+
+// txdRuleSentence renders the rule_applied row body in the actor-verb-object
+// shape used by user-driven rows: bold rule name (linked to the rule detail
+// page on the *name only* — not the whole row, so the chip stays clickable
+// without accidentally navigating away) → plain verb → resource chip. Falls
+// back to the prebuilt Summary string when the action_field is anything we
+// don't have chip metadata for, preserving forward compatibility with future
+// rule action types.
+templ txdRuleSentence(e service.ActivityEntry) {
+	@txdRuleActor(e)
+	if e.ActionField == "tag" {
+		<span>added the </span>
+		@txdInlineTagChip(e)
+		<span class="ml-1">tag</span>
+	} else if e.ActionField == "category" {
+		<span>set the category to </span>
+		@txdInlineCategoryChip(e)
+	} else {
+		<!-- Unknown / future action_field: fall through to the bare
+		     verb so we never render a stale "set category to <slug>"
+		     when only Summary carries the right phrasing. -->
+		<span class="text-base-content/55">{ txdRuleVerbFallback(e) }</span>
+	}
+}
+
+// txdRuleActor renders the rule's name as either a link to /rules/<short_id>
+// (when the short_id is known) or plain bold text. Only the name itself is
+// the anchor so the chip rendered later in the row stays an independent
+// click target — avoiding the "click the tag, end up on the rule page"
+// regression the previous whole-row link caused.
+templ txdRuleActor(e service.ActivityEntry) {
+	<span>Rule </span>
+	if e.RuleShortID != "" {
+		<a
+			href={ templ.SafeURL("/rules/" + e.RuleShortID) }
+			class="font-semibold text-base-content hover:underline underline-offset-2 decoration-base-content/40 break-words"
+		>{ e.RuleName }</a>
+	} else if e.RuleID != "" {
+		<a
+			href={ templ.SafeURL("/rules/" + e.RuleID) }
+			class="font-semibold text-base-content hover:underline underline-offset-2 decoration-base-content/40 break-words"
+		>{ e.RuleName }</a>
+	} else {
+		<strong class="font-semibold text-base-content">{ e.RuleName }</strong>
+	}
+	{ " " }
+}
+
+// txdRuleVerbFallback returns the trailing verb-and-object text for rule
+// rows whose action_field doesn't have a chip rendering. Strips the rule
+// name + opening quote off the prebuilt Summary so we don't render the
+// rule name twice when this branch fires.
+func txdRuleVerbFallback(e service.ActivityEntry) string {
+	s := e.Summary
+	prefix := "Rule \"" + e.RuleName + "\" "
+	if strings.HasPrefix(s, prefix) {
+		return s[len(prefix):]
+	}
+	return s
+}
+
+// txdInlineCategoryChip renders a pill matching the canonical bb-tag chip
+// styling (the same look used for tags) but populated from a category's
+// color + icon + display name. Reuses the --tag-color CSS variable so a
+// single CSS class drives both tag and category chips.
+templ txdInlineCategoryChip(e service.ActivityEntry) {
+	<span
+		class="bb-tag bb-tag-sm align-middle"
+		if e.CategoryColor != nil && *e.CategoryColor != "" {
+			style={ "--tag-color: " + *e.CategoryColor }
+		}
+	>
+		if e.CategoryIcon != nil && *e.CategoryIcon != "" {
+			<i data-lucide={ *e.CategoryIcon }></i>
+		} else {
+			<i data-lucide="folder"></i>
+		}
+		<span class="truncate">{ e.CategoryName }</span>
+	</span>
 }
 
 // txdInlineTagChip renders the inline tag pill that follows the summary
@@ -700,9 +787,14 @@ templ txdComposerCard(p TransactionDetailProps) {
 // strike-through. The chip is byte-equivalent to the original markup.
 templ txdInlineTagChip(e service.ActivityEntry) {
 	<span
-		class={ "bb-tag bb-tag-sm ml-1 align-middle", templ.KV("line-through opacity-70", e.TagAction == "removed") }
+		class={ "bb-tag bb-tag-sm ml-1 align-middle",
+			templ.KV("line-through opacity-70", e.TagAction == "removed"),
+			templ.KV("tooltip tooltip-top", txdTagChipShowTooltip(e)) }
 		if e.TagColor != nil && *e.TagColor != "" {
 			style={ "--tag-color: " + *e.TagColor }
+		}
+		if txdTagChipShowTooltip(e) {
+			data-tip={ e.TagSlug }
 		}
 		title={ e.TagSlug }
 	>
@@ -714,6 +806,12 @@ templ txdInlineTagChip(e service.ActivityEntry) {
 			}
 		</span>
 	</span>
+}
+
+// txdTagChipShowTooltip mirrors components.tagChipShowTooltip — only show
+// the slug-tooltip when the chip's visible label is the display name.
+func txdTagChipShowTooltip(e service.ActivityEntry) bool {
+	return e.TagDisplayName != "" && e.TagDisplayName != e.TagSlug
 }
 
 // ---- helpers ----
