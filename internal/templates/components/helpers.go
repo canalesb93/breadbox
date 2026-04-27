@@ -15,15 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/ptrutil"
 	"breadbox/internal/service"
 )
 
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
+// deref is a templ-friendly alias for ptrutil.Deref[string]. Generated *_templ.go
+// code emitted from .templ files calls deref by bare identifier, so the alias
+// keeps the codegen working without renaming the call sites.
+func deref(s *string) string { return ptrutil.Deref(s) }
 
 // firstChar returns the first A–Z/0–9 rune of s uppercased, or "?" when s
 // has none. Used for avatar letter fallbacks.

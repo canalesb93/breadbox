@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/ptrutil"
 	"breadbox/internal/service"
 )
 
@@ -71,13 +72,13 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 			row := []string{
 				tx.Date,
 				tx.Name,
-				derefStr(tx.MerchantName),
+				ptrutil.Deref(tx.MerchantName),
 				strconv.FormatFloat(tx.Amount, 'f', 2, 64),
-				derefStr(tx.IsoCurrencyCode),
+				ptrutil.Deref(tx.IsoCurrencyCode),
 				tx.AccountName,
 				tx.InstitutionName,
 				tx.UserName,
-				derefStr(tx.CategoryDisplayName),
+				ptrutil.Deref(tx.CategoryDisplayName),
 				strconv.FormatBool(tx.Pending),
 				tx.ID,
 			}
@@ -87,12 +88,4 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 			}
 		}
 	}
-}
-
-// derefStr safely dereferences a string pointer, returning empty string if nil.
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
