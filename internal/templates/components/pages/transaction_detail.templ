@@ -676,18 +676,30 @@ templ txdComposerCard(p TransactionDetailProps) {
 					<span x-text="newComment.length"></span>/<span x-text="maxLength"></span>
 				</span>
 			</span>
-			if !p.HasPendingReview {
-				<label class="ml-auto btn btn-sm btn-ghost rounded-md gap-2 cursor-pointer transition-all duration-200" :title="pinReview ? 'Posting will also tag this transaction needs-review (Shift+R)' : 'Also tag needs-review when posting (Shift+R)'">
-					<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
-					<span class="text-xs font-medium">
-						<span class="sm:hidden">Needs review</span>
-						<span class="hidden sm:inline">Toggle Needs Review</span>
-					</span>
-				</label>
-			}
+			<!--
+				Toggle visibility is bound to `hasPendingReview` (initialized
+				from data-has-pending-review) so the timeline-driven
+				bb-needs-review-changed event can hide/show the affordance
+				without a page reload — see static/js/admin/components/transaction_detail.js.
+				`x-cloak` keeps the label hidden during initial Alpine boot
+				when the txn already has the tag.
+			-->
+			<label
+				class="ml-auto btn btn-sm btn-ghost rounded-md gap-2 cursor-pointer transition-all duration-200"
+				:title="pinReview ? 'Posting will also tag this transaction needs-review (Shift+R)' : 'Also tag needs-review when posting (Shift+R)'"
+				x-show="!hasPendingReview"
+				x-cloak
+			>
+				<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
+				<span class="text-xs font-medium">
+					<span class="sm:hidden">Needs review</span>
+					<span class="hidden sm:inline">Toggle Needs Review</span>
+				</span>
+			</label>
 			<button
 				@click="addComment()"
-				class={ "btn btn-sm btn-primary rounded-md gap-1.5", templ.KV("ml-auto", p.HasPendingReview) }
+				class="btn btn-sm btn-primary rounded-md gap-1.5"
+				:class="{ 'ml-auto': hasPendingReview }"
 				:disabled="!canSubmit()"
 			>
 				<i data-lucide="message-square" class="w-3.5 h-3.5" x-show="!pinReview" aria-hidden="true"></i>
