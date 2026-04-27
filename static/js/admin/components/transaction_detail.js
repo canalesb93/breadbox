@@ -59,7 +59,7 @@
 //
 // ---- Cross-factory needs-review sync (Option B: $dispatch event) ----
 //
-// The composer's "Toggle Needs Review" affordance is bound to
+// The composer's "Add Needs Review" affordance is bound to
 // `pinReview` and gated by `hasPendingReview` inside txdCommentManager,
 // while the timeline's tag chips (add via picker, remove via inline ✕)
 // live in txdTagManager. They are sibling Alpine factories with no
@@ -135,9 +135,19 @@ function composerLi() {
 // those comment short_ids regardless of cursor age — used by the
 // soft-delete path where the tombstone replaces an existing bubble (its
 // CreatedAt is older than `since`, but `is_deleted` just flipped).
+//
+// The optional `opts` object controls post-insert scroll behavior:
+//   { anchorComposer: true } — pin the composer to its pre-insertion
+//     viewport y-position instead of scrolling the new row into view.
+//     Used by the comment-add path so the textarea the user was just
+//     typing into doesn't get pushed off-screen by the optimistic row.
+//     Other actions (category set, tag add) leave this off and keep the
+//     default "scroll new row into view" behavior so the user sees the
+//     change land.
+//
 // Returns a promise that resolves to the number of rows inserted (0 = no
 // new rows, treat as silent success).
-function fetchTimelineRows(txId, replaceCommentIDs) {
+function fetchTimelineRows(txId, replaceCommentIDs, opts) {
   var root = timelineRoot();
   if (!root) return Promise.resolve(0);
   var since = root.dataset.lastActivityTs || '';
@@ -148,6 +158,13 @@ function fetchTimelineRows(txId, replaceCommentIDs) {
   }
   var url = '/-/transactions/' + encodeURIComponent(txId) + '/timeline/rows';
   if (params.length) url += '?' + params.join('&');
+  var anchorComposer = !!(opts && opts.anchorComposer);
+  // Capture composer's pre-insertion viewport y-position when caller asked
+  // to anchor it. We measure here (before the fetch) so the value is the
+  // user's current view of the textarea — measuring after the fetch resolves
+  // would already include any layout the network request triggered.
+  var anchorEl = anchorComposer ? document.querySelector('[data-composer-anchor]') : null;
+  var anchorBeforeY = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
   return fetch(url, { headers: { Accept: 'text/html' } })
     .then(function (res) {
       if (!res.ok) throw new Error('render-failed');
@@ -207,16 +224,38 @@ function fetchTimelineRows(txId, replaceCommentIDs) {
         lastAppended = n;
       });
 
-      // Mobile auto-scroll: on small viewports the composer (and any
-      // freshly-appended row above it) often lands below the fold. After a
-      // user posts a comment / sets a category / adds a tag the new row
-      // would otherwise be invisible until they scroll manually. Bring the
-      // last appended row into view so the optimistic update is visible.
-      // Skipped for replacement rows (tombstones) — the bubble being swapped
-      // is already on screen if the user just clicked its trash button.
-      if (lastAppended) {
-        // rAF so the layout settles before measuring; smooth scroll so the
-        // motion doubles as a "your action landed" signal.
+      // Post-insert scroll behavior. Two modes:
+      //
+      //   1. anchorComposer (comment add) — keep the composer pinned to
+      //      the same viewport y-position it occupied before insertion.
+      //      The user was just typing into the textarea; scrolling the
+      //      new row into view would push the textarea off-screen and
+      //      make them feel they "lost their place". The new comment row
+      //      lands in its natural spot above the composer; if it ends up
+      //      above the viewport, scrolling up reveals it.
+      //
+      //   2. default (category set, tag add, etc.) — bring the last
+      //      appended row into view so the optimistic update is visible
+      //      on small viewports. The user wasn't typing into anything,
+      //      so there's no input focus to preserve, and the motion
+      //      doubles as a "your action landed" signal.
+      //
+      // Both modes skip when there's nothing newly appended (tombstone-
+      // only swaps): the bubble being swapped is already on screen if
+      // the user just clicked its trash button.
+      if (anchorComposer && anchorEl) {
+        // rAF so layout settles after the new <li> is in the tree, then
+        // restore the composer to its pre-insertion y-position via an
+        // instant scrollBy (no smooth animation — the goal is invisible
+        // pinning, not motion).
+        window.requestAnimationFrame(function () {
+          var afterY = anchorEl.getBoundingClientRect().top;
+          var delta = afterY - anchorBeforeY;
+          if (delta !== 0) {
+            window.scrollBy({ top: delta, left: 0, behavior: 'instant' });
+          }
+        });
+      } else if (lastAppended) {
         window.requestAnimationFrame(function () {
           lastAppended.scrollIntoView({ behavior: 'smooth', block: 'end' });
         });
@@ -246,7 +285,7 @@ function fetchTimelineRows(txId, replaceCommentIDs) {
 // notifyNeedsReviewChanged dispatches the cross-factory sync event when a
 // successful timeline-driven add/remove of the `needs-review` slug lands.
 // txdCommentManager listens and updates its bound state so the composer's
-// "Toggle Needs Review" affordance reflects the new truth without a reload.
+// "Add Needs Review" affordance reflects the new truth without a reload.
 // Caller is responsible for slug-scoping; this just fires the event.
 function notifyNeedsReviewChanged(isOn) {
   window.dispatchEvent(new CustomEvent('bb-needs-review-changed', { detail: { isOn: !!isOn } }));
@@ -568,7 +607,7 @@ document.addEventListener('alpine:init', function () {
   });
 
   // Activity-timeline comment composer. Reads txId + maxLength +
-  // hasPendingReview from data-*. The `Toggle Needs Review` checkbox in the
+  // hasPendingReview from data-*. The `Add Needs Review` checkbox in the
   // composer card binds to `pinReview`; when posting, if pinReview is on
   // and the transaction doesn't already have a pending review, we also
   // POST a `needs-review` tag.
@@ -590,7 +629,7 @@ document.addEventListener('alpine:init', function () {
 
         // Cross-factory sync (Option B). When the timeline tag manager
         // adds or removes the needs-review slug, mirror the change on the
-        // composer's bound state so the "Toggle Needs Review" affordance
+        // composer's bound state so the "Add Needs Review" affordance
         // hides/shows correctly without a page reload. Idempotent — bail
         // when the state already matches so the composer's own toggle
         // path doesn't fight itself.
@@ -659,14 +698,17 @@ document.addEventListener('alpine:init', function () {
             });
           })
           .then(function () {
-            return fetchTimelineRows(self.txId);
+            // Anchor the composer to its current viewport position so the
+            // textarea the user was just typing into doesn't get pushed
+            // off-screen by the optimistic comment row.
+            return fetchTimelineRows(self.txId, null, { anchorComposer: true });
           })
           .then(function () {
             self.newComment = '';
             self.submitting = false;
             if (shouldPin) {
               // Update local state so subsequent posts don't try to pin again
-              // and the composer's "Toggle Needs Review" checkbox hides.
+              // and the composer's "Add Needs Review" checkbox hides.
               self.hasPendingReview = true;
               self.pinReview = false;
               showToast('Comment added; tagged needs-review.', 'success');
@@ -687,8 +729,9 @@ document.addEventListener('alpine:init', function () {
             if (msg === 'Tag write failed') {
               showToast('Comment added (tag failed).', 'warning');
               // Refresh timeline so the comment row still appears even when
-              // the secondary tag write was the one that failed.
-              fetchTimelineRows(self.txId).then(function () {
+              // the secondary tag write was the one that failed. Same
+              // composer-anchoring rationale as the success path.
+              fetchTimelineRows(self.txId, null, { anchorComposer: true }).then(function () {
                 self.newComment = '';
                 var ta = document.getElementById('bb-txd-comment');
                 if (ta) self.autosize(ta);
