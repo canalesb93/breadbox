@@ -19,8 +19,10 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"testing"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -679,4 +681,267 @@ func TestListTagsResponseShape(t *testing.T) {
 		"id", "slug", "display_name", "description",
 		"created_at", "updated_at",
 	)
+}
+
+// TestListAnnotationsActorTypesFilter exercises the actor_types filter — the
+// canonical "any human input?" check. Seeds events from all three actor
+// kinds (user, agent, system) and asserts each filter slice returns only
+// the matching rows. Also pins the validation error for unknown actor types.
+func TestListAnnotationsActorTypesFilter(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Seed: a user-authored comment (the human input we expect agents to
+	// look for) and an agent-authored comment (rule churn analog) on top of
+	// the system tag_added that seedFixtures already wrote.
+	if _, err := f.svc.svc.CreateComment(f.ctx, service.CreateCommentParams{
+		TransactionID: f.txnID,
+		Content:       "Manually checked — this is groceries.",
+		Actor:         service.Actor{Type: "user", ID: "alice", Name: "Alice"},
+	}); err != nil {
+		t.Fatalf("seed user comment: %v", err)
+	}
+	addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
+		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "agent-input"},
+		TransactionID:       f.txnID,
+		Content:             "Auto-tagged via review loop.",
+	})
+	_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+
+	// Unfiltered baseline: at least one row from each actor type.
+	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+	})
+	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
+	gotUser, gotAgent, gotSystem := 0, 0, 0
+	for _, raw := range all {
+		ann := asObject(t, "list_annotations[all]", raw)
+		switch ann["actor_type"] {
+		case "user":
+			gotUser++
+		case "agent":
+			gotAgent++
+		case "system":
+			gotSystem++
+		}
+	}
+	if gotUser == 0 || gotAgent == 0 || gotSystem == 0 {
+		t.Fatalf("baseline missing an actor: user=%d agent=%d system=%d", gotUser, gotAgent, gotSystem)
+	}
+
+	cases := []struct {
+		name       string
+		actorTypes []string
+		want       string
+	}{
+		{"user-only", []string{"user"}, "user"},
+		{"agent-only", []string{"agent"}, "agent"},
+		{"system-only", []string{"system"}, "system"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+				TransactionID: f.txnID,
+				ActorTypes:    tc.actorTypes,
+			})
+			rows := decodeToolResult[[]any](t, "list_annotations", res, err)
+			if len(rows) == 0 {
+				t.Fatalf("actor_types=%v returned 0 rows; expected at least one", tc.actorTypes)
+			}
+			for i, raw := range rows {
+				ann := asObject(t, "list_annotations[actor]", raw)
+				if got, _ := ann["actor_type"].(string); got != tc.want {
+					t.Errorf("row %d: actor_type=%q, want %q", i, got, tc.want)
+				}
+			}
+		})
+	}
+
+	// Combined slice: actor_types=['user','agent'] excludes system.
+	combinedRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		ActorTypes:    []string{"user", "agent"},
+	})
+	combined := decodeToolResult[[]any](t, "list_annotations", combinedRes, err)
+	for i, raw := range combined {
+		ann := asObject(t, "list_annotations[user+agent]", raw)
+		if got, _ := ann["actor_type"].(string); got == "system" {
+			t.Errorf("row %d: combined filter leaked system actor", i)
+		}
+	}
+
+	// Token-budget evidence: the canonical "humans only" call returns a
+	// strictly-smaller envelope than the unfiltered one. We log the byte
+	// delta so PR reviewers can eyeball the win.
+	allBytes := mustMarshal(t, all)
+	humansBytes := mustMarshal(t, decodeToolResult[[]any](t, "list_annotations",
+		mustListAnnotations(t, f, listAnnotationsInput{TransactionID: f.txnID, ActorTypes: []string{"user"}}), nil))
+	if len(humansBytes) >= len(allBytes) {
+		t.Errorf("expected actor_types=['user'] envelope (%d bytes) to be smaller than unfiltered (%d bytes)", len(humansBytes), len(allBytes))
+	}
+	t.Logf("token-budget evidence: unfiltered=%d bytes, actor_types=['user']=%d bytes (delta %+d)",
+		len(allBytes), len(humansBytes), len(humansBytes)-len(allBytes))
+
+	// Validation: unknown actor type returns the error envelope.
+	badRes, _, _ := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		ActorTypes:    []string{"robot"},
+	})
+	if badRes == nil || !badRes.IsError {
+		t.Fatalf("expected error envelope for invalid actor_type, got %+v", badRes)
+	}
+}
+
+// TestListAnnotationsSinceFilter pins the cursor-style since filter: only
+// rows created strictly after the supplied timestamp are returned. We pull
+// the cursor from the live DB row (full microsecond precision) so the test
+// doesn't race the wall-clock second boundary that the user-facing
+// CreatedAt string would truncate to.
+func TestListAnnotationsSinceFilter(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Snapshot the baseline timeline so we know the row count to subtract.
+	beforeRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+	})
+	before := decodeToolResult[[]any](t, "list_annotations", beforeRes, err)
+	baselineLen := len(before)
+	if baselineLen == 0 {
+		t.Fatal("baseline timeline empty")
+	}
+
+	// Capture cursor as the full-precision timestamp of the latest baseline
+	// row. Sleeping past it guarantees subsequent inserts land strictly
+	// after.
+	anns, err := f.svc.svc.ListAnnotations(f.ctx, f.txnID, service.ListAnnotationsParams{})
+	if err != nil {
+		t.Fatalf("svc.ListAnnotations: %v", err)
+	}
+	cursorTS := anns[len(anns)-1].CreatedAtTime
+	time.Sleep(2 * time.Millisecond)
+
+	// Add three new annotations after the cursor.
+	for i := 0; i < 3; i++ {
+		addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
+			WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "since-test"},
+			TransactionID:       f.txnID,
+			Content:             fmt.Sprintf("post-cursor comment %d", i),
+		})
+		_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+	}
+
+	deltaRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Since:         cursorTS.Format(time.RFC3339Nano),
+	})
+	delta := decodeToolResult[[]any](t, "list_annotations", deltaRes, err)
+	if len(delta) != 3 {
+		t.Fatalf("since=%s expected 3 new rows, got %d", cursorTS.Format(time.RFC3339Nano), len(delta))
+	}
+
+	// Validation: malformed since returns the error envelope.
+	badRes, _, _ := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Since:         "yesterday",
+	})
+	if badRes == nil || !badRes.IsError {
+		t.Fatalf("expected error envelope for malformed since, got %+v", badRes)
+	}
+}
+
+// TestListAnnotationsLimit pins the tail-N semantics: limit returns the
+// most recent N rows, still in ASC chronological order. Also pins the cap
+// at MaxAnnotationLimit and the negative-value rejection.
+func TestListAnnotationsLimit(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Seed several events so we have a meaningful timeline to slice.
+	for i := 0; i < 5; i++ {
+		addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
+			WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "limit-test"},
+			TransactionID:       f.txnID,
+			Content:             fmt.Sprintf("limit-test comment %d", i),
+		})
+		_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+	})
+	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
+	if len(all) < 6 {
+		t.Fatalf("expected >= 6 annotations to slice, got %d", len(all))
+	}
+
+	limitRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Limit:         3,
+	})
+	limited := decodeToolResult[[]any](t, "list_annotations", limitRes, err)
+	if len(limited) != 3 {
+		t.Fatalf("limit=3 expected 3 rows, got %d", len(limited))
+	}
+
+	// Tail semantics: the limited slice equals the last len(limited) rows
+	// of the full timeline (same IDs, same order).
+	for i, raw := range limited {
+		want, _ := asObject(t, "all", all[len(all)-3+i])["id"].(string)
+		got, _ := asObject(t, "limited", raw)["id"].(string)
+		if got != want {
+			t.Errorf("row %d: limit returned id %q, want tail row %q", i, got, want)
+		}
+	}
+
+	// limit=0 is the documented default — full timeline.
+	zeroRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Limit:         0,
+	})
+	zero := decodeToolResult[[]any](t, "list_annotations", zeroRes, err)
+	if len(zero) != len(all) {
+		t.Errorf("limit=0 should match unfiltered: got %d, want %d", len(zero), len(all))
+	}
+
+	// limit > MaxAnnotationLimit is silently capped — the response itself
+	// can't exceed the cap. We assert no error here; the cap is exercised
+	// at the normalize layer (unit covered by the negative case below).
+	bigRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Limit:         10_000,
+	})
+	if err != nil || bigRes == nil || bigRes.IsError {
+		t.Errorf("limit=10000 should clamp silently, got error: %+v", bigRes)
+	}
+
+	// Negative limit is rejected with the error envelope.
+	negRes, _, _ := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Limit:         -5,
+	})
+	if negRes == nil || !negRes.IsError {
+		t.Fatalf("expected error envelope for negative limit, got %+v", negRes)
+	}
+}
+
+// mustMarshal serializes v as JSON and fails the test on error. Used to
+// produce the byte-size proxy for token-budget evidence.
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return b
+}
+
+// mustListAnnotations runs the handler and fails the test if the call
+// errored — used in callsites that want the raw CallToolResult so they can
+// re-decode it.
+func mustListAnnotations(t *testing.T, f *fixtures, in listAnnotationsInput) *mcpsdk.CallToolResult {
+	t.Helper()
+	res, _, err := f.svc.handleListAnnotations(f.ctx, nil, in)
+	if err != nil {
+		t.Fatalf("list_annotations: %v", err)
+	}
+	return res
 }

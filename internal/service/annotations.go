@@ -5,12 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// MaxAnnotationLimit caps the row count returned by ListAnnotations when a
+// limit is supplied. Mirrors the cap on other MCP list tools so a runaway
+// agent can't pull arbitrarily large timelines in one call.
+const MaxAnnotationLimit = 200
 
 // Annotation is the canonical timeline event for a transaction — the single
 // source of truth for comments, rule applications, tag changes, and category
@@ -97,6 +103,12 @@ type Annotation struct {
 	// for user actors whose row has been deleted. Mirrors the pattern in
 	// users.html — see admin/templates.go avatarURL helper.
 	ActorAvatarVersion string `json:"-"`
+
+	// CreatedAtTime carries the row's timestamptz at full Postgres
+	// precision (microseconds) so the since filter can compare without
+	// the second-precision truncation that CreatedAt's RFC3339 string
+	// applies. Not serialized — clients still see CreatedAt only.
+	CreatedAtTime time.Time `json:"-"`
 }
 
 // writeAnnotationParams is the shared input for writing an annotation row via
@@ -158,6 +170,22 @@ type ListAnnotationsParams struct {
 	// Empty = no filter.
 	Kinds []string
 
+	// ActorTypes limits results to specific actor types
+	// (user | agent | system). Empty = no filter. The canonical use is
+	// ActorTypes=["user"] — "any human input on this transaction?" — which
+	// drops rule-applied / agent-driven churn from the timeline.
+	ActorTypes []string
+
+	// Since, when non-zero, limits results to annotations created strictly
+	// after the supplied time. Pairs with Limit so an agent that has
+	// already read the timeline once can ask only for what's new.
+	Since time.Time
+
+	// Limit, when > 0, caps the number of returned rows to the most recent
+	// N (timeline tail), still ordered ASC. 0 = no cap (full timeline).
+	// Capped at MaxAnnotationLimit.
+	Limit int
+
 	// Raw, when true, skips enrichment and dedup. The returned rows have
 	// their structural fields populated but no Summary/Action/etc., and
 	// rule-source duplicates and same-actor adjacent comment-vs-tag-note
@@ -196,23 +224,35 @@ func (s *Service) ListAnnotations(ctx context.Context, transactionID string, par
 	}
 
 	if params.Raw {
-		return filterAnnotationKinds(all, params.Kinds), nil
+		return applyAnnotationFilters(all, params), nil
 	}
 
 	enriched, err := s.enrichAnnotations(ctx, all)
 	if err != nil {
 		return nil, fmt.Errorf("enrich annotations: %w", err)
 	}
-	return filterAnnotationKinds(enriched, params.Kinds), nil
+	return applyAnnotationFilters(enriched, params), nil
+}
+
+// applyAnnotationFilters runs the post-enrichment filter+limit pipeline:
+// kind filter → actor-type filter → since filter → limit (tail).
+// Filtering happens after enrichment so dedup decisions see the full set,
+// not a kind-filtered slice that would miss the parent rule_applied row
+// needed to elide its rule-source duplicates. The limit slices the tail so
+// callers asking for "the most recent N" get the newest rows, still ordered
+// chronologically (ASC).
+func applyAnnotationFilters(in []Annotation, params ListAnnotationsParams) []Annotation {
+	out := filterAnnotationKinds(in, params.Kinds)
+	out = filterAnnotationActorTypes(out, params.ActorTypes)
+	out = filterAnnotationsSince(out, params.Since)
+	return limitAnnotations(out, params.Limit)
 }
 
 // filterAnnotationKinds returns the subset of `in` whose Kind matches one of
 // the listed kinds. An empty kinds slice is treated as a no-op (returns the
-// input unchanged). Filtering happens after enrichment so dedup decisions
-// see the full set, not a kind-filtered slice that would miss the parent
-// rule_applied row needed to elide its rule-source duplicates.
+// input unchanged).
 func filterAnnotationKinds(in []Annotation, kinds []string) []Annotation {
-	keep := annotationKindFilter(kinds)
+	keep := stringSet(kinds)
 	if keep == nil {
 		return in
 	}
@@ -225,17 +265,64 @@ func filterAnnotationKinds(in []Annotation, kinds []string) []Annotation {
 	return out
 }
 
-// annotationKindFilter builds an O(1) lookup set from a kinds slice. Returns
-// nil when no filter is supplied so callers can short-circuit.
-func annotationKindFilter(kinds []string) map[string]bool {
-	if len(kinds) == 0 {
+// filterAnnotationActorTypes returns the subset of `in` whose ActorType
+// matches one of the listed values. Empty input = no filter.
+func filterAnnotationActorTypes(in []Annotation, actorTypes []string) []Annotation {
+	keep := stringSet(actorTypes)
+	if keep == nil {
+		return in
+	}
+	out := make([]Annotation, 0, len(in))
+	for _, a := range in {
+		if keep[a.ActorType] {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// filterAnnotationsSince returns rows created strictly after `since`. A zero
+// time disables the filter. Compares against CreatedAtTime (full Postgres
+// precision) — the RFC3339 string in CreatedAt truncates to seconds, which
+// would mis-classify rows that share a wall-clock second with the cursor.
+func filterAnnotationsSince(in []Annotation, since time.Time) []Annotation {
+	if since.IsZero() {
+		return in
+	}
+	out := make([]Annotation, 0, len(in))
+	for _, a := range in {
+		if a.CreatedAtTime.IsZero() {
+			out = append(out, a)
+			continue
+		}
+		if a.CreatedAtTime.After(since) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// limitAnnotations caps the result to the most recent `limit` rows (the
+// timeline tail), preserving ASC order. 0 = no cap. Negative is treated as
+// no cap (defensive — handler should reject).
+func limitAnnotations(in []Annotation, limit int) []Annotation {
+	if limit <= 0 || len(in) <= limit {
+		return in
+	}
+	return in[len(in)-limit:]
+}
+
+// stringSet builds an O(1) lookup set. Returns nil when input is empty so
+// callers can short-circuit.
+func stringSet(s []string) map[string]bool {
+	if len(s) == 0 {
 		return nil
 	}
-	set := make(map[string]bool, len(kinds))
-	for _, k := range kinds {
-		set[k] = true
+	out := make(map[string]bool, len(s))
+	for _, v := range s {
+		out[v] = true
 	}
-	return set
+	return out
 }
 
 // annotationFromActorRow converts a joined annotation+actor row into its
@@ -266,6 +353,7 @@ func annotationFromActorRow(a db.ListAnnotationsWithActorByTransactionRow) Annot
 		ActorID:       textPtr(a.ActorID),
 		ActorName:     displayName,
 		CreatedAt:     pgconv.TimestampStr(a.CreatedAt),
+		CreatedAtTime: a.CreatedAt.Time.UTC(),
 	}
 
 	if a.SessionID.Valid {
