@@ -1,0 +1,156 @@
+package pages
+
+import "fmt"
+
+// Agents renders the /agents composite page — Getting Started, Prompt
+// Library, MCP Settings, and Activity tabs. Hosts inside the base layout
+// via TemplateRenderer.RenderWithTempl. The four tabs were previously
+// four separate html/template files (mcp_guide.html, agent_wizard.html,
+// mcp_settings.html, agents.html) wired together via the
+// `compositePages` map; the templ port collapses them into one tree
+// where Alpine x-show toggles between MCPGuide / AgentWizard /
+// MCPSettings sub-components and the Activity content rendered inline.
+//
+// Each tab that needs per-tab state ships its own Alpine factory in
+// static/js/admin/components/<tab>.js per the post-#878 convention. The
+// outer tab switcher loads the agents factory which reads its initial
+// tab from data-initial-tab.
+templ Agents(p AgentsProps) {
+	<script src="/static/js/admin/components/agents.js"></script>
+	<div x-data="agentsTabs" data-initial-tab={ string(p.Tab) }>
+		<div class="bb-page-header">
+			<div>
+				<h1 class="bb-page-title">Agents</h1>
+				<p class="text-sm text-base-content/50 mt-1">Set up and configure AI agent access to your financial data</p>
+			</div>
+		</div>
+		<!-- Tab Switcher: wraps to a second row on mobile so all labels stay visible; stays single-line from sm and up. -->
+		<div class="flex flex-wrap sm:flex-nowrap items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-full sm:w-fit max-w-full sm:overflow-x-auto">
+			<button
+				@click="tab = 'guide'"
+				:class="tab === 'guide' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0"
+			>
+				<i data-lucide="rocket" class="w-3.5 h-3.5"></i>
+				Getting Started
+			</button>
+			<button
+				@click="tab = 'wizard'"
+				:class="tab === 'wizard' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0"
+			>
+				<i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>
+				Prompt Library
+			</button>
+			<button
+				@click="tab = 'settings'"
+				:class="tab === 'settings' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0"
+			>
+				<i data-lucide="settings" class="w-3.5 h-3.5"></i>
+				MCP Settings
+			</button>
+			<a
+				href="/agents?tab=activity"
+				:class="tab === 'activity' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 no-underline whitespace-nowrap shrink-0"
+			>
+				<i data-lucide="scroll-text" class="w-3.5 h-3.5"></i>
+				Activity
+			</a>
+		</div>
+		<!-- Getting Started Tab -->
+		<div x-show="tab === 'guide'">
+			@MCPGuide(p.Guide)
+		</div>
+		<!-- Prompt Library Tab -->
+		<div x-show="tab === 'wizard'" x-cloak>
+			@AgentWizard(p.Wizard)
+		</div>
+		<!-- MCP Settings Tab -->
+		<div x-show="tab === 'settings'" x-cloak>
+			@MCPSettings(p.Settings)
+		</div>
+		<!-- Activity Tab -->
+		<div x-show="tab === 'activity'" x-cloak>
+			@agentsActivity(p)
+		</div>
+	</div>
+}
+
+// agentsActivity renders the Activity tab body — a list of MCP sessions
+// with pagination, or an empty-state CTA back to Getting Started /
+// Prompt Library.
+templ agentsActivity(p AgentsProps) {
+	if len(p.Sessions) > 0 {
+		<div class="space-y-3">
+			for _, s := range p.Sessions {
+				@agentsSessionCard(s)
+			}
+		</div>
+		if p.SessionsTotalPages > 1 {
+			<div class="bb-pagination mt-6">
+				if p.SessionsPage > 1 {
+					<a href={ templ.SafeURL(fmt.Sprintf("/agents?tab=activity&page=%d", p.SessionsPage-1)) } class="btn btn-sm btn-ghost">&laquo; Previous</a>
+				}
+				<span class="text-sm text-base-content/50">{ fmt.Sprintf("Page %d of %d", p.SessionsPage, p.SessionsTotalPages) }</span>
+				if p.SessionsPage < p.SessionsTotalPages {
+					<a href={ templ.SafeURL(fmt.Sprintf("/agents?tab=activity&page=%d", p.SessionsPage+1)) } class="btn btn-sm btn-ghost">Next &raquo;</a>
+				}
+			</div>
+		}
+	} else {
+		<div class="card bg-base-100 shadow-sm">
+			<div class="card-body items-center text-center py-12 gap-4">
+				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-1"></i>
+				<div>
+					<h3 class="font-medium text-base-content/70">No agent sessions yet</h3>
+					<p class="text-sm text-base-content/50 max-w-md mt-1">Agent activity appears here once an MCP client connects to Breadbox. Start by configuring your first agent.</p>
+				</div>
+				<div class="flex flex-wrap items-center justify-center gap-2">
+					<a href="/agents?tab=guide" class="btn btn-primary btn-sm rounded-xl">
+						<i data-lucide="rocket" class="w-4 h-4"></i> Connect your first agent
+					</a>
+					<a href="/agents?tab=wizard" class="btn btn-ghost btn-sm rounded-xl">
+						<i data-lucide="wand-sparkles" class="w-4 h-4"></i> Browse prompt library
+					</a>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ agentsSessionCard(s AgentsSessionRow) {
+	<a href={ templ.SafeURL("/agents/sessions/" + s.ShortID) } class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow no-underline block">
+		<div class="card-body p-4">
+			<div class="flex items-start justify-between gap-4">
+				<div class="min-w-0 flex-1">
+					<div class="flex items-center gap-2 mb-1">
+						<span class="font-medium text-base-content">{ s.Purpose }</span>
+						if s.HasReport {
+							<span class="badge badge-sm badge-success gap-1">
+								<i data-lucide="file-text" class="w-3 h-3"></i> Report
+							</span>
+						}
+					</div>
+					<div class="flex items-center gap-3 text-xs text-base-content/50">
+						if s.AgentName != "" {
+							<span class="flex items-center gap-1">
+								<i data-lucide="bot" class="w-3 h-3"></i>
+								{ s.AgentName }
+							</span>
+						} else {
+							<span class="flex items-center gap-1">
+								<i data-lucide="key" class="w-3 h-3"></i>
+								{ s.APIKeyName }
+							</span>
+						}
+						<span>{ fmt.Sprintf("%d tool calls", s.ToolCallCount) }</span>
+						<span>{ s.CreatedAtRel }</span>
+					</div>
+				</div>
+				<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/30 shrink-0 mt-1"></i>
+			</div>
+		</div>
+	</a>
+}

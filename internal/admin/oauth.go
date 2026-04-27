@@ -9,6 +9,7 @@ import (
 
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -360,19 +361,24 @@ func (rw *oauthRedirectInterceptor) WriteHeader(code int) {
 
 
 // OAuthClientNewPageHandler serves GET /admin/oauth-clients/new.
-func OAuthClientNewPageHandler(tr *TemplateRenderer) http.HandlerFunc {
+func OAuthClientNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := map[string]any{
-			"PageTitle":   "Create OAuth Client",
-			"CurrentPage": "api-keys",
-			"CSRFToken":   GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
+		data := BaseTemplateData(r, sm, "api-keys", "Create OAuth Client")
+		renderOAuthClientNew(w, r, tr, data, pages.OAuthClientNewProps{
+			CSRFToken: GetCSRFToken(r),
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "API Keys", Href: "/settings/api-keys"},
 				{Label: "Create OAuth Client"},
 			},
-		}
-		tr.Render(w, r, "oauth_client_new.html", data)
+		})
 	}
+}
+
+// renderOAuthClientNew mirrors renderAPIKeyNew: hands the typed
+// OAuthClientNewProps to the templ component and uses RenderWithTempl
+// to host it inside base.html.
+func renderOAuthClientNew(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.OAuthClientNewProps) {
+	tr.RenderWithTempl(w, r, data, pages.OAuthClientNew(props))
 }
 
 // OAuthClientCreatePageHandler serves POST /admin/oauth-clients/new.
@@ -380,8 +386,7 @@ func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, 
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
-			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/settings/oauth-clients/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Name is required", "/settings/oauth-clients/new")
 			return
 		}
 		scope := r.FormValue("scope")
@@ -390,8 +395,7 @@ func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, 
 		}
 		result, err := svc.CreateOAuthClient(r.Context(), name, scope)
 		if err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to create OAuth client")
-			http.Redirect(w, r, "/settings/oauth-clients/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to create OAuth client", "/settings/oauth-clients/new")
 			return
 		}
 		sm.Put(r.Context(), "created_oauth_client_id", result.ClientID)
@@ -411,21 +415,25 @@ func OAuthClientCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer)
 			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 			return
 		}
-		data := map[string]any{
-			"PageTitle":    "OAuth Client Created",
-			"CurrentPage":  "api-keys",
-			"ClientID":     clientID,
-			"ClientSecret": clientSecret,
-			"ClientName":   name,
-			"MCPServerURL": mcpServerURL(r),
-			"CSRFToken":    GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
+		data := BaseTemplateData(r, sm, "api-keys", "OAuth Client Created")
+		renderOAuthClientCreated(w, r, tr, data, pages.OAuthClientCreatedProps{
+			ClientName:   name,
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			MCPServerURL: mcpServerURL(r),
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "API Keys", Href: "/settings/api-keys"},
 				{Label: "Client Created"},
 			},
-		}
-		tr.Render(w, r, "oauth_client_created.html", data)
+		})
 	}
+}
+
+// renderOAuthClientCreated mirrors renderAPIKeyCreated: hands the typed
+// OAuthClientCreatedProps to the templ component and uses RenderWithTempl
+// to host it inside base.html.
+func renderOAuthClientCreated(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.OAuthClientCreatedProps) {
+	tr.RenderWithTempl(w, r, data, pages.OAuthClientCreated(props))
 }
 
 // OAuthClientRevokePageHandler serves POST /admin/oauth-clients/{id}/revoke.

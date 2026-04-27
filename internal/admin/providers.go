@@ -85,8 +85,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 		ctx := r.Context()
 
 		if os.Getenv("PLAID_CLIENT_ID") != "" {
-			SetFlash(ctx, sm, "error", "Plaid is configured via environment variables and cannot be changed here.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Plaid is configured via environment variables and cannot be changed here.", "/settings/providers")
 			return
 		}
 
@@ -112,26 +111,22 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			a.Config.PlaidEnv = "sandbox"
 			a.Config.WebhookURL = ""
 			_ = a.ReinitProvider("plaid")
-			SetFlash(ctx, sm, "success", "Plaid configuration cleared.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "success", "Plaid configuration cleared.", "/settings/providers")
 			return
 		}
 
 		if plaidSecret == "" {
-			SetFlash(ctx, sm, "error", "Plaid secret is required.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Plaid secret is required.", "/settings/providers")
 			return
 		}
 
 		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
-			SetFlash(ctx, sm, "error", "Webhook URL must use HTTPS.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Webhook URL must use HTTPS.", "/settings/providers")
 			return
 		}
 
 		if err := plaidprovider.ValidateCredentials(ctx, plaidClientID, plaidSecret, plaidEnv); err != nil {
-			SetFlash(ctx, sm, "error", "Invalid Plaid credentials: "+err.Error())
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid Plaid credentials: "+err.Error(), "/settings/providers")
 			return
 		}
 
@@ -144,8 +139,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 		for _, entry := range entries {
 			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
 				a.Logger.Error("save plaid config", "error", err, "key", entry.Key)
-				SetFlash(ctx, sm, "error", "Failed to save Plaid credentials.")
-				http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Failed to save Plaid credentials.", "/settings/providers")
 				return
 			}
 		}
@@ -161,8 +155,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 
 		if err := a.ReinitProvider("plaid"); err != nil {
 			a.Logger.Error("reinit plaid provider", "error", err)
-			SetFlash(ctx, sm, "error", "Plaid credentials saved but provider failed to initialize: "+err.Error())
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Plaid credentials saved but provider failed to initialize: "+err.Error(), "/settings/providers")
 			return
 		}
 
@@ -177,15 +170,13 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 		ctx := r.Context()
 
 		if os.Getenv("TELLER_APP_ID") != "" {
-			SetFlash(ctx, sm, "error", "Teller is configured via environment variables and cannot be changed here.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Teller is configured via environment variables and cannot be changed here.", "/settings/providers")
 			return
 		}
 
 		// Parse multipart form (10MB max for cert/key files).
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			SetFlash(ctx, sm, "error", "Failed to parse form data.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to parse form data.", "/settings/providers")
 			return
 		}
 
@@ -206,8 +197,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 			a.Config.TellerCertPEM = nil
 			a.Config.TellerKeyPEM = nil
 			_ = a.ReinitProvider("teller")
-			SetFlash(ctx, sm, "success", "Teller configuration cleared.")
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "success", "Teller configuration cleared.", "/settings/providers")
 			return
 		}
 
@@ -229,8 +219,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 		for _, entry := range configEntries {
 			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
 				a.Logger.Error("save teller config", "error", err, "key", entry.Key)
-				SetFlash(ctx, sm, "error", "Failed to save Teller configuration.")
-				http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Failed to save Teller configuration.", "/settings/providers")
 				return
 			}
 		}
@@ -247,36 +236,31 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 		if a.Config.TellerCertPath == "" {
 			certPEM, keyPEM, err := readTellerCertFiles(r)
 			if err != nil {
-				SetFlash(ctx, sm, "error", err.Error())
-				http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", err.Error(), "/settings/providers")
 				return
 			}
 
 			if certPEM != nil && keyPEM != nil {
 				// Validate the key pair.
 				if err := tellerprovider.ValidateCredentialsPEM(certPEM, keyPEM); err != nil {
-					SetFlash(ctx, sm, "error", "Invalid certificate/key: "+err.Error())
-					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+					FlashRedirect(w, r, sm, "error", "Invalid certificate/key: "+err.Error(), "/settings/providers")
 					return
 				}
 
 				if len(a.Config.EncryptionKey) == 0 {
-					SetFlash(ctx, sm, "error", "Encryption key is required to store certificates. Set ENCRYPTION_KEY environment variable.")
-					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+					FlashRedirect(w, r, sm, "error", "Encryption key is required to store certificates. Set ENCRYPTION_KEY environment variable.", "/settings/providers")
 					return
 				}
 
 				// Encrypt and store.
 				encCert, err := crypto.Encrypt(certPEM, a.Config.EncryptionKey)
 				if err != nil {
-					SetFlash(ctx, sm, "error", "Failed to encrypt certificate.")
-					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+					FlashRedirect(w, r, sm, "error", "Failed to encrypt certificate.", "/settings/providers")
 					return
 				}
 				encKey, err := crypto.Encrypt(keyPEM, a.Config.EncryptionKey)
 				if err != nil {
-					SetFlash(ctx, sm, "error", "Failed to encrypt private key.")
-					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+					FlashRedirect(w, r, sm, "error", "Failed to encrypt private key.", "/settings/providers")
 					return
 				}
 
@@ -286,15 +270,13 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 					Key: "teller_cert_pem", Value: pgconv.Text(certB64),
 				}); err != nil {
-					SetFlash(ctx, sm, "error", "Failed to save certificate.")
-					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+					FlashRedirect(w, r, sm, "error", "Failed to save certificate.", "/settings/providers")
 					return
 				}
 				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 					Key: "teller_key_pem", Value: pgconv.Text(keyB64),
 				}); err != nil {
-					SetFlash(ctx, sm, "error", "Failed to save private key.")
-					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+					FlashRedirect(w, r, sm, "error", "Failed to save private key.", "/settings/providers")
 					return
 				}
 
@@ -305,8 +287,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 
 		if err := a.ReinitProvider("teller"); err != nil {
 			a.Logger.Error("reinit teller provider", "error", err)
-			SetFlash(ctx, sm, "error", "Teller settings saved but provider failed to initialize: "+err.Error())
-			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Teller settings saved but provider failed to initialize: "+err.Error(), "/settings/providers")
 			return
 		}
 

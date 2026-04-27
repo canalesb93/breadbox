@@ -401,8 +401,12 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 	return nil
 }
 
-// SetTransactionCategory sets a manual category override on a transaction.
-func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID string) error {
+// SetTransactionCategory sets a manual category override on a transaction and
+// records a `category_set` annotation attributed to the supplied actor. The
+// UPDATE and the annotation write run in a single DB transaction so a failed
+// annotation rolls back the category change — keeping the activity timeline in
+// sync with the persisted state.
+func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID string, actor Actor) error {
 	txnUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
 		return ErrNotFound
@@ -412,7 +416,21 @@ func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID 
 		return ErrCategoryNotFound
 	}
 
-	rowsAffected, err := s.Queries.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
+	// Resolve the slug for the annotation payload. resolveCategoryID accepts
+	// UUID/short_id, so we still need a row lookup to get the canonical slug.
+	cat, err := s.Queries.GetCategoryByID(ctx, catUID)
+	if err != nil {
+		return ErrCategoryNotFound
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin set_transaction_category: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	rowsAffected, err := qtx.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
 		ID:         txnUID,
 		CategoryID: catUID,
 	})
@@ -427,19 +445,38 @@ func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID 
 	if rowsAffected == 0 {
 		return ErrNotFound
 	}
+
+	if err := writeCategorySetAnnotation(ctx, qtx, txnUID, actor, cat.Slug, false); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit set_transaction_category: %w", err)
+	}
 	return nil
 }
 
-// ResetTransactionCategory clears the manual override and sets the category to uncategorized.
-// Transaction rules will re-categorize it on the next sync if a matching rule exists.
-func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string) error {
+// ResetTransactionCategory clears the manual override and sets the category to
+// uncategorized. Transaction rules will re-categorize it on the next sync if a
+// matching rule exists. Records a `category_set` annotation with
+// `action: "reset"` attributed to the supplied actor in the same DB transaction
+// as the writes.
+func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string, actor Actor) error {
 	txnUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
 		return ErrNotFound
 	}
 
-	// Clear the override flag
-	rowsAffected, err := s.Queries.ClearTransactionCategoryOverride(ctx, txnUID)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin reset_transaction_category: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	// Clear the override flag — bail out early on a missing transaction so the
+	// uncategorized lookup below isn't reached for nonexistent rows.
+	rowsAffected, err := qtx.ClearTransactionCategoryOverride(ctx, txnUID)
 	if err != nil {
 		return fmt.Errorf("clear override: %w", err)
 	}
@@ -447,17 +484,56 @@ func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string) er
 		return ErrNotFound
 	}
 
-	// Set to uncategorized — rules will re-categorize on next sync.
-	uncategorized, err := s.Queries.GetCategoryBySlug(ctx, "uncategorized")
+	uncategorized, err := qtx.GetCategoryBySlug(ctx, "uncategorized")
 	if err != nil {
 		return fmt.Errorf("get uncategorized: %w", err)
 	}
-	_, err = s.Pool.Exec(ctx, "UPDATE transactions SET category_id = $1 WHERE id = $2", uncategorized.ID, txnUID)
-	return err
+
+	// Set to uncategorized — rules will re-categorize on next sync.
+	if _, err := tx.Exec(ctx, "UPDATE transactions SET category_id = $1 WHERE id = $2", uncategorized.ID, txnUID); err != nil {
+		return fmt.Errorf("reset category: %w", err)
+	}
+
+	if err := writeCategorySetAnnotation(ctx, qtx, txnUID, actor, "uncategorized", true); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit reset_transaction_category: %w", err)
+	}
+	return nil
+}
+
+// writeCategorySetAnnotation writes a manual `category_set` annotation. Manual
+// writes carry `source: "manual"` and never include rule_id/rule_name — those
+// are reserved for rule-driven writes (see internal/ruleapply/annotations.go).
+// When isReset is true, the payload also records `action: "reset"` so the
+// timeline can distinguish reset events from forward category changes.
+func writeCategorySetAnnotation(ctx context.Context, q *db.Queries, txnUID pgtype.UUID, actor Actor, slug string, isReset bool) error {
+	if actor.Type == "" {
+		actor = SystemActor()
+	}
+	payload := map[string]interface{}{
+		"category_slug": slug,
+		"source":        "manual",
+	}
+	if isReset {
+		payload["action"] = "reset"
+	}
+	return writeAnnotation(ctx, q, writeAnnotationParams{
+		TransactionID: txnUID,
+		Kind:          "category_set",
+		ActorType:     normalizeAnnotationActorType(actor.Type),
+		ActorID:       actor.ID,
+		ActorName:     actor.Name,
+		Payload:       payload,
+	})
 }
 
 // BatchSetTransactionCategory sets category overrides on multiple transactions at once.
-func (s *Service) BatchSetTransactionCategory(ctx context.Context, items []BatchCategorizeItem) (*BatchCategorizeResult, error) {
+// Each successful row gets its own actor-attributed `category_set` annotation
+// via SetTransactionCategory.
+func (s *Service) BatchSetTransactionCategory(ctx context.Context, items []BatchCategorizeItem, actor Actor) (*BatchCategorizeResult, error) {
 	if len(items) == 0 {
 		return nil, fmt.Errorf("%w: items array is empty", ErrInvalidParameter)
 	}
@@ -490,7 +566,7 @@ func (s *Service) BatchSetTransactionCategory(ctx context.Context, items []Batch
 			continue
 		}
 
-		if err := s.SetTransactionCategory(ctx, item.TransactionID, categoryID); err != nil {
+		if err := s.SetTransactionCategory(ctx, item.TransactionID, categoryID, actor); err != nil {
 			result.Failed = append(result.Failed, BatchCategorizeError{
 				TransactionID: item.TransactionID,
 				Error:         err.Error(),

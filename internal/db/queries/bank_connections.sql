@@ -84,7 +84,7 @@ SELECT COUNT(*) FROM bank_connections WHERE status IN ('error', 'pending_reauth'
 SELECT * FROM bank_connections WHERE status = 'active';
 
 -- name: GetBankConnectionForSync :one
-SELECT id, provider, external_id, encrypted_credentials, sync_cursor, user_id FROM bank_connections WHERE id = $1 AND status != 'disconnected';
+SELECT id, short_id, provider, external_id, encrypted_credentials, sync_cursor, user_id FROM bank_connections WHERE id = $1 AND status != 'disconnected';
 
 -- name: ListConnectionsForAPI :many
 SELECT bc.id, bc.short_id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,

@@ -97,7 +97,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	// Run the sync and capture results.
-	added, modified, removed, unchanged, perAccount, ruleHits, warningMsg, syncErr := e.runSync(ctx, connectionID, logger)
+	added, modified, removed, unchanged, perAccount, ruleHits, warningMsg, syncErr := e.runSync(ctx, connectionID, syncLog.ShortID, logger)
 
 	// Update sync_log with final status.
 	completedAt := time.Now()
@@ -118,7 +118,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	var durationMs pgtype.Int4
 	if syncLog.StartedAt.Valid {
 		ms := completedAt.Sub(syncLog.StartedAt.Time).Milliseconds()
-		durationMs = pgtype.Int4{Int32: int32(ms), Valid: true}
+		durationMs = pgconv.Int4(int32(ms))
 	}
 
 	if err := e.db.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
@@ -157,7 +157,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 }
 
 // runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, rule hit counts JSON, warning message, and any error.
-func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, ruleHits []byte, warning string, err error) {
+func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, syncLogShortID string, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, ruleHits []byte, warning string, err error) {
 	// Initialize per-account tracking map.
 	perAccount = make(map[string]*accountSyncCounts)
 
@@ -330,6 +330,8 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			upsertStart:      upsertStart,
 			perAccount:       perAccount,
 			logger:           logger,
+			connShortID:      conn.ShortID,
+			syncLogShortID:   syncLogShortID,
 		}
 
 		for i := range pendingAdded {
@@ -447,6 +449,8 @@ type processTransactionOpts struct {
 	upsertStart      time.Time
 	perAccount       map[string]*accountSyncCounts
 	logger           *slog.Logger
+	connShortID      string // bank connection short_id, used for sync_started/sync_updated actor_id + payload
+	syncLogShortID   string // sync_logs short_id of the current run, recorded in sync annotation payloads
 }
 
 // processTransactionResult captures the outcome of processing a single transaction.
@@ -486,6 +490,13 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 		return result
 	}
 
+	// Capture the prior `pending` value before the upsert so we can detect a
+	// flip on subsequent syncs and emit a `sync_updated` annotation. A missing
+	// row (NoRows) is treated as "no prior state" — the upsert will INSERT and
+	// classifyUpsertResult will mark isNew, in which case we emit
+	// `sync_started` instead.
+	priorPending, hadPrior := e.lookupPriorPending(ctx, opts.tx, txn.ExternalID)
+
 	dbTxn, err := e.upsertTransaction(ctx, opts.txQueries, txn, opts.accountIDCache)
 	if err != nil {
 		opts.logger.Error("upsert "+label+" transaction", "external_id", txn.ExternalID, "error", err)
@@ -494,6 +505,27 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 	}
 
 	isNew, isChanged := classifyUpsertResult(dbTxn, opts.upsertStart)
+
+	// Emit sync annotations (initial import + pending flip) before rules run
+	// so the activity timeline reads "imported" → "rule applied" in chronological
+	// order rather than the reverse.
+	switch {
+	case providerAdded && isNew:
+		// Brand-new transaction landed during this sync. One row per insert.
+		// Classified by the upsert path (created_at ~= updated_at) — re-runs of
+		// a partially-completed initial sync hit this branch only on rows that
+		// were actually inserted on this pass, not previously-imported rows.
+		if err := writeSyncStartedAnnotation(ctx, opts.tx, dbTxn.ID, opts.providerName, opts.connShortID, opts.syncLogShortID); err != nil {
+			opts.logger.Error("write sync_started annotation", "transaction_id", dbTxn.ID, "error", err)
+		}
+	case hadPrior && priorPending != dbTxn.Pending:
+		// Pending flipped (true→false or false→true). Other field touches are
+		// intentionally silent — rule firings get their own kind, and plain
+		// field updates don't carry timeline value worth a row each.
+		if err := writeSyncUpdatedAnnotation(ctx, opts.tx, dbTxn.ID, opts.providerName, opts.connShortID, opts.syncLogShortID, priorPending, dbTxn.Pending); err != nil {
+			opts.logger.Error("write sync_updated annotation", "transaction_id", dbTxn.ID, "error", err)
+		}
+	}
 
 	// For provider-added transactions, a newly inserted row counts as "added".
 	// For provider-modified transactions, isNew is not expected — all changes
@@ -536,6 +568,24 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 	}
 
 	return result
+}
+
+// lookupPriorPending returns the existing transaction's `pending` flag inside
+// the active sync transaction. The boolean second return is false when there
+// is no prior row (or the lookup fails) — callers treat that as "no prior
+// state available" and skip sync_updated emission.
+func (e *Engine) lookupPriorPending(ctx context.Context, tx pgx.Tx, externalID string) (bool, bool) {
+	var pending bool
+	err := tx.QueryRow(ctx,
+		`SELECT pending FROM transactions WHERE provider_transaction_id = $1`,
+		externalID).Scan(&pending)
+	if err != nil {
+		// pgx.ErrNoRows is the expected "no prior row" path; any other error
+		// also degrades gracefully — sync_started will be emitted on insert
+		// or the sync_updated row simply won't be written for this txn.
+		return false, false
+	}
+	return pending, true
 }
 
 // upsertTransaction upserts a single transaction without rule evaluation.
@@ -924,9 +974,17 @@ func writeSyncAnnotation(ctx context.Context, tx pgx.Tx, params writeSyncAnnotat
 		actorID = pgconv.Text(params.ActorID)
 	}
 
+	// created_at = clock_timestamp() (real wall-clock) instead of relying on the
+	// column default (NOW(), which returns the transaction-start time). Within
+	// the sync tx we write multiple annotations per transaction — sync_started
+	// before applyRulesToTransaction, then a rule_applied / category_set /
+	// tag_added cluster — and the timeline orders them by created_at ASC. With
+	// NOW() every row tied at the same instant and the displayed order fell
+	// back to arbitrary tie-breaking, surfacing rule rows ahead of the
+	// sync_started row that logically precedes them.
 	_, err := tx.Exec(ctx,
-		`INSERT INTO annotations (transaction_id, kind, actor_type, actor_id, actor_name, session_id, payload, tag_id, rule_id)
-		VALUES ($1, $2, $3, $4, $5, NULL, $6::jsonb, $7, $8)`,
+		`INSERT INTO annotations (transaction_id, kind, actor_type, actor_id, actor_name, session_id, payload, tag_id, rule_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, NULL, $6::jsonb, $7, $8, clock_timestamp())`,
 		params.TransactionID, params.Kind, params.ActorType, actorID, params.ActorName, payloadJSON,
 		params.TagID, params.RuleID)
 	return err

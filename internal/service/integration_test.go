@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"strings"
 	"testing"
 
@@ -105,7 +104,7 @@ func TestListAccounts_WithData(t *testing.T) {
 		Type:              "depository",
 		Subtype:           pgtype.Text{String: "checking", Valid: true},
 		IsoCurrencyCode:   pgtype.Text{String: "USD", Valid: true},
-		BalanceCurrent:    pgtype.Numeric{Int: big.NewInt(100000), Exp: -2, Valid: true},
+		BalanceCurrent:    pgconv.NumericCents(100000),
 	})
 	if err != nil {
 		t.Fatalf("upsert account: %v", err)
@@ -728,7 +727,7 @@ func TestImportCategoriesTSV_MergeInto(t *testing.T) {
 	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
 		AccountID:             acct.ID,
 		ProviderTransactionID: "txn_merge_1",
-		Amount:                pgtype.Numeric{Int: big.NewInt(550), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(550),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(testutil.MustParseDate("2025-01-15")),
 		ProviderName:          "Starbucks",
@@ -935,7 +934,7 @@ func TestBatchSetTransactionCategory_Success(t *testing.T) {
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "food_and_drink"},
 		{TransactionID: pgconv.FormatUUID(txn2.ID), CategorySlug: "transportation"},
-	})
+	}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
@@ -994,7 +993,7 @@ func TestBatchSetTransactionCategory_InvalidTxnID(t *testing.T) {
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "food_and_drink"},
 		{TransactionID: "00000000-0000-0000-0000-000000000099", CategorySlug: "food_and_drink"},
-	})
+	}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
@@ -1018,7 +1017,7 @@ func TestBatchSetTransactionCategory_MaxLimitExceeded(t *testing.T) {
 		}
 	}
 
-	_, err := svc.BatchSetTransactionCategory(ctx, items)
+	_, err := svc.BatchSetTransactionCategory(ctx, items, service.SystemActor())
 	if err == nil {
 		t.Fatal("expected error for > 500 items, got nil")
 	}

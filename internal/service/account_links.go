@@ -171,8 +171,8 @@ func (s *Service) GetAccountLink(ctx context.Context, id string) (*AccountLinkRe
 		Enabled:                 row.Enabled,
 		MatchCount:              matchCount,
 		UnmatchedDependentCount: unmatchedCount,
-		CreatedAt:               row.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:               row.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:               pgconv.TimestampStr(row.CreatedAt),
+		UpdatedAt:               pgconv.TimestampStr(row.UpdatedAt),
 	}, nil
 }
 
@@ -202,8 +202,8 @@ func (s *Service) ListAccountLinks(ctx context.Context) ([]AccountLinkResponse, 
 			Enabled:                 row.Enabled,
 			MatchCount:              matchCount,
 			UnmatchedDependentCount: unmatchedCount,
-			CreatedAt:               row.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:               row.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:               pgconv.TimestampStr(row.CreatedAt),
+			UpdatedAt:               pgconv.TimestampStr(row.UpdatedAt),
 		})
 	}
 	return result, nil
@@ -346,7 +346,7 @@ func (s *Service) ListTransactionMatches(ctx context.Context, linkID string) ([]
 			DependentTransactionID: formatUUID(row.DependentTransactionID),
 			MatchConfidence:        row.MatchConfidence,
 			MatchedOn:              row.MatchedOn,
-			CreatedAt:              row.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:              pgconv.TimestampStr(row.CreatedAt),
 			PrimaryTxnName:         row.PrimaryTxnName,
 			PrimaryTxnMerchant:     textPtr(row.PrimaryTxnMerchant),
 			DependentTxnName:       row.DependentTxnName,
@@ -457,7 +457,7 @@ func (s *Service) ManualMatch(ctx context.Context, linkID, primaryTxnID, depende
 		DependentTransactionID: formatUUID(match.DependentTransactionID),
 		MatchConfidence:        match.MatchConfidence,
 		MatchedOn:              match.MatchedOn,
-		CreatedAt:              match.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:              pgconv.TimestampStr(match.CreatedAt),
 	}, nil
 }
 

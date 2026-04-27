@@ -139,7 +139,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, "/settings/api-keys", http.StatusMovedPermanently)
 			})
-			r.Get("/new", OAuthClientNewPageHandler(tr))
+			r.Get("/new", OAuthClientNewPageHandler(sm, tr))
 			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
 			r.Get("/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
 			// Revoke is admin-only — handled in the admin group below.
@@ -316,16 +316,20 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
 
+		// Activity-timeline partial render — powers the optimistic-update
+		// flow on the detail page. Accessible to all roles (read-only).
+		r.Get("/transactions/{id}/timeline/rows", TimelineRowsHandler(a, sm, svc))
+
 		// Editor+ API routes (categorization, tagging, access management).
 		r.Group(func(r chi.Router) {
 			r.Use(RequireEditor(sm))
 
 			// Transaction category override
-			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
-			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
+			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc, sm))
+			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc, sm))
 
 			// Transaction bulk categorize
-			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
+			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc, sm))
 
 			// Batch compound update (bulk actions on transactions list).
 			r.Post("/transactions/batch-update", BulkUpdateTransactionsAdminHandler(a, sm, svc))

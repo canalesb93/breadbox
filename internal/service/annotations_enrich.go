@@ -91,8 +91,10 @@ func EnrichAnnotations(in []Annotation, opts EnrichOptions) []Annotation {
 			continue
 		}
 		// 2. Drop the standalone comment that mirrors an adjacent
-		//    tag_added.note from the same actor.
-		if src.Kind == "comment" && isCommentDuplicateOfTagNote(in, src) {
+		//    tag_added.note from the same actor — but tombstones never
+		//    fold: a deleted comment is a distinct event with audit value
+		//    of its own and must always survive enrichment.
+		if src.Kind == "comment" && !src.IsDeleted && isCommentDuplicateOfTagNote(in, src) {
 			continue
 		}
 		out = append(out, enrichOne(src, tagDisplay, categoryDisplay))
@@ -197,7 +199,13 @@ func enrichOne(a Annotation, tagDisplay, categoryDisplay func(string) string) An
 		content, _ := a.Payload["content"].(string)
 		a.Content = content
 		a.Subject = content
-		a.Summary = formatCommentSummary(a.ActorName, content)
+		if a.IsDeleted {
+			// Tombstones don't echo the original body — the comment is
+			// retired; only actor + verb remain on the timeline.
+			a.Summary = formatDeletedCommentSummary(a.ActorName)
+		} else {
+			a.Summary = formatCommentSummary(a.ActorName, content)
+		}
 
 	case "tag_added", "tag_removed":
 		slug, _ := a.Payload["slug"].(string)
@@ -252,9 +260,31 @@ func enrichOne(a Annotation, tagDisplay, categoryDisplay func(string) string) An
 			a.Subject = ruleName
 		}
 		a.Summary = formatRuleSummary(ruleName, field, value, categoryDisplay, a.Origin)
+
+	case "sync_started":
+		a.Action = "started"
+		a.Subject = a.ActorName
+		a.Summary = formatSyncStartedSummary(a.ActorName)
+
+	case "sync_updated":
+		a.Action = "updated"
+		a.Subject = a.ActorName
+		from, to := readStatusChange(a.Payload)
+		a.Summary = formatSyncUpdatedSummary(a.ActorName, from, to)
 	}
 
 	return a
+}
+
+// formatDeletedCommentSummary renders the tombstone sentence shown in place
+// of a deleted comment's bubble. Mirrors the system-row sentence shape so
+// the timeline reads the same when a comment is gone — only actor + verb
+// remain.
+func formatDeletedCommentSummary(actor string) string {
+	if actor == "" {
+		return "Comment deleted"
+	}
+	return actor + " deleted a comment"
 }
 
 // formatCommentSummary builds a one-line preview of a comment for the
@@ -334,6 +364,44 @@ func formatRuleSummary(ruleName, field, value string, categoryDisplay func(strin
 		return subject + " " + verb
 	}
 	return subject + " " + verb + " " + origin
+}
+
+// formatSyncStartedSummary renders the timeline sentence for a sync_started
+// row. ActorName is the provider display name ("Plaid", "Teller", "CSV
+// import"); fall back to a generic phrase when it's unexpectedly empty so the
+// timeline is never just blank.
+func formatSyncStartedSummary(provider string) string {
+	if provider == "" {
+		return "Initial sync imported this transaction"
+	}
+	return "Initial sync from " + provider + " imported this transaction"
+}
+
+// formatSyncUpdatedSummary renders the timeline sentence for a sync_updated
+// row. The pending flip is the only field-level change we surface today, so
+// the sentence always carries the from→to label when the payload provides one.
+func formatSyncUpdatedSummary(provider, from, to string) string {
+	prefix := "Synced"
+	if provider != "" {
+		prefix = "Synced from " + provider
+	}
+	if from == "" || to == "" {
+		return prefix
+	}
+	return prefix + " · " + from + " → " + to
+}
+
+// readStatusChange pulls the from/to labels out of a sync_updated payload's
+// status_change object. Returns ("", "") when the payload is missing the
+// keys so callers can render a defensive fallback summary.
+func readStatusChange(payload map[string]interface{}) (string, string) {
+	sc, ok := payload["status_change"].(map[string]interface{})
+	if !ok {
+		return "", ""
+	}
+	from, _ := sc["from"].(string)
+	to, _ := sc["to"].(string)
+	return from, to
 }
 
 // formatRuleOrigin maps the payload's applied_by field to the standardized

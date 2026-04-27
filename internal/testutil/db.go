@@ -28,7 +28,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"os"
 	"strings"
 	"testing"
@@ -182,7 +181,7 @@ func MustCreateTransaction(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
 		ProviderTransactionID: extID,
-		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(amountCents),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(MustParseDate(date)),
 		ProviderName:          name,

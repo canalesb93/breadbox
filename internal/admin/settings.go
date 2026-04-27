@@ -138,8 +138,7 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 
 		syncInterval, err := strconv.Atoi(syncIntervalStr)
 		if err != nil || !isValidSyncInterval(syncInterval) {
-			SetFlash(ctx, sm, "error", "Invalid sync interval.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid sync interval.", "/settings")
 			return
 		}
 
@@ -148,8 +147,7 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 			Value: pgconv.Text(strconv.Itoa(syncInterval)),
 		}); err != nil {
 			a.Logger.Error("save sync interval", "error", err)
-			SetFlash(ctx, sm, "error", "Failed to save sync interval.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to save sync interval.", "/settings")
 			return
 		}
 		a.Config.SyncIntervalMinutes = syncInterval
@@ -181,8 +179,7 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 		retentionStr := r.FormValue("sync_log_retention_days")
 		retentionDays, err := strconv.Atoi(retentionStr)
 		if err != nil || retentionDays < 0 || retentionDays > 3650 {
-			SetFlash(ctx, sm, "error", "Invalid retention period. Must be 0-3650 days.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid retention period. Must be 0-3650 days.", "/settings")
 			return
 		}
 
@@ -191,8 +188,7 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			Value: pgconv.Text(strconv.Itoa(retentionDays)),
 		}); err != nil {
 			a.Logger.Error("save sync log retention", "error", err)
-			SetFlash(ctx, sm, "error", "Failed to save retention setting.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to save retention setting.", "/settings")
 			return
 		}
 

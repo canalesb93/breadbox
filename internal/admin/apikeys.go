@@ -3,11 +3,11 @@ package admin
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -129,8 +129,8 @@ func buildAccessKeyRow(k service.APIKeyResponse) pages.AccessKeyRow {
 		Name:             k.Name,
 		KeyPrefix:        k.KeyPrefix,
 		Scope:            k.Scope,
-		CreatedAtShort:   formatDateShortFromRFC3339(k.CreatedAt),
-		LastUsedRelative: relativeTimeFromRFC3339Ptr(k.LastUsedAt),
+		CreatedAtShort:   timefmt.FormatRFC3339(k.CreatedAt, timefmt.LayoutDateShort),
+		LastUsedRelative: timefmt.RelativeRFC3339Ptr(k.LastUsedAt),
 	}
 }
 
@@ -142,23 +142,8 @@ func buildAccessClientRow(c service.OAuthClientResponse) pages.AccessClientRow {
 		Name:           c.Name,
 		ClientIDPrefix: c.ClientIDPrefix,
 		Scope:          c.Scope,
-		CreatedAtShort: formatDateShortFromRFC3339(c.CreatedAt),
+		CreatedAtShort: timefmt.FormatRFC3339(c.CreatedAt, timefmt.LayoutDateShort),
 	}
-}
-
-// formatDateShortFromRFC3339 mirrors the `formatDateShort` funcMap helper
-// for a string-typed timestamp: parses RFC3339 and renders as
-// "Jan 2, 3:04 PM" in the local timezone. Returns the input verbatim on
-// parse failure (matching the helper's fall-through).
-func formatDateShortFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return t.Local().Format("Jan 2, 3:04 PM")
 }
 
 // APIKeyNewPageHandler serves GET /admin/api-keys/new.
@@ -187,8 +172,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
-			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/settings/api-keys/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Name is required", "/settings/api-keys/new")
 			return
 		}
 		scope := r.FormValue("scope")
@@ -197,8 +181,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		}
 		result, err := svc.CreateAPIKey(r.Context(), name, scope)
 		if err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to create API key")
-			http.Redirect(w, r, "/settings/api-keys/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to create API key", "/settings/api-keys/new")
 			return
 		}
 		// Store the plaintext key in the session so the "created" page can display it once.

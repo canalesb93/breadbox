@@ -114,6 +114,13 @@ func (s *Service) ListComments(ctx context.Context, transactionID string) ([]Com
 		if r.Kind != "comment" {
 			continue
 		}
+		// Tombstoned comments are kept on the activity timeline (rendered as
+		// "<Actor> deleted a comment") but elided from the REST/MCP comment
+		// list — external callers expect the same semantics as the prior
+		// hard-delete behavior.
+		if r.DeletedAt.Valid {
+			continue
+		}
 		content, reviewID := contentFromAnnotationPayload(r.Payload)
 		result = append(result, commentFromAnnotation(r, content, reviewID))
 	}
@@ -142,6 +149,13 @@ func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCom
 	}
 
 	if existing.Kind != "comment" {
+		return nil, ErrNotFound
+	}
+
+	// A tombstoned comment is no longer editable — its content is retired
+	// even though the row survives for audit. Treat as not-found so the
+	// API surface matches the prior hard-delete semantics.
+	if existing.DeletedAt.Valid {
 		return nil, ErrNotFound
 	}
 
@@ -177,7 +191,18 @@ func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCom
 	return &resp, nil
 }
 
-// DeleteComment hard-deletes a comment annotation.
+// DeleteComment soft-deletes a comment annotation: the row stays put with a
+// deleted_at timestamp so the activity timeline can render a tombstone
+// ("<Actor> deleted a comment · <relative-time>") instead of silently dropping
+// every record that the comment ever existed. Hard-delete erased the audit
+// trail; soft-delete preserves actor + timestamp so the timeline keeps its
+// audit value.
+//
+// Idempotent against a row that's already tombstoned: SoftDeleteAnnotation's
+// WHERE clause filters out non-tombstoned rows so a re-delete is a no-op
+// rather than an error. We still verify the annotation exists, is a comment,
+// and the actor is authorized — those checks short-circuit on the first
+// soft-delete and stay correct on retries.
 func (s *Service) DeleteComment(ctx context.Context, id string, actor Actor) error {
 	annID, err := s.resolveAnnotationID(ctx, id)
 	if err != nil {
@@ -200,8 +225,8 @@ func (s *Service) DeleteComment(ctx context.Context, id string, actor Actor) err
 		return ErrForbidden
 	}
 
-	if err := s.Queries.DeleteAnnotation(ctx, annID); err != nil {
-		return fmt.Errorf("delete comment annotation: %w", err)
+	if err := s.Queries.SoftDeleteAnnotation(ctx, annID); err != nil {
+		return fmt.Errorf("soft-delete comment annotation: %w", err)
 	}
 
 	return nil

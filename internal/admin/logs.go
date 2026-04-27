@@ -3,12 +3,12 @@ package admin
 import (
 	"net/http"
 	"net/url"
-	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 )
@@ -123,7 +123,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 					InstitutionName:      l.InstitutionName,
 					Trigger:              l.Trigger,
 					Status:               l.Status,
-					StartedAtRelative:    relativeTimeFromRFC3339Ptr(l.StartedAt),
+					StartedAtRelative:    timefmt.RelativeRFC3339Ptr(l.StartedAt),
 					Duration:             l.Duration,
 					AccountsAffected:     l.AccountsAffected,
 					FriendlyErrorMessage: l.FriendlyErrorMessage,
@@ -221,8 +221,8 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 					InstitutionName:   e.InstitutionName,
 					PayloadHash:       e.PayloadHash,
 					ErrorMessage:      e.ErrorMessage,
-					CreatedAtRelative: relativeTimeFromRFC3339Ptr(e.CreatedAt),
-					CreatedAtFull:     formatDateTimeFromRFC3339Ptr(e.CreatedAt),
+					CreatedAtRelative: timefmt.RelativeRFC3339Ptr(e.CreatedAt),
+					CreatedAtFull:     timefmt.FormatRFC3339Ptr(e.CreatedAt, timefmt.LayoutDateTime),
 				})
 			}
 
@@ -260,7 +260,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 					AgentName:         s.AgentName,
 					HasReport:         s.ReportID != nil,
 					ToolCallCount:     s.ToolCallCount,
-					CreatedAtRelative: relativeTimeFromRFC3339(s.CreatedAt),
+					CreatedAtRelative: timefmt.RelativeRFC3339(s.CreatedAt),
 				})
 			}
 			totalPages := int((total + 24) / 25)
@@ -307,44 +307,3 @@ func encodeSyncStatusQuery(status, connID, trigger, dateFrom, dateTo string) str
 	return v.Encode()
 }
 
-// relativeTimeFromRFC3339 parses a non-pointer RFC3339 string and
-// returns a humanised "X minutes ago". Used for service responses that
-// already pre-format their timestamps as strings (e.g. MCP sessions).
-func relativeTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return relativeTime(t)
-}
-
-// relativeTimeFromRFC3339Ptr parses a *string RFC3339 timestamp and
-// returns a humanised "X minutes ago" string. Mirrors the *string
-// branch of the `relativeTime` funcMap helper.
-func relativeTimeFromRFC3339Ptr(s *string) string {
-	if s == nil || *s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, *s)
-	if err != nil {
-		return *s
-	}
-	return relativeTime(t)
-}
-
-// formatDateTimeFromRFC3339Ptr parses a *string RFC3339 timestamp into
-// the local "Jan 2, 2006 3:04 PM" rendering used by the `formatDateTime`
-// funcMap helper.
-func formatDateTimeFromRFC3339Ptr(s *string) string {
-	if s == nil || *s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, *s)
-	if err != nil {
-		return *s
-	}
-	return t.Local().Format("Jan 2, 2006 3:04 PM")
-}

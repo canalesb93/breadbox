@@ -330,3 +330,53 @@ func TestDateStrPtr_Invalid(t *testing.T) {
 		t.Errorf("DateStrPtr(invalid) = %v, want nil", got)
 	}
 }
+
+func TestInt4(t *testing.T) {
+	got := Int4(42)
+	if !got.Valid || got.Int32 != 42 {
+		t.Errorf("Int4(42) = %+v, want {42 true}", got)
+	}
+}
+
+func TestInt4_Zero(t *testing.T) {
+	got := Int4(0)
+	if !got.Valid || got.Int32 != 0 {
+		t.Errorf("Int4(0) = %+v, want {0 true} — zero stays valid", got)
+	}
+}
+
+func TestNumericCents(t *testing.T) {
+	got := NumericCents(1050)
+	if !got.Valid {
+		t.Fatalf("NumericCents(1050).Valid = false, want true")
+	}
+	if got.Exp != -2 {
+		t.Errorf("NumericCents(1050).Exp = %d, want -2", got.Exp)
+	}
+	if got.Int == nil || got.Int.Int64() != 1050 {
+		t.Errorf("NumericCents(1050).Int = %v, want 1050", got.Int)
+	}
+	f, ok := NumericToFloat(got)
+	if !ok || f != 10.50 {
+		t.Errorf("NumericCents(1050) → NumericToFloat = (%v, %v), want (10.50, true)", f, ok)
+	}
+}
+
+func TestNumericCents_Negative(t *testing.T) {
+	got := NumericCents(-4200)
+	f, ok := NumericToFloat(got)
+	if !ok || f != -42.00 {
+		t.Errorf("NumericCents(-4200) → NumericToFloat = (%v, %v), want (-42, true)", f, ok)
+	}
+}
+
+func TestNumericCents_Zero(t *testing.T) {
+	got := NumericCents(0)
+	if !got.Valid {
+		t.Errorf("NumericCents(0).Valid = false, want true — zero stays valid")
+	}
+	f, ok := NumericToFloat(got)
+	if !ok || f != 0 {
+		t.Errorf("NumericCents(0) → NumericToFloat = (%v, %v), want (0, true)", f, ok)
+	}
+}

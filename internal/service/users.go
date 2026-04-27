@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 )
 
 func (s *Service) ListUsers(ctx context.Context) ([]UserResponse, error) {
@@ -25,7 +26,7 @@ func userFromRow(r db.User) UserResponse {
 		ShortID:   r.ShortID,
 		Name:      r.Name,
 		Email:     textPtr(r.Email),
-		CreatedAt: r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt: pgconv.TimestampStr(r.CreatedAt),
+		UpdatedAt: pgconv.TimestampStr(r.UpdatedAt),
 	}
 }

@@ -92,8 +92,7 @@ func CreateAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManager)
 		dependentID := r.FormValue("dependent_account_id")
 
 		if primaryID == "" || dependentID == "" {
-			SetFlash(r.Context(), sm, "error", "Both accounts must be selected.")
-			http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Both accounts must be selected.", "/connections?tab=links")
 			return
 		}
 
@@ -102,8 +101,7 @@ func CreateAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManager)
 			DependentAccountID: dependentID,
 		})
 		if err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to create link: "+err.Error())
-			http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to create link: "+err.Error(), "/connections?tab=links")
 			return
 		}
 

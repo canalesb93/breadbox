@@ -1,0 +1,83 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// OAuthClientCreated renders the /oauth-clients/{id}/created page —
+// shown once after creating a new OAuth client, displaying the client_id,
+// plaintext client_secret, and the MCP server URL for one-time copy.
+// Hosts inside the base layout via TemplateRenderer.RenderWithTempl. The
+// markup mirrors the previous html/template version byte-for-byte.
+//
+// The Alpine factory lives in static/js/admin/components/oauth_client_created.js
+// and reads the secret value off the data-secret attribute on the x-data
+// root so the inline @click handlers stay tiny. The factory <script> is
+// loaded synchronously at the top of the component (not `defer`) so
+// Alpine.data('oauthClientCreated', ...) is registered before Alpine —
+// itself <script defer> in <head> — fires alpine:init.
+templ OAuthClientCreated(p OAuthClientCreatedProps) {
+	<!-- Component factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registration runs before Alpine — itself deferred
+	     from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/oauth_client_created.js"></script>
+	@components.BreadcrumbNav(p.Breadcrumbs)
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">OAuth Client Created</h1>
+			<p class="text-sm text-base-content/50 mt-1">Copy your credentials now -- you won't see the secret again</p>
+		</div>
+	</div>
+	<div class="bb-card p-6 max-w-lg" x-data="oauthClientCreated" data-secret={ p.ClientSecret }>
+		<div class="flex items-center gap-3 mb-5">
+			<div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
+				<i data-lucide="check" class="w-5 h-5 text-success"></i>
+			</div>
+			<div>
+				<h2 class="text-sm font-semibold">{ p.ClientName }</h2>
+				<p class="text-xs text-base-content/45">Copy these credentials -- the secret won't be shown again.</p>
+			</div>
+		</div>
+		<div class="space-y-4 mb-5">
+			<div>
+				<label class="text-xs font-medium text-base-content/50 mb-1.5 block">Client ID</label>
+				<div class="flex gap-2">
+					<input type="text" value={ p.ClientID } readonly id="oauth-client-id" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs"/>
+					<button class="btn btn-sm btn-ghost rounded-xl shrink-0 gap-1.5" :class="copiedId && '!text-success'" @click="copyClientId()">
+						<i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedId"></i>
+						<i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedId" x-cloak></i>
+						<span x-text="copiedId ? 'Copied!' : 'Copy'"></span>
+					</button>
+				</div>
+			</div>
+			<div>
+				<label class="text-xs font-medium text-base-content/50 mb-1.5 block">Client Secret</label>
+				<div class="flex gap-2">
+					<input type="text" value={ p.ClientSecret } readonly id="oauth-client-secret" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs"/>
+					<button class="btn btn-primary btn-sm rounded-xl shrink-0 gap-1.5" :class="copiedSecret && '!btn-success'" @click="copyClientSecret()">
+						<i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedSecret"></i>
+						<i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedSecret" x-cloak></i>
+						<span x-text="copiedSecret ? 'Copied!' : 'Copy'"></span>
+					</button>
+				</div>
+			</div>
+		</div>
+		<div class="pt-4 border-t border-base-300 space-y-3">
+			<div class="flex items-center justify-between">
+				<p class="text-xs text-base-content/40">
+					Paste the Client ID and Secret into your connector's settings.
+				</p>
+				<a href="/access" class="btn btn-ghost btn-sm rounded-xl shrink-0">Done</a>
+			</div>
+			<div class="rounded-xl bg-base-200/50 p-3">
+				<div class="text-xs font-medium text-base-content/50 mb-1.5">MCP Server URL</div>
+				<div class="flex gap-2">
+					<input type="text" value={ p.MCPServerURL } readonly id="oauth-mcp-url" class="input input-sm font-mono flex-1 bg-base-100 border-base-300 rounded-xl text-xs text-primary/80"/>
+					<button class="btn btn-sm btn-ghost rounded-xl shrink-0 gap-1.5" :class="copiedUrl && '!text-success'" @click="copyMCPUrl()">
+						<i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedUrl"></i>
+						<i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedUrl" x-cloak></i>
+						<span x-text="copiedUrl ? 'Copied!' : 'Copy'"></span>
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}

@@ -236,16 +236,14 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 
 		// Guard: must be an unlinked account.
 		if SessionUserID(sm, r) != "" {
-			SetFlash(ctx, sm, "error", "Your account is already linked to a household member.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Your account is already linked to a household member.", "/settings/account")
 			return
 		}
 
 		accountIDStr := SessionAccountID(sm, r)
 		accountID, err := parseUUID(accountIDStr)
 		if err != nil {
-			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid session.", "/settings/account")
 			return
 		}
 
@@ -256,14 +254,12 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		case "create":
 			name := strings.TrimSpace(r.FormValue("name"))
 			if name == "" {
-				SetFlash(ctx, sm, "error", "Name is required.")
-				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Name is required.", "/settings/account")
 				return
 			}
 			user, err := a.Queries.CreateUser(ctx, db.CreateUserParams{Name: name})
 			if err != nil {
-				SetFlash(ctx, sm, "error", "Failed to create household member.")
-				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Failed to create household member.", "/settings/account")
 				return
 			}
 			userID = user.ID
@@ -271,32 +267,27 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		case "existing":
 			uid := r.FormValue("user_id")
 			if uid == "" {
-				SetFlash(ctx, sm, "error", "Please select a household member.")
-				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Please select a household member.", "/settings/account")
 				return
 			}
 			parsed, err := parseUUID(uid)
 			if err != nil {
-				SetFlash(ctx, sm, "error", "Invalid user selected.")
-				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Invalid user selected.", "/settings/account")
 				return
 			}
 			// Verify user exists and isn't already linked.
 			if _, err := a.Queries.GetUser(ctx, parsed); err != nil {
-				SetFlash(ctx, sm, "error", "Household member not found.")
-				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "Household member not found.", "/settings/account")
 				return
 			}
 			if _, err := a.Queries.GetAuthAccountByUserID(ctx, parsed); err == nil {
-				SetFlash(ctx, sm, "error", "That household member already has a login account.")
-				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+				FlashRedirect(w, r, sm, "error", "That household member already has a login account.", "/settings/account")
 				return
 			}
 			userID = parsed
 
 		default:
-			SetFlash(ctx, sm, "error", "Invalid request.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid request.", "/settings/account")
 			return
 		}
 
@@ -305,8 +296,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 			ID:     accountID,
 			UserID: userID,
 		}); err != nil {
-			SetFlash(ctx, sm, "error", "Failed to link account.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to link account.", "/settings/account")
 			return
 		}
 
@@ -321,12 +311,9 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 // MyAccountChangePasswordHandler serves POST /settings/account/password -- member changes their own password.
 func MyAccountChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
 		accountIDStr := SessionAccountID(sm, r)
 		if accountIDStr == "" {
-			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid session.", "/settings/account")
 			return
 		}
 
@@ -417,16 +404,14 @@ func MyAccountWipeDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 
 		userIDStr := SessionUserID(sm, r)
 		if userIDStr == "" {
-			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid session.", "/settings/account")
 			return
 		}
 
 		txnCount, err := a.Service.WipeUserData(ctx, userIDStr)
 		if err != nil {
 			a.Logger.Error("member wipe own data", "error", err, "user_id", userIDStr)
-			SetFlash(ctx, sm, "error", "Failed to wipe data.")
-			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to wipe data.", "/settings/account")
 			return
 		}
 

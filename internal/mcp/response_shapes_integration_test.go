@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"math/big"
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -71,7 +71,7 @@ func seedFixtures(t *testing.T) *fixtures {
 		Name:              "Primary Credit Card",
 		Type:              "credit",
 		IsoCurrencyCode:   pgtype.Text{String: "USD", Valid: true},
-		BalanceCurrent:    pgtype.Numeric{Int: big.NewInt(50000), Exp: -2, Valid: true},
+		BalanceCurrent:    pgconv.NumericCents(50000),
 	})
 	if err != nil {
 		t.Fatalf("upsert primary account: %v", err)

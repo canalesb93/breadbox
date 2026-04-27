@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -34,6 +35,31 @@ func redirectPreserveMethod(dest string) http.HandlerFunc {
 		}
 		http.Redirect(w, r, target, http.StatusPermanentRedirect)
 	}
+}
+
+// parseURLUUIDOrNotFound extracts the named chi URL param and decodes it as a
+// UUID. On parse failure it renders the styled 404 page via tr and returns
+// ok=false. Used by HTML detail/edit handlers.
+func parseURLUUIDOrNotFound(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, key string) (pgtype.UUID, bool) {
+	var id pgtype.UUID
+	if err := id.Scan(chi.URLParam(r, key)); err != nil {
+		tr.RenderNotFound(w, r)
+		return pgtype.UUID{}, false
+	}
+	return id, true
+}
+
+// parseURLUUIDOrInvalid extracts the named chi URL param and decodes it as a
+// UUID. On parse failure it writes a 400 response with the legacy
+// {"error": label} envelope and returns ok=false. Used by admin JSON handlers
+// that pre-date the canonical error envelope.
+func parseURLUUIDOrInvalid(w http.ResponseWriter, r *http.Request, key, label string) (pgtype.UUID, bool) {
+	var id pgtype.UUID
+	if err := id.Scan(chi.URLParam(r, key)); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": label})
+		return pgtype.UUID{}, false
+	}
+	return id, true
 }
 
 // parsePage returns the 1-indexed page from ?page=, flooring at 1 when the
@@ -140,13 +166,6 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
-}
-
-// BalanceTotals holds aggregated asset/liability/net-worth values.
-type BalanceTotals struct {
-	TotalAssets      float64
-	TotalLiabilities float64
-	NetWorth         float64
 }
 
 // IsLiabilityAccount returns true for account types that represent liabilities (credit, loan).

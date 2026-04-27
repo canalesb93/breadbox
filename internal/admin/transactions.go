@@ -419,13 +419,10 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		idStr := chi.URLParam(r, "id")
-
-		var accountID pgtype.UUID
-		if err := accountID.Scan(idStr); err != nil {
-			tr.RenderNotFound(w, r)
+		if _, ok := parseURLUUIDOrNotFound(w, r, tr, "id"); !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		detail, err := svc.GetAccountDetail(ctx, idStr)
 		if err != nil {
@@ -683,8 +680,14 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			timelineTags = nil
 		}
 
+		// Capture a single now anchor so the day-bucket labels
+		// ("Today" / "Yesterday" / weekday) and the per-row relative
+		// timestamps ("5 minutes ago" / "yesterday") agree across
+		// midnight and timezone boundaries. Threaded into the templ via
+		// props.Now → relativeTimeStrAt.
+		now := time.Now()
 		activity := buildActivityTimeline(annotations, categoryDetailLookup(categoryTree), tagDisplayLookup(timelineTags))
-		activityDays := groupActivityByDay(activity)
+		activityDays := groupActivityByDay(activity, now)
 
 		// Load tags currently attached + the registered-tag list (for the inline
 		// add-tag suggestion datalist). Also derive HasPendingReview from the
@@ -795,6 +798,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			Account:          account,
 			Activity:         activity,
 			ActivityDays:     componentActivityDays,
+			Now:              now,
 			HasPendingReview: hasPendingReview,
 			CurrentTags:      currentTags,
 			AvailableTags:    availableTags,
@@ -969,6 +973,19 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			ActorAvatarVersion: a.ActorAvatarVersion,
 			Detail:             a.Content,
 			CommentID:          a.ShortID,
+			IsDeleted:          a.IsDeleted,
+		}
+		// Tombstoned comments don't echo their original body. The
+		// CommentID short_id stays populated so the optimistic-update
+		// path on the detail page can match the tombstone back to the
+		// bubble it replaces (`?comment_ids=<id>` on the timeline-rows
+		// endpoint). The bubble template gates the trash button on
+		// CommentID being non-empty AND the row not being IsDeleted, so
+		// keeping the ID here doesn't accidentally re-surface the
+		// delete affordance on a tombstone.
+		if a.IsDeleted {
+			entry.Detail = ""
+			entry.Summary = a.Summary
 		}
 		if a.ActorID != nil && *a.ActorID != "" {
 			id := *a.ActorID
@@ -1060,8 +1077,38 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			entry.ActorID = &id
 		}
 		return entry, true
+
+	case "sync_started", "sync_updated":
+		// Sync events: actor is the provider (Plaid / Teller / CSV import).
+		// Summary is the canonical sentence built by EnrichAnnotations; the
+		// templ row renders it as-is via the fallback branch in
+		// txdSystemSentence — same path used by rule rows that pre-format the
+		// sentence in the service layer.
+		entry := service.ActivityEntry{
+			Type:               syncEntryType(a.Kind),
+			Timestamp:          a.CreatedAt,
+			ActorName:          a.ActorName,
+			ActorType:          a.ActorType,
+			ActorAvatarVersion: a.ActorAvatarVersion,
+			Summary:            a.Summary,
+		}
+		if a.ActorID != nil && *a.ActorID != "" {
+			id := *a.ActorID
+			entry.ActorID = &id
+		}
+		return entry, true
 	}
 	return service.ActivityEntry{}, false
+}
+
+// syncEntryType maps the raw DB kind to the ActivityEntry type. Both sync_*
+// kinds collapse to a single "sync" type in the UI — the icon is identical
+// (landmark) and the Summary already differentiates the verb.
+func syncEntryType(dbKind string) string {
+	if dbKind == "sync_started" || dbKind == "sync_updated" {
+		return "sync"
+	}
+	return dbKind
 }
 
 // ActivityDayGroup holds activity entries grouped by calendar day (in the
@@ -1076,13 +1123,14 @@ type ActivityDayGroup struct {
 // groupActivityByDay groups a sorted-desc activity list into per-day buckets.
 // Timestamp is an RFC3339 string on ActivityEntry; entries with unparseable
 // timestamps are skipped (they're dropped rather than mis-bucketed). Each
-// returned group preserves the relative ordering of the input slice.
-func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
+// returned group preserves the relative ordering of the input slice. The
+// now anchor is passed in (rather than read via time.Now()) so the bucket
+// labels share the same reference clock as the per-row relative timestamps.
+func groupActivityByDay(entries []service.ActivityEntry, now time.Time) []ActivityDayGroup {
 	if len(entries) == 0 {
 		return nil
 	}
 
-	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 
@@ -1100,7 +1148,7 @@ func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
 		if !ok {
 			groups = append(groups, ActivityDayGroup{
 				Date:  date,
-				Label: activityDayLabel(date, today, yesterday),
+				Label: activityDayLabel(date, today, yesterday, now),
 			})
 			idx = len(groups) - 1
 			groupIdx[date] = idx
@@ -1114,7 +1162,9 @@ func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
 // activityDayLabel returns "Today", "Yesterday", or "Thursday, April 16" /
 // "Thursday, April 16, 2025" for older dates. The long-form weekday/month
 // mirrors GitHub's timeline convention and reads well at mobile widths.
-func activityDayLabel(dateStr, today, yesterday string) string {
+// now provides the reference year for the same-year shortening so the
+// label cannot disagree with the day-grouping anchor across New Year.
+func activityDayLabel(dateStr, today, yesterday string, now time.Time) string {
 	if dateStr == today {
 		return "Today"
 	}
@@ -1125,7 +1175,7 @@ func activityDayLabel(dateStr, today, yesterday string) string {
 	if err != nil {
 		return dateStr
 	}
-	if t.Year() == time.Now().Year() {
+	if t.Year() == now.Year() {
 		return t.Format("Monday, January 2")
 	}
 	return t.Format("Monday, January 2, 2006")
@@ -1196,6 +1246,139 @@ func DeleteTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *se
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// TimelineRowsHandler serves GET /-/transactions/{id}/timeline/rows?since=<RFC3339>[&comment_ids=<id1,id2>].
+//
+// Powers the optimistic-update flow on the transaction detail page: each
+// Alpine action (set category, add tag, comment, etc.) POSTs the mutation
+// and then GETs this endpoint to fetch the rendered HTML for the row(s)
+// that were just written. Reuses the same buildActivityTimeline +
+// pages.TimelineRows helpers as the page handler so server-rendered row
+// markup is the single source of truth (Strategy A — see
+// static/js/admin/components/transaction_detail.js header).
+//
+// Behavior:
+//   - `since` is a RFC3339 timestamp; only entries with Timestamp > since
+//     are returned. Empty/missing `since` returns no entries (the JS uses
+//     this as a sentinel for "no prior cursor — first load only").
+//   - `comment_ids` is a comma-separated list of comment short_ids. Comment
+//     entries matching any of those IDs are included in the response even
+//     when their Timestamp is older than `since`. This handles the
+//     soft-delete case: PR 4's tombstone flips `is_deleted` on an existing
+//     annotation rather than inserting a new one, so the deleted comment's
+//     CreatedAt stays in the past — the JS passes the deleted ID here and
+//     gets the freshly-rendered tombstone row back.
+//   - Returns text/html with the rendered <li> rows, plus an optional day
+//     separator <li> when the new entries fall on a different calendar day
+//     from the most recent prior entry (or when there were no prior entries).
+//   - Empty body when no new entries exist (e.g. the mutation was a no-op).
+func TimelineRowsHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		txnID := chi.URLParam(r, "id")
+		sinceRaw := strings.TrimSpace(r.URL.Query().Get("since"))
+		commentIDsRaw := strings.TrimSpace(r.URL.Query().Get("comment_ids"))
+		commentIDs := map[string]bool{}
+		if commentIDsRaw != "" {
+			for _, id := range strings.Split(commentIDsRaw, ",") {
+				if id = strings.TrimSpace(id); id != "" {
+					commentIDs[id] = true
+				}
+			}
+		}
+
+		// Build the timeline the same way TransactionDetailHandler does so
+		// the row markup is byte-equivalent to the main page render.
+		annotations, err := svc.ListAnnotations(ctx, txnID, service.ListAnnotationsParams{})
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				return
+			}
+			a.Logger.Error("timeline rows: list annotations", "error", err)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load activity")
+			return
+		}
+		categoryTree, err := svc.ListCategoryTree(ctx)
+		if err != nil {
+			a.Logger.Error("timeline rows: list categories", "error", err)
+		}
+		timelineTags, err := svc.ListTags(ctx)
+		if err != nil {
+			a.Logger.Error("timeline rows: list tags", "error", err)
+			timelineTags = nil
+		}
+
+		now := time.Now()
+		entries := buildActivityTimeline(annotations, categoryDetailLookup(categoryTree), tagDisplayLookup(timelineTags))
+
+		// Compute the prior-most-recent timestamp as the boundary between
+		// "already on the page" and "newly inserted". An empty `since` means
+		// the JS hasn't tracked a cursor yet — return nothing rather than the
+		// full timeline (the page already has every entry on first paint).
+		var prior, since time.Time
+		var haveSince, havePrior bool
+		if sinceRaw != "" {
+			if parsed, perr := time.Parse(time.RFC3339, sinceRaw); perr == nil {
+				since = parsed
+				haveSince = true
+			}
+		}
+
+		var newEntries []service.ActivityEntry
+		for _, e := range entries {
+			ts, perr := time.Parse(time.RFC3339, e.Timestamp)
+			if perr != nil {
+				continue
+			}
+			// Always include comment entries whose ID matches one of the
+			// explicit comment_ids — this is the soft-delete tombstone path
+			// where the row's CreatedAt is older than `since` but its
+			// IsDeleted state just flipped.
+			if e.Type == "comment" && commentIDs[e.CommentID] {
+				newEntries = append(newEntries, e)
+				continue
+			}
+			if haveSince {
+				if ts.After(since) {
+					newEntries = append(newEntries, e)
+				} else if !havePrior || ts.After(prior) {
+					prior = ts
+					havePrior = true
+				}
+			}
+		}
+
+		// Decide whether we need a day separator before the new rows. The
+		// separator is needed when the first new entry's calendar day is
+		// different from the most recent prior entry's calendar day (or
+		// when there were no prior entries — the activity-empty case).
+		var dayLabel string
+		if len(newEntries) > 0 {
+			firstNewTs, _ := time.Parse(time.RFC3339, newEntries[0].Timestamp)
+			firstNewDay := firstNewTs.Local().Format("2006-01-02")
+			if !havePrior || prior.Local().Format("2006-01-02") != firstNewDay {
+				today := now.Format("2006-01-02")
+				yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+				dayLabel = activityDayLabel(firstNewDay, today, yesterday, now)
+			}
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if len(newEntries) == 0 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		comp := pages.TimelineRows(pages.TimelineRowsProps{
+			Entries:           newEntries,
+			Now:               now,
+			DaySeparatorLabel: dayLabel,
+		})
+		if err := comp.Render(ctx, w); err != nil {
+			a.Logger.Error("timeline rows: render", "error", err)
+		}
 	}
 }
 

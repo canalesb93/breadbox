@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/shortid"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -124,7 +125,7 @@ func (s *Service) LogToolCall(ctx context.Context, input ToolCallLogInput) {
 
 	var durationMs pgtype.Int4
 	if input.DurationMs > 0 {
-		durationMs = pgtype.Int4{Int32: int32(input.DurationMs), Valid: true}
+		durationMs = pgconv.Int4(int32(input.DurationMs))
 	}
 
 	err := s.Queries.CreateToolCallLog(ctx, db.CreateToolCallLogParams{
@@ -174,7 +175,7 @@ func (s *Service) ListMCPSessions(ctx context.Context, page, pageSize int) ([]MC
 			ShortID:       r.ShortID,
 			Purpose:       r.Purpose,
 			APIKeyName:    r.ApiKeyName,
-			CreatedAt:     r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:     pgconv.TimestampStr(r.CreatedAt),
 			ToolCallCount: r.ToolCallCount,
 			LastCallAt:    timestampStr(r.LastCallAt),
 			AgentName:     r.AgentName,
@@ -291,7 +292,7 @@ func mcpSessionFromRow(r db.McpSession) MCPSessionResponse {
 		ShortID:    r.ShortID,
 		Purpose:    r.Purpose,
 		APIKeyName: r.ApiKeyName,
-		CreatedAt:  r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:  pgconv.TimestampStr(r.CreatedAt),
 	}
 }
 
@@ -303,7 +304,7 @@ func toolCallFromRow(r db.McpToolCall) ToolCallLogResponse {
 		Reason:         r.Reason,
 		IsError:        r.IsError,
 		ActorName:      r.ActorName,
-		CreatedAt:      r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      pgconv.TimestampStr(r.CreatedAt),
 	}
 	if len(r.RequestJson) > 0 {
 		raw := json.RawMessage(r.RequestJson)

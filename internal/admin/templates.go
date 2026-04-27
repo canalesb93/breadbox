@@ -22,6 +22,7 @@ import (
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 	"breadbox/internal/version"
 
 	"github.com/a-h/templ"
@@ -107,6 +108,33 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdCombo(keys...), nil
 	},
+}
+
+// formatTimeAny returns a funcMap-shaped helper that renders a time-ish
+// value via layout in the local timezone. Accepted shapes: time.Time,
+// *time.Time, RFC3339/RFC3339Nano string, *string. Nil pointers and the
+// empty string render as ""; an unparseable string passes through
+// verbatim so callers don't show "0001-01-01..." on bad data. Centralises
+// what used to be three near-identical funcMap entries (#871).
+func formatTimeAny(layout string) func(any) string {
+	format := func(t time.Time) string { return t.Local().Format(layout) }
+	return func(v any) string {
+		switch v := v.(type) {
+		case time.Time:
+			return format(v)
+		case *time.Time:
+			if v == nil {
+				return ""
+			}
+			return format(*v)
+		case string:
+			return timefmt.FormatRFC3339(v, layout)
+		case *string:
+			return timefmt.FormatRFC3339Ptr(v, layout)
+		default:
+			return ""
+		}
+	}
 }
 
 // assertAdminTxRow extracts a service.AdminTransactionRow from data,
@@ -333,18 +361,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			},
 			"statusBadge": func(status string) template.HTML {
 				return template.HTML(components.StatusBadge(status))
-			},
-			"syncBadge": func(status string) template.HTML {
-				switch status {
-				case "success":
-					return `<span class="badge badge-soft badge-success badge-sm">success</span>`
-				case "error":
-					return `<span class="badge badge-soft badge-error badge-sm">error</span>`
-				case "in_progress":
-					return `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`
-				default:
-					return template.HTML(`<span class="badge badge-ghost badge-sm">` + template.HTMLEscapeString(status) + `</span>`)
-				}
 			},
 			"errorMessage": components.ErrorMessage,
 			"syncFriendlyError": func(rawErr string) string {
@@ -660,100 +676,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return acctType
 			},
-			"formatDateTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("Jan 2, 2006 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
+			"formatDateTime": formatTimeAny(timefmt.LayoutDateTime),
 			// clockTime renders the local clock portion of a timestamp
 			// ("2:03 AM"). Paired with a same-day day separator on the
 			// activity timeline it disambiguates 10 events that would all
 			// otherwise read "8 days ago" (#707).
-			"clockTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					if parsed, err := time.Parse(time.RFC3339Nano, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
-			"formatDateShort": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("Jan 2, 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
+			"clockTime":       formatTimeAny(timefmt.LayoutClock),
+			"formatDateShort": formatTimeAny(timefmt.LayoutDateShort),
 			"formatDate":   components.FormatDate,
 			"relativeDate": components.RelativeDate,
 			"formatNumeric": func(n pgtype.Numeric) string {
@@ -850,7 +779,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// using the _templ_shell template key (see pages.ConnectionNew).
 		// pages/connection_detail.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.ConnectionDetail).
-		"pages/connection_reauth.html",
+		// pages/connection_reauth.html removed — renders via RenderWithTempl
+		// using the _templ_shell template key (see pages.ConnectionReauth).
 		// pages/users.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.Users).
 		// pages/user_form.html removed — renders via RenderWithTempl using
@@ -888,12 +818,14 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// the _templ_shell template key (see pages.Reports).
 		// pages/logs.html removed — renders via RenderWithTempl using the
 		// _templ_shell template key (see pages.Logs).
-		"pages/oauth_clients.html",
-		"pages/oauth_client_new.html",
-		"pages/oauth_client_created.html",
-		// pages/agent_wizard.html is not registered as a standalone base page —
-		// its standalone route redirects to /agents and it's only consumed as a
-		// composite extra (see compositePages below).
+		// pages/oauth_clients.html removed — was dead (consolidated into pages/access.html).
+		// pages/oauth_client_new.html and pages/oauth_client_created.html removed —
+		// both render via RenderWithTempl using the _templ_shell template
+		// key (see pages.OAuthClientNew and pages.OAuthClientCreated).
+		// pages/agents.html, pages/mcp_guide.html, pages/agent_wizard.html, and
+		// pages/mcp_settings.html removed — agent prompts now render via
+		// RenderWithTempl using pages.AgentWizard. MCP Settings moved to the
+		// unified Settings shell at /settings/mcp.
 		// pages/prompt_builder.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.PromptBuilder).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
@@ -902,32 +834,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// using the _templ_shell template key (see pages.GettingStarted).
 	}
 
-	// Pages that need multiple page files parsed together (for sub-template sharing).
-	compositePages := map[string][]string{
-		"pages/agents.html": {
-			"pages/agent_wizard.html",
-		},
-	}
-
 	for _, page := range basePages {
 		if err := tr.parseBasePage(page); err != nil {
 			return err
 		}
-	}
-
-	// Composite pages: parsed with extra page files so sub-templates are available.
-	for page, extras := range compositePages {
-		files := []string{"layout/base.html"}
-		files = append(files, templatePartials...)
-		files = append(files, extras...)
-		files = append(files, page)
-		t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
-		if err != nil {
-			return fmt.Errorf("parse composite page %s: %w", page, err)
-		}
-		name := path.Base(page)
-		tr.templates[name] = t
-		tr.specs[name] = files
 	}
 
 	return nil

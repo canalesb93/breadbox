@@ -379,7 +379,7 @@ func TestShortID_SetTransactionCategory_WithShortIDs(t *testing.T) {
 	}
 
 	// Categorize using short_ids for both transaction and category.
-	err = svc.SetTransactionCategory(ctx, dbTxn.ShortID, catShortID)
+	err = svc.SetTransactionCategory(ctx, dbTxn.ShortID, catShortID, service.SystemActor())
 	if err != nil {
 		t.Fatalf("SetTransactionCategory with short_ids: %v", err)
 	}

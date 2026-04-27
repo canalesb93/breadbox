@@ -280,13 +280,11 @@ func NewUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ht
 func EditUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		idStr := chi.URLParam(r, "id")
-
-		var userID pgtype.UUID
-		if err := userID.Scan(idStr); err != nil {
-			tr.RenderNotFound(w, r)
+		userID, ok := parseURLUUIDOrNotFound(w, r, tr, "id")
+		if !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		user, err := a.Queries.GetUser(ctx, userID)
 		if err != nil {
@@ -446,13 +444,11 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		idStr := chi.URLParam(r, "id")
-
-		var userID pgtype.UUID
-		if err := userID.Scan(idStr); err != nil {
-			tr.RenderNotFound(w, r)
+		userID, ok := parseURLUUIDOrNotFound(w, r, tr, "id")
+		if !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		user, err := a.Queries.GetUser(ctx, userID)
 		if err != nil {

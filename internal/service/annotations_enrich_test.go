@@ -250,6 +250,70 @@ func TestEnrichAnnotations_DropsCommentDuplicatingAdjacentTagNote(t *testing.T) 
 	}
 }
 
+// Tombstoned comments must NEVER be folded into an adjacent tag-with-note
+// even when the timestamps and actor match — a deletion is a distinct audit
+// event and the timeline must surface it independently.
+func TestEnrichAnnotations_TombstoneNeverFoldsIntoTagNote(t *testing.T) {
+	actor := "user-1"
+	note := "Please review this one again"
+	rows := []Annotation{
+		{
+			ID:        "a-tag",
+			Kind:      "tag_added",
+			ActorID:   &actor,
+			ActorName: "alice",
+			Payload: map[string]interface{}{
+				"slug": "needs-review",
+				"note": note,
+			},
+			CreatedAt: "2026-04-16T03:39:34.502794Z",
+		},
+		{
+			ID:        "a-comment",
+			Kind:      "comment",
+			ActorID:   &actor,
+			ActorName: "alice",
+			Payload: map[string]interface{}{
+				"content": note,
+			},
+			CreatedAt: "2026-04-16T03:39:34.513524Z",
+			IsDeleted: true,
+		},
+	}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	if len(out) != 2 {
+		t.Fatalf("len = %d, want 2 (tombstone must survive enrichment)", len(out))
+	}
+	// Tombstone Summary is the muted "<Actor> deleted a comment" sentence,
+	// not the original body.
+	gotComment := out[1]
+	if gotComment.Kind != "comment" || !gotComment.IsDeleted {
+		t.Fatalf("expected tombstoned comment to survive; got kind=%q deleted=%v", gotComment.Kind, gotComment.IsDeleted)
+	}
+	if gotComment.Summary != "alice deleted a comment" {
+		t.Errorf("Summary = %q, want %q", gotComment.Summary, "alice deleted a comment")
+	}
+}
+
+// A bare tombstone (no actor name) renders the system-shape "Comment deleted"
+// sentence so the timeline still narrates the event.
+func TestEnrichAnnotations_TombstoneSummaryFallsBackWithoutActor(t *testing.T) {
+	rows := []Annotation{{
+		ID:        "ghost",
+		Kind:      "comment",
+		Payload:   map[string]interface{}{"content": "old body"},
+		CreatedAt: "2026-04-16T03:39:34Z",
+		IsDeleted: true,
+	}}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	if len(out) != 1 {
+		t.Fatalf("len = %d, want 1", len(out))
+	}
+	if out[0].Summary != "Comment deleted" {
+		t.Errorf("Summary = %q, want %q", out[0].Summary, "Comment deleted")
+	}
+}
+
 // A comment outside the ±2s window of a matching tag_added.note is NOT
 // deduped — users can legitimately repeat the same text minutes later.
 func TestEnrichAnnotations_KeepsDistantComment(t *testing.T) {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -32,8 +34,8 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 				ErrorCode:       textPtr(r.ErrorCode),
 				ErrorMessage:    textPtr(r.ErrorMessage),
 				LastSyncedAt:    timestampStr(r.LastSyncedAt),
-				CreatedAt:       r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-				UpdatedAt:       r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+				CreatedAt:       pgconv.TimestampStr(r.CreatedAt),
+				UpdatedAt:       pgconv.TimestampStr(r.UpdatedAt),
 			}
 		}
 		return result, nil
@@ -57,8 +59,8 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 			ErrorCode:       textPtr(r.ErrorCode),
 			ErrorMessage:    textPtr(r.ErrorMessage),
 			LastSyncedAt:    timestampStr(r.LastSyncedAt),
-			CreatedAt:       r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:       r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:       pgconv.TimestampStr(r.CreatedAt),
+			UpdatedAt:       pgconv.TimestampStr(r.UpdatedAt),
 		}
 	}
 	return result, nil
@@ -91,8 +93,8 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 			ErrorCode:       textPtr(conn.ErrorCode),
 			ErrorMessage:    textPtr(conn.ErrorMessage),
 			LastSyncedAt:    timestampStr(conn.LastSyncedAt),
-			CreatedAt:       conn.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:       conn.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:       pgconv.TimestampStr(conn.CreatedAt),
+			UpdatedAt:       pgconv.TimestampStr(conn.UpdatedAt),
 		},
 	}
 

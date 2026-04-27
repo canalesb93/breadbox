@@ -4,16 +4,10 @@ import (
 	"net/http"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 )
-
-// AgentWizardStats holds live stats shown on the agent wizard cards.
-type AgentWizardStats struct {
-	PendingReviews int64
-	TotalRules     int64
-	TotalAccounts  int64
-}
 
 // AgentsPageHandler serves GET /admin/agent-prompts — the Agent Prompts library.
 //
@@ -21,7 +15,7 @@ type AgentWizardStats struct {
 // activity). The guide tab was removed, MCP settings moved into the unified
 // Settings shell at /settings/mcp, and the activity tab moved to
 // /activity?tab=sessions. What remains is a single page rendering the prompt
-// wizard cards.
+// wizard cards via the AgentWizard templ component.
 func AgentsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -40,12 +34,13 @@ func AgentsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 			totalAccounts = int64(len(accounts))
 		}
 
-		data["Stats"] = AgentWizardStats{
-			PendingReviews: pendingReviews,
-			TotalRules:     ruleCount,
-			TotalAccounts:  totalAccounts,
+		props := pages.AgentWizardProps{
+			Stats: pages.AgentWizardStatsProps{
+				PendingReviews: pendingReviews,
+				TotalRules:     ruleCount,
+				TotalAccounts:  totalAccounts,
+			},
 		}
-
-		tr.Render(w, r, "agents.html", data)
+		tr.RenderWithTempl(w, r, data, pages.AgentWizard(props))
 	}
 }

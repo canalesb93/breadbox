@@ -41,7 +41,7 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 		Tags:          tags,
 		Author:        textPtr(r.Author),
 		ReadAt:        timestampStr(r.ReadAt),
-		CreatedAt:     r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:     pgconv.TimestampStr(r.CreatedAt),
 	}
 }
 
