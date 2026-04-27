@@ -295,6 +295,8 @@ templ txdActivity(p TransactionDetailProps) {
 		data-tx-id={ p.TransactionID }
 		data-max-comment-length={ strconv.Itoa(p.MaxCommentLength) }
 		data-has-pending-review={ strconv.FormatBool(p.HasPendingReview) }
+		data-last-activity-ts={ txdLastActivityTimestamp(p.Activity) }
+		data-today={ p.Now.Format("2006-01-02") }
 		@bb-toggle-pin-review.window="if (!hasPendingReview) pinReview = !pinReview"
 	>
 		<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
@@ -523,7 +525,7 @@ templ txdTimelineComment(e service.ActivityEntry, now time.Time) {
 // shape pulled out so the entry-point templ above can branch cleanly on
 // IsDeleted without duplicating either path.
 templ txdTimelineCommentBubble(e service.ActivityEntry, now time.Time) {
-	<li class="relative flex items-start gap-3 py-2.5 group">
+	<li class="relative flex items-start gap-3 py-2.5 group" data-comment-id={ e.CommentID }>
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
 			@txdCommentAvatar(e)
 		</div>
@@ -563,7 +565,7 @@ templ txdTimelineCommentBubble(e service.ActivityEntry, now time.Time) {
 // comment · <relative-time>" remains, preserving audit value (we still
 // know who removed what and when) without re-displaying retired content.
 templ txdTimelineDeletedComment(e service.ActivityEntry, now time.Time) {
-	<li class="relative flex items-start gap-3 py-2 group">
+	<li class="relative flex items-start gap-3 py-2 group" data-comment-id={ e.CommentID }>
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
 				<i data-lucide="trash-2" class="w-3 h-3 text-base-content/40"></i>
@@ -868,4 +870,49 @@ func txdCategoryOverrideAttr(p TransactionDetailProps) string {
 		return "true"
 	}
 	return "false"
+}
+
+// txdLastActivityTimestamp returns the RFC3339 timestamp of the latest
+// activity entry, or empty string when the timeline has no entries. Used
+// as a `data-last-activity-ts` cursor on the activity section so the JS
+// optimistic-update path can ask the render endpoint for "everything newer
+// than this timestamp" after a mutation.
+func txdLastActivityTimestamp(entries []service.ActivityEntry) string {
+	if len(entries) == 0 {
+		return ""
+	}
+	return entries[len(entries)-1].Timestamp
+}
+
+// TimelineRowsProps drives the partial-render endpoint used by the
+// optimistic-update flow. The handler builds the activity entries the
+// same way the main page does, slices off the new ones, and passes them
+// through here. DaySeparatorLabel is non-empty when the new rows live in
+// a different calendar day from whatever was already on the page — the
+// JS then knows to insert this fragment as a fresh day group.
+//
+// The component renders ONLY the new <li> rows (and an optional
+// separator) — never the surrounding <ol> or composer. The JS unwraps
+// the fragment and inserts each <li> right before the composer.
+type TimelineRowsProps struct {
+	Entries           []service.ActivityEntry
+	Now               time.Time
+	DaySeparatorLabel string
+}
+
+// TimelineRows renders activity rows for the partial-render endpoint
+// (GET /-/transactions/{id}/timeline/rows). Reuses txdTimelineDay /
+// txdTimelineSystem / txdTimelineComment so the row markup matches the
+// main page exactly — no client-side templating, no risk of drift.
+templ TimelineRows(p TimelineRowsProps) {
+	if p.DaySeparatorLabel != "" {
+		@txdTimelineDay(p.DaySeparatorLabel, false)
+	}
+	for _, e := range p.Entries {
+		if e.Type == "comment" {
+			@txdTimelineComment(e, p.Now)
+		} else {
+			@txdTimelineSystem(e, p.Now)
+		}
+	}
 }

@@ -235,6 +235,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
 
+		// Activity-timeline partial render — powers the optimistic-update
+		// flow on the detail page. Accessible to all roles (read-only).
+		r.Get("/transactions/{id}/timeline/rows", TimelineRowsHandler(a, sm, svc))
+
 		// Editor+ API routes (categorization, tagging, access management).
 		r.Group(func(r chi.Router) {
 			r.Use(RequireEditor(sm))
