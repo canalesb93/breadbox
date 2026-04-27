@@ -471,6 +471,7 @@
     max-width: 100%;
   }
 
+
   .bb-tag > i, .bb-tag > svg {
     width: 0.75rem;
     height: 0.75rem;
@@ -2687,4 +2688,17 @@
   }
   .bb-report-body tbody tr:last-child td { @apply border-b-0; }
 
+}
+
+/* ─── Unlayered overrides ───
+ * Rules outside any @layer beat anything inside one, regardless of
+ * specificity. We need that here because DaisyUI 5's `.tooltip` rule lands
+ * in a deeper sub-layer (`daisyui.l1.l2.l3`) than our `@layer components`
+ * tag styles (`daisyui.l1.l2`), so a chained `.bb-tag.tooltip` selector
+ * inside @layer components still loses on cascade order. Pulling the
+ * override out of every layer is the smallest fix that pins icon + label
+ * to a single row whenever a chip carries both classes (see #904, where
+ * the slug-tooltip class made the chip render two-line). */
+.bb-tag.tooltip {
+  display: inline-flex;
 }

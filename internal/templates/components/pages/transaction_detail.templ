@@ -783,35 +783,20 @@ templ txdInlineCategoryChip(e service.ActivityEntry) {
 }
 
 // txdInlineTagChip renders the inline tag pill that follows the summary
-// for tag_added / tag_removed timeline rows. Removed tags render with
-// strike-through. The chip is byte-equivalent to the original markup.
+// for tag_added / tag_removed timeline rows. Delegates to the canonical
+// components.TagChipSm so icon, color, label, and slug-tooltip rendering
+// stay in lockstep with every other tag chip in the app. The wrapper
+// carries the removed-state strikethrough + opacity treatment so the
+// inner chip can stay shape-identical to non-strike chips.
 templ txdInlineTagChip(e service.ActivityEntry) {
-	<span
-		class={ "bb-tag bb-tag-sm ml-1 align-middle",
-			templ.KV("line-through opacity-70", e.TagAction == "removed"),
-			templ.KV("tooltip tooltip-top", txdTagChipShowTooltip(e)) }
-		if e.TagColor != nil && *e.TagColor != "" {
-			style={ "--tag-color: " + *e.TagColor }
-		}
-		if txdTagChipShowTooltip(e) {
-			data-tip={ e.TagSlug }
-		}
-		title={ e.TagSlug }
-	>
-		<span class="truncate">
-			if e.TagDisplayName != "" {
-				{ e.TagDisplayName }
-			} else {
-				{ e.TagSlug }
-			}
-		</span>
+	<span class={ "ml-1 align-middle inline-flex", templ.KV("line-through opacity-70", e.TagAction == "removed") }>
+		@components.TagChipSm(components.TagChipData{
+			Slug:        e.TagSlug,
+			DisplayName: e.TagDisplayName,
+			Color:       e.TagColor,
+			Icon:        e.TagIcon,
+		})
 	</span>
-}
-
-// txdTagChipShowTooltip mirrors components.tagChipShowTooltip — only show
-// the slug-tooltip when the chip's visible label is the display name.
-func txdTagChipShowTooltip(e service.ActivityEntry) bool {
-	return e.TagDisplayName != "" && e.TagDisplayName != e.TagSlug
 }
 
 // ---- helpers ----
