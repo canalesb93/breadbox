@@ -142,13 +142,6 @@ func splitCSV(s string) []string {
 	return out
 }
 
-// BalanceTotals holds aggregated asset/liability/net-worth values.
-type BalanceTotals struct {
-	TotalAssets      float64
-	TotalLiabilities float64
-	NetWorth         float64
-}
-
 // IsLiabilityAccount returns true for account types that represent liabilities (credit, loan).
 func IsLiabilityAccount(accountType string) bool {
 	return accountType == "credit" || accountType == "loan"

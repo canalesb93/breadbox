@@ -232,48 +232,9 @@ func annotationKindFilter(kinds []string) map[string]bool {
 	return set
 }
 
-// annotationFromRow converts a db.Annotation into its service-layer response.
-func annotationFromRow(a db.Annotation) Annotation {
-	ann := Annotation{
-		ID:            formatUUID(a.ID),
-		ShortID:       a.ShortID,
-		TransactionID: formatUUID(a.TransactionID),
-		Kind:          a.Kind,
-		ActorType:     a.ActorType,
-		ActorID:       textPtr(a.ActorID),
-		ActorName:     a.ActorName,
-		CreatedAt:     pgconv.TimestampStr(a.CreatedAt),
-	}
-
-	if a.SessionID.Valid {
-		s := formatUUID(a.SessionID)
-		ann.SessionID = &s
-	}
-	if a.TagID.Valid {
-		s := formatUUID(a.TagID)
-		ann.TagID = &s
-	}
-	if a.RuleID.Valid {
-		s := formatUUID(a.RuleID)
-		ann.RuleID = &s
-	}
-
-	if len(a.Payload) > 0 && string(a.Payload) != "{}" {
-		var payload map[string]interface{}
-		if err := json.Unmarshal(a.Payload, &payload); err == nil {
-			ann.Payload = payload
-		}
-	}
-
-	if a.DeletedAt.Valid {
-		ann.IsDeleted = true
-	}
-
-	return ann
-}
-
-// annotationFromActorRow mirrors annotationFromRow but additionally surfaces
-// the joined user's updated_at as a unix-timestamp avatar version string.
+// annotationFromActorRow converts a joined annotation+actor row into its
+// service-layer response, surfacing the actor's updated_at as a unix-timestamp
+// avatar version string.
 func annotationFromActorRow(a db.ListAnnotationsWithActorByTransactionRow) Annotation {
 	ann := Annotation{
 		ID:            formatUUID(a.ID),
