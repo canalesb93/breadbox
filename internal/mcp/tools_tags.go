@@ -19,7 +19,7 @@ type listTagsInput struct {
 type listAnnotationsInput struct {
 	ReadSessionContext
 	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
-	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category. Empty = all kinds. Pass ['comment'] for the comment-only timeline (replaces list_transaction_comments). Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied) for the specific event."`
+	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync. Empty = all kinds. Pass ['comment'] for the comment-only timeline (replaces list_transaction_comments). Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated) for the specific event. Pass ['sync'] to see initial-import + pending-flip rows."`
 }
 
 type addTransactionTagInput struct {
@@ -98,6 +98,7 @@ var mcpAnnotationKinds = map[string][]string{
 	"rule":     {"rule_applied"},
 	"tag":      {"tag_added", "tag_removed"},
 	"category": {"category_set"},
+	"sync":     {"sync_started", "sync_updated"},
 }
 
 // mapAnnotationKinds translates the agent-facing generic kinds into the raw DB
@@ -113,7 +114,7 @@ func mapAnnotationKinds(kinds []string) ([]string, error) {
 	for _, k := range kinds {
 		raw, ok := mcpAnnotationKinds[k]
 		if !ok {
-			return nil, fmt.Errorf("invalid kind %q: expected one of comment, rule, tag, category", k)
+			return nil, fmt.Errorf("invalid kind %q: expected one of comment, rule, tag, category, sync", k)
 		}
 		for _, r := range raw {
 			if seen[r] {
@@ -178,6 +179,10 @@ func dbKindToMCP(dbKind string) (kind, action string) {
 		return "tag", "removed"
 	case "category_set":
 		return "category", "set"
+	case "sync_started":
+		return "sync", "started"
+	case "sync_updated":
+		return "sync", "updated"
 	}
 	return dbKind, ""
 }

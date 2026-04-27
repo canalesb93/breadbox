@@ -120,9 +120,12 @@ func writeAnnotation(ctx context.Context, tx pgx.Tx, r annotationRow) error {
 		actorID = pgconv.Text(r.ActorID)
 	}
 
+	// created_at = clock_timestamp() so multiple rule-driven rows written inside
+	// the same sync tx preserve their write order on the timeline (the column
+	// default NOW() returns the transaction-start time, tying every row).
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO annotations (transaction_id, kind, actor_type, actor_id, actor_name, session_id, payload, tag_id, rule_id)
-		VALUES ($1, $2, $3, $4, $5, NULL, $6::jsonb, $7, $8)`,
+		`INSERT INTO annotations (transaction_id, kind, actor_type, actor_id, actor_name, session_id, payload, tag_id, rule_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, NULL, $6::jsonb, $7, $8, clock_timestamp())`,
 		r.TransactionID, r.Kind, r.ActorType, actorID, r.ActorName, payloadJSON,
 		r.TagID, r.RuleID,
 	); err != nil {
