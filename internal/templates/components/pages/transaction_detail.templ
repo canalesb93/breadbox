@@ -296,7 +296,10 @@ templ txdMain(p TransactionDetailProps) {
 // internal/templates/components/timeline.templ — this template wires the
 // transaction-specific data + Alpine bindings through that chrome.
 templ txdActivity(p TransactionDetailProps) {
-	<!-- Activity Timeline (GitHub-style) -->
+	<!-- Activity Timeline — promoted to main content (GitHub-style). The
+	     bb-card chrome is intentionally dropped here so the timeline reads as
+	     the primary section of the page rather than as a tertiary card next
+	     to Details and Category. -->
 	<div
 		id="activity"
 		x-data="txdCommentManager"
@@ -306,6 +309,7 @@ templ txdActivity(p TransactionDetailProps) {
 		data-last-activity-ts={ txdLastActivityTimestamp(p.Activity) }
 		data-today={ p.Now.Format("2006-01-02") }
 		@bb-toggle-pin-review.window="if (!hasPendingReview) pinReview = !pinReview"
+		class="mt-6 sm:mt-10"
 	>
 		if len(p.ActivityDays) > 0 {
 			@components.Timeline(components.TimelineProps{
@@ -313,6 +317,7 @@ templ txdActivity(p TransactionDetailProps) {
 				HeadingIcon: "activity",
 				EventCount:  len(p.Activity),
 				AriaLabel:   "Transaction activity timeline",
+				Variant:     "prominent",
 			}) {
 				for di, day := range p.ActivityDays {
 					@components.TimelineDay(day.Label, di == 0)
@@ -327,10 +332,10 @@ templ txdActivity(p TransactionDetailProps) {
 				@txdTimelineComposer(p)
 			}
 		} else {
-			<section class="bb-card p-0 overflow-hidden" aria-labelledby="activity-heading">
-				<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
-					<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
-					<h2 id="activity-heading" class="text-sm font-semibold text-base-content/60">Activity</h2>
+			<section aria-labelledby="activity-heading">
+				<header class="flex items-center gap-2 pb-4 mb-4 border-b border-base-300/60">
+					<i data-lucide="activity" class="w-4 h-4 text-base-content/50" aria-hidden="true"></i>
+					<h2 id="activity-heading" class="text-base font-semibold text-base-content">Activity</h2>
 				</header>
 				@txdTimelineEmptyComposer(p)
 			</section>

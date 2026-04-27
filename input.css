@@ -656,6 +656,33 @@
     word-break: break-word;
   }
 
+  /* ── Activity timeline — prominent (main-content) variant ──
+   * Used by the transaction-detail page to promote the activity timeline
+   * out of card chrome (see internal/templates/components/timeline.templ).
+   * The card-mode 24px tile / leading-6 / ring-4 invariants from
+   * docs/activity-timeline.md are preserved — these overrides only swap
+   * the rail-mask colour from the card surface (base-100) to the page
+   * surface (base-200), so the row tiles still mask the rail seam without
+   * the rows themselves having to learn about variants.
+   *
+   * Rows continue to render with `bg-base-100` and `ring-base-100` because
+   * they're shared with the card variant; here we redirect both at the
+   * variant-scoped level. */
+  .bb-timeline-prominent .bg-base-100 {
+    background-color: var(--color-base-200);
+  }
+  .bb-timeline-prominent .ring-base-100 {
+    --tw-ring-color: var(--color-base-200);
+  }
+
+  /* Comment bubbles in the prominent variant pick up a slightly stronger
+   * border so they read as discrete messages against the (cardless) page
+   * background, matching the GitHub PR-conversation bubble weight. */
+  .bb-timeline-prominent .bb-comment-bubble {
+    background: color-mix(in srgb, var(--color-base-100) 70%, transparent);
+    border-color: color-mix(in srgb, var(--color-base-300) 90%, transparent);
+  }
+
   /* ── Info grid (detail pages) ── */
   .bb-info-grid {
     @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm;
