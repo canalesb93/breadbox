@@ -27,7 +27,7 @@ templ Rules(p RulesProps) {
 	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Rules</h1>
-			<p class="text-sm text-base-content/50 mt-1">Automatically categorize, tag, or comment on transactions during sync</p>
+			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Automatically categorize, tag, or comment on transactions during sync</p>
 		</div>
 		<div class="flex items-center gap-2">
 			<a href="/rules/new" class="btn btn-primary btn-sm rounded-xl" data-new-rule>
@@ -116,7 +116,7 @@ templ rulesRow(r RulesRow) {
 			<!-- Main info -->
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 flex-wrap">
-					<span class="font-semibold text-sm truncate">{ r.Name }</span>
+					<span class="font-semibold text-sm line-clamp-2 sm:truncate sm:line-clamp-none">{ r.Name }</span>
 					if r.IsSystem {
 						<span class="hidden sm:inline-flex badge badge-soft badge-info badge-xs gap-1" title="Built-in system rule">
 							<i data-lucide="shield" class="w-2.5 h-2.5"></i>
