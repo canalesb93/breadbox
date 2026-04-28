@@ -250,10 +250,10 @@ templ txdMain(p TransactionDetailProps) {
 				<div class="flex items-center justify-between mb-3">
 					<h2 class="text-sm font-semibold text-base-content/50">Tags</h2>
 				</div>
-				<div class="flex flex-wrap gap-1.5 min-h-[1.5rem] items-center">
+				<div class="flex flex-wrap gap-2 min-h-[1.75rem] items-center">
 					<template x-for="t in tags" :key="t.slug">
 						<span
-							class="bb-tag"
+							class="bb-tag bb-tag-lg"
 							:class="t.displayName && t.displayName !== t.slug ? 'tooltip tooltip-top' : ''"
 							:data-tip="t.displayName && t.displayName !== t.slug ? t.slug : null"
 							:style="t.color ? ('--tag-color:' + t.color) : ''"
@@ -276,7 +276,7 @@ templ txdMain(p TransactionDetailProps) {
 					     can add, remove, or both from one session. -->
 					<button
 						type="button"
-						class="bb-tag bb-tag-add"
+						class="bb-tag bb-tag-lg bb-tag-add"
 						@click="openTagPicker()"
 						@tag-selection-commit.window="if ($event.detail.sourceId === 'txd-tag') { applyTagDiff($event.detail.adds, $event.detail.removes) }"
 						title="Edit tags"

@@ -440,7 +440,8 @@
    * Color driven by --tag-color CSS variable so server- and client-rendered chips stay consistent.
    *
    * Variants:
-   *   .bb-tag         — default (forms, detail pages, filter panels)
+   *   .bb-tag         — default (forms, filter panels, dense detail rows)
+   *   .bb-tag-lg      — primary interactive surface (detail-page tag editor)
    *   .bb-tag-sm      — compact (transaction rows, dense lists)
    *   .bb-tag-ghost   — selector/filter state when unselected (muted)
    *   .bb-tag-remove  — inline × button, hidden until hover/focus on parent
@@ -483,6 +484,26 @@
   .bb-tag-sm > i, .bb-tag-sm > svg {
     width: 0.65rem;
     height: 0.65rem;
+  }
+
+  /* Larger pill for primary interactive contexts (e.g. the tag editor on the
+     transaction detail card). The default size suits dense lists and filter
+     bars; this variant gives a comfortable tap/click target where managing
+     tags is the section's main action. */
+  .bb-tag-lg {
+    padding: 0.3125rem 0.625rem;
+    font-size: 0.8125rem;
+    gap: 0.3125rem;
+  }
+
+  .bb-tag-lg > i, .bb-tag-lg > svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .bb-tag-lg .bb-tag-remove > i, .bb-tag-lg .bb-tag-remove > svg {
+    width: 0.875rem;
+    height: 0.875rem;
   }
 
   /* Below xl, transaction-row tag chips collapse into a single icon + count
