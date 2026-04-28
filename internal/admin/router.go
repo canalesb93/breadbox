@@ -127,23 +127,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// API Keys + OAuth Clients page (Settings → API Keys tab).
 		// Editors can view and create.
 		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
+		r.Get("/settings/api-keys/new", APIKeyNewPageHandler(sm, tr))
+		r.Post("/settings/api-keys/new", APIKeyCreatePageHandler(svc, sm, tr))
+		r.Get("/settings/api-keys/{id}/created", APIKeyCreatedPageHandler(sm, tr))
 
-		r.Route("/settings/api-keys", func(r chi.Router) {
-			r.Get("/new", APIKeyNewPageHandler(sm, tr))
-			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
-			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
-			// Revoke is admin-only — handled in the admin group below.
-		})
-
-		r.Route("/settings/oauth-clients", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "/settings/api-keys", http.StatusMovedPermanently)
-			})
-			r.Get("/new", OAuthClientNewPageHandler(sm, tr))
-			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
-			r.Get("/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
-			// Revoke is admin-only — handled in the admin group below.
-		})
+		r.Get("/settings/oauth-clients", redirectGET("/settings/api-keys"))
+		r.Get("/settings/oauth-clients/new", OAuthClientNewPageHandler(sm, tr))
+		r.Post("/settings/oauth-clients/new", OAuthClientCreatePageHandler(svc, sm, tr))
+		r.Get("/settings/oauth-clients/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
 
 		// Legacy /access, /api-keys, /oauth-clients redirects.
 		r.Get("/access", redirectGET("/settings/api-keys"))

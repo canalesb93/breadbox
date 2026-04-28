@@ -27,20 +27,22 @@ templ APIKeyCreated(p APIKeyCreatedProps) {
 		</div>
 		<div class="mb-5">
 			<label class="text-xs font-medium text-base-content/50 mb-1.5 block">API Key</label>
-			<div class="flex gap-2" x-data="{ copied: false }">
-				<input type="text" value={ p.PlaintextKey } readonly id="api-key-value" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs"/>
-				<button class="btn btn-primary btn-sm rounded-xl shrink-0 gap-2" :class="copied && '!btn-success'" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
+			<div class="flex flex-col sm:flex-row gap-2" x-data="{ copied: false }">
+				<div class="relative flex-1 min-w-0">
+					<input type="text" value={ p.PlaintextKey } readonly id="api-key-value" class="input input-sm font-mono w-full bg-base-200/50 border-base-300 rounded-xl text-xs truncate"/>
+				</div>
+				<button class="btn btn-primary btn-sm rounded-xl shrink-0 gap-2 w-full sm:w-auto" :class="copied && '!btn-success'" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
 					<i data-lucide="clipboard" class="w-4 h-4" x-show="!copied"></i>
 					<i data-lucide="check" class="w-4 h-4" x-show="copied" x-cloak></i>
 					<span x-text="copied ? 'Copied!' : 'Copy'"></span>
 				</button>
 			</div>
 		</div>
-		<div class="flex items-center justify-between pt-4 border-t border-base-300">
-			<p class="text-xs text-base-content/40">
+		<div class="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-base-300">
+			<p class="text-xs text-base-content/40 min-w-0">
 				Use in the <code class="font-mono text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded">X-API-Key</code> header for API requests.
 			</p>
-			<a href="/settings/api-keys" class="btn btn-ghost btn-sm rounded-xl">Done</a>
+			<a href="/settings/api-keys" class="btn btn-ghost btn-sm rounded-xl shrink-0">Done</a>
 		</div>
 	</div>
 }
