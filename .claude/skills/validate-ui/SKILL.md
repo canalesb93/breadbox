@@ -2,9 +2,9 @@
 name: validate-ui
 description: >
   Validate a Breadbox admin UI change in a real browser and produce a screenshot as PR
-  evidence. Uses Chrome DevTools MCP to navigate the running app and capture the rendered
-  page directly (no OS screen recording, no AppleScript, no focus hacks). Saves a JPEG
-  under 1MB, uploads to GitHub's native CDN via `gh release upload`, ready to embed in a PR.
+  evidence. Prefers Chrome DevTools MCP when available; falls back to headless Chromium
+  via Playwright in cloud sessions where the MCP is not loaded. Saves a JPEG under 1MB,
+  uploads to GitHub's native CDN via `gh release upload`, ready to embed in a PR.
   Triggers: "validate the UI change", "screenshot this page", "capture the transactions page",
   "attach a screenshot to the PR", "show me how it looks", or any task needing a visual
   of the running app before a PR can be marked done.
@@ -12,14 +12,34 @@ description: >
 
 # Validate UI
 
-Validate a Breadbox admin UI change in the running app, then attach a screenshot to the PR as evidence. Uses Chrome DevTools MCP end-to-end.
+Validate a Breadbox admin UI change in the running app, then attach a screenshot to the PR as evidence. Two backends, picked in this order:
 
-This replaces the old `screencapture` / AppleScript / `sips` pipeline. No OS permissions, no focus stealing, no browser chrome in the image. Defaults to a viewport capture at a controlled breakpoint so PR reviewers aren't scrolling through a 4,000-pixel-tall image.
+1. **Chrome DevTools MCP** (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`) — preferred when available. Drives a real Chrome you can also see; supports interactive flows (forms, snapshots, JS evaluation).
+2. **Headless Chromium via Playwright** — fallback for cloud sessions where the MCP isn't loaded. Pre-installed under `/opt/node22/lib/node_modules/playwright` with bundled Chromium at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. No MCP, no GUI — just a Node script that navigates and captures.
+
+Both replace the old `screencapture` / AppleScript / `sips` pipeline. **Never** fall back to OS screen recording.
+
+## Pick a backend up front
+
+```bash
+# In a cloud / remote session? CLAUDE_CODE_REMOTE=true is set by the harness.
+# Local sessions on a developer machine usually have the Chrome DevTools MCP
+# wired up; cloud sessions usually don't.
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
+  echo "cloud session — use the Playwright fallback (Step 4b below)"
+else
+  echo "local session — use Chrome DevTools MCP (Steps 2–7 below)"
+fi
+```
+
+If you're not sure, check the available tools in your context. If `mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_pages` is not in your tool list, the MCP isn't available and you must use the Playwright fallback.
 
 ## Prerequisites
 
 - Breadbox running locally. Main repo: `http://localhost:8080`. Worktrees get a port in `8081–8099` from `.claude/hooks/session-start.sh`, which exports both `$PORT` (consumed by the Makefile) and `$SERVER_PORT` (consumed by the binary) — either works. If neither is set, `curl` each port to find the live one.
-- Chrome DevTools MCP tools available under `mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`.
+- **Backend (one of):**
+  - Chrome DevTools MCP tools available under `mcp__plugin_chrome-devtools-mcp_chrome-devtools__*` (preferred), or
+  - Node 18+ on `PATH` and the global Playwright install at `/opt/node22/lib/node_modules/playwright` (cloud-session default).
 
 ## Steps
 
@@ -79,6 +99,72 @@ take_screenshot(
 - `fullPage: true` is for rare cases where the change is *below the fold* and scrolling wouldn't convey it (e.g., a new footer, a long settings form that's entirely below the fold). Prefer scrolling to the relevant section and capturing the viewport instead.
 - Use a descriptive `<PAGE>` slug (e.g., `dashboard`, `transactions-before`, `transactions-after`, `dashboard-mobile`).
 - JPEG at quality 85 keeps most captures well under 1MB. Drop to 70 only if you hit the limit.
+
+### 5b. Capture — headless Chromium fallback (cloud sessions)
+
+When the Chrome DevTools MCP isn't available (typical for cloud sessions where `CLAUDE_CODE_REMOTE=true`), fall back to headless Chromium driven by the globally-installed Playwright. The bundled binary lives at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`; the Node module at `/opt/node22/lib/node_modules/playwright`. Both ship pre-installed on the cloud image — no `npm install`.
+
+Drop this into `/tmp/shot.js`, then run it:
+
+```js
+// /tmp/shot.js — headless capture for one URL.
+// Usage:
+//   URL=http://localhost:8081/transactions OUT=/tmp/app-transactions.jpg \
+//   W=1280 H=800 FULL=false node /tmp/shot.js
+//
+// Optional auth: set BB_USER + BB_PASS to log in if redirected to /login.
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+
+const url      = process.env.URL  || (() => { console.error('URL required'); process.exit(1); })();
+const out      = process.env.OUT  || '/tmp/app.jpg';
+const width    = parseInt(process.env.W || '1280', 10);
+const height   = parseInt(process.env.H || '800', 10);
+const fullPage = process.env.FULL === 'true';
+const waitFor  = process.env.WAIT_FOR || '';            // optional CSS selector
+const user     = process.env.BB_USER || '';
+const pass     = process.env.BB_PASS || '';
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width, height } });
+  const page = await ctx.newPage();
+
+  const goto = async (target) => page.goto(target, { waitUntil: 'networkidle', timeout: 15_000 });
+  await goto(url);
+
+  if (page.url().includes('/login') && user && pass) {
+    await page.fill('input[name="username"]', user);
+    await page.fill('input[name="password"]', pass);
+    await Promise.all([
+      page.waitForLoadState('networkidle'),
+      page.click('form button[type="submit"]'),
+    ]);
+    await goto(url);
+  }
+
+  if (waitFor) await page.waitForSelector(waitFor, { timeout: 10_000 });
+
+  await page.screenshot({ path: out, type: 'jpeg', quality: 85, fullPage });
+  await browser.close();
+  console.log('wrote', out);
+})().catch((e) => { console.error(e); process.exit(1); });
+```
+
+```bash
+URL=http://localhost:8081/transactions \
+  OUT=/tmp/app-transactions.jpg \
+  W=1280 H=800 \
+  WAIT_FOR='[data-page="transactions"]' \
+  BB_USER=admin BB_PASS=testpass123 \
+  node /tmp/shot.js
+```
+
+Conventions are identical to the MCP path: JPEG at 85% quality, viewport-only by default (`FULL=false`), descriptive `<PAGE>` slug in the filename. For before/after diffs, run the script twice with the same `W`/`H` but different `OUT`.
+
+**Constraints / gotchas:**
+- This backend can capture but **cannot** drive the page interactively across multiple turns — the browser exits when the script returns. For complex multi-step flows (open a modal, fill a form, navigate, then capture), inline the steps inside the `async` block before the screenshot call. Prefer the Chrome DevTools MCP when you need to script a long sequence.
+- No `chromium-browser` / `chromium` symlink on `PATH` — always reference the Playwright module path so you get the version-pinned bundled binary.
+- If the cloud image upgrades Playwright and the path under `/opt/pw-browsers/` changes, fall back to `require('playwright')` after `cd /opt/node22/lib/node_modules` — the package is installed globally either way.
 
 ### 6. Verify size (rare safeguard)
 

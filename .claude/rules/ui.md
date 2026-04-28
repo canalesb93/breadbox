@@ -149,9 +149,16 @@ Lucide names only. Nav-level icons are stable; don't rename on a whim (users bui
 
 ## Validation / PR evidence
 
-UI changes must be validated in a real browser before the task is reported done, and the PR must include a screenshot. Use the `validate-ui` skill — it drives Chrome DevTools MCP end-to-end. **Never** fall back to `screencapture` / AppleScript.
+UI changes must be validated in a real browser before the task is reported done, and the PR must include a screenshot. Use the `validate-ui` skill — it picks the right backend for your session. **Never** fall back to `screencapture` / AppleScript.
 
-**Default flow**:
+**Backend selection** — pick once, up front:
+
+- **Local sessions**: prefer the **Chrome DevTools MCP** (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`). Real Chrome you can see, scriptable across multiple turns.
+- **Cloud sessions** (`CLAUDE_CODE_REMOTE=true` is set): the Chrome DevTools MCP is typically not loaded. Fall back to **headless Chromium via Playwright** — pre-installed on the cloud image at `/opt/node22/lib/node_modules/playwright` with bundled Chromium at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. The skill ships a copy-pasteable Node script under "Step 5b — headless Chromium fallback".
+
+If Chrome MCP tools aren't in your tool list, you're in the fallback path — don't skip validation, don't substitute curl + grep for a screenshot. Run the Playwright script and attach a real image.
+
+**Default flow** (Chrome MCP — the cloud fallback follows the same five steps with a one-shot Node script in place of the per-step MCP calls):
 
 1. `list_pages` → `select_page`/`new_page` at the target URL.
 2. `wait_for` on expected text so the capture doesn't race render.
