@@ -102,10 +102,12 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 			</div>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">{ c.Title }</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">@templ.Raw(c.SubtitleCol)
-</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>@templ.Raw(c.SubtitleExp)
-</p>
+				<p class="text-xs text-base-content/40 truncate" x-show="!expanded">
+					@templ.Raw(c.SubtitleCol)
+				</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>
+					@templ.Raw(c.SubtitleExp)
+				</p>
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
