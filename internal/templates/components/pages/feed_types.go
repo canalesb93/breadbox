@@ -2,49 +2,46 @@ package pages
 
 import "time"
 
-// FeedProps is the full view model for the new household Feed page — a
-// timeline-style replacement candidate for the legacy stats dashboard. The
-// page surfaces sync runs, agent reports, transaction comments, rule-driven
-// auto-categorisation batches, and per-transaction recategorisations as a
-// chronological stream of mixed-weight cards on a single GitHub-style rail.
+// FeedProps is the full view model for the home Feed page. The page
+// surfaces sync runs, agent reports, MCP agent sessions, bulk-action
+// bursts, and standalone comments as a chronological stream of mixed-
+// weight cards on a single GitHub-style rail.
+//
+// The grouped-events shape (sync / agent_session / bulk_action / comment)
+// is computed by `service.ListFeedEvents`; this view-model is a thin
+// projection that rebinds the service shapes onto display-side types so
+// the templ never has to import the service package.
 type FeedProps struct {
 	CSRFToken string
 
-	// Hero is the at-a-glance band rendered above the rail — today's
-	// snapshot (events, new transactions, last sync, unread reports) plus a
-	// one-line generated-at label.
+	// Hero is the at-a-glance band rendered above the rail.
 	Hero FeedHero
 
 	// ConnectionAlerts pin to the very top of the page (above the rail) so
-	// connections in error/pending_reauth state are impossible to miss when
-	// the rest of the feed is dominated by routine syncs.
+	// connections in error/pending_reauth state are impossible to miss.
 	ConnectionAlerts []FeedAlert
 
-	// Days is the day-bucketed feed body. Each FeedDay contains its rendered
-	// label ("Today", "Yesterday", "Mar 14") and the items that occurred in
-	// that bucket, ordered newest-first within the bucket.
+	// Days is the day-bucketed feed body. Each FeedDay contains its
+	// rendered label ("Today", "Yesterday", "Jan 2") and the items that
+	// occurred in that bucket, ordered newest-first within the bucket.
 	Days []FeedDay
 
-	// TotalItems is the count rendered next to the section heading; useful
-	// when the page is dense and the user wants a quick "how much is here"
-	// signal before scrolling.
+	// TotalItems is the count rendered next to the section heading.
 	TotalItems int
 
-	// Now is the request-level time anchor threaded through to the relative-
-	// time helpers so day-bucket labels and per-row timestamps share a single
-	// reference and never disagree across midnight.
+	// WindowDays is rendered as a footer note ("showing the last 3 days").
+	WindowDays int
+
+	// Now is the request-level time anchor used for relative-time helpers.
 	Now time.Time
 
-	// Filter is the active scope ("" = all, "agents", "household", "syncs",
-	// "reports") parsed from the ?filter= query param. The page renders the
-	// filter chips with the matching one highlighted; the actual filtering
-	// is applied at the handler layer for now.
+	// Filter is the active scope ("" = all, "syncs", "reports", "comments",
+	// "agents", "me") parsed from the ?filter= query param. Renders chip
+	// state only — actual filtering applies at the handler layer.
 	Filter string
 }
 
-// FeedHero powers the at-a-glance band above the feed rail. Numeric fields
-// are derived from today's items; string fields ("Generated") are formatted
-// in the handler to keep the templ side free of time arithmetic.
+// FeedHero powers the at-a-glance band above the feed rail.
 type FeedHero struct {
 	Generated            string
 	EventsToday          int
@@ -54,51 +51,47 @@ type FeedHero struct {
 	UnreadReports        int
 
 	LastSyncAt          time.Time
-	LastSyncRel         string // human-readable "5 minutes ago"
+	LastSyncRel         string
 	LastSyncStatus      string
 	LastSyncInstitution string
 }
 
-// FeedAlert is one pinned warning rendered above the feed rail. Each alert
-// corresponds to a connection currently in error or pending_reauth state.
+// FeedAlert is one pinned warning for a connection in error /
+// pending_reauth state.
 type FeedAlert struct {
 	ConnectionID        string
 	Institution         string
 	Provider            string
-	Status              string // "error" | "pending_reauth"
+	Status              string
 	ErrorMessage        string
-	LastSyncedAt        string // relative time string
+	LastSyncedAt        string
 	ConsecutiveFailures int
 }
 
-// FeedDay is one day-bucket of feed items. The day separator on the rail
-// renders the Label; the Items render below it newest-first.
+// FeedDay is one day-bucket of feed items.
 type FeedDay struct {
-	Key   string // YYYY-MM-DD — used for stable test snapshots and DOM ids.
-	Label string // "Today" / "Yesterday" / "Jan 2"
+	Key   string
+	Label string
 	Items []FeedItem
 	First bool
 }
 
-// FeedItem is a single rail row. Type drives the renderer branch; the union
-// pointers carry the per-type payload. Exactly one of the pointers is set
-// for any given Type; the rest are nil.
+// FeedItem is a single rail row. Type drives the renderer branch; the
+// union pointers carry the per-type payload. Exactly one is set per row.
 type FeedItem struct {
-	Type         string    // "sync" | "report" | "comment" | "tag" | "category" | "rule_batch"
-	Timestamp    time.Time // sortable wall-clock time
-	TimestampStr string    // RFC3339 for the templ row's relative-time helper
+	Type         string
+	Timestamp    time.Time
+	TimestampStr string
 
-	Sync     *FeedSync
-	Report   *FeedReport
-	Comment  *FeedComment
-	Tag      *FeedTagChange
-	Category *FeedCategoryChange
-	RuleBatch *FeedRuleBatch
+	Sync         *FeedSync
+	Report       *FeedReport
+	Comment      *FeedComment
+	AgentSession *FeedAgentSession
+	BulkAction   *FeedBulkAction
 }
 
-// FeedTransactionRef is the small card-within-a-card that every transaction-
-// anchored row uses to anchor the event to its source ("$87.42 at Whole
-// Foods · Chase Sapphire").
+// FeedTransactionRef is the small card-within-a-card that anchors any
+// transaction-anchored row to its source ("$87.42 at Whole Foods · Chase").
 type FeedTransactionRef struct {
 	ShortID      string
 	Name         string
@@ -110,19 +103,41 @@ type FeedTransactionRef struct {
 	Institution  string
 }
 
-// FeedSync is the sync-card payload — counts + status + provider/institution
-// labels for one sync_logs row.
+// FeedSync is the sync-card payload. Inline transaction samples and rule
+// outcomes are rendered directly inside the card so a sync card answers
+// "what came in, and what did Breadbox do with it" in one glance.
 type FeedSync struct {
 	SyncLogID       string
 	InstitutionName string
 	Provider        string
 	Trigger         string
 	Status          string
-	AddedCount      int
-	ModifiedCount   int
-	RemovedCount    int
-	RuleHits        int
 	ErrorMessage    string
+
+	AddedCount    int
+	ModifiedCount int
+	RemovedCount  int
+
+	StartedAt time.Time
+
+	// RetryCount + FirstFailureAt are populated only on error syncs that
+	// folded N earlier same-error retry attempts; the card renders them
+	// as "Failing for 18h · 49 attempts" so a flapping connection takes
+	// up one rail row instead of dozens.
+	RetryCount     int
+	FirstFailureAt time.Time
+
+	SampleTransactions []FeedTransactionRef
+	AdditionalCount    int
+
+	RuleOutcomes []FeedRuleOutcome
+}
+
+// FeedRuleOutcome is one (rule, count) line inside a sync card.
+type FeedRuleOutcome struct {
+	RuleName    string
+	RuleShortID string
+	Count       int
 }
 
 // FeedReport is the rich agent-report card payload.
@@ -131,14 +146,13 @@ type FeedReport struct {
 	ShortID       string
 	Title         string
 	BodyExcerpt   string
-	Priority      string // "info" | "warning" | "critical"
+	Priority      string
 	Tags          []string
 	DisplayAuthor string
 	IsUnread      bool
 }
 
-// FeedComment carries everything the comment-bubble row needs to render in
-// the global feed (actor + content + linked transaction).
+// FeedComment carries one standalone comment row.
 type FeedComment struct {
 	ActorName          string
 	ActorType          string
@@ -148,52 +162,61 @@ type FeedComment struct {
 	Transaction        FeedTransactionRef
 }
 
-// FeedTagChange carries one tag_added / tag_removed event.
-type FeedTagChange struct {
+// FeedAgentSession is the rich card that collapses every annotation in
+// one MCP session into a single row.
+type FeedAgentSession struct {
+	SessionID      string
+	SessionShortID string
+	APIKeyName     string
+	Purpose        string
+
 	ActorName          string
 	ActorType          string
 	ActorID            string
 	ActorAvatarVersion string
-	Action             string // "added" | "removed"
-	TagSlug            string
-	TagName            string
-	TagColor           string
-	TagIcon            string
-	Note               string
-	Transaction        FeedTransactionRef
+
+	StartedAt time.Time
+	EndedAt   time.Time
+
+	AnnotationCount    int
+	UniqueTransactions int
+
+	// Counts breaks the session's annotations down by category-of-action
+	// for the inline summary line ("23 categorised · 12 tagged · 8
+	// commented · 4 rules applied"). Order is fixed by the templ.
+	Categorised    int
+	Tagged         int
+	UntaggedRemoved int
+	Commented      int
+	RuleApplied    int
+
+	SampleTransactions []FeedTransactionRef
 }
 
-// FeedCategoryChange carries one manual category_set event.
-type FeedCategoryChange struct {
+// FeedBulkAction is the rich card that collapses ≥3 same-actor same-kind
+// annotations from a 5-minute bucket into a single row.
+type FeedBulkAction struct {
 	ActorName          string
 	ActorType          string
 	ActorID            string
 	ActorAvatarVersion string
-	CategorySlug       string
-	CategoryName       string
-	CategoryColor      string
-	CategoryIcon       string
-	Transaction        FeedTransactionRef
+
+	Kind  string
+	Count int
+
+	Subjects []FeedBulkSubject
+
+	StartedAt time.Time
+	EndedAt   time.Time
+
+	SampleTransactions []FeedTransactionRef
 }
 
-// FeedRuleBatch is the collapsed (rule, day)-grouped rule_applied card. The
-// per-transaction rows fold into one with a count, sample list, and the
-// breakdown of action fields ("tag" / "category" / etc).
-type FeedRuleBatch struct {
-	RuleName     string
-	RuleShortID  string
-	Count        int
-	ActionFields map[string]int // "tag" -> N, "category" -> M
-	Samples      []FeedTransactionSample
-	DayLabel     string
-	LatestTS     time.Time
-}
-
-// FeedTransactionSample is one expandable sample row inside a rule batch
-// card.
-type FeedTransactionSample struct {
-	ShortID      string
-	MerchantName string
-	Amount       float64
-	Currency     string
+// FeedBulkSubject is one (subject, count) chip inside a bulk-action card.
+type FeedBulkSubject struct {
+	Name  string
+	Slug  string
+	Color string
+	Icon  string
+	Count int
 }

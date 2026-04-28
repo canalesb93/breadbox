@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -16,6 +17,9 @@ import (
 // transaction context (merchant, amount, currency, account, institution) so
 // the home Feed page can render rich cards for events that happened on any
 // transaction without re-fetching transaction details per row.
+//
+// FeedActivityRow is the low-level read helper. The feed page itself reads
+// `FeedEvent`s from `ListFeedEvents`, which applies grouping on top.
 type FeedActivityRow struct {
 	Annotation Annotation
 
@@ -31,15 +35,9 @@ type FeedActivityRow struct {
 }
 
 // ListFeedActivity returns the most recent annotations across every
-// transaction, joined with merchant/amount/account context so the global
-// feed page can render rich rows without N+1 lookups. Annotations are
-// returned newest-first (DESC) — the feed surface shows newest at the top
-// (inverse of the per-transaction timeline, which puts newest at the
-// bottom near the composer).
-//
-// EnrichAnnotations is applied after the SQL fetch with descending order
-// reversed temporarily, since enrichment dedup logic assumes ASC ordering
-// (rule-source duplicates appear adjacent to their parent rule_applied row).
+// transaction, joined with merchant/amount/account context. Pre-existing
+// helper kept for any caller that wants the raw annotation feed; the home
+// Feed page itself goes through `ListFeedEvents`.
 func (s *Service) ListFeedActivity(ctx context.Context, limit int) ([]FeedActivityRow, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
@@ -48,13 +46,24 @@ func (s *Service) ListFeedActivity(ctx context.Context, limit int) ([]FeedActivi
 	const q = `
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type, a.actor_id, a.actor_name,
-    a.payload, a.tag_id, a.rule_id, a.created_at,
+    a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
+    COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
+    COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
     ac.name, bc.institution_name
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN auth_accounts aa
+    ON a.actor_type = 'user'
+   AND aa.id::text = a.actor_id
+LEFT JOIN users u_via_account
+    ON aa.user_id = u_via_account.id
+LEFT JOIN users u_direct
+    ON a.actor_type = 'user'
+   AND aa.id IS NULL
+   AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
 ORDER BY a.created_at DESC
 LIMIT $1
@@ -68,76 +77,9 @@ LIMIT $1
 
 	out := make([]FeedActivityRow, 0, limit)
 	for rows.Next() {
-		var (
-			id, txnID, tagID, ruleID                    pgtype.UUID
-			actorID, actorName, kind, actorType         string
-			actorIDOpt                                  pgtype.Text
-			shortID                                     string
-			payload                                     []byte
-			createdAt                                   pgtype.Timestamptz
-			txShort, txName                             string
-			merchantName                                pgtype.Text
-			amount                                      pgtype.Numeric
-			isoCcy                                      pgtype.Text
-			txDate                                      pgtype.Date
-			accountName, institutionName                pgtype.Text
-		)
-
-		if err := rows.Scan(
-			&id, &shortID, &txnID, &kind, &actorType, &actorIDOpt, &actorName,
-			&payload, &tagID, &ruleID, &createdAt,
-			&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate,
-			&accountName, &institutionName,
-		); err != nil {
-			return nil, fmt.Errorf("scan feed activity row: %w", err)
-		}
-
-		ann := Annotation{
-			ID:            formatUUID(id),
-			ShortID:       shortID,
-			TransactionID: formatUUID(txnID),
-			Kind:          kind,
-			ActorType:     actorType,
-			ActorName:     actorName,
-			CreatedAt:     pgconv.TimestampStr(createdAt),
-			CreatedAtTime: createdAt.Time.UTC(),
-		}
-		if actorIDOpt.Valid && actorIDOpt.String != "" {
-			s := actorIDOpt.String
-			ann.ActorID = &s
-		}
-		_ = actorID
-		if tagID.Valid {
-			s := formatUUID(tagID)
-			ann.TagID = &s
-		}
-		if ruleID.Valid {
-			s := formatUUID(ruleID)
-			ann.RuleID = &s
-		}
-		if len(payload) > 0 && string(payload) != "{}" {
-			var p map[string]interface{}
-			if err := json.Unmarshal(payload, &p); err == nil {
-				ann.Payload = p
-			}
-		}
-
-		row := FeedActivityRow{
-			Annotation:         ann,
-			TransactionShortID: txShort,
-			TransactionName:    txName,
-			MerchantName:       pgconv.TextOr(merchantName, ""),
-			IsoCurrencyCode:    pgconv.TextOr(isoCcy, "USD"),
-			AccountName:        pgconv.TextOr(accountName, ""),
-			InstitutionName:    pgconv.TextOr(institutionName, ""),
-		}
-		if amount.Valid {
-			if f, err := amount.Float64Value(); err == nil && f.Valid {
-				row.Amount = f.Float64
-			}
-		}
-		if txDate.Valid {
-			row.TransactionDate = txDate.Time.Format("2006-01-02")
+		row, err := scanFeedActivityRow(rows)
+		if err != nil {
+			return nil, err
 		}
 		out = append(out, row)
 	}
@@ -145,52 +87,722 @@ LIMIT $1
 		return nil, fmt.Errorf("iterate feed activity rows: %w", err)
 	}
 
-	// Enrichment expects ASC ordering for dedup heuristics; reverse, enrich,
-	// reverse back.
-	asc := make([]Annotation, len(out))
-	for i, r := range out {
-		asc[len(out)-1-i] = r.Annotation
+	out = enrichFeedActivityRows(out)
+	return out, nil
+}
+
+// FeedEvent is the unit the Feed page renders — one row on the rail,
+// possibly representing many underlying annotations that have been grouped
+// together. Exactly one of the typed payload pointers is set; the rest are
+// nil.
+type FeedEvent struct {
+	Type      string    // "sync" | "agent_session" | "bulk_action" | "comment"
+	Timestamp time.Time // sortable wall-clock anchor for newest-first ordering
+
+	Sync         *FeedSyncEvent
+	AgentSession *FeedAgentSessionEvent
+	BulkAction   *FeedBulkActionEvent
+	Comment      *FeedCommentEvent
+}
+
+// FeedSyncEvent represents one sync run. The card shows the headline
+// (`12 new transactions from Chase`), inline transaction samples (top
+// `SampleLimit` by absolute amount), and any rule outcomes that fired
+// during the sync (lifted from `sync_logs.rule_hits`).
+//
+// Failed syncs that repeat because of cron retries (same connection +
+// same error message) collapse into a single FeedSyncEvent with the
+// retry counters populated. The card displays "Has been failing for
+// 18h · 49 attempts" instead of 49 identical rows.
+type FeedSyncEvent struct {
+	SyncLogID       string
+	InstitutionName string
+	Provider        string
+	Trigger         string
+	Status          string
+	ErrorMessage    string
+
+	AddedCount    int
+	ModifiedCount int
+	RemovedCount  int
+
+	StartedAt   time.Time
+	CompletedAt time.Time
+
+	// RetryCount counts the additional same-error sync attempts that
+	// were folded into this card. 0 = single attempt; N = total attempts
+	// is RetryCount + 1. Only populated for failed syncs.
+	RetryCount      int
+	FirstFailureAt  time.Time
+
+	SampleTransactions []FeedSampleTx
+	AdditionalCount    int
+
+	RuleOutcomes []FeedRuleOutcome
+}
+
+// FeedAgentSessionEvent represents one MCP agent session whose annotations
+// are folded into a single card. An MCP review session that touches 50
+// transactions and writes 200 annotations is one row here, not 200.
+type FeedAgentSessionEvent struct {
+	SessionID      string
+	SessionShortID string
+	APIKeyName     string
+	Purpose        string
+
+	ActorName          string
+	ActorType          string
+	ActorID            string
+	ActorAvatarVersion string
+
+	StartedAt time.Time
+	EndedAt   time.Time
+
+	AnnotationCount    int
+	UniqueTransactions int
+
+	// KindCounts breaks the session's annotations down by kind so the card
+	// can render "categorised 23 · tagged 12 · commented 8" without the
+	// caller iterating annotations a second time.
+	KindCounts map[string]int
+
+	SampleTransactions []FeedSampleTx
+}
+
+// FeedBulkActionEvent represents ≥ N annotations from the same actor of
+// the same kind within a soft time-bucket — typically a human running a
+// bulk recategorisation or an agent making changes outside an MCP session.
+type FeedBulkActionEvent struct {
+	ActorName          string
+	ActorType          string
+	ActorID            string
+	ActorAvatarVersion string
+
+	Kind  string // "tag_added" | "tag_removed" | "category_set" | "rule_applied"
+	Count int
+
+	// Subjects is the deduped list of subject names (tag names, category
+	// names, rule names) that were applied. When all rows share one
+	// subject, the card renders "added the Groceries tag to 12
+	// transactions"; with several subjects it renders the count per
+	// subject ("Groceries: 8 · Transport: 4").
+	Subjects []FeedBulkSubject
+
+	StartedAt time.Time
+	EndedAt   time.Time
+
+	SampleTransactions []FeedSampleTx
+}
+
+// FeedBulkSubject is one (subject, count) pair inside a bulk-action card.
+type FeedBulkSubject struct {
+	Name  string
+	Slug  string
+	Color string
+	Icon  string
+	Count int
+}
+
+// FeedCommentEvent is one standalone comment — surfaced as its own row when
+// it isn't part of an MCP session and isn't part of a bulk-action group.
+type FeedCommentEvent struct {
+	ActorName          string
+	ActorType          string
+	ActorID            string
+	ActorAvatarVersion string
+	Content            string
+
+	Transaction FeedSampleTx
+}
+
+// FeedSampleTx is the small projection used inside every event card to
+// reference a transaction. Carries enough to render the merchant + amount
+// pair without an extra fetch per card.
+type FeedSampleTx struct {
+	ShortID      string
+	Name         string
+	MerchantName string
+	Amount       float64
+	Currency     string
+	Date         string
+	AccountName  string
+	Institution  string
+}
+
+// FeedRuleOutcome is one (rule, count) pair shown inline on a sync card.
+type FeedRuleOutcome struct {
+	RuleName    string
+	RuleShortID string
+	Count       int
+}
+
+// FeedEventsParams configures the window + grouping thresholds applied by
+// `ListFeedEvents`. Zero values resolve to sensible defaults: 3-day window,
+// soft-group threshold of 3, sample limit of 5.
+type FeedEventsParams struct {
+	Window        time.Duration
+	BulkThreshold int
+	SampleLimit   int
+}
+
+// ListFeedEvents returns grouped FeedEvents for the home Feed page,
+// already ordered newest-first.
+//
+// The grouping pipeline is:
+//
+//  1. Pull annotations from the window, dropping rule-applied rows that
+//     fired during sync (`payload.applied_by == "sync"`) and the
+//     per-transaction `sync_started` / `sync_updated` rows — both are
+//     already represented by their parent sync card.
+//  2. Hard-group annotations by `session_id`. Every session collapses
+//     into a single AgentSession event regardless of how many annotations
+//     it produced.
+//  3. Soft-bucket the remaining (un-sessioned) annotations by
+//     `(actor_id, kind, floor(time / 5min))`. Buckets with ≥ BulkThreshold
+//     events become BulkAction events; the rest of the un-sessioned
+//     annotations are dropped UNLESS they're standalone comments — those
+//     pass through as Comment events because every comment is high-signal.
+//  4. Sync logs from the window become Sync events with inline transaction
+//     samples and `RuleOutcomes` lifted from `sync_logs.rule_hits`.
+//
+// Reports + connection alerts are returned by separate handler-level
+// queries, not by this function.
+func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) ([]FeedEvent, error) {
+	if params.Window <= 0 {
+		params.Window = 3 * 24 * time.Hour
+	}
+	if params.BulkThreshold <= 0 {
+		params.BulkThreshold = 3
+	}
+	if params.SampleLimit <= 0 {
+		params.SampleLimit = 5
+	}
+
+	cutoff := time.Now().Add(-params.Window)
+
+	annotationRows, err := s.fetchFeedAnnotations(ctx, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	annotationRows = enrichFeedActivityRows(annotationRows)
+
+	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, params.SampleLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	sessionMeta, err := s.fetchFeedSessionMeta(ctx, annotationRows)
+	if err != nil {
+		s.Logger.Debug("fetch feed session meta", "error", err)
+	}
+
+	groupedEvents := groupAnnotationsIntoEvents(annotationRows, sessionMeta, params)
+
+	out := make([]FeedEvent, 0, len(syncEvents)+len(groupedEvents))
+	out = append(out, syncEvents...)
+	out = append(out, groupedEvents...)
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Timestamp.After(out[j].Timestamp)
+	})
+
+	return out, nil
+}
+
+// fetchFeedAnnotations runs the windowed annotation query used by
+// `ListFeedEvents`. Excludes annotations that are byproducts of a sync
+// (`sync_started` / `sync_updated` rows and rule applications fired
+// during sync — both are represented by the parent sync card).
+//
+// The user join mirrors `ListAnnotationsWithActorByTransaction`: it
+// resolves user.name through either an auth_accounts row whose user_id
+// links to users, or a direct users.id match against actor_id, and
+// surfaces both the live profile name (preferred over the frozen-at-
+// write-time `annotations.actor_name`) and the user's `updated_at` for
+// avatar cache-busting.
+func (s *Service) fetchFeedAnnotations(ctx context.Context, cutoff time.Time) ([]FeedActivityRow, error) {
+	const q = `
+SELECT
+    a.id, a.short_id, a.transaction_id, a.kind, a.actor_type, a.actor_id, a.actor_name,
+    a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
+    COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
+    COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
+    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
+    ac.name, bc.institution_name
+FROM annotations a
+JOIN transactions t ON a.transaction_id = t.id
+LEFT JOIN accounts ac ON t.account_id = ac.id
+LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN auth_accounts aa
+    ON a.actor_type = 'user'
+   AND aa.id::text = a.actor_id
+LEFT JOIN users u_via_account
+    ON aa.user_id = u_via_account.id
+LEFT JOIN users u_direct
+    ON a.actor_type = 'user'
+   AND aa.id IS NULL
+   AND u_direct.id::text = a.actor_id
+WHERE t.deleted_at IS NULL
+  AND a.created_at >= $1
+  AND a.kind NOT IN ('sync_started', 'sync_updated')
+  AND COALESCE(a.payload->>'applied_by', '') <> 'sync'
+ORDER BY a.created_at DESC
+`
+
+	rows, err := s.Pool.Query(ctx, q, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("list feed annotations: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]FeedActivityRow, 0, 256)
+	for rows.Next() {
+		row, err := scanFeedActivityRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate feed annotation rows: %w", err)
+	}
+	return out, nil
+}
+
+// scanFeedActivityRow is the shared row scanner used by
+// `fetchFeedAnnotations` and `ListFeedActivity`. The `Scanner` interface
+// keeps the shape independent of pgx-vs-rows specifics.
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
+	var (
+		id, txnID, tagID, ruleID, sessionID pgtype.UUID
+		actorName, kind, actorType          string
+		actorIDOpt                          pgtype.Text
+		shortID                             string
+		payload                             []byte
+		createdAt                           pgtype.Timestamptz
+		actorUserName                       string
+		actorUpdatedAt                      pgtype.Timestamptz
+		txShort, txName                     string
+		merchantName                        pgtype.Text
+		amount                              pgtype.Numeric
+		isoCcy                              pgtype.Text
+		txDate                              pgtype.Date
+		accountName, institutionName        pgtype.Text
+	)
+
+	if err := s.Scan(
+		&id, &shortID, &txnID, &kind, &actorType, &actorIDOpt, &actorName,
+		&payload, &tagID, &ruleID, &sessionID, &createdAt,
+		&actorUserName, &actorUpdatedAt,
+		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate,
+		&accountName, &institutionName,
+	); err != nil {
+		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
+	}
+
+	// Prefer the live users.name over the actor_name frozen at write time
+	// (which is typically the auth_accounts.username/email login). Mirrors
+	// the same preference annotation_actor_row.go applies on the per-tx
+	// timeline so feed and timeline render the same display name.
+	displayName := actorName
+	if actorType == "user" && actorUserName != "" {
+		displayName = actorUserName
+	}
+
+	ann := Annotation{
+		ID:            formatUUID(id),
+		ShortID:       shortID,
+		TransactionID: formatUUID(txnID),
+		Kind:          kind,
+		ActorType:     actorType,
+		ActorName:     displayName,
+		CreatedAt:     pgconv.TimestampStr(createdAt),
+		CreatedAtTime: createdAt.Time.UTC(),
+	}
+	if actorUpdatedAt.Valid {
+		ann.ActorAvatarVersion = strconv.FormatInt(actorUpdatedAt.Time.Unix(), 10)
+	}
+	if actorIDOpt.Valid && actorIDOpt.String != "" {
+		s := actorIDOpt.String
+		ann.ActorID = &s
+	}
+	if tagID.Valid {
+		s := formatUUID(tagID)
+		ann.TagID = &s
+	}
+	if ruleID.Valid {
+		s := formatUUID(ruleID)
+		ann.RuleID = &s
+	}
+	if sessionID.Valid {
+		s := formatUUID(sessionID)
+		ann.SessionID = &s
+	}
+	if len(payload) > 0 && string(payload) != "{}" {
+		var p map[string]interface{}
+		if err := json.Unmarshal(payload, &p); err == nil {
+			ann.Payload = p
+		}
+	}
+
+	row := FeedActivityRow{
+		Annotation:         ann,
+		TransactionShortID: txShort,
+		TransactionName:    txName,
+		MerchantName:       pgconv.TextOr(merchantName, ""),
+		IsoCurrencyCode:    pgconv.TextOr(isoCcy, "USD"),
+		AccountName:        pgconv.TextOr(accountName, ""),
+		InstitutionName:    pgconv.TextOr(institutionName, ""),
+	}
+	if amount.Valid {
+		if f, err := amount.Float64Value(); err == nil && f.Valid {
+			row.Amount = f.Float64
+		}
+	}
+	if txDate.Valid {
+		row.TransactionDate = txDate.Time.Format("2006-01-02")
+	}
+	return row, nil
+}
+
+// enrichFeedActivityRows runs `EnrichAnnotations` over a feed-activity slice
+// (ASC ordering required by the dedup heuristics) and returns the rows in
+// their original order.
+func enrichFeedActivityRows(in []FeedActivityRow) []FeedActivityRow {
+	if len(in) == 0 {
+		return in
+	}
+	asc := make([]Annotation, len(in))
+	for i, r := range in {
+		asc[len(in)-1-i] = r.Annotation
 	}
 	enriched := EnrichAnnotations(asc, EnrichOptions{})
-
-	// Map enriched annotations back by ID and rebuild DESC-ordered slice.
 	byID := make(map[string]Annotation, len(enriched))
 	for _, a := range enriched {
 		byID[a.ID] = a
 	}
-	desc := make([]FeedActivityRow, 0, len(enriched))
-	for _, r := range out {
+	out := make([]FeedActivityRow, 0, len(enriched))
+	for _, r := range in {
 		if a, ok := byID[r.Annotation.ID]; ok {
 			r.Annotation = a
-			desc = append(desc, r)
+			out = append(out, r)
 		}
 	}
-
-	// Best-effort actor avatar version for user actors. The dashboard
-	// already does the same trick via a join on users.updated_at; for the
-	// feed we issue a single follow-up batch lookup keyed by actor_id so
-	// we don't have to re-do the whole join.
-	if err := s.hydrateFeedAvatarVersions(ctx, desc); err != nil {
-		s.Logger.Debug("hydrate feed avatar versions", "error", err)
-	}
-
-	_ = strconv.Itoa // keep import used across small refactors
-	_ = time.Now
-	return desc, nil
+	return out
 }
 
-// hydrateFeedAvatarVersions populates Annotation.ActorAvatarVersion on every
-// user-attributed row in `rows` using a single batch query against users.
-// Best-effort: failures are returned to the caller for logging, but the feed
-// still renders without avatar cache-busting.
-func (s *Service) hydrateFeedAvatarVersions(ctx context.Context, rows []FeedActivityRow) error {
-	ids := make([]string, 0, len(rows))
-	seen := make(map[string]bool)
-	for _, r := range rows {
-		if r.Annotation.ActorType != "user" || r.Annotation.ActorID == nil {
+
+// ── Sync events ───────────────────────────────────────────────────────────
+
+// fetchFeedSyncEvents returns one FeedEvent per sync run within the window
+// (failed runs always included; successful no-op runs filtered out).
+// Inline transaction samples are batched in a single follow-up query.
+func (s *Service) fetchFeedSyncEvents(ctx context.Context, cutoff time.Time, sampleLimit int) ([]FeedEvent, error) {
+	const q = `
+SELECT
+    sl.id, sl.connection_id,
+    bc.institution_name, bc.provider,
+    sl.trigger, sl.status,
+    sl.added_count, sl.modified_count, sl.removed_count,
+    sl.error_message, sl.started_at, sl.completed_at, sl.rule_hits
+FROM sync_logs sl
+JOIN bank_connections bc ON sl.connection_id = bc.id
+WHERE sl.started_at >= $1
+ORDER BY sl.started_at DESC
+`
+
+	rows, err := s.Pool.Query(ctx, q, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("list feed sync logs: %w", err)
+	}
+	defer rows.Close()
+
+	var raws []syncRowRaw
+	for rows.Next() {
+		var r syncRowRaw
+		if err := rows.Scan(
+			&r.id, &r.connectionID, &r.institutionName, &r.provider,
+			&r.trigger, &r.status,
+			&r.addedCount, &r.modifiedCount, &r.removedCount,
+			&r.errorMessage, &r.startedAt, &r.completedAt, &r.ruleHitsJSON,
+		); err != nil {
+			return nil, fmt.Errorf("scan feed sync row: %w", err)
+		}
+		raws = append(raws, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate feed sync rows: %w", err)
+	}
+
+	syncIDs := make([]string, 0, len(raws))
+	for _, r := range raws {
+		hasChanges := r.addedCount+r.modifiedCount+r.removedCount > 0
+		if hasChanges || r.status == "error" {
+			syncIDs = append(syncIDs, formatUUID(r.id))
+		}
+	}
+	samplesBySync, err := s.fetchSyncSampleTransactions(ctx, raws, sampleLimit)
+	if err != nil {
+		s.Logger.Debug("fetch sync sample transactions", "error", err)
+	}
+
+	// Dedup repeated same-error sync attempts per connection. The cron
+	// retry cadence (every 15 minutes for connections in error state)
+	// otherwise dumps 50+ identical cards into the rail and drowns out
+	// every signal event. Each (connection_id, error_message) cluster
+	// folds into the most recent attempt with `RetryCount` set.
+	type errKey struct {
+		connectionID string
+		errorMessage string
+	}
+	errClusters := make(map[errKey]*FeedSyncEvent)
+
+	out := make([]FeedEvent, 0, len(raws))
+	for _, r := range raws {
+		hasChanges := r.addedCount+r.modifiedCount+r.removedCount > 0
+		if !hasChanges && r.status != "error" {
 			continue
 		}
-		id := *r.Annotation.ActorID
+		if !r.startedAt.Valid {
+			continue
+		}
+
+		ev := &FeedSyncEvent{
+			SyncLogID:       formatUUID(r.id),
+			InstitutionName: pgconv.TextOr(r.institutionName, ""),
+			Provider:        r.provider,
+			Trigger:         r.trigger,
+			Status:          r.status,
+			ErrorMessage:    pgconv.TextOr(r.errorMessage, ""),
+			AddedCount:      int(r.addedCount),
+			ModifiedCount:   int(r.modifiedCount),
+			RemovedCount:    int(r.removedCount),
+			StartedAt:       r.startedAt.Time.UTC(),
+			RuleOutcomes:    s.parseFeedRuleHits(ctx, r.ruleHitsJSON),
+		}
+		if r.completedAt.Valid {
+			ev.CompletedAt = r.completedAt.Time.UTC()
+		}
+		samples := samplesBySync[ev.SyncLogID]
+		if len(samples) > sampleLimit {
+			ev.AdditionalCount = len(samples) - sampleLimit
+			samples = samples[:sampleLimit]
+		} else if ev.AddedCount > len(samples) {
+			ev.AdditionalCount = ev.AddedCount - len(samples)
+		}
+		ev.SampleTransactions = samples
+
+		if r.status == "error" {
+			key := errKey{
+				connectionID: formatUUID(r.connectionID),
+				errorMessage: ev.ErrorMessage,
+			}
+			if existing, ok := errClusters[key]; ok {
+				existing.RetryCount++
+				if ev.StartedAt.Before(existing.FirstFailureAt) || existing.FirstFailureAt.IsZero() {
+					existing.FirstFailureAt = ev.StartedAt
+				}
+				continue
+			}
+			ev.FirstFailureAt = ev.StartedAt
+			errClusters[key] = ev
+		}
+
+		out = append(out, FeedEvent{
+			Type:      "sync",
+			Timestamp: ev.StartedAt,
+			Sync:      ev,
+		})
+	}
+	return out, nil
+}
+
+// syncRowRaw is the per-row scratch struct used by `fetchFeedSyncEvents`
+// to keep raw column values around long enough to drive the follow-up
+// sample-transaction fetch. Hoisted out of the function so the helper can
+// take a typed slice instead of a struct literal.
+type syncRowRaw struct {
+	id, connectionID                        pgtype.UUID
+	institutionName                         pgtype.Text
+	provider                                string
+	trigger, status                         string
+	addedCount, modifiedCount, removedCount int32
+	errorMessage                            pgtype.Text
+	startedAt, completedAt                  pgtype.Timestamptz
+	ruleHitsJSON                            []byte
+}
+
+// fetchSyncSampleTransactions issues one SQL query to fetch all transactions
+// added in the window and partitions them per-sync in Go using each
+// transaction's account → connection mapping plus the sync's started_at /
+// completed_at window.
+func (s *Service) fetchSyncSampleTransactions(ctx context.Context, raws []syncRowRaw, sampleLimit int) (map[string][]FeedSampleTx, error) {
+	if len(raws) == 0 {
+		return nil, nil
+	}
+
+	connIDs := make(map[string]bool, len(raws))
+	earliest := time.Now()
+	for _, r := range raws {
+		connIDs[formatUUID(r.connectionID)] = true
+		if r.startedAt.Valid && r.startedAt.Time.Before(earliest) {
+			earliest = r.startedAt.Time
+		}
+	}
+	connList := make([]string, 0, len(connIDs))
+	for id := range connIDs {
+		connList = append(connList, id)
+	}
+
+	const q = `
+SELECT t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
+       t.created_at, ac.name, bc.id::text, bc.institution_name
+FROM transactions t
+JOIN accounts ac ON ac.id = t.account_id
+JOIN bank_connections bc ON ac.connection_id = bc.id
+WHERE t.created_at >= $1
+  AND t.deleted_at IS NULL
+  AND bc.id::text = ANY($2::text[])
+ORDER BY t.created_at DESC
+`
+
+	rows, err := s.Pool.Query(ctx, q, earliest.Add(-1*time.Minute), connList)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type txRow struct {
+		FeedSampleTx
+		ConnectionID string
+		CreatedAt    time.Time
+	}
+	var fetched []txRow
+	for rows.Next() {
+		var (
+			shortID, provName string
+			merchantName      pgtype.Text
+			amount            pgtype.Numeric
+			isoCcy            pgtype.Text
+			txDate            pgtype.Date
+			createdAt         pgtype.Timestamptz
+			accountName       pgtype.Text
+			connID            string
+			institutionName   pgtype.Text
+		)
+		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &accountName, &connID, &institutionName); err != nil {
+			return nil, err
+		}
+		t := txRow{
+			FeedSampleTx: FeedSampleTx{
+				ShortID:      shortID,
+				Name:         provName,
+				MerchantName: pgconv.TextOr(merchantName, ""),
+				Currency:     pgconv.TextOr(isoCcy, "USD"),
+				AccountName:  pgconv.TextOr(accountName, ""),
+				Institution:  pgconv.TextOr(institutionName, ""),
+			},
+			ConnectionID: connID,
+			CreatedAt:    createdAt.Time.UTC(),
+		}
+		if amount.Valid {
+			if f, err := amount.Float64Value(); err == nil && f.Valid {
+				t.Amount = f.Float64
+			}
+		}
+		if txDate.Valid {
+			t.Date = txDate.Time.Format("2006-01-02")
+		}
+		fetched = append(fetched, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	samples := make(map[string][]FeedSampleTx, len(raws))
+	for _, r := range raws {
+		if !r.startedAt.Valid {
+			continue
+		}
+		connID := formatUUID(r.connectionID)
+		windowStart := r.startedAt.Time.Add(-30 * time.Second)
+		windowEnd := r.startedAt.Time.Add(2 * time.Hour)
+		if r.completedAt.Valid {
+			windowEnd = r.completedAt.Time.Add(30 * time.Second)
+		}
+
+		var picked []FeedSampleTx
+		for _, t := range fetched {
+			if t.ConnectionID != connID {
+				continue
+			}
+			if t.CreatedAt.Before(windowStart) || t.CreatedAt.After(windowEnd) {
+				continue
+			}
+			picked = append(picked, t.FeedSampleTx)
+		}
+		// Sort by absolute amount desc so the biggest transactions surface
+		// first — they're the highest-signal samples for "what came in".
+		sort.SliceStable(picked, func(i, j int) bool {
+			return absFloat(picked[i].Amount) > absFloat(picked[j].Amount)
+		})
+		if len(picked) > sampleLimit {
+			samples[formatUUID(r.id)] = append([]FeedSampleTx(nil), picked[:sampleLimit]...)
+		} else {
+			samples[formatUUID(r.id)] = picked
+		}
+	}
+	return samples, nil
+}
+
+// parseFeedRuleHits decodes the `sync_logs.rule_hits` JSONB column into the
+// feed's lightweight FeedRuleOutcome slice. The richer SyncLogRow path
+// resolves rule names against the live rules table; on the feed we accept
+// the frozen names captured at sync-time, which is good enough for the
+// "X auto-tagged" outcome line and avoids the extra round-trip.
+func (s *Service) parseFeedRuleHits(ctx context.Context, payload []byte) []FeedRuleOutcome {
+	if len(payload) == 0 || string(payload) == "{}" || string(payload) == "[]" {
+		return nil
+	}
+	type hit struct {
+		RuleID      string `json:"rule_id"`
+		RuleShortID string `json:"rule_short_id"`
+		RuleName    string `json:"rule_name"`
+		Count       int    `json:"count"`
+	}
+	var raw []hit
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return nil
+	}
+	out := make([]FeedRuleOutcome, 0, len(raw))
+	for _, h := range raw {
+		if h.Count <= 0 {
+			continue
+		}
+		out = append(out, FeedRuleOutcome{
+			RuleName:    h.RuleName,
+			RuleShortID: h.RuleShortID,
+			Count:       h.Count,
+		})
+	}
+	return out
+}
+
+// fetchFeedSessionMeta fetches mcp_sessions metadata for any session_ids
+// referenced by the supplied annotations. Returns a map keyed by session
+// UUID string.
+func (s *Service) fetchFeedSessionMeta(ctx context.Context, rows []FeedActivityRow) (map[string]feedSessionMeta, error) {
+	ids := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, r := range rows {
+		if r.Annotation.SessionID == nil {
+			continue
+		}
+		id := *r.Annotation.SessionID
 		if id == "" || seen[id] {
 			continue
 		}
@@ -198,31 +810,329 @@ func (s *Service) hydrateFeedAvatarVersions(ctx context.Context, rows []FeedActi
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	const q = `SELECT id::text, EXTRACT(EPOCH FROM updated_at)::bigint FROM users WHERE id::text = ANY($1::text[])`
+	const q = `
+SELECT id::text, short_id, api_key_name, purpose, created_at
+FROM mcp_sessions
+WHERE id::text = ANY($1::text[])
+`
+
 	pgrows, err := s.Pool.Query(ctx, q, ids)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer pgrows.Close()
-	versions := make(map[string]string, len(ids))
+	out := make(map[string]feedSessionMeta, len(ids))
 	for pgrows.Next() {
-		var id string
-		var ts int64
-		if err := pgrows.Scan(&id, &ts); err != nil {
-			return err
+		var id, shortID, keyName, purpose string
+		var createdAt pgtype.Timestamptz
+		if err := pgrows.Scan(&id, &shortID, &keyName, &purpose, &createdAt); err != nil {
+			return nil, err
 		}
-		versions[id] = strconv.FormatInt(ts, 10)
+		out[id] = feedSessionMeta{
+			ID:         id,
+			ShortID:    shortID,
+			APIKeyName: keyName,
+			Purpose:    purpose,
+			CreatedAt:  createdAt.Time.UTC(),
+		}
 	}
-	for i := range rows {
-		if rows[i].Annotation.ActorType != "user" || rows[i].Annotation.ActorID == nil {
+	return out, nil
+}
+
+type feedSessionMeta struct {
+	ID         string
+	ShortID    string
+	APIKeyName string
+	Purpose    string
+	CreatedAt  time.Time
+}
+
+// ── Grouping ──────────────────────────────────────────────────────────────
+
+// groupAnnotationsIntoEvents applies the two-stage grouping described on
+// `ListFeedEvents`: hard group by session_id, then soft-bucket the
+// remaining un-sessioned annotations.
+func groupAnnotationsIntoEvents(rows []FeedActivityRow, sessions map[string]feedSessionMeta, params FeedEventsParams) []FeedEvent {
+	bySession := make(map[string][]FeedActivityRow)
+	var unsessioned []FeedActivityRow
+	for _, r := range rows {
+		if r.Annotation.SessionID != nil && *r.Annotation.SessionID != "" {
+			id := *r.Annotation.SessionID
+			bySession[id] = append(bySession[id], r)
+		} else {
+			unsessioned = append(unsessioned, r)
+		}
+	}
+
+	out := make([]FeedEvent, 0, len(bySession)+len(unsessioned))
+
+	for sessionID, rows := range bySession {
+		ev := buildAgentSessionEvent(sessionID, rows, sessions[sessionID], params)
+		out = append(out, FeedEvent{
+			Type:         "agent_session",
+			Timestamp:    ev.EndedAt,
+			AgentSession: &ev,
+		})
+	}
+
+	out = append(out, groupUnsessionedAnnotations(unsessioned, params)...)
+	return out
+}
+
+// buildAgentSessionEvent collapses the annotations of one MCP session into
+// a single FeedAgentSessionEvent, summarising the kind breakdown and
+// picking up to SampleLimit unique transaction samples.
+func buildAgentSessionEvent(sessionID string, rows []FeedActivityRow, meta feedSessionMeta, params FeedEventsParams) FeedAgentSessionEvent {
+	ev := FeedAgentSessionEvent{
+		SessionID:      sessionID,
+		SessionShortID: meta.ShortID,
+		APIKeyName:     meta.APIKeyName,
+		Purpose:        meta.Purpose,
+		KindCounts:     make(map[string]int),
+	}
+	if !meta.CreatedAt.IsZero() {
+		ev.StartedAt = meta.CreatedAt
+	}
+
+	uniqueTx := make(map[string]FeedSampleTx)
+	for _, r := range rows {
+		ann := r.Annotation
+		if ev.ActorName == "" {
+			ev.ActorName = ann.ActorName
+			ev.ActorType = ann.ActorType
+			ev.ActorAvatarVersion = ann.ActorAvatarVersion
+			if ann.ActorID != nil {
+				ev.ActorID = *ann.ActorID
+			}
+		}
+		ev.AnnotationCount++
+		ev.KindCounts[ann.Kind]++
+		if ev.StartedAt.IsZero() || ann.CreatedAtTime.Before(ev.StartedAt) {
+			ev.StartedAt = ann.CreatedAtTime
+		}
+		if ann.CreatedAtTime.After(ev.EndedAt) {
+			ev.EndedAt = ann.CreatedAtTime
+		}
+		if _, ok := uniqueTx[r.TransactionShortID]; !ok {
+			uniqueTx[r.TransactionShortID] = sampleTxFromRow(r)
+		}
+	}
+	ev.UniqueTransactions = len(uniqueTx)
+
+	samples := make([]FeedSampleTx, 0, len(uniqueTx))
+	for _, t := range uniqueTx {
+		samples = append(samples, t)
+	}
+	sort.SliceStable(samples, func(i, j int) bool {
+		return absFloat(samples[i].Amount) > absFloat(samples[j].Amount)
+	})
+	if len(samples) > params.SampleLimit {
+		samples = samples[:params.SampleLimit]
+	}
+	ev.SampleTransactions = samples
+
+	if ev.ActorName == "" && meta.APIKeyName != "" {
+		ev.ActorName = meta.APIKeyName
+		ev.ActorType = "agent"
+	}
+	if ev.EndedAt.IsZero() {
+		ev.EndedAt = ev.StartedAt
+	}
+	return ev
+}
+
+// groupUnsessionedAnnotations buckets the remaining annotations by
+// (actor_id, kind, 5-min). Buckets at-or-above BulkThreshold collapse into
+// a FeedBulkActionEvent; smaller buckets pass through annotations
+// individually but only `comment` rows are kept (other singleton
+// recategorisations are too low-signal for the home feed).
+func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams) []FeedEvent {
+	if len(rows) == 0 {
+		return nil
+	}
+	const bucketWindow = 5 * time.Minute
+
+	type bucketKey struct {
+		actorID string
+		kind    string
+		bucket  int64
+	}
+
+	buckets := make(map[bucketKey][]FeedActivityRow)
+	keyOrder := make([]bucketKey, 0)
+	for _, r := range rows {
+		actorID := ""
+		if r.Annotation.ActorID != nil {
+			actorID = *r.Annotation.ActorID
+		}
+		if actorID == "" {
+			actorID = r.Annotation.ActorType + ":" + r.Annotation.ActorName
+		}
+		k := bucketKey{
+			actorID: actorID,
+			kind:    r.Annotation.Kind,
+			bucket:  r.Annotation.CreatedAtTime.Unix() / int64(bucketWindow.Seconds()),
+		}
+		if _, ok := buckets[k]; !ok {
+			keyOrder = append(keyOrder, k)
+		}
+		buckets[k] = append(buckets[k], r)
+	}
+
+	out := make([]FeedEvent, 0, len(buckets))
+	for _, k := range keyOrder {
+		bucket := buckets[k]
+		if len(bucket) >= params.BulkThreshold {
+			ev := buildBulkActionEvent(bucket, params)
+			out = append(out, FeedEvent{
+				Type:       "bulk_action",
+				Timestamp:  ev.EndedAt,
+				BulkAction: &ev,
+			})
 			continue
 		}
-		if v, ok := versions[*rows[i].Annotation.ActorID]; ok {
-			rows[i].Annotation.ActorAvatarVersion = v
+		// Below threshold — only standalone comments survive in v2.
+		for _, r := range bucket {
+			if r.Annotation.Kind != "comment" || r.Annotation.IsDeleted {
+				continue
+			}
+			ev := FeedCommentEvent{
+				ActorName:          r.Annotation.ActorName,
+				ActorType:          r.Annotation.ActorType,
+				ActorAvatarVersion: r.Annotation.ActorAvatarVersion,
+				Content:            r.Annotation.Content,
+				Transaction:        sampleTxFromRow(r),
+			}
+			if r.Annotation.ActorID != nil {
+				ev.ActorID = *r.Annotation.ActorID
+			}
+			out = append(out, FeedEvent{
+				Type:      "comment",
+				Timestamp: r.Annotation.CreatedAtTime,
+				Comment:   &ev,
+			})
 		}
 	}
-	return nil
+	return out
+}
+
+// buildBulkActionEvent collapses one (actor, kind, time-bucket) cluster of
+// annotations into a single FeedBulkActionEvent, summarising the subjects
+// (tag names, category names, rule names) the actor applied.
+func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedBulkActionEvent {
+	ev := FeedBulkActionEvent{
+		Count: len(rows),
+	}
+	subjectCounts := make(map[string]int)
+	subjectMeta := make(map[string]FeedBulkSubject)
+	uniqueTx := make(map[string]FeedSampleTx)
+
+	for _, r := range rows {
+		ann := r.Annotation
+		if ev.ActorName == "" {
+			ev.ActorName = ann.ActorName
+			ev.ActorType = ann.ActorType
+			ev.ActorAvatarVersion = ann.ActorAvatarVersion
+			ev.Kind = ann.Kind
+			if ann.ActorID != nil {
+				ev.ActorID = *ann.ActorID
+			}
+		}
+		if ev.StartedAt.IsZero() || ann.CreatedAtTime.Before(ev.StartedAt) {
+			ev.StartedAt = ann.CreatedAtTime
+		}
+		if ann.CreatedAtTime.After(ev.EndedAt) {
+			ev.EndedAt = ann.CreatedAtTime
+		}
+		key := bulkSubjectKey(ann)
+		if key != "" {
+			subjectCounts[key]++
+			if _, ok := subjectMeta[key]; !ok {
+				subjectMeta[key] = FeedBulkSubject{
+					Name: ann.Subject,
+					Slug: bulkSubjectSlug(ann),
+				}
+			}
+		}
+		if _, ok := uniqueTx[r.TransactionShortID]; !ok {
+			uniqueTx[r.TransactionShortID] = sampleTxFromRow(r)
+		}
+	}
+
+	subjects := make([]FeedBulkSubject, 0, len(subjectCounts))
+	for k, count := range subjectCounts {
+		s := subjectMeta[k]
+		s.Count = count
+		subjects = append(subjects, s)
+	}
+	sort.SliceStable(subjects, func(i, j int) bool {
+		return subjects[i].Count > subjects[j].Count
+	})
+	ev.Subjects = subjects
+
+	samples := make([]FeedSampleTx, 0, len(uniqueTx))
+	for _, t := range uniqueTx {
+		samples = append(samples, t)
+	}
+	sort.SliceStable(samples, func(i, j int) bool {
+		return absFloat(samples[i].Amount) > absFloat(samples[j].Amount)
+	})
+	if len(samples) > params.SampleLimit {
+		samples = samples[:params.SampleLimit]
+	}
+	ev.SampleTransactions = samples
+	return ev
+}
+
+func bulkSubjectKey(a Annotation) string {
+	switch a.Kind {
+	case "tag_added", "tag_removed":
+		return "tag:" + a.TagSlug
+	case "category_set":
+		return "category:" + a.CategorySlug
+	case "rule_applied":
+		return "rule:" + a.RuleShortID
+	}
+	return ""
+}
+
+func bulkSubjectSlug(a Annotation) string {
+	switch a.Kind {
+	case "tag_added", "tag_removed":
+		return a.TagSlug
+	case "category_set":
+		return a.CategorySlug
+	case "rule_applied":
+		return a.RuleShortID
+	}
+	return ""
+}
+
+// sampleTxFromRow projects a feed-activity row into the small FeedSampleTx
+// shape used by every event card.
+func sampleTxFromRow(r FeedActivityRow) FeedSampleTx {
+	merchant := r.MerchantName
+	if merchant == "" {
+		merchant = r.TransactionName
+	}
+	return FeedSampleTx{
+		ShortID:      r.TransactionShortID,
+		Name:         r.TransactionName,
+		MerchantName: merchant,
+		Amount:       r.Amount,
+		Currency:     r.IsoCurrencyCode,
+		Date:         r.TransactionDate,
+		AccountName:  r.AccountName,
+		Institution:  r.InstitutionName,
+	}
+}
+
+func absFloat(f float64) float64 {
+	if f < 0 {
+		return -f
+	}
+	return f
 }

@@ -3,29 +3,27 @@ package pages
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"breadbox/internal/templates/components"
 	"breadbox/internal/timefmt"
 )
 
 // Feed renders the home Feed — a chronological, GitHub-style activity stream
-// across the whole household. Designed as a candidate replacement for the
-// stats-heavy dashboard: replaces "what is my net worth" surfaces with
-// "what changed today" surfaces. The page composes:
-//
-//   - feedHero — the at-a-glance band: title, generated-at line, and the
-//     four KPIs (events today, new transactions, last sync, unread reports).
-//   - feedAlerts — pinned warning cards for connections in error state.
-//   - feedFilters — the scope-chip strip ("All", "From me", "From agents",
-//     "Syncs", "Reports").
-//   - feedTimeline — the actual rail: day separators + per-item cards mixed
-//     across a single left rail (reusing the timeline primitive's chrome).
-//
-// The feed convention is reverse-chronological — newest at the top — which
-// is the inverse of the per-transaction activity timeline (composer-anchored,
-// newest at the bottom). A global feed is consumed differently: people
-// glance at the top to see "what's new", then scroll back through history.
+// across the whole household. Every row threads through the shared timeline
+// primitives (TimelineSystemRow / TimelineSystemRowCustomTile /
+// TimelineCommentRow) so the visual language stays identical to the per-
+// transaction activity log on /transactions/{id}. The home feed is just a
+// global, grouped view of the same shape.
 templ Feed(p FeedProps) {
+	<!-- Comment bubbles use the shared markdown scanner so a comment posted
+	     from the per-transaction composer renders identically when it
+	     surfaces here. Same marked + DOMPurify versions / SRI as the
+	     per-transaction page. The scanner is idempotent — safe on every
+	     feed visit. -->
+	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/markdown.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('feed')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@feedHero(p)
 	if len(p.ConnectionAlerts) > 0 {
@@ -35,9 +33,8 @@ templ Feed(p FeedProps) {
 	@feedTimeline(p)
 }
 
-// feedHero is the prominent header band: title + small generated-at line +
-// four highly-scannable KPI tiles. Anchors the page so the user sees a
-// "today" snapshot before they start reading the stream.
+// ── Hero band ─────────────────────────────────────────────────────────────
+
 templ feedHero(p FeedProps) {
 	<header class="mb-6">
 		<div class="flex flex-wrap items-end justify-between gap-3 mb-4">
@@ -72,10 +69,6 @@ templ feedHero(p FeedProps) {
 	</header>
 }
 
-// feedHeroTile renders one KPI tile — neutral icon + label + big number +
-// optional sublabel. Used for the "events today", "new transactions", and
-// "unread reports" tiles; the sync tile renders separately so it can carry
-// a status dot.
 templ feedHeroTile(icon, label, value, sub string) {
 	<div class="bb-card p-4">
 		<div class="flex items-center gap-2">
@@ -89,9 +82,6 @@ templ feedHeroTile(icon, label, value, sub string) {
 	</div>
 }
 
-// feedHeroSyncTile is the special "Last sync" tile — pulses a coloured dot
-// based on the latest sync status. Designed so the user sees at a glance
-// whether everything is healthy without reading numbers.
 templ feedHeroSyncTile(p FeedProps) {
 	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline group block">
 		<div class="flex items-center gap-2">
@@ -111,9 +101,8 @@ templ feedHeroSyncTile(p FeedProps) {
 	</a>
 }
 
-// feedAlerts renders the pinned-warning band. Each alert is a vivid warning
-// card with a Reconnect CTA — the goal is "you cannot scroll past this
-// without seeing it".
+// ── Pinned alerts ─────────────────────────────────────────────────────────
+
 templ feedAlerts(p FeedProps) {
 	<div class="space-y-2 mb-6">
 		for _, a := range p.ConnectionAlerts {
@@ -147,17 +136,15 @@ templ feedAlertCard(a FeedAlert) {
 	</div>
 }
 
-// feedFilters renders the scope-chip strip — a row of pill buttons that
-// re-issue the page with a ?filter= query param. Visual treatment matches
-// the bb-tag-chip family used elsewhere on the admin so it feels familiar.
+// ── Filters ───────────────────────────────────────────────────────────────
+
 templ feedFilters(p FeedProps) {
 	<nav class="flex items-center gap-1.5 mb-5 overflow-x-auto" aria-label="Feed filters">
 		@feedFilterChip("All", "", "layers", p.Filter)
 		@feedFilterChip("Syncs", "syncs", "refresh-cw", p.Filter)
 		@feedFilterChip("Reports", "reports", "file-text", p.Filter)
 		@feedFilterChip("Comments", "comments", "message-circle", p.Filter)
-		@feedFilterChip("Rules", "rules", "zap", p.Filter)
-		@feedFilterChip("From agents", "agents", "bot", p.Filter)
+		@feedFilterChip("Sessions", "sessions", "bot", p.Filter)
 		@feedFilterChip("From me", "me", "user", p.Filter)
 	</nav>
 }
@@ -174,10 +161,8 @@ templ feedFilterChip(label, slug, icon, current string) {
 	</a>
 }
 
-// feedTimeline owns the rail itself — a single ordered list with day
-// separators and per-item rendering branching off Type. The rail uses the
-// "prominent" timeline variant so it feels like the page's main content
-// (vs. a sidebar widget like the per-transaction timeline).
+// ── Timeline + dispatch ───────────────────────────────────────────────────
+
 templ feedTimeline(p FeedProps) {
 	if len(p.Days) == 0 {
 		<div class="bb-card p-12 text-center">
@@ -198,344 +183,373 @@ templ feedTimeline(p FeedProps) {
 			for _, day := range p.Days {
 				@components.TimelineDay(day.Label, day.First)
 				for _, item := range day.Items {
-					@feedRow(item)
+					@feedRow(item, p.Now)
 				}
 			}
+		}
+		if p.WindowDays > 0 {
+			<p class="text-xs text-base-content/40 text-center mt-6">
+				Showing the last { fmt.Sprintf("%d days", p.WindowDays) }.
+			</p>
 		}
 	}
 }
 
-// feedRow dispatches on item Type to the right card renderer. Each renderer
-// uses TimelineSystemRow for compact one-liners (tag/category/rule_batch)
-// and a custom <li> for rich cards (sync/report/comment) that need
-// multi-line layout.
-templ feedRow(it FeedItem) {
+// feedRow dispatches each FeedItem to the right primitive. Comments use
+// TimelineCommentRow (matching the per-transaction activity log shape);
+// every other event type uses TimelineSystemRowCustomTile so the rail
+// chrome, leading-6 body container, and tile geometry stay identical to
+// the existing timeline surfaces. We never reach for a bespoke <li>.
+templ feedRow(it FeedItem, now time.Time) {
 	switch it.Type {
 		case "sync":
 			if it.Sync != nil {
-				@feedSyncCard(it, it.Sync)
+				@components.TimelineSystemRowCustomTile(
+					"", "", now,
+					feedSyncTile(it.Sync.Status),
+					feedSyncBody(it, it.Sync, now),
+					nil,
+				)
 			}
 		case "report":
 			if it.Report != nil {
-				@feedReportCard(it, it.Report)
+				@components.TimelineSystemRowCustomTile(
+					"", "", now,
+					feedReportTile(it.Report.Priority),
+					feedReportBody(it, it.Report, now),
+					nil,
+				)
 			}
 		case "comment":
 			if it.Comment != nil {
-				@feedCommentCard(it, it.Comment)
+				@feedCommentRow(it, it.Comment, now)
 			}
-		case "tag":
-			if it.Tag != nil {
-				@feedTagRow(it, it.Tag)
+		case "agent_session":
+			if it.AgentSession != nil {
+				@components.TimelineSystemRowCustomTile(
+					"", "", now,
+					feedActorTile(it.AgentSession.ActorType, it.AgentSession.ActorID, it.AgentSession.ActorAvatarVersion, feedSessionActorName(it.AgentSession)),
+					feedAgentSessionBody(it, it.AgentSession, now),
+					nil,
+				)
 			}
-		case "category":
-			if it.Category != nil {
-				@feedCategoryRow(it, it.Category)
-			}
-		case "rule_batch":
-			if it.RuleBatch != nil {
-				@feedRuleBatchCard(it, it.RuleBatch)
+		case "bulk_action":
+			if it.BulkAction != nil {
+				@components.TimelineSystemRowCustomTile(
+					"", "", now,
+					feedActorTile(it.BulkAction.ActorType, it.BulkAction.ActorID, it.BulkAction.ActorAvatarVersion, it.BulkAction.ActorName),
+					feedBulkActionBody(it, it.BulkAction, now),
+					nil,
+				)
 			}
 	}
 }
 
-// ── Sync card ─────────────────────────────────────────────────────────────
-//
-// Rich card. Provider-coloured icon tile, headline ("12 new transactions
-// from Chase"), supporting line ("3 modified · 2 rules applied · 4s ago"),
-// CTA chevron to the sync-log detail page. Failures get an error variant.
-templ feedSyncCard(it FeedItem, s *FeedSync) {
-	<li class="relative flex items-start gap-3 py-3 group">
-		<div class="relative z-10 shrink-0 w-7 h-7 rounded-full bg-base-200">
-			<span class={ "flex items-center justify-center w-7 h-7 rounded-full ring-4 ring-base-200", feedSyncTileBg(s.Status) }>
-				<i data-lucide={ feedSyncIcon(s.Status) } class={ "w-3.5 h-3.5", feedSyncTileText(s.Status) }></i>
-			</span>
-		</div>
-		<a
-			href={ templ.SafeURL("/logs/sync-logs/" + s.SyncLogID) }
-			class="flex-1 min-w-0 bb-card bb-card--interactive p-3.5 sm:p-4 no-underline block group/card"
-		>
-			<div class="flex items-start gap-3">
-				<div class="flex-1 min-w-0">
-					<div class="flex items-baseline gap-2 flex-wrap">
-						<span class="font-semibold text-sm text-base-content">
-							{ feedSyncHeadline(s) }
-						</span>
-						<span class="text-xs text-base-content/50">{ feedProviderLabel(s.Provider) }</span>
-						<span class="text-xs text-base-content/35">&middot;</span>
-						<span class="text-xs text-base-content/55 tabular-nums">
-							{ relativeFromRFC3339(it.TimestampStr) }
-						</span>
-					</div>
-					<div class="text-xs text-base-content/55 mt-1.5 flex items-center gap-3 flex-wrap">
-						if s.AddedCount > 0 {
-							<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-success" aria-hidden="true"></span>{ fmt.Sprintf("%d added", s.AddedCount) }</span>
-						}
-						if s.ModifiedCount > 0 {
-							<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-info" aria-hidden="true"></span>{ fmt.Sprintf("%d modified", s.ModifiedCount) }</span>
-						}
-						if s.RemovedCount > 0 {
-							<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-base-content/30" aria-hidden="true"></span>{ fmt.Sprintf("%d removed", s.RemovedCount) }</span>
-						}
-						if s.RuleHits > 0 {
-							<span class="inline-flex items-center gap-1 text-primary/80"><i data-lucide="zap" class="w-3 h-3"></i>{ fmt.Sprintf("%d rule hit%s", s.RuleHits, pluralFeedS(s.RuleHits)) }</span>
-						}
-						if s.Trigger != "" && s.Trigger != "cron" {
-							<span class="inline-flex items-center gap-1 text-base-content/50"><i data-lucide="hand" class="w-3 h-3"></i>{ feedTriggerLabel(s.Trigger) }</span>
-						}
-					</div>
-					if s.Status == "error" && s.ErrorMessage != "" {
-						<div class="mt-2 text-xs text-error/90 bg-error/8 rounded-lg px-2.5 py-1.5 border border-error/20">
-							<i data-lucide="alert-circle" class="w-3 h-3 inline-block align-text-bottom mr-1"></i>
-							{ s.ErrorMessage }
-						</div>
-					}
-				</div>
-				<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/25 shrink-0 mt-0.5 group-hover/card:text-base-content/55 transition-colors"></i>
-			</div>
-		</a>
-	</li>
-}
+// ── Tile templates (24px on the rail) ─────────────────────────────────────
 
-// ── Report card ───────────────────────────────────────────────────────────
-//
-// Big rich card. Priority-coloured icon tile, title, excerpt body, author
-// chip + tags. Designed to make agent reports feel like first-class items
-// in the feed, not buried sidebar widgets.
-templ feedReportCard(it FeedItem, r *FeedReport) {
-	<li class="relative flex items-start gap-3 py-3 group">
-		<div class="relative z-10 shrink-0 w-7 h-7 rounded-full bg-base-200">
-			<span class={ "flex items-center justify-center w-7 h-7 rounded-full ring-4 ring-base-200", feedReportTileBg(r.Priority) }>
-				<i data-lucide={ feedReportIcon(r.Priority) } class={ "w-3.5 h-3.5", feedReportTileText(r.Priority) }></i>
-			</span>
-		</div>
-		<a
-			href={ templ.SafeURL("/reports/" + r.ID) }
-			class="flex-1 min-w-0 bb-card bb-card--interactive p-4 no-underline block"
-		>
-			<div class="flex items-start gap-2 flex-wrap mb-1.5">
-				if r.IsUnread {
-					<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
-				}
-				if r.Priority == "critical" {
-					<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
-				} else if r.Priority == "warning" {
-					<span class="badge badge-warning badge-xs uppercase tracking-wide">Warning</span>
-				}
-				<span class="text-xs text-base-content/45 ml-auto tabular-nums">{ relativeFromRFC3339(it.TimestampStr) }</span>
-			</div>
-			<h3 class="text-base font-semibold text-base-content tracking-tight leading-snug">{ r.Title }</h3>
-			if r.BodyExcerpt != "" {
-				<p class="text-sm text-base-content/65 leading-relaxed mt-1.5 line-clamp-3">{ r.BodyExcerpt }</p>
-			}
-			<div class="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-base-200">
-				<i data-lucide="bot" class="w-3.5 h-3.5 text-base-content/40"></i>
-				<span class="text-xs text-base-content/55">{ r.DisplayAuthor }</span>
-				if len(r.Tags) > 0 {
-					<span class="text-xs text-base-content/30 mx-1">·</span>
-					for _, t := range r.Tags {
-						<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-200 text-[0.65rem] font-medium text-base-content/65">{ t }</span>
-					}
-				}
-				<span class="text-xs text-primary/70 ml-auto inline-flex items-center gap-1">
-					Read
-					<i data-lucide="arrow-right" class="w-3 h-3"></i>
-				</span>
-			</div>
-		</a>
-	</li>
-}
-
-// ── Comment card ──────────────────────────────────────────────────────────
-//
-// Mid-weight card. Avatar tile, "<actor> commented on <transaction>", a
-// chat-style bubble carrying the comment body, and a small transaction-ref
-// strip with merchant + amount.
-templ feedCommentCard(it FeedItem, c *FeedComment) {
-	<li class="relative flex items-start gap-3 py-3 group">
-		<div class="relative z-10 shrink-0 w-7 h-7 rounded-full bg-base-200 flex items-center justify-center">
-			@feedActorAvatar(c.ActorType, c.ActorID, c.ActorAvatarVersion, c.ActorName, "lg")
-		</div>
-		<div class="flex-1 min-w-0">
-			<div class="flex items-baseline gap-1.5 flex-wrap text-xs leading-6 mb-1.5">
-				<strong class="font-semibold text-base-content">{ feedActorDisplay(c.ActorName, c.ActorType) }</strong>
-				<span class="text-base-content/55">commented on</span>
-				<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-medium text-base-content hover:text-primary transition-colors">
-					{ feedTransactionLabel(c.Transaction) }
-				</a>
-				<span class="text-base-content/30">·</span>
-				<span class="text-base-content/45 tabular-nums">{ relativeFromRFC3339(it.TimestampStr) }</span>
-			</div>
-			<div class="bb-card p-3.5 sm:p-4 leading-relaxed">
-				<p class="text-sm text-base-content/85 whitespace-pre-wrap break-words">{ c.Content }</p>
-				@feedTransactionRefStrip(c.Transaction)
-			</div>
-		</div>
-	</li>
-}
-
-// ── Tag row ───────────────────────────────────────────────────────────────
-//
-// Compact one-liner via TimelineSystemRow. Shows actor, action ("added"/
-// "removed"), tag chip with its own color, and the linked transaction.
-templ feedTagRow(it FeedItem, t *FeedTagChange) {
-	@components.TimelineSystemRow(components.TimelineRowProps{
-		Icon:      feedTagIcon(t.Action),
-		IconTone:  feedTagTone(t.Action),
-		Timestamp: it.TimestampStr,
-	}) {
-		<strong class="font-medium text-base-content">{ feedActorDisplay(t.ActorName, t.ActorType) }</strong>
-		<span class="text-base-content/55">
-			if t.Action == "added" {
-				added the
-			} else {
-				removed the
-			}
-		</span>
-		@feedTagChipInline(t.TagName, t.TagColor)
-		<span class="text-base-content/55">tag on</span>
-		<a href={ templ.SafeURL("/transactions/" + t.Transaction.ShortID) } class="font-medium text-base-content hover:text-primary transition-colors">
-			{ feedTransactionLabel(t.Transaction) }
-		</a>
-		if t.Note != "" {
-			<span class="block text-base-content/55 mt-0.5 italic">&ldquo;{ t.Note }&rdquo;</span>
-		}
-	}
-}
-
-// ── Category row ──────────────────────────────────────────────────────────
-templ feedCategoryRow(it FeedItem, c *FeedCategoryChange) {
-	@components.TimelineSystemRow(components.TimelineRowProps{
-		Icon:      "folder",
-		IconTone:  "info",
-		Timestamp: it.TimestampStr,
-	}) {
-		<strong class="font-medium text-base-content">{ feedActorDisplay(c.ActorName, c.ActorType) }</strong>
-		<span class="text-base-content/55">set category to</span>
-		@feedCategoryChipInline(c.CategoryName, c.CategoryColor, c.CategoryIcon)
-		<span class="text-base-content/55">on</span>
-		<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-medium text-base-content hover:text-primary transition-colors">
-			{ feedTransactionLabel(c.Transaction) }
-		</a>
-	}
-}
-
-// ── Rule batch card ───────────────────────────────────────────────────────
-//
-// Mid-weight card. Collapses N rule_applied rows for one rule on one day
-// into a single row with a count and an expandable sample list. Heavy users
-// of automation see "Rule X auto-categorized 47 transactions today" as a
-// single line instead of 47 rows.
-templ feedRuleBatchCard(it FeedItem, b *FeedRuleBatch) {
-	<li class="relative flex items-start gap-3 py-2.5 group" x-data="{ expanded: false }">
-		<div class="relative z-10 shrink-0 w-7 h-7 rounded-full bg-base-200">
-			<span class="flex items-center justify-center w-7 h-7 rounded-full ring-4 ring-base-200 bg-primary/12">
-				<i data-lucide="zap" class="w-3.5 h-3.5 text-primary"></i>
-			</span>
-		</div>
-		<div class="flex-1 min-w-0 text-sm leading-6">
-			<div class="flex items-baseline gap-1.5 flex-wrap">
-				<span class="text-base-content/55">Rule</span>
-				if b.RuleShortID != "" {
-					<a href={ templ.SafeURL("/rules/" + b.RuleShortID) } class="font-semibold text-base-content hover:text-primary transition-colors">{ b.RuleName }</a>
-				} else {
-					<strong class="font-semibold text-base-content">{ b.RuleName }</strong>
-				}
-				<span class="text-base-content/55">auto-applied to</span>
-				<strong class="font-semibold text-base-content">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</strong>
-				if af := feedRuleActionLabel(b.ActionFields); af != "" {
-					<span class="text-base-content/55">{ af }</span>
-				}
-				<span class="text-base-content/30 mx-1">·</span>
-				<span class="text-base-content/45 tabular-nums text-xs">{ relativeFromRFC3339(it.TimestampStr) }</span>
-			</div>
-			if len(b.Samples) > 0 {
-				<button
-					type="button"
-					class="text-xs text-primary/70 hover:text-primary transition-colors mt-1 inline-flex items-center gap-1"
-					@click="expanded = !expanded"
-				>
-					<i data-lucide="chevron-right" class="w-3 h-3 transition-transform" :class="expanded ? 'rotate-90' : ''"></i>
-					<span x-text="expanded ? 'Hide examples' : 'Show examples'"></span>
-				</button>
-				<div x-show="expanded" x-cloak class="mt-2 space-y-1">
-					for _, s := range b.Samples {
-						<a
-							href={ templ.SafeURL("/transactions/" + s.ShortID) }
-							class="flex items-center justify-between gap-2 text-xs text-base-content/70 hover:text-base-content transition-colors px-2.5 py-1.5 rounded-lg bg-base-200/50 hover:bg-base-200 no-underline"
-						>
-							<span class="truncate">{ feedNonEmpty(s.MerchantName, "Unknown") }</span>
-							<span class="tabular-nums shrink-0">{ feedAmountWithSign(s.Amount, s.Currency) }</span>
-						</a>
-					}
-					if b.Count > len(b.Samples) {
-						<div class="text-xs text-base-content/40 pl-2.5 mt-1">+ { fmt.Sprintf("%d more", b.Count-len(b.Samples)) }</div>
-					}
-				</div>
-			}
-		</div>
-	</li>
-}
-
-// ── Shared subcomponents ──────────────────────────────────────────────────
-
-// feedTransactionRefStrip is the small horizontal strip rendered beneath a
-// comment bubble that anchors the comment to its source transaction.
-templ feedTransactionRefStrip(tx FeedTransactionRef) {
-	if tx.ShortID != "" {
-		<a
-			href={ templ.SafeURL("/transactions/" + tx.ShortID) }
-			class="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-base-200 text-xs no-underline group/strip"
-		>
-			<div class="flex items-center gap-2 min-w-0">
-				<i data-lucide="receipt" class="w-3.5 h-3.5 text-base-content/40 shrink-0"></i>
-				<span class="font-medium text-base-content truncate">{ feedNonEmpty(tx.MerchantName, tx.Name) }</span>
-				if tx.AccountName != "" {
-					<span class="text-base-content/35 hidden sm:inline">·</span>
-					<span class="text-base-content/50 truncate hidden sm:inline">{ tx.AccountName }</span>
-				}
-			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				<span class={ "tabular-nums font-medium", feedAmountClass(tx.Amount) }>{ feedAmountWithSign(tx.Amount, tx.Currency) }</span>
-				<i data-lucide="arrow-right" class="w-3 h-3 text-base-content/30 group-hover/strip:text-primary/60 transition-colors"></i>
-			</div>
-		</a>
-	}
-}
-
-templ feedTagChipInline(name, color string) {
-	<span class={ "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium",
-		templ.KV("bg-base-200 text-base-content/75", color == "") } style={ feedTagStyle(color) }>
-		<i data-lucide="tag" class="w-2.5 h-2.5" aria-hidden="true"></i>
-		<span>{ name }</span>
+// feedSyncTile is the icon tile for a sync row. Tinted by status.
+templ feedSyncTile(status string) {
+	<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-200", feedSyncTileBg(status) } aria-hidden="true">
+		<i data-lucide={ feedSyncIcon(status) } class={ "w-3 h-3", feedSyncTileText(status) }></i>
 	</span>
 }
 
-templ feedCategoryChipInline(name, color, icon string) {
-	<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium" style={ feedCategoryStyle(color) }>
-		if icon != "" {
-			<i data-lucide={ icon } class="w-2.5 h-2.5" aria-hidden="true"></i>
-		} else {
-			<i data-lucide="folder" class="w-2.5 h-2.5" aria-hidden="true"></i>
-		}
-		<span>{ name }</span>
+// feedReportTile is the icon tile for an agent-report row. Tinted by
+// priority (critical/warning/info → error/warning/primary palette).
+templ feedReportTile(priority string) {
+	<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-200", feedReportTileBg(priority) } aria-hidden="true">
+		<i data-lucide={ feedReportIcon(priority) } class={ "w-3 h-3", feedReportTileText(priority) }></i>
 	</span>
 }
 
-templ feedActorAvatar(actorType, actorID, version, name, size string) {
+// feedActorTile is the avatar tile used for actor-driven rows
+// (agent_session, bulk_action). Mirrors the per-tx timeline avatar tile so
+// the same person looks identical on both surfaces. We pass a single 24px
+// tile through the rail's ring-4 ring-base-200 scaffolding.
+templ feedActorTile(actorType, actorID, version, name string) {
 	if actorType == "user" && actorID != "" {
-		<img src={ feedAvatarURL(actorID, version) } alt={ name + " avatar" } class={ feedAvatarSize(size), "rounded-full object-cover ring-4 ring-base-200" } title={ name }/>
+		<img src={ feedAvatarURL(actorID, version) } alt={ name + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-200" title={ name }/>
 	} else if actorType == "agent" {
-		<span class={ feedAvatarSize(size), "rounded-full bg-primary/12 ring-4 ring-base-200 flex items-center justify-center" } title={ name }>
-			<i data-lucide="bot" class="w-3.5 h-3.5 text-primary"></i>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/12 ring-4 ring-base-200" aria-hidden="true" title={ name }>
+			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
 		</span>
 	} else {
-		<span class={ feedAvatarSize(size), "rounded-full bg-base-300 ring-4 ring-base-200 flex items-center justify-center" } title={ name }>
-			<i data-lucide="settings" class="w-3.5 h-3.5 text-base-content/55"></i>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-200" aria-hidden="true" title={ name }>
+			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ feedFirstChar(name) }</span>
 		</span>
 	}
 }
 
-// ── Helper sub-renderers (string functions) ───────────────────────────────
+// ── Row body templates ────────────────────────────────────────────────────
+//
+// Each body lives inside the primitive's `flex-1 min-w-0 text-xs leading-6`
+// container. Multi-line bodies render the headline first (with an inline
+// timestamp pill) and any supporting content below.
+
+templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
+	<div class="flex items-baseline gap-1.5 flex-wrap">
+		<a href={ templ.SafeURL("/logs/sync-logs/" + s.SyncLogID) } class="font-semibold text-base-content hover:text-primary transition-colors no-underline">
+			{ feedSyncHeadline(s) }
+		</a>
+		if lab := feedProviderLabel(s.Provider); lab != "" {
+			<span class="text-base-content/45">{ lab }</span>
+		}
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+	if s.AddedCount+s.ModifiedCount+s.RemovedCount > 0 {
+		<div class="text-base-content/55 mt-0.5 flex items-center gap-2 flex-wrap">
+			if s.AddedCount > 0 {
+				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-success" aria-hidden="true"></span>{ fmt.Sprintf("%d added", s.AddedCount) }</span>
+			}
+			if s.ModifiedCount > 0 {
+				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-info" aria-hidden="true"></span>{ fmt.Sprintf("%d modified", s.ModifiedCount) }</span>
+			}
+			if s.RemovedCount > 0 {
+				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-base-content/30" aria-hidden="true"></span>{ fmt.Sprintf("%d removed", s.RemovedCount) }</span>
+			}
+			if s.Trigger != "" && s.Trigger != "cron" {
+				<span class="text-base-content/45">&middot; { feedTriggerLabel(s.Trigger) }</span>
+			}
+		</div>
+	}
+	if s.Status == "error" && s.ErrorMessage != "" {
+		<div class="mt-1.5 text-error/90 bg-error/8 rounded-lg px-2.5 py-1.5 border border-error/20">
+			<i data-lucide="alert-circle" class="w-3 h-3 inline-block align-text-bottom mr-1"></i>
+			{ s.ErrorMessage }
+		</div>
+		if s.RetryCount > 0 {
+			<div class="mt-1 text-base-content/55 flex items-center gap-1.5">
+				<i data-lucide="refresh-cw" class="w-3 h-3"></i>
+				<span>{ feedSyncRetryLabel(s) }</span>
+			</div>
+		}
+	}
+	if len(s.SampleTransactions) > 0 {
+		<div class="mt-2">
+			@feedTxRefList(s.SampleTransactions, s.AdditionalCount)
+		</div>
+	}
+	if len(s.RuleOutcomes) > 0 {
+		<div class="mt-1.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+			<i data-lucide="zap" class="w-3 h-3 text-primary/70"></i>
+			for i, ro := range s.RuleOutcomes {
+				if i > 0 {
+					<span class="text-base-content/25">·</span>
+				}
+				if ro.RuleShortID != "" {
+					<a href={ templ.SafeURL("/rules/" + ro.RuleShortID) } class="hover:text-primary transition-colors no-underline">
+						<span class="font-medium text-base-content/85">{ feedNonEmpty(ro.RuleName, "A rule") }</span>
+						<span>&nbsp;applied to&nbsp;</span>
+						<span class="font-medium tabular-nums text-base-content/85">{ fmt.Sprintf("%d", ro.Count) }</span>
+					</a>
+				} else {
+					<span>
+						<span class="font-medium text-base-content/85">{ feedNonEmpty(ro.RuleName, "A rule") }</span>
+						<span>&nbsp;applied to&nbsp;</span>
+						<span class="font-medium tabular-nums text-base-content/85">{ fmt.Sprintf("%d", ro.Count) }</span>
+					</span>
+				}
+			}
+		</div>
+	}
+}
+
+templ feedReportBody(it FeedItem, r *FeedReport, now time.Time) {
+	<div class="flex items-baseline gap-1.5 flex-wrap">
+		<a href={ templ.SafeURL("/reports/" + r.ID) } class="font-semibold text-base-content hover:text-primary transition-colors no-underline">
+			{ r.Title }
+		</a>
+		if r.IsUnread {
+			<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
+		}
+		if r.Priority == "critical" {
+			<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
+		} else if r.Priority == "warning" {
+			<span class="badge badge-warning badge-xs uppercase tracking-wide">Warning</span>
+		}
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+	if r.BodyExcerpt != "" {
+		<p class="text-base-content/65 leading-relaxed mt-0.5 line-clamp-2">{ r.BodyExcerpt }</p>
+	}
+	<div class="mt-1 flex items-center gap-1.5 flex-wrap text-base-content/55">
+		<i data-lucide="bot" class="w-3 h-3"></i>
+		<span>{ r.DisplayAuthor }</span>
+		if len(r.Tags) > 0 {
+			<span class="text-base-content/30 mx-1">·</span>
+			for _, t := range r.Tags {
+				<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-200 text-[0.65rem] font-medium text-base-content/65">{ t }</span>
+			}
+		}
+	</div>
+}
+
+templ feedAgentSessionBody(it FeedItem, s *FeedAgentSession, now time.Time) {
+	<div class="flex items-baseline gap-1.5 flex-wrap">
+		<strong class="font-semibold text-base-content">{ feedSessionActorName(s) }</strong>
+		<span class="text-base-content/55">ran a session</span>
+		<span class="text-base-content/30">·</span>
+		<span class="font-medium text-base-content tabular-nums">{ fmt.Sprintf("%d transaction%s touched", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+	if breakdown := feedSessionBreakdown(s); breakdown != "" {
+		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+			<i data-lucide="sparkles" class="w-3 h-3 text-primary/70"></i>
+			<span>{ breakdown }</span>
+			if dur := feedSessionDuration(s); dur != "" {
+				<span class="text-base-content/30 mx-1">·</span>
+				<i data-lucide="clock" class="w-3 h-3"></i>
+				<span>{ dur }</span>
+			}
+		</div>
+	}
+	if len(s.SampleTransactions) > 0 {
+		<div class="mt-2">
+			@feedTxRefList(s.SampleTransactions, max0(s.UniqueTransactions-len(s.SampleTransactions)))
+		</div>
+	}
+	if s.SessionShortID != "" {
+		<a href={ templ.SafeURL("/logs/sessions/" + s.SessionShortID) } class="text-primary/70 hover:text-primary transition-colors mt-1.5 inline-flex items-center gap-1 no-underline">
+			Open session log
+			<i data-lucide="arrow-right" class="w-3 h-3"></i>
+		</a>
+	}
+}
+
+templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
+	<div class="flex items-baseline gap-1.5 flex-wrap">
+		<strong class="font-semibold text-base-content">{ feedActorDisplay(b.ActorName, b.ActorType) }</strong>
+		<span class="text-base-content/65">{ feedBulkVerb(b.Kind) }</span>
+		<span class="font-semibold text-base-content tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
+		if subjectLabel := feedBulkSubjectLabel(b); subjectLabel != "" {
+			<span class="text-base-content/65">{ subjectLabel }</span>
+		}
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+	if len(b.Subjects) > 1 {
+		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+			for i, sub := range b.Subjects {
+				if i >= 4 {
+					<span class="text-base-content/40">+ { fmt.Sprintf("%d more", len(b.Subjects)-4) }</span>
+					break
+				}
+				<span class="inline-flex items-center gap-1 bg-base-200 px-1.5 py-0.5 rounded-md">
+					<span class="font-medium text-base-content/85">{ sub.Name }</span>
+					<span class="text-base-content/55 tabular-nums">&times;{ fmt.Sprintf("%d", sub.Count) }</span>
+				</span>
+			}
+		</div>
+	}
+	if len(b.SampleTransactions) > 0 {
+		<div class="mt-2">
+			@feedTxRefList(b.SampleTransactions, max0(b.Count-len(b.SampleTransactions)))
+		</div>
+	}
+}
+
+// feedRowTimestamp renders the inline relative-time pill used at the end of
+// every row's headline. We render our own (instead of letting
+// TimelineSystemRowCustomTile auto-append it) so the timestamp lands at
+// the end of the *first* line, not after the multi-line body content.
+templ feedRowTimestamp(timestamp string, now time.Time) {
+	if timestamp != "" {
+		<span class="text-base-content/30 mx-0.5">·</span>
+		<span class="tooltip tooltip-top" data-tip={ feedFormatTimestamp(timestamp) }>
+			<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ feedFormatTimestamp(timestamp) }>{ feedRelativeTimestamp(timestamp, now) }</time>
+		</span>
+	}
+}
+
+// ── Comment row ───────────────────────────────────────────────────────────
+//
+// Comments wrap the existing TimelineCommentRowRaw primitive so the meta
+// line and avatar tile match the per-transaction activity log byte-for-
+// byte. The bubble body uses the shared `.bb-comment-bubble` CSS class
+// (defined in input.css) and the same data-markdown attribute the per-tx
+// page consumes — so a comment posted from the per-tx composer renders
+// identically when it surfaces on the home feed.
+templ feedCommentRow(it FeedItem, c *FeedComment, now time.Time) {
+	@components.TimelineCommentRowRaw(feedCommentAvatar(c), nil) {
+		<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6 min-w-0">
+			<strong class="font-semibold text-base-content truncate min-w-0 max-w-[10rem] sm:max-w-none">{ feedActorDisplay(c.ActorName, c.ActorType) }</strong>
+			<span class="text-base-content/55 shrink-0">commented on</span>
+			<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-medium text-base-content hover:text-primary transition-colors no-underline truncate min-w-0">
+				{ feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name) }
+			</a>
+			@feedRowTimestamp(it.TimestampStr, now)
+		</div>
+		if c.Content != "" {
+			<div class="bb-comment-bubble mt-1" data-markdown={ c.Content } data-markdown-breaks="true"></div>
+		}
+	}
+}
+
+templ feedCommentAvatar(c *FeedComment) {
+	if c.ActorType == "user" && c.ActorID != "" {
+		<img src={ feedAvatarURL(c.ActorID, c.ActorAvatarVersion) } alt={ c.ActorName + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-200" title={ c.ActorName }/>
+	} else if c.ActorType == "agent" {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/12 ring-4 ring-base-200" aria-hidden="true" title={ c.ActorName }>
+			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
+		</span>
+	} else {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-200" aria-hidden="true" title={ c.ActorName }>
+			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ feedFirstChar(c.ActorName) }</span>
+		</span>
+	}
+}
+
+// ── Shared transaction-reference helpers ──────────────────────────────────
+//
+// `feedTxRefRow` is the canonical inline reference to a transaction —
+// receipt icon, merchant name, optional account name, signed amount.
+// Used inside sync, agent_session, and bulk_action bodies. Keeping a
+// single source of truth so the sample list looks identical wherever it
+// surfaces.
+
+// feedTxRefRow renders one transaction-reference line.
+templ feedTxRefRow(tx FeedTransactionRef, dimmed bool) {
+	<a
+		href={ templ.SafeURL("/transactions/" + tx.ShortID) }
+		class="flex items-center justify-between gap-2 text-base-content/85 hover:text-base-content transition-colors no-underline group/txref"
+	>
+		<span class="flex items-center gap-2 min-w-0 flex-1">
+			<i data-lucide="receipt" class="w-3 h-3 text-base-content/35 shrink-0"></i>
+			<span class={ "font-medium truncate", templ.KV("text-base-content/65", dimmed) }>{ feedNonEmpty(tx.MerchantName, tx.Name) }</span>
+			if tx.AccountName != "" {
+				<span class="text-base-content/35 hidden sm:inline">·</span>
+				<span class="text-base-content/45 truncate hidden sm:inline">{ tx.AccountName }</span>
+			}
+		</span>
+		<span class={ "tabular-nums font-medium shrink-0", feedAmountClass(tx.Amount) }>
+			{ feedAmountWithSign(tx.Amount, tx.Currency) }
+		</span>
+	</a>
+}
+
+// feedTxRefList wraps `feedTxRefRow` for the multi-sample case used by
+// sync / session / bulk-action bodies. Mobile collapses to 3 visible rows
+// via `hidden sm:flex` on samples ≥ index 3; desktop shows up to 5.
+templ feedTxRefList(samples []FeedTransactionRef, additional int) {
+	<ul class="space-y-0.5" role="list">
+		for i, tx := range samples {
+			<li class={ templ.KV("hidden sm:block", i >= 3) }>
+				@feedTxRefRow(tx, false)
+			</li>
+		}
+		if additional > 0 {
+			<li class="text-base-content/40 pl-5">
+				<span class="sm:hidden">{ fmt.Sprintf("+ %d more", additional+max0(len(samples)-3)) }</span>
+				<span class="hidden sm:inline">{ fmt.Sprintf("+ %d more", additional) }</span>
+			</li>
+		} else if len(samples) > 3 {
+			<li class="text-base-content/40 pl-5 sm:hidden">
+				{ fmt.Sprintf("+ %d more", len(samples)-3) }
+			</li>
+		}
+	</ul>
+}
+
+// ── String helpers ────────────────────────────────────────────────────────
 
 func feedAvatarURL(id, version string) string {
 	base := "/avatars/" + id
@@ -543,13 +557,6 @@ func feedAvatarURL(id, version string) string {
 		return base + "?v=" + version
 	}
 	return base
-}
-
-func feedAvatarSize(size string) string {
-	if size == "lg" {
-		return "w-7 h-7"
-	}
-	return "w-6 h-6"
 }
 
 func feedActorDisplay(name, actorType string) string {
@@ -565,18 +572,84 @@ func feedActorDisplay(name, actorType string) string {
 	return "Someone"
 }
 
-func feedTransactionLabel(tx FeedTransactionRef) string {
-	merchant := tx.MerchantName
-	if merchant == "" {
-		merchant = tx.Name
+func feedSessionActorName(s *FeedAgentSession) string {
+	if s.ActorName != "" {
+		return s.ActorName
 	}
-	if merchant == "" {
-		merchant = "a transaction"
+	if s.APIKeyName != "" {
+		return s.APIKeyName
 	}
-	if tx.Amount != 0 {
-		return fmt.Sprintf("%s · %s", merchant, feedAmountWithSign(tx.Amount, tx.Currency))
+	return "An agent"
+}
+
+func feedSessionBreakdown(s *FeedAgentSession) string {
+	parts := []string{}
+	if s.Categorised > 0 {
+		parts = append(parts, fmt.Sprintf("%d categorised", s.Categorised))
 	}
-	return merchant
+	if s.Tagged > 0 {
+		parts = append(parts, fmt.Sprintf("%d tagged", s.Tagged))
+	}
+	if s.UntaggedRemoved > 0 {
+		parts = append(parts, fmt.Sprintf("%d untagged", s.UntaggedRemoved))
+	}
+	if s.Commented > 0 {
+		parts = append(parts, fmt.Sprintf("%d commented", s.Commented))
+	}
+	if s.RuleApplied > 0 {
+		parts = append(parts, fmt.Sprintf("%d rules applied", s.RuleApplied))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func feedSessionDuration(s *FeedAgentSession) string {
+	if s.StartedAt.IsZero() || s.EndedAt.IsZero() {
+		return ""
+	}
+	d := s.EndedAt.Sub(s.StartedAt)
+	if d < 1 {
+		return ""
+	}
+	if d < 60 {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < 3600 {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%dh", int(d.Hours()))
+}
+
+func feedBulkVerb(kind string) string {
+	switch kind {
+	case "tag_added":
+		return "added a tag to"
+	case "tag_removed":
+		return "removed a tag from"
+	case "category_set":
+		return "categorised"
+	case "rule_applied":
+		return "ran a rule on"
+	}
+	return "updated"
+}
+
+func feedBulkSubjectLabel(b *FeedBulkAction) string {
+	if len(b.Subjects) != 1 {
+		return ""
+	}
+	name := b.Subjects[0].Name
+	if name == "" {
+		return ""
+	}
+	switch b.Kind {
+	case "tag_added", "tag_removed":
+		return "with the " + name + " tag"
+	case "category_set":
+		return "as " + name
+	case "rule_applied":
+		return "with rule " + name
+	}
+	return ""
 }
 
 func feedNonEmpty(a, fallback string) string {
@@ -584,6 +657,13 @@ func feedNonEmpty(a, fallback string) string {
 		return a
 	}
 	return fallback
+}
+
+func feedFirstChar(s string) string {
+	for _, r := range s {
+		return string(r)
+	}
+	return ""
 }
 
 func feedSyncDotClass(status string) string {
@@ -694,6 +774,18 @@ func feedSyncHeadline(s *FeedSync) string {
 	return "Synced " + bank
 }
 
+func feedSyncRetryLabel(s *FeedSync) string {
+	total := s.RetryCount + 1
+	if s.FirstFailureAt.IsZero() {
+		return fmt.Sprintf("%d attempts so far", total)
+	}
+	since := timefmt.Relative(s.FirstFailureAt)
+	if since == "" {
+		return fmt.Sprintf("%d attempts so far", total)
+	}
+	return fmt.Sprintf("Failing since %s · %d attempts", since, total)
+}
+
 func feedProviderLabel(p string) string {
 	switch p {
 	case "plaid":
@@ -716,56 +808,6 @@ func feedTriggerLabel(t string) string {
 		return "first sync"
 	}
 	return t
-}
-
-func feedRuleActionLabel(fields map[string]int) string {
-	if len(fields) == 0 {
-		return ""
-	}
-	if len(fields) == 1 {
-		for k := range fields {
-			switch k {
-			case "tag":
-				return "(tagged)"
-			case "category":
-				return "(categorised)"
-			}
-			return "(" + k + ")"
-		}
-	}
-	parts := make([]string, 0, len(fields))
-	for k := range fields {
-		parts = append(parts, k)
-	}
-	return "(" + strings.Join(parts, " + ") + ")"
-}
-
-func feedTagIcon(action string) string {
-	if action == "removed" {
-		return "tag"
-	}
-	return "tag"
-}
-
-func feedTagTone(action string) string {
-	if action == "removed" {
-		return "error"
-	}
-	return "success"
-}
-
-func feedTagStyle(color string) string {
-	if color == "" {
-		return ""
-	}
-	return fmt.Sprintf("background-color: color-mix(in srgb, %s 18%%, transparent); color: %s;", color, color)
-}
-
-func feedCategoryStyle(color string) string {
-	if color == "" {
-		return "background-color: oklch(var(--b2)); color: var(--bc, #1f2937);"
-	}
-	return fmt.Sprintf("background-color: color-mix(in srgb, %s 18%%, transparent); color: %s;", color, color)
 }
 
 func feedHeroSubEvents(p FeedProps) string {
@@ -825,13 +867,32 @@ func pluralFeedS(n int) string {
 	return "s"
 }
 
-// relativeFromRFC3339 is the relative-time formatter the feed uses for
-// per-row timestamps. It mirrors the "relativeTimelineTimestamp" helper used
-// by the per-transaction timeline so feed rows feel visually identical to
-// activity rows on a transaction page.
-func relativeFromRFC3339(s string) string {
+func max0(n int) int {
+	if n < 0 {
+		return 0
+	}
+	return n
+}
+
+// feedRelativeTimestamp / feedFormatTimestamp mirror the helpers used by
+// the per-tx timeline rows so a feed row's tooltip + relative-time pill
+// renders identical to the activity log.
+func feedRelativeTimestamp(s string, now time.Time) string {
 	if s == "" {
 		return ""
 	}
-	return timefmt.RelativeRFC3339(s)
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return timefmt.RelativeRFC3339At(s, now)
+}
+
+func feedFormatTimestamp(s string) string {
+	if s == "" {
+		return ""
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t.Local().Format("Jan 2, 2006 3:04 PM")
+	}
+	return s
 }
