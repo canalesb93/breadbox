@@ -63,11 +63,12 @@ templ feedHero(p FeedProps) {
 					class="btn btn-sm btn-ghost rounded-xl"
 					onclick="window.location.reload()"
 					title="Refresh"
+					aria-label="Refresh feed"
 				>
 					<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Refresh</span>
 				</button>
-				<a href="/connections/new" class="btn btn-sm btn-primary rounded-xl">
+				<a href="/connections/new" class="btn btn-sm btn-primary rounded-xl" aria-label="Connect a new bank">
 					<i data-lucide="plus" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Connect bank</span>
 				</a>
@@ -96,7 +97,7 @@ templ feedHeroTile(icon, label, value, sub string) {
 }
 
 templ feedHeroSyncTile(p FeedProps) {
-	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline group block">
+	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline group block" aria-label="Last sync — view sync logs">
 		<div class="flex items-center gap-2">
 			<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/40"></i>
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Last sync</div>
@@ -169,7 +170,10 @@ templ feedFilters(p FeedProps) {
 templ feedFilterChip(label, slug, icon, current string) {
 	<a
 		href={ templ.SafeURL(feedFilterHRef(slug)) }
-		class={ "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors no-underline whitespace-nowrap shrink-0",
+		if current == slug {
+			aria-current="page"
+		}
+		class={ "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors no-underline whitespace-nowrap shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2",
 			templ.KV("bg-primary/10 border-primary/40 text-primary", current == slug),
 			templ.KV("border-base-300 text-base-content/65 hover:bg-base-200/70", current != slug) }
 	>
@@ -474,7 +478,7 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 		</div>
 	}
 	if s.Status == "error" && s.ErrorMessage != "" {
-		<div class="mt-1.5 text-error/90 bg-error/15 rounded-lg px-2.5 py-1.5 border border-error/25 break-words">
+		<div role="alert" class="mt-1.5 text-error/90 bg-error/15 rounded-lg px-2.5 py-1.5 border border-error/25 break-words">
 			<i data-lucide="alert-circle" class="w-3 h-3 inline-block align-text-bottom mr-1"></i>
 			{ s.ErrorMessage }
 		</div>
@@ -678,7 +682,7 @@ templ feedCommentAvatar(c *FeedComment) {
 templ feedTxRefRow(tx FeedTransactionRef, dimmed bool) {
 	<a
 		href={ templ.SafeURL("/transactions/" + tx.ShortID) }
-		class="flex items-center justify-between gap-2 text-base-content/85 hover:text-base-content transition-colors no-underline group/txref"
+		class="flex items-center justify-between gap-2 text-base-content/85 hover:text-base-content transition-colors no-underline group/txref focus-visible:bg-base-200/50 focus-visible:outline-none rounded-md"
 	>
 		<span class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
 			<i data-lucide="receipt" class="w-3 h-3 text-base-content/35 shrink-0"></i>
