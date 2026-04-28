@@ -197,6 +197,13 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		if !lastSyncAt.IsZero() {
 			hero.LastSyncRel = relativeTime(lastSyncAt)
 		}
+		// Next-sync ETA — drives the "Next sync in ~6h" sub-line under the
+		// Last Sync hero tile so the page answers "why no new transactions
+		// yet?" inline. The scheduler is nil in test env (no cron); leave
+		// the field empty there and the templ hides the sub-line.
+		if a.Scheduler != nil {
+			hero.NextSyncRel = formatNextSync(a.Scheduler.NextRun())
+		}
 
 		data := map[string]any{
 			"PageTitle":   "Feed",

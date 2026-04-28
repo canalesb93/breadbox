@@ -72,6 +72,12 @@ type FeedHero struct {
 	LastSyncRel         string
 	LastSyncStatus      string
 	LastSyncInstitution string
+
+	// NextSyncRel is a human-readable countdown to the next scheduled cron
+	// fire (e.g. "in ~6h", "in 12m"). Empty when the scheduler is unset
+	// (test env) or when the connection is failing — in the failing case
+	// we suppress it because the next tick won't help until reauth.
+	NextSyncRel string
 }
 
 // FeedAlert is one pinned warning for a connection in error /
