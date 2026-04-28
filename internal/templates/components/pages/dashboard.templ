@@ -8,20 +8,20 @@ import (
 )
 
 templ dashOverviewStats(p DashboardProps) {
-	<div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-		<div class="bb-card p-4 col-span-2 lg:col-span-1">
+	<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+		<div class="bb-card p-3 sm:p-4 col-span-2 md:col-span-1">
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Net Worth</div>
-			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.FormatBalance(p.NetWorth) }</div>
+			<div class="text-xl sm:text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.FormatBalance(p.NetWorth) }</div>
 			<div class="text-[0.65rem] text-base-content/40 mt-1 flex flex-wrap gap-x-2">
 				<span>Assets <span class="tabular-nums text-success/80 font-medium">{ components.FormatBalance(p.TotalAssets) }</span></span>
 				<span>Liabilities <span class="tabular-nums text-error/70 font-medium">{ components.FormatBalance(p.TotalLiabilities) }</span></span>
 			</div>
 		</div>
-		<div class="bb-card p-4">
+		<div class="bb-card p-3 sm:p-4">
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">
 				<a href="/transactions" class="hover:text-base-content/60 transition-colors">Transactions</a>
 			</div>
-			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.TotalTransactions) }</div>
+			<div class="text-xl sm:text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.TotalTransactions) }</div>
 			<div class="text-[0.65rem] text-base-content/40 mt-1 flex flex-wrap gap-x-2">
 				<a href="/transactions?filter=uncategorized" class="hover:text-warning transition-colors">
 					Uncategorized <span class="tabular-nums text-warning/80 font-medium">{ components.CommaInt(p.UncategorizedCount) }</span>
@@ -29,9 +29,9 @@ templ dashOverviewStats(p DashboardProps) {
 			</div>
 		</div>
 		if p.ReviewsEnabled {
-			<a href="/reviews" class="bb-card bb-card--interactive p-4 no-underline group block">
+			<a href="/reviews" class="bb-card bb-card--interactive p-3 sm:p-4 no-underline group block">
 				<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Pending Reviews</div>
-				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.ReviewPending) }</div>
+				<div class="text-xl sm:text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.ReviewPending) }</div>
 				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Approve &rarr;</div>
 			</a>
 		}
@@ -86,7 +86,7 @@ templ Dashboard(p DashboardProps) {
 		@dashConnectionErrorsBanner(p)
 	}
 	if len(p.Accounts) == 0 {
-		<div class="bb-card mb-6 p-8 text-center">
+		<div class="bb-card mb-6 p-6 sm:p-8 text-center">
 			<i data-lucide="wallet" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
 			<h2 class="text-lg font-semibold mb-1">No accounts yet</h2>
 			<p class="text-sm text-base-content/50 mb-4">Connect your first bank to see your balances and transactions here.</p>
@@ -98,16 +98,16 @@ templ Dashboard(p DashboardProps) {
 	} else {
 		@dashOverviewStats(p)
 	}
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
 		@dashAgentReportsCard(p)
 		@dashRecentTransactionsCard(p)
 	</div>
 }
 
 templ dashUpdateBanner(p DashboardProps) {
-	<div role="alert" class="alert alert-info rounded-xl mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
-		<i data-lucide="download" class="w-5 h-5"></i>
-		<div class="flex-1">
+	<div role="alert" class="alert alert-info rounded-xl mb-6 flex-wrap sm:flex-nowrap" x-data="{ pulling: false, pulled: false, error: '' }">
+		<i data-lucide="download" class="w-5 h-5 shrink-0"></i>
+		<div class="flex-1 min-w-0">
 			<h3 class="font-bold">Update Available</h3>
 			<p class="text-sm">
 				Version <strong>v{ p.LatestVersion }</strong> is available (current: v{ p.CurrentVersion }).
@@ -122,7 +122,7 @@ templ dashUpdateBanner(p DashboardProps) {
 				<p class="text-sm mt-1 text-error" x-text="error"></p>
 			</template>
 		</div>
-		<div class="flex gap-2 items-center">
+		<div class="flex flex-wrap gap-2 items-center shrink-0">
 			if p.DockerSocketAvailable {
 				<button
 					class="btn btn-sm btn-primary rounded-xl"
@@ -136,8 +136,8 @@ templ dashUpdateBanner(p DashboardProps) {
 			}
 			<div class="dropdown dropdown-end">
 				<div tabindex="0" role="button" class="btn btn-sm btn-ghost rounded-xl">Update Command</div>
-				<div tabindex="0" class="dropdown-content card card-compact bg-base-200 shadow-sm p-3 w-80 z-10">
-					<code class="text-xs select-all">cd /opt/breadbox && docker compose pull && docker compose up -d</code>
+				<div tabindex="0" class="dropdown-content card card-compact bg-base-200 shadow-sm p-3 w-72 sm:w-80 z-10">
+					<code class="text-xs select-all break-all">cd /opt/breadbox && docker compose pull && docker compose up -d</code>
 				</div>
 			</div>
 			<button class="btn btn-sm btn-ghost" @click={ dashDismissUpdateScript(p.LatestVersion) }>Dismiss</button>
@@ -146,8 +146,8 @@ templ dashUpdateBanner(p DashboardProps) {
 }
 
 templ dashAgentReportsCard(p DashboardProps) {
-	<div class="bb-card flex flex-col h-full" x-data="agentReports">
-		<div class="px-5 py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-200/60 shrink-0">
+	<div class="bb-card flex flex-col lg:h-full" x-data="agentReports">
+		<div class="px-4 sm:px-5 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-200/60 shrink-0">
 			<div class="flex items-center gap-2 min-w-0">
 				<i data-lucide="bot" class="w-4 h-4 text-primary/70 shrink-0"></i>
 				<h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
@@ -162,7 +162,7 @@ templ dashAgentReportsCard(p DashboardProps) {
 						<span class="hidden sm:inline">Mark all read</span>
 					</button>
 				}
-				<a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+				<a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors min-h-[2rem] inline-flex items-center">View all</a>
 			</div>
 		</div>
 		if len(p.AgentReports) > 0 {
@@ -177,11 +177,11 @@ templ dashAgentReportsCard(p DashboardProps) {
 				}
 			</div>
 		} else {
-			<div class="px-5 py-8 text-center flex-1 flex flex-col items-center justify-center">
+			<div class="px-5 py-6 sm:py-8 text-center flex-1 flex flex-col items-center justify-center">
 				<i data-lucide="bot" class="w-8 h-8 mx-auto mb-2 text-base-content/15"></i>
 				<p class="text-sm text-base-content/40 mb-1">No unread reports</p>
 				<p class="text-xs text-base-content/30">Agent reports appear here when AI agents submit findings about your finances.</p>
-				<a href="/agent-prompts" class="text-xs text-primary/60 hover:text-primary transition-colors mt-2 inline-block">Set up an agent &rarr;</a>
+				<a href="/agent-prompts" class="text-xs text-primary/60 hover:text-primary transition-colors mt-2 inline-block min-h-[2rem] leading-8">Set up an agent &rarr;</a>
 			</div>
 		}
 	</div>
@@ -220,10 +220,10 @@ templ dashReportItem(r DashboardReport) {
 }
 
 templ dashRecentTransactionsCard(p DashboardProps) {
-	<div class="bb-card flex flex-col h-full">
-		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60 shrink-0">
+	<div class="bb-card flex flex-col lg:h-full">
+		<div class="px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between border-b border-base-200/60 shrink-0">
 			<h2 class="text-sm font-semibold text-base-content/80">Recent Transactions</h2>
-			<a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+			<a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors min-h-[2rem] inline-flex items-center">View all</a>
 		</div>
 		if len(p.RecentTransactions) > 0 {
 			<div class="px-3 sm:px-4 py-2 flex-1 min-h-0 overflow-y-auto">
@@ -232,7 +232,7 @@ templ dashRecentTransactionsCard(p DashboardProps) {
 				}
 			</div>
 		} else {
-			<div class="flex-1 flex items-center justify-center py-8 text-base-content/40">
+			<div class="flex-1 flex items-center justify-center py-6 sm:py-8 text-base-content/40">
 				<div class="text-center">
 					<i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
 					<p class="text-sm">No transactions yet</p>
