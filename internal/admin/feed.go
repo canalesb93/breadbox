@@ -496,6 +496,7 @@ func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 		Date:         tx.Date,
 		AccountName:  tx.AccountName,
 		Institution:  tx.Institution,
+		Pending:      tx.Pending,
 	}
 }
 

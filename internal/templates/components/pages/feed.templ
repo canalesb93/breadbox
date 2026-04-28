@@ -667,6 +667,13 @@ templ feedCommentAvatar(c *FeedComment) {
 // surfaces.
 
 // feedTxRefRow renders one transaction-reference line.
+//
+// Pending transactions render a small clock-icon mark flush against the
+// amount — the same canonical pending visual used on `/transactions/{id}`
+// (`tx_row.templ`) and the transactions list (`tx_row_compact.templ`).
+// Pending rows often re-show as posted later, so surfacing the lifecycle
+// state inline gives users a "this is provisional" read without leaving
+// the feed.
 templ feedTxRefRow(tx FeedTransactionRef, dimmed bool) {
 	<a
 		href={ templ.SafeURL("/transactions/" + tx.ShortID) }
@@ -680,8 +687,18 @@ templ feedTxRefRow(tx FeedTransactionRef, dimmed bool) {
 				<span class="text-base-content/45 truncate hidden sm:inline">{ tx.AccountName }</span>
 			}
 		</span>
-		<span class={ "tabular-nums font-medium shrink-0", feedAmountClass(tx.Amount) }>
-			{ feedAmountWithSign(tx.Amount, tx.Currency) }
+		<span class="flex items-center gap-1 shrink-0">
+			if tx.Pending {
+				<i
+					data-lucide="clock"
+					class="w-3 h-3 shrink-0 text-warning/70"
+					title="Pending — not yet posted"
+				></i>
+				<span class="sr-only">(pending)</span>
+			}
+			<span class={ "tabular-nums font-medium", feedAmountClass(tx.Amount) }>
+				{ feedAmountWithSign(tx.Amount, tx.Currency) }
+			</span>
 		</span>
 	</a>
 }
