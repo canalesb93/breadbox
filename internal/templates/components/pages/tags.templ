@@ -21,7 +21,7 @@ templ Tags(p TagsProps) {
 			<h1 class="bb-page-title">Tags</h1>
 			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Open-ended labels for coordinating work on transactions</p>
 		</div>
-		<a href="/tags/new" class="btn btn-sm btn-primary rounded-xl gap-2">
+		<a href="/tags/new" class="btn btn-sm btn-primary rounded-xl gap-2 self-start sm:self-auto">
 			<i data-lucide="plus" class="w-4 h-4"></i>
 			Add Tag
 		</a>
@@ -62,10 +62,10 @@ templ tagListRow(t TagRow) {
 	<div
 		data-search={ tagSearchIndex(t) }
 		x-show="!filter || ($el.dataset.search || '').includes(filter.toLowerCase())"
-		class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3"
+		class="group flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3"
 	>
 		<!-- Chip preview — natural width, capped so it can't monopolize the row -->
-		<div class="shrink-0 min-w-0 max-w-[10rem] sm:max-w-[14rem]">
+		<div class="shrink-0 min-w-0 max-w-[7rem] sm:max-w-[14rem]">
 			@components.TagChip(components.TagChipData{
 				Slug:        t.Slug,
 				DisplayName: t.DisplayName,
@@ -73,15 +73,28 @@ templ tagListRow(t TagRow) {
 				Icon:        t.Icon,
 			})
 		</div>
-		<!-- Slug + optional description -->
+		<!-- Slug + optional description + mobile count -->
 		<div class="flex-1 min-w-0">
-			<code class="font-mono text-xs text-base-content/60 bg-base-200/50 px-1.5 py-0.5 rounded">{ t.Slug }</code>
+			<code class="font-mono text-xs text-base-content/60 bg-base-200/50 px-1.5 py-0.5 rounded block truncate max-w-full">{ t.Slug }</code>
 			if t.Description != "" {
-				<p class="text-xs text-base-content/50 mt-1 line-clamp-1">{ t.Description }</p>
+				<p class="text-xs text-base-content/50 mt-0.5 truncate">{ t.Description }</p>
 			}
+			<!-- Transaction count on mobile only -->
+			<div class="sm:hidden mt-0.5">
+				if t.TransactionCount > 0 {
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/transactions?tags=%s", t.Slug)) }
+						class="inline-flex items-baseline gap-0.5 text-xs text-base-content/50 hover:text-base-content"
+						title="View transactions"
+					>
+						<span class="font-medium tabular-nums">{ strconv.FormatInt(t.TransactionCount, 10) }</span>
+						<span class="text-base-content/35">{ tagCountLabel(t.TransactionCount) }</span>
+					</a>
+				}
+			</div>
 		</div>
-		<!-- Transaction count (always visible; desktop gets the "txns" label) -->
-		<div class="shrink-0 text-right tabular-nums">
+		<!-- Transaction count on desktop only -->
+		<div class="hidden sm:block shrink-0 text-right tabular-nums">
 			if t.TransactionCount > 0 {
 				<a
 					href={ templ.SafeURL(fmt.Sprintf("/transactions?tags=%s", t.Slug)) }
@@ -89,7 +102,7 @@ templ tagListRow(t TagRow) {
 					title="View transactions"
 				>
 					<span class="font-medium">{ strconv.FormatInt(t.TransactionCount, 10) }</span>
-					<span class="text-base-content/40 hidden sm:inline">{ tagCountLabel(t.TransactionCount) }</span>
+					<span class="text-base-content/40">{ tagCountLabel(t.TransactionCount) }</span>
 				</a>
 			} else {
 				<span class="text-xs text-base-content/25">&mdash;</span>
