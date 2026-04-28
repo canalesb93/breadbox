@@ -784,7 +784,11 @@
 
   /* ── Wizard / Auth pages (login, setup, error) ── */
   .bb-wizard-bg {
-    @apply bg-base-200 min-h-screen flex items-center justify-center p-4;
+    /* Mobile: top-aligned with generous top padding so content isn't dead-center
+       in a sea of dark background. sm+: vertically centered as before. */
+    @apply bg-base-200 min-h-screen flex items-start justify-center
+           px-4 pt-10 pb-8
+           sm:items-center sm:py-4;
   }
 
   .bb-wizard-orb {
@@ -796,7 +800,8 @@
   }
 
   .bb-wizard-brand {
-    @apply flex justify-center mb-8;
+    /* Tighten vertical gap on mobile; restore on sm+ */
+    @apply flex justify-center mb-5 sm:mb-8;
   }
 
   .bb-wizard-brand-icon {
@@ -805,7 +810,8 @@
   }
 
   .bb-wizard-card {
-    @apply bg-base-100 rounded-xl border border-base-300 p-6;
+    /* Tighter padding on mobile (p-5), comfortable on sm+ (p-6) */
+    @apply bg-base-100 rounded-xl border border-base-300 p-5 sm:p-6;
     animation: bb-wizard-enter 0.3s ease-out;
   }
 
