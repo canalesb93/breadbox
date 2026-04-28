@@ -332,6 +332,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Transaction category override
 			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc, sm))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc, sm))
+			r.Patch("/transactions/{id}/category-override", SetCategoryOverrideAdminHandler(svc, sm))
 
 			// Transaction bulk categorize
 			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc, sm))
