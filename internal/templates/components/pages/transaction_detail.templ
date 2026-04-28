@@ -741,23 +741,25 @@ func txdRuleVerbFallback(e service.ActivityEntry) string {
 	return s
 }
 
-// txdInlineCategoryChip renders a pill matching the canonical bb-tag chip
-// styling (the same look used for tags) but populated from a category's
-// color + icon + display name. Reuses the --tag-color CSS variable so a
-// single CSS class drives both tag and category chips.
+// txdInlineCategoryChip renders an inline category reference matching the
+// app's canonical category visual: a colored dot + (optional) icon + bold
+// name. Deliberately *not* shaped like a tag pill — categories and tags
+// look almost identical when both render as bb-tag chips, so the timeline
+// uses the dot+name pattern from the category picker / filters here to
+// keep the two readable at a glance.
 templ txdInlineCategoryChip(e service.ActivityEntry) {
-	<span
-		class="bb-tag bb-tag-sm align-middle"
+	<span class="inline-flex items-center gap-1 align-middle">
 		if e.CategoryColor != nil && *e.CategoryColor != "" {
-			style={ "--tag-color: " + *e.CategoryColor }
+			<span class="bb-cat-dot" style={ "background-color: " + *e.CategoryColor }></span>
 		}
-	>
 		if e.CategoryIcon != nil && *e.CategoryIcon != "" {
-			<i data-lucide={ *e.CategoryIcon }></i>
-		} else {
-			<i data-lucide="folder"></i>
+			if e.CategoryColor != nil && *e.CategoryColor != "" {
+				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0" style={ "color: " + *e.CategoryColor }></i>
+			} else {
+				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0 text-base-content/60"></i>
+			}
 		}
-		<span class="truncate">{ e.CategoryName }</span>
+		<strong class="font-semibold text-base-content break-words">{ e.CategoryName }</strong>
 	</span>
 }
 
