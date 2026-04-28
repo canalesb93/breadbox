@@ -201,6 +201,30 @@ templ feedTimeline(p FeedProps) {
 				Showing the last { fmt.Sprintf("%d days", p.WindowDays) }.
 			</p>
 		}
+		@feedLoadOlder(p)
+	}
+}
+
+// feedLoadOlder renders the pagination affordance under the rail. Only
+// shows the button when the rail has at least one event (empty windows
+// don't get a "load older" since the user has no anchor). When the
+// earliest visible event is past the 30-day lookback ceiling we render
+// "End of feed" instead so users have a clear stop signal.
+templ feedLoadOlder(p FeedProps) {
+	if !p.OldestVisible.IsZero() {
+		<div class="flex items-center justify-center mt-3">
+			if p.AtMaxLookback {
+				<p class="text-xs text-base-content/40">End of feed</p>
+			} else {
+				<a
+					href={ templ.SafeURL(feedLoadOlderHRef(p)) }
+					class="btn btn-sm btn-ghost rounded-xl border border-base-300 text-base-content/65"
+				>
+					<i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+					Load older activity
+				</a>
+			}
+		</div>
 	}
 }
 
@@ -987,6 +1011,18 @@ func feedFilterHRef(slug string) string {
 		return "/feed"
 	}
 	return "/feed?filter=" + slug
+}
+
+// feedLoadOlderHRef builds the href for the "Load older activity" button:
+// `/feed?before=<oldestVisible>` plus the active filter (so an active chip
+// survives pagination). The timestamp is RFC3339 so the handler's
+// `time.Parse(time.RFC3339, …)` round-trips it without any loss.
+func feedLoadOlderHRef(p FeedProps) string {
+	q := "before=" + p.OldestVisible.UTC().Format(time.RFC3339)
+	if p.Filter != "" {
+		q = "filter=" + p.Filter + "&" + q
+	}
+	return "/feed?" + q
 }
 
 // feedFilterLabel renders the chip-name string used in the active-filter

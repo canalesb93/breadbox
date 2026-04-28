@@ -57,6 +57,23 @@ type FeedProps struct {
 	// is admin-only; non-admin members see the link to /transactions
 	// instead.
 	IsAdmin bool
+
+	// OldestVisible is the timestamp of the earliest event currently in the
+	// rendered window. Drives the "Load older activity" button's href —
+	// `?before=<oldestVisible.RFC3339>` rolls the window backward in
+	// `WindowDays`-sized chunks. Zero value means the rail is empty (no
+	// button should render).
+	OldestVisible time.Time
+
+	// AtMaxLookback is true when the oldest visible event is at-or-past the
+	// service-layer 30-day lookback cap. The footer renders an "End of
+	// feed" sentence instead of the load-older button so users have a
+	// clear stop signal.
+	AtMaxLookback bool
+
+	// Filter is forwarded into load-older hrefs so an active chip survives
+	// pagination. Already exists above; documented here as part of the
+	// pagination contract.
 }
 
 // FeedHero powers the at-a-glance band above the feed rail.

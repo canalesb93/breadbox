@@ -36,6 +36,25 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		window := time.Duration(feedWindowDays) * 24 * time.Hour
 		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
+		// `?before=<rfc3339>` lets the user roll the 3-day window backward
+		// in chunks via the "Load older activity" footer button. Cap at
+		// 30 days back from now — the service layer enforces the same
+		// ceiling, but clamping here keeps the rendered window/footer
+		// consistent and makes the cap discoverable from a single layer.
+		var beforeTime time.Time
+		if rawBefore := strings.TrimSpace(r.URL.Query().Get("before")); rawBefore != "" {
+			if parsed, err := time.Parse(time.RFC3339, rawBefore); err == nil {
+				beforeTime = parsed
+				minBefore := now.Add(-service.FeedMaxLookback)
+				if beforeTime.Before(minBefore) {
+					beforeTime = minBefore
+				}
+				if beforeTime.After(now) {
+					beforeTime = time.Time{}
+				}
+			}
+		}
+
 		// Resolve the session actor for the "me" chip. Prefer the linked
 		// household user_id; fall back to the auth_account id for the
 		// initial admin (which writes annotations against its account id).
@@ -72,6 +91,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			SampleLimit:   5,
 			Filter:        filter,
 			ActorID:       sessionActorID,
+			Before:        beforeTime,
 		})
 		if err != nil {
 			a.Logger.Error("feed: list events", "error", err)
@@ -99,7 +119,15 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			alerts = nil
 		}
 
-		// 4. Project FeedEvents onto templ-side FeedItems.
+		// 4. Project FeedEvents onto templ-side FeedItems. The window is
+		// anchored at `windowEnd` (now, or the `?before=` timestamp when
+		// paginating); `windowStart` is `windowEnd - window`.
+		windowEnd := now
+		if !beforeTime.IsZero() {
+			windowEnd = beforeTime
+		}
+		windowStart := windowEnd.Add(-window)
+
 		items := make([]pages.FeedItem, 0, len(events)+len(reports))
 		var lastSyncAt time.Time
 		var lastSyncStatus, lastSyncInstitution string
@@ -107,7 +135,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 		for _, ev := range events {
-			if ev.Timestamp.Before(now.Add(-window)) {
+			if ev.Timestamp.Before(windowStart) || ev.Timestamp.After(windowEnd) {
 				continue
 			}
 			it := projectFeedEvent(ev, tagDisplayFn, categoryDetail)
@@ -142,7 +170,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			if err != nil {
 				continue
 			}
-			if ts.Before(now.Add(-window)) {
+			if ts.Before(windowStart) || ts.After(windowEnd) {
 				continue
 			}
 			items = append(items, pages.FeedItem{
@@ -210,6 +238,26 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			"CurrentPage": "feed",
 			"CSRFToken":   GetCSRFToken(r),
 		}
+		// Compute the oldest visible event timestamp + the at-cap flag that
+		// drive the "Load older activity" button. We pass the oldest item's
+		// timestamp through so the button's href rolls the window backward
+		// in 3-day chunks. AtMaxLookback hides the button (replaced by
+		// "End of feed") when the next chunk would exceed the 30-day cap.
+		var oldestVisible time.Time
+		for _, it := range items {
+			if oldestVisible.IsZero() || it.Timestamp.Before(oldestVisible) {
+				oldestVisible = it.Timestamp
+			}
+		}
+		atMaxLookback := false
+		if !oldestVisible.IsZero() {
+			// Once the oldest visible event is older than (now - 30d), or
+			// the next-chunk's upper bound would be, treat as end-of-feed.
+			if oldestVisible.Before(now.Add(-service.FeedMaxLookback)) {
+				atMaxLookback = true
+			}
+		}
+
 		body := pages.Feed(pages.FeedProps{
 			CSRFToken:        GetCSRFToken(r),
 			Hero:             hero,
@@ -222,6 +270,8 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			HasConnections:   hasConnections,
 			LastSyncAt:       globalLastSyncAt,
 			IsAdmin:          IsAdmin(tr.sm, r),
+			OldestVisible:    oldestVisible,
+			AtMaxLookback:    atMaxLookback,
 		})
 		tr.RenderWithTempl(w, r, data, body)
 	}
