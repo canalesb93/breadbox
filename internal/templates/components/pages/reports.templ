@@ -24,16 +24,16 @@ templ Reports(p ReportsProps) {
 		<div class="flex items-center gap-2">
 			<a href="/settings/mcp#report-format" class="btn btn-ghost btn-sm rounded-xl text-xs no-underline" aria-label="Manage report format" title="Customize how agents write reports">
 				<i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-				<span class="hidden sm:inline">Manage format</span>
+				<span>Manage format</span>
 			</a>
 		</div>
 	</div>
 	<!-- Filter Tabs + Actions -->
-	<div class="flex items-center gap-1 border-b border-base-200/80 mb-6">
+	<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto">
 		<a href="/reports" class={ reportsTabClass(p.FilterStatus == "") }>All</a>
 		<a href="/reports?status=unread" class={ reportsTabClass(p.FilterStatus == "unread") }>Unread</a>
 		<a href="/reports?status=read" class={ reportsTabClass(p.FilterStatus == "read") }>Read</a>
-		<div class="ml-auto flex items-center gap-2">
+		<div class="ml-auto flex items-center gap-2 shrink-0">
 			<span class="text-xs text-base-content/30 hidden sm:inline">{ reportsCountLabel(p.TotalCount) }</span>
 			<button
 				class="btn btn-ghost btn-sm rounded-xl text-xs cursor-pointer"
