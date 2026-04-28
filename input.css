@@ -2820,12 +2820,30 @@
 
 /* Rail mask. The 28px tile bg + ring are still painted with base-100
  * (card-surface) classes by the shared row markup — redirect both to
- * base-200 here so the seam stays invisible against the page surface. */
-.bb-timeline-prominent .bg-base-100 {
+ * base-200 here so the seam stays invisible against the page surface.
+ * Selectors are scoped to the rail-mask wrapper (`> li > div:first-child`)
+ * and its descendants so the remap doesn't bleed into other elements
+ * inside the section that legitimately want a base-100 surface — e.g.
+ * the comment composer card, whose `bg-base-100` would otherwise blend
+ * into the base-200 page and erase the entire composer chrome. */
+.bb-timeline-prominent .bb-timeline > li > div:first-child.bg-base-100 {
   background-color: var(--color-base-200);
 }
-.bb-timeline-prominent .ring-base-100 {
+.bb-timeline-prominent .bb-timeline > li > div:first-child .ring-base-100,
+.bb-timeline-prominent .bb-timeline > li > div:first-child.ring-base-100 {
   --tw-ring-color: var(--color-base-200);
+}
+/* Inner tile pills painted `bg-base-200` (sync, deleted-comment trash,
+ * neutral review, unknown-kind fallback) match the base-200 page surface
+ * in prominent mode and disappear. Lift the fill to base-300 so the
+ * circle reads as a defined shape on the rail. Targets only direct
+ * children of the rail-mask wrapper so the inner lucide icon's color
+ * isn't touched. Comment rows are excluded — their initials/image/agent
+ * avatars rely on the GitHub-style 1px base-300 outline below (added in
+ * #927) instead of a fill bump, since the fill approach didn't help
+ * image avatars that already carry their own background. */
+.bb-timeline-prominent .bb-timeline > li:not(:has(.bb-comment-bubble)) > div:first-child > .bg-base-200 {
+  background-color: var(--color-base-300);
 }
 /* Slightly thicker ring for the bigger tile so the colour pill reads
  * cleanly against the rail. */
@@ -2921,9 +2939,15 @@
 }
 
 /* Composer row gets the same outer card treatment as comment rows so
- * the page reads as one continuous conversation. */
+ * the page reads as one continuous conversation. The composer card
+ * carries `border-base-200` from the templ markup (matches the lighter
+ * card-mode chrome); against a base-200 page surface that border is
+ * invisible from outside the card, so lift it to base-300 here to give
+ * the composer a defined edge — same treatment the comment cards above
+ * already use. */
 .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 > [data-composer-anchor] {
   border-radius: 0.5rem;
+  border-color: var(--color-base-300);
 }
 .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 {
   position: relative;
