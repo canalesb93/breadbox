@@ -47,12 +47,23 @@ func (s *Service) ListFeedActivity(ctx context.Context, limit int) ([]FeedActivi
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type, a.actor_id, a.actor_name,
     a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
+    COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
+    COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
     ac.name, bc.institution_name
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN auth_accounts aa
+    ON a.actor_type = 'user'
+   AND aa.id::text = a.actor_id
+LEFT JOIN users u_via_account
+    ON aa.user_id = u_via_account.id
+LEFT JOIN users u_direct
+    ON a.actor_type = 'user'
+   AND aa.id IS NULL
+   AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
 ORDER BY a.created_at DESC
 LIMIT $1
@@ -77,11 +88,6 @@ LIMIT $1
 	}
 
 	out = enrichFeedActivityRows(out)
-
-	if err := s.hydrateFeedAvatarVersions(ctx, out); err != nil {
-		s.Logger.Debug("hydrate feed avatar versions", "error", err)
-	}
-
 	return out, nil
 }
 
@@ -279,9 +285,6 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 		return nil, err
 	}
 	annotationRows = enrichFeedActivityRows(annotationRows)
-	if err := s.hydrateFeedAvatarVersions(ctx, annotationRows); err != nil {
-		s.Logger.Debug("hydrate feed avatar versions", "error", err)
-	}
 
 	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, params.SampleLimit)
 	if err != nil {
@@ -307,21 +310,38 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 }
 
 // fetchFeedAnnotations runs the windowed annotation query used by
-// `ListFeedEvents`. It excludes annotations that are byproducts of a sync
-// (per-transaction `sync_started` / `sync_updated` rows and rule
-// applications fired during sync — they're represented by the parent sync
-// card instead).
+// `ListFeedEvents`. Excludes annotations that are byproducts of a sync
+// (`sync_started` / `sync_updated` rows and rule applications fired
+// during sync — both are represented by the parent sync card).
+//
+// The user join mirrors `ListAnnotationsWithActorByTransaction`: it
+// resolves user.name through either an auth_accounts row whose user_id
+// links to users, or a direct users.id match against actor_id, and
+// surfaces both the live profile name (preferred over the frozen-at-
+// write-time `annotations.actor_name`) and the user's `updated_at` for
+// avatar cache-busting.
 func (s *Service) fetchFeedAnnotations(ctx context.Context, cutoff time.Time) ([]FeedActivityRow, error) {
 	const q = `
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type, a.actor_id, a.actor_name,
     a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
+    COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
+    COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
     ac.name, bc.institution_name
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN auth_accounts aa
+    ON a.actor_type = 'user'
+   AND aa.id::text = a.actor_id
+LEFT JOIN users u_via_account
+    ON aa.user_id = u_via_account.id
+LEFT JOIN users u_direct
+    ON a.actor_type = 'user'
+   AND aa.id IS NULL
+   AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
   AND a.created_at >= $1
   AND a.kind NOT IN ('sync_started', 'sync_updated')
@@ -364,6 +384,8 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		shortID                             string
 		payload                             []byte
 		createdAt                           pgtype.Timestamptz
+		actorUserName                       string
+		actorUpdatedAt                      pgtype.Timestamptz
 		txShort, txName                     string
 		merchantName                        pgtype.Text
 		amount                              pgtype.Numeric
@@ -375,10 +397,20 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 	if err := s.Scan(
 		&id, &shortID, &txnID, &kind, &actorType, &actorIDOpt, &actorName,
 		&payload, &tagID, &ruleID, &sessionID, &createdAt,
+		&actorUserName, &actorUpdatedAt,
 		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate,
 		&accountName, &institutionName,
 	); err != nil {
 		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
+	}
+
+	// Prefer the live users.name over the actor_name frozen at write time
+	// (which is typically the auth_accounts.username/email login). Mirrors
+	// the same preference annotation_actor_row.go applies on the per-tx
+	// timeline so feed and timeline render the same display name.
+	displayName := actorName
+	if actorType == "user" && actorUserName != "" {
+		displayName = actorUserName
 	}
 
 	ann := Annotation{
@@ -387,9 +419,12 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		TransactionID: formatUUID(txnID),
 		Kind:          kind,
 		ActorType:     actorType,
-		ActorName:     actorName,
+		ActorName:     displayName,
 		CreatedAt:     pgconv.TimestampStr(createdAt),
 		CreatedAtTime: createdAt.Time.UTC(),
+	}
+	if actorUpdatedAt.Valid {
+		ann.ActorAvatarVersion = strconv.FormatInt(actorUpdatedAt.Time.Unix(), 10)
 	}
 	if actorIDOpt.Valid && actorIDOpt.String != "" {
 		s := actorIDOpt.String
@@ -460,51 +495,6 @@ func enrichFeedActivityRows(in []FeedActivityRow) []FeedActivityRow {
 	return out
 }
 
-// hydrateFeedAvatarVersions populates Annotation.ActorAvatarVersion on every
-// user-attributed row in `rows` using a single batch query against users.
-func (s *Service) hydrateFeedAvatarVersions(ctx context.Context, rows []FeedActivityRow) error {
-	ids := make([]string, 0, len(rows))
-	seen := make(map[string]bool)
-	for _, r := range rows {
-		if r.Annotation.ActorType != "user" || r.Annotation.ActorID == nil {
-			continue
-		}
-		id := *r.Annotation.ActorID
-		if id == "" || seen[id] {
-			continue
-		}
-		seen[id] = true
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-
-	const q = `SELECT id::text, EXTRACT(EPOCH FROM updated_at)::bigint FROM users WHERE id::text = ANY($1::text[])`
-	pgrows, err := s.Pool.Query(ctx, q, ids)
-	if err != nil {
-		return err
-	}
-	defer pgrows.Close()
-	versions := make(map[string]string, len(ids))
-	for pgrows.Next() {
-		var id string
-		var ts int64
-		if err := pgrows.Scan(&id, &ts); err != nil {
-			return err
-		}
-		versions[id] = strconv.FormatInt(ts, 10)
-	}
-	for i := range rows {
-		if rows[i].Annotation.ActorType != "user" || rows[i].Annotation.ActorID == nil {
-			continue
-		}
-		if v, ok := versions[*rows[i].Annotation.ActorID]; ok {
-			rows[i].Annotation.ActorAvatarVersion = v
-		}
-	}
-	return nil
-}
 
 // ── Sync events ───────────────────────────────────────────────────────────
 
