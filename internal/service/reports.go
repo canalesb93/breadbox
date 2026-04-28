@@ -24,12 +24,11 @@ type AgentReportResponse struct {
 	CreatedAt     string   `json:"created_at"`
 
 	// SessionID, when populated, links this report to the MCP session that
-	// produced it. Surfacing it in the response lets the home Feed fold a
-	// report into the matching agent_session card so an agent run shows up
-	// as a single row headed by the report title rather than two adjacent
-	// cards (the report + the session). Nil when the report wasn't anchored
-	// to a session at write time (older reports, or human-authored ones).
-	SessionID *string `json:"session_id,omitempty"`
+	// produced it. Available to Go consumers (the home Feed folds a report
+	// into the matching agent_session card by session_id) but suppressed
+	// from JSON output so the MCP `submit_report` response contract stays
+	// stable — the link is server-side internal, not a public field.
+	SessionID *string `json:"-"`
 }
 
 func agentReportFromRow(r db.AgentReport) AgentReportResponse {

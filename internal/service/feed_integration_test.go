@@ -297,17 +297,20 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		ctx := context.Background()
 		seed := seedFeedFixture(t, queries, "bulk", 4)
 
-		now := time.Now().UTC()
+		// Anchor 2 minutes past the current 15-min bucket boundary so all
+		// seeded annotations land in one bucket regardless of when the
+		// test runs. Without this, runs that fire near a boundary split
+		// the seeds across two buckets and the count flakes.
+		now := time.Now().UTC().Truncate(15 * time.Minute).Add(2 * time.Minute)
 		actorID := "user-actor-bulk"
 		// 4 category_set annotations, same actor, 4 different transactions,
-		// all within ~30 seconds (well inside the 5-minute soft bucket and
-		// the 2-minute window the spec asks us to assert).
+		// all within ~30 seconds (well inside the 15-minute soft bucket).
 		for i := 0; i < 4; i++ {
 			insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[i],
 				"category_set", "user", actorID, "Alice",
 				pgtype.UUID{},
 				[]byte(`{"category_slug":"food_and_drink"}`),
-				now.Add(time.Duration(-30+i*10)*time.Second),
+				now.Add(time.Duration(i*5)*time.Second),
 			)
 		}
 
@@ -444,10 +447,12 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		rule := testutil.MustCreateTransactionRule(t, queries, "Coffee Rule", []byte(`[]`), []byte(`[]`), "on_create")
 		ruleShortID := rule.ShortID
 
-		now := time.Now().UTC()
+		// Anchor 2 minutes past the current 15-min bucket boundary so all
+		// seeds land in one bucket regardless of when the test fires.
+		now := time.Now().UTC().Truncate(15 * time.Minute).Add(2 * time.Minute)
 		actorID := "actor-retro"
 		// 5 rule_applied annotations, same actor, no `applied_by=sync`, all
-		// within ~30 seconds → should produce a single bulk_action event.
+		// within ~25 seconds → should produce a single bulk_action event.
 		for i := 0; i < 5; i++ {
 			params := db.InsertAnnotationParams{
 				TransactionID: seed.TxnIDs[i],
@@ -464,7 +469,7 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 			}
 			if _, err := pool.Exec(ctx,
 				"UPDATE annotations SET created_at = $1 WHERE id = $2",
-				now.Add(time.Duration(-30+i*5)*time.Second), ann.ID,
+				now.Add(time.Duration(i*5)*time.Second), ann.ID,
 			); err != nil {
 				t.Fatalf("backdate: %v", err)
 			}
