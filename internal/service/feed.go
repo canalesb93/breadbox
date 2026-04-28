@@ -243,6 +243,18 @@ type FeedEventsParams struct {
 	Window        time.Duration
 	BulkThreshold int
 	SampleLimit   int
+
+	// Filter scopes the resulting event slice to a single chip on the feed
+	// rail. Empty string means "no filter" — every grouped event is
+	// returned. See `filterFeedEvents` for the recognised values.
+	Filter string
+
+	// ActorID is consulted only when Filter == "me". The handler resolves
+	// the session's user_id (falling back to the auth_account id for the
+	// initial admin) before calling. Both forms are matched because
+	// `annotations.actor_id` historically stores either depending on
+	// whether the auth_account is linked to a household user.
+	ActorID string
 }
 
 // ListFeedEvents returns grouped FeedEvents for the home Feed page,
@@ -306,7 +318,77 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 		return out[i].Timestamp.After(out[j].Timestamp)
 	})
 
+	out = filterFeedEvents(out, params.Filter, params.ActorID)
 	return out, nil
+}
+
+// filterFeedEvents narrows a feed-event slice to the subset matching the
+// chip-filter string. Applied after grouping so the windowed pull stays
+// shared across filters and the slice is small enough that an in-memory
+// sweep beats re-running the SQL.
+//
+// Filter values:
+//   - ""           → no filter, returns input unchanged
+//   - "syncs"      → only sync events
+//   - "comments"   → only comment events
+//   - "sessions"   → only agent_session events
+//   - "reports"    → reports come from the handler, so ListFeedEvents
+//                    contributes nothing in this mode
+//   - "me"         → events authored by the supplied actorID; bulk-action
+//                    rows match on the bucket actor as well. If actorID is
+//                    empty (e.g. the initial admin without a linked user)
+//                    the filter is treated as "no filter" so the page
+//                    keeps rendering instead of going blank.
+func filterFeedEvents(events []FeedEvent, filter, actorID string) []FeedEvent {
+	switch filter {
+	case "":
+		return events
+	case "reports":
+		return nil
+	case "syncs":
+		return filterEventsByType(events, "sync")
+	case "comments":
+		return filterEventsByType(events, "comment")
+	case "sessions":
+		return filterEventsByType(events, "agent_session")
+	case "me":
+		if actorID == "" {
+			return events
+		}
+		return filterEventsByActor(events, actorID)
+	}
+	return events
+}
+
+func filterEventsByType(events []FeedEvent, t string) []FeedEvent {
+	out := make([]FeedEvent, 0, len(events))
+	for _, ev := range events {
+		if ev.Type == t {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
+func filterEventsByActor(events []FeedEvent, actorID string) []FeedEvent {
+	out := make([]FeedEvent, 0, len(events))
+	for _, ev := range events {
+		switch ev.Type {
+		case "comment":
+			if ev.Comment != nil && ev.Comment.ActorID == actorID {
+				out = append(out, ev)
+			}
+		case "agent_session":
+			if ev.AgentSession != nil && ev.AgentSession.ActorID == actorID {
+				out = append(out, ev)
+			}
+		case "bulk_action":
+			if ev.BulkAction != nil && ev.BulkAction.ActorID == actorID {
+				out = append(out, ev)
+			}
+		}
+	}
+	return out
 }
 
 // fetchFeedAnnotations runs the windowed annotation query used by

@@ -34,6 +34,23 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		ctx := r.Context()
 		now := time.Now()
 		window := time.Duration(feedWindowDays) * 24 * time.Hour
+		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
+
+		// Resolve the session actor for the "me" chip. Prefer the linked
+		// household user_id; fall back to the auth_account id for the
+		// initial admin (which writes annotations against its account id).
+		// If neither resolves we silently downgrade to "All" rather than
+		// erroring — see filterFeedEvents.
+		var sessionActorID string
+		if filter == "me" {
+			sessionActorID = SessionUserID(tr.sm, r)
+			if sessionActorID == "" {
+				sessionActorID = SessionAccountID(tr.sm, r)
+			}
+			if sessionActorID == "" {
+				filter = ""
+			}
+		}
 
 		// Display lookups so bulk-action subjects render with friendly tag
 		// and category display names instead of raw slugs.
@@ -53,19 +70,31 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			Window:        window,
 			BulkThreshold: 3,
 			SampleLimit:   5,
+			Filter:        filter,
+			ActorID:       sessionActorID,
 		})
 		if err != nil {
 			a.Logger.Error("feed: list events", "error", err)
 		}
 
-		// 2. Reports — windowed to match the feed bound.
-		reports, err := svc.ListAgentReports(ctx, 50)
-		if err != nil {
-			a.Logger.Error("feed: list agent reports", "error", err)
+		// 2. Reports — windowed to match the feed bound. Skipped under the
+		// syncs/comments/sessions/me chips, which scope the page to events
+		// the service layer produces.
+		var reports []service.AgentReportResponse
+		if filter == "" || filter == "reports" {
+			reports, err = svc.ListAgentReports(ctx, 50)
+			if err != nil {
+				a.Logger.Error("feed: list agent reports", "error", err)
+			}
 		}
 
-		// 3. Connection alerts — current state, not windowed.
-		alerts := buildFeedConnectionAlerts(ctx, a)
+		// 3. Connection alerts — current state, not windowed. Hidden under
+		// any active chip so the filtered view is exclusively the chip's
+		// scope; the alerts re-appear on the unfiltered "All" page.
+		var alerts []pages.FeedAlert
+		if filter == "" {
+			alerts = buildFeedConnectionAlerts(ctx, a)
+		}
 
 		// 4. Project FeedEvents onto templ-side FeedItems.
 		items := make([]pages.FeedItem, 0, len(events)+len(reports))
@@ -179,7 +208,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			TotalItems:       len(items),
 			WindowDays:       feedWindowDays,
 			Now:              now,
-			Filter:           strings.TrimSpace(r.URL.Query().Get("filter")),
+			Filter:           filter,
 		})
 		tr.RenderWithTempl(w, r, data, body)
 	}
