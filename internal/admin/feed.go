@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -8,24 +9,34 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/pgconv"
-	"breadbox/internal/ptrutil"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
 )
 
-// FeedHandler serves GET /feed — the activity-style household feed page,
-// designed as a candidate replacement for the legacy stats dashboard. The
-// page renders a chronological, GitHub-style timeline of household events
-// (syncs, agent reports, transaction comments, rule applications, manual
-// recategorizations) with rich cards on the high-signal items and compact
-// rows on the low-signal ones.
+// feedWindowDays is the bounded lookback window for the home Feed page.
+// Events older than this drop off; the cap ensures the page never grows
+// unbounded and that the day buckets stay interpretable. Tuned with the
+// product owner — three days lines up with "what's happened this weekend".
+const feedWindowDays = 3
+
+// FeedHandler serves GET /feed — the activity-style household feed page.
+//
+// The aggregation pipeline is:
+//
+//  1. service.ListFeedEvents returns already-grouped sync / agent_session /
+//     bulk_action / comment events for the last `feedWindowDays`.
+//  2. Reports + connection alerts are pulled here (unrelated to grouping).
+//  3. We project FeedEvents onto the templ-side `pages.FeedItem` shape,
+//     resolve tag/category display names for bulk-action subjects, and
+//     bucket the merged stream by day for the rail's day separators.
 func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		now := time.Now()
+		window := time.Duration(feedWindowDays) * 24 * time.Hour
 
-		// Build display lookups so enriched annotation summaries render the
-		// human-friendly category and tag names instead of raw slugs.
+		// Display lookups so bulk-action subjects render with friendly tag
+		// and category display names instead of raw slugs.
 		categoryTree, err := svc.ListCategories(ctx)
 		if err != nil {
 			a.Logger.Error("feed: list categories", "error", err)
@@ -37,104 +48,61 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		}
 		tagDisplayFn := tagDisplayLookup(tags)
 
-		// 1. Pull cross-transaction annotations (the substrate for most feed
-		//    items: comments, rule applications, manual category sets, manual
-		//    tag actions).
-		feedRows, err := svc.ListFeedActivity(ctx, 250)
-		if err != nil {
-			a.Logger.Error("feed: list activity", "error", err)
-		}
-
-		// 2. Pull recent sync logs — one feed card per sync run keeps the
-		//    "X transactions arrived from Chase" event compact.
-		syncResult, err := svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
-			Page:     1,
-			PageSize: 25,
+		// 1. Grouped events from the service.
+		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{
+			Window:        window,
+			BulkThreshold: 3,
+			SampleLimit:   5,
 		})
 		if err != nil {
-			a.Logger.Error("feed: list sync logs", "error", err)
+			a.Logger.Error("feed: list events", "error", err)
 		}
 
-		// 3. Recent agent reports — rich cards. We pull the wider list (read
-		//    + unread) so the feed shows the full activity stream rather than
-		//    only the unread queue.
-		recentReports, err := svc.ListAgentReports(ctx, 20)
+		// 2. Reports — windowed to match the feed bound.
+		reports, err := svc.ListAgentReports(ctx, 50)
 		if err != nil {
 			a.Logger.Error("feed: list agent reports", "error", err)
 		}
 
-		// 4. Connection alerts — pinned warning cards at the top for any
-		//    connection currently in error/pending_reauth state.
-		var connectionAlerts []pages.FeedAlert
-		bankConnections, err := a.Queries.ListBankConnections(ctx)
-		if err != nil {
-			a.Logger.Error("feed: list bank connections", "error", err)
-		}
-		for _, conn := range bankConnections {
-			status := string(conn.Status)
-			if status != "error" && status != "pending_reauth" {
+		// 3. Connection alerts — current state, not windowed.
+		alerts := buildFeedConnectionAlerts(ctx, a)
+
+		// 4. Project FeedEvents onto templ-side FeedItems.
+		items := make([]pages.FeedItem, 0, len(events)+len(reports))
+		var lastSyncAt time.Time
+		var lastSyncStatus, lastSyncInstitution string
+		var totalNewTransactionsToday, ruleHitsToday int
+		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+		for _, ev := range events {
+			if ev.Timestamp.Before(now.Add(-window)) {
 				continue
 			}
-			alert := pages.FeedAlert{
-				ConnectionID:   pgconv.FormatUUID(conn.ID),
-				Institution:    pgconv.TextOr(conn.InstitutionName, "Unknown bank"),
-				Provider:       string(conn.Provider),
-				Status:         status,
-				ErrorMessage:   pgconv.TextOr(conn.ErrorMessage, ""),
-				LastSyncedAt:   "Never",
-				ConsecutiveFailures: int(conn.ConsecutiveFailures),
+			it := projectFeedEvent(ev, tagDisplayFn, categoryDetail)
+			if it == nil {
+				continue
 			}
-			if conn.LastSyncedAt.Valid {
-				alert.LastSyncedAt = relativeTime(conn.LastSyncedAt.Time)
-			}
-			connectionAlerts = append(connectionAlerts, alert)
-		}
+			items = append(items, *it)
 
-		// 5. Build feed items.
-		items := make([]pages.FeedItem, 0, 64)
-
-		// Sync items — emit one per sync run with non-zero changes OR errors.
-		// Successful no-op syncs are noisy; suppress them so the feed stays
-		// signal-rich.
-		if syncResult != nil {
-			for _, log := range syncResult.Logs {
-				hasChanges := log.AddedCount+log.ModifiedCount+log.RemovedCount > 0
-				isFailure := log.Status == "error"
-				if !hasChanges && !isFailure {
-					continue
+			// Hero-stat collection over the same loop.
+			switch ev.Type {
+			case "sync":
+				if ev.Sync != nil && ev.Sync.StartedAt.After(lastSyncAt) {
+					lastSyncAt = ev.Sync.StartedAt
+					lastSyncStatus = ev.Sync.Status
+					lastSyncInstitution = ev.Sync.InstitutionName
 				}
-				ts := time.Time{}
-				if log.StartedAt != nil {
-					if t, err := time.Parse(time.RFC3339, *log.StartedAt); err == nil {
-						ts = t
+				if ev.Sync != nil && ev.Timestamp.After(startOfDay) {
+					totalNewTransactionsToday += ev.Sync.AddedCount
+					for _, ro := range ev.Sync.RuleOutcomes {
+						ruleHitsToday += ro.Count
 					}
 				}
-				if ts.IsZero() {
-					continue
-				}
-				item := pages.FeedItem{
-					Type:         "sync",
-					Timestamp:    ts,
-					TimestampStr: ts.UTC().Format(time.RFC3339),
-					Sync: &pages.FeedSync{
-						SyncLogID:       log.ID,
-						InstitutionName: log.InstitutionName,
-						Provider:        log.Provider,
-						Trigger:         log.Trigger,
-						Status:          log.Status,
-						AddedCount:      int(log.AddedCount),
-						ModifiedCount:   int(log.ModifiedCount),
-						RemovedCount:    int(log.RemovedCount),
-						RuleHits:        int(log.TotalRuleHits),
-						ErrorMessage:    ptrutil.DerefOr(log.ErrorMessage, ""),
-					},
-				}
-				items = append(items, item)
 			}
 		}
 
-		// Agent report items.
-		for _, rep := range recentReports {
+		// 5. Append reports as their own feed items.
+		for _, rep := range reports {
 			if rep.CreatedAt == "" {
 				continue
 			}
@@ -142,7 +110,10 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			if err != nil {
 				continue
 			}
-			item := pages.FeedItem{
+			if ts.Before(now.Add(-window)) {
+				continue
+			}
+			items = append(items, pages.FeedItem{
 				Type:         "report",
 				Timestamp:    ts,
 				TimestampStr: ts.UTC().Format(time.RFC3339),
@@ -156,147 +127,44 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 					DisplayAuthor: reportDisplayAuthor(rep.CreatedByName, rep.Author),
 					IsUnread:      rep.ReadAt == nil,
 				},
-			}
-			items = append(items, item)
-		}
-
-		// Annotation-driven items. We group rule_applied rows by (rule_id, day)
-		// to collapse "Rule X auto-categorized 47 transactions" into a single
-		// card instead of 47 separate ones. Comments, manual category sets,
-		// and manual tag actions stay as individual rows.
-		ruleBatches := make(map[string]*pages.FeedRuleBatch)
-		for _, fr := range feedRows {
-			ann := fr.Annotation
-			if ann.CreatedAtTime.IsZero() {
-				continue
-			}
-			ts := ann.CreatedAtTime
-			tsStr := ts.UTC().Format(time.RFC3339)
-
-			switch ann.Kind {
-			case "rule_applied":
-				dayKey := ts.Local().Format("2006-01-02")
-				ruleKey := dayKey + "|" + safeStr(ann.RuleID) + "|" + ann.RuleName
-				batch, ok := ruleBatches[ruleKey]
-				if !ok {
-					batch = &pages.FeedRuleBatch{
-						RuleName:    ann.RuleName,
-						RuleShortID: ann.RuleShortID,
-						DayLabel:    ts.Local().Format("Jan 2"),
-						LatestTS:    ts,
-					}
-					ruleBatches[ruleKey] = batch
-				}
-				batch.Count++
-				field, _ := ann.Payload["action_field"].(string)
-				if field != "" {
-					if batch.ActionFields == nil {
-						batch.ActionFields = map[string]int{}
-					}
-					batch.ActionFields[field]++
-				}
-				if ts.After(batch.LatestTS) {
-					batch.LatestTS = ts
-				}
-				// Track up to 4 sample transactions for the expand affordance.
-				if len(batch.Samples) < 4 {
-					batch.Samples = append(batch.Samples, pages.FeedTransactionSample{
-						ShortID:      fr.TransactionShortID,
-						MerchantName: pickMerchant(fr),
-						Amount:       fr.Amount,
-						Currency:     fr.IsoCurrencyCode,
-					})
-				}
-
-			case "comment":
-				if ann.IsDeleted {
-					continue
-				}
-				items = append(items, pages.FeedItem{
-					Type:         "comment",
-					Timestamp:    ts,
-					TimestampStr: tsStr,
-					Comment: &pages.FeedComment{
-						ActorName:          ann.ActorName,
-						ActorType:          ann.ActorType,
-						ActorID:            safeStr(ann.ActorID),
-						ActorAvatarVersion: ann.ActorAvatarVersion,
-						Content:            ann.Content,
-						Transaction:        feedTransactionRef(fr),
-					},
-				})
-
-			case "tag_added", "tag_removed":
-				display := tagDisplayFn(ann.TagSlug)
-				name := display.DisplayName
-				if name == "" {
-					name = ann.TagSlug
-				}
-				items = append(items, pages.FeedItem{
-					Type:         "tag",
-					Timestamp:    ts,
-					TimestampStr: tsStr,
-					Tag: &pages.FeedTagChange{
-						ActorName:          ann.ActorName,
-						ActorType:          ann.ActorType,
-						ActorID:            safeStr(ann.ActorID),
-						ActorAvatarVersion: ann.ActorAvatarVersion,
-						Action:             strings.TrimPrefix(ann.Kind, "tag_"),
-						TagSlug:            ann.TagSlug,
-						TagName:            name,
-						TagColor:           ptrutil.DerefOr(display.Color, ""),
-						TagIcon:            ptrutil.DerefOr(display.Icon, ""),
-						Note:               ann.Note,
-						Transaction:        feedTransactionRef(fr),
-					},
-				})
-
-			case "category_set":
-				cd := categoryDetail(ann.CategorySlug)
-				name := cd.DisplayName
-				if name == "" {
-					name = ann.CategorySlug
-				}
-				items = append(items, pages.FeedItem{
-					Type:         "category",
-					Timestamp:    ts,
-					TimestampStr: tsStr,
-					Category: &pages.FeedCategoryChange{
-						ActorName:          ann.ActorName,
-						ActorType:          ann.ActorType,
-						ActorID:            safeStr(ann.ActorID),
-						ActorAvatarVersion: ann.ActorAvatarVersion,
-						CategorySlug:       ann.CategorySlug,
-						CategoryName:       name,
-						CategoryColor:      ptrutil.DerefOr(cd.Color, ""),
-						CategoryIcon:       ptrutil.DerefOr(cd.Icon, ""),
-						Transaction:        feedTransactionRef(fr),
-					},
-				})
-			}
-		}
-		for _, batch := range ruleBatches {
-			items = append(items, pages.FeedItem{
-				Type:         "rule_batch",
-				Timestamp:    batch.LatestTS,
-				TimestampStr: batch.LatestTS.UTC().Format(time.RFC3339),
-				RuleBatch:    batch,
 			})
 		}
 
-		// 6. Sort newest-first. Feed convention is reverse-chronological so
-		//    the most recent activity is always on top — the inverse of the
-		//    per-transaction timeline (chat-style; new at the bottom).
+		// 6. Sort + day-bucket.
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].Timestamp.After(items[j].Timestamp)
 		})
-
-		// 7. Group into day buckets for the day-separator chrome.
 		days := groupFeedByDay(items, now)
 
-		// 8. At-a-glance hero stats — quick "today" snapshot derived from the
-		//    feed itself plus a couple of cheap counts.
-		hero := buildFeedHero(now, items, feedRows, recentReports, syncResult)
+		// 7. Hero band.
+		var commentsToday, eventsToday, unreadReports int
+		for _, it := range items {
+			if it.Timestamp.After(startOfDay) {
+				eventsToday++
+				if it.Type == "comment" {
+					commentsToday++
+				}
+			}
+		}
+		for _, r := range reports {
+			if r.ReadAt == nil {
+				unreadReports++
+			}
+		}
+		hero := pages.FeedHero{
+			Generated:            now.Format("Mon, Jan 2"),
+			EventsToday:          eventsToday,
+			NewTransactionsToday: totalNewTransactionsToday,
+			CommentsToday:        commentsToday,
+			RuleHitsToday:        ruleHitsToday,
+			UnreadReports:        unreadReports,
+			LastSyncAt:           lastSyncAt,
+			LastSyncStatus:       lastSyncStatus,
+			LastSyncInstitution:  lastSyncInstitution,
+		}
+		if !lastSyncAt.IsZero() {
+			hero.LastSyncRel = relativeTime(lastSyncAt)
+		}
 
 		data := map[string]any{
 			"PageTitle":   "Feed",
@@ -306,9 +174,10 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		body := pages.Feed(pages.FeedProps{
 			CSRFToken:        GetCSRFToken(r),
 			Hero:             hero,
-			ConnectionAlerts: connectionAlerts,
+			ConnectionAlerts: alerts,
 			Days:             days,
 			TotalItems:       len(items),
+			WindowDays:       feedWindowDays,
 			Now:              now,
 			Filter:           strings.TrimSpace(r.URL.Query().Get("filter")),
 		})
@@ -316,50 +185,227 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 	}
 }
 
-// pickMerchant prefers merchant_name when present, falling back to the
-// transaction name (which often carries the raw description from the
-// provider).
-func pickMerchant(fr service.FeedActivityRow) string {
-	if fr.MerchantName != "" {
-		return fr.MerchantName
+// buildFeedConnectionAlerts collects the pinned warning cards rendered above
+// the rail. Each alert maps one bank connection currently in error or
+// pending_reauth state to a `pages.FeedAlert`.
+func buildFeedConnectionAlerts(ctx context.Context, a *app.App) []pages.FeedAlert {
+	bankConnections, err := a.Queries.ListBankConnections(ctx)
+	if err != nil {
+		a.Logger.Error("feed: list bank connections", "error", err)
+		return nil
 	}
-	return fr.TransactionName
+	out := make([]pages.FeedAlert, 0)
+	for _, conn := range bankConnections {
+		status := string(conn.Status)
+		if status != "error" && status != "pending_reauth" {
+			continue
+		}
+		alert := pages.FeedAlert{
+			ConnectionID:        pgconv.FormatUUID(conn.ID),
+			Institution:         pgconv.TextOr(conn.InstitutionName, "Unknown bank"),
+			Provider:            string(conn.Provider),
+			Status:              status,
+			ErrorMessage:        pgconv.TextOr(conn.ErrorMessage, ""),
+			LastSyncedAt:        "Never",
+			ConsecutiveFailures: int(conn.ConsecutiveFailures),
+		}
+		if conn.LastSyncedAt.Valid {
+			alert.LastSyncedAt = relativeTime(conn.LastSyncedAt.Time)
+		}
+		out = append(out, alert)
+	}
+	return out
 }
 
-// feedTransactionRef builds the FeedTransactionRef projection that every
-// transaction-anchored card uses for the "$amount at Merchant" subtitle.
-func feedTransactionRef(fr service.FeedActivityRow) pages.FeedTransactionRef {
+// projectFeedEvent maps one service-layer FeedEvent onto its templ-side
+// FeedItem projection. Returns nil for events with unrecognised Type so the
+// caller can skip them. tagDisplayFn / categoryDetail resolve display
+// metadata for bulk-action subjects.
+func projectFeedEvent(ev service.FeedEvent, tagDisplayFn func(string) tagDisplay, categoryDetail func(string) categoryDisplay) *pages.FeedItem {
+	tsStr := ev.Timestamp.UTC().Format(time.RFC3339)
+	switch ev.Type {
+	case "sync":
+		if ev.Sync == nil {
+			return nil
+		}
+		return &pages.FeedItem{
+			Type:         "sync",
+			Timestamp:    ev.Timestamp,
+			TimestampStr: tsStr,
+			Sync:         projectFeedSync(ev.Sync),
+		}
+	case "comment":
+		if ev.Comment == nil {
+			return nil
+		}
+		return &pages.FeedItem{
+			Type:         "comment",
+			Timestamp:    ev.Timestamp,
+			TimestampStr: tsStr,
+			Comment: &pages.FeedComment{
+				ActorName:          ev.Comment.ActorName,
+				ActorType:          ev.Comment.ActorType,
+				ActorID:            ev.Comment.ActorID,
+				ActorAvatarVersion: ev.Comment.ActorAvatarVersion,
+				Content:            ev.Comment.Content,
+				Transaction:        projectSampleTx(ev.Comment.Transaction),
+			},
+		}
+	case "agent_session":
+		if ev.AgentSession == nil {
+			return nil
+		}
+		return &pages.FeedItem{
+			Type:         "agent_session",
+			Timestamp:    ev.Timestamp,
+			TimestampStr: tsStr,
+			AgentSession: projectFeedAgentSession(ev.AgentSession),
+		}
+	case "bulk_action":
+		if ev.BulkAction == nil {
+			return nil
+		}
+		return &pages.FeedItem{
+			Type:         "bulk_action",
+			Timestamp:    ev.Timestamp,
+			TimestampStr: tsStr,
+			BulkAction:   projectFeedBulkAction(ev.BulkAction, tagDisplayFn, categoryDetail),
+		}
+	}
+	return nil
+}
+
+func projectFeedSync(s *service.FeedSyncEvent) *pages.FeedSync {
+	out := &pages.FeedSync{
+		SyncLogID:       s.SyncLogID,
+		InstitutionName: s.InstitutionName,
+		Provider:        s.Provider,
+		Trigger:         s.Trigger,
+		Status:          s.Status,
+		ErrorMessage:    s.ErrorMessage,
+		AddedCount:      s.AddedCount,
+		ModifiedCount:   s.ModifiedCount,
+		RemovedCount:    s.RemovedCount,
+		StartedAt:       s.StartedAt,
+		RetryCount:      s.RetryCount,
+		FirstFailureAt:  s.FirstFailureAt,
+		AdditionalCount: s.AdditionalCount,
+	}
+	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(s.SampleTransactions))
+	for _, tx := range s.SampleTransactions {
+		out.SampleTransactions = append(out.SampleTransactions, projectSampleTx(tx))
+	}
+	out.RuleOutcomes = make([]pages.FeedRuleOutcome, 0, len(s.RuleOutcomes))
+	for _, ro := range s.RuleOutcomes {
+		out.RuleOutcomes = append(out.RuleOutcomes, pages.FeedRuleOutcome{
+			RuleName:    ro.RuleName,
+			RuleShortID: ro.RuleShortID,
+			Count:       ro.Count,
+		})
+	}
+	return out
+}
+
+func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentSession {
+	out := &pages.FeedAgentSession{
+		SessionID:          s.SessionID,
+		SessionShortID:     s.SessionShortID,
+		APIKeyName:         s.APIKeyName,
+		Purpose:            s.Purpose,
+		ActorName:          s.ActorName,
+		ActorType:          s.ActorType,
+		ActorID:            s.ActorID,
+		ActorAvatarVersion: s.ActorAvatarVersion,
+		StartedAt:          s.StartedAt,
+		EndedAt:            s.EndedAt,
+		AnnotationCount:    s.AnnotationCount,
+		UniqueTransactions: s.UniqueTransactions,
+		Categorised:        s.KindCounts["category_set"],
+		Tagged:             s.KindCounts["tag_added"],
+		UntaggedRemoved:    s.KindCounts["tag_removed"],
+		Commented:          s.KindCounts["comment"],
+		RuleApplied:        s.KindCounts["rule_applied"],
+	}
+	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(s.SampleTransactions))
+	for _, tx := range s.SampleTransactions {
+		out.SampleTransactions = append(out.SampleTransactions, projectSampleTx(tx))
+	}
+	return out
+}
+
+func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(string) tagDisplay, categoryDetail func(string) categoryDisplay) *pages.FeedBulkAction {
+	out := &pages.FeedBulkAction{
+		ActorName:          b.ActorName,
+		ActorType:          b.ActorType,
+		ActorID:            b.ActorID,
+		ActorAvatarVersion: b.ActorAvatarVersion,
+		Kind:               b.Kind,
+		Count:              b.Count,
+		StartedAt:          b.StartedAt,
+		EndedAt:            b.EndedAt,
+	}
+	for _, sub := range b.Subjects {
+		display := pages.FeedBulkSubject{
+			Name:  sub.Name,
+			Slug:  sub.Slug,
+			Count: sub.Count,
+		}
+		switch b.Kind {
+		case "tag_added", "tag_removed":
+			td := tagDisplayFn(sub.Slug)
+			if td.DisplayName != "" {
+				display.Name = td.DisplayName
+			}
+			if td.Color != nil {
+				display.Color = *td.Color
+			}
+			if td.Icon != nil {
+				display.Icon = *td.Icon
+			}
+		case "category_set":
+			cd := categoryDetail(sub.Slug)
+			if cd.DisplayName != "" {
+				display.Name = cd.DisplayName
+			}
+			if cd.Color != nil {
+				display.Color = *cd.Color
+			}
+			if cd.Icon != nil {
+				display.Icon = *cd.Icon
+			}
+		}
+		if display.Name == "" {
+			display.Name = sub.Slug
+		}
+		out.Subjects = append(out.Subjects, display)
+	}
+	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(b.SampleTransactions))
+	for _, tx := range b.SampleTransactions {
+		out.SampleTransactions = append(out.SampleTransactions, projectSampleTx(tx))
+	}
+	return out
+}
+
+func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 	return pages.FeedTransactionRef{
-		ShortID:      fr.TransactionShortID,
-		Name:         fr.TransactionName,
-		MerchantName: pickMerchant(fr),
-		Amount:       fr.Amount,
-		Currency:     fr.IsoCurrencyCode,
-		Date:         fr.TransactionDate,
-		AccountName:  fr.AccountName,
-		Institution:  fr.InstitutionName,
+		ShortID:      tx.ShortID,
+		Name:         tx.Name,
+		MerchantName: tx.MerchantName,
+		Amount:       tx.Amount,
+		Currency:     tx.Currency,
+		Date:         tx.Date,
+		AccountName:  tx.AccountName,
+		Institution:  tx.Institution,
 	}
-}
-
-// safeStr dereferences a *string with an empty-string fallback. Used for the
-// many *string-typed fields on Annotation that the feed projection wants to
-// pass through as plain strings.
-func safeStr(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
 }
 
 // excerpt returns the first `n` runes of `s`, trimmed at the nearest word
-// boundary if the cut would land mid-word. Trailing whitespace is stripped
-// and an ellipsis is appended when the original was longer.
+// boundary if the cut would land mid-word.
 func excerpt(s string, n int) string {
 	s = strings.TrimSpace(s)
 	if n <= 0 || len(s) <= n {
 		return s
 	}
-	// Cut on rune boundaries.
 	runes := []rune(s)
 	if len(runes) <= n {
 		return s
@@ -414,56 +460,4 @@ func friendlyDayLabel(t, now time.Time) string {
 		return t.Format("Jan 2")
 	}
 	return t.Format("Jan 2, 2006")
-}
-
-// buildFeedHero derives the at-a-glance numbers shown above the feed: events
-// today, sync status, unread-report count, and the count of pinned alerts.
-func buildFeedHero(now time.Time, items []pages.FeedItem, rows []service.FeedActivityRow, reports []service.AgentReportResponse, syncResult *service.SyncLogListResult) pages.FeedHero {
-	hero := pages.FeedHero{
-		Generated: now.Format("Mon, Jan 2"),
-	}
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	for _, it := range items {
-		if it.Timestamp.After(startOfDay) {
-			hero.EventsToday++
-			switch it.Type {
-			case "sync":
-				if it.Sync != nil {
-					hero.NewTransactionsToday += it.Sync.AddedCount
-				}
-			case "comment":
-				hero.CommentsToday++
-			case "rule_batch":
-				if it.RuleBatch != nil {
-					hero.RuleHitsToday += it.RuleBatch.Count
-				}
-			}
-		}
-	}
-	for _, r := range reports {
-		if r.ReadAt == nil {
-			hero.UnreadReports++
-		}
-	}
-	if syncResult != nil {
-		for _, log := range syncResult.Logs {
-			if log.StartedAt == nil {
-				continue
-			}
-			t, err := time.Parse(time.RFC3339, *log.StartedAt)
-			if err != nil {
-				continue
-			}
-			if hero.LastSyncAt.IsZero() || t.After(hero.LastSyncAt) {
-				hero.LastSyncAt = t
-				hero.LastSyncStatus = log.Status
-				hero.LastSyncInstitution = log.InstitutionName
-			}
-		}
-	}
-	if !hero.LastSyncAt.IsZero() {
-		hero.LastSyncRel = relativeTime(hero.LastSyncAt)
-	}
-	_ = rows
-	return hero
 }
