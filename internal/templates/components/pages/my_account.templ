@@ -13,9 +13,9 @@ package pages
 templ MyAccount(p MyAccountProps) {
 	<div class="max-w-2xl">
 		<div class="bb-page-header">
-			<div>
+			<div class="min-w-0">
 				<h1 class="bb-page-title">Account</h1>
-				<p class="text-sm text-base-content/50 mt-1">
+				<p class="text-sm text-base-content/50 mt-1 truncate">
 					if p.AdminUsername != "" {
 						Signed in as <span class="text-base-content/70 font-medium">{ p.AdminUsername }</span>
 						if p.RoleDisplay != "" {
@@ -54,7 +54,7 @@ templ MyProfile(p MyAccountProps) {
 	<script src="/static/js/admin/components/user_form.js"></script>
 	<div class="max-w-2xl">
 		<div class="bb-page-header">
-			<div>
+			<div class="min-w-0">
 				<h1 class="bb-page-title">Profile</h1>
 				<p class="text-sm text-base-content/50 mt-1">Update your name, email, and avatar</p>
 			</div>
@@ -104,12 +104,12 @@ templ myAccountProfileCard(p MyAccountProps) {
 					</div>
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold truncate">Profile</h2>
-						<p class="text-xs text-base-content/45">
+						<p class="text-xs text-base-content/45 flex flex-wrap items-center gap-x-1.5 gap-y-1">
 							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="upload" class="w-3 h-3"></i>Upload photo</button>
 							<span class="text-base-content/20">·</span>
 							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate</button>
 							<template x-if="hasCustomAvatar">
-								<span>
+								<span class="inline-flex items-center gap-1.5">
 									<span class="text-base-content/20">·</span>
 									<button type="button" @click="removeAvatar()" class="link link-hover text-error/70 hover:text-error">Remove</button>
 								</span>
