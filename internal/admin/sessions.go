@@ -13,7 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// SessionDetailHandler serves GET /admin/activity/sessions/{id}.
+// SessionDetailHandler serves GET /admin/logs/sessions/{id}.
 func SessionDetailHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -23,7 +23,7 @@ func SessionDetailHandler(svc *service.Service, sm *scs.SessionManager, tr *Temp
 			return
 		}
 
-		data := BaseTemplateData(r, sm, "activity", "Session Detail")
+		data := BaseTemplateData(r, sm, "logs", "Session Detail")
 		props := buildSessionDetailProps(detail)
 		renderSessionDetail(w, r, tr, data, props)
 	}

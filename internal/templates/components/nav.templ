@@ -92,8 +92,8 @@ templ Nav(p NavProps) {
 			</a>
 		}
 		if p.IsAdmin {
-			<a href="/activity" class={ "bb-sidebar-link", navActive(p.CurrentPage, "activity") }>
-				<i data-lucide="activity"></i> Activity
+			<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
+				<i data-lucide="scroll-text"></i> Logs
 			</a>
 		}
 		if p.IsEditor {

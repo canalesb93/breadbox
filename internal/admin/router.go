@@ -161,19 +161,22 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		})
 
 		// Agent Prompts page (formerly /agents) — editors can view.
-		// Per-session detail lives under /activity/sessions/{id} since
-		// session data is hosted on the Activity page's Sessions tab;
+		// Per-session detail lives under /logs/sessions/{id} since
+		// session data is hosted on the Logs page's Sessions tab;
 		// it's registered here under the editor+ scope to preserve the
 		// previous /agents/sessions/{id} permission level.
 		r.Get("/agent-prompts", AgentsPageHandler(svc, sm, tr))
 		r.Get("/agent-prompts/builder/{type}", PromptBuilderHandler(sm, tr))
 		r.Get("/agent-prompts/builder/{type}/copy", PromptCopyHandler())
-		r.Get("/activity/sessions/{id}", SessionDetailHandler(svc, sm, tr))
+		r.Get("/logs/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 
-		// Legacy /agents and /agent-wizard redirects.
+		// Legacy /agents, /agent-wizard, and /activity/sessions redirects.
 		r.Get("/agents", redirectGET("/agent-prompts"))
 		r.Get("/agents/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/activity/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
+			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
+		})
+		r.Get("/activity/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
 		r.Get("/agent-wizard/{type}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type"), http.StatusMovedPermanently)
@@ -220,24 +223,26 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			http.Redirect(w, r, "/settings/oauth-clients/"+chi.URLParam(r, "id")+"/revoke", http.StatusPermanentRedirect)
 		})
 
-		// Activity page (formerly /logs) — sync history, webhook events,
-		// agent sessions tabs. The per-sync-log detail page lives under
-		// /activity/sync-logs/{id}; the per-session detail page lives
-		// under /activity/sessions/{id} (since session data is on the
-		// activity page's Sessions tab).
-		r.Get("/activity", LogsPageHandler(a, svc, sm, tr))
-		r.Get("/activity/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
+		// Logs page — sync history, webhook events, agent sessions tabs.
+		// The per-sync-log detail page lives under /logs/sync-logs/{id};
+		// the per-session detail page lives under /logs/sessions/{id}
+		// (since session data is on the Logs page's Sessions tab).
+		r.Get("/logs", LogsPageHandler(a, svc, sm, tr))
+		r.Get("/logs/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
 
-		// Legacy /logs and /sync-logs redirects.
-		r.Get("/logs", redirectGET("/activity"))
+		// Legacy /activity, /sync-logs, and /webhook-events redirects.
+		r.Get("/activity", redirectGET("/logs"))
 		r.Get("/sync-logs", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/activity?tab=syncs", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/logs?tab=syncs", http.StatusMovedPermanently)
 		})
 		r.Get("/sync-logs/{id}", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/activity/sync-logs/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
+			http.Redirect(w, r, "/logs/sync-logs/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
+		})
+		r.Get("/activity/sync-logs/{id}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/logs/sync-logs/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
 		r.Get("/webhook-events", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/activity?tab=webhooks", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/logs?tab=webhooks", http.StatusMovedPermanently)
 		})
 
 		r.Get("/account-links", func(w http.ResponseWriter, r *http.Request) {

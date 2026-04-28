@@ -14,7 +14,7 @@ import (
 // Historically this route was a 4-tab composite (guide / wizard / settings /
 // activity). The guide tab was removed, MCP settings moved into the unified
 // Settings shell at /settings/mcp, and the activity tab moved to
-// /activity?tab=sessions. What remains is a single page rendering the prompt
+// /logs?tab=sessions. What remains is a single page rendering the prompt
 // wizard cards via the AgentWizard templ component.
 func AgentsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
