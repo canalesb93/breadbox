@@ -249,7 +249,7 @@ templ deleteCategoryModal() {
 		x-data="{deleteId: '', deleteName: '', submitting: false}"
 		@delete-category.window="deleteId = $event.detail.id; deleteName = $event.detail.name; document.getElementById('delete-modal').showModal()"
 	>
-		<div class="modal-box rounded-xl max-w-md">
+		<div class="modal-box w-full sm:max-w-md [padding-bottom:calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:[padding-bottom:1.5rem]">
 			<div class="flex items-center gap-3 mb-4">
 				<div class="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center">
 					<i data-lucide="alert-triangle" class="w-5 h-5 text-error"></i>
