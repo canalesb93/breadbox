@@ -31,6 +31,16 @@ templ TransactionDetail(p TransactionDetailProps) {
 	@templ.JSONScript("transaction-detail-data", p.Categories)
 	@templ.JSONScript("transaction-detail-available-tags", p.AvailableTags)
 	@templ.JSONScript("transaction-detail-current-tags", p.CurrentTags)
+	<!-- Markdown rendering for activity-timeline comment bubbles. The
+	     shared static/js/admin/markdown.js scanner runs marked +
+	     DOMPurify (same versions / SRI as report_detail.templ) over
+	     every [data-markdown] element on DOMContentLoaded, and
+	     transaction_detail.js calls window.bbRenderMarkdown(node) on
+	     each freshly-inserted timeline row so optimistic comment
+	     additions render markdown without a full reload. -->
+	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/markdown.js"></script>
 	<!-- Component factory. Loaded synchronously (no defer) so the
 	     Alpine.data() registrations run before Alpine — itself deferred from
 	     <head> — fires alpine:init. -->
@@ -558,7 +568,18 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 		}
 	</div>
 	if e.Detail != "" {
-		<div class="bb-comment-bubble mt-1">{ e.Detail }</div>
+		<!--
+			Markdown rendering: the bubble div ships with the raw
+			markdown source in data-markdown and is rewritten by the
+			shared static/js/admin/markdown.js scanner (loaded at the
+			top of the page) on DOMContentLoaded. Optimistic inserts
+			from transaction_detail.js call window.bbRenderMarkdown(
+			newRow) so freshly-added comments render without a reload.
+			data-markdown-breaks="true" makes single newlines render as
+			<br>, matching the chat-style expectation users have when
+			typing in the composer.
+		-->
+		<div class="bb-comment-bubble mt-1" data-markdown={ e.Detail } data-markdown-breaks="true"></div>
 	}
 }
 
@@ -645,6 +666,10 @@ templ txdComposerCard(p TransactionDetailProps) {
 				>
 					<span x-text="newComment.length"></span>/<span x-text="maxLength"></span>
 				</span>
+			</span>
+			<span class="hidden sm:inline-flex items-center gap-1 text-[11px] text-base-content/40" title="Markdown is supported (bold, italic, lists, links, code).">
+				<i data-lucide="markdown" class="w-3.5 h-3.5" aria-hidden="true"></i>
+				<span>Markdown supported</span>
 			</span>
 			<!--
 				Toggle visibility is bound to `hasPendingReview` (initialized

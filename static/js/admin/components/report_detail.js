@@ -4,10 +4,12 @@
 // Initial scalar state (report ID + is-read flag) flows in via data-*
 // attributes on the x-data root and is read in init().
 //
-// The DOMContentLoaded listener at the bottom runs DOMPurify.sanitize(
-// marked.parse(body)) over each `.bb-report-body` element and rewrites
-// external links to open in a new tab. It depends on the marked and
-// dompurify CDN scripts loaded as siblings of this file in the templ.
+// Markdown rendering for the body lives in the shared
+// static/js/admin/markdown.js scanner (loaded as a sibling script in
+// report_detail.templ). It picks up the `.bb-report-body[data-markdown]`
+// element on DOMContentLoaded and runs marked + DOMPurify with the
+// shared link/table/last-child enhancements. This file is now purely
+// the Alpine factory for the toolbar (mark-read, copy-link, toast).
 document.addEventListener('alpine:init', function () {
   Alpine.data('reportDetail', function () {
     return {
@@ -56,27 +58,3 @@ document.addEventListener('alpine:init', function () {
   });
 });
 
-// External-link targeting only — styling lives in .bb-report-body (input.css).
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.bb-report-body').forEach(function (el) {
-    var md = el.getAttribute('data-markdown');
-    if (!md) return;
-    el.innerHTML = DOMPurify.sanitize(marked.parse(md));
-    el.querySelectorAll('a').forEach(function (a) {
-      var href = a.getAttribute('href') || '';
-      if (a.href && !a.href.startsWith(window.location.origin) && !href.startsWith('/')) {
-        a.setAttribute('target', '_blank');
-        a.setAttribute('rel', 'noopener');
-      }
-    });
-    el.querySelectorAll('table').forEach(function (t) {
-      if (t.parentNode && t.parentNode.classList && t.parentNode.classList.contains('bb-report-table-wrap')) return;
-      var wrap = document.createElement('div');
-      wrap.className = 'bb-report-table-wrap';
-      t.parentNode.insertBefore(wrap, t);
-      wrap.appendChild(t);
-    });
-    var lastChild = el.lastElementChild;
-    if (lastChild) lastChild.classList.add('!mb-0');
-  });
-});
