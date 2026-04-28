@@ -2971,3 +2971,68 @@
   border-width: 8px 8px 8px 0;
   border-color: transparent var(--color-base-100) transparent transparent;
 }
+
+/* ── Activity timeline — inline chip fix ──
+ * Tag chips (`.bb-tag`) inside timeline sentence bodies carry a `truncate`
+ * class on their inner text span. That class truncates chip labels when the
+ * parent container is narrow (min-w-0 flex-1). In the prominent timeline the
+ * chip is the primary informational element; truncation defeats its purpose.
+ * Override: let the chip text fully wrap / display at natural width inside
+ * system-event sentence bodies (non-comment, non-composer rows). */
+.bb-timeline-prominent .bb-timeline
+  > li:not(:has(.bb-comment-bubble)):not(:has([data-composer-anchor]))
+  > div.flex-1 .bb-tag span.truncate {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+}
+
+/* ── Activity timeline — mobile responsive fixes ──
+ * Fixes for narrow (≤639px) viewports where system-event sentences with
+ * inline chips, long rule names, and tag badges could overflow or look
+ * cramped. */
+
+/* System-event sentence bodies: allow inline chips + timestamp suffix to
+ * wrap naturally on narrow screens. The leading-6 line-box is preserved
+ * for single-line sentences (short actor names, brief verbs); multi-line
+ * wrap picks up normal 1.5 leading so content stays readable. */
+@media (max-width: 639px) {
+  .bb-timeline-prominent .bb-timeline > li > div.flex-1.text-xs {
+    line-height: 1.5; /* relax from 1.75rem (28px) to 1.5 on mobile */
+  }
+
+  /* Timestamp/origin suffix: break onto its own line after the sentence
+   * body on very narrow viewports. The suffix `<span>` has ml-1 from the
+   * templ markup; on mobile we push it to a new pseudo-line so it doesn't
+   * tuck tightly against the last word of the sentence when the sentence
+   * has already wrapped. */
+  .bb-timeline-prominent .bb-timeline
+    > li:not(:has(.bb-comment-bubble)):not(:has([data-composer-anchor]))
+    > div.flex-1 > span:last-child {
+    display: block;
+    margin-left: 0;
+    margin-top: 0.125rem;
+  }
+
+  /* Composer card textarea: slightly smaller min-height on mobile so the
+   * keyboard doesn't immediately scroll the page when tapping to type. */
+  .bb-timeline-prominent .bb-timeline
+    > li:has([data-composer-anchor]) textarea {
+    min-height: 4rem;
+  }
+}
+
+/* Comment rows: on mobile the delete button should always be visible (not
+ * sm:opacity-0 hidden-until-hover). The templ markup hides it with
+ * sm:opacity-0 which means it's visible on mobile by default already —
+ * but ensure the tap target is large enough. */
+@media (max-width: 639px) {
+  .bb-timeline-prominent .bb-timeline
+    > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child button {
+    min-width: 2rem;
+    min-height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
