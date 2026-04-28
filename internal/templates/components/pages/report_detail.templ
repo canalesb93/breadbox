@@ -14,12 +14,19 @@ import "breadbox/internal/templates/components"
 // (no defer) and at the top of the component so the factory is
 // registered before Alpine — itself <script defer> in <head> — fires
 // alpine:init.
+//
+// Markdown rendering is delegated to the shared static/js/admin/markdown.js
+// scanner (also used by transaction-detail comments). It scans every
+// `[data-markdown]` element on DOMContentLoaded and rewrites it via
+// marked + DOMPurify, so this template only needs to point the body div
+// at its raw markdown via `data-markdown="..."`.
 templ ReportDetail(p ReportDetailProps) {
-	<!-- CDN dependencies for the body markdown renderer, then the
+	<!-- CDN dependencies for the shared markdown renderer, then the
 	     report_detail Alpine factory. Loaded synchronously (no defer)
 	     so Alpine.data() registration runs before alpine:init. -->
 	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/markdown.js"></script>
 	<script src="/static/js/admin/components/report_detail.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div x-data="reportDetail" data-report-id={ p.Report.ID } data-is-read={ boolLiteral(p.Report.IsRead) } class="max-w-4xl">
