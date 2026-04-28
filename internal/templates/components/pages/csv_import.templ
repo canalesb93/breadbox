@@ -109,8 +109,8 @@ templ CSVImport(p CSVImportProps) {
 					<i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5"></i>
 					<span id="upload-status"></span>
 				</div>
-				<div class="flex items-center gap-3 pt-2">
-					<button type="button" id="upload-btn" class="btn btn-primary btn-sm rounded-xl" onclick="uploadFile()">
+				<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+					<button type="button" id="upload-btn" class="btn btn-primary btn-sm rounded-xl w-full sm:w-auto" onclick="uploadFile()">
 						<i data-lucide="upload" class="w-4 h-4"></i> Upload &amp; Parse
 					</button>
 					<p id="upload-progress" class="text-sm text-base-content/60"></p>
@@ -199,14 +199,16 @@ templ CSVImport(p CSVImportProps) {
 						<input type="text" id="account-name" class="input input-bordered w-full rounded-xl" value="CSV Import" placeholder="e.g., Chase Checking CSV"/>
 					</fieldset>
 				}
-				<div class="flex items-center gap-3 pt-2">
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="window._csvWizard.setStep(1)">
-						<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
-					</button>
-					<button type="button" class="btn btn-sm btn-outline rounded-xl" onclick="previewData()">
-						<i data-lucide="eye" class="w-4 h-4"></i> Preview
-					</button>
-					<button type="button" id="continue-btn" class="btn btn-primary btn-sm rounded-xl hidden" onclick="goToStep3()">
+				<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+					<div class="flex items-center gap-2">
+						<button type="button" class="btn btn-ghost btn-sm rounded-xl flex-1 sm:flex-none" onclick="window._csvWizard.setStep(1)">
+							<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+						</button>
+						<button type="button" class="btn btn-sm btn-outline rounded-xl flex-1 sm:flex-none" onclick="previewData()">
+							<i data-lucide="eye" class="w-4 h-4"></i> Preview
+						</button>
+					</div>
+					<button type="button" id="continue-btn" class="btn btn-primary btn-sm rounded-xl hidden w-full sm:w-auto" onclick="goToStep3()">
 						Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
 					</button>
 					<p id="preview-status" class="text-sm text-error"></p>
@@ -265,11 +267,11 @@ templ CSVImport(p CSVImportProps) {
 						<span id="summary-member" class="text-sm font-semibold"></span>
 					</div>
 				</div>
-				<div class="flex items-center gap-3">
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="goToStep(2)">
+				<div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3">
+					<button type="button" class="btn btn-ghost btn-sm rounded-xl w-full sm:w-auto" onclick="goToStep(2)">
 						<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
 					</button>
-					<button type="button" id="import-btn" class="btn btn-primary btn-sm rounded-xl" onclick="doImport()">
+					<button type="button" id="import-btn" class="btn btn-primary btn-sm rounded-xl w-full sm:w-auto" onclick="doImport()">
 						<i data-lucide="download" class="w-4 h-4"></i> Import Transactions
 					</button>
 				</div>

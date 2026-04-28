@@ -373,8 +373,8 @@ templ RuleForm(p RuleFormProps) {
 				</template>
 				<!-- Action row -->
 				<div class="bb-action-row">
-					<a href="/rules" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-					<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+					<a href="/rules" class="btn btn-sm btn-ghost rounded-xl w-full sm:w-auto">Cancel</a>
+					<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 w-full sm:w-auto min-w-32" :disabled="submitting">
 						<span x-show="!submitting" class="inline-flex items-center gap-1.5">
 							<i data-lucide="save" class="w-3.5 h-3.5"></i>
 							<span x-text="isEdit ? 'Save Changes' : 'Create Rule'"></span>

@@ -1,8 +1,6 @@
 package pages
 
-import (
-	"breadbox/internal/templates/components"
-)
+import "breadbox/internal/templates/components"
 
 // TagForm renders the create/edit tag form. Hosts inside the base layout
 // via TemplateRenderer.RenderWithTempl. The markup mirrors the previous
@@ -191,10 +189,10 @@ templ TagForm(p TagFormProps) {
 				</div>
 			</div>
 			<div class="bb-action-row">
-				<a href="/tags" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+				<a href="/tags" class="btn btn-sm btn-ghost rounded-xl w-full sm:w-auto">Cancel</a>
 				<button
 					type="submit"
-					class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32"
+					class="btn btn-sm btn-primary rounded-xl gap-1.5 w-full sm:w-auto min-w-32"
 					:disabled="submitting"
 				>
 					<span x-show="!submitting" class="inline-flex items-center gap-1.5">

@@ -254,8 +254,15 @@
   .bb-icon-tile--error   { @apply bg-error/10 text-error; }
 
   /* Action row at the bottom of a sectioned form card.
-     Holds Cancel + primary (Save/Create) buttons right-aligned. */
-  .bb-action-row { @apply p-4 sm:p-5 border-t border-base-300 bg-base-200/20 flex items-center justify-end gap-2; }
+     Stacks Cancel + primary buttons vertically on mobile (primary first via
+     flex-col-reverse) and aligns them right on sm+. Safe-area bottom padding
+     ensures home-indicator clearance on iOS. */
+  .bb-action-row {
+    @apply p-4 sm:p-5 border-t border-base-300 bg-base-200/20
+           flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    @media (min-width: 640px) { padding-bottom: 1.25rem; }
+  }
 
   /* Form inputs/selects with subtle base-200 bg that clears on focus. */
   .bb-form-input { @apply input w-full rounded-xl bg-base-200/50 focus:bg-base-100 transition-colors; }
