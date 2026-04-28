@@ -696,6 +696,7 @@
     border-radius: 1rem;
     border-top-left-radius: 0.375rem;
     word-break: break-word;
+    overflow-wrap: anywhere;
   }
   /* Markdown element styling inside a comment bubble. Tuned to the
      bubble's compact scale — paragraph margins are tighter than the
