@@ -473,7 +473,7 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 		</div>
 	}
 	if s.Status == "error" && s.ErrorMessage != "" {
-		<div class="mt-1.5 text-error/90 bg-error/8 rounded-lg px-2.5 py-1.5 border border-error/20">
+		<div class="mt-1.5 text-error/90 bg-error/15 rounded-lg px-2.5 py-1.5 border border-error/25">
 			<i data-lucide="alert-circle" class="w-3 h-3 inline-block align-text-bottom mr-1"></i>
 			{ s.ErrorMessage }
 		</div>
