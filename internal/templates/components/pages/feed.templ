@@ -47,7 +47,6 @@ templ feedActiveFilterBanner(p FeedProps) {
 }
 
 // ── Hero band ─────────────────────────────────────────────────────────────
-
 templ feedHero(p FeedProps) {
 	<header class="mb-6">
 		<div class="flex flex-wrap items-end justify-between gap-3 mb-4">
@@ -107,6 +106,12 @@ templ feedHeroSyncTile(p FeedProps) {
 			<div class="text-[0.65rem] text-base-content/45 mt-1 truncate">
 				{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }
 			</div>
+			if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
+				<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate flex items-center gap-1">
+					<i data-lucide="clock" class="w-3 h-3 shrink-0" aria-hidden="true"></i>
+					<span>Next sync { p.Hero.NextSyncRel }</span>
+				</div>
+			}
 		} else {
 			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1.5 text-base-content/30">—</div>
 			<div class="text-[0.65rem] text-base-content/45 mt-1">No syncs yet</div>
@@ -115,7 +120,6 @@ templ feedHeroSyncTile(p FeedProps) {
 }
 
 // ── Pinned alerts ─────────────────────────────────────────────────────────
-
 templ feedAlerts(p FeedProps) {
 	<div class="space-y-2 mb-6">
 		for _, a := range p.ConnectionAlerts {
@@ -150,7 +154,6 @@ templ feedAlertCard(a FeedAlert) {
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────
-
 templ feedFilters(p FeedProps) {
 	<nav class="flex items-center gap-1.5 mb-5 overflow-x-auto" aria-label="Feed filters">
 		@feedFilterChip("All", "", "layers", p.Filter)
@@ -175,7 +178,6 @@ templ feedFilterChip(label, slug, icon, current string) {
 }
 
 // ── Timeline + dispatch ───────────────────────────────────────────────────
-
 templ feedTimeline(p FeedProps) {
 	if len(p.Days) == 0 {
 		@feedEmptyState(p)
@@ -420,7 +422,6 @@ templ feedActorTile(actorType, actorID, version, name string) {
 // Each body lives inside the primitive's `flex-1 min-w-0 text-xs leading-6`
 // container. Multi-line bodies render the headline first (with an inline
 // timestamp pill) and any supporting content below.
-
 templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 	<div class="flex items-baseline gap-1.5 flex-wrap">
 		<a href={ templ.SafeURL("/logs/sync-logs/" + s.SyncLogID) } class="font-semibold text-base-content hover:text-primary transition-colors no-underline">
@@ -827,6 +828,21 @@ func feedSyncSubLine(status, institution string) string {
 		return institution + " · syncing now"
 	}
 	return institution
+}
+
+// feedShowNextSync gates the "Next sync in ~6h" sub-line. We hide it when
+// the relative-time string is missing (e.g. test env with no scheduler) and
+// when the most recent sync errored — in the failing case the next cron
+// tick won't help until the user reauths, so showing an ETA there is just
+// noise.
+func feedShowNextSync(status, nextRel string) bool {
+	if nextRel == "" {
+		return false
+	}
+	if status == "error" {
+		return false
+	}
+	return true
 }
 
 func feedSyncTileBg(status string) string {
