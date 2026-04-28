@@ -254,8 +254,8 @@
   .bb-icon-tile--error   { @apply bg-error/10 text-error; }
 
   /* Action row at the bottom of a sectioned form card.
-     Holds Cancel + primary (Save/Create) buttons right-aligned. */
-  .bb-action-row { @apply p-4 sm:p-5 border-t border-base-300 bg-base-200/20 flex items-center justify-end gap-2; }
+     Left-aligned on mobile (thumb-reach), right-aligned on sm+. */
+  .bb-action-row { @apply p-4 sm:p-5 border-t border-base-300 bg-base-200/20 flex items-center justify-start sm:justify-end gap-2; }
 
   /* Form inputs/selects with subtle base-200 bg that clears on focus. */
   .bb-form-input { @apply input w-full rounded-xl bg-base-200/50 focus:bg-base-100 transition-colors; }

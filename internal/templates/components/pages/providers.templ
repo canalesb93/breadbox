@@ -23,7 +23,7 @@ templ Providers(p ProvidersProps) {
 	     from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/providers.js"></script>
 	<div class="bb-page-header">
-		<div>
+		<div class="min-w-0">
 			<h1 class="bb-page-title">Providers</h1>
 			<p class="text-sm text-base-content/50 mt-1">Configure bank data providers for syncing accounts and transactions</p>
 		</div>
@@ -66,9 +66,9 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 				</button>
 				<div x-show="showConfig" x-collapse x-cloak class="mt-4 space-y-4">
 					if p.PlaidFromEnv {
-						<p class="text-sm text-base-content/50 mb-4 flex items-center gap-1.5">
-							<i data-lucide="lock" class="w-3.5 h-3.5"></i>
-							Configured via environment variables (read-only)
+						<p class="text-sm text-base-content/50 mb-4 flex flex-wrap items-center gap-1.5">
+							<i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
+							<span>Configured via environment variables (read-only)</span>
 						</p>
 						<dl class="bb-info-grid">
 							<dt>
@@ -207,9 +207,9 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 				</button>
 				<div x-show="showConfig" x-collapse x-cloak class="mt-4 space-y-4">
 					if p.TellerFromEnv {
-						<p class="text-sm text-base-content/50 mb-4 flex items-center gap-1.5">
-							<i data-lucide="lock" class="w-3.5 h-3.5"></i>
-							Configured via environment variables (read-only)
+						<p class="text-sm text-base-content/50 mb-4 flex flex-wrap items-center gap-1.5">
+							<i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
+							<span>Configured via environment variables (read-only)</span>
 						</p>
 						<dl class="bb-info-grid">
 							<dt>
