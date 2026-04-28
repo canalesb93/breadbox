@@ -36,6 +36,13 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		window := time.Duration(feedWindowDays) * 24 * time.Hour
 		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
+		// Per-query timings, emitted as a single structured slog line at the
+		// end of the request so we can spot regressions in production logs.
+		// Zero-value durations indicate "skipped" — e.g. q_categories=0 when
+		// there are no bulk_action events to resolve.
+		reqStart := time.Now()
+		var qCategories, qTags, qEvents, qReports, qAlerts time.Duration
+
 		// `?before=<rfc3339>` lets the user roll the 3-day window backward
 		// in chunks via the "Load older activity" footer button. Cap at
 		// 30 days back from now — the service layer enforces the same
@@ -71,20 +78,11 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// Display lookups so bulk-action subjects render with friendly tag
-		// and category display names instead of raw slugs.
-		categoryTree, err := svc.ListCategories(ctx)
-		if err != nil {
-			a.Logger.Error("feed: list categories", "error", err)
-		}
-		categoryDetail := categoryDetailLookup(categoryTree)
-		tags, err := svc.ListTags(ctx)
-		if err != nil {
-			a.Logger.Error("feed: list tags", "error", err)
-		}
-		tagDisplayFn := tagDisplayLookup(tags)
-
-		// 1. Grouped events from the service.
+		// 1. Grouped events from the service. Run this first so we can decide
+		// whether the (relatively expensive) tag + category lookups are even
+		// needed — they only feed bulk_action subject rendering. Skipping
+		// them on the common no-bulk path saves 5-10ms per request.
+		t0 := time.Now()
 		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{
 			Window:        window,
 			BulkThreshold: 3,
@@ -93,8 +91,45 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			ActorID:       sessionActorID,
 			Before:        beforeTime,
 		})
+		qEvents = time.Since(t0)
 		if err != nil {
 			a.Logger.Error("feed: list events", "error", err)
+		}
+
+		// Display lookups so bulk-action subjects render with friendly tag
+		// and category display names instead of raw slugs. Only fetched when
+		// at least one bulk_action event is present — the common case (sync
+		// + comment + agent_session events only) skips both queries.
+		hasBulkAction := false
+		for _, ev := range events {
+			if ev.Type == "bulk_action" {
+				hasBulkAction = true
+				break
+			}
+		}
+		var categoryDetail func(string) categoryDisplay
+		var tagDisplayFn func(string) tagDisplay
+		if hasBulkAction {
+			t0 = time.Now()
+			categoryTree, cerr := svc.ListCategories(ctx)
+			qCategories = time.Since(t0)
+			if cerr != nil {
+				a.Logger.Error("feed: list categories", "error", cerr)
+			}
+			categoryDetail = categoryDetailLookup(categoryTree)
+			t0 = time.Now()
+			tags, terr := svc.ListTags(ctx)
+			qTags = time.Since(t0)
+			if terr != nil {
+				a.Logger.Error("feed: list tags", "error", terr)
+			}
+			tagDisplayFn = tagDisplayLookup(tags)
+		} else {
+			// projectFeedBulkAction won't fire on this path, but
+			// projectFeedEvent unconditionally accepts the lookups. Provide
+			// no-op stubs so the call site stays simple.
+			categoryDetail = func(string) categoryDisplay { return categoryDisplay{} }
+			tagDisplayFn = func(string) tagDisplay { return tagDisplay{} }
 		}
 
 		// 2. Reports — windowed to match the feed bound. Skipped under the
@@ -102,7 +137,9 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		// the service layer produces.
 		var reports []service.AgentReportResponse
 		if filter == "" || filter == "reports" {
+			t0 = time.Now()
 			reports, err = svc.ListAgentReports(ctx, 50)
+			qReports = time.Since(t0)
 			if err != nil {
 				a.Logger.Error("feed: list agent reports", "error", err)
 			}
@@ -114,7 +151,9 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		// unfiltered "All" page. The meta (hasConnections + global last-
 		// sync-at) is always collected so the empty-state branch can pick
 		// the right copy regardless of filter.
+		t0 = time.Now()
 		alerts, hasConnections, globalLastSyncAt := buildFeedConnectionMeta(ctx, a)
+		qAlerts = time.Since(t0)
 		if filter != "" {
 			alerts = nil
 		}
@@ -273,6 +312,21 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			OldestVisible:    oldestVisible,
 			AtMaxLookback:    atMaxLookback,
 		})
+		// Single structured log line per request — read in production logs
+		// to spot regressions across the per-query timings. Durations are
+		// rounded to milliseconds; q_categories=0 means "skipped" (no bulk
+		// action events to resolve).
+		a.Logger.Info("feed: rendered",
+			"duration_ms", time.Since(reqStart).Milliseconds(),
+			"events", len(items),
+			"reports", len(reports),
+			"q_categories_ms", qCategories.Milliseconds(),
+			"q_tags_ms", qTags.Milliseconds(),
+			"q_events_total_ms", qEvents.Milliseconds(),
+			"q_reports_ms", qReports.Milliseconds(),
+			"q_alerts_ms", qAlerts.Milliseconds(),
+		)
+
 		tr.RenderWithTempl(w, r, data, body)
 	}
 }
