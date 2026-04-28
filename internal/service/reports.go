@@ -22,6 +22,13 @@ type AgentReportResponse struct {
 	Author        *string  `json:"author,omitempty"`
 	ReadAt        *string  `json:"read_at"`
 	CreatedAt     string   `json:"created_at"`
+
+	// SessionID, when populated, links this report to the MCP session that
+	// produced it. Available to Go consumers (the home Feed folds a report
+	// into the matching agent_session card by session_id) but suppressed
+	// from JSON output so the MCP `submit_report` response contract stays
+	// stable — the link is server-side internal, not a public field.
+	SessionID *string `json:"-"`
 }
 
 func agentReportFromRow(r db.AgentReport) AgentReportResponse {
@@ -29,7 +36,7 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 	if tags == nil {
 		tags = []string{}
 	}
-	return AgentReportResponse{
+	out := AgentReportResponse{
 		ID:            formatUUID(r.ID),
 		ShortID:       r.ShortID,
 		Title:         r.Title,
@@ -43,6 +50,11 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 		ReadAt:        timestampStr(r.ReadAt),
 		CreatedAt:     pgconv.TimestampStr(r.CreatedAt),
 	}
+	if r.SessionID.Valid {
+		s := formatUUID(r.SessionID)
+		out.SessionID = &s
+	}
+	return out
 }
 
 // ValidReportPriorities lists allowed priority values.

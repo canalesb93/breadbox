@@ -39,6 +39,41 @@ type FeedProps struct {
 	// "agents", "me") parsed from the ?filter= query param. Renders chip
 	// state only — actual filtering applies at the handler layer.
 	Filter string
+
+	// HasConnections is true when at least one bank connection exists,
+	// regardless of status. Drives the empty-state branch — first-run
+	// (no connections) gets a different copy + CTA than "quiet around
+	// here" (has connections, no events in window).
+	HasConnections bool
+
+	// LastSyncAt is the most recent successful sync timestamp across the
+	// household, mirrored from FeedHero so the empty-state copy can
+	// render "Last sync was {relative-time}" without re-deriving it.
+	// Zero value means "no sync yet".
+	LastSyncAt time.Time
+
+	// IsAdmin is true when the current session has the admin role. The
+	// "Sync now" empty-state CTA POSTs to /-/connections/sync-all which
+	// is admin-only; non-admin members see the link to /transactions
+	// instead.
+	IsAdmin bool
+
+	// OldestVisible is the timestamp of the earliest event currently in the
+	// rendered window. Drives the "Load older activity" button's href —
+	// `?before=<oldestVisible.RFC3339>` rolls the window backward in
+	// `WindowDays`-sized chunks. Zero value means the rail is empty (no
+	// button should render).
+	OldestVisible time.Time
+
+	// AtMaxLookback is true when the oldest visible event is at-or-past the
+	// service-layer 30-day lookback cap. The footer renders an "End of
+	// feed" sentence instead of the load-older button so users have a
+	// clear stop signal.
+	AtMaxLookback bool
+
+	// Filter is forwarded into load-older hrefs so an active chip survives
+	// pagination. Already exists above; documented here as part of the
+	// pagination contract.
 }
 
 // FeedHero powers the at-a-glance band above the feed rail.
@@ -54,6 +89,12 @@ type FeedHero struct {
 	LastSyncRel         string
 	LastSyncStatus      string
 	LastSyncInstitution string
+
+	// NextSyncRel is a human-readable countdown to the next scheduled cron
+	// fire (e.g. "in ~6h", "in 12m"). Empty when the scheduler is unset
+	// (test env) or when the connection is failing — in the failing case
+	// we suppress it because the next tick won't help until reauth.
+	NextSyncRel string
 }
 
 // FeedAlert is one pinned warning for a connection in error /
@@ -101,6 +142,20 @@ type FeedTransactionRef struct {
 	Date         string
 	AccountName  string
 	Institution  string
+	// Pending mirrors `transactions.pending`. When true the inline tx-ref
+	// row renders the same small clock-icon mark used on the per-tx page
+	// and the transactions list, signalling the row is still preliminary
+	// (provider may re-issue it as posted later).
+	Pending bool
+
+	// Category presentation, mirrored from `tx_row_compact.templ`. When the
+	// underlying transaction is categorised the inline tx-ref row renders
+	// the same coloured-circle avatar used on /transactions; nil falls back
+	// to a neutral letter avatar so feed sample rows match the list layout.
+	CategoryDisplayName *string
+	CategoryColor       *string
+	CategoryIcon        *string
+	CategorySlug        *string
 }
 
 // FeedSync is the sync-card payload. Inline transaction samples and rule
@@ -191,18 +246,44 @@ type FeedAgentSession struct {
 	RuleApplied    int
 
 	SampleTransactions []FeedTransactionRef
+
+	// Report fields are populated when the service folded an agent_report
+	// whose `session_id` matches this session into the card. The templ
+	// uses ReportTitle as the headline (instead of the generic "ran a
+	// session" line) and renders priority badges + tags inline. Empty
+	// when no report was folded — render the plain session card.
+	ReportID       string
+	ReportShortID  string
+	ReportTitle    string
+	ReportPriority string
+	ReportTags     []string
+	ReportIsUnread bool
 }
 
-// FeedBulkAction is the rich card that collapses ≥3 same-actor same-kind
-// annotations from a 5-minute bucket into a single row.
+// FeedBulkAction is the rich card that collapses ≥3 same-actor
+// annotations from a 15-minute bucket into a single row. As of iteration
+// 13 the bucket key is (actor, time-window) only — `kind` is absent — so
+// a single agent run that categorises some rows, removes a tag from
+// others, and updates more in the same window collapses into ONE
+// bulk_action card. KindCounts surfaces the per-kind breakdown for inline
+// rendering ("5 categorised · 8 tag-removed · 8 updated").
 type FeedBulkAction struct {
 	ActorName          string
 	ActorType          string
 	ActorID            string
 	ActorAvatarVersion string
 
+	// Kind is "mixed" when the bucket spans multiple kinds; otherwise the
+	// single homogeneous kind. The templ branches on "mixed" to render
+	// the per-kind breakdown line in lieu of a dedicated verb phrasing.
 	Kind  string
 	Count int
+
+	// KindCounts breaks the bucket down by kind. Always populated; the
+	// templ renders it as the "5 categorised · 8 tag-removed · 8 updated"
+	// breakdown when Kind == "mixed", or skips it for homogeneous
+	// buckets (the dedicated verb phrasing already conveys the kind).
+	KindCounts map[string]int
 
 	Subjects []FeedBulkSubject
 
@@ -210,6 +291,18 @@ type FeedBulkAction struct {
 	EndedAt   time.Time
 
 	SampleTransactions []FeedTransactionRef
+
+	// Report fields are populated when the service folded a matching
+	// agent_report into the card (see service.foldReportsIntoEvents). The
+	// templ uses ReportTitle as the bold headline instead of the generic
+	// "Alice updated N transactions" line and renders priority badges +
+	// tags inline. Empty when no report was folded.
+	ReportID       string
+	ReportShortID  string
+	ReportTitle    string
+	ReportPriority string
+	ReportTags     []string
+	ReportIsUnread bool
 }
 
 // FeedBulkSubject is one (subject, count) chip inside a bulk-action card.

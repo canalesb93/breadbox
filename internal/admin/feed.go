@@ -36,6 +36,32 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		window := time.Duration(feedWindowDays) * 24 * time.Hour
 		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
+		// Per-query timings, emitted as a single structured slog line at the
+		// end of the request so we can spot regressions in production logs.
+		// Zero-value durations indicate "skipped" — e.g. q_categories=0 when
+		// there are no bulk_action events to resolve.
+		reqStart := time.Now()
+		var qCategories, qTags, qEvents, qReports, qAlerts time.Duration
+
+		// `?before=<rfc3339>` lets the user roll the 3-day window backward
+		// in chunks via the "Load older activity" footer button. Cap at
+		// 30 days back from now — the service layer enforces the same
+		// ceiling, but clamping here keeps the rendered window/footer
+		// consistent and makes the cap discoverable from a single layer.
+		var beforeTime time.Time
+		if rawBefore := strings.TrimSpace(r.URL.Query().Get("before")); rawBefore != "" {
+			if parsed, err := time.Parse(time.RFC3339, rawBefore); err == nil {
+				beforeTime = parsed
+				minBefore := now.Add(-service.FeedMaxLookback)
+				if beforeTime.Before(minBefore) {
+					beforeTime = minBefore
+				}
+				if beforeTime.After(now) {
+					beforeTime = time.Time{}
+				}
+			}
+		}
+
 		// Resolve the session actor for the "me" chip. Prefer the linked
 		// household user_id; fall back to the auth_account id for the
 		// initial admin (which writes annotations against its account id).
@@ -52,51 +78,102 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// Display lookups so bulk-action subjects render with friendly tag
-		// and category display names instead of raw slugs.
-		categoryTree, err := svc.ListCategories(ctx)
-		if err != nil {
-			a.Logger.Error("feed: list categories", "error", err)
+		// 1. Reports — windowed to match the feed bound. Fetched ahead of
+		// the events call so the service can fold matching reports into
+		// bulk_action / agent_session events (one card per agent run
+		// instead of two adjacent cards). Skipped under the
+		// syncs/comments/sessions/me chips, which scope the page to events
+		// the service layer produces.
+		var reports []service.AgentReportResponse
+		if filter == "" || filter == "reports" {
+			t0 := time.Now()
+			var rerr error
+			reports, rerr = svc.ListAgentReports(ctx, 50)
+			qReports = time.Since(t0)
+			if rerr != nil {
+				a.Logger.Error("feed: list agent reports", "error", rerr)
+			}
 		}
-		categoryDetail := categoryDetailLookup(categoryTree)
-		tags, err := svc.ListTags(ctx)
-		if err != nil {
-			a.Logger.Error("feed: list tags", "error", err)
-		}
-		tagDisplayFn := tagDisplayLookup(tags)
 
-		// 1. Grouped events from the service.
-		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{
+		// 2. Grouped events from the service. Run after the report fetch so
+		// the service can fold matching reports into bulk_action /
+		// agent_session events. Reports that don't fold into anything come
+		// back via `leftoverReports` for standalone-card rendering. We also
+		// decide here whether the (relatively expensive) tag + category
+		// lookups are needed — they only feed bulk_action subject rendering.
+		// Skipping them on the common no-bulk path saves 5-10ms per request.
+		t0 := time.Now()
+		events, leftoverReports, err := svc.ListFeedEventsWithReports(ctx, service.FeedEventsParams{
 			Window:        window,
 			BulkThreshold: 3,
 			SampleLimit:   5,
 			Filter:        filter,
 			ActorID:       sessionActorID,
-		})
+			Before:        beforeTime,
+		}, reports)
+		qEvents = time.Since(t0)
 		if err != nil {
 			a.Logger.Error("feed: list events", "error", err)
 		}
 
-		// 2. Reports — windowed to match the feed bound. Skipped under the
-		// syncs/comments/sessions/me chips, which scope the page to events
-		// the service layer produces.
-		var reports []service.AgentReportResponse
-		if filter == "" || filter == "reports" {
-			reports, err = svc.ListAgentReports(ctx, 50)
-			if err != nil {
-				a.Logger.Error("feed: list agent reports", "error", err)
+		// Display lookups so bulk-action subjects render with friendly tag
+		// and category display names instead of raw slugs. Only fetched when
+		// at least one bulk_action event is present — the common case (sync
+		// + comment + agent_session events only) skips both queries.
+		hasBulkAction := false
+		for _, ev := range events {
+			if ev.Type == "bulk_action" {
+				hasBulkAction = true
+				break
 			}
 		}
-
-		// 3. Connection alerts — current state, not windowed. Hidden under
-		// any active chip so the filtered view is exclusively the chip's
-		// scope; the alerts re-appear on the unfiltered "All" page.
-		var alerts []pages.FeedAlert
-		if filter == "" {
-			alerts = buildFeedConnectionAlerts(ctx, a)
+		var categoryDetail func(string) categoryDisplay
+		var tagDisplayFn func(string) tagDisplay
+		if hasBulkAction {
+			t0 = time.Now()
+			categoryTree, cerr := svc.ListCategories(ctx)
+			qCategories = time.Since(t0)
+			if cerr != nil {
+				a.Logger.Error("feed: list categories", "error", cerr)
+			}
+			categoryDetail = categoryDetailLookup(categoryTree)
+			t0 = time.Now()
+			tags, terr := svc.ListTags(ctx)
+			qTags = time.Since(t0)
+			if terr != nil {
+				a.Logger.Error("feed: list tags", "error", terr)
+			}
+			tagDisplayFn = tagDisplayLookup(tags)
+		} else {
+			// projectFeedBulkAction won't fire on this path, but
+			// projectFeedEvent unconditionally accepts the lookups. Provide
+			// no-op stubs so the call site stays simple.
+			categoryDetail = func(string) categoryDisplay { return categoryDisplay{} }
+			tagDisplayFn = func(string) tagDisplay { return tagDisplay{} }
 		}
 
-		// 4. Project FeedEvents onto templ-side FeedItems.
+		// 3. Connection alerts + empty-state meta — current state, not
+		// windowed. Alerts hide under any active chip so the filtered view
+		// is exclusively the chip's scope; the alerts re-appear on the
+		// unfiltered "All" page. The meta (hasConnections + global last-
+		// sync-at) is always collected so the empty-state branch can pick
+		// the right copy regardless of filter.
+		t0 = time.Now()
+		alerts, hasConnections, globalLastSyncAt := buildFeedConnectionMeta(ctx, a)
+		qAlerts = time.Since(t0)
+		if filter != "" {
+			alerts = nil
+		}
+
+		// 4. Project FeedEvents onto templ-side FeedItems. The window is
+		// anchored at `windowEnd` (now, or the `?before=` timestamp when
+		// paginating); `windowStart` is `windowEnd - window`.
+		windowEnd := now
+		if !beforeTime.IsZero() {
+			windowEnd = beforeTime
+		}
+		windowStart := windowEnd.Add(-window)
+
 		items := make([]pages.FeedItem, 0, len(events)+len(reports))
 		var lastSyncAt time.Time
 		var lastSyncStatus, lastSyncInstitution string
@@ -104,7 +181,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 		for _, ev := range events {
-			if ev.Timestamp.Before(now.Add(-window)) {
+			if ev.Timestamp.Before(windowStart) || ev.Timestamp.After(windowEnd) {
 				continue
 			}
 			it := projectFeedEvent(ev, tagDisplayFn, categoryDetail)
@@ -130,8 +207,11 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 5. Append reports as their own feed items.
-		for _, rep := range reports {
+		// 5. Append leftover (un-folded) reports as their own feed items.
+		// Reports that the service folded into a bulk_action / agent_session
+		// card are NOT in `leftoverReports` — they render as part of that
+		// card's headline.
+		for _, rep := range leftoverReports {
 			if rep.CreatedAt == "" {
 				continue
 			}
@@ -139,7 +219,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			if err != nil {
 				continue
 			}
-			if ts.Before(now.Add(-window)) {
+			if ts.Before(windowStart) || ts.After(windowEnd) {
 				continue
 			}
 			items = append(items, pages.FeedItem{
@@ -194,12 +274,39 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		if !lastSyncAt.IsZero() {
 			hero.LastSyncRel = relativeTime(lastSyncAt)
 		}
+		// Next-sync ETA — drives the "Next sync in ~6h" sub-line under the
+		// Last Sync hero tile so the page answers "why no new transactions
+		// yet?" inline. The scheduler is nil in test env (no cron); leave
+		// the field empty there and the templ hides the sub-line.
+		if a.Scheduler != nil {
+			hero.NextSyncRel = formatNextSync(a.Scheduler.NextRun())
+		}
 
 		data := map[string]any{
 			"PageTitle":   "Feed",
 			"CurrentPage": "feed",
 			"CSRFToken":   GetCSRFToken(r),
 		}
+		// Compute the oldest visible event timestamp + the at-cap flag that
+		// drive the "Load older activity" button. We pass the oldest item's
+		// timestamp through so the button's href rolls the window backward
+		// in 3-day chunks. AtMaxLookback hides the button (replaced by
+		// "End of feed") when the next chunk would exceed the 30-day cap.
+		var oldestVisible time.Time
+		for _, it := range items {
+			if oldestVisible.IsZero() || it.Timestamp.Before(oldestVisible) {
+				oldestVisible = it.Timestamp
+			}
+		}
+		atMaxLookback := false
+		if !oldestVisible.IsZero() {
+			// Once the oldest visible event is older than (now - 30d), or
+			// the next-chunk's upper bound would be, treat as end-of-feed.
+			if oldestVisible.Before(now.Add(-service.FeedMaxLookback)) {
+				atMaxLookback = true
+			}
+		}
+
 		body := pages.Feed(pages.FeedProps{
 			CSRFToken:        GetCSRFToken(r),
 			Hero:             hero,
@@ -209,22 +316,50 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			WindowDays:       feedWindowDays,
 			Now:              now,
 			Filter:           filter,
+			HasConnections:   hasConnections,
+			LastSyncAt:       globalLastSyncAt,
+			IsAdmin:          IsAdmin(tr.sm, r),
+			OldestVisible:    oldestVisible,
+			AtMaxLookback:    atMaxLookback,
 		})
+		// Single structured log line per request — read in production logs
+		// to spot regressions across the per-query timings. Durations are
+		// rounded to milliseconds; q_categories=0 means "skipped" (no bulk
+		// action events to resolve).
+		a.Logger.Info("feed: rendered",
+			"duration_ms", time.Since(reqStart).Milliseconds(),
+			"events", len(items),
+			"reports", len(reports),
+			"q_categories_ms", qCategories.Milliseconds(),
+			"q_tags_ms", qTags.Milliseconds(),
+			"q_events_total_ms", qEvents.Milliseconds(),
+			"q_reports_ms", qReports.Milliseconds(),
+			"q_alerts_ms", qAlerts.Milliseconds(),
+		)
+
 		tr.RenderWithTempl(w, r, data, body)
 	}
 }
 
-// buildFeedConnectionAlerts collects the pinned warning cards rendered above
-// the rail. Each alert maps one bank connection currently in error or
-// pending_reauth state to a `pages.FeedAlert`.
-func buildFeedConnectionAlerts(ctx context.Context, a *app.App) []pages.FeedAlert {
+// buildFeedConnectionMeta does one ListBankConnections pass and projects out
+// three things the page needs: the pinned alert cards (for connections in
+// error/pending_reauth), whether *any* connection exists (drives the first-
+// run empty state), and the most recent successful sync time across the
+// household (drives the "quiet around here · last sync was {rel}" empty
+// state). Co-locating the projections means the empty-state branch can
+// pick the right copy without a second query.
+func buildFeedConnectionMeta(ctx context.Context, a *app.App) (alerts []pages.FeedAlert, hasConnections bool, globalLastSyncAt time.Time) {
 	bankConnections, err := a.Queries.ListBankConnections(ctx)
 	if err != nil {
 		a.Logger.Error("feed: list bank connections", "error", err)
-		return nil
+		return nil, false, time.Time{}
 	}
-	out := make([]pages.FeedAlert, 0)
+	alerts = make([]pages.FeedAlert, 0)
 	for _, conn := range bankConnections {
+		hasConnections = true
+		if conn.LastSyncedAt.Valid && conn.LastSyncedAt.Time.After(globalLastSyncAt) {
+			globalLastSyncAt = conn.LastSyncedAt.Time
+		}
 		status := string(conn.Status)
 		if status != "error" && status != "pending_reauth" {
 			continue
@@ -241,9 +376,9 @@ func buildFeedConnectionAlerts(ctx context.Context, a *app.App) []pages.FeedAler
 		if conn.LastSyncedAt.Valid {
 			alert.LastSyncedAt = relativeTime(conn.LastSyncedAt.Time)
 		}
-		out = append(out, alert)
+		alerts = append(alerts, alert)
 	}
-	return out
+	return alerts, hasConnections, globalLastSyncAt
 }
 
 // projectFeedEvent maps one service-layer FeedEvent onto its templ-side
@@ -355,6 +490,14 @@ func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentS
 		Commented:          s.KindCounts["comment"],
 		RuleApplied:        s.KindCounts["rule_applied"],
 	}
+	if s.Report != nil {
+		out.ReportID = s.Report.ID
+		out.ReportShortID = s.Report.ShortID
+		out.ReportTitle = s.Report.Title
+		out.ReportPriority = s.Report.Priority
+		out.ReportTags = s.Report.Tags
+		out.ReportIsUnread = s.Report.IsUnread
+	}
 	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(s.SampleTransactions))
 	for _, tx := range s.SampleTransactions {
 		out.SampleTransactions = append(out.SampleTransactions, projectSampleTx(tx))
@@ -363,6 +506,10 @@ func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentS
 }
 
 func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(string) tagDisplay, categoryDetail func(string) categoryDisplay) *pages.FeedBulkAction {
+	kindCounts := make(map[string]int, len(b.KindCounts))
+	for k, v := range b.KindCounts {
+		kindCounts[k] = v
+	}
 	out := &pages.FeedBulkAction{
 		ActorName:          b.ActorName,
 		ActorType:          b.ActorType,
@@ -370,8 +517,17 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 		ActorAvatarVersion: b.ActorAvatarVersion,
 		Kind:               b.Kind,
 		Count:              b.Count,
+		KindCounts:         kindCounts,
 		StartedAt:          b.StartedAt,
 		EndedAt:            b.EndedAt,
+	}
+	if b.Report != nil {
+		out.ReportID = b.Report.ID
+		out.ReportShortID = b.Report.ShortID
+		out.ReportTitle = b.Report.Title
+		out.ReportPriority = b.Report.Priority
+		out.ReportTags = b.Report.Tags
+		out.ReportIsUnread = b.Report.IsUnread
 	}
 	for _, sub := range b.Subjects {
 		display := pages.FeedBulkSubject{
@@ -417,14 +573,19 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 
 func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 	return pages.FeedTransactionRef{
-		ShortID:      tx.ShortID,
-		Name:         tx.Name,
-		MerchantName: tx.MerchantName,
-		Amount:       tx.Amount,
-		Currency:     tx.Currency,
-		Date:         tx.Date,
-		AccountName:  tx.AccountName,
-		Institution:  tx.Institution,
+		ShortID:             tx.ShortID,
+		Name:                tx.Name,
+		MerchantName:        tx.MerchantName,
+		Amount:              tx.Amount,
+		Currency:            tx.Currency,
+		Date:                tx.Date,
+		AccountName:         tx.AccountName,
+		Institution:         tx.Institution,
+		Pending:             tx.Pending,
+		CategoryDisplayName: tx.CategoryDisplayName,
+		CategoryColor:       tx.CategoryColor,
+		CategoryIcon:        tx.CategoryIcon,
+		CategorySlug:        tx.CategorySlug,
 	}
 }
 

@@ -29,9 +29,19 @@ type FeedActivityRow struct {
 	Amount             float64
 	IsoCurrencyCode    string
 	TransactionDate    string
+	Pending            bool
 
 	AccountName     string
 	InstitutionName string
+
+	// Category presentation, threaded through so feed sample rows can
+	// render the same coloured-circle avatar as /transactions. Nil when
+	// uncategorised. Mirrors the LEFT JOIN on `categories` performed by
+	// every feed query.
+	CategoryDisplayName *string
+	CategoryColor       *string
+	CategoryIcon        *string
+	CategorySlug        *string
 }
 
 // ListFeedActivity returns the most recent annotations across every
@@ -49,12 +59,14 @@ SELECT
     a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
     COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
-    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
-    ac.name, bc.institution_name
+    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
+    ac.name, bc.institution_name,
+    cat.display_name, cat.color, cat.icon, cat.slug
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -167,19 +179,43 @@ type FeedAgentSessionEvent struct {
 	KindCounts map[string]int
 
 	SampleTransactions []FeedSampleTx
+
+	// Report, when non-nil, is an agent_report whose session_id matches
+	// this session. Populated by ListFeedEvents so a reporting agent run
+	// surfaces as a single feed row headlined by the report's title — the
+	// alternative (a separate report card adjacent to the session card) is
+	// noisy on the timeline.
+	Report *FeedReportRef
 }
 
-// FeedBulkActionEvent represents ≥ N annotations from the same actor of
-// the same kind within a soft time-bucket — typically a human running a
-// bulk recategorisation or an agent making changes outside an MCP session.
+// FeedBulkActionEvent represents ≥ N annotations from the same actor
+// within a soft time-bucket — typically a human running a bulk
+// recategorisation or an agent making changes outside an MCP session.
+//
+// As of iteration 13 the soft bucket is keyed by (actor, time-window) only
+// — the actor's `kind` is *not* part of the bucket key. A single agent run
+// that categorises 5 rows, removes a tag from 8, and updates 8 more in the
+// same 15-minute window collapses into one bulk_action card whose
+// `KindCounts` map exposes the per-kind breakdown for inline rendering
+// ("5 categorised · 8 tag-removed · 8 updated"). `Kind` is kept for the
+// homogeneous-bucket code path: when every annotation in the bucket
+// shares one kind the templ renders the dedicated verb/subject phrasing,
+// otherwise it falls back to the generic breakdown line.
 type FeedBulkActionEvent struct {
 	ActorName          string
 	ActorType          string
 	ActorID            string
 	ActorAvatarVersion string
 
-	Kind  string // "tag_added" | "tag_removed" | "category_set" | "rule_applied"
+	// Kind is the homogeneous kind of every annotation in this bucket, or
+	// "mixed" when the bucket folds annotations across kinds.
+	Kind  string
 	Count int
+
+	// KindCounts breaks the bucket's annotations down by kind so the card
+	// can render the breakdown line ("5 categorised · 8 tag-removed · 8
+	// updated") when the bucket spans multiple kinds.
+	KindCounts map[string]int
 
 	// Subjects is the deduped list of subject names (tag names, category
 	// names, rule names) that were applied. When all rows share one
@@ -192,6 +228,26 @@ type FeedBulkActionEvent struct {
 	EndedAt   time.Time
 
 	SampleTransactions []FeedSampleTx
+
+	// Report, when non-nil, is an agent_report whose actor + window
+	// matches this bucket. Folding the report in lets a reporting agent
+	// run render as a single card headlined by the report title rather
+	// than the generic "X categorised, Y tagged" line.
+	Report *FeedReportRef
+}
+
+// FeedReportRef is the slim projection of an agent report folded into a
+// bulk_action / agent_session card. The handler still owns the canonical
+// report card (rendered when the report wasn't folded into anything) — this
+// shape only carries enough to display the title + priority + tags inline
+// and a link to the full report.
+type FeedReportRef struct {
+	ID       string
+	ShortID  string
+	Title    string
+	Priority string
+	Tags     []string
+	IsUnread bool
 }
 
 // FeedBulkSubject is one (subject, count) pair inside a bulk-action card.
@@ -227,6 +283,22 @@ type FeedSampleTx struct {
 	Date         string
 	AccountName  string
 	Institution  string
+	// Pending mirrors `transactions.pending` so the feed card can render
+	// the same clock-icon pending mark used on `/transactions/{id}` and
+	// the transactions list — preliminary rows often re-show as posted
+	// later, and surfacing the lifecycle state inline gives users a
+	// "this is provisional" read.
+	Pending bool
+
+	// Category presentation, matched to `tx_row_compact.templ`. Populated
+	// when the underlying transaction is categorised so the inline tx-ref
+	// row can render the same coloured circle avatar (icon when set; first-
+	// letter fallback otherwise) as the /transactions list. Nil when
+	// uncategorised — the templ falls back to a neutral letter avatar.
+	CategoryDisplayName *string
+	CategoryColor       *string
+	CategoryIcon        *string
+	CategorySlug        *string
 }
 
 // FeedRuleOutcome is one (rule, count) pair shown inline on a sync card.
@@ -244,6 +316,14 @@ type FeedEventsParams struct {
 	BulkThreshold int
 	SampleLimit   int
 
+	// Before, when non-zero, anchors the window's *upper* bound at this
+	// timestamp instead of "now". Used by the "Load older activity"
+	// pagination affordance — the page rolls backward in `Window`-sized
+	// chunks. The cutoff becomes `Before.Add(-Window)`. Default-window
+	// behaviour (no `Before`) is preserved verbatim: events newer than
+	// `now - Window` and up to `now`.
+	Before time.Time
+
 	// Filter scopes the resulting event slice to a single chip on the feed
 	// rail. Empty string means "no filter" — every grouped event is
 	// returned. See `filterFeedEvents` for the recognised values.
@@ -256,6 +336,24 @@ type FeedEventsParams struct {
 	// whether the auth_account is linked to a household user.
 	ActorID string
 }
+
+// FeedMaxLookback is the hard ceiling for `Before`-driven pagination on the
+// home feed. A user can scroll backward in 3-day chunks but cannot ask for
+// activity older than this — the unbounded read would walk the entire
+// annotations table for households with years of history.
+const FeedMaxLookback = 30 * 24 * time.Hour
+
+// feedSoftBucketWindow is the wall-clock window used by the unsessioned
+// soft-bucket grouping in `groupUnsessionedAnnotations`. An actor's
+// annotations within one window collapse into a single bulk_action card.
+//
+// 15 minutes is wide enough to capture an agent run end-to-end (categorise
+// → tag → comment → write report → leave) while still being narrow enough
+// that a human editing throughout the day stays as distinct buckets per
+// hour. Iteration 12 used 5 minutes which fragmented agent runs into 3-4
+// adjacent cards on the rail; widening collapsed those into one card per
+// run.
+const feedSoftBucketWindow = 15 * time.Minute
 
 // ListFeedEvents returns grouped FeedEvents for the home Feed page,
 // already ordered newest-first.
@@ -270,16 +368,41 @@ type FeedEventsParams struct {
 //     into a single AgentSession event regardless of how many annotations
 //     it produced.
 //  3. Soft-bucket the remaining (un-sessioned) annotations by
-//     `(actor_id, kind, floor(time / 5min))`. Buckets with ≥ BulkThreshold
-//     events become BulkAction events; the rest of the un-sessioned
-//     annotations are dropped UNLESS they're standalone comments — those
-//     pass through as Comment events because every comment is high-signal.
+//     `(actor_id, floor(time / feedSoftBucketWindow))` — note that `kind`
+//     is intentionally absent from the key so a single agent run that
+//     categorises some rows and removes a tag from others collapses into
+//     ONE bulk_action card with a per-kind breakdown. Buckets with
+//     ≥ BulkThreshold events become BulkAction events; sub-threshold
+//     buckets pass through standalone comments individually.
 //  4. Sync logs from the window become Sync events with inline transaction
 //     samples and `RuleOutcomes` lifted from `sync_logs.rule_hits`.
+//  5. Agent reports inside the same window are folded into matching
+//     bulk_action / agent_session events when the actor or session_id
+//     lines up — a reporting agent run renders as one row headed by the
+//     report's title instead of two adjacent cards. Reports that don't
+//     match anything are returned in the consumed/unconsumed split for
+//     the handler to render as standalone report cards.
 //
-// Reports + connection alerts are returned by separate handler-level
-// queries, not by this function.
+// Connection alerts are returned by a separate handler-level query, not
+// by this function.
 func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) ([]FeedEvent, error) {
+	out, _, err := s.listFeedEventsWithReports(ctx, params, nil)
+	return out, err
+}
+
+// ListFeedEventsWithReports is the report-aware variant the home Feed
+// handler uses. It folds matching reports into bulk_action / agent_session
+// events and returns the leftover (un-folded) reports separately so the
+// handler can render them as standalone report cards.
+//
+// Splitting this from `ListFeedEvents` keeps the report-free entry-point
+// available for callers that don't have a windowed report list handy
+// (none today; preserved for symmetry with `ListFeedActivity`).
+func (s *Service) ListFeedEventsWithReports(ctx context.Context, params FeedEventsParams, reports []AgentReportResponse) ([]FeedEvent, []AgentReportResponse, error) {
+	return s.listFeedEventsWithReports(ctx, params, reports)
+}
+
+func (s *Service) listFeedEventsWithReports(ctx context.Context, params FeedEventsParams, reports []AgentReportResponse) ([]FeedEvent, []AgentReportResponse, error) {
 	if params.Window <= 0 {
 		params.Window = 3 * 24 * time.Hour
 	}
@@ -290,17 +413,31 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 		params.SampleLimit = 5
 	}
 
-	cutoff := time.Now().Add(-params.Window)
+	now := time.Now()
+	// Clamp the upper bound to the lookback ceiling so callers asking for a
+	// timestamp deeper than `FeedMaxLookback` silently get the oldest still-
+	// addressable window. Keeps the handler's `?before=` clamp honoured at
+	// the service layer too — defence in depth, since this is the layer
+	// that actually owns the unbounded-query risk.
+	upper := now
+	if !params.Before.IsZero() {
+		upper = params.Before
+		minUpper := now.Add(-FeedMaxLookback)
+		if upper.Before(minUpper) {
+			upper = minUpper
+		}
+	}
+	cutoff := upper.Add(-params.Window)
 
-	annotationRows, err := s.fetchFeedAnnotations(ctx, cutoff)
+	annotationRows, err := s.fetchFeedAnnotations(ctx, cutoff, upper)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	annotationRows = enrichFeedActivityRows(annotationRows)
 
-	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, params.SampleLimit)
+	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, upper, params.SampleLimit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	sessionMeta, err := s.fetchFeedSessionMeta(ctx, annotationRows)
@@ -309,6 +446,10 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 	}
 
 	groupedEvents := groupAnnotationsIntoEvents(annotationRows, sessionMeta, params)
+
+	// Fold matching reports into bulk_action / agent_session events. The
+	// remainder is the standalone-card list returned to the handler.
+	leftoverReports := foldReportsIntoEvents(groupedEvents, reports)
 
 	out := make([]FeedEvent, 0, len(syncEvents)+len(groupedEvents))
 	out = append(out, syncEvents...)
@@ -319,7 +460,7 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 	})
 
 	out = filterFeedEvents(out, params.Filter, params.ActorID)
-	return out, nil
+	return out, leftoverReports, nil
 }
 
 // filterFeedEvents narrows a feed-event slice to the subset matching the
@@ -402,19 +543,21 @@ func filterEventsByActor(events []FeedEvent, actorID string) []FeedEvent {
 // surfaces both the live profile name (preferred over the frozen-at-
 // write-time `annotations.actor_name`) and the user's `updated_at` for
 // avatar cache-busting.
-func (s *Service) fetchFeedAnnotations(ctx context.Context, cutoff time.Time) ([]FeedActivityRow, error) {
+func (s *Service) fetchFeedAnnotations(ctx context.Context, cutoff, upper time.Time) ([]FeedActivityRow, error) {
 	const q = `
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type, a.actor_id, a.actor_name,
     a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
     COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
-    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
-    ac.name, bc.institution_name
+    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
+    ac.name, bc.institution_name,
+    cat.display_name, cat.color, cat.icon, cat.slug
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -426,12 +569,13 @@ LEFT JOIN users u_direct
    AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
   AND a.created_at >= $1
+  AND a.created_at <  $2
   AND a.kind NOT IN ('sync_started', 'sync_updated')
   AND COALESCE(a.payload->>'applied_by', '') <> 'sync'
 ORDER BY a.created_at DESC
 `
 
-	rows, err := s.Pool.Query(ctx, q, cutoff)
+	rows, err := s.Pool.Query(ctx, q, cutoff, upper)
 	if err != nil {
 		return nil, fmt.Errorf("list feed annotations: %w", err)
 	}
@@ -473,15 +617,19 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		amount                              pgtype.Numeric
 		isoCcy                              pgtype.Text
 		txDate                              pgtype.Date
+		pending                             bool
 		accountName, institutionName        pgtype.Text
+		catDisplay, catColor                pgtype.Text
+		catIcon, catSlug                    pgtype.Text
 	)
 
 	if err := s.Scan(
 		&id, &shortID, &txnID, &kind, &actorType, &actorIDOpt, &actorName,
 		&payload, &tagID, &ruleID, &sessionID, &createdAt,
 		&actorUserName, &actorUpdatedAt,
-		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate,
+		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate, &pending,
 		&accountName, &institutionName,
+		&catDisplay, &catColor, &catIcon, &catSlug,
 	); err != nil {
 		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
 	}
@@ -537,6 +685,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		TransactionName:    txName,
 		MerchantName:       pgconv.TextOr(merchantName, ""),
 		IsoCurrencyCode:    pgconv.TextOr(isoCcy, "USD"),
+		Pending:            pending,
 		AccountName:        pgconv.TextOr(accountName, ""),
 		InstitutionName:    pgconv.TextOr(institutionName, ""),
 	}
@@ -547,6 +696,22 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 	}
 	if txDate.Valid {
 		row.TransactionDate = txDate.Time.Format("2006-01-02")
+	}
+	if catDisplay.Valid {
+		v := catDisplay.String
+		row.CategoryDisplayName = &v
+	}
+	if catColor.Valid {
+		v := catColor.String
+		row.CategoryColor = &v
+	}
+	if catIcon.Valid {
+		v := catIcon.String
+		row.CategoryIcon = &v
+	}
+	if catSlug.Valid {
+		v := catSlug.String
+		row.CategorySlug = &v
 	}
 	return row, nil
 }
@@ -583,7 +748,7 @@ func enrichFeedActivityRows(in []FeedActivityRow) []FeedActivityRow {
 // fetchFeedSyncEvents returns one FeedEvent per sync run within the window
 // (failed runs always included; successful no-op runs filtered out).
 // Inline transaction samples are batched in a single follow-up query.
-func (s *Service) fetchFeedSyncEvents(ctx context.Context, cutoff time.Time, sampleLimit int) ([]FeedEvent, error) {
+func (s *Service) fetchFeedSyncEvents(ctx context.Context, cutoff, upper time.Time, sampleLimit int) ([]FeedEvent, error) {
 	const q = `
 SELECT
     sl.id, sl.connection_id,
@@ -594,10 +759,11 @@ SELECT
 FROM sync_logs sl
 JOIN bank_connections bc ON sl.connection_id = bc.id
 WHERE sl.started_at >= $1
+  AND sl.started_at <  $2
 ORDER BY sl.started_at DESC
 `
 
-	rows, err := s.Pool.Query(ctx, q, cutoff)
+	rows, err := s.Pool.Query(ctx, q, cutoff, upper)
 	if err != nil {
 		return nil, fmt.Errorf("list feed sync logs: %w", err)
 	}
@@ -742,10 +908,12 @@ func (s *Service) fetchSyncSampleTransactions(ctx context.Context, raws []syncRo
 
 	const q = `
 SELECT t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
-       t.created_at, ac.name, bc.id::text, bc.institution_name
+       t.created_at, t.pending, ac.name, bc.id::text, bc.institution_name,
+       cat.display_name, cat.color, cat.icon, cat.slug
 FROM transactions t
 JOIN accounts ac ON ac.id = t.account_id
 JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN categories cat ON t.category_id = cat.id
 WHERE t.created_at >= $1
   AND t.deleted_at IS NULL
   AND bc.id::text = ANY($2::text[])
@@ -766,17 +934,20 @@ ORDER BY t.created_at DESC
 	var fetched []txRow
 	for rows.Next() {
 		var (
-			shortID, provName string
-			merchantName      pgtype.Text
-			amount            pgtype.Numeric
-			isoCcy            pgtype.Text
-			txDate            pgtype.Date
-			createdAt         pgtype.Timestamptz
-			accountName       pgtype.Text
-			connID            string
-			institutionName   pgtype.Text
+			shortID, provName    string
+			merchantName         pgtype.Text
+			amount               pgtype.Numeric
+			isoCcy               pgtype.Text
+			txDate               pgtype.Date
+			createdAt            pgtype.Timestamptz
+			pending              bool
+			accountName          pgtype.Text
+			connID               string
+			institutionName      pgtype.Text
+			catDisplay, catColor pgtype.Text
+			catIcon, catSlug     pgtype.Text
 		)
-		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &accountName, &connID, &institutionName); err != nil {
+		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName, &catDisplay, &catColor, &catIcon, &catSlug); err != nil {
 			return nil, err
 		}
 		t := txRow{
@@ -787,6 +958,7 @@ ORDER BY t.created_at DESC
 				Currency:     pgconv.TextOr(isoCcy, "USD"),
 				AccountName:  pgconv.TextOr(accountName, ""),
 				Institution:  pgconv.TextOr(institutionName, ""),
+				Pending:      pending,
 			},
 			ConnectionID: connID,
 			CreatedAt:    createdAt.Time.UTC(),
@@ -798,6 +970,22 @@ ORDER BY t.created_at DESC
 		}
 		if txDate.Valid {
 			t.Date = txDate.Time.Format("2006-01-02")
+		}
+		if catDisplay.Valid {
+			v := catDisplay.String
+			t.CategoryDisplayName = &v
+		}
+		if catColor.Valid {
+			v := catColor.String
+			t.CategoryColor = &v
+		}
+		if catIcon.Valid {
+			v := catIcon.String
+			t.CategoryIcon = &v
+		}
+		if catSlug.Valid {
+			v := catSlug.String
+			t.CategorySlug = &v
 		}
 		fetched = append(fetched, t)
 	}
@@ -1027,19 +1215,26 @@ func buildAgentSessionEvent(sessionID string, rows []FeedActivityRow, meta feedS
 }
 
 // groupUnsessionedAnnotations buckets the remaining annotations by
-// (actor_id, kind, 5-min). Buckets at-or-above BulkThreshold collapse into
-// a FeedBulkActionEvent; smaller buckets pass through annotations
-// individually but only `comment` rows are kept (other singleton
-// recategorisations are too low-signal for the home feed).
+// `(actor_id, floor(time / feedSoftBucketWindow))` — note that `kind` is
+// NOT part of the bucket key. Buckets at-or-above BulkThreshold collapse
+// into a single FeedBulkActionEvent regardless of how many distinct kinds
+// the annotations carry; the per-kind breakdown is preserved on the
+// event's `KindCounts` map so the templ can render the breakdown line.
+//
+// Sub-threshold buckets pass through standalone comments individually
+// (other singleton recategorisations are too low-signal for the home
+// feed). When ≥3 standalone comments share a bucket they collapse into a
+// bulk_action event whose Kind == "comment" — we don't want a feed full
+// of identical "Alice commented on transaction" rows when Alice was
+// triaging.
 func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams) []FeedEvent {
 	if len(rows) == 0 {
 		return nil
 	}
-	const bucketWindow = 5 * time.Minute
+	bucketSeconds := int64(feedSoftBucketWindow.Seconds())
 
 	type bucketKey struct {
 		actorID string
-		kind    string
 		bucket  int64
 	}
 
@@ -1055,8 +1250,7 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 		}
 		k := bucketKey{
 			actorID: actorID,
-			kind:    r.Annotation.Kind,
-			bucket:  r.Annotation.CreatedAtTime.Unix() / int64(bucketWindow.Seconds()),
+			bucket:  r.Annotation.CreatedAtTime.Unix() / bucketSeconds,
 		}
 		if _, ok := buckets[k]; !ok {
 			keyOrder = append(keyOrder, k)
@@ -1076,7 +1270,7 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 			})
 			continue
 		}
-		// Below threshold — only standalone comments survive in v2.
+		// Below threshold — only standalone comments survive.
 		for _, r := range bucket {
 			if r.Annotation.Kind != "comment" || r.Annotation.IsDeleted {
 				continue
@@ -1101,12 +1295,16 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 	return out
 }
 
-// buildBulkActionEvent collapses one (actor, kind, time-bucket) cluster of
+// buildBulkActionEvent collapses one (actor, time-bucket) cluster of
 // annotations into a single FeedBulkActionEvent, summarising the subjects
-// (tag names, category names, rule names) the actor applied.
+// (tag names, category names, rule names) the actor applied. When every
+// row in the bucket shares one kind, `Kind` is set to that homogeneous
+// kind so the templ can render the dedicated verb phrasing; otherwise
+// `Kind` is "mixed" and the templ renders the per-kind breakdown line.
 func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedBulkActionEvent {
 	ev := FeedBulkActionEvent{
-		Count: len(rows),
+		Count:      len(rows),
+		KindCounts: make(map[string]int),
 	}
 	subjectCounts := make(map[string]int)
 	subjectMeta := make(map[string]FeedBulkSubject)
@@ -1118,11 +1316,11 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 			ev.ActorName = ann.ActorName
 			ev.ActorType = ann.ActorType
 			ev.ActorAvatarVersion = ann.ActorAvatarVersion
-			ev.Kind = ann.Kind
 			if ann.ActorID != nil {
 				ev.ActorID = *ann.ActorID
 			}
 		}
+		ev.KindCounts[ann.Kind]++
 		if ev.StartedAt.IsZero() || ann.CreatedAtTime.Before(ev.StartedAt) {
 			ev.StartedAt = ann.CreatedAtTime
 		}
@@ -1142,6 +1340,19 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 		if _, ok := uniqueTx[r.TransactionShortID]; !ok {
 			uniqueTx[r.TransactionShortID] = sampleTxFromRow(r)
 		}
+	}
+
+	// Single-kind buckets keep the dedicated kind so the templ can render
+	// the canonical verb phrasing ("Alice categorised 12 transactions").
+	// Mixed-kind buckets get "mixed" so the templ falls back to the
+	// generic "Alice updated N transactions" headline plus the per-kind
+	// breakdown line.
+	if len(ev.KindCounts) == 1 {
+		for k := range ev.KindCounts {
+			ev.Kind = k
+		}
+	} else {
+		ev.Kind = "mixed"
 	}
 
 	subjects := make([]FeedBulkSubject, 0, len(subjectCounts))
@@ -1167,6 +1378,118 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 	}
 	ev.SampleTransactions = samples
 	return ev
+}
+
+// foldReportsIntoEvents pairs each report with a matching bulk_action or
+// agent_session event in `events` so the report renders as part of that
+// card's headline instead of as its own row. Matching is:
+//
+//   - SessionID equality with an agent_session event, OR
+//   - actor (id, type+name fallback) equality plus the report's timestamp
+//     falling inside the bulk_action's [StartedAt-15m, EndedAt+15m] window.
+//
+// Mutates the matched events in place (sets `ev.BulkAction.Report` /
+// `ev.AgentSession.Report`) and returns the un-folded reports for the
+// handler to render as standalone report cards.
+func foldReportsIntoEvents(events []FeedEvent, reports []AgentReportResponse) []AgentReportResponse {
+	if len(events) == 0 || len(reports) == 0 {
+		return reports
+	}
+
+	leftover := make([]AgentReportResponse, 0, len(reports))
+	for _, rep := range reports {
+		if folded := tryFoldReport(events, rep); !folded {
+			leftover = append(leftover, rep)
+		}
+	}
+	return leftover
+}
+
+// tryFoldReport attempts to attach `rep` to a matching event in `events`.
+// Returns true if a match was found and the event was mutated.
+func tryFoldReport(events []FeedEvent, rep AgentReportResponse) bool {
+	ref := reportRefFromResponse(rep)
+
+	// 1. Session match wins. If the report's session_id lines up with an
+	//    agent_session event, fold there regardless of timestamps.
+	if rep.SessionID != nil && *rep.SessionID != "" {
+		for i := range events {
+			if events[i].Type != "agent_session" {
+				continue
+			}
+			if events[i].AgentSession == nil {
+				continue
+			}
+			if events[i].AgentSession.SessionID == *rep.SessionID {
+				if events[i].AgentSession.Report == nil {
+					events[i].AgentSession.Report = &ref
+				}
+				return true
+			}
+		}
+	}
+
+	// 2. Actor + window match into a bulk_action event. The report's
+	//    `created_at` must fall inside the bucket window (with a slack
+	//    of feedSoftBucketWindow on either side so a report written
+	//    seconds after the last annotation still anchors).
+	repTime, err := time.Parse(time.RFC3339, rep.CreatedAt)
+	if err != nil {
+		return false
+	}
+	repActorID := ""
+	if rep.CreatedByID != nil {
+		repActorID = *rep.CreatedByID
+	}
+	repActorKey := repActorID
+	if repActorKey == "" {
+		repActorKey = rep.CreatedByType + ":" + rep.CreatedByName
+	}
+
+	for i := range events {
+		if events[i].Type != "bulk_action" {
+			continue
+		}
+		ba := events[i].BulkAction
+		if ba == nil {
+			continue
+		}
+		baKey := ba.ActorID
+		if baKey == "" {
+			baKey = ba.ActorType + ":" + ba.ActorName
+		}
+		if baKey != repActorKey {
+			continue
+		}
+		windowStart := ba.StartedAt.Add(-feedSoftBucketWindow)
+		windowEnd := ba.EndedAt.Add(feedSoftBucketWindow)
+		if repTime.Before(windowStart) || repTime.After(windowEnd) {
+			continue
+		}
+		if ba.Report == nil {
+			ba.Report = &ref
+		}
+		// Take the report's timestamp as the event timestamp so the row
+		// sorts at the report's wall-clock position (typically the run's
+		// last action). Prevents the row drifting earlier than the
+		// report itself.
+		if repTime.After(events[i].Timestamp) {
+			events[i].Timestamp = repTime
+		}
+		return true
+	}
+	return false
+}
+
+func reportRefFromResponse(r AgentReportResponse) FeedReportRef {
+	return FeedReportRef{
+		ID:       r.ID,
+		ShortID:  r.ShortID,
+		Title:    r.Title,
+		Priority: r.Priority,
+		Tags:     r.Tags,
+		IsUnread: r.ReadAt == nil,
+	}
 }
 
 func bulkSubjectKey(a Annotation) string {
@@ -1201,14 +1524,19 @@ func sampleTxFromRow(r FeedActivityRow) FeedSampleTx {
 		merchant = r.TransactionName
 	}
 	return FeedSampleTx{
-		ShortID:      r.TransactionShortID,
-		Name:         r.TransactionName,
-		MerchantName: merchant,
-		Amount:       r.Amount,
-		Currency:     r.IsoCurrencyCode,
-		Date:         r.TransactionDate,
-		AccountName:  r.AccountName,
-		Institution:  r.InstitutionName,
+		ShortID:             r.TransactionShortID,
+		Name:                r.TransactionName,
+		MerchantName:        merchant,
+		Amount:              r.Amount,
+		Currency:            r.IsoCurrencyCode,
+		Date:                r.TransactionDate,
+		AccountName:         r.AccountName,
+		Institution:         r.InstitutionName,
+		Pending:             r.Pending,
+		CategoryDisplayName: r.CategoryDisplayName,
+		CategoryColor:       r.CategoryColor,
+		CategoryIcon:        r.CategoryIcon,
+		CategorySlug:        r.CategorySlug,
 	}
 }
 

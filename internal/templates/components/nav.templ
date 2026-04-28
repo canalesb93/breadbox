@@ -55,7 +55,9 @@ templ Nav(p NavProps) {
 		<a href="/feed" class={ "bb-sidebar-link", navActive(p.CurrentPage, "feed") }>
 			<i data-lucide="rss"></i>
 			<span class="flex-1">Feed</span>
-			<span class="bb-nav-badge" title="New activity-style home">New</span>
+			if p.UnreadReports > 0 {
+				<span class="bb-nav-badge" title={ fmt.Sprintf("%d unread reports", p.UnreadReports) }>{ badgeCount(p.UnreadReports) }</span>
+			}
 		</a>
 		<a href="/transactions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "transactions") }>
 			<i data-lucide="receipt"></i> Transactions

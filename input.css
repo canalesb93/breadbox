@@ -235,8 +235,21 @@
   }
 
   @media (prefers-color-scheme: dark) {
+    /* In dark mode the body background equals --color-base-100 (oklch 0.205),
+     * so a stock .bb-card painted bg-base-100 is invisible — same colour as
+     * the page underneath. Lift the card surface 4–5% toward white via
+     * color-mix so cards/tiles read as elevated panels. Targeted (no light-
+     * mode change). Pairs with the body=base-100 dark-theme convention; the
+     * cleaner alternative (flip body to base-200) was rejected as too high
+     * blast-radius. See PR for /feed dark-mode contrast pass. */
+    .bb-card {
+      background-color: color-mix(in oklch, var(--color-base-100) 92%, white 8%);
+    }
     .bb-card--interactive:hover {
       border-color: oklch(0.35 0 0);
+      /* Hover should read as more elevated than rest, not less. Default
+       * bg-base-200/50 in dark mode dips below the body — reverse that. */
+      background-color: color-mix(in oklch, var(--color-base-100) 86%, white 14%);
     }
   }
 
@@ -683,6 +696,7 @@
     border-radius: 1rem;
     border-top-left-radius: 0.375rem;
     word-break: break-word;
+    overflow-wrap: anywhere;
   }
   /* Markdown element styling inside a comment bubble. Tuned to the
      bubble's compact scale — paragraph margins are tighter than the
@@ -731,6 +745,18 @@
     @apply px-2 py-1 border-b border-base-200 whitespace-nowrap sm:whitespace-normal;
   }
   .bb-comment-bubble tbody tr:last-child td { @apply border-b-0; }
+
+  /* Dark-mode lift: in dark theme base-200 sits *below* the body bg
+   * (body = base-100 = oklch 0.205, base-200 = oklch 0.145), so the
+   * default base-200 comment bubble reads as a recessed hole. Bump the
+   * surface and border so the bubble floats above the conversation
+   * background. Light-mode untouched. */
+  @media (prefers-color-scheme: dark) {
+    .bb-comment-bubble {
+      background: color-mix(in oklch, var(--color-base-100) 88%, white 12%);
+      border-color: color-mix(in oklch, var(--color-base-300) 85%, white 15%);
+    }
+  }
 
   /* ── Activity timeline — prominent (main-content) variant ──
    * Used by the transaction-detail page to promote the activity timeline
@@ -2848,15 +2874,14 @@
   --tw-ring-color: var(--color-base-200);
 }
 /* Inner tile pills painted `bg-base-200` (sync, deleted-comment trash,
- * neutral review, unknown-kind fallback) match the base-200 page surface
- * in prominent mode and disappear. Lift the fill to base-300 so the
- * circle reads as a defined shape on the rail. Targets only direct
- * children of the rail-mask wrapper so the inner lucide icon's color
- * isn't touched. Comment rows are excluded — their initials/image/agent
- * avatars rely on the GitHub-style 1px base-300 outline below (added in
- * #927) instead of a fill bump, since the fill approach didn't help
- * image avatars that already carry their own background. */
-.bb-timeline-prominent .bb-timeline > li:not(:has(.bb-comment-bubble)) > div:first-child > .bg-base-200 {
+ * neutral review, comment message-circle, unknown-kind fallback) match
+ * the base-200 page surface in prominent mode and disappear. Lift the
+ * fill to base-300 so the circle reads as a defined shape on the rail.
+ * Targets only direct children of the rail-mask wrapper so the inner
+ * lucide icon's color isn't touched. As of #969 comment rows are
+ * included — they use the same neutral message-circle tile as every
+ * other system row, so the same fill bump applies uniformly. */
+.bb-timeline-prominent .bb-timeline > li > div:first-child > .bg-base-200 {
   background-color: var(--color-base-300);
 }
 /* Slightly thicker ring for the bigger tile so the colour pill reads
@@ -2889,17 +2914,10 @@
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
-/* GitHub-style 1px outline on comment-row avatars. The rail mask is
- * base-200, so without an outline a neutral avatar (image / agent /
- * initials) reads as floating without a defined edge. base-300 is our
- * "border" colour and works in both themes — subtle gray-on-white in
- * light mode, subtle lift on near-black in dark mode. We use `border`
- * (not box-shadow) so it works on `<img>` too — replaced elements
- * ignore inset shadows. With box-sizing:border-box the outer 28px
- * stays intact, so the rail still threads through the avatar centre. */
-.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div:first-child .ring-4 {
-  border: 1px solid var(--color-base-300);
-}
+/* As of #969 comment rows use the same neutral message-circle tile as
+ * every other system-event row, so the bespoke 1px outline that used to
+ * sit on the avatar is gone — the shared `bg-base-200 + ring-4` chrome
+ * already gives every rail tile a defined edge against the rail mask. */
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 {
   position: relative;
   background: var(--color-base-100);
@@ -2984,6 +3002,28 @@
   left: -7px;
   border-width: 8px 8px 8px 0;
   border-color: transparent var(--color-base-100) transparent transparent;
+}
+
+/* Dark-mode contrast lift for the prominent timeline's comment + composer
+ * cards. Both rules above paint `var(--color-base-100)`, which in the dark
+ * theme is identical to the body background — the cards disappear. Mix in
+ * 8% white so they read as elevated surfaces, matching the `.bb-card` lift
+ * used elsewhere on /feed. Light-mode is unaffected. */
+@media (prefers-color-scheme: dark) {
+  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1,
+  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 {
+    background: color-mix(in oklch, var(--color-base-100) 92%, white 8%);
+  }
+  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after,
+  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
+    border-right-color: color-mix(in oklch, var(--color-base-100) 92%, white 8%);
+  }
+  /* Header bar inside the comment card uses base-200 60% — in dark that
+   * is base-200 (oklch 0.145) which is darker than the lifted card. Bump
+   * it slightly so the header reads as a defined band rather than a hole. */
+  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child {
+    background: color-mix(in oklch, var(--color-base-100) 86%, white 14%);
+  }
 }
 
 /* ── Activity timeline — inline chip fix ──

@@ -245,6 +245,12 @@ func CommaAmount(f float64) string { return commaAmount(f) }
 // mixed-case input untouched. See titleCase.
 func TitleCase(s string) string { return titleCase(s) }
 
+// TxAvatarColorStyle is the exported wrapper around `txAvatarColorStyle`
+// (defined in tx_row.templ) so subpackages — notably `templates/components/
+// pages` — can render the same coloured-circle avatar used by
+// `tx_row_compact.templ` without copying the fallback color.
+func TxAvatarColorStyle(color *string) string { return txAvatarColorStyle(color) }
+
 // PluralS returns "" for n == 1, else "s". See pluralS.
 func PluralS[T pluralInt](n T) string { return pluralS(n) }
 
