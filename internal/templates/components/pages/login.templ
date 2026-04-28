@@ -9,7 +9,7 @@ templ Login(p LoginProps) {
 		FlashType: p.FlashType,
 		FlashMsg:  p.FlashMsg,
 	}) {
-		<div class="text-center mb-8">
+		<div class="text-center mb-6 sm:mb-8">
 			<h1 class="text-xl font-semibold tracking-tight">Welcome back</h1>
 			<p class="text-sm text-base-content/50 mt-1.5">Sign in to your Breadbox dashboard</p>
 		</div>
@@ -32,6 +32,8 @@ templ Login(p LoginProps) {
 					value={ p.Username }
 					required
 					autocomplete="email"
+					autocorrect="off"
+					autocapitalize="none"
 					placeholder="Enter your email"
 					class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200"
 				/>
