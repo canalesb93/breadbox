@@ -115,8 +115,9 @@ templ acctSummaryCards(p AccountDetailProps) {
 					}
 					{ fmtBalancePtr(p.Account.BalanceCurrent) }
 				} else {
-					<span class="text-base-content/20">@templ.Raw("&mdash;")
-</span>
+					<span class="text-base-content/20">
+						@templ.Raw("&mdash;")
+					</span>
 				}
 			</div>
 			if p.HasCreditUtil {
@@ -369,8 +370,9 @@ templ acctPagination(p AccountDetailProps) {
 			<!-- Page numbers -->
 			for _, n := range acctPageRange(p.Page, p.TotalPages) {
 				if n == 0 {
-					<span class="bb-paginator__ellipsis">@templ.Raw("&hellip;")
-</span>
+					<span class="bb-paginator__ellipsis">
+						@templ.Raw("&hellip;")
+					</span>
 				} else if n == p.Page {
 					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
 				} else {

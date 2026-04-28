@@ -111,18 +111,18 @@ templ Connections(p ConnectionsProps) {
 				<!-- Financial Summary Bar -->
 				if p.HasAnyBalance {
 					<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
-						<div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300">
-							<div class="px-5 py-4">
-								<div class="text-xs font-medium text-base-content/50 mb-1">Net Worth</div>
-								<div class="text-2xl font-semibold tabular-nums tracking-tight">{ components.FormatAmount(p.NetWorth) }</div>
+						<div class="grid grid-cols-3 divide-x divide-base-300">
+							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Net Worth</div>
+								<div class="text-sm sm:text-2xl font-semibold tabular-nums tracking-tight truncate">{ components.FormatAmount(p.NetWorth) }</div>
 							</div>
-							<div class="px-5 py-4">
-								<div class="text-xs font-medium text-base-content/50 mb-1">Assets</div>
-								<div class="text-2xl font-semibold tabular-nums tracking-tight text-success">{ components.FormatAmount(p.TotalAssets) }</div>
+							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Assets</div>
+								<div class="text-sm sm:text-2xl font-semibold tabular-nums tracking-tight text-success truncate">{ components.FormatAmount(p.TotalAssets) }</div>
 							</div>
-							<div class="px-5 py-4">
-								<div class="text-xs font-medium text-base-content/50 mb-1">Liabilities</div>
-								<div class="text-2xl font-semibold tabular-nums tracking-tight text-error">{ components.FormatAmount(p.TotalLiabilities) }</div>
+							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Liabilities</div>
+								<div class="text-sm sm:text-2xl font-semibold tabular-nums tracking-tight text-error truncate">{ components.FormatAmount(p.TotalLiabilities) }</div>
 							</div>
 						</div>
 					</div>
@@ -205,7 +205,7 @@ templ connectionsCard(c ConnectionsRow) {
 		x-show={ fmt.Sprintf("filterUser === 'all' || filterUser === %q", c.UserID) }
 	>
 		<!-- Connection Header — non-nested interactives (a11y: link + sibling button) -->
-		<div class="group px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4">
+		<div class="group px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
 			<a href={ templ.SafeURL("/connections/" + c.ID) } class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 no-underline" aria-label={ "Open " + c.InstitutionName + " connection" }>
 				<div class="hidden sm:flex w-10 h-10 rounded-lg bg-base-200/60 items-center justify-center shrink-0">
 					switch c.Provider {
@@ -218,12 +218,13 @@ templ connectionsCard(c ConnectionsRow) {
 					}
 				</div>
 				<div class="min-w-0">
+					<!-- Name + status badge row -->
 					<div class="flex items-center gap-2 flex-wrap">
-						<h3 class="font-semibold text-sm sm:text-base group-hover:text-primary transition-colors truncate max-w-[10rem] sm:max-w-none">{ c.InstitutionName }</h3>
+						<h3 class="font-semibold text-sm sm:text-base group-hover:text-primary transition-colors truncate max-w-[8rem] xs:max-w-[10rem] sm:max-w-none">{ c.InstitutionName }</h3>
 						if c.IsStale {
-							<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Stale</span>
+							<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning shrink-0">Stale</span>
 						} else if c.LastSyncStatus == "error" && c.Status == "active" {
-							<span class="relative group/err">
+							<span class="relative group/err shrink-0">
 								<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
 								if c.LastSyncErrorMessage != "" {
 									<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
@@ -236,23 +237,25 @@ templ connectionsCard(c ConnectionsRow) {
 							@templ.Raw(components.StatusBadge(c.Status))
 						}
 						if c.Paused {
-							<span class="badge badge-ghost badge-xs">Paused</span>
+							<span class="badge badge-ghost badge-xs shrink-0">Paused</span>
 						}
 					</div>
-					<div class="flex items-center gap-2 text-xs text-base-content/40 mt-0.5">
-						<span>{ c.UserName }</span>
-						<span class="text-base-content/20">&middot;</span>
-						<span class="capitalize">{ c.Provider }</span>
-						<span class="text-base-content/20">&middot;</span>
+					<!-- Meta row: user · provider · last sync — username truncates, rest shrink-0 to stay on one line -->
+					<div class="flex items-center gap-1.5 sm:gap-2 text-xs text-base-content/40 mt-0.5 min-w-0 overflow-hidden">
+						<span class="truncate shrink min-w-0">{ c.UserName }</span>
+						<span class="text-base-content/20 shrink-0">&middot;</span>
+						<span class="capitalize whitespace-nowrap shrink-0">{ c.Provider }</span>
+						<span class="text-base-content/20 shrink-0">&middot;</span>
 						if c.LastSyncedAtValid {
-							<span>{ c.LastSyncedAtRelative }</span>
+							<span class="whitespace-nowrap shrink-0">{ c.LastSyncedAtRelative }</span>
 						} else {
-							<span>Never synced</span>
+							<span class="whitespace-nowrap shrink-0">Never synced</span>
 						}
 					</div>
 				</div>
 			</a>
-			<div class="flex items-center gap-2 sm:gap-3 shrink-0">
+			<!-- Right side: sync button + balance/count -->
+			<div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
 				<!-- Sync Now button (non-CSV active connections only) -->
 				if c.Provider != "csv" && c.Status == "active" {
 					<div x-data="syncBtn" data-conn-id={ c.ID }>
@@ -274,7 +277,7 @@ templ connectionsCard(c ConnectionsRow) {
 				<!-- Connection total balance -->
 				if c.HasBalance {
 					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
-						<div class="text-base sm:text-lg font-semibold tabular-nums tracking-tight">{ components.FormatAmount(c.TotalBalance) }</div>
+						<div class="text-sm sm:text-lg font-semibold tabular-nums tracking-tight">{ components.FormatAmount(c.TotalBalance) }</div>
 						<div class="text-xs text-base-content/40">
 							{ strconv.FormatInt(c.AccountCount, 10) }
 							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
@@ -325,7 +328,7 @@ templ connectionsCard(c ConnectionsRow) {
 }
 
 templ connectionsAccountRow(a ConnectionsAccountRow) {
-	<a href={ templ.SafeURL("/accounts/" + a.ID) } class="flex items-center justify-between px-5 py-3 hover:bg-base-200/40 transition-colors no-underline border-b border-base-300 last:border-b-0 group/acct">
+	<a href={ templ.SafeURL("/accounts/" + a.ID) } class="flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-base-200/40 transition-colors no-underline border-b border-base-300 last:border-b-0 group/acct">
 		<div class="flex items-center gap-3 min-w-0">
 			<!-- Account type icon -->
 			<div class="w-7 h-7 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">

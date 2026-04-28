@@ -62,9 +62,11 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 					></i>
 					<span class="sr-only">(pending)</span>
 				}
-				<span class={ "bb-tx-amount tabular-nums",
+				<span
+					class={ "bb-tx-amount tabular-nums",
 					templ.KV("bb-tx-amount--income", tx.Amount < 0),
-					templ.KV("bb-tx-amount--pending", tx.Pending) }>
+					templ.KV("bb-tx-amount--pending", tx.Pending) }
+				>
 					{ formatAmount(tx.Amount) }
 				</span>
 			</div>
