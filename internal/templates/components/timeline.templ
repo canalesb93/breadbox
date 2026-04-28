@@ -54,6 +54,11 @@ type TimelineProps struct {
 	EventCount   int    // Rendered next to the heading as "N events". 0 hides the count.
 	AriaLabel    string // aria-label for the inner <ol>.
 	EmptyMessage string // Reserved for future opt-in empty rendering; ignored today.
+	// Variant selects the visual treatment.
+	//   "" / "card" → legacy bb-card wrapper, used by side-panel/embed callers.
+	//   "prominent" → GitHub-style: no card, top divider, larger heading,
+	//                 larger 28px icon tiles, ring matches the page bg.
+	Variant string
 }
 
 // TimelineRowProps drives a single system row's chrome (icon tile + timestamp).
@@ -81,6 +86,21 @@ type TimelineActor struct {
 // TimelineSystemRow, TimelineCommentRow, plus any composer they want at the
 // tail. Empty timelines should render `TimelineEmpty` instead.
 templ Timeline(p TimelineProps) {
+	if p.Variant == "prominent" {
+		@timelineProminent(p) {
+			{ children... }
+		}
+	} else {
+		@timelineCard(p) {
+			{ children... }
+		}
+	}
+}
+
+// timelineCard is the original card-wrapped chrome. Kept as the default so
+// future side-panel / embed callers (sync-log detail, agent-run logs) keep the
+// compact treatment.
+templ timelineCard(p TimelineProps) {
 	<section
 		aria-labelledby={ timelineHeadingID(p.Heading) }
 		class="bb-card p-0 overflow-hidden"
@@ -105,6 +125,54 @@ templ Timeline(p TimelineProps) {
 				every circle on the timeline.
 			-->
 			<span class="absolute left-[28px] sm:left-[32px] top-2 bottom-12 w-px bg-base-200" aria-hidden="true"></span>
+			{ children... }
+		</ol>
+	</section>
+}
+
+// timelineProminent is the GitHub-style "main content" treatment. The
+// card-mode 24px tile / leading-6 / ring-4 invariants from
+// docs/activity-timeline.md are preserved verbatim — the only structural
+// change is the section chrome:
+//
+//   - No bb-card. A top divider + larger heading set the section apart.
+//   - The opaque tile bg + ring colour (base-100 in card mode) shift to
+//     base-200 to keep the rail-mask seam invisible against the page
+//     background instead of a card surface. The shift is implemented in
+//     input.css under .bb-timeline-prominent so individual rows don't have
+//     to learn about variants.
+//   - The rail itself uses base-300/60 for slightly more presence on the
+//     darker (light-mode) / lighter (dark-mode) page surface.
+//
+// Container padding (`pl-4 sm:pl-5`) and rail offset (`left-[28px]
+// sm:left-[32px]`) match the card variant exactly — see docs/activity-timeline.md
+// "CSS / Tailwind invariants".
+templ timelineProminent(p TimelineProps) {
+	<section
+		aria-labelledby={ timelineHeadingID(p.Heading) }
+		class="bb-timeline-prominent relative"
+	>
+		if p.Heading != "" {
+			<header class="flex items-center gap-2.5 pb-4 mb-5 border-b border-base-300">
+				if p.HeadingIcon != "" {
+					<i data-lucide={ p.HeadingIcon } class="w-5 h-5 text-base-content/70" aria-hidden="true"></i>
+				}
+				<h2 id={ timelineHeadingID(p.Heading) } class="text-lg font-semibold text-base-content tracking-tight">{ p.Heading }</h2>
+				if p.EventCount > 0 {
+					<span class="bb-timeline-count">{ pluralEvents(p.EventCount) }</span>
+				}
+			</header>
+		}
+		<!--
+			Prominent rail. Tiles are scaled up to 28px in input.css (see
+			.bb-timeline-prominent overrides), so the rail offset accounts
+			for the larger half-width: 16px (pl-4) + 14px = 30; 20px
+			(sm:pl-5) + 14px = 34. The rail itself is 2px wide and a touch
+			more contrast-y than the card-mode 1px line so it reads against
+			the page surface (not just a card surface).
+		-->
+		<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+			<span class="absolute left-[29px] sm:left-[33px] top-2 bottom-14 w-[2px] bg-base-300 rounded-full" aria-hidden="true"></span>
 			{ children... }
 		</ol>
 	</section>
