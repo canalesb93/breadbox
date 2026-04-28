@@ -359,6 +359,15 @@ templ txdActivity(p TransactionDetailProps) {
 // custom-tile primitive so the page-local txdSystemIcon palette continues to
 // drive the 24px tile while the primitive owns the rail anchor, leading-6
 // text container, and timestamp/origin suffix.
+//
+// As of #969 the live-comment branch also uses TimelineSystemRowCustomTile
+// — the rail tile is now the shared `TimelineCommentTile` (a neutral
+// message-circle) and the actor's avatar moves inline into the meta line
+// via `TimelineActorInline`. Both surfaces (/feed and /transactions/{id})
+// render the same primitive shape so the design system stays uniform.
+// `data-comment-id` is still attached to the row's <li> so the optimistic-
+// update flow in transaction_detail.js can swap a bubble for a tombstone in
+// place without re-rendering the timeline.
 templ txdTimelineRow(e service.ActivityEntry, now time.Time) {
 	if e.Type == "comment" {
 		if e.IsDeleted {
@@ -371,9 +380,12 @@ templ txdTimelineRow(e service.ActivityEntry, now time.Time) {
 				templ.Attributes{"data-comment-id": e.CommentID},
 			)
 		} else {
-			@components.TimelineCommentRowRaw(txdCommentAvatar(e), templ.Attributes{"data-comment-id": e.CommentID}) {
-				@txdCommentBubbleBody(e, now)
-			}
+			@components.TimelineSystemRowCustomTile(
+				"", "", now,
+				components.TimelineCommentTile(),
+				txdCommentBubbleBody(e, now),
+				templ.Attributes{"data-comment-id": e.CommentID},
+			)
 		}
 	} else {
 		@components.TimelineSystemRowCustomTile(
@@ -463,18 +475,23 @@ templ txdSystemSentence(e service.ActivityEntry) {
 }
 
 // txdActorInline renders an actor reference inside a system-event sentence:
-// a tiny (16px) avatar followed by the bold name. Users get their photo;
-// agents get a bot tile; system/anonymous actors fall back to the bold name
-// alone since there is no actor identity to surface visually.
+// a tiny (16px) avatar followed by the bold name. Delegates to the shared
+// `TimelineActorInline` primitive in `components/timeline.templ` so /feed
+// and /transactions/{id} render the same actor identically.
 templ txdActorInline(e service.ActivityEntry) {
+	@components.TimelineActorInline(txdActor(e))
+}
+
+// txdActor adapts a system-event ActivityEntry into the shared
+// TimelineActor shape used by `TimelineActorInline`.
+func txdActor(e service.ActivityEntry) components.TimelineActor {
+	a := components.TimelineActor{Name: e.ActorName}
 	if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
-		<img src={ avatarURLStr(*e.ActorID, e.ActorAvatarVersion) } alt="" class="inline-block w-4 h-4 rounded-full object-cover align-text-bottom mr-1" aria-hidden="true"/>
+		a.AvatarURL = avatarURLStr(*e.ActorID, e.ActorAvatarVersion)
 	} else if e.ActorType == "agent" {
-		<span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 align-text-bottom mr-1" aria-hidden="true">
-			<i data-lucide="bot" class="w-2.5 h-2.5 text-primary"></i>
-		</span>
+		a.IsAgent = true
 	}
-	<strong class="font-semibold text-base-content">{ e.ActorName }</strong>
+	return a
 }
 
 // txdSystemIcon renders the small (24px) kind-specific icon tile that sits
@@ -545,12 +562,16 @@ templ txdCategoryIcon(e service.ActivityEntry) {
 }
 
 // txdCommentBubbleBody renders the body slot for a live comment row — the
-// meta line (actor / "commented" / timestamp / delete button) above the
-// rounded message bubble. Wrapped by components.TimelineCommentRowRaw which
-// owns the row's <li>, rail anchor, and avatar tile.
+// meta line (inline avatar / actor / "commented" / timestamp / delete
+// button) above the rounded message bubble. Wrapped by
+// `components.TimelineSystemRowCustomTile` which owns the row's <li>, rail
+// anchor, and the shared message-circle tile. The actor's avatar is
+// rendered inline via `TimelineActorInline` so the same actor renders
+// identically on /feed (system-row sentence) and on /transactions/{id}
+// (the meta line above each bubble).
 templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 	<!--
-		Meta line shares a 24px line-box with the avatar so the actor
+		Meta line shares a 24px line-box with the rail tile so the actor
 		baseline sits dead-center on the rail circle. Keeping every
 		label at text-xs / leading-6 also matches the system-event
 		rows above for a uniform actor + timestamp treatment.
@@ -561,9 +582,7 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 		far right; on mobile it follows naturally after the timestamp.
 	-->
 	<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6 min-w-0">
-		if e.ActorName != "" {
-			<strong class="font-semibold text-base-content truncate min-w-0 max-w-[10rem] sm:max-w-none">{ e.ActorName }</strong>
-		}
+		@components.TimelineActorInline(txdCommentActor(e))
 		<span class="text-base-content/55 shrink-0">commented</span>
 		if e.Timestamp != "" {
 			<span class="tooltip tooltip-top shrink-0" data-tip={ formatDateTimeStr(e.Timestamp) }>
@@ -592,20 +611,18 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 	}
 }
 
-// txdCommentAvatar renders the 24px avatar for a comment. User actors get
-// their image; agents get a bot icon; anonymous/system gets initials.
-templ txdCommentAvatar(e service.ActivityEntry) {
+// txdCommentActor adapts a comment ActivityEntry into the shared
+// TimelineActor shape so `TimelineActorInline` can render its 16px
+// avatar. Users get an image URL; agents get the bot fallback; system
+// actors render as just the bold name.
+func txdCommentActor(e service.ActivityEntry) components.TimelineActor {
+	a := components.TimelineActor{Name: e.ActorName}
 	if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
-		<img src={ avatarURLStr(*e.ActorID, e.ActorAvatarVersion) } alt={ e.ActorName + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-100" title={ e.ActorName }/>
+		a.AvatarURL = avatarURLStr(*e.ActorID, e.ActorAvatarVersion)
 	} else if e.ActorType == "agent" {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 ring-4 ring-base-100" aria-hidden="true" title={ e.ActorName }>
-			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
-		</span>
-	} else {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true" title={ e.ActorName }>
-			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ components.FirstChar(e.ActorName) }</span>
-		</span>
+		a.IsAgent = true
 	}
+	return a
 }
 
 // txdTimelineComposer renders the inline comment composer at the bottom of

@@ -717,38 +717,51 @@ templ feedRowTimestamp(timestamp string, now time.Time) {
 
 // ── Comment row ───────────────────────────────────────────────────────────
 //
-// Comments wrap the existing TimelineCommentRowRaw primitive so the meta
-// line and avatar tile match the per-transaction activity log byte-for-
-// byte. As of iteration 13 the home feed renders only the meta line — no
+// Comment rows render the same rail tile as every other system-event row —
+// a 24px message-circle icon — and move the actor's avatar inline before
+// their bolded name (matching the per-tx activity log's tag / category
+// sentences). The shared `TimelineCommentTile` + `TimelineActorInline`
+// primitives in `components/timeline.templ` are the single source of truth
+// for that pair, used by both /feed (here) and /transactions/{id} so the
+// surfaces stay byte-equivalent.
+//
+// As of iteration 13 the home feed renders only the meta line — no
 // markdown bubble. The body lives on the per-tx page (click-through via
 // the transaction ref). Reasoning: a global feed is a glance surface, and
 // rendering bodies inline duplicated the markdown-scanner cost across
 // every feed visit. Click-through is the right read for full content.
 templ feedCommentRow(it FeedItem, c *FeedComment, now time.Time) {
-	@components.TimelineCommentRowRaw(feedCommentAvatar(c), nil) {
-		<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6 min-w-0">
-			<strong class="font-semibold text-base-content truncate min-w-0 max-w-[10rem] sm:max-w-none">{ feedActorDisplay(c.ActorName, c.ActorType) }</strong>
-			<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
-			<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">
-				{ feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name) }
-			</a>
-			@feedRowTimestamp(it.TimestampStr, now)
-		</div>
-	}
+	@components.TimelineSystemRowCustomTile(
+		"", "", now,
+		components.TimelineCommentTile(),
+		feedCommentRowBody(it, c, now),
+		nil,
+	)
 }
 
-templ feedCommentAvatar(c *FeedComment) {
+templ feedCommentRowBody(it FeedItem, c *FeedComment, now time.Time) {
+	<div class="flex items-center gap-1.5 flex-wrap text-xs leading-6 min-w-0">
+		@components.TimelineActorInline(feedCommentActor(c))
+		<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
+		<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">
+			{ feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name) }
+		</a>
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+}
+
+// feedCommentActor builds the shared TimelineActor for a feed comment so
+// the inline-actor renderer can do its job uniformly. Users get an avatar
+// URL (or fall through to initials when the ID is missing); agents get the
+// bot fallback; system actors render as just the name (no glyph).
+func feedCommentActor(c *FeedComment) components.TimelineActor {
+	a := components.TimelineActor{Name: feedActorDisplay(c.ActorName, c.ActorType)}
 	if c.ActorType == "user" && c.ActorID != "" {
-		<img src={ feedAvatarURL(c.ActorID, c.ActorAvatarVersion) } alt={ c.ActorName + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-200" title={ c.ActorName }/>
+		a.AvatarURL = feedAvatarURL(c.ActorID, c.ActorAvatarVersion)
 	} else if c.ActorType == "agent" {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/12 ring-4 ring-base-200" aria-hidden="true" title={ c.ActorName }>
-			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
-		</span>
-	} else {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-200" aria-hidden="true" title={ c.ActorName }>
-			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ feedFirstChar(c.ActorName) }</span>
-		</span>
+		a.IsAgent = true
 	}
+	return a
 }
 
 // ── Shared transaction-reference helpers ──────────────────────────────────

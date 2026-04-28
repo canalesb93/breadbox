@@ -341,3 +341,47 @@ templ timelineCommentAvatar(actor TimelineActor) {
 		</span>
 	}
 }
+
+// TimelineCommentTile renders the 24px rail tile for a comment row — the
+// neutral chrome shared with other system-event rows (sync, review, etc.).
+// As of #969 comment rows render a message-circle icon on the rail and move
+// the actor's avatar inline (see TimelineActorInline) so every rail tile on
+// the feed and per-tx timeline looks like the same primitive shape: a
+// 24px filled circle with a 4px ring against the page surface.
+//
+// The ring colour is `ring-base-100` because that's what the rest of the
+// timeline primitives ship with; the prominent variant's input.css remap
+// shifts ring-base-100 → base-200 so the seam disappears against a page
+// background. The card variant keeps base-100 verbatim.
+templ TimelineCommentTile() {
+	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
+		<i data-lucide="message-circle" class="w-3 h-3 text-base-content/55"></i>
+	</span>
+}
+
+// TimelineActorInline renders the inline actor reference used inside system
+// row sentences and comment meta lines: a tiny (16px) avatar followed by the
+// bold actor name. Users get their photo; agents get a bot tile in primary
+// tint; system / anonymous actors fall back to the bold name alone.
+//
+// Shared between /feed (FeedComment, FeedAgentSession, FeedBulkAction) and
+// /transactions/{id} (txdActorInline → tag/category sentences, comment meta
+// lines) so the actor representation looks identical on both surfaces. The
+// avatar slot uses `align-text-bottom` so the baseline lines up with the
+// surrounding `leading-6` text, and `mr-1` reproduces the legacy spacing.
+templ TimelineActorInline(actor TimelineActor) {
+	if actor.AvatarURL != "" {
+		<img src={ actor.AvatarURL } alt="" class="inline-block w-4 h-4 rounded-full object-cover align-text-bottom mr-1" aria-hidden="true"/>
+	} else if actor.IsAgent {
+		<span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 align-text-bottom mr-1" aria-hidden="true">
+			<i data-lucide="bot" class="w-2.5 h-2.5 text-primary"></i>
+		</span>
+	}
+	if actor.Name != "" {
+		if actor.HRef != "" {
+			<a href={ templ.SafeURL(actor.HRef) } class="font-semibold text-base-content hover:text-primary transition-colors">{ actor.Name }</a>
+		} else {
+			<strong class="font-semibold text-base-content">{ actor.Name }</strong>
+		}
+	}
+}
