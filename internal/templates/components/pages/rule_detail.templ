@@ -558,7 +558,7 @@ templ ruleDetailSyncRow(h map[string]any) {
 	{{ startedAt, _ := h["started_at"].(string) }}
 	{{ instPtr, _ := h["institution"].(*string) }}
 	{{ hits := syncHistoryHitCount(h) }}
-	<a href={ templ.SafeURL("/activity/sync-logs/" + syncID) } class="flex items-center justify-between p-3 bg-base-200/40 rounded-xl hover:bg-base-200/60 transition-colors">
+	<a href={ templ.SafeURL("/logs/sync-logs/" + syncID) } class="flex items-center justify-between p-3 bg-base-200/40 rounded-xl hover:bg-base-200/60 transition-colors">
 		<div class="flex items-center gap-3">
 			<div class={ "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", syncStatusBgClass(status) }>
 				if status == "success" {

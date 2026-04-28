@@ -24,8 +24,8 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 		}
 
 		data := map[string]any{
-			"PageTitle":   "Activity",
-			"CurrentPage": "activity",
+			"PageTitle":   "Logs",
+			"CurrentPage": "logs",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}
@@ -102,7 +102,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 				"connection_id", "status", "trigger", "date_from", "date_to",
 			})
 			pVals.Set("tab", "syncs")
-			pBase := paginationBase("/activity",pVals, "page")
+			pBase := paginationBase("/logs", pVals, "page")
 
 			// Connection filter options.
 			connOpts := make([]pages.LogsConnectionOption, 0, len(connections))
@@ -207,7 +207,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			}
 			whVals := pickValues(r, []string{"wh_provider", "wh_status"})
 			whVals.Set("tab", "webhooks")
-			whPBase := paginationBase("/activity",whVals, "wh_page")
+			whPBase := paginationBase("/logs", whVals, "wh_page")
 
 			// Project webhook events into the templ view-model with
 			// pre-rendered relative + full timestamps.
