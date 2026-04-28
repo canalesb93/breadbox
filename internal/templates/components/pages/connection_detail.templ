@@ -58,7 +58,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 			</div>
 		}
 		<!-- Header with actions -->
-		<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+		<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
 			<div class="flex items-center gap-4 min-w-0">
 				<div class={ "w-11 h-11 rounded-xl flex items-center justify-center shrink-0", connDetailHeaderTileBg(p.Provider) }>
 					switch p.Provider {
@@ -103,7 +103,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 					</div>
 				</div>
 			</div>
-			<div class="flex items-center gap-2 flex-wrap shrink-0">
+			<div class="flex items-center gap-2 flex-wrap sm:shrink-0">
 				if p.Status == "error" || p.Status == "pending_reauth" {
 					<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
 				}
@@ -163,7 +163,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 
 templ connDetailSyncHealth(p ConnectionDetailProps) {
 	<div class="bb-card p-0 mb-6 overflow-hidden">
-		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+		<div class="grid grid-cols-2 sm:grid-cols-5 [&>*:not(:last-child)]:border-r [&>*:not(:last-child)]:border-base-300/40 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0 [&>*:nth-child(n+3)]:border-t [&>*:nth-child(n+3)]:border-base-300/40 sm:[&>*:nth-child(n+3)]:border-t-0 [&>*:nth-child(2n)]:border-r-0 sm:[&>*:nth-child(2n)]:border-r [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
 			<div class="p-4">
 				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Success Rate</div>
 				<div class="flex items-baseline gap-1">
@@ -275,7 +275,7 @@ templ connDetailDayBar(ds DaySyncRow) {
 
 templ connDetailInfoGrid(p ConnectionDetailProps) {
 	<div class="bb-card p-0 mb-6 overflow-hidden">
-		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+		<div class="grid grid-cols-2 sm:grid-cols-5 [&>*:not(:last-child)]:border-r [&>*:not(:last-child)]:border-base-300/40 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0 [&>*:nth-child(n+3)]:border-t [&>*:nth-child(n+3)]:border-base-300/40 sm:[&>*:nth-child(n+3)]:border-t-0 [&>*:nth-child(2n)]:border-r-0 sm:[&>*:nth-child(2n)]:border-r [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
 			<div class="p-4">
 				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Family Member</div>
 				<div class="text-sm font-semibold truncate">{ p.UserName }</div>
@@ -322,7 +322,7 @@ templ connDetailInfoGrid(p ConnectionDetailProps) {
 			</div>
 		</div>
 		if p.ConsecutiveFailures > 0 {
-			<div class="border-t border-base-300/40 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+			<div class="border-t border-base-300/40 grid grid-cols-2 sm:grid-cols-5 [&>*:not(:last-child)]:border-r [&>*:not(:last-child)]:border-base-300/40 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0">
 				<div class="p-4">
 					<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Consecutive Failures</div>
 					<div class="text-sm font-semibold text-warning">{ fmt.Sprintf("%d", p.ConsecutiveFailures) }</div>
