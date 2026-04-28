@@ -178,13 +178,7 @@ templ feedFilterChip(label, slug, icon, current string) {
 
 templ feedTimeline(p FeedProps) {
 	if len(p.Days) == 0 {
-		<div class="bb-card p-12 text-center">
-			<i data-lucide="rss" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
-			<h2 class="text-lg font-semibold mb-1">Nothing in your feed yet</h2>
-			<p class="text-sm text-base-content/50">
-				As bank syncs run, agents post reports, and household members tag transactions, they'll show up here.
-			</p>
-		</div>
+		@feedEmptyState(p)
 	} else {
 		@components.Timeline(components.TimelineProps{
 			Heading:     "Activity",
@@ -206,6 +200,134 @@ templ feedTimeline(p FeedProps) {
 			</p>
 		}
 	}
+}
+
+// ── Empty states ──────────────────────────────────────────────────────────
+//
+// The /feed page has four distinct empty cases, each with its own copy
+// and CTA. We dispatch off (HasConnections, Filter, LastSyncAt) so the
+// right card renders in each scenario.
+
+// feedEmptyState picks the right empty-state variant. Order matters:
+//   1. No connections at all → first-run onboarding card.
+//   2. Filter active → "No <chip-label>" card with a clear-filter link.
+//   3. Otherwise → "Quiet around here" with a Sync now / browse-history CTA.
+templ feedEmptyState(p FeedProps) {
+	if !p.HasConnections {
+		@feedEmptyFirstRun()
+	} else if p.Filter != "" {
+		@feedEmptyFiltered(p.Filter)
+	} else {
+		@feedEmptyNoRecent(p)
+	}
+}
+
+// feedEmptyFirstRun is shown when zero bank connections exist. The CTA is
+// the only path forward — connect a bank — so we render it as a primary
+// button rather than a quiet link.
+templ feedEmptyFirstRun() {
+	<div class="bb-card p-10 sm:p-12 text-center">
+		<i data-lucide="landmark" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+		<h2 class="text-lg font-semibold mb-1">Welcome to Breadbox</h2>
+		<p class="text-sm text-base-content/55 max-w-md mx-auto mb-5">
+			Connect your first bank to start filling your feed.
+		</p>
+		<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+			<i data-lucide="plus" class="w-3.5 h-3.5"></i>
+			Connect a bank
+		</a>
+	</div>
+}
+
+// feedEmptyFiltered is shown when a chip filter is active but produced
+// zero rows. The CTA is "Clear filter" — the same affordance the active-
+// filter banner offers, repeated here so a user landing in an empty state
+// has a clear way out without scrolling back up.
+templ feedEmptyFiltered(filter string) {
+	<div class="bb-card p-10 sm:p-12 text-center">
+		<i data-lucide="filter" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+		<h2 class="text-lg font-semibold mb-1">{ feedEmptyFilteredHeadline(filter) }</h2>
+		<p class="text-sm text-base-content/55 mb-5">
+			Nothing in this slice today.
+		</p>
+		<a href="/feed" class="btn btn-sm btn-ghost rounded-xl border border-base-300">
+			<i data-lucide="x" class="w-3.5 h-3.5"></i>
+			Clear filter
+		</a>
+	</div>
+}
+
+// feedEmptyNoRecent is the "all caught up" card for households that have
+// connections but no events in the windowed feed. Admins get a "Sync now"
+// button (POST /-/connections/sync-all → reload); members see only the
+// browse-history link, since sync-all is admin-only.
+templ feedEmptyNoRecent(p FeedProps) {
+	if p.IsAdmin {
+		<script src="/static/js/admin/components/feed.js"></script>
+		<div class="bb-card p-10 sm:p-12 text-center" x-data="feedSyncNow">
+			<i data-lucide="moon" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
+			<p class="text-sm text-base-content/55 mb-5">
+				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
+			</p>
+			<div class="flex items-center justify-center gap-2 flex-wrap">
+				<button
+					type="button"
+					class="btn btn-primary btn-sm rounded-xl"
+					x-bind:disabled="state !== 'idle'"
+					x-on:click="triggerSyncNow()"
+				>
+					<i data-lucide="refresh-cw" class="w-3.5 h-3.5" x-bind:class="state === 'syncing' ? 'animate-spin' : ''"></i>
+					<span x-text="state === 'syncing' ? 'Syncing…' : (state === 'done' ? 'Sync queued' : 'Sync now')"></span>
+				</button>
+				<a href="/transactions" class="btn btn-sm btn-ghost rounded-xl border border-base-300">
+					<i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+					Browse transactions
+				</a>
+			</div>
+		</div>
+	} else {
+		<div class="bb-card p-10 sm:p-12 text-center">
+			<i data-lucide="moon" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
+			<p class="text-sm text-base-content/55 mb-5">
+				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
+			</p>
+			<a href="/transactions" class="btn btn-sm btn-ghost rounded-xl border border-base-300">
+				<i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+				Browse transactions
+			</a>
+		</div>
+	}
+}
+
+// feedEmptyFilteredHeadline maps a chip slug onto its empty-state
+// headline. Mirrors feedFilterLabel but pluralises for the headline copy.
+func feedEmptyFilteredHeadline(filter string) string {
+	switch filter {
+	case "syncs":
+		return "No syncs in the last 3 days"
+	case "reports":
+		return "No reports in the last 3 days"
+	case "comments":
+		return "No comments in the last 3 days"
+	case "sessions":
+		return "No agent sessions in the last 3 days"
+	case "me":
+		return "Nothing from you in the last 3 days"
+	}
+	return "No matches"
+}
+
+// feedEmptyNoRecentSubline composes the supporting copy for the "quiet
+// around here" empty state. Mentions the last successful sync time when
+// we have one — gives operators a quick read on whether sync is broken
+// or genuinely quiet.
+func feedEmptyNoRecentSubline(lastSync time.Time) string {
+	if lastSync.IsZero() {
+		return "No activity in the last 3 days. Try syncing to pull the latest from your banks."
+	}
+	return "No activity in the last 3 days. Last sync was " + timefmt.Relative(lastSync) + "."
 }
 
 // feedRow dispatches each FeedItem to the right primitive. Comments use

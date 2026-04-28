@@ -39,6 +39,24 @@ type FeedProps struct {
 	// "agents", "me") parsed from the ?filter= query param. Renders chip
 	// state only — actual filtering applies at the handler layer.
 	Filter string
+
+	// HasConnections is true when at least one bank connection exists,
+	// regardless of status. Drives the empty-state branch — first-run
+	// (no connections) gets a different copy + CTA than "quiet around
+	// here" (has connections, no events in window).
+	HasConnections bool
+
+	// LastSyncAt is the most recent successful sync timestamp across the
+	// household, mirrored from FeedHero so the empty-state copy can
+	// render "Last sync was {relative-time}" without re-deriving it.
+	// Zero value means "no sync yet".
+	LastSyncAt time.Time
+
+	// IsAdmin is true when the current session has the admin role. The
+	// "Sync now" empty-state CTA POSTs to /-/connections/sync-all which
+	// is admin-only; non-admin members see the link to /transactions
+	// instead.
+	IsAdmin bool
 }
 
 // FeedHero powers the at-a-glance band above the feed rail.
