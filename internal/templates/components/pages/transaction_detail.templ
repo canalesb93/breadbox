@@ -70,7 +70,7 @@ templ txdHero(p TransactionDetailProps) {
 			<div class={ "w-12 h-12 rounded-xl flex items-center justify-center shrink-0", txdHeroTileBg(p.Transaction.Amount) }>
 				<i data-lucide={ txdHeroIcon(p.Transaction.Amount) } class={ "w-6 h-6", txdHeroIconColor(p.Transaction.Amount) }></i>
 			</div>
-			<div class="min-w-0">
+			<div class="min-w-0 flex-1">
 				<h1 class="bb-page-title break-words">{ p.Transaction.ProviderName }</h1>
 				<div class="flex items-center gap-2 mt-0.5 flex-wrap">
 					<span class="text-xs text-base-content/40">{ components.FormatDate(p.Transaction.Date) }</span>
@@ -85,7 +85,7 @@ templ txdHero(p TransactionDetailProps) {
 				</div>
 			</div>
 		</div>
-		<div class="sm:text-right">
+		<div class="flex flex-row items-baseline justify-between sm:block sm:text-right shrink-0">
 			<p
 				class={ "text-3xl font-semibold tabular-nums inline-flex items-center gap-2 justify-end", templ.KV("text-success", p.Transaction.Amount < 0) }
 				if p.Transaction.Pending {
@@ -98,7 +98,7 @@ templ txdHero(p TransactionDetailProps) {
 				<span class={ templ.KV("bb-tx-amount--pending", p.Transaction.Pending) }>{ components.FormatAmount(p.Transaction.Amount) }</span>
 			</p>
 			if p.Transaction.IsoCurrencyCode != nil && *p.Transaction.IsoCurrencyCode != "" {
-				<p class="text-xs text-base-content/30 mt-0.5">{ *p.Transaction.IsoCurrencyCode }</p>
+				<p class="text-xs text-base-content/30 mt-0.5 sm:mt-0.5 ml-1 sm:ml-0">{ *p.Transaction.IsoCurrencyCode }</p>
 			}
 		</div>
 	</div>
@@ -107,27 +107,27 @@ templ txdHero(p TransactionDetailProps) {
 templ txdAccountBanner(p TransactionDetailProps) {
 	<!-- Account Context Banner -->
 	<div class="bb-card p-0 mb-4 sm:mb-6 overflow-hidden">
-		<div class="flex items-center gap-4 px-5 py-3.5">
+		<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-3.5">
 			<div class="w-9 h-9 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
 				<i data-lucide="building-2" class="w-5 h-5 text-base-content/40"></i>
 			</div>
 			<div class="flex-1 min-w-0">
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2 flex-wrap">
 					<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="text-sm font-semibold hover:text-primary transition-colors no-underline truncate">{ p.AccountName }</a>
 					if p.AccountMask != "" {
 						<span class="text-xs text-base-content/30 font-mono">&middot;&middot;&middot;&middot;{ p.AccountMask }</span>
 					}
 				</div>
-				<div class="flex items-center gap-2 mt-0.5 flex-wrap">
+				<div class="flex items-center gap-x-2 gap-y-0 mt-0.5 flex-wrap">
 					if p.InstitutionName != "" {
 						<span class="text-xs text-base-content/40">{ p.InstitutionName }</span>
 					}
 					if p.AccountType != "" {
-						<span class="text-xs text-base-content/30 hidden sm:inline">&middot;</span>
+						<span class="text-xs text-base-content/30">&middot;</span>
 						<span class="text-xs text-base-content/40">{ accountTypeLabel(p.AccountType, "") }</span>
 					}
 					if p.UserName != "" {
-						<span class="text-xs text-base-content/30 hidden sm:inline">&middot;</span>
+						<span class="text-xs text-base-content/30">&middot;</span>
 						<span class="text-xs text-base-content/40">{ p.UserName }</span>
 					}
 				</div>
@@ -138,7 +138,7 @@ templ txdAccountBanner(p TransactionDetailProps) {
 					<p class="text-sm font-semibold tabular-nums">{ components.FormatAmount(*p.Account.BalanceCurrent) }</p>
 				</div>
 			}
-			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-xs rounded-lg shrink-0">
+			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-xs rounded-lg shrink-0 ml-auto sm:ml-0">
 				<i data-lucide="external-link" class="w-3.5 h-3.5"></i>
 			</a>
 		</div>
@@ -149,9 +149,9 @@ templ txdMain(p TransactionDetailProps) {
 	<!-- Main content: Details + Category sidebar -->
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
 		<!-- Transaction Details -->
-		<div class="bb-card p-5 lg:col-span-2">
-			<h2 class="text-sm font-semibold text-base-content/50 mb-5">Details</h2>
-			<div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
+		<div class="bb-card p-4 sm:p-5 lg:col-span-2">
+			<h2 class="text-sm font-semibold text-base-content/50 mb-4 sm:mb-5">Details</h2>
+			<div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 sm:gap-y-5 gap-x-4 sm:gap-x-6">
 				<div>
 					<p class="text-xs text-base-content/40 mb-1">Date</p>
 					<p class="text-sm font-medium">{ components.FormatDate(p.Transaction.Date) }</p>
@@ -164,7 +164,7 @@ templ txdMain(p TransactionDetailProps) {
 				}
 				if p.Transaction.ProviderPaymentChannel != nil && *p.Transaction.ProviderPaymentChannel != "" {
 					<div>
-						<p class="text-xs text-base-content/40 mb-1">Payment Channel</p>
+						<p class="text-xs text-base-content/40 mb-1 truncate">Payment Channel</p>
 						<p class="text-sm font-medium capitalize">{ *p.Transaction.ProviderPaymentChannel }</p>
 					</div>
 				}
@@ -183,7 +183,7 @@ templ txdMain(p TransactionDetailProps) {
 				if p.Transaction.ProviderCategoryPrimary != nil && *p.Transaction.ProviderCategoryPrimary != "" {
 					<div>
 						<p class="text-xs text-base-content/40 mb-1">Provider Category</p>
-						<p class="text-xs font-mono text-base-content/50">
+						<p class="text-xs font-mono text-base-content/50 break-words">
 							{ *p.Transaction.ProviderCategoryPrimary }
 							if p.Transaction.ProviderCategoryDetailed != nil && *p.Transaction.ProviderCategoryDetailed != "" {
 								{ " / " + *p.Transaction.ProviderCategoryDetailed }
@@ -218,7 +218,7 @@ templ txdMain(p TransactionDetailProps) {
 		</div>
 		<!-- Category + Tags Card -->
 		<div
-			class="bb-card p-5 space-y-5"
+			class="bb-card p-4 sm:p-5 space-y-4 sm:space-y-5"
 			x-data="txdCategoryEditor"
 			data-tx-id={ p.TransactionID }
 			data-category-override={ txdCategoryOverrideAttr(p) }
