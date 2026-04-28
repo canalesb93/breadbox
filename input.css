@@ -395,13 +395,13 @@
   }
 
   /* ── External-link arrow (Documentation / GitHub buttons) ── */
-  /* The trailing chevron-style glyph is hidden by default and slides
-     + fades in when the parent .group is hovered. Kept inside the
+  /* Always visible on mobile (no hover affordance there), hidden by
+     default and faded in on hover at lg+. Kept inside the
      bb-sidebar-link cascade so the arrow inherits the link's icon
      colour but overrides the size + opacity rules. */
   .bb-sidebar-link .bb-nav-external-arrow,
   .bb-sidebar-link .bb-nav-external-arrow svg {
-    @apply w-3.5 h-3.5 opacity-0;
+    @apply w-3.5 h-3.5 opacity-60 lg:opacity-0;
     transition: opacity 0.15s ease;
   }
   .bb-sidebar-link.group:hover .bb-nav-external-arrow,

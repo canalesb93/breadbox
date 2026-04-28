@@ -101,6 +101,9 @@ templ Nav(p NavProps) {
 				<i data-lucide="settings"></i> Settings
 			</a>
 		}
+		<div class="bb-sidebar-section">Help</div>
+		@navExternalLink("https://docs.breadbox.sh", "book-open", "Documentation")
+		@navExternalLink("https://github.com/canalesb93/breadbox", "github", "GitHub")
 	</nav>
 	<!--
 		Footer entrypoint to /settings/account. Settings has its own
@@ -108,9 +111,6 @@ templ Nav(p NavProps) {
 		personal-scope.
 	-->
 	<div class="mt-auto pt-3 border-t border-base-300 px-2">
-		@navExternalLink("https://docs.breadbox.sh", "book-open", "Documentation")
-		@navExternalLink("https://github.com/canalesb93/breadbox", "github", "GitHub")
-		<div class="my-1.5 mx-2 border-t border-base-300/60"></div>
 		<a href="/settings/account" class={ "flex items-center gap-2.5 py-2.5 px-2.5 rounded-lg no-underline transition-colors hover:bg-base-200/70", navActive(p.CurrentPage, "account") } title="My Account">
 			if p.HasLinkedUser {
 				<img src={ navAvatar(p.SessionUserID, p.SessionAvatarVersion) } alt="" class="bb-sidebar-profile-avatar shrink-0"/>
