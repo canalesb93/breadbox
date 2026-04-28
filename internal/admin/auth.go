@@ -69,6 +69,10 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing
 func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
+			if sm.GetString(r.Context(), sessionKeyAccountID) != "" {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
 			renderLogin(w, r, sm, "", "")
 			return
 		}
