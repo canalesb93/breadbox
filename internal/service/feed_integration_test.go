@@ -573,6 +573,215 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		}
 	})
 
+	t.Run("BulkActionFoldsAcrossKinds", func(t *testing.T) {
+		// Iteration-13 widening: a single actor that touches multiple kinds
+		// in one 15-minute window collapses into ONE bulk_action card whose
+		// KindCounts surfaces the breakdown. Previously each kind got its
+		// own bucket and the rail showed 3 adjacent cards for one agent run.
+		svc, queries, pool := newService(t)
+		ctx := context.Background()
+		seed := seedFeedFixture(t, queries, "mixedkind", 21)
+
+		// Anchor inserts well inside a single 15-min bucket window so
+		// the floor(unix/15m) key is identical for every annotation. We
+		// step back 1 hour from real wall-time and snap to the bucket
+		// centre — the resulting timestamp is comfortably inside the 3-day
+		// fetch window and clear of any 15-min boundary.
+		anchor := time.Now().UTC().Add(-1 * time.Hour).Truncate(15 * time.Minute).Add(7 * time.Minute)
+		actorID := "actor-mixed-kind"
+		var i int
+		// 5 category_set
+		for j := 0; j < 5; j++ {
+			insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[i],
+				"category_set", "user", actorID, "Alice",
+				pgtype.UUID{},
+				[]byte(`{"category_slug":"food_and_drink"}`),
+				anchor.Add(time.Duration(j)*time.Second),
+			)
+			i++
+		}
+		// 8 tag_removed
+		for j := 0; j < 8; j++ {
+			insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[i],
+				"tag_removed", "user", actorID, "Alice",
+				pgtype.UUID{},
+				[]byte(`{"tag_slug":"needs-review"}`),
+				anchor.Add(time.Duration(10+j)*time.Second),
+			)
+			i++
+		}
+		// 8 comments from the same actor in the same window. Together with
+		// the bursts above they prove the bucket is kind-agnostic — without
+		// this iteration's widening, each kind would produce its own card.
+		for j := 0; j < 8; j++ {
+			insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[i],
+				"comment", "user", actorID, "Alice",
+				pgtype.UUID{},
+				[]byte(`{"content":"thinking"}`),
+				anchor.Add(time.Duration(20+j)*time.Second),
+			)
+			i++
+		}
+
+		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{})
+		if err != nil {
+			t.Fatalf("ListFeedEvents: %v", err)
+		}
+		if got := countEventsByType(events, "bulk_action"); got != 1 {
+			t.Fatalf("expected 1 bulk_action event (kind-agnostic bucket), got %d", got)
+		}
+		if got := countEventsByType(events, "comment"); got != 0 {
+			t.Errorf("expected 0 standalone comment events (folded into bulk), got %d", got)
+		}
+		ev := findEventByType(events, "bulk_action").BulkAction
+		if ev.Count != 21 {
+			t.Errorf("Count = %d, want 21", ev.Count)
+		}
+		if ev.Kind != "mixed" {
+			t.Errorf("Kind = %q, want %q", ev.Kind, "mixed")
+		}
+		if ev.KindCounts["category_set"] != 5 {
+			t.Errorf("KindCounts[category_set] = %d, want 5", ev.KindCounts["category_set"])
+		}
+		if ev.KindCounts["tag_removed"] != 8 {
+			t.Errorf("KindCounts[tag_removed] = %d, want 8", ev.KindCounts["tag_removed"])
+		}
+		if ev.KindCounts["comment"] != 8 {
+			t.Errorf("KindCounts[comment] = %d, want 8", ev.KindCounts["comment"])
+		}
+	})
+
+	t.Run("CommentsBucketIfThree", func(t *testing.T) {
+		// Three same-actor comments in a 15-min window collapse into a
+		// bulk_action with Kind="comment" Count=3. Two comments in the same
+		// window stay as individual comment cards (sub-threshold).
+		t.Run("ThreeFold", func(t *testing.T) {
+			svc, queries, pool := newService(t)
+			ctx := context.Background()
+			seed := seedFeedFixture(t, queries, "comments3", 3)
+
+			anchor := time.Now().UTC().Add(-1 * time.Hour).Truncate(15 * time.Minute).Add(7 * time.Minute)
+			actorID := "actor-3-comments"
+			for j := 0; j < 3; j++ {
+				insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[j],
+					"comment", "user", actorID, "Alice",
+					pgtype.UUID{},
+					[]byte(`{"content":"hi"}`),
+					anchor.Add(time.Duration(j)*time.Second),
+				)
+			}
+
+			events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{})
+			if err != nil {
+				t.Fatalf("ListFeedEvents: %v", err)
+			}
+			if got := countEventsByType(events, "bulk_action"); got != 1 {
+				t.Fatalf("expected 1 bulk_action (≥3 comments), got %d", got)
+			}
+			if got := countEventsByType(events, "comment"); got != 0 {
+				t.Errorf("expected 0 standalone comments, got %d", got)
+			}
+			ev := findEventByType(events, "bulk_action").BulkAction
+			if ev.Kind != "comment" {
+				t.Errorf("Kind = %q, want %q", ev.Kind, "comment")
+			}
+			if ev.Count != 3 {
+				t.Errorf("Count = %d, want 3", ev.Count)
+			}
+		})
+		t.Run("TwoStandalone", func(t *testing.T) {
+			svc, queries, pool := newService(t)
+			ctx := context.Background()
+			seed := seedFeedFixture(t, queries, "comments2", 2)
+
+			anchor := time.Now().UTC().Add(-1 * time.Hour).Truncate(15 * time.Minute).Add(7 * time.Minute)
+			actorID := "actor-2-comments"
+			for j := 0; j < 2; j++ {
+				insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[j],
+					"comment", "user", actorID, "Alice",
+					pgtype.UUID{},
+					[]byte(`{"content":"hi"}`),
+					anchor.Add(time.Duration(j)*time.Second),
+				)
+			}
+
+			events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{})
+			if err != nil {
+				t.Fatalf("ListFeedEvents: %v", err)
+			}
+			if got := countEventsByType(events, "bulk_action"); got != 0 {
+				t.Errorf("expected 0 bulk_action (sub-threshold), got %d", got)
+			}
+			if got := countEventsByType(events, "comment"); got != 2 {
+				t.Errorf("expected 2 standalone comments, got %d", got)
+			}
+		})
+	})
+
+	t.Run("ReportFoldsIntoBulkAction", func(t *testing.T) {
+		// A reporting agent run: 8 same-actor annotations in a 5-minute
+		// span plus an agent report at the bucket center (same actor).
+		// The report folds into the bulk_action card; only ONE event
+		// surfaces, with the report title in the headline.
+		svc, queries, pool := newService(t)
+		ctx := context.Background()
+		seed := seedFeedFixture(t, queries, "reportfold", 8)
+
+		anchor := time.Now().UTC().Add(-1 * time.Hour).Truncate(15 * time.Minute).Add(7 * time.Minute)
+		actorID := "agent-report-fold"
+		for j := 0; j < 8; j++ {
+			insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[j],
+				"category_set", "agent", actorID, "ReportingAgent",
+				pgtype.UUID{},
+				[]byte(`{"category_slug":"food_and_drink"}`),
+				anchor.Add(time.Duration(j)*time.Second),
+			)
+		}
+
+		// Report from the same agent created in the middle of the bucket.
+		actor := service.Actor{Type: "agent", ID: actorID, Name: "ReportingAgent"}
+		report, err := svc.CreateAgentReport(ctx, "Reviewed and cleared 8 transactions",
+			"All 8 looked clean.",
+			actor, "info", []string{"review"}, "", "")
+		if err != nil {
+			t.Fatalf("CreateAgentReport: %v", err)
+		}
+		// Backdate the report into the middle of the bulk_action's
+		// time window so the actor+window fold check passes.
+		if _, err := pool.Exec(ctx,
+			"UPDATE agent_reports SET created_at = $1 WHERE id::text = $2",
+			anchor.Add(10*time.Second), report.ID,
+		); err != nil {
+			t.Fatalf("backdate report: %v", err)
+		}
+		// Re-fetch the report so the SessionID/CreatedAt round-trip.
+		fetched, err := svc.GetAgentReport(ctx, report.ID)
+		if err != nil {
+			t.Fatalf("GetAgentReport: %v", err)
+		}
+
+		events, leftover, err := svc.ListFeedEventsWithReports(ctx,
+			service.FeedEventsParams{},
+			[]service.AgentReportResponse{fetched},
+		)
+		if err != nil {
+			t.Fatalf("ListFeedEventsWithReports: %v", err)
+		}
+		if got := countEventsByType(events, "bulk_action"); got != 1 {
+			t.Fatalf("expected 1 bulk_action event, got %d", got)
+		}
+		if len(leftover) != 0 {
+			t.Errorf("expected 0 leftover reports (folded into bulk), got %d (%+v)", len(leftover), leftover)
+		}
+		ev := findEventByType(events, "bulk_action").BulkAction
+		if ev.Report == nil {
+			t.Fatalf("BulkAction.Report = nil, want non-nil with title %q", "Reviewed and cleared 8 transactions")
+		}
+		if ev.Report.Title != "Reviewed and cleared 8 transactions" {
+			t.Errorf("BulkAction.Report.Title = %q, want %q", ev.Report.Title, "Reviewed and cleared 8 transactions")
+		}
+	})
+
 	t.Run("WindowIsBounded", func(t *testing.T) {
 		svc, queries, pool := newService(t)
 		ctx := context.Background()

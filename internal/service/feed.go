@@ -168,19 +168,43 @@ type FeedAgentSessionEvent struct {
 	KindCounts map[string]int
 
 	SampleTransactions []FeedSampleTx
+
+	// Report, when non-nil, is an agent_report whose session_id matches
+	// this session. Populated by ListFeedEvents so a reporting agent run
+	// surfaces as a single feed row headlined by the report's title — the
+	// alternative (a separate report card adjacent to the session card) is
+	// noisy on the timeline.
+	Report *FeedReportRef
 }
 
-// FeedBulkActionEvent represents ≥ N annotations from the same actor of
-// the same kind within a soft time-bucket — typically a human running a
-// bulk recategorisation or an agent making changes outside an MCP session.
+// FeedBulkActionEvent represents ≥ N annotations from the same actor
+// within a soft time-bucket — typically a human running a bulk
+// recategorisation or an agent making changes outside an MCP session.
+//
+// As of iteration 13 the soft bucket is keyed by (actor, time-window) only
+// — the actor's `kind` is *not* part of the bucket key. A single agent run
+// that categorises 5 rows, removes a tag from 8, and updates 8 more in the
+// same 15-minute window collapses into one bulk_action card whose
+// `KindCounts` map exposes the per-kind breakdown for inline rendering
+// ("5 categorised · 8 tag-removed · 8 updated"). `Kind` is kept for the
+// homogeneous-bucket code path: when every annotation in the bucket
+// shares one kind the templ renders the dedicated verb/subject phrasing,
+// otherwise it falls back to the generic breakdown line.
 type FeedBulkActionEvent struct {
 	ActorName          string
 	ActorType          string
 	ActorID            string
 	ActorAvatarVersion string
 
-	Kind  string // "tag_added" | "tag_removed" | "category_set" | "rule_applied"
+	// Kind is the homogeneous kind of every annotation in this bucket, or
+	// "mixed" when the bucket folds annotations across kinds.
+	Kind  string
 	Count int
+
+	// KindCounts breaks the bucket's annotations down by kind so the card
+	// can render the breakdown line ("5 categorised · 8 tag-removed · 8
+	// updated") when the bucket spans multiple kinds.
+	KindCounts map[string]int
 
 	// Subjects is the deduped list of subject names (tag names, category
 	// names, rule names) that were applied. When all rows share one
@@ -193,6 +217,26 @@ type FeedBulkActionEvent struct {
 	EndedAt   time.Time
 
 	SampleTransactions []FeedSampleTx
+
+	// Report, when non-nil, is an agent_report whose actor + window
+	// matches this bucket. Folding the report in lets a reporting agent
+	// run render as a single card headlined by the report title rather
+	// than the generic "X categorised, Y tagged" line.
+	Report *FeedReportRef
+}
+
+// FeedReportRef is the slim projection of an agent report folded into a
+// bulk_action / agent_session card. The handler still owns the canonical
+// report card (rendered when the report wasn't folded into anything) — this
+// shape only carries enough to display the title + priority + tags inline
+// and a link to the full report.
+type FeedReportRef struct {
+	ID       string
+	ShortID  string
+	Title    string
+	Priority string
+	Tags     []string
+	IsUnread bool
 }
 
 // FeedBulkSubject is one (subject, count) pair inside a bulk-action card.
@@ -278,6 +322,18 @@ type FeedEventsParams struct {
 // annotations table for households with years of history.
 const FeedMaxLookback = 30 * 24 * time.Hour
 
+// feedSoftBucketWindow is the wall-clock window used by the unsessioned
+// soft-bucket grouping in `groupUnsessionedAnnotations`. An actor's
+// annotations within one window collapse into a single bulk_action card.
+//
+// 15 minutes is wide enough to capture an agent run end-to-end (categorise
+// → tag → comment → write report → leave) while still being narrow enough
+// that a human editing throughout the day stays as distinct buckets per
+// hour. Iteration 12 used 5 minutes which fragmented agent runs into 3-4
+// adjacent cards on the rail; widening collapsed those into one card per
+// run.
+const feedSoftBucketWindow = 15 * time.Minute
+
 // ListFeedEvents returns grouped FeedEvents for the home Feed page,
 // already ordered newest-first.
 //
@@ -291,16 +347,41 @@ const FeedMaxLookback = 30 * 24 * time.Hour
 //     into a single AgentSession event regardless of how many annotations
 //     it produced.
 //  3. Soft-bucket the remaining (un-sessioned) annotations by
-//     `(actor_id, kind, floor(time / 5min))`. Buckets with ≥ BulkThreshold
-//     events become BulkAction events; the rest of the un-sessioned
-//     annotations are dropped UNLESS they're standalone comments — those
-//     pass through as Comment events because every comment is high-signal.
+//     `(actor_id, floor(time / feedSoftBucketWindow))` — note that `kind`
+//     is intentionally absent from the key so a single agent run that
+//     categorises some rows and removes a tag from others collapses into
+//     ONE bulk_action card with a per-kind breakdown. Buckets with
+//     ≥ BulkThreshold events become BulkAction events; sub-threshold
+//     buckets pass through standalone comments individually.
 //  4. Sync logs from the window become Sync events with inline transaction
 //     samples and `RuleOutcomes` lifted from `sync_logs.rule_hits`.
+//  5. Agent reports inside the same window are folded into matching
+//     bulk_action / agent_session events when the actor or session_id
+//     lines up — a reporting agent run renders as one row headed by the
+//     report's title instead of two adjacent cards. Reports that don't
+//     match anything are returned in the consumed/unconsumed split for
+//     the handler to render as standalone report cards.
 //
-// Reports + connection alerts are returned by separate handler-level
-// queries, not by this function.
+// Connection alerts are returned by a separate handler-level query, not
+// by this function.
 func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) ([]FeedEvent, error) {
+	out, _, err := s.listFeedEventsWithReports(ctx, params, nil)
+	return out, err
+}
+
+// ListFeedEventsWithReports is the report-aware variant the home Feed
+// handler uses. It folds matching reports into bulk_action / agent_session
+// events and returns the leftover (un-folded) reports separately so the
+// handler can render them as standalone report cards.
+//
+// Splitting this from `ListFeedEvents` keeps the report-free entry-point
+// available for callers that don't have a windowed report list handy
+// (none today; preserved for symmetry with `ListFeedActivity`).
+func (s *Service) ListFeedEventsWithReports(ctx context.Context, params FeedEventsParams, reports []AgentReportResponse) ([]FeedEvent, []AgentReportResponse, error) {
+	return s.listFeedEventsWithReports(ctx, params, reports)
+}
+
+func (s *Service) listFeedEventsWithReports(ctx context.Context, params FeedEventsParams, reports []AgentReportResponse) ([]FeedEvent, []AgentReportResponse, error) {
 	if params.Window <= 0 {
 		params.Window = 3 * 24 * time.Hour
 	}
@@ -329,13 +410,13 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 
 	annotationRows, err := s.fetchFeedAnnotations(ctx, cutoff, upper)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	annotationRows = enrichFeedActivityRows(annotationRows)
 
 	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, upper, params.SampleLimit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	sessionMeta, err := s.fetchFeedSessionMeta(ctx, annotationRows)
@@ -344,6 +425,10 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 	}
 
 	groupedEvents := groupAnnotationsIntoEvents(annotationRows, sessionMeta, params)
+
+	// Fold matching reports into bulk_action / agent_session events. The
+	// remainder is the standalone-card list returned to the handler.
+	leftoverReports := foldReportsIntoEvents(groupedEvents, reports)
 
 	out := make([]FeedEvent, 0, len(syncEvents)+len(groupedEvents))
 	out = append(out, syncEvents...)
@@ -354,7 +439,7 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 	})
 
 	out = filterFeedEvents(out, params.Filter, params.ActorID)
-	return out, nil
+	return out, leftoverReports, nil
 }
 
 // filterFeedEvents narrows a feed-event slice to the subset matching the
@@ -1068,19 +1153,26 @@ func buildAgentSessionEvent(sessionID string, rows []FeedActivityRow, meta feedS
 }
 
 // groupUnsessionedAnnotations buckets the remaining annotations by
-// (actor_id, kind, 5-min). Buckets at-or-above BulkThreshold collapse into
-// a FeedBulkActionEvent; smaller buckets pass through annotations
-// individually but only `comment` rows are kept (other singleton
-// recategorisations are too low-signal for the home feed).
+// `(actor_id, floor(time / feedSoftBucketWindow))` — note that `kind` is
+// NOT part of the bucket key. Buckets at-or-above BulkThreshold collapse
+// into a single FeedBulkActionEvent regardless of how many distinct kinds
+// the annotations carry; the per-kind breakdown is preserved on the
+// event's `KindCounts` map so the templ can render the breakdown line.
+//
+// Sub-threshold buckets pass through standalone comments individually
+// (other singleton recategorisations are too low-signal for the home
+// feed). When ≥3 standalone comments share a bucket they collapse into a
+// bulk_action event whose Kind == "comment" — we don't want a feed full
+// of identical "Alice commented on transaction" rows when Alice was
+// triaging.
 func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams) []FeedEvent {
 	if len(rows) == 0 {
 		return nil
 	}
-	const bucketWindow = 5 * time.Minute
+	bucketSeconds := int64(feedSoftBucketWindow.Seconds())
 
 	type bucketKey struct {
 		actorID string
-		kind    string
 		bucket  int64
 	}
 
@@ -1096,8 +1188,7 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 		}
 		k := bucketKey{
 			actorID: actorID,
-			kind:    r.Annotation.Kind,
-			bucket:  r.Annotation.CreatedAtTime.Unix() / int64(bucketWindow.Seconds()),
+			bucket:  r.Annotation.CreatedAtTime.Unix() / bucketSeconds,
 		}
 		if _, ok := buckets[k]; !ok {
 			keyOrder = append(keyOrder, k)
@@ -1117,7 +1208,7 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 			})
 			continue
 		}
-		// Below threshold — only standalone comments survive in v2.
+		// Below threshold — only standalone comments survive.
 		for _, r := range bucket {
 			if r.Annotation.Kind != "comment" || r.Annotation.IsDeleted {
 				continue
@@ -1142,12 +1233,16 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 	return out
 }
 
-// buildBulkActionEvent collapses one (actor, kind, time-bucket) cluster of
+// buildBulkActionEvent collapses one (actor, time-bucket) cluster of
 // annotations into a single FeedBulkActionEvent, summarising the subjects
-// (tag names, category names, rule names) the actor applied.
+// (tag names, category names, rule names) the actor applied. When every
+// row in the bucket shares one kind, `Kind` is set to that homogeneous
+// kind so the templ can render the dedicated verb phrasing; otherwise
+// `Kind` is "mixed" and the templ renders the per-kind breakdown line.
 func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedBulkActionEvent {
 	ev := FeedBulkActionEvent{
-		Count: len(rows),
+		Count:      len(rows),
+		KindCounts: make(map[string]int),
 	}
 	subjectCounts := make(map[string]int)
 	subjectMeta := make(map[string]FeedBulkSubject)
@@ -1159,11 +1254,11 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 			ev.ActorName = ann.ActorName
 			ev.ActorType = ann.ActorType
 			ev.ActorAvatarVersion = ann.ActorAvatarVersion
-			ev.Kind = ann.Kind
 			if ann.ActorID != nil {
 				ev.ActorID = *ann.ActorID
 			}
 		}
+		ev.KindCounts[ann.Kind]++
 		if ev.StartedAt.IsZero() || ann.CreatedAtTime.Before(ev.StartedAt) {
 			ev.StartedAt = ann.CreatedAtTime
 		}
@@ -1183,6 +1278,19 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 		if _, ok := uniqueTx[r.TransactionShortID]; !ok {
 			uniqueTx[r.TransactionShortID] = sampleTxFromRow(r)
 		}
+	}
+
+	// Single-kind buckets keep the dedicated kind so the templ can render
+	// the canonical verb phrasing ("Alice categorised 12 transactions").
+	// Mixed-kind buckets get "mixed" so the templ falls back to the
+	// generic "Alice updated N transactions" headline plus the per-kind
+	// breakdown line.
+	if len(ev.KindCounts) == 1 {
+		for k := range ev.KindCounts {
+			ev.Kind = k
+		}
+	} else {
+		ev.Kind = "mixed"
 	}
 
 	subjects := make([]FeedBulkSubject, 0, len(subjectCounts))
@@ -1208,6 +1316,118 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 	}
 	ev.SampleTransactions = samples
 	return ev
+}
+
+// foldReportsIntoEvents pairs each report with a matching bulk_action or
+// agent_session event in `events` so the report renders as part of that
+// card's headline instead of as its own row. Matching is:
+//
+//   - SessionID equality with an agent_session event, OR
+//   - actor (id, type+name fallback) equality plus the report's timestamp
+//     falling inside the bulk_action's [StartedAt-15m, EndedAt+15m] window.
+//
+// Mutates the matched events in place (sets `ev.BulkAction.Report` /
+// `ev.AgentSession.Report`) and returns the un-folded reports for the
+// handler to render as standalone report cards.
+func foldReportsIntoEvents(events []FeedEvent, reports []AgentReportResponse) []AgentReportResponse {
+	if len(events) == 0 || len(reports) == 0 {
+		return reports
+	}
+
+	leftover := make([]AgentReportResponse, 0, len(reports))
+	for _, rep := range reports {
+		if folded := tryFoldReport(events, rep); !folded {
+			leftover = append(leftover, rep)
+		}
+	}
+	return leftover
+}
+
+// tryFoldReport attempts to attach `rep` to a matching event in `events`.
+// Returns true if a match was found and the event was mutated.
+func tryFoldReport(events []FeedEvent, rep AgentReportResponse) bool {
+	ref := reportRefFromResponse(rep)
+
+	// 1. Session match wins. If the report's session_id lines up with an
+	//    agent_session event, fold there regardless of timestamps.
+	if rep.SessionID != nil && *rep.SessionID != "" {
+		for i := range events {
+			if events[i].Type != "agent_session" {
+				continue
+			}
+			if events[i].AgentSession == nil {
+				continue
+			}
+			if events[i].AgentSession.SessionID == *rep.SessionID {
+				if events[i].AgentSession.Report == nil {
+					events[i].AgentSession.Report = &ref
+				}
+				return true
+			}
+		}
+	}
+
+	// 2. Actor + window match into a bulk_action event. The report's
+	//    `created_at` must fall inside the bucket window (with a slack
+	//    of feedSoftBucketWindow on either side so a report written
+	//    seconds after the last annotation still anchors).
+	repTime, err := time.Parse(time.RFC3339, rep.CreatedAt)
+	if err != nil {
+		return false
+	}
+	repActorID := ""
+	if rep.CreatedByID != nil {
+		repActorID = *rep.CreatedByID
+	}
+	repActorKey := repActorID
+	if repActorKey == "" {
+		repActorKey = rep.CreatedByType + ":" + rep.CreatedByName
+	}
+
+	for i := range events {
+		if events[i].Type != "bulk_action" {
+			continue
+		}
+		ba := events[i].BulkAction
+		if ba == nil {
+			continue
+		}
+		baKey := ba.ActorID
+		if baKey == "" {
+			baKey = ba.ActorType + ":" + ba.ActorName
+		}
+		if baKey != repActorKey {
+			continue
+		}
+		windowStart := ba.StartedAt.Add(-feedSoftBucketWindow)
+		windowEnd := ba.EndedAt.Add(feedSoftBucketWindow)
+		if repTime.Before(windowStart) || repTime.After(windowEnd) {
+			continue
+		}
+		if ba.Report == nil {
+			ba.Report = &ref
+		}
+		// Take the report's timestamp as the event timestamp so the row
+		// sorts at the report's wall-clock position (typically the run's
+		// last action). Prevents the row drifting earlier than the
+		// report itself.
+		if repTime.After(events[i].Timestamp) {
+			events[i].Timestamp = repTime
+		}
+		return true
+	}
+	return false
+}
+
+func reportRefFromResponse(r AgentReportResponse) FeedReportRef {
+	return FeedReportRef{
+		ID:       r.ID,
+		ShortID:  r.ShortID,
+		Title:    r.Title,
+		Priority: r.Priority,
+		Tags:     r.Tags,
+		IsUnread: r.ReadAt == nil,
+	}
 }
 
 func bulkSubjectKey(a Annotation) string {

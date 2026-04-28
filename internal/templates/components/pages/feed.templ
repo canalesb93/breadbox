@@ -16,14 +16,12 @@ import (
 // transaction activity log on /transactions/{id}. The home feed is just a
 // global, grouped view of the same shape.
 templ Feed(p FeedProps) {
-	<!-- Comment bubbles use the shared markdown scanner so a comment posted
-	     from the per-transaction composer renders identically when it
-	     surfaces here. Same marked + DOMPurify versions / SRI as the
-	     per-transaction page. The scanner is idempotent — safe on every
-	     feed visit. -->
-	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
-	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
-	<script src="/static/js/admin/markdown.js"></script>
+	<!-- Comment rows on the home feed render the meta line only ("Alice
+	     commented on Whole Foods") — the body lives on the per-tx page.
+	     Dropping the markdown bubble here lets us drop the marked /
+	     DOMPurify / markdown-scanner script trio entirely; the global
+	     feed is a glance surface, and a click-through to /transactions/{id}
+	     is the right home for the comment body. -->
 	<div x-data x-init="$store.shortcuts.setScope('feed')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@feedHero(p)
 	if len(p.ConnectionAlerts) > 0 {
@@ -550,65 +548,157 @@ templ feedReportBody(it FeedItem, r *FeedReport, now time.Time) {
 }
 
 templ feedAgentSessionBody(it FeedItem, s *FeedAgentSession, now time.Time) {
-	<div class="flex items-baseline gap-1.5 flex-wrap">
-		<strong class="font-semibold text-base-content">{ feedSessionActorName(s) }</strong>
-		<span class="text-base-content/55">ran a session</span>
-		<span class="text-base-content/30">·</span>
-		<span class="font-medium text-base-content tabular-nums">{ fmt.Sprintf("%d transaction%s touched", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
-		@feedRowTimestamp(it.TimestampStr, now)
-	</div>
-	if breakdown := feedSessionBreakdown(s); breakdown != "" {
+	if s.ReportTitle != "" {
+		// Report folded into this session — use the report title as the
+		// headline and the session description sinks beneath it. Mirrors
+		// how the bulk_action card folds a report (see feedBulkActionBody).
+		<div class="flex items-baseline gap-1.5 flex-wrap">
+			<a href={ templ.SafeURL("/reports/" + s.ReportID) } class="font-semibold text-base-content hover:text-primary transition-colors no-underline">
+				{ s.ReportTitle }
+			</a>
+			if s.ReportIsUnread {
+				<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
+			}
+			if s.ReportPriority == "critical" {
+				<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
+			} else if s.ReportPriority == "warning" {
+				<span class="badge badge-warning badge-xs uppercase tracking-wide">Warning</span>
+			}
+			@feedRowTimestamp(it.TimestampStr, now)
+		</div>
 		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-			<i data-lucide="sparkles" class="w-3 h-3 text-primary/70"></i>
-			<span>{ breakdown }</span>
-			if dur := feedSessionDuration(s); dur != "" {
+			<i data-lucide="bot" class="w-3 h-3"></i>
+			<span class="font-medium text-base-content/75">{ feedSessionActorName(s) }</span>
+			<span class="text-base-content/30">·</span>
+			<span class="tabular-nums">{ fmt.Sprintf("%d transaction%s", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
+			if breakdown := feedSessionBreakdown(s); breakdown != "" {
+				<span class="text-base-content/30">·</span>
+				<span>{ breakdown }</span>
+			}
+			if len(s.ReportTags) > 0 {
 				<span class="text-base-content/30 mx-1">·</span>
-				<i data-lucide="clock" class="w-3 h-3"></i>
-				<span>{ dur }</span>
+				for _, t := range s.ReportTags {
+					<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-200 text-[0.65rem] font-medium text-base-content/65">{ t }</span>
+				}
 			}
 		</div>
+	} else {
+		<div class="flex items-baseline gap-1.5 flex-wrap">
+			<strong class="font-semibold text-base-content">{ feedSessionActorName(s) }</strong>
+			<span class="text-base-content/55">ran a session</span>
+			<span class="text-base-content/30">·</span>
+			<span class="font-medium text-base-content tabular-nums">{ fmt.Sprintf("%d transaction%s touched", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
+			@feedRowTimestamp(it.TimestampStr, now)
+		</div>
+		if breakdown := feedSessionBreakdown(s); breakdown != "" {
+			<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+				<i data-lucide="sparkles" class="w-3 h-3 text-primary/70"></i>
+				<span>{ breakdown }</span>
+				if dur := feedSessionDuration(s); dur != "" {
+					<span class="text-base-content/30 mx-1">·</span>
+					<i data-lucide="clock" class="w-3 h-3"></i>
+					<span>{ dur }</span>
+				}
+			</div>
+		}
 	}
 	if len(s.SampleTransactions) > 0 {
 		<div class="mt-2">
 			@feedTxRefList(s.SampleTransactions, max0(s.UniqueTransactions-len(s.SampleTransactions)))
 		</div>
 	}
-	if s.SessionShortID != "" {
-		<a href={ templ.SafeURL("/logs/sessions/" + s.SessionShortID) } class="text-primary/70 hover:text-primary transition-colors mt-1.5 inline-flex items-center gap-1 no-underline">
-			Open session log
-			<i data-lucide="arrow-right" class="w-3 h-3"></i>
-		</a>
-	}
+	<div class="mt-1.5 flex items-center gap-3 flex-wrap">
+		if s.ReportTitle != "" && s.ReportID != "" {
+			<a href={ templ.SafeURL("/reports/" + s.ReportID) } class="text-primary/70 hover:text-primary transition-colors inline-flex items-center gap-1 no-underline">
+				Read the full report
+				<i data-lucide="arrow-right" class="w-3 h-3"></i>
+			</a>
+		}
+		if s.SessionShortID != "" {
+			<a href={ templ.SafeURL("/logs/sessions/" + s.SessionShortID) } class="text-primary/70 hover:text-primary transition-colors inline-flex items-center gap-1 no-underline">
+				Open session log
+				<i data-lucide="arrow-right" class="w-3 h-3"></i>
+			</a>
+		}
+	</div>
 }
 
 templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
-	<div class="flex items-baseline gap-1.5 flex-wrap">
-		<strong class="font-semibold text-base-content">{ feedActorDisplay(b.ActorName, b.ActorType) }</strong>
-		<span class="text-base-content/65">{ feedBulkVerb(b.Kind) }</span>
-		<span class="font-semibold text-base-content tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
-		if subjectLabel := feedBulkSubjectLabel(b); subjectLabel != "" {
-			<span class="text-base-content/65">{ subjectLabel }</span>
-		}
-		@feedRowTimestamp(it.TimestampStr, now)
-	</div>
-	if len(b.Subjects) > 1 {
+	if b.ReportTitle != "" {
+		// Report folded into this bucket — use the report title as the
+		// headline. Mirrors the agent_session card's report-folded layout.
+		<div class="flex items-baseline gap-1.5 flex-wrap">
+			<a href={ templ.SafeURL("/reports/" + b.ReportID) } class="font-semibold text-base-content hover:text-primary transition-colors no-underline">
+				{ b.ReportTitle }
+			</a>
+			if b.ReportIsUnread {
+				<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
+			}
+			if b.ReportPriority == "critical" {
+				<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
+			} else if b.ReportPriority == "warning" {
+				<span class="badge badge-warning badge-xs uppercase tracking-wide">Warning</span>
+			}
+			@feedRowTimestamp(it.TimestampStr, now)
+		</div>
 		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-			for i, sub := range b.Subjects {
-				if i >= 4 {
-					<span class="text-base-content/40">+ { fmt.Sprintf("%d more", len(b.Subjects)-4) }</span>
-					break
+			<i data-lucide="bot" class="w-3 h-3"></i>
+			<span class="font-medium text-base-content/75">{ feedActorDisplay(b.ActorName, b.ActorType) }</span>
+			<span class="text-base-content/30">·</span>
+			<span class="tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
+			if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
+				<span class="text-base-content/30">·</span>
+				<span>{ breakdown }</span>
+			}
+			if len(b.ReportTags) > 0 {
+				<span class="text-base-content/30 mx-1">·</span>
+				for _, t := range b.ReportTags {
+					<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-200 text-[0.65rem] font-medium text-base-content/65">{ t }</span>
 				}
-				<span class="inline-flex items-center gap-1 bg-base-200 px-1.5 py-0.5 rounded-md">
-					<span class="font-medium text-base-content/85">{ sub.Name }</span>
-					<span class="text-base-content/55 tabular-nums">&times;{ fmt.Sprintf("%d", sub.Count) }</span>
-				</span>
 			}
 		</div>
+	} else {
+		<div class="flex items-baseline gap-1.5 flex-wrap">
+			<strong class="font-semibold text-base-content">{ feedActorDisplay(b.ActorName, b.ActorType) }</strong>
+			<span class="text-base-content/65">{ feedBulkVerb(b.Kind) }</span>
+			<span class="font-semibold text-base-content tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
+			if subjectLabel := feedBulkSubjectLabel(b); subjectLabel != "" {
+				<span class="text-base-content/65">{ subjectLabel }</span>
+			}
+			@feedRowTimestamp(it.TimestampStr, now)
+		</div>
+		if b.Kind == "mixed" {
+			if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
+				<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+					<i data-lucide="sparkles" class="w-3 h-3 text-primary/70"></i>
+					<span>{ breakdown }</span>
+				</div>
+			}
+		} else if len(b.Subjects) > 1 {
+			<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+				for i, sub := range b.Subjects {
+					if i >= 4 {
+						<span class="text-base-content/40">+ { fmt.Sprintf("%d more", len(b.Subjects)-4) }</span>
+						break
+					}
+					<span class="inline-flex items-center gap-1 bg-base-200 px-1.5 py-0.5 rounded-md">
+						<span class="font-medium text-base-content/85">{ sub.Name }</span>
+						<span class="text-base-content/55 tabular-nums">&times;{ fmt.Sprintf("%d", sub.Count) }</span>
+					</span>
+				}
+			</div>
+		}
 	}
 	if len(b.SampleTransactions) > 0 {
 		<div class="mt-2">
 			@feedTxRefList(b.SampleTransactions, max0(b.Count-len(b.SampleTransactions)))
 		</div>
+	}
+	if b.ReportTitle != "" && b.ReportID != "" {
+		<a href={ templ.SafeURL("/reports/" + b.ReportID) } class="text-primary/70 hover:text-primary transition-colors mt-1.5 inline-flex items-center gap-1 no-underline">
+			Read the full report
+			<i data-lucide="arrow-right" class="w-3 h-3"></i>
+		</a>
 	}
 }
 
@@ -629,10 +719,11 @@ templ feedRowTimestamp(timestamp string, now time.Time) {
 //
 // Comments wrap the existing TimelineCommentRowRaw primitive so the meta
 // line and avatar tile match the per-transaction activity log byte-for-
-// byte. The bubble body uses the shared `.bb-comment-bubble` CSS class
-// (defined in input.css) and the same data-markdown attribute the per-tx
-// page consumes — so a comment posted from the per-tx composer renders
-// identically when it surfaces on the home feed.
+// byte. As of iteration 13 the home feed renders only the meta line — no
+// markdown bubble. The body lives on the per-tx page (click-through via
+// the transaction ref). Reasoning: a global feed is a glance surface, and
+// rendering bodies inline duplicated the markdown-scanner cost across
+// every feed visit. Click-through is the right read for full content.
 templ feedCommentRow(it FeedItem, c *FeedComment, now time.Time) {
 	@components.TimelineCommentRowRaw(feedCommentAvatar(c), nil) {
 		<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6 min-w-0">
@@ -643,9 +734,6 @@ templ feedCommentRow(it FeedItem, c *FeedComment, now time.Time) {
 			</a>
 			@feedRowTimestamp(it.TimestampStr, now)
 		</div>
-		if c.Content != "" {
-			<div class="bb-comment-bubble mt-1" data-markdown={ c.Content } data-markdown-breaks="true"></div>
-		}
 	}
 }
 
@@ -811,8 +899,47 @@ func feedBulkVerb(kind string) string {
 		return "categorised"
 	case "rule_applied":
 		return "ran a rule on"
+	case "comment":
+		return "commented on"
 	}
 	return "updated"
+}
+
+// feedBulkKindBreakdown renders the per-kind breakdown line ("5 categorised
+// · 8 tag-removed · 8 updated") used by mixed-kind bulk_action cards and
+// the report-folded variants. Returns "" when the bucket only carries one
+// kind (the dedicated verb already conveys it). Order is fixed so the
+// rendered string is stable across renders even when the underlying
+// `KindCounts` map iterates differently.
+func feedBulkKindBreakdown(b *FeedBulkAction) string {
+	if len(b.KindCounts) == 0 {
+		return ""
+	}
+	order := []struct {
+		kind  string
+		label string
+	}{
+		{"category_set", "categorised"},
+		{"tag_added", "tag-added"},
+		{"tag_removed", "tag-removed"},
+		{"rule_applied", "rule-applied"},
+		{"comment", "commented"},
+	}
+	parts := []string{}
+	seen := map[string]bool{}
+	for _, o := range order {
+		if c := b.KindCounts[o.kind]; c > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", c, o.label))
+			seen[o.kind] = true
+		}
+	}
+	for k, c := range b.KindCounts {
+		if seen[k] || c <= 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", c, k))
+	}
+	return strings.Join(parts, " · ")
 }
 
 func feedBulkSubjectLabel(b *FeedBulkAction) string {
