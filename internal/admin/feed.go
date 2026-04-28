@@ -573,15 +573,19 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 
 func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 	return pages.FeedTransactionRef{
-		ShortID:      tx.ShortID,
-		Name:         tx.Name,
-		MerchantName: tx.MerchantName,
-		Amount:       tx.Amount,
-		Currency:     tx.Currency,
-		Date:         tx.Date,
-		AccountName:  tx.AccountName,
-		Institution:  tx.Institution,
-		Pending:      tx.Pending,
+		ShortID:             tx.ShortID,
+		Name:                tx.Name,
+		MerchantName:        tx.MerchantName,
+		Amount:              tx.Amount,
+		Currency:            tx.Currency,
+		Date:                tx.Date,
+		AccountName:         tx.AccountName,
+		Institution:         tx.Institution,
+		Pending:             tx.Pending,
+		CategoryDisplayName: tx.CategoryDisplayName,
+		CategoryColor:       tx.CategoryColor,
+		CategoryIcon:        tx.CategoryIcon,
+		CategorySlug:        tx.CategorySlug,
 	}
 }
 

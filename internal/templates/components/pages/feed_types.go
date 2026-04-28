@@ -147,6 +147,15 @@ type FeedTransactionRef struct {
 	// and the transactions list, signalling the row is still preliminary
 	// (provider may re-issue it as posted later).
 	Pending bool
+
+	// Category presentation, mirrored from `tx_row_compact.templ`. When the
+	// underlying transaction is categorised the inline tx-ref row renders
+	// the same coloured-circle avatar used on /transactions; nil falls back
+	// to a neutral letter avatar so feed sample rows match the list layout.
+	CategoryDisplayName *string
+	CategoryColor       *string
+	CategoryIcon        *string
+	CategorySlug        *string
 }
 
 // FeedSync is the sync-card payload. Inline transaction samples and rule

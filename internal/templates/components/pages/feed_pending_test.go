@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// ptrString returns &s — handy for building FeedTransactionRef.Category*
+// pointers inline in test cases without intermediate variables.
+func ptrString(s string) *string { return &s }
+
 // TestFeedTxRefRowPendingPill asserts the inline transaction-reference row
 // renders the canonical clock-icon pending mark when the underlying
 // transaction is pending, and renders cleanly without it when posted.
@@ -89,6 +93,51 @@ func TestFeedTxRefRowPendingPill(t *testing.T) {
 			mustOmit: []string{
 				"Pending — not yet posted",
 				"(pending)",
+			},
+		},
+		{
+			// All-caps merchant from a provider feed must be rendered in
+			// title-case so the row matches the /transactions list. Tests
+			// the `titleCase` pipeline applied to feedTxRefRow as part of
+			// the tx-row consistency pass (PR #970).
+			name: "all_caps_merchant_renders_title_case",
+			tx: FeedTransactionRef{
+				ShortID:      "tx12345c",
+				MerchantName: "WATER SUPPLY COMPANY",
+				Amount:       102.40,
+				Currency:     "USD",
+				AccountName:  "Essential Savings",
+				Pending:      false,
+			},
+			mustContain: []string{
+				"Water Supply Company",
+			},
+			mustOmit: []string{
+				"WATER SUPPLY COMPANY",
+			},
+		},
+		{
+			// When a category icon + color are present the row must render
+			// the same coloured-circle avatar used by tx_row_compact.templ
+			// (the /transactions list). Letter avatar fallback otherwise.
+			name: "category_avatar_renders_lucide_icon",
+			tx: FeedTransactionRef{
+				ShortID:             "tx12345d",
+				MerchantName:        "Whole Foods",
+				Amount:              42.10,
+				Currency:            "USD",
+				AccountName:         "Chase Checking",
+				CategoryDisplayName: ptrString("Groceries"),
+				CategoryColor:       ptrString("oklch(0.7 0.15 140)"),
+				CategoryIcon:        ptrString("shopping-cart"),
+				CategorySlug:        ptrString("food_and_drink_groceries"),
+			},
+			mustContain: []string{
+				`data-lucide="shopping-cart"`,
+				"bb-tx-avatar bb-tx-avatar--sm",
+			},
+			mustOmit: []string{
+				"bb-tx-avatar--letter",
 			},
 		},
 	}

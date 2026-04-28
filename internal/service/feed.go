@@ -33,6 +33,15 @@ type FeedActivityRow struct {
 
 	AccountName     string
 	InstitutionName string
+
+	// Category presentation, threaded through so feed sample rows can
+	// render the same coloured-circle avatar as /transactions. Nil when
+	// uncategorised. Mirrors the LEFT JOIN on `categories` performed by
+	// every feed query.
+	CategoryDisplayName *string
+	CategoryColor       *string
+	CategoryIcon        *string
+	CategorySlug        *string
 }
 
 // ListFeedActivity returns the most recent annotations across every
@@ -51,11 +60,13 @@ SELECT
     COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
-    ac.name, bc.institution_name
+    ac.name, bc.institution_name,
+    cat.display_name, cat.color, cat.icon, cat.slug
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -278,6 +289,16 @@ type FeedSampleTx struct {
 	// later, and surfacing the lifecycle state inline gives users a
 	// "this is provisional" read.
 	Pending bool
+
+	// Category presentation, matched to `tx_row_compact.templ`. Populated
+	// when the underlying transaction is categorised so the inline tx-ref
+	// row can render the same coloured circle avatar (icon when set; first-
+	// letter fallback otherwise) as the /transactions list. Nil when
+	// uncategorised — the templ falls back to a neutral letter avatar.
+	CategoryDisplayName *string
+	CategoryColor       *string
+	CategoryIcon        *string
+	CategorySlug        *string
 }
 
 // FeedRuleOutcome is one (rule, count) pair shown inline on a sync card.
@@ -530,11 +551,13 @@ SELECT
     COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
-    ac.name, bc.institution_name
+    ac.name, bc.institution_name,
+    cat.display_name, cat.color, cat.icon, cat.slug
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -596,6 +619,8 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		txDate                              pgtype.Date
 		pending                             bool
 		accountName, institutionName        pgtype.Text
+		catDisplay, catColor                pgtype.Text
+		catIcon, catSlug                    pgtype.Text
 	)
 
 	if err := s.Scan(
@@ -604,6 +629,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		&actorUserName, &actorUpdatedAt,
 		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate, &pending,
 		&accountName, &institutionName,
+		&catDisplay, &catColor, &catIcon, &catSlug,
 	); err != nil {
 		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
 	}
@@ -670,6 +696,22 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 	}
 	if txDate.Valid {
 		row.TransactionDate = txDate.Time.Format("2006-01-02")
+	}
+	if catDisplay.Valid {
+		v := catDisplay.String
+		row.CategoryDisplayName = &v
+	}
+	if catColor.Valid {
+		v := catColor.String
+		row.CategoryColor = &v
+	}
+	if catIcon.Valid {
+		v := catIcon.String
+		row.CategoryIcon = &v
+	}
+	if catSlug.Valid {
+		v := catSlug.String
+		row.CategorySlug = &v
 	}
 	return row, nil
 }
@@ -866,10 +908,12 @@ func (s *Service) fetchSyncSampleTransactions(ctx context.Context, raws []syncRo
 
 	const q = `
 SELECT t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
-       t.created_at, t.pending, ac.name, bc.id::text, bc.institution_name
+       t.created_at, t.pending, ac.name, bc.id::text, bc.institution_name,
+       cat.display_name, cat.color, cat.icon, cat.slug
 FROM transactions t
 JOIN accounts ac ON ac.id = t.account_id
 JOIN bank_connections bc ON ac.connection_id = bc.id
+LEFT JOIN categories cat ON t.category_id = cat.id
 WHERE t.created_at >= $1
   AND t.deleted_at IS NULL
   AND bc.id::text = ANY($2::text[])
@@ -890,18 +934,20 @@ ORDER BY t.created_at DESC
 	var fetched []txRow
 	for rows.Next() {
 		var (
-			shortID, provName string
-			merchantName      pgtype.Text
-			amount            pgtype.Numeric
-			isoCcy            pgtype.Text
-			txDate            pgtype.Date
-			createdAt         pgtype.Timestamptz
-			pending           bool
-			accountName       pgtype.Text
-			connID            string
-			institutionName   pgtype.Text
+			shortID, provName    string
+			merchantName         pgtype.Text
+			amount               pgtype.Numeric
+			isoCcy               pgtype.Text
+			txDate               pgtype.Date
+			createdAt            pgtype.Timestamptz
+			pending              bool
+			accountName          pgtype.Text
+			connID               string
+			institutionName      pgtype.Text
+			catDisplay, catColor pgtype.Text
+			catIcon, catSlug     pgtype.Text
 		)
-		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName); err != nil {
+		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName, &catDisplay, &catColor, &catIcon, &catSlug); err != nil {
 			return nil, err
 		}
 		t := txRow{
@@ -924,6 +970,22 @@ ORDER BY t.created_at DESC
 		}
 		if txDate.Valid {
 			t.Date = txDate.Time.Format("2006-01-02")
+		}
+		if catDisplay.Valid {
+			v := catDisplay.String
+			t.CategoryDisplayName = &v
+		}
+		if catColor.Valid {
+			v := catColor.String
+			t.CategoryColor = &v
+		}
+		if catIcon.Valid {
+			v := catIcon.String
+			t.CategoryIcon = &v
+		}
+		if catSlug.Valid {
+			v := catSlug.String
+			t.CategorySlug = &v
 		}
 		fetched = append(fetched, t)
 	}
@@ -1462,15 +1524,19 @@ func sampleTxFromRow(r FeedActivityRow) FeedSampleTx {
 		merchant = r.TransactionName
 	}
 	return FeedSampleTx{
-		ShortID:      r.TransactionShortID,
-		Name:         r.TransactionName,
-		MerchantName: merchant,
-		Amount:       r.Amount,
-		Currency:     r.IsoCurrencyCode,
-		Date:         r.TransactionDate,
-		AccountName:  r.AccountName,
-		Institution:  r.InstitutionName,
-		Pending:      r.Pending,
+		ShortID:             r.TransactionShortID,
+		Name:                r.TransactionName,
+		MerchantName:        merchant,
+		Amount:              r.Amount,
+		Currency:            r.IsoCurrencyCode,
+		Date:                r.TransactionDate,
+		AccountName:         r.AccountName,
+		Institution:         r.InstitutionName,
+		Pending:             r.Pending,
+		CategoryDisplayName: r.CategoryDisplayName,
+		CategoryColor:       r.CategoryColor,
+		CategoryIcon:        r.CategoryIcon,
+		CategorySlug:        r.CategorySlug,
 	}
 }
 

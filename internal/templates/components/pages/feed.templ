@@ -744,7 +744,7 @@ templ feedCommentRowBody(it FeedItem, c *FeedComment, now time.Time) {
 		@components.TimelineActorInline(feedCommentActor(c))
 		<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
 		<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">
-			{ feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name) }
+			{ components.TitleCase(feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name)) }
 		</a>
 		@feedRowTimestamp(it.TimestampStr, now)
 	</div>
@@ -783,16 +783,30 @@ func feedCommentActor(c *FeedComment) components.TimelineActor {
 templ feedTxRefRow(tx FeedTransactionRef, dimmed bool) {
 	<a
 		href={ templ.SafeURL("/transactions/" + tx.ShortID) }
-		class="flex items-center justify-between gap-2 text-base-content/85 hover:text-base-content hover:bg-base-200/40 -mx-1 px-1 rounded-md transition-colors no-underline group/txref focus-visible:bg-base-200/50 focus-visible:outline-none"
+		class="flex items-center gap-2 text-base-content/85 hover:text-base-content hover:bg-base-200/70 -mx-1 px-1 py-1 rounded-md transition-colors duration-150 no-underline group/txref focus-visible:bg-base-200/70 focus-visible:outline-none"
 	>
-		<span class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-			<i data-lucide="receipt" class="w-3 h-3 text-base-content/35 shrink-0"></i>
-			<span class={ "font-medium truncate min-w-0", templ.KV("text-base-content/65", dimmed) }>{ feedNonEmpty(tx.MerchantName, tx.Name) }</span>
-			if tx.AccountName != "" {
-				<span class="text-base-content/35 hidden sm:inline">·</span>
-				<span class="text-base-content/45 truncate hidden sm:inline">{ tx.AccountName }</span>
+		<!-- Category avatar — mirrors tx_row_compact.templ so feed sample
+		     rows pick up the same coloured circle as /transactions. -->
+		<span class="relative shrink-0">
+			if tx.CategoryIcon != nil {
+				<span class="bb-tx-avatar bb-tx-avatar--sm" style={ components.TxAvatarColorStyle(tx.CategoryColor) }>
+					<i data-lucide={ *tx.CategoryIcon } class="w-3.5 h-3.5"></i>
+				</span>
+			} else {
+				<span class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
+					<span>{ components.FirstChar(feedNonEmpty(tx.MerchantName, tx.Name)) }</span>
+				</span>
 			}
 		</span>
+		<span class="flex flex-col min-w-0 flex-1 overflow-hidden">
+			<span class={ "font-medium truncate min-w-0", templ.KV("text-base-content/65", dimmed) }>{ components.TitleCase(feedNonEmpty(tx.MerchantName, tx.Name)) }</span>
+			if tx.AccountName != "" {
+				<span class="text-xs text-base-content/45 truncate hidden sm:inline">{ tx.AccountName }</span>
+			}
+		</span>
+		if tx.Date != "" {
+			<span class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:inline">{ components.RelativeDate(tx.Date) }</span>
+		}
 		<span class="flex items-center gap-1 shrink-0">
 			if tx.Pending {
 				<i
