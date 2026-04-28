@@ -102,17 +102,26 @@ templ gsStep1(p GettingStartedProps) {
 					<span class="text-sm font-bold">1</span>
 				}
 			</div>
-			<div class="flex-1 min-w-0">
-				<h3 class={ "font-semibold", templ.KV("text-success", p.HasMember) }>Add a family member</h3>
-				<p class="text-sm text-base-content/50 mt-0.5">
+			<div class="flex-1 min-w-0 flex flex-col gap-2">
+				<div>
+					<h3 class={ "font-semibold", templ.KV("text-success", p.HasMember) }>Add a family member</h3>
+					<p class="text-sm text-base-content/50 mt-0.5">
+						if p.HasMember {
+							Family member added. Bank connections are linked to household members.
+						} else {
+							Create a household member to link bank connections to. Each member represents a person in your household.
+						}
+					</p>
+				</div>
+				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasMember {
-						Family member added. Bank connections are linked to household members.
+						<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">View Members</a>
 					} else {
-						Create a household member to link bank connections to. Each member represents a person in your household.
+						<a href="/settings/household/new" class="btn btn-primary btn-sm rounded-xl">Add Member</a>
 					}
-				</p>
+				</div>
 			</div>
-			<div class="flex-shrink-0">
+			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasMember {
 					<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">View Members</a>
 				} else {
@@ -136,17 +145,26 @@ templ gsStep2(p GettingStartedProps) {
 					<span class="text-sm font-bold">2</span>
 				}
 			</div>
-			<div class="flex-1 min-w-0">
-				<h3 class={ "font-semibold", templ.KV("text-success", p.HasProvider) }>Configure a bank provider</h3>
-				<p class="text-sm text-base-content/50 mt-0.5">
+			<div class="flex-1 min-w-0 flex flex-col gap-2">
+				<div>
+					<h3 class={ "font-semibold", templ.KV("text-success", p.HasProvider) }>Configure a bank provider</h3>
+					<p class="text-sm text-base-content/50 mt-0.5">
+						if p.HasProvider {
+							Provider configured. You can connect bank accounts through Plaid or Teller.
+						} else {
+							Set up Plaid or Teller to connect bank accounts. You can also import transactions via CSV.
+						}
+					</p>
+				</div>
+				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasProvider {
-						Provider configured. You can connect bank accounts through Plaid or Teller.
+						<a href="/settings/providers" class="btn btn-ghost btn-sm rounded-xl">View Providers</a>
 					} else {
-						Set up Plaid or Teller to connect bank accounts. You can also import transactions via CSV.
+						<a href="/settings/providers" class="btn btn-primary btn-sm rounded-xl">Configure</a>
 					}
-				</p>
+				</div>
 			</div>
-			<div class="flex-shrink-0">
+			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasProvider {
 					<a href="/settings/providers" class="btn btn-ghost btn-sm rounded-xl">View Providers</a>
 				} else {
@@ -170,19 +188,30 @@ templ gsStep3(p GettingStartedProps) {
 					<span class="text-sm font-bold">3</span>
 				}
 			</div>
-			<div class="flex-1 min-w-0">
-				<h3 class={ "font-semibold", templ.KV("text-success", p.HasConnection) }>Connect your first bank</h3>
-				<p class="text-sm text-base-content/50 mt-0.5">
+			<div class="flex-1 min-w-0 flex flex-col gap-2">
+				<div>
+					<h3 class={ "font-semibold", templ.KV("text-success", p.HasConnection) }>Connect your first bank</h3>
+					<p class="text-sm text-base-content/50 mt-0.5">
+						if p.HasConnection {
+							Bank connected. Accounts and transactions will sync automatically.
+						} else if p.HasProvider {
+							Link a bank account to start syncing transactions.
+						} else {
+							Configure a provider first, then connect a bank account.
+						}
+					</p>
+				</div>
+				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasConnection {
-						Bank connected. Accounts and transactions will sync automatically.
+						<a href="/connections" class="btn btn-ghost btn-sm rounded-xl">View Connections</a>
 					} else if p.HasProvider {
-						Link a bank account to start syncing transactions.
+						<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">Connect Bank</a>
 					} else {
-						Configure a provider first, then connect a bank account.
+						<span class="btn btn-sm btn-disabled rounded-xl">Connect Bank</span>
 					}
-				</p>
+				</div>
 			</div>
-			<div class="flex-shrink-0">
+			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasConnection {
 					<a href="/connections" class="btn btn-ghost btn-sm rounded-xl">View Connections</a>
 				} else if p.HasProvider {
@@ -207,19 +236,30 @@ templ gsStep4(p GettingStartedProps) {
 					<span class="text-sm font-bold">4</span>
 				}
 			</div>
-			<div class="flex-1 min-w-0">
-				<h3 class={ "font-semibold", templ.KV("text-success", p.HasSync) }>Complete first sync</h3>
-				<p class="text-sm text-base-content/50 mt-0.5">
+			<div class="flex-1 min-w-0 flex flex-col gap-2">
+				<div>
+					<h3 class={ "font-semibold", templ.KV("text-success", p.HasSync) }>Complete first sync</h3>
+					<p class="text-sm text-base-content/50 mt-0.5">
+						if p.HasSync {
+							{ fmt.Sprintf("Sync complete. %s transactions synced across %s accounts.", components.CommaInt(p.TransactionCount), components.CommaInt(p.AccountCount)) }
+						} else if p.HasConnection {
+							Your first sync should start automatically. Check the sync logs if it hasn't started.
+						} else {
+							Connect a bank first, then transactions will sync automatically.
+						}
+					</p>
+				</div>
+				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasSync {
-						{ fmt.Sprintf("Sync complete. %s transactions synced across %s accounts.", components.CommaInt(p.TransactionCount), components.CommaInt(p.AccountCount)) }
+						<a href="/transactions" class="btn btn-ghost btn-sm rounded-xl">View Transactions</a>
 					} else if p.HasConnection {
-						Your first sync should start automatically. Check the sync logs if it hasn't started.
+						<a href="/logs" class="btn btn-ghost btn-sm rounded-xl">View Logs</a>
 					} else {
-						Connect a bank first, then transactions will sync automatically.
+						<span class="btn btn-sm btn-disabled rounded-xl">View Logs</span>
 					}
-				</p>
+				</div>
 			</div>
-			<div class="flex-shrink-0">
+			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasSync {
 					<a href="/transactions" class="btn btn-ghost btn-sm rounded-xl">View Transactions</a>
 				} else if p.HasConnection {
@@ -245,17 +285,26 @@ templ gsStep5(p GettingStartedProps) {
 					<span class="text-sm font-bold">5</span>
 				}
 			</div>
-			<div class="flex-1 min-w-0">
-				<h3 class={ "font-semibold", templ.KV("text-success", p.HasAPIKey) }>Set up AI agents</h3>
-				<p class="text-sm text-base-content/50 mt-0.5">
+			<div class="flex-1 min-w-0 flex flex-col gap-2">
+				<div>
+					<h3 class={ "font-semibold", templ.KV("text-success", p.HasAPIKey) }>Set up AI agents</h3>
+					<p class="text-sm text-base-content/50 mt-0.5">
+						if p.HasAPIKey {
+							API key created. AI agents can access Breadbox via the MCP server or REST API.
+						} else {
+							Create an API key so AI agents can query your financial data via the MCP server.
+						}
+					</p>
+				</div>
+				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasAPIKey {
-						API key created. AI agents can access Breadbox via the MCP server or REST API.
+						<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">View Agents</a>
 					} else {
-						Create an API key so AI agents can query your financial data via the MCP server.
+						<a href="/agent-prompts" class="btn btn-primary btn-sm rounded-xl">Set Up Agents</a>
 					}
-				</p>
+				</div>
 			</div>
-			<div class="flex-shrink-0">
+			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasAPIKey {
 					<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">View Agents</a>
 				} else {
