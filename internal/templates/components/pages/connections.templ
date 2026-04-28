@@ -456,7 +456,7 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 
 templ connectionsCreateLinkModal(p ConnectionsProps) {
 	<dialog id="create-link-modal" class="modal modal-bottom sm:modal-middle">
-		<div class="modal-box rounded-xl max-w-lg">
+		<div class="modal-box w-full sm:max-w-lg [padding-bottom:calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:[padding-bottom:1.5rem]">
 			<h3 class="font-bold text-lg">Create Account Link</h3>
 			<p class="text-sm text-base-content/50 mt-1">Link a dependent (authorized user) account to the primary cardholder's account.</p>
 			<form method="POST" action="/-/account-links" class="mt-4 space-y-4" x-data="{ loading: false }" @submit="loading = true">
