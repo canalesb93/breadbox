@@ -29,6 +29,7 @@ type FeedActivityRow struct {
 	Amount             float64
 	IsoCurrencyCode    string
 	TransactionDate    string
+	Pending            bool
 
 	AccountName     string
 	InstitutionName string
@@ -49,7 +50,7 @@ SELECT
     a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
     COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
-    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
+    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
     ac.name, bc.institution_name
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
@@ -227,6 +228,12 @@ type FeedSampleTx struct {
 	Date         string
 	AccountName  string
 	Institution  string
+	// Pending mirrors `transactions.pending` so the feed card can render
+	// the same clock-icon pending mark used on `/transactions/{id}` and
+	// the transactions list — preliminary rows often re-show as posted
+	// later, and surfacing the lifecycle state inline gives users a
+	// "this is provisional" read.
+	Pending bool
 }
 
 // FeedRuleOutcome is one (rule, count) pair shown inline on a sync card.
@@ -437,7 +444,7 @@ SELECT
     a.payload, a.tag_id, a.rule_id, a.session_id, a.created_at,
     COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
-    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
+    t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
     ac.name, bc.institution_name
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
@@ -502,6 +509,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		amount                              pgtype.Numeric
 		isoCcy                              pgtype.Text
 		txDate                              pgtype.Date
+		pending                             bool
 		accountName, institutionName        pgtype.Text
 	)
 
@@ -509,7 +517,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		&id, &shortID, &txnID, &kind, &actorType, &actorIDOpt, &actorName,
 		&payload, &tagID, &ruleID, &sessionID, &createdAt,
 		&actorUserName, &actorUpdatedAt,
-		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate,
+		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate, &pending,
 		&accountName, &institutionName,
 	); err != nil {
 		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
@@ -566,6 +574,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		TransactionName:    txName,
 		MerchantName:       pgconv.TextOr(merchantName, ""),
 		IsoCurrencyCode:    pgconv.TextOr(isoCcy, "USD"),
+		Pending:            pending,
 		AccountName:        pgconv.TextOr(accountName, ""),
 		InstitutionName:    pgconv.TextOr(institutionName, ""),
 	}
@@ -772,7 +781,7 @@ func (s *Service) fetchSyncSampleTransactions(ctx context.Context, raws []syncRo
 
 	const q = `
 SELECT t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
-       t.created_at, ac.name, bc.id::text, bc.institution_name
+       t.created_at, t.pending, ac.name, bc.id::text, bc.institution_name
 FROM transactions t
 JOIN accounts ac ON ac.id = t.account_id
 JOIN bank_connections bc ON ac.connection_id = bc.id
@@ -802,11 +811,12 @@ ORDER BY t.created_at DESC
 			isoCcy            pgtype.Text
 			txDate            pgtype.Date
 			createdAt         pgtype.Timestamptz
+			pending           bool
 			accountName       pgtype.Text
 			connID            string
 			institutionName   pgtype.Text
 		)
-		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &accountName, &connID, &institutionName); err != nil {
+		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName); err != nil {
 			return nil, err
 		}
 		t := txRow{
@@ -817,6 +827,7 @@ ORDER BY t.created_at DESC
 				Currency:     pgconv.TextOr(isoCcy, "USD"),
 				AccountName:  pgconv.TextOr(accountName, ""),
 				Institution:  pgconv.TextOr(institutionName, ""),
+				Pending:      pending,
 			},
 			ConnectionID: connID,
 			CreatedAt:    createdAt.Time.UTC(),
@@ -1239,6 +1250,7 @@ func sampleTxFromRow(r FeedActivityRow) FeedSampleTx {
 		Date:         r.TransactionDate,
 		AccountName:  r.AccountName,
 		Institution:  r.InstitutionName,
+		Pending:      r.Pending,
 	}
 }
 
