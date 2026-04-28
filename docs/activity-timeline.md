@@ -24,12 +24,18 @@ Cross-references to the canonical specs:
 ## Where it's used
 
 - `/transactions/{id}` — the activity card under the main transaction body.
-  This is the canonical implementation and the only full consumer today.
-- Future: sync-log detail and agent-run logs are the obvious reuse targets.
-  They share the same row-on-rail shape (system-attributed events, occasional
-  human comments, day grouping) and should reuse the shared primitives below
-  rather than fork them. See "Shared primitives" next, and "Future extensions"
-  for the surfaces still on the roadmap.
+  This is the canonical per-event implementation and the original consumer.
+- `/feed` — the home Feed page renders the global, grouped view of the same
+  shape: sync runs, agent reports, MCP agent sessions, bulk-action bursts,
+  and standalone comments threaded onto one rail across the whole household.
+  It composes `TimelineSystemRowCustomTile` and `TimelineCommentRowRaw` from
+  the shared primitives and never forks the row chrome. See `docs/feed.md`
+  for the data shape, aggregation pipeline, and "adding a new event type"
+  recipe.
+- Future: sync-log detail and agent-run logs are the obvious next reuse
+  targets. They share the same row-on-rail shape and should reuse the shared
+  primitives below rather than fork them. See "Shared primitives" next, and
+  "Future extensions" for the surfaces still on the roadmap.
 
 ## Shared primitives
 
