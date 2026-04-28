@@ -2790,14 +2790,16 @@
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
-/* Initials-variant comment avatar uses bg-base-200 for contrast against the
- * card-mode page surface. In prominent mode the rail mask is also base-200,
- * so the neutral circle would otherwise blend right into its surroundings
- * and the avatar reads as a floating letter. Bump it to base-300 so the
- * circle still reads. Image avatars (no bg class) and agent avatars
- * (bg-primary/10) aren't matched and stay as-is. */
-.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div:first-child .bg-base-200 {
-  background-color: var(--color-base-300);
+/* GitHub-style 1px outline on comment-row avatars. The rail mask is
+ * base-200, so without an outline a neutral avatar (image / agent /
+ * initials) reads as floating without a defined edge. base-300 is our
+ * "border" colour and works in both themes — subtle gray-on-white in
+ * light mode, subtle lift on near-black in dark mode. We use `border`
+ * (not box-shadow) so it works on `<img>` too — replaced elements
+ * ignore inset shadows. With box-sizing:border-box the outer 28px
+ * stays intact, so the rail still threads through the avatar centre. */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div:first-child .ring-4 {
+  border: 1px solid var(--color-base-300);
 }
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 {
   position: relative;
