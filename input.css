@@ -676,139 +676,12 @@
            bg-base-200 text-base-content/70 border border-base-300;
   }
 
-  /* Tile + icon scale-up. Targets the row-tile (`w-6 h-6`) and inner icon
-   * (`w-3 h-3`) classes that the card-mode rows render — so we lift the
-   * size in CSS without duplicating the templ markup for each variant.
-   * Also lifts the text leading on row sentences so first-line baseline
-   * stays vertically centred against the larger tile. */
-  .bb-timeline-prominent .bb-timeline > li > div:first-child.w-6.h-6,
-  .bb-timeline-prominent .bb-timeline > li > div:first-child .w-6.h-6 {
-    width: 1.75rem;   /* 28px */
-    height: 1.75rem;
-  }
-  .bb-timeline-prominent .bb-timeline > li > div:first-child .w-3.h-3 {
-    width: 0.875rem;  /* 14px */
-    height: 0.875rem;
-  }
-  .bb-timeline-prominent .bb-timeline > li > div.flex-1.text-xs.leading-6 {
-    line-height: 1.75rem; /* 28px — matches the new tile height */
-  }
-
-  /* Rail mask. The 28px tile bg + ring are still painted with base-100
-   * (card-surface) classes by the shared row markup — redirect both to
-   * base-200 here so the seam stays invisible against the page surface. */
-  .bb-timeline-prominent .bg-base-100 {
-    background-color: var(--color-base-200);
-  }
-  .bb-timeline-prominent .ring-base-100 {
-    --tw-ring-color: var(--color-base-200);
-  }
-  /* Slightly thicker ring for the bigger tile so the colour pill reads
-   * cleanly against the rail. */
-  .bb-timeline-prominent .bb-timeline > li > div:first-child .ring-4 {
-    --tw-ring-offset-width: 0;
-    box-shadow: 0 0 0 5px var(--color-base-200);
-  }
-
-  /* Day separator. Bigger anchor dot and a less-shouty label — closer to
-   * GitHub's "X commented on Aug 12" header than the current uppercase
-   * tracking-wider treatment. */
-  .bb-timeline-prominent .bb-timeline > li[role="separator"] > div:first-child > span {
-    width: 0.875rem;   /* 14px dot, up from 12 */
-    height: 0.875rem;
-  }
-  .bb-timeline-prominent .bb-timeline > li[role="separator"] h3 {
-    font-size: 0.75rem;
-    letter-spacing: 0.04em;
-    color: color-mix(in srgb, var(--color-base-content) 65%, transparent);
-  }
-
-  /* Comment cards. Each comment row's right-hand column becomes a
-   * GitHub-style bordered card: header bar with actor + timestamp, body
-   * with the comment text, and a small left-pointing tail anchoring it
-   * to the avatar on the rail. Targets only comment rows (those that
-   * contain a `.bb-comment-bubble`) so system-event rows and the
-   * composer-row stay untouched. */
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) {
-    @apply py-2;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 {
-    position: relative;
-    background: var(--color-base-100);
-    border: 1px solid var(--color-base-300);
-    border-radius: 0.5rem;
-    overflow: visible;
-  }
-  /* Header bar (was the "Name commented X ago" meta line) */
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child {
-    background: color-mix(in srgb, var(--color-base-200) 60%, transparent);
-    border-bottom: 1px solid var(--color-base-300);
-    padding: 0.5rem 0.875rem;
-    margin: 0;
-    border-top-left-radius: 0.5rem;
-    border-top-right-radius: 0.5rem;
-  }
-  /* Body (was the chat-bubble) */
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) .bb-comment-bubble {
-    display: block;
-    margin: 0;
-    padding: 0.75rem 0.875rem 0.875rem 0.875rem;
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    max-width: none;
-  }
-  /* Left-pointing tail. Two stacked triangles: outer (border-color) sits
-   * one pixel behind the inner (background) so the card border is hinted
-   * along the seam. Top offset (1rem) puts the tip ~halfway down the
-   * 28px avatar tile. */
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::before,
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after {
-    content: '';
-    position: absolute;
-    top: 0.85rem;
-    width: 0;
-    height: 0;
-    border-style: solid;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::before {
-    left: -8px;
-    border-width: 8px 8px 8px 0;
-    border-color: transparent var(--color-base-300) transparent transparent;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after {
-    left: -7px;
-    border-width: 8px 8px 8px 0;
-    border-color: transparent color-mix(in srgb, var(--color-base-200) 60%, transparent) transparent transparent;
-  }
-
-  /* Composer row gets the same outer card treatment as comment rows so
-   * the page reads as one continuous conversation. */
-  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 > [data-composer-anchor] {
-    border-radius: 0.5rem;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 {
-    position: relative;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::before,
-  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
-    content: '';
-    position: absolute;
-    top: 0.85rem;
-    width: 0;
-    height: 0;
-    border-style: solid;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::before {
-    left: -8px;
-    border-width: 8px 8px 8px 0;
-    border-color: transparent var(--color-base-300) transparent transparent;
-  }
-  .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
-    left: -7px;
-    border-width: 8px 8px 8px 0;
-    border-color: transparent var(--color-base-100) transparent transparent;
-  }
+  /* Note: the size/colour/layout overrides for `.bb-timeline-prominent` are
+   * defined below the closing `}` of @layer components (search for
+   * "Activity timeline — prominent overrides"). They have to live outside
+   * the layer because they target Tailwind utility classes (w-6, h-6,
+   * leading-6, ring-4, py-2.5, …) — utilities live in @layer utilities
+   * and beat anything in @layer components regardless of specificity. */
 
   /* ── Info grid (detail pages) ── */
   .bb-info-grid {
@@ -2850,4 +2723,149 @@
  * the slug-tooltip class made the chip render two-line). */
 .bb-tag.tooltip {
   display: inline-flex;
+}
+
+/* ── Activity timeline — prominent overrides ──
+ * Has to live unlayered because every rule below targets Tailwind utility
+ * classes (w-6, h-6, leading-6, ring-4, py-2.5, …). Inside @layer components
+ * those overrides lose to the utilities regardless of specificity, leaving
+ * tiles at 24px and the rail offset (engineered for 28px tiles) two pixels
+ * to the right of every circle's centre. See input.css line ~660 for the
+ * placeholder comment in the @layer components block. */
+
+/* Tile + icon scale-up. Targets the row-tile (`w-6 h-6`) and inner icon
+ * (`w-3 h-3`) classes that the card-mode rows render — so we lift the
+ * size in CSS without duplicating the templ markup for each variant. */
+.bb-timeline-prominent .bb-timeline > li > div:first-child.w-6.h-6,
+.bb-timeline-prominent .bb-timeline > li > div:first-child .w-6.h-6 {
+  width: 1.75rem;   /* 28px */
+  height: 1.75rem;
+}
+.bb-timeline-prominent .bb-timeline > li > div:first-child .w-3.h-3 {
+  width: 0.875rem;  /* 14px */
+  height: 0.875rem;
+}
+/* Lift the text leading on row sentences so the first-line baseline stays
+ * vertically centred against the larger 28px tile next to it. */
+.bb-timeline-prominent .bb-timeline > li > div.flex-1.text-xs.leading-6 {
+  line-height: 1.75rem; /* 28px — matches the tile height */
+}
+
+/* Rail mask. The 28px tile bg + ring are still painted with base-100
+ * (card-surface) classes by the shared row markup — redirect both to
+ * base-200 here so the seam stays invisible against the page surface. */
+.bb-timeline-prominent .bg-base-100 {
+  background-color: var(--color-base-200);
+}
+.bb-timeline-prominent .ring-base-100 {
+  --tw-ring-color: var(--color-base-200);
+}
+/* Slightly thicker ring for the bigger tile so the colour pill reads
+ * cleanly against the rail. */
+.bb-timeline-prominent .bb-timeline > li > div:first-child .ring-4 {
+  --tw-ring-offset-width: 0;
+  box-shadow: 0 0 0 5px var(--color-base-200);
+}
+
+/* Day separator. Bigger anchor dot and a less-shouty label — closer to
+ * GitHub's "X commented on Aug 12" header than the default uppercase
+ * tracking-wider treatment. */
+.bb-timeline-prominent .bb-timeline > li[role="separator"] > div:first-child > span {
+  width: 0.875rem;   /* 14px dot, up from 12 */
+  height: 0.875rem;
+}
+.bb-timeline-prominent .bb-timeline > li[role="separator"] h3 {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--color-base-content) 65%, transparent);
+}
+
+/* Comment cards. Each comment row's right-hand column becomes a
+ * GitHub-style bordered card: header bar with actor + timestamp, body
+ * with the comment text, and a small left-pointing tail anchoring it
+ * to the avatar on the rail. Targets only comment rows (those that
+ * contain a `.bb-comment-bubble`) so system-event rows and the
+ * composer-row stay untouched. */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 {
+  position: relative;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  border-radius: 0.5rem;
+  overflow: visible;
+}
+/* Header bar (was the "Name commented X ago" meta line) */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child {
+  background: color-mix(in srgb, var(--color-base-200) 60%, transparent);
+  border-bottom: 1px solid var(--color-base-300);
+  padding: 0.5rem 0.875rem;
+  margin: 0;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+/* Body (was the chat-bubble) */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) .bb-comment-bubble {
+  display: block;
+  margin: 0;
+  padding: 0.75rem 0.875rem 0.875rem 0.875rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  max-width: none;
+}
+/* Left-pointing tail. Two stacked triangles: outer (border-color) sits
+ * one pixel behind the inner (background) so the card border is hinted
+ * along the seam. The triangle is 16px tall; with `top: 6px` its vertical
+ * centre lands at y=14 inside the card, which is exactly the centre of
+ * the 28px avatar next to it (both flex items share the row's top edge
+ * via `items-start`, so card_top == avatar_top). */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::before,
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::before {
+  left: -8px;
+  border-width: 8px 8px 8px 0;
+  border-color: transparent var(--color-base-300) transparent transparent;
+}
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after {
+  left: -7px;
+  border-width: 8px 8px 8px 0;
+  border-color: transparent color-mix(in srgb, var(--color-base-200) 60%, transparent) transparent transparent;
+}
+
+/* Composer row gets the same outer card treatment as comment rows so
+ * the page reads as one continuous conversation. */
+.bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 > [data-composer-anchor] {
+  border-radius: 0.5rem;
+}
+.bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 {
+  position: relative;
+}
+.bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::before,
+.bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+.bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::before {
+  left: -8px;
+  border-width: 8px 8px 8px 0;
+  border-color: transparent var(--color-base-300) transparent transparent;
+}
+.bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
+  left: -7px;
+  border-width: 8px 8px 8px 0;
+  border-color: transparent var(--color-base-100) transparent transparent;
 }
