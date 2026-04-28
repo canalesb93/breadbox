@@ -78,19 +78,39 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 1. Grouped events from the service. Run this first so we can decide
-		// whether the (relatively expensive) tag + category lookups are even
-		// needed — they only feed bulk_action subject rendering. Skipping
-		// them on the common no-bulk path saves 5-10ms per request.
+		// 1. Reports — windowed to match the feed bound. Fetched ahead of
+		// the events call so the service can fold matching reports into
+		// bulk_action / agent_session events (one card per agent run
+		// instead of two adjacent cards). Skipped under the
+		// syncs/comments/sessions/me chips, which scope the page to events
+		// the service layer produces.
+		var reports []service.AgentReportResponse
+		if filter == "" || filter == "reports" {
+			t0 := time.Now()
+			var rerr error
+			reports, rerr = svc.ListAgentReports(ctx, 50)
+			qReports = time.Since(t0)
+			if rerr != nil {
+				a.Logger.Error("feed: list agent reports", "error", rerr)
+			}
+		}
+
+		// 2. Grouped events from the service. Run after the report fetch so
+		// the service can fold matching reports into bulk_action /
+		// agent_session events. Reports that don't fold into anything come
+		// back via `leftoverReports` for standalone-card rendering. We also
+		// decide here whether the (relatively expensive) tag + category
+		// lookups are needed — they only feed bulk_action subject rendering.
+		// Skipping them on the common no-bulk path saves 5-10ms per request.
 		t0 := time.Now()
-		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{
+		events, leftoverReports, err := svc.ListFeedEventsWithReports(ctx, service.FeedEventsParams{
 			Window:        window,
 			BulkThreshold: 3,
 			SampleLimit:   5,
 			Filter:        filter,
 			ActorID:       sessionActorID,
 			Before:        beforeTime,
-		})
+		}, reports)
 		qEvents = time.Since(t0)
 		if err != nil {
 			a.Logger.Error("feed: list events", "error", err)
@@ -130,19 +150,6 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			// no-op stubs so the call site stays simple.
 			categoryDetail = func(string) categoryDisplay { return categoryDisplay{} }
 			tagDisplayFn = func(string) tagDisplay { return tagDisplay{} }
-		}
-
-		// 2. Reports — windowed to match the feed bound. Skipped under the
-		// syncs/comments/sessions/me chips, which scope the page to events
-		// the service layer produces.
-		var reports []service.AgentReportResponse
-		if filter == "" || filter == "reports" {
-			t0 = time.Now()
-			reports, err = svc.ListAgentReports(ctx, 50)
-			qReports = time.Since(t0)
-			if err != nil {
-				a.Logger.Error("feed: list agent reports", "error", err)
-			}
 		}
 
 		// 3. Connection alerts + empty-state meta — current state, not
@@ -200,8 +207,11 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 5. Append reports as their own feed items.
-		for _, rep := range reports {
+		// 5. Append leftover (un-folded) reports as their own feed items.
+		// Reports that the service folded into a bulk_action / agent_session
+		// card are NOT in `leftoverReports` — they render as part of that
+		// card's headline.
+		for _, rep := range leftoverReports {
 			if rep.CreatedAt == "" {
 				continue
 			}
@@ -480,6 +490,14 @@ func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentS
 		Commented:          s.KindCounts["comment"],
 		RuleApplied:        s.KindCounts["rule_applied"],
 	}
+	if s.Report != nil {
+		out.ReportID = s.Report.ID
+		out.ReportShortID = s.Report.ShortID
+		out.ReportTitle = s.Report.Title
+		out.ReportPriority = s.Report.Priority
+		out.ReportTags = s.Report.Tags
+		out.ReportIsUnread = s.Report.IsUnread
+	}
 	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(s.SampleTransactions))
 	for _, tx := range s.SampleTransactions {
 		out.SampleTransactions = append(out.SampleTransactions, projectSampleTx(tx))
@@ -488,6 +506,10 @@ func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentS
 }
 
 func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(string) tagDisplay, categoryDetail func(string) categoryDisplay) *pages.FeedBulkAction {
+	kindCounts := make(map[string]int, len(b.KindCounts))
+	for k, v := range b.KindCounts {
+		kindCounts[k] = v
+	}
 	out := &pages.FeedBulkAction{
 		ActorName:          b.ActorName,
 		ActorType:          b.ActorType,
@@ -495,8 +517,17 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 		ActorAvatarVersion: b.ActorAvatarVersion,
 		Kind:               b.Kind,
 		Count:              b.Count,
+		KindCounts:         kindCounts,
 		StartedAt:          b.StartedAt,
 		EndedAt:            b.EndedAt,
+	}
+	if b.Report != nil {
+		out.ReportID = b.Report.ID
+		out.ReportShortID = b.Report.ShortID
+		out.ReportTitle = b.Report.Title
+		out.ReportPriority = b.Report.Priority
+		out.ReportTags = b.Report.Tags
+		out.ReportIsUnread = b.Report.IsUnread
 	}
 	for _, sub := range b.Subjects {
 		display := pages.FeedBulkSubject{

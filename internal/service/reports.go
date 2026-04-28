@@ -22,6 +22,14 @@ type AgentReportResponse struct {
 	Author        *string  `json:"author,omitempty"`
 	ReadAt        *string  `json:"read_at"`
 	CreatedAt     string   `json:"created_at"`
+
+	// SessionID, when populated, links this report to the MCP session that
+	// produced it. Surfacing it in the response lets the home Feed fold a
+	// report into the matching agent_session card so an agent run shows up
+	// as a single row headed by the report title rather than two adjacent
+	// cards (the report + the session). Nil when the report wasn't anchored
+	// to a session at write time (older reports, or human-authored ones).
+	SessionID *string `json:"session_id,omitempty"`
 }
 
 func agentReportFromRow(r db.AgentReport) AgentReportResponse {
@@ -29,7 +37,7 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 	if tags == nil {
 		tags = []string{}
 	}
-	return AgentReportResponse{
+	out := AgentReportResponse{
 		ID:            formatUUID(r.ID),
 		ShortID:       r.ShortID,
 		Title:         r.Title,
@@ -43,6 +51,11 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 		ReadAt:        timestampStr(r.ReadAt),
 		CreatedAt:     pgconv.TimestampStr(r.CreatedAt),
 	}
+	if r.SessionID.Valid {
+		s := formatUUID(r.SessionID)
+		out.SessionID = &s
+	}
+	return out
 }
 
 // ValidReportPriorities lists allowed priority values.

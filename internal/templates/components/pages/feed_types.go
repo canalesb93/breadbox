@@ -237,18 +237,44 @@ type FeedAgentSession struct {
 	RuleApplied    int
 
 	SampleTransactions []FeedTransactionRef
+
+	// Report fields are populated when the service folded an agent_report
+	// whose `session_id` matches this session into the card. The templ
+	// uses ReportTitle as the headline (instead of the generic "ran a
+	// session" line) and renders priority badges + tags inline. Empty
+	// when no report was folded — render the plain session card.
+	ReportID       string
+	ReportShortID  string
+	ReportTitle    string
+	ReportPriority string
+	ReportTags     []string
+	ReportIsUnread bool
 }
 
-// FeedBulkAction is the rich card that collapses ≥3 same-actor same-kind
-// annotations from a 5-minute bucket into a single row.
+// FeedBulkAction is the rich card that collapses ≥3 same-actor
+// annotations from a 15-minute bucket into a single row. As of iteration
+// 13 the bucket key is (actor, time-window) only — `kind` is absent — so
+// a single agent run that categorises some rows, removes a tag from
+// others, and updates more in the same window collapses into ONE
+// bulk_action card. KindCounts surfaces the per-kind breakdown for inline
+// rendering ("5 categorised · 8 tag-removed · 8 updated").
 type FeedBulkAction struct {
 	ActorName          string
 	ActorType          string
 	ActorID            string
 	ActorAvatarVersion string
 
+	// Kind is "mixed" when the bucket spans multiple kinds; otherwise the
+	// single homogeneous kind. The templ branches on "mixed" to render
+	// the per-kind breakdown line in lieu of a dedicated verb phrasing.
 	Kind  string
 	Count int
+
+	// KindCounts breaks the bucket down by kind. Always populated; the
+	// templ renders it as the "5 categorised · 8 tag-removed · 8 updated"
+	// breakdown when Kind == "mixed", or skips it for homogeneous
+	// buckets (the dedicated verb phrasing already conveys the kind).
+	KindCounts map[string]int
 
 	Subjects []FeedBulkSubject
 
@@ -256,6 +282,18 @@ type FeedBulkAction struct {
 	EndedAt   time.Time
 
 	SampleTransactions []FeedTransactionRef
+
+	// Report fields are populated when the service folded a matching
+	// agent_report into the card (see service.foldReportsIntoEvents). The
+	// templ uses ReportTitle as the bold headline instead of the generic
+	// "Alice updated N transactions" line and renders priority badges +
+	// tags inline. Empty when no report was folded.
+	ReportID       string
+	ReportShortID  string
+	ReportTitle    string
+	ReportPriority string
+	ReportTags     []string
+	ReportIsUnread bool
 }
 
 // FeedBulkSubject is one (subject, count) chip inside a bulk-action card.
