@@ -88,12 +88,15 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 3. Connection alerts — current state, not windowed. Hidden under
-		// any active chip so the filtered view is exclusively the chip's
-		// scope; the alerts re-appear on the unfiltered "All" page.
-		var alerts []pages.FeedAlert
-		if filter == "" {
-			alerts = buildFeedConnectionAlerts(ctx, a)
+		// 3. Connection alerts + empty-state meta — current state, not
+		// windowed. Alerts hide under any active chip so the filtered view
+		// is exclusively the chip's scope; the alerts re-appear on the
+		// unfiltered "All" page. The meta (hasConnections + global last-
+		// sync-at) is always collected so the empty-state branch can pick
+		// the right copy regardless of filter.
+		alerts, hasConnections, globalLastSyncAt := buildFeedConnectionMeta(ctx, a)
+		if filter != "" {
+			alerts = nil
 		}
 
 		// 4. Project FeedEvents onto templ-side FeedItems.
@@ -209,22 +212,33 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			WindowDays:       feedWindowDays,
 			Now:              now,
 			Filter:           filter,
+			HasConnections:   hasConnections,
+			LastSyncAt:       globalLastSyncAt,
+			IsAdmin:          IsAdmin(tr.sm, r),
 		})
 		tr.RenderWithTempl(w, r, data, body)
 	}
 }
 
-// buildFeedConnectionAlerts collects the pinned warning cards rendered above
-// the rail. Each alert maps one bank connection currently in error or
-// pending_reauth state to a `pages.FeedAlert`.
-func buildFeedConnectionAlerts(ctx context.Context, a *app.App) []pages.FeedAlert {
+// buildFeedConnectionMeta does one ListBankConnections pass and projects out
+// three things the page needs: the pinned alert cards (for connections in
+// error/pending_reauth), whether *any* connection exists (drives the first-
+// run empty state), and the most recent successful sync time across the
+// household (drives the "quiet around here · last sync was {rel}" empty
+// state). Co-locating the projections means the empty-state branch can
+// pick the right copy without a second query.
+func buildFeedConnectionMeta(ctx context.Context, a *app.App) (alerts []pages.FeedAlert, hasConnections bool, globalLastSyncAt time.Time) {
 	bankConnections, err := a.Queries.ListBankConnections(ctx)
 	if err != nil {
 		a.Logger.Error("feed: list bank connections", "error", err)
-		return nil
+		return nil, false, time.Time{}
 	}
-	out := make([]pages.FeedAlert, 0)
+	alerts = make([]pages.FeedAlert, 0)
 	for _, conn := range bankConnections {
+		hasConnections = true
+		if conn.LastSyncedAt.Valid && conn.LastSyncedAt.Time.After(globalLastSyncAt) {
+			globalLastSyncAt = conn.LastSyncedAt.Time
+		}
 		status := string(conn.Status)
 		if status != "error" && status != "pending_reauth" {
 			continue
@@ -241,9 +255,9 @@ func buildFeedConnectionAlerts(ctx context.Context, a *app.App) []pages.FeedAler
 		if conn.LastSyncedAt.Valid {
 			alert.LastSyncedAt = relativeTime(conn.LastSyncedAt.Time)
 		}
-		out = append(out, alert)
+		alerts = append(alerts, alert)
 	}
-	return out
+	return alerts, hasConnections, globalLastSyncAt
 }
 
 // projectFeedEvent maps one service-layer FeedEvent onto its templ-side
