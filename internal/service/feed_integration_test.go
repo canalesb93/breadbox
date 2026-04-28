@@ -486,6 +486,93 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		}
 	})
 
+	t.Run("BeforeAnchorsUpperBound", func(t *testing.T) {
+		// `Before` rolls the 3-day window backward — events newer than the
+		// upper bound must drop out of the result, while events inside
+		// `[Before-3d, Before)` come through. Validates the pagination
+		// affordance the /feed footer exposes.
+		svc, queries, pool := newService(t)
+		ctx := context.Background()
+		seed := seedFeedFixture(t, queries, "before-window", 2)
+
+		now := time.Now().UTC()
+		// Recent comment (1 hour ago) — should be excluded by Before=now-2d.
+		insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[0],
+			"comment", "user", "actor-recent", "Alice",
+			pgtype.UUID{},
+			[]byte(`{"content":"recent"}`),
+			now.Add(-1*time.Hour),
+		)
+		// Older comment (2.5 days ago) — should land inside the chunk
+		// `[Before-3d, Before)` where Before = now-2d.
+		insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[1],
+			"comment", "user", "actor-older", "Alice",
+			pgtype.UUID{},
+			[]byte(`{"content":"older"}`),
+			now.Add(-60*time.Hour),
+		)
+
+		before := now.Add(-2 * 24 * time.Hour)
+		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{
+			Window: 3 * 24 * time.Hour,
+			Before: before,
+		})
+		if err != nil {
+			t.Fatalf("ListFeedEvents: %v", err)
+		}
+		if got := countEventsByType(events, "comment"); got != 1 {
+			t.Fatalf("expected 1 comment in `[before-3d, before)` chunk, got %d (%+v)", got, events)
+		}
+		// The single event must be the older one (the recent comment is
+		// past the upper bound).
+		c := findEventByType(events, "comment").Comment
+		if c.Content != "older" {
+			t.Errorf("Comment.Content = %q, want %q", c.Content, "older")
+		}
+	})
+
+	t.Run("BeforeIsCappedAt30Days", func(t *testing.T) {
+		// Asking for a `Before` deeper than 30 days clamps the upper bound
+		// to (now - FeedMaxLookback). With Window=3d the resulting chunk is
+		// `[now-33d, now-30d)`, so an annotation aged ~31 days ago lands
+		// inside it while a 90-day-old annotation does not.
+		svc, queries, pool := newService(t)
+		ctx := context.Background()
+		seed := seedFeedFixture(t, queries, "before-cap", 2)
+
+		now := time.Now().UTC()
+		insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[0],
+			"comment", "user", "actor-cap-in", "Alice",
+			pgtype.UUID{},
+			[]byte(`{"content":"in-clamped-chunk"}`),
+			now.Add(-31*24*time.Hour),
+		)
+		insertAnnotation(t, ctx, pool, queries, seed.TxnIDs[1],
+			"comment", "user", "actor-cap-out", "Alice",
+			pgtype.UUID{},
+			[]byte(`{"content":"way-too-old"}`),
+			now.Add(-90*24*time.Hour),
+		)
+
+		// Caller asks for a `Before` 60 days back — service must clamp it
+		// to (now - FeedMaxLookback) so the 31-day-old annotation lands
+		// inside the resulting chunk while the 90-day-old one stays out.
+		events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{
+			Window: 3 * 24 * time.Hour,
+			Before: now.Add(-60 * 24 * time.Hour),
+		})
+		if err != nil {
+			t.Fatalf("ListFeedEvents: %v", err)
+		}
+		if got := countEventsByType(events, "comment"); got != 1 {
+			t.Fatalf("expected 1 comment after clamping Before to -30d, got %d (%+v)", got, events)
+		}
+		c := findEventByType(events, "comment").Comment
+		if c.Content != "in-clamped-chunk" {
+			t.Errorf("Comment.Content = %q, want %q", c.Content, "in-clamped-chunk")
+		}
+	})
+
 	t.Run("WindowIsBounded", func(t *testing.T) {
 		svc, queries, pool := newService(t)
 		ctx := context.Background()

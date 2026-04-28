@@ -244,6 +244,14 @@ type FeedEventsParams struct {
 	BulkThreshold int
 	SampleLimit   int
 
+	// Before, when non-zero, anchors the window's *upper* bound at this
+	// timestamp instead of "now". Used by the "Load older activity"
+	// pagination affordance — the page rolls backward in `Window`-sized
+	// chunks. The cutoff becomes `Before.Add(-Window)`. Default-window
+	// behaviour (no `Before`) is preserved verbatim: events newer than
+	// `now - Window` and up to `now`.
+	Before time.Time
+
 	// Filter scopes the resulting event slice to a single chip on the feed
 	// rail. Empty string means "no filter" — every grouped event is
 	// returned. See `filterFeedEvents` for the recognised values.
@@ -256,6 +264,12 @@ type FeedEventsParams struct {
 	// whether the auth_account is linked to a household user.
 	ActorID string
 }
+
+// FeedMaxLookback is the hard ceiling for `Before`-driven pagination on the
+// home feed. A user can scroll backward in 3-day chunks but cannot ask for
+// activity older than this — the unbounded read would walk the entire
+// annotations table for households with years of history.
+const FeedMaxLookback = 30 * 24 * time.Hour
 
 // ListFeedEvents returns grouped FeedEvents for the home Feed page,
 // already ordered newest-first.
@@ -290,15 +304,29 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 		params.SampleLimit = 5
 	}
 
-	cutoff := time.Now().Add(-params.Window)
+	now := time.Now()
+	// Clamp the upper bound to the lookback ceiling so callers asking for a
+	// timestamp deeper than `FeedMaxLookback` silently get the oldest still-
+	// addressable window. Keeps the handler's `?before=` clamp honoured at
+	// the service layer too — defence in depth, since this is the layer
+	// that actually owns the unbounded-query risk.
+	upper := now
+	if !params.Before.IsZero() {
+		upper = params.Before
+		minUpper := now.Add(-FeedMaxLookback)
+		if upper.Before(minUpper) {
+			upper = minUpper
+		}
+	}
+	cutoff := upper.Add(-params.Window)
 
-	annotationRows, err := s.fetchFeedAnnotations(ctx, cutoff)
+	annotationRows, err := s.fetchFeedAnnotations(ctx, cutoff, upper)
 	if err != nil {
 		return nil, err
 	}
 	annotationRows = enrichFeedActivityRows(annotationRows)
 
-	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, params.SampleLimit)
+	syncEvents, err := s.fetchFeedSyncEvents(ctx, cutoff, upper, params.SampleLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +430,7 @@ func filterEventsByActor(events []FeedEvent, actorID string) []FeedEvent {
 // surfaces both the live profile name (preferred over the frozen-at-
 // write-time `annotations.actor_name`) and the user's `updated_at` for
 // avatar cache-busting.
-func (s *Service) fetchFeedAnnotations(ctx context.Context, cutoff time.Time) ([]FeedActivityRow, error) {
+func (s *Service) fetchFeedAnnotations(ctx context.Context, cutoff, upper time.Time) ([]FeedActivityRow, error) {
 	const q = `
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type, a.actor_id, a.actor_name,
@@ -426,12 +454,13 @@ LEFT JOIN users u_direct
    AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
   AND a.created_at >= $1
+  AND a.created_at <  $2
   AND a.kind NOT IN ('sync_started', 'sync_updated')
   AND COALESCE(a.payload->>'applied_by', '') <> 'sync'
 ORDER BY a.created_at DESC
 `
 
-	rows, err := s.Pool.Query(ctx, q, cutoff)
+	rows, err := s.Pool.Query(ctx, q, cutoff, upper)
 	if err != nil {
 		return nil, fmt.Errorf("list feed annotations: %w", err)
 	}
@@ -583,7 +612,7 @@ func enrichFeedActivityRows(in []FeedActivityRow) []FeedActivityRow {
 // fetchFeedSyncEvents returns one FeedEvent per sync run within the window
 // (failed runs always included; successful no-op runs filtered out).
 // Inline transaction samples are batched in a single follow-up query.
-func (s *Service) fetchFeedSyncEvents(ctx context.Context, cutoff time.Time, sampleLimit int) ([]FeedEvent, error) {
+func (s *Service) fetchFeedSyncEvents(ctx context.Context, cutoff, upper time.Time, sampleLimit int) ([]FeedEvent, error) {
 	const q = `
 SELECT
     sl.id, sl.connection_id,
@@ -594,10 +623,11 @@ SELECT
 FROM sync_logs sl
 JOIN bank_connections bc ON sl.connection_id = bc.id
 WHERE sl.started_at >= $1
+  AND sl.started_at <  $2
 ORDER BY sl.started_at DESC
 `
 
-	rows, err := s.Pool.Query(ctx, q, cutoff)
+	rows, err := s.Pool.Query(ctx, q, cutoff, upper)
 	if err != nil {
 		return nil, fmt.Errorf("list feed sync logs: %w", err)
 	}
