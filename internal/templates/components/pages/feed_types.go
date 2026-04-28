@@ -142,6 +142,11 @@ type FeedTransactionRef struct {
 	Date         string
 	AccountName  string
 	Institution  string
+	// Pending mirrors `transactions.pending`. When true the inline tx-ref
+	// row renders the same small clock-icon mark used on the per-tx page
+	// and the transactions list, signalling the row is still preliminary
+	// (provider may re-issue it as posted later).
+	Pending bool
 }
 
 // FeedSync is the sync-card payload. Inline transaction samples and rule
