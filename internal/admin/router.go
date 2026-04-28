@@ -62,6 +62,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
 		r.Get("/", DashboardHandler(a, svc, tr))
+		r.Get("/feed", FeedHandler(a, svc, tr))
 		r.Get("/getting-started", GettingStartedHandler(a, sm, tr))
 		r.Post("/getting-started/dismiss", DismissGettingStartedHandler(a, sm))
 		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))

@@ -52,6 +52,11 @@ templ Nav(p NavProps) {
 			<i data-lucide="house"></i>
 			<span class="flex-1">Home</span>
 		</a>
+		<a href="/feed" class={ "bb-sidebar-link", navActive(p.CurrentPage, "feed") }>
+			<i data-lucide="rss"></i>
+			<span class="flex-1">Feed</span>
+			<span class="bb-nav-badge" title="New activity-style home">New</span>
+		</a>
 		<a href="/transactions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "transactions") }>
 			<i data-lucide="receipt"></i> Transactions
 		</a>
