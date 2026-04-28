@@ -665,10 +665,11 @@ templ txdComposerCard(p TransactionDetailProps) {
 				x-cloak
 			>
 				<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
-				<span class="text-xs font-medium">
-					<span class="sm:hidden">Add Needs Review</span>
-					<span class="hidden sm:inline">Add Needs Review</span>
-				</span>
+				<!-- Mobile drops the label entirely so the toolbar fits the
+				     390px composer width. The checkbox + :title tooltip carry
+				     the affordance; the desktop label restores the full text
+				     once horizontal room opens up at sm. -->
+				<span class="text-xs font-medium hidden sm:inline">Add Needs Review</span>
 			</label>
 			<button
 				@click="addComment()"
@@ -678,7 +679,12 @@ templ txdComposerCard(p TransactionDetailProps) {
 			>
 				<i data-lucide="message-square" class="w-3.5 h-3.5" x-show="!pinReview" aria-hidden="true"></i>
 				<i data-lucide="message-square-x" class="w-3.5 h-3.5" x-show="pinReview" x-cloak aria-hidden="true"></i>
-				<span class="text-xs font-medium" x-text="pinReview ? 'Comment and tag' : 'Comment'"></span>
+				<!-- Two spans share the same Alpine state so the wording can
+				     shrink on mobile ("Comment + tag") while the desktop copy
+				     stays explicit ("Comment and tag"). Splitting at sm keeps
+				     the toolbar within the composer width on a 390px viewport. -->
+				<span class="text-xs font-medium sm:hidden" x-text="pinReview ? 'Comment + tag' : 'Comment'"></span>
+				<span class="text-xs font-medium hidden sm:inline" x-text="pinReview ? 'Comment and tag' : 'Comment'"></span>
 				<span class="hidden sm:inline ml-0.5 text-[10px] opacity-70 border border-current/30 rounded px-1 leading-none py-0.5" x-show="!$store.device.isTouch">⌘↵</span>
 			</button>
 		</div>
