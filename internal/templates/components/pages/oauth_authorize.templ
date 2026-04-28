@@ -28,11 +28,11 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 		FlashType: p.FlashType,
 		FlashMsg:  p.FlashMsg,
 	}) {
-		<div class="flex flex-col items-center justify-center min-h-[60vh] px-4">
-			<div class="bb-card p-8 max-w-md w-full">
+		<div class="flex flex-col items-center justify-center min-h-[60vh] px-4 py-6">
+			<div class="bb-card p-6 sm:p-8 max-w-md w-full">
 				<div class="flex flex-col items-center text-center mb-6">
-					<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-						<i data-lucide="shield-check" class="w-8 h-8 text-primary"></i>
+					<div class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+						<i data-lucide="shield-check" class="w-7 h-7 sm:w-8 sm:h-8 text-primary"></i>
 					</div>
 					<h2 class="text-lg font-semibold mb-1">Authorize Access</h2>
 					<p class="text-sm text-base-content/50">
@@ -41,19 +41,19 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 				</div>
 				<div class="rounded-xl bg-base-200/50 p-4 mb-6">
 					<div class="text-xs font-medium text-base-content/50 mb-2">This will allow the application to:</div>
-					<ul class="space-y-2">
-						<li class="flex items-center gap-2 text-sm">
-							<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
-							Read your transactions, accounts, and categories
+					<ul class="space-y-2.5">
+						<li class="flex items-start gap-2 text-sm">
+							<i data-lucide="check" class="w-4 h-4 text-success shrink-0 mt-0.5"></i>
+							<span>Read your transactions, accounts, and categories</span>
 						</li>
 						if p.Scope != "read_only" {
-							<li class="flex items-center gap-2 text-sm">
-								<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
-								Categorize transactions and manage rules
+							<li class="flex items-start gap-2 text-sm">
+								<i data-lucide="check" class="w-4 h-4 text-success shrink-0 mt-0.5"></i>
+								<span>Categorize transactions and manage rules</span>
 							</li>
-							<li class="flex items-center gap-2 text-sm">
-								<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
-								Use MCP tools in read/write mode
+							<li class="flex items-start gap-2 text-sm">
+								<i data-lucide="check" class="w-4 h-4 text-success shrink-0 mt-0.5"></i>
+								<span>Use MCP tools in read/write mode</span>
 							</li>
 						}
 					</ul>
@@ -66,12 +66,12 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 					<input type="hidden" name="scope" value={ p.Scope }/>
 					<input type="hidden" name="code_challenge" value={ p.CodeChallenge }/>
 					<input type="hidden" name="code_challenge_method" value={ p.CodeChallengeMethod }/>
-					<div class="flex gap-3">
-						<button type="submit" name="action" value="approve" class="btn btn-primary flex-1 rounded-xl">
+					<div class="flex flex-col sm:flex-row gap-3">
+						<button type="submit" name="action" value="approve" class="btn btn-primary flex-1 rounded-xl order-1 sm:order-none">
 							<i data-lucide="check" class="w-4 h-4"></i>
 							Authorize
 						</button>
-						<button type="submit" name="action" value="deny" class="btn btn-ghost flex-1 rounded-xl">
+						<button type="submit" name="action" value="deny" class="btn btn-ghost flex-1 rounded-xl order-2 sm:order-none">
 							Deny
 						</button>
 					</div>
