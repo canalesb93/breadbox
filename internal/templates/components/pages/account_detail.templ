@@ -61,7 +61,7 @@ templ acctHeader(p AccountDetailProps) {
 			</div>
 			<div>
 				<h1 class="bb-page-title">{ acctDisplayLabel(p.Account) }</h1>
-				<div class="flex items-center gap-2 mt-0.5">
+				<div class="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
 					{{ typeLabel := accountTypeLabel(p.Account.Type, "") }}
 					{{ subtype := "" }}
 					if p.Account.Subtype != nil {
@@ -248,7 +248,7 @@ templ acctTransactionsHeader(p AccountDetailProps) {
 					@click="filtersOpen = !filtersOpen"
 				>
 					<i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-					<span>Filters</span>
+					<span class="hidden sm:inline">Filters</span>
 					if acctHasFilters(p) {
 						<span class="badge badge-xs" :class="filtersOpen ? 'badge-primary-content' : 'badge-primary'">Active</span>
 					}
@@ -263,7 +263,7 @@ templ acctTransactionsHeader(p AccountDetailProps) {
 
 templ acctFilterPanel(p AccountDetailProps) {
 	<form method="GET" action={ templ.SafeURL("/accounts/" + p.AccountID) } x-show="filtersOpen" x-cloak x-collapse class="bb-card mb-4 p-4" x-data>
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+		<div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
 			<label class="bb-filter-label">
 				Start Date
 				<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm input-bordered w-full"/>
@@ -272,7 +272,7 @@ templ acctFilterPanel(p AccountDetailProps) {
 				End Date
 				<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm input-bordered w-full"/>
 			</label>
-			<label class="bb-filter-label">
+			<label class="bb-filter-label col-span-2 sm:col-span-1">
 				Category
 				<div
 					class="bb-cat-picker"
@@ -292,7 +292,7 @@ templ acctFilterPanel(p AccountDetailProps) {
 					</button>
 				</div>
 			</label>
-			<label class="bb-filter-label">
+			<label class="bb-filter-label col-span-2 sm:col-span-1">
 				Status
 				<select name="pending" class="select select-sm select-bordered w-full">
 					<option value="">All</option>
@@ -308,7 +308,7 @@ templ acctFilterPanel(p AccountDetailProps) {
 					}
 				</select>
 			</label>
-			<label class="bb-filter-label">
+			<label class="bb-filter-label col-span-2 sm:col-span-1">
 				Search
 				<input type="text" name="search" value={ p.FilterSearch } placeholder="Name or merchant" class="input input-sm input-bordered w-full"/>
 			</label>
