@@ -245,6 +245,31 @@ func ResetTransactionCategoryAdminHandler(svc *service.Service, sm *scs.SessionM
 	}
 }
 
+// SetCategoryOverrideAdminHandler handles PATCH /-/transactions/{id}/category-override.
+// Flips the override flag without changing the category — drives the lock
+// toggle on the transaction detail page.
+func SetCategoryOverrideAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var req struct {
+			Override bool `json:"override"`
+		}
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		actor := ActorFromSession(sm, r)
+		if err := svc.SetCategoryOverrideFlag(r.Context(), id, req.Override, actor); err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update override")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // BatchSetTransactionCategoryAdminHandler handles POST /admin/api/transactions/batch-categorize.
 // Accepts {items: [{transaction_id, category_id}]} and sets category overrides on all.
 func BatchSetTransactionCategoryAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {

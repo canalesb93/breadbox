@@ -234,14 +234,18 @@ templ txdMain(p TransactionDetailProps) {
 					</button>
 				</div>
 				<div class="flex items-center gap-2 mt-3">
-					if p.Transaction.CategoryOverride {
-						<span class="badge badge-ghost badge-xs">Manual override</span>
-					}
-					<template x-if="isOverride">
-						<button class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-base-content" @click="resetCategory()">
-							<i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset to auto
-						</button>
-					</template>
+					<button
+						type="button"
+						class="btn btn-xs rounded-full gap-1.5 px-2.5"
+						:class="isOverride ? 'btn-primary btn-soft' : 'btn-ghost text-base-content/55 hover:text-base-content'"
+						:aria-pressed="isOverride ? 'true' : 'false'"
+						:title="isOverride ? 'Locked — protected from automatic rules. Click to unlock.' : 'Auto — managed by transaction rules. Click to lock.'"
+						@click="toggleOverride()"
+						:disabled="saving"
+					>
+						<i :data-lucide="isOverride ? 'lock' : 'lock-open'" class="w-3.5 h-3.5"></i>
+						<span x-text="isOverride ? 'Locked' : 'Auto'"></span>
+					</button>
 					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
 				</div>
 			</div>

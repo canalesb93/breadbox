@@ -59,6 +59,14 @@ UPDATE transactions
 SET category_override = FALSE, updated_at = NOW()
 WHERE id = $1;
 
+-- name: SetCategoryOverrideFlag :execrows
+-- Flips the override flag without changing the category. Used by the
+-- detail-page lock toggle, which only governs whether transaction rules
+-- may re-categorize the row.
+UPDATE transactions
+SET category_override = $2, updated_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL;
+
 -- ReassignRulesCategory was removed in 20260415070000_rule_actions_v2 — rule
 -- category targets now live inside the actions JSONB. Reassignment is handled
 -- in the service layer via pool.Exec to keep sqlc happy with JSONB subqueries.

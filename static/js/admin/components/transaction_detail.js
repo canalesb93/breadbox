@@ -451,6 +451,42 @@ document.addEventListener('alpine:init', function () {
             showToast((e && e.message) || 'Network error.');
           });
       },
+
+      // Flips the override flag without changing the category. Locked rows are
+      // protected from transaction rules; unlocked rows can be re-categorized
+      // on the next sync if a matching rule fires.
+      toggleOverride: function () {
+        if (this.saving) return;
+        var self = this;
+        var prevOverride = this.isOverride;
+        var next = !prevOverride;
+        this.saving = true;
+        this.isOverride = next;
+        fetch('/-/transactions/' + this.txId + '/category-override', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ override: next }),
+        })
+          .then(function (r) {
+            if (!r.ok && r.status !== 204) {
+              return r.json().then(function (d) {
+                throw new Error((d && d.error && d.error.message) || 'Failed to update lock.');
+              });
+            }
+          })
+          .then(function () {
+            self.saving = false;
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons();
+            }
+            showToast(next ? 'Category locked.' : 'Category unlocked.', 'success');
+          })
+          .catch(function (e) {
+            self.saving = false;
+            self.isOverride = prevOverride;
+            showToast((e && e.message) || 'Network error.');
+          });
+      },
     };
   });
 

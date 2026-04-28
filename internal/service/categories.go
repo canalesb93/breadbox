@@ -504,6 +504,28 @@ func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string, ac
 	return nil
 }
 
+// SetCategoryOverrideFlag flips the category_override flag on a transaction
+// without touching the category itself. Used by the detail-page lock toggle:
+// locking shields the row from transaction rules; unlocking lets rules
+// re-categorize on the next sync.
+func (s *Service) SetCategoryOverrideFlag(ctx context.Context, txnID string, override bool, actor Actor) error {
+	txnUID, err := s.resolveTransactionID(ctx, txnID)
+	if err != nil {
+		return ErrNotFound
+	}
+	rowsAffected, err := s.Queries.SetCategoryOverrideFlag(ctx, db.SetCategoryOverrideFlagParams{
+		ID:               txnUID,
+		CategoryOverride: override,
+	})
+	if err != nil {
+		return fmt.Errorf("set category override flag: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // writeCategorySetAnnotation writes a manual `category_set` annotation. Manual
 // writes carry `source: "manual"` and never include rule_id/rule_name — those
 // are reserved for rule-driven writes (see internal/ruleapply/annotations.go).
