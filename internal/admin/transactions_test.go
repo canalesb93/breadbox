@@ -294,7 +294,7 @@ func TestGroupActivityByDay_BucketsByLocalDate(t *testing.T) {
 		{Type: "comment", Timestamp: "2026-04-14T15:00:00Z", Summary: "c"},
 	}
 
-	groups := groupActivityByDay(entries, time.Now())
+	groups := groupActivityByDay(entries, time.Now(), time.Local)
 
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 day groups, got %d", len(groups))
@@ -322,10 +322,10 @@ func TestGroupActivityByDay_BucketsByLocalDate(t *testing.T) {
 
 func TestGroupActivityByDay_EmptyInput(t *testing.T) {
 	now := time.Now()
-	if groups := groupActivityByDay(nil, now); groups != nil {
+	if groups := groupActivityByDay(nil, now, time.Local); groups != nil {
 		t.Errorf("expected nil for nil input, got %v", groups)
 	}
-	if groups := groupActivityByDay([]service.ActivityEntry{}, now); groups != nil {
+	if groups := groupActivityByDay([]service.ActivityEntry{}, now, time.Local); groups != nil {
 		t.Errorf("expected nil for empty input, got %v", groups)
 	}
 }
@@ -335,7 +335,7 @@ func TestGroupActivityByDay_DropsUnparseableTimestamps(t *testing.T) {
 		{Type: "comment", Timestamp: "2026-04-16T09:00:00Z", Summary: "ok"},
 		{Type: "comment", Timestamp: "not-a-date", Summary: "bad"},
 	}
-	groups := groupActivityByDay(entries, time.Now())
+	groups := groupActivityByDay(entries, time.Now(), time.Local)
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 day group, got %d", len(groups))
 	}
@@ -362,7 +362,7 @@ func TestGroupActivityByDay_SharesNowAnchorWithRelative(t *testing.T) {
 		{Type: "comment", Timestamp: yesterdayLate.Format(time.RFC3339), Summary: "yesterday-late"},
 	}
 
-	groups := groupActivityByDay(entries, now)
+	groups := groupActivityByDay(entries, now, time.Local)
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 day groups, got %d", len(groups))
 	}

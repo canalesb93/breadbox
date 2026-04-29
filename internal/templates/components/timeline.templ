@@ -221,8 +221,8 @@ templ TimelineSystemRow(p TimelineRowProps) {
 					}
 					if p.Timestamp != "" {
 						<span aria-hidden="true">&middot;</span>
-						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(p.Timestamp) }>
-							<time datetime={ p.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(p.Timestamp) }>{ relativeTimelineTimestamp(p.Timestamp, p.Now) }</time>
+						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(p.Timestamp, p.Now) }>
+							<time datetime={ p.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(p.Timestamp, p.Now) }>{ relativeTimelineTimestamp(p.Timestamp, p.Now) }</time>
 						</span>
 					}
 				</span>
@@ -256,8 +256,8 @@ templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile,
 					}
 					if timestamp != "" {
 						<span aria-hidden="true">&middot;</span>
-						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp) }>
-							<time datetime={ timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
+						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp, now) }>
+							<time datetime={ timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp, now) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
 						</span>
 					}
 				</span>
@@ -286,8 +286,8 @@ templ TimelineCommentRow(actor TimelineActor, timestamp string, now time.Time) {
 				}
 				<span class="text-base-content/55">commented</span>
 				if timestamp != "" {
-					<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp) }>
-						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
+					<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp, now) }>
+						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp, now) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
 					</span>
 				}
 			</div>
