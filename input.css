@@ -105,6 +105,27 @@
   /* Ensure Lucide SVG icons don't steal clicks from interactive parents. */
   svg.lucide, svg.lucide * { pointer-events: none; }
 
+  /*
+   * Pre-hydration size for Lucide placeholders.
+   *
+   * Before lucide.createIcons() swaps `<i data-lucide="x">` for `<svg>`, the
+   * <i> renders as `display:inline` with no intrinsic dimensions, so Tailwind
+   * sizing utilities (`w-4 h-4`, etc.) on the <i> do not produce a real box —
+   * the placeholder collapses to 0×0 and reflows when the SVG arrives. Make
+   * the <i> behave like an inline-block 1em×1em box so the row is the right
+   * height immediately and there is no layout shift on hydration.
+   *
+   * Once lucide replaces the <i> with `<svg class="lucide">`, this rule no
+   * longer applies (svg is not <i>), so SVG sizing remains controlled by the
+   * size utilities migrated onto the SVG by lucide's clone behavior.
+   */
+  i[data-lucide] {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+  }
+
   html { scroll-behavior: smooth; }
 
   body {
@@ -288,15 +309,15 @@
     z-index: 30;
     border-bottom: 1px solid oklch(0 0 0 / 0.06);
     /* Subtle backdrop blur for depth when content scrolls underneath */
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    background-color: oklch(var(--b1) / 0.92);
+            backdrop-filter: blur(8px);
+    background-color: color-mix(in oklch, var(--color-base-100) 92%, transparent);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-mobile-navbar {
       border-bottom-color: oklch(1 0 0 / 0.08);
-      background-color: oklch(var(--b1) / 0.88);
+      background-color: color-mix(in oklch, var(--color-base-100) 88%, transparent);
     }
   }
 
@@ -413,6 +434,25 @@
 
   .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
     @apply opacity-100;
+  }
+
+  /* ── Sparkle accent for highlighted sidebar links (e.g. Agent Prompts) ── */
+  /* Trailing sparkle icon — overrides the generic icon rule above so it
+     gets its own size, accent colour, and a gentle pulse to draw the eye. */
+  .bb-sidebar-link .bb-sidebar-sparkle,
+  .bb-sidebar-link .bb-sidebar-sparkle svg {
+    @apply w-3.5 h-3.5 opacity-90;
+    animation: bb-sparkle-pulse 2.4s ease-in-out infinite;
+  }
+  .bb-sidebar-link:hover .bb-sidebar-sparkle,
+  .bb-sidebar-link:hover .bb-sidebar-sparkle svg,
+  .bb-sidebar-link--active .bb-sidebar-sparkle,
+  .bb-sidebar-link--active .bb-sidebar-sparkle svg {
+    @apply opacity-100;
+  }
+  @keyframes bb-sparkle-pulse {
+    0%, 100% { opacity: 0.65; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.12); }
   }
 
   /* ── External-link arrow (Documentation / GitHub buttons) ── */
@@ -1148,8 +1188,11 @@
     @apply w-3.5 h-3.5;
   }
 
-  .bb-tx-avatar--letter {
-    @apply text-xs font-semibold;
+  /* Uncategorized: a neutral grey circle with a question-mark icon. Used
+   * across every tx-row variant (full, compact, feed one-liner) when a
+   * transaction has no category yet, so the visual signal "needs a
+   * category" is consistent regardless of where the row appears. */
+  .bb-tx-avatar--uncategorized {
     --avatar-color: oklch(0.205 0 0);
     background: oklch(0.205 0 0 / 0.06);
     color: oklch(0.205 0 0 / 0.45);
@@ -1159,7 +1202,7 @@
     .bb-tx-avatar {
       background: color-mix(in oklch, var(--avatar-color) 18%, transparent);
     }
-    .bb-tx-avatar--letter {
+    .bb-tx-avatar--uncategorized {
       background: oklch(0.985 0 0 / 0.08);
       color: oklch(0.985 0 0 / 0.45);
     }
@@ -2862,6 +2905,12 @@
                         * its 4px ring still anchor the row's vertical
                         * extent, this just brings the body's leading
                         * back in line with the rest of the page. */
+  /* The 28px tile is 4px taller than the 24px meta line, so under
+   * `items-start` the tile center lands 2px below the text center.
+   * Pad the body 2px so every first-line content (sync action, report
+   * title, comment meta, bulk_action sentence) re-centers against the
+   * tile vertically. */
+  padding-top: 0.125rem;
 }
 
 /* Rail mask. The 28px tile bg + ring are still painted with base-100

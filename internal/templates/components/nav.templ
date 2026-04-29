@@ -94,21 +94,23 @@ templ Nav(p NavProps) {
 		}
 		if p.IsEditor {
 			<div class="bb-sidebar-section">System</div>
-			<a href="/agent-prompts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agent-prompts") }>
-				<i data-lucide="bot-message-square"></i> Agent Prompts
-			</a>
-		}
-		if p.IsAdmin {
-			<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
-				<i data-lucide="scroll-text"></i> Logs
-			</a>
-		}
-		if p.IsEditor {
+			if p.IsAdmin {
+				<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
+					<i data-lucide="scroll-text"></i> Logs
+				</a>
+			}
 			<a href="/settings" class={ navActiveSettings(p.CurrentPage) }>
 				<i data-lucide="settings"></i> Settings
 			</a>
 		}
-		<div class="bb-sidebar-section">Help</div>
+		<div class="bb-sidebar-section">Resources</div>
+		if p.IsEditor {
+			<a href="/agent-prompts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agent-prompts") }>
+				<i data-lucide="bot-message-square"></i>
+				<span>Agent Prompts</span>
+				<i data-lucide="sparkles" class="bb-sidebar-sparkle ml-auto !text-amber-400"></i>
+			</a>
+		}
 		@navExternalLink("https://docs.breadbox.sh", "book-open", "Documentation")
 		@navExternalLink("https://github.com/canalesb93/breadbox", "github", "GitHub")
 	</nav>

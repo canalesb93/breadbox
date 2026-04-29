@@ -50,13 +50,17 @@ templ TxRow(tx service.AdminTransactionRow) {
 			     so we don't burn meta-line real estate (and so phones don't lose
 			     attribution entirely — the meta line is hidden <sm). -->
 			<div class="relative shrink-0 bb-tx-avatar-slot">
-				if tx.CategoryIcon != nil {
+				if tx.CategoryIcon != nil || tx.CategoryColor != nil {
 					<div class="bb-tx-avatar" style={ txAvatarColorStyle(tx.CategoryColor) }>
-						<i data-lucide={ deref(tx.CategoryIcon) } class="w-4 h-4"></i>
+						if tx.CategoryIcon != nil {
+							<i data-lucide={ deref(tx.CategoryIcon) } class="w-4 h-4"></i>
+						} else {
+							<i data-lucide="folder" class="w-4 h-4"></i>
+						}
 					</div>
 				} else {
-					<div class="bb-tx-avatar bb-tx-avatar--letter">
-						<span>{ firstChar(tx.Name) }</span>
+					<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+						<i data-lucide="circle-off" class="w-4 h-4"></i>
 					</div>
 				}
 				if tx.UserName != "" {

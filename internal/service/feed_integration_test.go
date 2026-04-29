@@ -297,11 +297,15 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		ctx := context.Background()
 		seed := seedFeedFixture(t, queries, "bulk", 4)
 
-		// Anchor 2 minutes past the current 15-min bucket boundary so all
-		// seeded annotations land in one bucket regardless of when the
-		// test runs. Without this, runs that fire near a boundary split
-		// the seeds across two buckets and the count flakes.
-		now := time.Now().UTC().Truncate(15 * time.Minute).Add(2 * time.Minute)
+		// Anchor 2 minutes past a 15-min bucket boundary an hour ago so all
+		// seeded annotations land in one bucket AND safely in the past
+		// relative to the service's `time.Now()`. The earlier `Add(-1h)`
+		// guards against the test firing in the first ~2 minutes of a
+		// bucket — without it, `Truncate(15m).Add(2m)` lands in the
+		// FUTURE and the SQL window's `created_at < now` upper bound
+		// drops every seeded row. Mirrors the safer anchor pattern used
+		// by every other Truncate-based test below in this file.
+		now := time.Now().UTC().Add(-1 * time.Hour).Truncate(15 * time.Minute).Add(2 * time.Minute)
 		actorID := "user-actor-bulk"
 		// 4 category_set annotations, same actor, 4 different transactions,
 		// all within ~30 seconds (well inside the 15-minute soft bucket).
@@ -447,9 +451,11 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		rule := testutil.MustCreateTransactionRule(t, queries, "Coffee Rule", []byte(`[]`), []byte(`[]`), "on_create")
 		ruleShortID := rule.ShortID
 
-		// Anchor 2 minutes past the current 15-min bucket boundary so all
-		// seeds land in one bucket regardless of when the test fires.
-		now := time.Now().UTC().Truncate(15 * time.Minute).Add(2 * time.Minute)
+		// Anchor an hour back, snapped to a 15-min bucket + 2 min, so the
+		// seeds bucket together AND land in the past — mirrors the
+		// SoftBucketBulkAction fix above. See that comment for why the
+		// straight `Truncate(15m).Add(2m)` form was flaky.
+		now := time.Now().UTC().Add(-1 * time.Hour).Truncate(15 * time.Minute).Add(2 * time.Minute)
 		actorID := "actor-retro"
 		// 5 rule_applied annotations, same actor, no `applied_by=sync`, all
 		// within ~25 seconds → should produce a single bulk_action event.
