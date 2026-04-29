@@ -407,6 +407,7 @@ func projectFeedEvent(ev service.FeedEvent, tagDisplayFn func(string) tagDisplay
 			Timestamp:    ev.Timestamp,
 			TimestampStr: tsStr,
 			Comment: &pages.FeedComment{
+				CommentShortID:     ev.Comment.CommentShortID,
 				ActorName:          ev.Comment.ActorName,
 				ActorType:          ev.Comment.ActorType,
 				ActorID:            ev.Comment.ActorID,

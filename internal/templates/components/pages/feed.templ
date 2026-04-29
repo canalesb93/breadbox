@@ -16,12 +16,12 @@ import (
 // transaction activity log on /transactions/{id}. The home feed is just a
 // global, grouped view of the same shape.
 templ Feed(p FeedProps) {
-	<!-- Comment rows on the home feed render the meta line only ("Alice
-	     commented on Whole Foods") — the body lives on the per-tx page.
-	     Dropping the markdown bubble here lets us drop the marked /
-	     DOMPurify / markdown-scanner script trio entirely; the global
-	     feed is a glance surface, and a click-through to /transactions/{id}
-	     is the right home for the comment body. -->
+	<!-- Comment rows on the home feed render as a single-line system event:
+	     "<actor> commented on <merchant>". A tooltip on the "commented on"
+	     verb surfaces the first line of the comment body for a quick peek;
+	     the full body lives on the per-tx page (click-through via the
+	     transaction ref). The /feed view stays a glance surface — no
+	     marked / DOMPurify scanner cost on every visit. -->
 	<div x-data x-init="$store.shortcuts.setScope('feed')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@feedHero(p)
 	if len(p.ConnectionAlerts) > 0 {
@@ -159,7 +159,7 @@ templ feedFilters(p FeedProps) {
 		@feedFilterChip("All", "", "layers", p.Filter)
 		@feedFilterChip("Syncs", "syncs", "refresh-cw", p.Filter)
 		@feedFilterChip("Reports", "reports", "file-text", p.Filter)
-		@feedFilterChip("Comments", "comments", "message-circle", p.Filter)
+		@feedFilterChip("Comments", "comments", "message-square", p.Filter)
 		@feedFilterChip("Sessions", "sessions", "bot", p.Filter)
 		@feedFilterChip("From me", "me", "user", p.Filter)
 	</nav>
@@ -432,13 +432,13 @@ templ feedReportTile(priority string) {
 // tile through the rail's ring-4 ring-base-200 scaffolding.
 templ feedActorTile(actorType, actorID, version, name string) {
 	if actorType == "user" && actorID != "" {
-		<img src={ feedAvatarURL(actorID, version) } alt={ name + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-200" title={ name }/>
+		<img src={ feedAvatarURL(actorID, version) } alt={ name + " avatar" } class="w-6 h-6 rounded-full object-cover border border-base-300 ring-4 ring-base-200" title={ name }/>
 	} else if actorType == "agent" {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/12 ring-4 ring-base-200" aria-hidden="true" title={ name }>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/12 border border-base-300 ring-4 ring-base-200" aria-hidden="true" title={ name }>
 			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
 		</span>
 	} else {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-200" aria-hidden="true" title={ name }>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-200" aria-hidden="true" title={ name }>
 			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ feedFirstChar(name) }</span>
 		</span>
 	}
@@ -446,7 +446,7 @@ templ feedActorTile(actorType, actorID, version, name string) {
 
 // ── Row body templates ────────────────────────────────────────────────────
 //
-// Each body lives inside the primitive's `flex-1 min-w-0 text-xs leading-6`
+// Each body lives inside the primitive's `flex-1 min-w-0 text-sm leading-6`
 // container. Multi-line bodies render the headline first (with an inline
 // timestamp pill) and any supporting content below.
 templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
@@ -718,18 +718,17 @@ templ feedRowTimestamp(timestamp string, now time.Time) {
 // ── Comment row ───────────────────────────────────────────────────────────
 //
 // Comment rows render the same rail tile as every other system-event row —
-// a 24px message-circle icon — and move the actor's avatar inline before
+// a 24px message-square icon — and move the actor's avatar inline before
 // their bolded name (matching the per-tx activity log's tag / category
 // sentences). The shared `TimelineCommentTile` + `TimelineActorInline`
 // primitives in `components/timeline.templ` are the single source of truth
 // for that pair, used by both /feed (here) and /transactions/{id} so the
 // surfaces stay byte-equivalent.
 //
-// As of iteration 13 the home feed renders only the meta line — no
-// markdown bubble. The body lives on the per-tx page (click-through via
-// the transaction ref). Reasoning: a global feed is a glance surface, and
-// rendering bodies inline duplicated the markdown-scanner cost across
-// every feed visit. Click-through is the right read for full content.
+// Comment rows render as a single-line system event ("Alice commented on
+// Whole Foods · 5m ago"). The "commented on" verb carries a tooltip that
+// surfaces the first line of the comment body so users get a peek without
+// leaving /feed. Full body lives on the per-tx page via click-through.
 templ feedCommentRow(it FeedItem, c *FeedComment, now time.Time) {
 	@components.TimelineSystemRowCustomTile(
 		"", "", now,
@@ -740,14 +739,73 @@ templ feedCommentRow(it FeedItem, c *FeedComment, now time.Time) {
 }
 
 templ feedCommentRowBody(it FeedItem, c *FeedComment, now time.Time) {
-	<div class="flex items-center gap-1.5 flex-wrap text-xs leading-6 min-w-0">
+	<div class="flex items-center gap-1.5 flex-wrap min-w-0">
 		@components.TimelineActorInline(feedCommentActor(c))
-		<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
+		if peek := feedCommentPeek(c.Content); peek != "" && c.CommentShortID != "" {
+			<span class="tooltip tooltip-top before:max-w-xs before:whitespace-normal before:text-left" data-tip={ peek }>
+				<a
+					href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID + "#comment-" + c.CommentShortID) }
+					class="text-base-content/65 shrink-0 font-normal underline decoration-dotted decoration-base-content/30 underline-offset-2 hover:decoration-base-content/70 hover:text-base-content transition-colors"
+				>commented on</a>
+			</span>
+		} else {
+			<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
+		}
 		<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">
 			{ components.TitleCase(feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name)) }
 		</a>
 		@feedRowTimestamp(it.TimestampStr, now)
 	</div>
+}
+
+// feedCommentPeek returns a multi-line excerpt of a comment body suitable
+// for the /feed comment-row tooltip. Joins the first non-blank lines with
+// spaces (data-tip can't render literal newlines — the tooltip's
+// max-width wraps the text into 2–3 visual lines naturally), collapses
+// whitespace, caps at ~180 chars, and appends "…" if anything was
+// truncated. Empty when the body has nothing to preview, so callers can
+// branch off the empty string.
+func feedCommentPeek(body string) string {
+	const max = 180
+	var (
+		parts   []string
+		total   int
+		dropped bool
+	)
+	for _, line := range strings.Split(body, "\n") {
+		s := strings.Join(strings.Fields(line), " ")
+		if s == "" {
+			continue
+		}
+		// Reserve 1 char for the joining space when this isn't the first
+		// segment, so the per-segment budget tracks the rendered length.
+		add := len(s)
+		if len(parts) > 0 {
+			add++
+		}
+		if total+add > max {
+			remaining := max - total
+			if len(parts) > 0 {
+				remaining-- // joining space
+			}
+			if remaining > 0 {
+				parts = append(parts, s[:remaining])
+				total += add
+			}
+			dropped = true
+			break
+		}
+		parts = append(parts, s)
+		total += add
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	out := strings.Join(parts, " ")
+	if dropped {
+		out += "…"
+	}
+	return out
 }
 
 // feedCommentActor builds the shared TimelineActor for a feed comment so

@@ -212,7 +212,7 @@ templ TimelineSystemRow(p TimelineRowProps) {
 				</span>
 			}
 		</div>
-		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/75 break-words">
+		<div class="flex-1 min-w-0 text-sm leading-6 text-base-content/75 break-words">
 			{ children... }
 			if p.Origin != "" || p.Timestamp != "" {
 				<span class="text-base-content/40 ml-1">
@@ -247,7 +247,7 @@ templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile,
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			@tile
 		</div>
-		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/75 break-words">
+		<div class="flex-1 min-w-0 text-sm leading-6 text-base-content/75 break-words">
 			@body
 			if origin != "" || timestamp != "" {
 				<span class="text-base-content/40 ml-1">
@@ -276,7 +276,7 @@ templ TimelineCommentRow(actor TimelineActor, timestamp string, now time.Time) {
 			@timelineCommentAvatar(actor)
 		</div>
 		<div class="flex-1 min-w-0">
-			<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6">
+			<div class="flex items-center gap-1.5 px-1 flex-wrap text-sm leading-6">
 				if actor.Name != "" {
 					if actor.HRef != "" {
 						<a href={ templ.SafeURL(actor.HRef) } class="font-semibold text-base-content hover:text-primary transition-colors">{ actor.Name }</a>
@@ -330,13 +330,13 @@ templ TimelineEmpty(message string) {
 // timelineCommentAvatar renders the 24px avatar tile for a comment row.
 templ timelineCommentAvatar(actor TimelineActor) {
 	if actor.AvatarURL != "" {
-		<img src={ actor.AvatarURL } alt={ actor.Name + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-100" title={ actor.Name }/>
+		<img src={ actor.AvatarURL } alt={ actor.Name + " avatar" } class="w-6 h-6 rounded-full object-cover border border-base-300 ring-4 ring-base-100" title={ actor.Name }/>
 	} else if actor.IsAgent {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 border border-base-300 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
 			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
 		</span>
 	} else {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
 			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ firstChar(actor.Name) }</span>
 		</span>
 	}
@@ -344,7 +344,7 @@ templ timelineCommentAvatar(actor TimelineActor) {
 
 // TimelineCommentTile renders the 24px rail tile for a comment row — the
 // neutral chrome shared with other system-event rows (sync, review, etc.).
-// As of #969 comment rows render a message-circle icon on the rail and move
+// As of #969 comment rows render a message-square icon on the rail and move
 // the actor's avatar inline (see TimelineActorInline) so every rail tile on
 // the feed and per-tx timeline looks like the same primitive shape: a
 // 24px filled circle with a 4px ring against the page surface.
@@ -354,8 +354,8 @@ templ timelineCommentAvatar(actor TimelineActor) {
 // shifts ring-base-100 → base-200 so the seam disappears against a page
 // background. The card variant keeps base-100 verbatim.
 templ TimelineCommentTile() {
-	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-		<i data-lucide="message-circle" class="w-3 h-3 text-base-content/55"></i>
+	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
+		<i data-lucide="message-square" class="w-3 h-3 text-base-content/55"></i>
 	</span>
 }
 
@@ -371,9 +371,9 @@ templ TimelineCommentTile() {
 // surrounding `leading-6` text, and `mr-1` reproduces the legacy spacing.
 templ TimelineActorInline(actor TimelineActor) {
 	if actor.AvatarURL != "" {
-		<img src={ actor.AvatarURL } alt="" class="inline-block w-4 h-4 rounded-full object-cover align-text-bottom mr-1" aria-hidden="true"/>
+		<img src={ actor.AvatarURL } alt="" class="inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom mr-1" aria-hidden="true"/>
 	} else if actor.IsAgent {
-		<span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 align-text-bottom mr-1" aria-hidden="true">
+		<span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 border border-base-300 align-text-bottom mr-1" aria-hidden="true">
 			<i data-lucide="bot" class="w-2.5 h-2.5 text-primary"></i>
 		</span>
 	}

@@ -209,6 +209,10 @@ type FeedReport struct {
 
 // FeedComment carries one standalone comment row.
 type FeedComment struct {
+	// CommentShortID is the annotation's short_id, used by feed.templ to
+	// build a `/transactions/{tx}#comment-{id}` link so the row's verb
+	// jumps to the matching comment on the per-tx timeline.
+	CommentShortID     string
 	ActorName          string
 	ActorType          string
 	ActorID            string

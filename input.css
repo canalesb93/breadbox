@@ -2854,8 +2854,11 @@
 }
 /* Lift the text leading on row sentences so the first-line baseline stays
  * vertically centred against the larger 28px tile next to it. */
-.bb-timeline-prominent .bb-timeline > li > div.flex-1.text-xs.leading-6 {
-  line-height: 1.75rem; /* 28px — matches the tile height */
+.bb-timeline-prominent .bb-timeline > li > div.flex-1.text-sm.leading-6 {
+  line-height: 1.5rem; /* 24px — tighter row rhythm; the 28px tile and
+                        * its 4px ring still anchor the row's vertical
+                        * extent, this just brings the body's leading
+                        * back in line with the rest of the page. */
 }
 
 /* Rail mask. The 28px tile bg + ring are still painted with base-100
@@ -2904,6 +2907,18 @@
   color: color-mix(in srgb, var(--color-base-content) 65%, transparent);
 }
 
+/* Card-mode comment rows: vertically center the rail tile against the
+ * row body's combined meta+bubble height. The default `items-start` on
+ * the <li> top-anchors every other row's tile to its first content line
+ * — fine for single-line system events. On comment rows the bubble
+ * shifts the perceived center down, so let the tile float to that
+ * combined-content centre for a chat-style alignment. Overridden in
+ * prominent mode below where the row's card chrome anchors to the
+ * header bar instead. */
+.bb-timeline > li:has(.bb-comment-bubble) > div:first-child {
+  align-self: center;
+}
+
 /* Comment cards. Each comment row's right-hand column becomes a
  * GitHub-style bordered card: header bar with actor + timestamp, body
  * with the comment text, and a small left-pointing tail anchoring it
@@ -2913,6 +2928,11 @@
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
+}
+/* Prominent comment rows keep the rail tile top-anchored to the
+ * comment card's header bar — undo the card-mode centering. */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div:first-child {
+  align-self: flex-start;
 }
 /* As of #969 comment rows use the same neutral message-circle tile as
  * every other system-event row, so the bespoke 1px outline that used to
@@ -2965,9 +2985,17 @@
   border-color: transparent var(--color-base-300) transparent transparent;
 }
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after {
-  left: -7px;
+  /* 1.5px horizontal offset (vs ::before at -8) gives a ~1.06px perpendicular
+   * diagonal stroke — matches the card's 1px straight border without the
+   * heavier read of a 2px shift. */
+  left: -6.5px;
   border-width: 8px 8px 8px 0;
-  border-color: transparent color-mix(in srgb, var(--color-base-200) 60%, transparent) transparent transparent;
+  /* Solid mix matching the header bar's composited appearance (60% base-200
+   * over base-100). Triggers a visual mismatch if left as the same
+   * `transparent`-based color used by the header — the triangle composites
+   * over the page (base-200 in prominent mode), the header over the card
+   * (base-100), so the two read as different shades. */
+  border-color: transparent color-mix(in srgb, var(--color-base-200) 60%, var(--color-base-100)) transparent transparent;
 }
 
 /* Composer row gets the same outer card treatment as comment rows so
@@ -2999,7 +3027,9 @@
   border-color: transparent var(--color-base-300) transparent transparent;
 }
 .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
-  left: -7px;
+  /* See the comment-card ::after note — 1.5px offset for matching
+   * perpendicular stroke weight on the diagonal. */
+  left: -6.5px;
   border-width: 8px 8px 8px 0;
   border-color: transparent var(--color-base-100) transparent transparent;
 }
@@ -3051,7 +3081,7 @@
  * for single-line sentences (short actor names, brief verbs); multi-line
  * wrap picks up normal 1.5 leading so content stays readable. */
 @media (max-width: 639px) {
-  .bb-timeline-prominent .bb-timeline > li > div.flex-1.text-xs {
+  .bb-timeline-prominent .bb-timeline > li > div.flex-1.text-sm {
     line-height: 1.5; /* relax from 1.75rem (28px) to 1.5 on mobile */
   }
 
