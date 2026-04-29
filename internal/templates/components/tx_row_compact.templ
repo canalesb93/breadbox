@@ -1,6 +1,11 @@
 package components
 
-import "breadbox/internal/service"
+import (
+	"fmt"
+	"strconv"
+
+	"breadbox/internal/service"
+)
 
 // TxRowCompact is the lightweight sibling of TxRow used in dense contexts
 // (dashboard recent txns, rule detail tables). No selection, no inline
@@ -54,10 +59,14 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 						<span class="text-base-content/50 truncate">{ deref(tx.CategoryDisplayName) }</span>
 					</span>
 				}
-				if tx.AgentReviewed {
+				if tx.CommentCount > 0 {
 					<span class="text-base-content/20 shrink-0">&middot;</span>
-					<span class="inline-flex items-center gap-0.5 text-primary/60 shrink-0" title="Categorized by AI agent">
-						<i data-lucide="bot" class="w-3 h-3"></i>
+					<span
+						class="inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+						title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
+					>
+						<i data-lucide="messages-square" class="w-3 h-3"></i>
+						<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
 					</span>
 				}
 			</div>
