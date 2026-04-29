@@ -3,6 +3,8 @@ package prompts
 import (
 	"fmt"
 	"strings"
+
+	rootprompts "breadbox/prompts"
 )
 
 // BlockRole determines how a block appears in the editor.
@@ -123,9 +125,9 @@ func GetAgentConfig(agentType string) (AgentTypeConfig, bool) {
 
 // LoadBlock reads a block .md file, parsing title and description from the first lines.
 func LoadBlock(id string) (Block, error) {
-	data, err := blocksFS.ReadFile("blocks/" + id + ".md")
+	data, err := rootprompts.Agent(id)
 	if err != nil {
-		return Block{}, fmt.Errorf("read block %q: %w", id, err)
+		return Block{}, err
 	}
 
 	content := string(data)
