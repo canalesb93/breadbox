@@ -129,9 +129,12 @@ templ TxRow(tx service.AdminTransactionRow) {
 					}
 				</div>
 				<!-- Mobile-only sub-line (<sm): date + category dot.
-				     Keeps the row informative on iPhone without crowding the name. -->
+				     Keeps the row informative on iPhone without crowding the name.
+				     The date span carries `bb-tx-date-mobile` so the grouped-view
+				     CSS can hide it (along with its immediately-following `·`)
+				     when the day header above the group already shows the date. -->
 				<div class="flex sm:hidden items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
-					<span class="tabular-nums text-base-content/35 shrink-0 whitespace-nowrap">{ formatDate(tx.Date) }</span>
+					<span class="bb-tx-date-mobile tabular-nums text-base-content/35 shrink-0 whitespace-nowrap">{ formatDate(tx.Date) }</span>
 					if tx.CategoryDisplayName != nil {
 						<span class="text-base-content/20">&middot;</span>
 						<span class="inline-flex items-center gap-1 min-w-0">
@@ -140,6 +143,9 @@ templ TxRow(tx service.AdminTransactionRow) {
 							}
 							<span class="text-base-content/50 truncate">{ deref(tx.CategoryDisplayName) }</span>
 						</span>
+					} else {
+						<span class="text-base-content/20">&middot;</span>
+						<span class="text-base-content/25 truncate shrink-0">Uncategorized</span>
 					}
 					if len(tx.Tags) > 0 {
 						<span class="text-base-content/20">&middot;</span>

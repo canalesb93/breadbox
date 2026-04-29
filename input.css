@@ -1284,8 +1284,14 @@
            border-b border-base-300/50 bg-base-200/30;
   }
 
-  /* ── Date column visibility (hidden in grouped, shown in list) ── */
-  .bb-date-group .bb-tx-date {
+  /* ── Date visibility (hidden in grouped, shown in list) ──
+     `.bb-tx-date` is the desktop right-side date column.
+     `.bb-tx-date-mobile` is the date in the mobile sub-line; we also hide
+     its immediately-following `·` separator span so the sub-line doesn't
+     start with an orphan dot. */
+  .bb-date-group .bb-tx-date,
+  .bb-date-group .bb-tx-date-mobile,
+  .bb-date-group .bb-tx-date-mobile + span {
     display: none !important;
   }
 
