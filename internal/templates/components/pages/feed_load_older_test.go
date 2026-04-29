@@ -62,7 +62,7 @@ func TestFeedLoadOlderButton(t *testing.T) {
 			},
 			mustContain: []string{
 				"Load older activity",
-				`href="/feed?before=2026-04-28T10:00:00Z"`,
+				`href="/?before=2026-04-28T10:00:00Z"`,
 				"Showing the last 3 days",
 			},
 			mustOmit: []string{
@@ -82,7 +82,7 @@ func TestFeedLoadOlderButton(t *testing.T) {
 			},
 			mustContain: []string{
 				"Load older activity",
-				`href="/feed?filter=syncs&amp;before=2026-04-28T10:30:00Z"`,
+				`href="/?filter=syncs&amp;before=2026-04-28T10:30:00Z"`,
 			},
 		},
 		{

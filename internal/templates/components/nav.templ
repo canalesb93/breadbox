@@ -51,10 +51,6 @@ templ Nav(p NavProps) {
 		<a href="/" class={ "bb-sidebar-link", navActive(p.CurrentPage, "home") }>
 			<i data-lucide="house"></i>
 			<span class="flex-1">Home</span>
-		</a>
-		<a href="/feed" class={ "bb-sidebar-link", navActive(p.CurrentPage, "feed") }>
-			<i data-lucide="rss"></i>
-			<span class="flex-1">Feed</span>
 			if p.UnreadReports > 0 {
 				<span class="bb-nav-badge" title={ fmt.Sprintf("%d unread reports", p.UnreadReports) }>{ badgeCount(p.UnreadReports) }</span>
 			}

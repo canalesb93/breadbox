@@ -7,9 +7,19 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/timefmt"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// relativeTime is a thin alias for timefmt.Relative kept so admin call sites
+// (and the funcMap registration in templates.go) can refer to a short, local
+// name. Concentrating the implementation in internal/timefmt prevents drift
+// between admin and service copies.
+func relativeTime(t time.Time) string {
+	return timefmt.Relative(t)
+}
 
 // redirectGET returns an http.HandlerFunc that 301-redirects to dest while
 // preserving any query string and fragment from the incoming request. Used
