@@ -1,13 +1,15 @@
 // Package prompts is the home for editable prompt content shipped with the
-// binary. Each subdirectory groups one kind of prompt:
+// binary. The layout is:
 //
-//   - agents/  — composable blocks used by the prompt builder to assemble
-//     agent system prompts (see internal/prompts for the composition logic).
-//   - mcp/     — defaults served by the MCP server (instructions, review
+//   - agents.yaml — agent catalogue (slugs, labels, card metadata, block
+//     composition). Edit this to add or recompose agents.
+//   - agents/*.md — composable prompt blocks referenced by agents.yaml.
+//   - mcp/*.md    — defaults served by the MCP server (instructions, review
 //     guidelines, report format), overridable per install via app_config.
 //
-// Editing a .md file here and rebuilding is the entire workflow — files are
-// embedded at build time, so nothing else needs to change.
+// Editing a file here and rebuilding is the entire workflow — everything is
+// embedded at build time. The composition logic and YAML parsing live in
+// internal/prompts.
 package prompts
 
 import (
@@ -15,8 +17,17 @@ import (
 	"fmt"
 )
 
-//go:embed agents/*.md mcp/*.md
+//go:embed agents.yaml agents/*.md mcp/*.md
 var FS embed.FS
+
+// AgentsConfig returns the embedded agents.yaml bytes.
+func AgentsConfig() ([]byte, error) {
+	data, err := FS.ReadFile("agents.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("read agents.yaml: %w", err)
+	}
+	return data, nil
+}
 
 // Agent reads an agent block by ID (filename without extension).
 func Agent(id string) ([]byte, error) {

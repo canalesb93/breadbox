@@ -1,0 +1,181 @@
+# Agent catalogue — drives both the prompt-library landing page (/agent-prompts)
+# and the per-agent prompt builder (/agent-wizard/{slug}).
+#
+# Edit this file to add, rename, or recompose agents. Block IDs reference
+# .md filenames (without extension) under prompts/agents/. See
+# internal/prompts/config.go for the loader; behaviour is identical to the
+# previous hard-coded Go map (#977 follow-up).
+#
+# Field reference:
+#   slug          — URL slug, e.g. /agent-wizard/{slug}
+#   label         — heading shown in the prompt builder
+#   description   — sub-heading shown in the prompt builder
+#   body          — body copy shown on the landing-page card
+#   icon          — Lucide icon name
+#   color         — Tailwind colour token used for accents on the card and
+#                   for the prompt-builder header. One of:
+#                     primary | success | warning | violet-500 | base-300
+#   section       — section ID (must exist in `sections:` below)
+#   badge         — text shown in the small badge on the card (omit for none)
+#   badge_style   — "violet" forces the custom violet badge styling.
+#                   Default: matches `color`.
+#   counter       — dynamic stat shown next to the badge. One of:
+#                     pending_reviews   → "{n} waiting"   (mono primary badge)
+#                     active_rules      → "{n} active rule(s)" (subtle text)
+#                     account_coverage  → "Across {n} account(s)" (subtle text)
+#   warn_no_rules — if true and `active_rules` is zero, replaces the counter
+#                   with the "No rules yet — run Initial Setup first" warning.
+#   layout        — "dashed" renders the special Custom Agent variant
+#                   (no copy button, dashed border, base-300 accent).
+#   blocks.core     — block IDs always included (locked in the builder)
+#   blocks.default  — block IDs enabled by default but removable
+#   blocks.optional — block IDs available but disabled by default
+
+sections:
+  - id: bulk-reviews
+    title: Bulk Reviews
+    show_pending_count: true
+  - id: routine
+    title: Routine
+  - id: recommended
+    title: Recommended
+
+agents:
+  - slug: initial-setup
+    label: Initial Setup
+    description: First-time bulk categorization after connecting a new account
+    body: Establish rules and categories after connecting your first accounts. Creates broad category mappings per provider.
+    icon: sparkles
+    color: primary
+    section: bulk-reviews
+    badge: First run
+    blocks:
+      core: [strategy-initial-setup]
+      default: [review-depth-efficient]
+      optional:
+        - review-depth-thorough
+        - gmail-integration
+        - account-linking
+        - category-system
+        - sync-management
+        - transaction-comments
+        - merchant-analysis
+
+  - slug: bulk-review
+    label: Bulk Review
+    description: Thorough review of a large pending queue
+    body: Review a large queue of pending transactions with careful categorization and rule creation.
+    icon: layers
+    color: primary
+    section: bulk-reviews
+    badge: Thorough
+    counter: pending_reviews
+    blocks:
+      core: [strategy-bulk-review]
+      default: [review-depth-thorough]
+      optional:
+        - review-depth-efficient
+        - gmail-integration
+        - account-linking
+        - category-system
+        - sync-management
+        - transaction-comments
+        - merchant-analysis
+
+  - slug: quick-review
+    label: Quick Review
+    description: Rapidly clear a large queue with batch operations
+    body: Rapidly clear a large queue using batch operations. Prioritizes speed with reasonable accuracy.
+    icon: zap
+    color: primary
+    section: bulk-reviews
+    badge: Fast
+    blocks:
+      core: [strategy-quick-review]
+      default: [review-depth-efficient]
+      optional:
+        - review-depth-thorough
+        - gmail-integration
+        - account-linking
+        - category-system
+        - sync-management
+        - transaction-comments
+        - merchant-analysis
+
+  - slug: routine-review
+    label: Routine Review
+    description: Daily or weekly review of recent transactions
+    body: Review and categorize new transactions on a daily or weekly schedule. Creates rules for new patterns.
+    icon: repeat
+    color: success
+    section: routine
+    badge: Recurring
+    counter: active_rules
+    warn_no_rules: true
+    blocks:
+      core: [strategy-routine-review]
+      default: [review-depth-thorough, transaction-comments]
+      optional:
+        - review-depth-efficient
+        - gmail-integration
+        - account-linking
+        - category-system
+        - sync-management
+        - merchant-analysis
+
+  - slug: spending-report
+    label: Spending Report
+    description: Weekly or monthly spending summary with trends
+    body: Weekly or monthly summary of spending by category with trend analysis and anomaly callouts.
+    icon: bar-chart-3
+    color: violet-500
+    section: routine
+    badge: Recurring
+    badge_style: violet
+    counter: account_coverage
+    blocks:
+      core: [strategy-spending-report]
+      default: [category-system, merchant-analysis]
+      optional:
+        - gmail-integration
+        - account-linking
+        - sync-management
+        - transaction-comments
+
+  - slug: anomaly-detection
+    label: Anomaly Detection
+    description: Monitor for unusual charges, duplicates, and spending spikes
+    body: Watch for unusual charges, duplicate transactions, or unexpected spending spikes across all accounts.
+    icon: shield-alert
+    color: warning
+    section: recommended
+    badge: Monitoring
+    blocks:
+      core: [strategy-anomaly-detection]
+      default: [merchant-analysis, account-linking]
+      optional:
+        - gmail-integration
+        - category-system
+        - sync-management
+        - transaction-comments
+
+  - slug: custom
+    label: Custom Agent
+    description: Start from scratch with your own goals and instructions
+    body: Start from scratch with your own goals and instructions. Full access to all prompt blocks.
+    icon: plus
+    color: base-300
+    section: recommended
+    layout: dashed
+    blocks:
+      core: []
+      default: []
+      optional:
+        - review-depth-efficient
+        - review-depth-thorough
+        - category-system
+        - account-linking
+        - gmail-integration
+        - sync-management
+        - transaction-comments
+        - merchant-analysis

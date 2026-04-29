@@ -3,8 +3,11 @@ package prompts
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	rootprompts "breadbox/prompts"
+
+	"gopkg.in/yaml.v3"
 )
 
 // BlockRole determines how a block appears in the editor.
@@ -27,103 +30,167 @@ type Block struct {
 	Enabled         bool   `json:"enabled"` // true for core and default, false for optional
 }
 
-// AgentTypeConfig defines the block composition for one agent type.
+// AgentTypeConfig is the legacy view of one agent's block composition.
+// Kept for backward compatibility with the prompt-builder handler.
 type AgentTypeConfig struct {
 	Type        string
 	Label       string
 	Description string
 	Icon        string
 	Color       string
-	Core        []string // block IDs always included
-	Default     []string // block IDs enabled by default
-	Optional    []string // block IDs available but off by default
+	Core        []string
+	Default     []string
+	Optional    []string
 }
 
-// agentConfigs maps URL slug to agent config.
-var agentConfigs = map[string]AgentTypeConfig{
-	"initial-setup": {
-		Type:        "initial-setup",
-		Label:       "Initial Setup",
-		Description: "First-time bulk categorization after connecting a new account",
-		Icon:        "sparkles",
-		Color:       "primary",
-		Core:        []string{"strategy-initial-setup"},
-		Default:     []string{"review-depth-efficient"},
-		Optional:    []string{"review-depth-thorough", "gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
-	},
-	"bulk-review": {
-		Type:        "bulk-review",
-		Label:       "Bulk Review",
-		Description: "Thorough review of a large pending queue",
-		Icon:        "layers",
-		Color:       "primary",
-		Core:        []string{"strategy-bulk-review"},
-		Default:     []string{"review-depth-thorough"},
-		Optional:    []string{"review-depth-efficient", "gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
-	},
-	"quick-review": {
-		Type:        "quick-review",
-		Label:       "Quick Review",
-		Description: "Rapidly clear a large queue with batch operations",
-		Icon:        "zap",
-		Color:       "primary",
-		Core:        []string{"strategy-quick-review"},
-		Default:     []string{"review-depth-efficient"},
-		Optional:    []string{"review-depth-thorough", "gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
-	},
-	"routine-review": {
-		Type:        "routine-review",
-		Label:       "Routine Review",
-		Description: "Daily or weekly review of recent transactions",
-		Icon:        "repeat",
-		Color:       "success",
-		Core:        []string{"strategy-routine-review"},
-		Default:     []string{"review-depth-thorough", "transaction-comments"},
-		Optional:    []string{"review-depth-efficient", "gmail-integration", "account-linking", "category-system", "sync-management", "merchant-analysis"},
-	},
-	"spending-report": {
-		Type:        "spending-report",
-		Label:       "Spending Report",
-		Description: "Weekly or monthly spending summary with trends",
-		Icon:        "bar-chart-3",
-		Color:       "violet",
-		Core:        []string{"strategy-spending-report"},
-		Default:     []string{"category-system", "merchant-analysis"},
-		Optional:    []string{"gmail-integration", "account-linking", "sync-management", "transaction-comments"},
-	},
-	"anomaly-detection": {
-		Type:        "anomaly-detection",
-		Label:       "Anomaly Detection",
-		Description: "Monitor for unusual charges, duplicates, and spending spikes",
-		Icon:        "shield-alert",
-		Color:       "warning",
-		Core:        []string{"strategy-anomaly-detection"},
-		Default:     []string{"merchant-analysis", "account-linking"},
-		Optional:    []string{"gmail-integration", "category-system", "sync-management", "transaction-comments"},
-	},
-	"custom": {
-		Type:        "custom",
-		Label:       "Custom Agent",
-		Description: "Start from scratch with your own goals and instructions",
-		Icon:        "plus",
-		Color:       "base",
-		Core:        []string{},
-		Default:     []string{},
-		Optional: []string{
-			"review-depth-efficient", "review-depth-thorough",
-			"category-system", "account-linking",
-			"gmail-integration", "sync-management", "transaction-comments", "merchant-analysis",
-		},
-	},
+// Section groups agents on the landing page.
+type Section struct {
+	ID               string `yaml:"id"`
+	Title            string `yaml:"title"`
+	ShowPendingCount bool   `yaml:"show_pending_count"`
 }
 
-// GetAgentConfig returns the config for an agent type.
+// AgentBlocks is the per-agent block composition declared in agents.yaml.
+type AgentBlocks struct {
+	Core     []string `yaml:"core"`
+	Default  []string `yaml:"default"`
+	Optional []string `yaml:"optional"`
+}
+
+// Agent is one entry in agents.yaml — covers both the prompt-builder header
+// and the landing-page card.
+type Agent struct {
+	Slug        string      `yaml:"slug"`
+	Label       string      `yaml:"label"`
+	Description string      `yaml:"description"`
+	Body        string      `yaml:"body"`
+	Icon        string      `yaml:"icon"`
+	Color       string      `yaml:"color"`
+	Section     string      `yaml:"section"`
+	Badge       string      `yaml:"badge"`
+	BadgeStyle  string      `yaml:"badge_style"`
+	Counter     string      `yaml:"counter"`
+	WarnNoRules bool        `yaml:"warn_no_rules"`
+	Layout      string      `yaml:"layout"`
+	Blocks      AgentBlocks `yaml:"blocks"`
+}
+
+// Catalog is the parsed agents.yaml.
+type Catalog struct {
+	Sections []Section `yaml:"sections"`
+	Agents   []Agent   `yaml:"agents"`
+}
+
+var (
+	catalogOnce sync.Once
+	catalog     *Catalog
+	catalogErr  error
+)
+
+// loadCatalog parses prompts/agents.yaml and validates that every referenced
+// block exists. Cached after first call.
+func loadCatalog() (*Catalog, error) {
+	catalogOnce.Do(func() {
+		data, err := rootprompts.AgentsConfig()
+		if err != nil {
+			catalogErr = err
+			return
+		}
+		var c Catalog
+		if err := yaml.Unmarshal(data, &c); err != nil {
+			catalogErr = fmt.Errorf("parse agents.yaml: %w", err)
+			return
+		}
+		// Build a lookup of valid section IDs.
+		validSection := make(map[string]bool, len(c.Sections))
+		for _, s := range c.Sections {
+			validSection[s.ID] = true
+		}
+		// Validate agents: unique slug, known section, every block resolves.
+		seen := make(map[string]bool, len(c.Agents))
+		for _, a := range c.Agents {
+			if a.Slug == "" {
+				catalogErr = fmt.Errorf("agents.yaml: agent missing slug")
+				return
+			}
+			if seen[a.Slug] {
+				catalogErr = fmt.Errorf("agents.yaml: duplicate agent slug %q", a.Slug)
+				return
+			}
+			seen[a.Slug] = true
+			if a.Section != "" && !validSection[a.Section] {
+				catalogErr = fmt.Errorf("agents.yaml: agent %q references unknown section %q", a.Slug, a.Section)
+				return
+			}
+			ids := make([]string, 0, len(a.Blocks.Core)+len(a.Blocks.Default)+len(a.Blocks.Optional))
+			ids = append(ids, a.Blocks.Core...)
+			ids = append(ids, a.Blocks.Default...)
+			ids = append(ids, a.Blocks.Optional...)
+			for _, id := range ids {
+				if _, err := LoadBlock(id); err != nil {
+					catalogErr = fmt.Errorf("agents.yaml: agent %q references unknown block %q: %w", a.Slug, id, err)
+					return
+				}
+			}
+		}
+		catalog = &c
+	})
+	return catalog, catalogErr
+}
+
+// findAgent returns the catalog entry matching slug.
+func findAgent(slug string) (Agent, bool) {
+	c, err := loadCatalog()
+	if err != nil || c == nil {
+		return Agent{}, false
+	}
+	for _, a := range c.Agents {
+		if a.Slug == slug {
+			return a, true
+		}
+	}
+	return Agent{}, false
+}
+
+// GetAgentConfig returns the legacy view of an agent's config.
 func GetAgentConfig(agentType string) (AgentTypeConfig, bool) {
-	cfg, ok := agentConfigs[agentType]
-	return cfg, ok
+	a, ok := findAgent(agentType)
+	if !ok {
+		return AgentTypeConfig{}, false
+	}
+	return AgentTypeConfig{
+		Type:        a.Slug,
+		Label:       a.Label,
+		Description: a.Description,
+		Icon:        a.Icon,
+		Color:       a.Color,
+		Core:        a.Blocks.Core,
+		Default:     a.Blocks.Default,
+		Optional:    a.Blocks.Optional,
+	}, true
 }
 
-// LoadBlock reads a block .md file, parsing title and description from the first lines.
+// ListAgents returns every agent in declaration order.
+func ListAgents() ([]Agent, error) {
+	c, err := loadCatalog()
+	if err != nil {
+		return nil, err
+	}
+	return c.Agents, nil
+}
+
+// ListSections returns every section in declaration order.
+func ListSections() ([]Section, error) {
+	c, err := loadCatalog()
+	if err != nil {
+		return nil, err
+	}
+	return c.Sections, nil
+}
+
+// LoadBlock reads a block .md file, parsing title and description from the
+// first lines. The title is the first H1, the description is the first
+// blockquote (`> ...`), and the rest is the body.
 func LoadBlock(id string) (Block, error) {
 	data, err := rootprompts.Agent(id)
 	if err != nil {
@@ -163,30 +230,28 @@ func LoadBlock(id string) (Block, error) {
 
 // LoadAgentBlocks loads all blocks for an agent type with roles and enabled state set.
 func LoadAgentBlocks(agentType string) ([]Block, error) {
-	cfg, ok := agentConfigs[agentType]
+	a, ok := findAgent(agentType)
 	if !ok {
 		return nil, fmt.Errorf("unknown agent type: %s", agentType)
 	}
 
-	// Build role map.
-	roles := make(map[string]BlockRole)
-	for _, id := range cfg.Core {
+	roles := make(map[string]BlockRole, len(a.Blocks.Core)+len(a.Blocks.Default)+len(a.Blocks.Optional))
+	for _, id := range a.Blocks.Core {
 		roles[id] = BlockCore
 	}
-	for _, id := range cfg.Default {
+	for _, id := range a.Blocks.Default {
 		roles[id] = BlockDefault
 	}
-	for _, id := range cfg.Optional {
+	for _, id := range a.Blocks.Optional {
 		roles[id] = BlockOptional
 	}
 
-	// Load blocks in order: core, default, optional.
-	var blocks []Block
-	allIDs := make([]string, 0, len(cfg.Core)+len(cfg.Default)+len(cfg.Optional))
-	allIDs = append(allIDs, cfg.Core...)
-	allIDs = append(allIDs, cfg.Default...)
-	allIDs = append(allIDs, cfg.Optional...)
+	allIDs := make([]string, 0, len(roles))
+	allIDs = append(allIDs, a.Blocks.Core...)
+	allIDs = append(allIDs, a.Blocks.Default...)
+	allIDs = append(allIDs, a.Blocks.Optional...)
 
+	blocks := make([]Block, 0, len(allIDs))
 	for _, id := range allIDs {
 		block, err := LoadBlock(id)
 		if err != nil {

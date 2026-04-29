@@ -62,7 +62,32 @@ type AgentWizardStatsProps struct {
 
 // AgentWizardProps powers the Prompt Library tab.
 type AgentWizardProps struct {
-	Stats AgentWizardStatsProps
+	Stats    AgentWizardStatsProps
+	Sections []AgentWizardSection
+}
+
+// AgentWizardSection is one heading + group of cards on the landing page.
+type AgentWizardSection struct {
+	ID               string
+	Title            string
+	ShowPendingCount bool // Bulk Reviews shows a "{n} pending" pill on the heading.
+	Cards            []AgentWizardCard
+}
+
+// AgentWizardCard is one preset-prompt card. The handler resolves dynamic
+// counters/warnings from stats so the templ stays purely presentational.
+type AgentWizardCard struct {
+	Slug        string
+	Title       string
+	Body        string
+	Icon        string
+	Color       string // Tailwind colour fragment: "primary" | "success" | "warning" | "violet-500" | "base-300"
+	Badge       string
+	BadgeViolet bool
+	Counter     string // pre-rendered text, e.g. "12 waiting" or "Across 3 accounts"
+	CounterMono bool   // bulk-review style: monospace badge in `Color`
+	Warning     string // pre-rendered warning text, replaces the counter when set
+	Layout      string // "" or "dashed" for the Custom Agent variant
 }
 
 // MCPSettingsToolInfo is one tool row in the Tools Enabled card.
