@@ -11,7 +11,7 @@ import (
 
 // TestFeedCommentRowUsesSharedCommentTile verifies the consolidation done in
 // #969: every /feed comment row renders the shared `TimelineCommentTile`
-// (a neutral 24px message-circle on the rail) and the actor's avatar moves
+// (a neutral 24px message-square on the rail) and the actor's avatar moves
 // inline before the bolded actor name. The old per-feed avatar tile has
 // been retired, so neither `feedCommentAvatar` markup nor a 24px <img>
 // avatar should appear inside the rail anchor anymore.
@@ -49,7 +49,7 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 		mustOmit    []string
 	}{
 		{
-			name: "user_comment_renders_message_circle_tile_and_inline_avatar",
+			name: "user_comment_renders_message_square_tile_and_inline_avatar",
 			comment: FeedComment{
 				ActorType:          "user",
 				ActorID:            "user-abc",
@@ -63,11 +63,11 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 				},
 			},
 			mustContain: []string{
-				// Rail tile is the shared message-circle, not an avatar.
-				`data-lucide="message-circle"`,
+				// Rail tile is the shared message-square, not an avatar.
+				`data-lucide="message-square"`,
 				// Inline avatar uses the 16px treatment from
 				// TimelineActorInline.
-				`inline-block w-4 h-4 rounded-full object-cover align-text-bottom`,
+				`inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom`,
 				// Bold actor name + verb.
 				`Alice`,
 				`commented on`,
@@ -80,7 +80,7 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 			},
 		},
 		{
-			name: "agent_comment_renders_message_circle_tile_and_inline_bot",
+			name: "agent_comment_renders_message_square_tile_and_inline_bot",
 			comment: FeedComment{
 				ActorType: "agent",
 				ActorName: "Categorizer",
@@ -92,7 +92,7 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 				},
 			},
 			mustContain: []string{
-				`data-lucide="message-circle"`,
+				`data-lucide="message-square"`,
 				// Inline bot tile, 16px (w-4 h-4) — distinct from the
 				// 24px (w-6 h-6) rail tile that used to be there.
 				`inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10`,
@@ -149,7 +149,7 @@ func TestFeedAndTxDetailShareInlineActor(t *testing.T) {
 			},
 			mustHave: []string{
 				`<img src="/avatars/user-abc?v=v1"`,
-				`inline-block w-4 h-4 rounded-full object-cover align-text-bottom mr-1`,
+				`inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom mr-1`,
 				`<strong class="font-semibold text-base-content">Alice</strong>`,
 			},
 		},

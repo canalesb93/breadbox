@@ -77,6 +77,7 @@ LEFT JOIN users u_direct
    AND aa.id IS NULL
    AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
+  AND a.deleted_at IS NULL
 ORDER BY a.created_at DESC
 LIMIT $1
 `
@@ -262,6 +263,10 @@ type FeedBulkSubject struct {
 // FeedCommentEvent is one standalone comment — surfaced as its own row when
 // it isn't part of an MCP session and isn't part of a bulk-action group.
 type FeedCommentEvent struct {
+	// CommentShortID is the annotation's short_id. Used by /feed to link
+	// the verb to the matching comment row on /transactions/{id} via a
+	// `#comment-<id>` fragment so a tap navigates straight to the body.
+	CommentShortID     string
 	ActorName          string
 	ActorType          string
 	ActorID            string
@@ -568,6 +573,7 @@ LEFT JOIN users u_direct
    AND aa.id IS NULL
    AND u_direct.id::text = a.actor_id
 WHERE t.deleted_at IS NULL
+  AND a.deleted_at IS NULL
   AND a.created_at >= $1
   AND a.created_at <  $2
   AND a.kind NOT IN ('sync_started', 'sync_updated')
@@ -1276,6 +1282,7 @@ func groupUnsessionedAnnotations(rows []FeedActivityRow, params FeedEventsParams
 				continue
 			}
 			ev := FeedCommentEvent{
+				CommentShortID:     r.Annotation.ShortID,
 				ActorName:          r.Annotation.ActorName,
 				ActorType:          r.Annotation.ActorType,
 				ActorAvatarVersion: r.Annotation.ActorAvatarVersion,
