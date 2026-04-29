@@ -105,6 +105,27 @@
   /* Ensure Lucide SVG icons don't steal clicks from interactive parents. */
   svg.lucide, svg.lucide * { pointer-events: none; }
 
+  /*
+   * Pre-hydration size for Lucide placeholders.
+   *
+   * Before lucide.createIcons() swaps `<i data-lucide="x">` for `<svg>`, the
+   * <i> renders as `display:inline` with no intrinsic dimensions, so Tailwind
+   * sizing utilities (`w-4 h-4`, etc.) on the <i> do not produce a real box —
+   * the placeholder collapses to 0×0 and reflows when the SVG arrives. Make
+   * the <i> behave like an inline-block 1em×1em box so the row is the right
+   * height immediately and there is no layout shift on hydration.
+   *
+   * Once lucide replaces the <i> with `<svg class="lucide">`, this rule no
+   * longer applies (svg is not <i>), so SVG sizing remains controlled by the
+   * size utilities migrated onto the SVG by lucide's clone behavior.
+   */
+  i[data-lucide] {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+  }
+
   html { scroll-behavior: smooth; }
 
   body {
