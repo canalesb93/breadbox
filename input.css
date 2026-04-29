@@ -2855,7 +2855,10 @@
 /* Lift the text leading on row sentences so the first-line baseline stays
  * vertically centred against the larger 28px tile next to it. */
 .bb-timeline-prominent .bb-timeline > li > div.flex-1.text-sm.leading-6 {
-  line-height: 1.75rem; /* 28px — matches the tile height */
+  line-height: 1.5rem; /* 24px — tighter row rhythm; the 28px tile and
+                        * its 4px ring still anchor the row's vertical
+                        * extent, this just brings the body's leading
+                        * back in line with the rest of the page. */
 }
 
 /* Rail mask. The 28px tile bg + ring are still painted with base-100
