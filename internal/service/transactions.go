@@ -670,10 +670,10 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"t.date, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
-		// "Agent reviewed" is inferred from a category_set annotation authored
-		// by an agent. "Pending review" is the presence of the needs-review
-		// tag.
-		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
+		// "Comment count" is the number of live (non-tombstoned) comment
+		// annotations on this row. "Pending review" is the presence of the
+		// needs-review tag.
+		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
 		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
@@ -912,7 +912,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			catColor         pgtype.Text
 			categoryOverride bool
 			pending          bool
-			agentReviewed    bool
+			commentCount     int64
 			hasPendingReview bool
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
@@ -924,7 +924,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
-			&categoryOverride, &pending, &agentReviewed, &hasPendingReview, &createdAt, &updatedAt,
+			&categoryOverride, &pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
 			&effectiveUserID,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
@@ -965,7 +965,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			CategoryColor:       textPtr(catColor),
 			CategoryOverride:    categoryOverride,
 			Pending:             pending,
-			AgentReviewed:       agentReviewed,
+			CommentCount:        int(commentCount),
 			HasPendingReview:    hasPendingReview,
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
@@ -1062,7 +1062,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 		"t.date, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
-		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
+		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
 		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
@@ -1101,7 +1101,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			catColor         pgtype.Text
 			categoryOverride bool
 			pending          bool
-			agentReviewed    bool
+			commentCount     int64
 			hasPendingReview bool
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
@@ -1112,7 +1112,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
-			&categoryOverride, &pending, &agentReviewed, &hasPendingReview, &createdAt, &updatedAt,
+			&categoryOverride, &pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
 			&effectiveUserID,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
@@ -1150,7 +1150,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			CategoryColor:       textPtr(catColor),
 			CategoryOverride:    categoryOverride,
 			Pending:             pending,
-			AgentReviewed:       agentReviewed,
+			CommentCount:        int(commentCount),
 			HasPendingReview:    hasPendingReview,
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
