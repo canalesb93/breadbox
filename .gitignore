@@ -19,6 +19,8 @@ tmp/
 
 # Go
 vendor/
+# … but keep self-hosted JS dependencies tracked.
+!static/js/vendor/
 
 # sqlc generated files
 internal/db/db.go

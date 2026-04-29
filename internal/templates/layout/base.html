@@ -21,6 +21,10 @@
   <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
   <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.15.11/dist/cdn.min.js" integrity="sha384-NArNwzWsUSF+kY2lgW4YriEkjLqi+J+za6HrENUn/3nZqkBnWbxV22kCJEK5Uu6n" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.11/dist/cdn.min.js" integrity="sha384-WPtu0YHhJ3arcykfnv1JgUffWDSKRnqnDeTpJUbOc2os2moEmLkIdaeR0trPN4be" crossorigin="anonymous"></script>
+  <!-- Lucide: self-hosted + deferred so the browser fetches it in parallel with HTML parsing
+       and runs createIcons() before DOMContentLoaded. Eliminates the CDN-dependent FOUC where
+       <i data-lucide> placeholders rendered empty until the CDN round-trip completed. -->
+  <script defer src="/static/js/vendor/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
   {{if .CSRFToken}}<meta name="csrf-token" content="{{.CSRFToken}}">{{end}}
   <script>
@@ -832,9 +836,19 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous"></script>
   <script>
-    lucide.createIcons();
+    // Lucide is loaded via `<script defer>` from `<head>`, so by the time this
+    // body script runs the global `lucide` may or may not exist yet — defer
+    // scripts execute after HTML parsing finishes. Run createIcons as soon as
+    // both the DOM is ready AND lucide is defined.
+    (function() {
+      function init() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
 
     // Auto-render Lucide icons when new elements are added to the DOM.
     // Prevents icons from missing when Alpine.js x-if templates or
