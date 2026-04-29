@@ -1,0 +1,100 @@
+package components
+
+// TxRowFeed is the dense, single-line transaction row used by the home
+// /feed inside sync, agent_session, and bulk_action sample lists. Trades
+// the two-line `tx_row_compact` layout (name + meta) for one glanceable
+// row of [avatar · description · amount] so a stack of 5+ samples reads
+// at a single scan.
+//
+// Differences from `TxRowCompact`:
+//   - Uses the transaction's *description* (raw provider text) instead of
+//     the cleaned merchant name. Households scanning the feed recognise
+//     their own bank descriptors faster than a cleaned merchant string,
+//     and the description carries detail the merchant strip removes
+//     (location, last 4, "PURCHASE AUTHORIZED", etc.).
+//   - One visual line. Account, date, and category-name chrome are
+//     dropped — in feed context the parent card already pins the
+//     when/who/why; this row only needs to answer "which transaction".
+//   - Pending state surfaces inline as a small clock-icon before the
+//     amount, mirroring `tx_row_compact` so the lifecycle visual stays
+//     consistent across surfaces.
+//
+// Reusable beyond /feed wherever a dense one-liner fits — pass the
+// `Dimmed` flag for de-emphasised reference rows (e.g. transactions
+// referenced inside a longer card body).
+type TxRowFeedProps struct {
+	ShortID       string
+	Description   string  // raw provider description; not the cleaned merchant
+	Amount        float64 // breadbox sign convention: positive = outflow, negative = inflow
+	Currency      string
+	Pending       bool
+	CategoryColor *string
+	CategoryIcon  *string
+	Dimmed        bool
+}
+
+templ TxRowFeed(p TxRowFeedProps) {
+	<a
+		href={ templ.SafeURL("/transactions/" + p.ShortID) }
+		class="bb-tx-row-feed flex items-center gap-2 py-1 px-1 -mx-1 rounded-md hover:bg-base-200/70 focus-visible:bg-base-200/70 focus-visible:outline-none transition-colors duration-150 no-underline"
+	>
+		<!-- Category avatar — mirrors TxRowCompact so the feed's coloured
+		     circle reads identically to the /transactions list. -->
+		<span class="relative shrink-0">
+			if p.CategoryIcon != nil {
+				<span class="bb-tx-avatar bb-tx-avatar--sm" style={ TxAvatarColorStyle(p.CategoryColor) }>
+					<i data-lucide={ *p.CategoryIcon } class="w-3.5 h-3.5"></i>
+				</span>
+			} else {
+				<span class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
+					<span>{ FirstChar(p.Description) }</span>
+				</span>
+			}
+		</span>
+		<!-- Description (single line, truncated). Uses provider text, not
+		     merchant name — see component doc. Title-cased so all-caps
+		     bank descriptors ("WHOLEFDS NEW YORK 12345") match the
+		     /transactions list visual. -->
+		<span class={ "text-sm font-medium truncate flex-1 min-w-0", templ.KV("text-base-content/65", p.Dimmed) }>
+			{ TitleCase(p.Description) }
+		</span>
+		<!-- Pending mark, kept inline so the row height stays stable. -->
+		if p.Pending {
+			<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning/70" title="Pending — not yet posted"></i>
+			<span class="sr-only">(pending)</span>
+		}
+		<!-- Amount: leading sign so income (negative in our convention)
+		     reads as "+$X" without the user having to know the sign rule. -->
+		<span class={ "tabular-nums font-medium shrink-0", txRowFeedAmountClass(p.Amount), templ.KV("bb-tx-amount--pending", p.Pending) }>
+			{ TxRowFeedAmountWithSign(p.Amount, p.Currency) }
+		</span>
+	</a>
+}
+
+func txRowFeedAmountClass(amount float64) string {
+	if amount < 0 {
+		return "text-success"
+	}
+	return "text-base-content"
+}
+
+// TxRowFeedAmountWithSign formats an amount for the feed one-liner: a
+// leading "+" for income (breadbox negative) and "−" for outflow so the
+// direction is unambiguous without the reader having to remember the
+// sign convention. Uses an en-dash (U+2212) for the minus so the glyph
+// matches the bookkeeping convention used elsewhere in the admin UI.
+func TxRowFeedAmountWithSign(amount float64, _currency string) string {
+	abs := amount
+	if abs < 0 {
+		abs = -abs
+	}
+	formatted := FormatBalance(abs)
+	switch {
+	case amount < 0:
+		return "+" + formatted
+	case amount > 0:
+		return "−" + formatted
+	default:
+		return formatted
+	}
+}

@@ -824,71 +824,44 @@ func feedCommentActor(c *FeedComment) components.TimelineActor {
 
 // ── Shared transaction-reference helpers ──────────────────────────────────
 //
-// `feedTxRefRow` is the canonical inline reference to a transaction —
-// receipt icon, merchant name, optional account name, signed amount.
-// Used inside sync, agent_session, and bulk_action bodies. Keeping a
-// single source of truth so the sample list looks identical wherever it
-// surfaces.
-
-// feedTxRefRow renders one transaction-reference line.
+// Sample lists inside sync, agent_session, and bulk_action cards delegate
+// to the shared `components.TxRowFeed` one-liner so every feed surface
+// renders the same dense, glanceable transaction reference. The adapter
+// below maps the page-side `FeedTransactionRef` shape onto the
+// component's `TxRowFeedProps`.
 //
-// Pending transactions render a small clock-icon mark flush against the
-// amount — the same canonical pending visual used on `/transactions/{id}`
-// (`tx_row.templ`) and the transactions list (`tx_row_compact.templ`).
-// Pending rows often re-show as posted later, so surfacing the lifecycle
-// state inline gives users a "this is provisional" read without leaving
-// the feed.
-templ feedTxRefRow(tx FeedTransactionRef, dimmed bool) {
-	<a
-		href={ templ.SafeURL("/transactions/" + tx.ShortID) }
-		class="flex items-center gap-2 text-base-content/85 hover:text-base-content hover:bg-base-200/70 -mx-1 px-1 py-1 rounded-md transition-colors duration-150 no-underline group/txref focus-visible:bg-base-200/70 focus-visible:outline-none"
-	>
-		<!-- Category avatar — mirrors tx_row_compact.templ so feed sample
-		     rows pick up the same coloured circle as /transactions. -->
-		<span class="relative shrink-0">
-			if tx.CategoryIcon != nil {
-				<span class="bb-tx-avatar bb-tx-avatar--sm" style={ components.TxAvatarColorStyle(tx.CategoryColor) }>
-					<i data-lucide={ *tx.CategoryIcon } class="w-3.5 h-3.5"></i>
-				</span>
-			} else {
-				<span class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
-					<span>{ components.FirstChar(feedNonEmpty(tx.MerchantName, tx.Name)) }</span>
-				</span>
-			}
-		</span>
-		<span class="flex flex-col min-w-0 flex-1 overflow-hidden">
-			<span class={ "font-medium truncate min-w-0", templ.KV("text-base-content/65", dimmed) }>{ components.TitleCase(feedNonEmpty(tx.MerchantName, tx.Name)) }</span>
-			if tx.AccountName != "" {
-				<span class="text-xs text-base-content/45 truncate hidden sm:inline">{ tx.AccountName }</span>
-			}
-		</span>
-		if tx.Date != "" {
-			<span class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:inline">{ components.RelativeDate(tx.Date) }</span>
-		}
-		<span class="flex items-center gap-1 shrink-0">
-			if tx.Pending {
-				<i
-					data-lucide="clock"
-					class="w-3 h-3 shrink-0 text-warning/70"
-					title="Pending — not yet posted"
-				></i>
-				<span class="sr-only">(pending)</span>
-			}
-			<span class={ "tabular-nums font-medium", feedAmountClass(tx.Amount) }>
-				{ feedAmountWithSign(tx.Amount, tx.Currency) }
-			</span>
-		</span>
-	</a>
+// The component pulls the transaction *description* (raw provider text)
+// rather than the cleaned merchant name — see `tx_row_feed.templ` for
+// the rationale. Falling back to merchant name when description is
+// empty preserves a sensible read for pre-fill backfills that haven't
+// stamped a description yet.
+
+// feedTxRowProps adapts a `FeedTransactionRef` to the shared
+// `components.TxRowFeed` props. Exported as a templ-side helper so
+// both `feedTxRefList` and any future feed surface (e.g. a comment row
+// that wants the full row instead of an inline merchant link) can lean
+// on the same mapping.
+func feedTxRowProps(tx FeedTransactionRef, dimmed bool) components.TxRowFeedProps {
+	return components.TxRowFeedProps{
+		ShortID:       tx.ShortID,
+		Description:   feedNonEmpty(tx.Name, tx.MerchantName),
+		Amount:        tx.Amount,
+		Currency:      tx.Currency,
+		Pending:       tx.Pending,
+		CategoryColor: tx.CategoryColor,
+		CategoryIcon:  tx.CategoryIcon,
+		Dimmed:        dimmed,
+	}
 }
 
-// feedTxRefList wraps `feedTxRefRow` for the multi-sample case used by
-// sync / session / bulk-action bodies. Mobile collapses to 3 visible rows
-// via `hidden sm:flex` on samples ≥ index 3; desktop shows up to 5.
+// feedTxRefList renders the sample-list pattern used by sync,
+// agent_session, and bulk_action cards. Mobile collapses to 3 visible
+// rows via `hidden sm:block` on samples ≥ index 3; desktop shows up to 5.
 templ feedTxRefList(samples []FeedTransactionRef, additional int) {
 	<ul class="space-y-0.5" role="list">
 		for i, tx := range samples {
 			<li class={ templ.KV("hidden sm:block", i >= 3) }>
-				@feedTxRefRow(tx, false)
+				@components.TxRowFeed(feedTxRowProps(tx, false))
 			</li>
 		}
 		if additional > 0 {
@@ -1309,28 +1282,6 @@ func feedFilterLabel(slug string) string {
 		return "From me"
 	}
 	return slug
-}
-
-func feedAmountClass(amount float64) string {
-	if amount < 0 {
-		return "text-success"
-	}
-	return "text-base-content"
-}
-
-func feedAmountWithSign(amount float64, currency string) string {
-	abs := amount
-	if abs < 0 {
-		abs = -abs
-	}
-	formatted := components.FormatBalance(abs)
-	if amount < 0 {
-		return "+" + formatted
-	}
-	if amount > 0 {
-		return "−" + formatted
-	}
-	return formatted
 }
 
 func pluralFeedS(n int) string {
