@@ -36,7 +36,7 @@ templ Users(p UsersProps) {
 		@usersUnlinkedPrompt(p)
 	}
 	if len(p.EnrichedUsers) > 0 {
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 bb-stagger">
+		<div class="flex flex-col gap-5 bb-stagger">
 			for _, u := range p.EnrichedUsers {
 				@usersMemberCard(u)
 			}
