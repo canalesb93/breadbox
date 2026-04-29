@@ -587,6 +587,7 @@ func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 		CategoryColor:       tx.CategoryColor,
 		CategoryIcon:        tx.CategoryIcon,
 		CategorySlug:        tx.CategorySlug,
+		TagCount:            tx.TagCount,
 	}
 }
 

@@ -1147,8 +1147,11 @@
     @apply w-3.5 h-3.5;
   }
 
-  .bb-tx-avatar--letter {
-    @apply text-xs font-semibold;
+  /* Uncategorized: a neutral grey circle with a question-mark icon. Used
+   * across every tx-row variant (full, compact, feed one-liner) when a
+   * transaction has no category yet, so the visual signal "needs a
+   * category" is consistent regardless of where the row appears. */
+  .bb-tx-avatar--uncategorized {
     --avatar-color: oklch(0.205 0 0);
     background: oklch(0.205 0 0 / 0.06);
     color: oklch(0.205 0 0 / 0.45);
@@ -1158,7 +1161,7 @@
     .bb-tx-avatar {
       background: color-mix(in oklch, var(--avatar-color) 18%, transparent);
     }
-    .bb-tx-avatar--letter {
+    .bb-tx-avatar--uncategorized {
       background: oklch(0.985 0 0 / 0.08);
       color: oklch(0.985 0 0 / 0.45);
     }

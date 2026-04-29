@@ -42,6 +42,12 @@ type FeedActivityRow struct {
 	CategoryColor       *string
 	CategoryIcon        *string
 	CategorySlug        *string
+
+	// TagCount is the current number of tags on the transaction (live
+	// `transaction_tags` rows, not historical add/remove annotations).
+	// Drives the small "tag · N" chip on the feed one-liner so a quick
+	// glance at the rail surfaces "this row has labels worth checking".
+	TagCount int
 }
 
 // ListFeedActivity returns the most recent annotations across every
@@ -61,12 +67,14 @@ SELECT
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
     ac.name, bc.institution_name,
-    cat.display_name, cat.color, cat.icon, cat.slug
+    cat.display_name, COALESCE(cat.color, pcat.color) AS cat_color, cat.icon, cat.slug,
+    (SELECT COUNT(*)::int FROM transaction_tags tt WHERE tt.transaction_id = t.id) AS tag_count
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
 LEFT JOIN categories cat ON t.category_id = cat.id
+LEFT JOIN categories pcat ON cat.parent_id = pcat.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -304,6 +312,11 @@ type FeedSampleTx struct {
 	CategoryColor       *string
 	CategoryIcon        *string
 	CategorySlug        *string
+
+	// TagCount is the current number of tags on the transaction. Surfaces
+	// on the feed one-liner as a small `[tag] N` chip so users can see at
+	// a glance which sample rows already carry labels.
+	TagCount int
 }
 
 // FeedRuleOutcome is one (rule, count) pair shown inline on a sync card.
@@ -557,12 +570,14 @@ SELECT
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
     ac.name, bc.institution_name,
-    cat.display_name, cat.color, cat.icon, cat.slug
+    cat.display_name, COALESCE(cat.color, pcat.color) AS cat_color, cat.icon, cat.slug,
+    (SELECT COUNT(*)::int FROM transaction_tags tt WHERE tt.transaction_id = t.id) AS tag_count
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
 LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
 LEFT JOIN categories cat ON t.category_id = cat.id
+LEFT JOIN categories pcat ON cat.parent_id = pcat.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -627,6 +642,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		accountName, institutionName        pgtype.Text
 		catDisplay, catColor                pgtype.Text
 		catIcon, catSlug                    pgtype.Text
+		tagCount                            int
 	)
 
 	if err := s.Scan(
@@ -636,6 +652,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate, &pending,
 		&accountName, &institutionName,
 		&catDisplay, &catColor, &catIcon, &catSlug,
+		&tagCount,
 	); err != nil {
 		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
 	}
@@ -694,6 +711,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		Pending:            pending,
 		AccountName:        pgconv.TextOr(accountName, ""),
 		InstitutionName:    pgconv.TextOr(institutionName, ""),
+		TagCount:           tagCount,
 	}
 	if amount.Valid {
 		if f, err := amount.Float64Value(); err == nil && f.Valid {
@@ -915,11 +933,13 @@ func (s *Service) fetchSyncSampleTransactions(ctx context.Context, raws []syncRo
 	const q = `
 SELECT t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
        t.created_at, t.pending, ac.name, bc.id::text, bc.institution_name,
-       cat.display_name, cat.color, cat.icon, cat.slug
+       cat.display_name, COALESCE(cat.color, pcat.color) AS cat_color, cat.icon, cat.slug,
+       (SELECT COUNT(*)::int FROM transaction_tags tt WHERE tt.transaction_id = t.id) AS tag_count
 FROM transactions t
 JOIN accounts ac ON ac.id = t.account_id
 JOIN bank_connections bc ON ac.connection_id = bc.id
 LEFT JOIN categories cat ON t.category_id = cat.id
+LEFT JOIN categories pcat ON cat.parent_id = pcat.id
 WHERE t.created_at >= $1
   AND t.deleted_at IS NULL
   AND bc.id::text = ANY($2::text[])
@@ -952,8 +972,9 @@ ORDER BY t.created_at DESC
 			institutionName      pgtype.Text
 			catDisplay, catColor pgtype.Text
 			catIcon, catSlug     pgtype.Text
+			tagCount             int
 		)
-		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName, &catDisplay, &catColor, &catIcon, &catSlug); err != nil {
+		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName, &catDisplay, &catColor, &catIcon, &catSlug, &tagCount); err != nil {
 			return nil, err
 		}
 		t := txRow{
@@ -965,6 +986,7 @@ ORDER BY t.created_at DESC
 				AccountName:  pgconv.TextOr(accountName, ""),
 				Institution:  pgconv.TextOr(institutionName, ""),
 				Pending:      pending,
+				TagCount:     tagCount,
 			},
 			ConnectionID: connID,
 			CreatedAt:    createdAt.Time.UTC(),
@@ -1544,6 +1566,7 @@ func sampleTxFromRow(r FeedActivityRow) FeedSampleTx {
 		CategoryColor:       r.CategoryColor,
 		CategoryIcon:        r.CategoryIcon,
 		CategorySlug:        r.CategorySlug,
+		TagCount:            r.TagCount,
 	}
 }
 

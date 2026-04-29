@@ -7,15 +7,21 @@ import "breadbox/internal/service"
 // category picker, no expand panel. Mirrors the "tx-row-compact" partial.
 templ TxRowCompact(tx service.AdminTransactionRow) {
 	<a href={ templ.SafeURL("/transactions/" + tx.ID) } class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
-		<!-- Category avatar -->
+		<!-- Category avatar. Categorised rows (any color or icon) render the
+		     coloured circle; uncategorised rows render a neutral grey
+		     question-mark — same convention used in tx_row + tx_row_feed. -->
 		<div class="relative shrink-0">
-			if tx.CategoryIcon != nil {
+			if tx.CategoryIcon != nil || tx.CategoryColor != nil {
 				<div class="bb-tx-avatar bb-tx-avatar--sm" style={ txAvatarColorStyle(tx.CategoryColor) }>
-					<i data-lucide={ deref(tx.CategoryIcon) } class="w-3.5 h-3.5"></i>
+					if tx.CategoryIcon != nil {
+						<i data-lucide={ deref(tx.CategoryIcon) } class="w-3.5 h-3.5"></i>
+					} else {
+						<i data-lucide="folder" class="w-3.5 h-3.5"></i>
+					}
 				</div>
 			} else {
-				<div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
-					<span>{ firstChar(tx.Name) }</span>
+				<div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--uncategorized">
+					<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>
 				</div>
 			}
 		</div>
