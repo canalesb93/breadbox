@@ -76,17 +76,24 @@ func timelineIconColor(tone string) string {
 }
 
 // formatTimelineTimestamp parses an RFC3339 timestamp and renders it in the
-// admin-standard "Jan 2, 2006 3:04 PM" local format. Unparseable input is
-// returned unchanged.
-func formatTimelineTimestamp(s string) string {
+// admin-standard "Jan 2, 2006 3:04 PM" format, anchored to the location of
+// the supplied now (typically derived from the viewer's browser TZ via
+// `admin.UserLocation`). Falls back to time.Local when now is the zero
+// value so callers without an anchor still get a sensible render.
+// Unparseable input is returned unchanged.
+func formatTimelineTimestamp(s string, now time.Time) string {
 	if s == "" {
 		return ""
 	}
+	loc := time.Local
+	if !now.IsZero() {
+		loc = now.Location()
+	}
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
+		return t.In(loc).Format("Jan 2, 2006 3:04 PM")
 	}
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
+		return t.In(loc).Format("Jan 2, 2006 3:04 PM")
 	}
 	return s
 }

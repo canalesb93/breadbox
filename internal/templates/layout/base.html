@@ -15,6 +15,24 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/css/styles.css">
+  <script>
+    // Stash the browser's IANA timezone in a cookie so server-rendered date
+    // logic ("Today" buckets, hero "Events today" counters, absolute-time
+    // tooltips on /feed and the per-tx activity log) can render against the
+    // viewer's wall clock instead of the server's. Re-set on every load so
+    // DST shifts and travel propagate without manual intervention.
+    (function () {
+      try {
+        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && /^[A-Za-z0-9_+\-/]+$/.test(tz)) {
+          var oneYear = 60 * 60 * 24 * 365;
+          var attrs = '; Path=/; Max-Age=' + oneYear + '; SameSite=Lax';
+          if (location.protocol === 'https:') attrs += '; Secure';
+          document.cookie = 'bb_tz=' + encodeURIComponent(tz) + attrs;
+        }
+      } catch (_) { /* best-effort */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">

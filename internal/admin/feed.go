@@ -42,7 +42,12 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			return
 		}
 
-		now := time.Now()
+		// Anchor every wall-clock decision (day buckets, "Today" hero
+		// counters, absolute-time tooltips) to the viewer's browser
+		// timezone via the bb_tz cookie. Falls back to server local when
+		// the cookie isn't set yet — see `UserLocation`.
+		loc := UserLocation(r)
+		now := time.Now().In(loc)
 		window := time.Duration(feedWindowDays) * 24 * time.Hour
 		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 
@@ -253,7 +258,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].Timestamp.After(items[j].Timestamp)
 		})
-		days := groupFeedByDay(items, now)
+		days := groupFeedByDay(items, now, loc)
 
 		// 7. Hero band.
 		var commentsToday, eventsToday, unreadReports int
@@ -619,22 +624,27 @@ func excerpt(s string, n int) string {
 	return strings.TrimRight(cut, " \n\t.,;:") + "…"
 }
 
-// groupFeedByDay buckets the feed into per-day groups using the server's
-// local timezone. The first bucket gets a "Today" / "Yesterday" friendly
-// label; older buckets render the calendar date.
-func groupFeedByDay(items []pages.FeedItem, now time.Time) []pages.FeedDay {
+// groupFeedByDay buckets the feed into per-day groups using the supplied
+// location (typically the viewer's browser timezone — see `UserLocation`).
+// The first bucket gets a "Today" / "Yesterday" friendly label; older
+// buckets render the calendar date.
+func groupFeedByDay(items []pages.FeedItem, now time.Time, loc *time.Location) []pages.FeedDay {
 	if len(items) == 0 {
 		return nil
 	}
+	if loc == nil {
+		loc = time.Local
+	}
+	nowInLoc := now.In(loc)
 	out := make([]pages.FeedDay, 0)
 	var current *pages.FeedDay
 	for i := range items {
-		ts := items[i].Timestamp.Local()
+		ts := items[i].Timestamp.In(loc)
 		key := ts.Format("2006-01-02")
 		if current == nil || current.Key != key {
 			out = append(out, pages.FeedDay{
 				Key:   key,
-				Label: friendlyDayLabel(ts, now.Local()),
+				Label: friendlyDayLabel(ts, nowInLoc),
 				First: len(out) == 0,
 			})
 			current = &out[len(out)-1]

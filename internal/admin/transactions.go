@@ -685,11 +685,14 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		// Capture a single now anchor so the day-bucket labels
 		// ("Today" / "Yesterday" / weekday) and the per-row relative
 		// timestamps ("5 minutes ago" / "yesterday") agree across
-		// midnight and timezone boundaries. Threaded into the templ via
-		// props.Now → relativeTimeStrAt.
-		now := time.Now()
+		// midnight and timezone boundaries. Anchored to the viewer's
+		// browser TZ via UserLocation so a user in PDT doesn't see UTC
+		// midnight events leak into tomorrow's bucket. Threaded into the
+		// templ via props.Now → relativeTimeStrAt.
+		loc := UserLocation(r)
+		now := time.Now().In(loc)
 		activity := buildActivityTimeline(annotations, categoryDetailLookup(categoryTree), tagDisplayLookup(timelineTags))
-		activityDays := groupActivityByDay(activity, now)
+		activityDays := groupActivityByDay(activity, now, loc)
 
 		// Load tags currently attached + the registered-tag list (for the inline
 		// add-tag suggestion datalist). Also derive HasPendingReview from the
@@ -1156,8 +1159,8 @@ func syncEntryType(dbKind string) string {
 }
 
 // ActivityDayGroup holds activity entries grouped by calendar day (in the
-// server's local timezone) for rendering day separators on the transaction
-// detail timeline.
+// viewer's browser timezone — see UserLocation) for rendering day separators
+// on the transaction detail timeline.
 type ActivityDayGroup struct {
 	Date   string                  // ISO date, e.g. "2026-04-16"
 	Label  string                  // Human-friendly: "Today", "Yesterday", "Thursday, April 16"
@@ -1170,13 +1173,19 @@ type ActivityDayGroup struct {
 // returned group preserves the relative ordering of the input slice. The
 // now anchor is passed in (rather than read via time.Now()) so the bucket
 // labels share the same reference clock as the per-row relative timestamps.
-func groupActivityByDay(entries []service.ActivityEntry, now time.Time) []ActivityDayGroup {
+// loc anchors the calendar-day boundaries to the viewer's browser timezone
+// so a UTC-running server doesn't roll evenings into tomorrow's bucket for
+// users in westward zones.
+func groupActivityByDay(entries []service.ActivityEntry, now time.Time, loc *time.Location) []ActivityDayGroup {
 	if len(entries) == 0 {
 		return nil
 	}
+	if loc == nil {
+		loc = time.Local
+	}
 
-	today := now.Format("2006-01-02")
-	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+	today := now.In(loc).Format("2006-01-02")
+	yesterday := now.In(loc).AddDate(0, 0, -1).Format("2006-01-02")
 
 	var groups []ActivityDayGroup
 	groupIdx := map[string]int{}
@@ -1186,7 +1195,7 @@ func groupActivityByDay(entries []service.ActivityEntry, now time.Time) []Activi
 		if err != nil {
 			continue
 		}
-		date := t.Local().Format("2006-01-02")
+		date := t.In(loc).Format("2006-01-02")
 
 		idx, ok := groupIdx[date]
 		if !ok {
@@ -1347,7 +1356,8 @@ func TimelineRowsHandler(a *app.App, sm *scs.SessionManager, svc *service.Servic
 			timelineTags = nil
 		}
 
-		now := time.Now()
+		loc := UserLocation(r)
+		now := time.Now().In(loc)
 		entries := buildActivityTimeline(annotations, categoryDetailLookup(categoryTree), tagDisplayLookup(timelineTags))
 
 		// Compute the prior-most-recent timestamp as the boundary between
@@ -1394,8 +1404,8 @@ func TimelineRowsHandler(a *app.App, sm *scs.SessionManager, svc *service.Servic
 		var dayLabel string
 		if len(newEntries) > 0 {
 			firstNewTs, _ := time.Parse(time.RFC3339, newEntries[0].Timestamp)
-			firstNewDay := firstNewTs.Local().Format("2006-01-02")
-			if !havePrior || prior.Local().Format("2006-01-02") != firstNewDay {
+			firstNewDay := firstNewTs.In(loc).Format("2006-01-02")
+			if !havePrior || prior.In(loc).Format("2006-01-02") != firstNewDay {
 				today := now.Format("2006-01-02")
 				yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 				dayLabel = activityDayLabel(firstNewDay, today, yesterday, now)

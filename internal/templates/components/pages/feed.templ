@@ -712,8 +712,8 @@ templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
 templ feedRowTimestamp(timestamp string, now time.Time) {
 	if timestamp != "" {
 		<span class="text-base-content/30 mx-0.5">·</span>
-		<span class="tooltip tooltip-top" data-tip={ feedFormatTimestamp(timestamp) }>
-			<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ feedFormatTimestamp(timestamp) }>{ feedRelativeTimestamp(timestamp, now) }</time>
+		<span class="tooltip tooltip-top" data-tip={ feedFormatTimestamp(timestamp, now) }>
+			<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ feedFormatTimestamp(timestamp, now) }>{ feedRelativeTimestamp(timestamp, now) }</time>
 		</span>
 	}
 }
@@ -1315,12 +1315,16 @@ func feedRelativeTimestamp(s string, now time.Time) string {
 	return timefmt.RelativeRFC3339At(s, now)
 }
 
-func feedFormatTimestamp(s string) string {
+func feedFormatTimestamp(s string, now time.Time) string {
 	if s == "" {
 		return ""
 	}
+	loc := time.Local
+	if !now.IsZero() {
+		loc = now.Location()
+	}
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
+		return t.In(loc).Format("Jan 2, 2006 3:04 PM")
 	}
 	return s
 }

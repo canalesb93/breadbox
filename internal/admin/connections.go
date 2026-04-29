@@ -628,8 +628,11 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		var avgDurationSec float64
 		var durationCount int
 		// Build a map of day -> status for the last 14 days (sync timeline).
+		// Anchor day boundaries to the viewer's browser TZ so a UTC-running
+		// server doesn't draw a "today" tile that's empty until 5pm Pacific.
 		dayMap := make(map[string]*connectionDaySync)
-		now := time.Now()
+		loc := UserLocation(r)
+		now := time.Now().In(loc)
 		for i := 13; i >= 0; i-- {
 			day := now.AddDate(0, 0, -i)
 			key := day.Format("2006-01-02")
@@ -647,7 +650,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			if string(log.Status) == "success" {
 				successSyncs++
 				if lastSuccessTime == "" && log.StartedAt.Valid {
-					lastSuccessTime = log.StartedAt.Time.Local().Format("Jan 2, 2006 3:04 PM")
+					lastSuccessTime = log.StartedAt.Time.In(loc).Format("Jan 2, 2006 3:04 PM")
 					lastSuccessRelative = relativeTime(log.StartedAt.Time)
 				}
 			} else if string(log.Status) == "error" {
@@ -664,7 +667,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 
 			// Populate day map.
 			if log.StartedAt.Valid {
-				dayKey := log.StartedAt.Time.Local().Format("2006-01-02")
+				dayKey := log.StartedAt.Time.In(loc).Format("2006-01-02")
 				if ds, ok := dayMap[dayKey]; ok {
 					ds.Total++
 					if string(log.Status) == "success" {
