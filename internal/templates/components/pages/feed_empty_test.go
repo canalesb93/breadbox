@@ -119,7 +119,7 @@ func TestFeedEmptyStateVariants(t *testing.T) {
 			mustContain: []string{
 				"No comments in the last 3 days",
 				"Clear filter",
-				`href="/feed"`,
+				`href="/"`,
 			},
 			mustOmit: []string{
 				"Welcome to Breadbox",

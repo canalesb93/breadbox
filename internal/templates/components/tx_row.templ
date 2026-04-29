@@ -45,7 +45,10 @@ templ TxRow(tx service.AdminTransactionRow) {
 			</label>
 			<!-- Category icon / merchant-initial avatar. The `bb-tx-avatar-slot`
 			     class lets CSS hide the slot on mobile while selection mode is on
-			     so the bulk-select checkbox doesn't squeeze the name column. -->
+			     so the bulk-select checkbox doesn't squeeze the name column.
+			     Owner identity rides as a small badge in the bottom-right corner
+			     so we don't burn meta-line real estate (and so phones don't lose
+			     attribution entirely — the meta line is hidden <sm). -->
 			<div class="relative shrink-0 bb-tx-avatar-slot">
 				if tx.CategoryIcon != nil || tx.CategoryColor != nil {
 					<div class="bb-tx-avatar" style={ txAvatarColorStyle(tx.CategoryColor) }>
@@ -60,6 +63,15 @@ templ TxRow(tx service.AdminTransactionRow) {
 						<i data-lucide="circle-off" class="w-4 h-4"></i>
 					</div>
 				}
+				if tx.UserName != "" {
+					if tx.EffectiveUserID != nil {
+						<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="bb-tx-owner-badge" title={ tx.UserName }/>
+					} else {
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ tx.UserName }>
+							<span>{ firstChar(tx.UserName) }</span>
+						</span>
+					}
+				}
 			</div>
 			<!-- Description + meta line -->
 			<div class="flex-1 min-w-0">
@@ -71,26 +83,22 @@ templ TxRow(tx service.AdminTransactionRow) {
 				     On sm+ we show account + compact category (below xl) or
 				     the inline category picker handles it (xl+). -->
 				<div class="hidden sm:flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 min-w-0">
-					if tx.UserName != "" {
-						<!-- Avatar renders at sm+ breakpoints so owner identity survives
-						     on tablet/desktop without eating space on narrow phones. -->
-						if tx.EffectiveUserID != nil {
-							<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title={ tx.UserName }/>
-						} else {
-							<span class="inline-flex w-4 h-4 rounded-full bg-primary/10 items-center justify-center shrink-0" title={ tx.UserName }>
-								<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ firstChar(tx.UserName) }</span>
-							</span>
-						}
-					}
+					<!-- Owner avatar moved to a corner badge on the category icon
+					     (see `bb-tx-owner-badge`) so it shows up across all
+					     breakpoints without burning meta-line space. -->
 					<span class="truncate min-w-0">{ tx.AccountName }</span>
 					if tx.MerchantName != nil && !strings.EqualFold(tx.Name, deref(tx.MerchantName)) {
 						<span class="text-base-content/20 hidden xl:inline">&middot;</span>
 						<span class="text-base-content/40 truncate hidden xl:inline">{ titleCase(deref(tx.MerchantName)) }</span>
 					}
-					if tx.AgentReviewed {
+					if tx.CommentCount > 0 {
 						<span class="text-base-content/20">&middot;</span>
-						<span class="inline-flex items-center gap-0.5 text-primary/60" title="Categorized by AI agent">
-							<i data-lucide="bot" class="w-3 h-3"></i>
+						<span
+							class="inline-flex items-center gap-0.5 text-base-content/40"
+							title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
+						>
+							<i data-lucide="messages-square" class="w-3 h-3"></i>
+							<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
 						</span>
 					}
 					<!-- Tag container — updated in place by JS on add/remove. Leading
@@ -133,9 +141,12 @@ templ TxRow(tx service.AdminTransactionRow) {
 					}
 				</div>
 				<!-- Mobile-only sub-line (<sm): date + category dot.
-				     Keeps the row informative on iPhone without crowding the name. -->
+				     Keeps the row informative on iPhone without crowding the name.
+				     The date span carries `bb-tx-date-mobile` so the grouped-view
+				     CSS can hide it (along with its immediately-following `·`)
+				     when the day header above the group already shows the date. -->
 				<div class="flex sm:hidden items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
-					<span class="tabular-nums text-base-content/35 shrink-0 whitespace-nowrap">{ formatDate(tx.Date) }</span>
+					<span class="bb-tx-date-mobile tabular-nums text-base-content/35 shrink-0 whitespace-nowrap">{ formatDate(tx.Date) }</span>
 					if tx.CategoryDisplayName != nil {
 						<span class="text-base-content/20">&middot;</span>
 						<span class="inline-flex items-center gap-1 min-w-0">
@@ -144,6 +155,9 @@ templ TxRow(tx service.AdminTransactionRow) {
 							}
 							<span class="text-base-content/50 truncate">{ deref(tx.CategoryDisplayName) }</span>
 						</span>
+					} else {
+						<span class="text-base-content/20">&middot;</span>
+						<span class="text-base-content/25 truncate shrink-0">Uncategorized</span>
 					}
 					if len(tx.Tags) > 0 {
 						<span class="text-base-content/20">&middot;</span>
@@ -152,10 +166,14 @@ templ TxRow(tx service.AdminTransactionRow) {
 							<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(len(tx.Tags)) }</span>
 						</span>
 					}
-					if tx.AgentReviewed {
+					if tx.CommentCount > 0 {
 						<span class="text-base-content/20">&middot;</span>
-						<span class="inline-flex items-center gap-0.5 text-primary/60 shrink-0" title="Categorized by AI agent">
-							<i data-lucide="bot" class="w-3 h-3"></i>
+						<span
+							class="inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+							title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
+						>
+							<i data-lucide="messages-square" class="w-3 h-3"></i>
+							<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
 						</span>
 					}
 				</div>

@@ -1,6 +1,11 @@
 package components
 
-import "breadbox/internal/service"
+import (
+	"fmt"
+	"strconv"
+
+	"breadbox/internal/service"
+)
 
 // TxRowCompact is the lightweight sibling of TxRow used in dense contexts
 // (dashboard recent txns, rule detail tables). No selection, no inline
@@ -8,8 +13,10 @@ import "breadbox/internal/service"
 templ TxRowCompact(tx service.AdminTransactionRow) {
 	<a href={ templ.SafeURL("/transactions/" + tx.ID) } class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
 		<!-- Category avatar. Categorised rows (any color or icon) render the
-		     coloured circle; uncategorised rows render a neutral grey
-		     question-mark — same convention used in tx_row + tx_row_feed. -->
+		     coloured circle; uncategorised rows render the neutral
+		     `circle-off` glyph — same convention used in tx_row + tx_row_feed.
+		     Owner identity rides as a corner badge so it shows up across all
+		     breakpoints without burning meta-line real estate. -->
 		<div class="relative shrink-0">
 			if tx.CategoryIcon != nil || tx.CategoryColor != nil {
 				<div class="bb-tx-avatar bb-tx-avatar--sm" style={ txAvatarColorStyle(tx.CategoryColor) }>
@@ -24,6 +31,15 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 					<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>
 				</div>
 			}
+			if tx.UserName != "" {
+				if tx.EffectiveUserID != nil {
+					<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="bb-tx-owner-badge" title={ tx.UserName }/>
+				} else {
+					<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ tx.UserName }>
+						<span>{ firstChar(tx.UserName) }</span>
+					</span>
+				}
+			}
 		</div>
 		<!-- Name + meta line -->
 		<div class="min-w-0 flex-1">
@@ -31,27 +47,26 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 				<span class="text-sm font-medium truncate">{ tx.Name }</span>
 			</div>
 			<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
-				if tx.UserName != "" {
-					if tx.EffectiveUserID != nil {
-						<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title={ tx.UserName }/>
-					} else {
-						<span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title={ tx.UserName }>
-							<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ firstChar(tx.UserName) }</span>
-						</span>
-					}
-				}
 				<span class="truncate shrink min-w-0">{ tx.AccountName }</span>
 				if tx.CategoryDisplayName != nil {
 					<span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
-					<span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
+					<!-- Container shrinks (not shrink-0) so the category can take
+					     whatever the account leaves behind, and truncates on the
+					     text node when actually overflowing. The old `max-w-24`
+					     cap pre-truncated even in wide surfaces (cmdk). -->
+					<span class="items-center gap-1 shrink min-w-0 hidden sm:inline-flex">
 						<span class="w-1.5 h-1.5 rounded-full shrink-0" style={ txCompactCatColor(tx.CategoryColor) }></span>
-						<span class="text-base-content/50 truncate max-w-24">{ deref(tx.CategoryDisplayName) }</span>
+						<span class="text-base-content/50 truncate">{ deref(tx.CategoryDisplayName) }</span>
 					</span>
 				}
-				if tx.AgentReviewed {
+				if tx.CommentCount > 0 {
 					<span class="text-base-content/20 shrink-0">&middot;</span>
-					<span class="inline-flex items-center gap-0.5 text-primary/60 shrink-0" title="Categorized by AI agent">
-						<i data-lucide="bot" class="w-3 h-3"></i>
+					<span
+						class="inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+						title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
+					>
+						<i data-lucide="messages-square" class="w-3 h-3"></i>
+						<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
 					</span>
 				}
 			</div>
