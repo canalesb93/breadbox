@@ -57,12 +57,16 @@ function updateRowCategory(txId, slug) {
       avatarWrap.replaceChildren(avatar);
       if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [avatarWrap] });
     } else {
-      var name = (row.querySelector('a[href*="/transactions/"]') && row.querySelector('a[href*="/transactions/"]').textContent.trim()) || '?';
-      avatar.className = 'bb-tx-avatar bb-tx-avatar--letter';
-      var letter = document.createElement('span');
-      letter.textContent = name.charAt(0).toUpperCase();
-      avatar.appendChild(letter);
+      // Uncategorised — neutral grey question-mark, same as the templ
+      // primitives. Mirrors `bb-tx-avatar--uncategorized` rendered server-
+      // side by tx_row.templ / tx_row_compact.templ / tx_row_feed.templ.
+      avatar.className = 'bb-tx-avatar bb-tx-avatar--uncategorized';
+      var iconEl = document.createElement('i');
+      iconEl.setAttribute('data-lucide', 'help-circle');
+      iconEl.className = 'w-4 h-4';
+      avatar.appendChild(iconEl);
       avatarWrap.replaceChildren(avatar);
+      if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [avatarWrap] });
     }
   }
 

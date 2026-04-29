@@ -39,15 +39,21 @@ templ TxRowFeed(p TxRowFeedProps) {
 		class="bb-tx-row-feed flex items-center gap-2 py-1 px-1 -mx-1 rounded-md hover:bg-base-200/70 focus-visible:bg-base-200/70 focus-visible:outline-none transition-colors duration-150 no-underline"
 	>
 		<!-- Category avatar — mirrors TxRowCompact so the feed's coloured
-		     circle reads identically to the /transactions list. -->
+		     circle reads identically to the /transactions list. Categorised
+		     rows (any color or icon) render the coloured circle; rows
+		     without a category render a neutral grey question-mark. -->
 		<span class="relative shrink-0">
-			if p.CategoryIcon != nil {
+			if p.CategoryIcon != nil || p.CategoryColor != nil {
 				<span class="bb-tx-avatar bb-tx-avatar--sm" style={ TxAvatarColorStyle(p.CategoryColor) }>
-					<i data-lucide={ *p.CategoryIcon } class="w-3.5 h-3.5"></i>
+					if p.CategoryIcon != nil {
+						<i data-lucide={ *p.CategoryIcon } class="w-3.5 h-3.5"></i>
+					} else {
+						<i data-lucide="folder" class="w-3.5 h-3.5"></i>
+					}
 				</span>
 			} else {
-				<span class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
-					<span>{ FirstChar(p.Description) }</span>
+				<span class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--uncategorized">
+					<i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
 				</span>
 			}
 		</span>
