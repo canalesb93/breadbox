@@ -436,6 +436,25 @@
     @apply opacity-100;
   }
 
+  /* ── Sparkle accent for highlighted sidebar links (e.g. Agent Prompts) ── */
+  /* Trailing sparkle icon — overrides the generic icon rule above so it
+     gets its own size, accent colour, and a gentle pulse to draw the eye. */
+  .bb-sidebar-link .bb-sidebar-sparkle,
+  .bb-sidebar-link .bb-sidebar-sparkle svg {
+    @apply w-3.5 h-3.5 opacity-90;
+    animation: bb-sparkle-pulse 2.4s ease-in-out infinite;
+  }
+  .bb-sidebar-link:hover .bb-sidebar-sparkle,
+  .bb-sidebar-link:hover .bb-sidebar-sparkle svg,
+  .bb-sidebar-link--active .bb-sidebar-sparkle,
+  .bb-sidebar-link--active .bb-sidebar-sparkle svg {
+    @apply opacity-100;
+  }
+  @keyframes bb-sparkle-pulse {
+    0%, 100% { opacity: 0.65; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.12); }
+  }
+
   /* ── External-link arrow (Documentation / GitHub buttons) ── */
   /* Always visible on mobile (no hover affordance there), hidden by
      default and faded in on hover at lg+. Kept inside the
