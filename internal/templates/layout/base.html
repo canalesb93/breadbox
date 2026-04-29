@@ -1485,7 +1485,7 @@
       // palette hint updates automatically.
       var allItems = [
         // Overview
-        { id: 'nav-home', shortcutId: 'global.go.d', group: 'Overview', title: 'Home', desc: 'Activity feed across the household', icon: 'house', href: '/', keywords: 'home feed activity dashboard overview' },
+        { id: 'nav-feed', shortcutId: 'global.go.d', group: 'Overview', title: 'Feed', desc: 'Activity feed across the household', icon: 'rss', href: '/', keywords: 'home feed activity dashboard overview' },
         { id: 'nav-transactions', shortcutId: 'global.go.t', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
@@ -2055,7 +2055,7 @@
       // "Go to" navigation — source of truth for `g+<x>` chords. Still exported
       // as plain maps so M0.5 can reuse them to seed palette entries.
       var goRoutes = {
-        d: { path: '/',                   label: 'Go to Home' },
+        d: { path: '/',                   label: 'Go to Feed' },
         t: { path: '/transactions',       label: 'Go to Transactions' },
         c: { path: '/connections',        label: 'Go to Connections' },
         r: { path: '/reviews',            label: 'Go to Reviews' },

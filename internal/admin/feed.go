@@ -293,8 +293,8 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		}
 
 		data := map[string]any{
-			"PageTitle":   "Home",
-			"CurrentPage": "home",
+			"PageTitle":   "Feed",
+			"CurrentPage": "feed",
 			"CSRFToken":   GetCSRFToken(r),
 		}
 		// Compute the oldest visible event timestamp + the at-cap flag that
