@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -19,7 +20,9 @@ import (
 // product owner — three days lines up with "what's happened this weekend".
 const feedWindowDays = 3
 
-// FeedHandler serves GET /feed — the activity-style household feed page.
+// FeedHandler serves GET / — the activity-style household home page.
+// Until onboarding is dismissed, the root path redirects to /getting-started
+// (matching the old DashboardHandler behaviour).
 //
 // The aggregation pipeline is:
 //
@@ -32,6 +35,13 @@ const feedWindowDays = 3
 func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		// Redirect to getting-started page if onboarding is not dismissed.
+		if !appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false) {
+			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
+			return
+		}
+
 		now := time.Now()
 		window := time.Duration(feedWindowDays) * 24 * time.Hour
 		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
@@ -283,8 +293,8 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		}
 
 		data := map[string]any{
-			"PageTitle":   "Feed",
-			"CurrentPage": "feed",
+			"PageTitle":   "Home",
+			"CurrentPage": "home",
 			"CSRFToken":   GetCSRFToken(r),
 		}
 		// Compute the oldest visible event timestamp + the at-cap flag that

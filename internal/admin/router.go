@@ -61,8 +61,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
-		r.Get("/", DashboardHandler(a, svc, tr))
-		r.Get("/feed", FeedHandler(a, svc, tr))
+		r.Get("/", FeedHandler(a, svc, tr))
+		// Old `/feed` URL retired — feed is now the root. Redirect any
+		// straggling external links (bookmarks, in-app history) to `/`.
+		r.Get("/feed", redirectGET("/"))
 		r.Get("/getting-started", GettingStartedHandler(a, sm, tr))
 		r.Post("/getting-started/dismiss", DismissGettingStartedHandler(a, sm))
 		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))
