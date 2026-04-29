@@ -62,7 +62,7 @@ function updateRowCategory(txId, slug) {
       // side by tx_row.templ / tx_row_compact.templ / tx_row_feed.templ.
       avatar.className = 'bb-tx-avatar bb-tx-avatar--uncategorized';
       var iconEl = document.createElement('i');
-      iconEl.setAttribute('data-lucide', 'help-circle');
+      iconEl.setAttribute('data-lucide', 'circle-off');
       iconEl.className = 'w-4 h-4';
       avatar.appendChild(iconEl);
       avatarWrap.replaceChildren(avatar);
