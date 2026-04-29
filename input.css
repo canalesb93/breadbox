@@ -309,15 +309,15 @@
     z-index: 30;
     border-bottom: 1px solid oklch(0 0 0 / 0.06);
     /* Subtle backdrop blur for depth when content scrolls underneath */
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    background-color: oklch(var(--b1) / 0.92);
+            backdrop-filter: blur(8px);
+    background-color: color-mix(in oklch, var(--color-base-100) 92%, transparent);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-mobile-navbar {
       border-bottom-color: oklch(1 0 0 / 0.08);
-      background-color: oklch(var(--b1) / 0.88);
+      background-color: color-mix(in oklch, var(--color-base-100) 88%, transparent);
     }
   }
 
