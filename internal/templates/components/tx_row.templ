@@ -45,7 +45,10 @@ templ TxRow(tx service.AdminTransactionRow) {
 			</label>
 			<!-- Category icon / merchant-initial avatar. The `bb-tx-avatar-slot`
 			     class lets CSS hide the slot on mobile while selection mode is on
-			     so the bulk-select checkbox doesn't squeeze the name column. -->
+			     so the bulk-select checkbox doesn't squeeze the name column.
+			     Owner identity rides as a small badge in the bottom-right corner
+			     so we don't burn meta-line real estate (and so phones don't lose
+			     attribution entirely — the meta line is hidden <sm). -->
 			<div class="relative shrink-0 bb-tx-avatar-slot">
 				if tx.CategoryIcon != nil {
 					<div class="bb-tx-avatar" style={ txAvatarColorStyle(tx.CategoryColor) }>
@@ -55,6 +58,15 @@ templ TxRow(tx service.AdminTransactionRow) {
 					<div class="bb-tx-avatar bb-tx-avatar--letter">
 						<span>{ firstChar(tx.Name) }</span>
 					</div>
+				}
+				if tx.UserName != "" {
+					if tx.EffectiveUserID != nil {
+						<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="bb-tx-owner-badge" title={ tx.UserName }/>
+					} else {
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ tx.UserName }>
+							<span>{ firstChar(tx.UserName) }</span>
+						</span>
+					}
 				}
 			</div>
 			<!-- Description + meta line -->
@@ -67,17 +79,9 @@ templ TxRow(tx service.AdminTransactionRow) {
 				     On sm+ we show account + compact category (below xl) or
 				     the inline category picker handles it (xl+). -->
 				<div class="hidden sm:flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 min-w-0">
-					if tx.UserName != "" {
-						<!-- Avatar renders at sm+ breakpoints so owner identity survives
-						     on tablet/desktop without eating space on narrow phones. -->
-						if tx.EffectiveUserID != nil {
-							<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title={ tx.UserName }/>
-						} else {
-							<span class="inline-flex w-4 h-4 rounded-full bg-primary/10 items-center justify-center shrink-0" title={ tx.UserName }>
-								<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ firstChar(tx.UserName) }</span>
-							</span>
-						}
-					}
+					<!-- Owner avatar moved to a corner badge on the category icon
+					     (see `bb-tx-owner-badge`) so it shows up across all
+					     breakpoints without burning meta-line space. -->
 					<span class="truncate min-w-0">{ tx.AccountName }</span>
 					if tx.MerchantName != nil && !strings.EqualFold(tx.Name, deref(tx.MerchantName)) {
 						<span class="text-base-content/20 hidden xl:inline">&middot;</span>

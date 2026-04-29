@@ -726,52 +726,15 @@
                    :class="item._kind === 'tx' ? 'bb-cmdk-item--tx' : ''"
                    :data-active="activeIndex === item._flatIndex"
                    :data-cmdk-idx="item._flatIndex"
-                   @click="go(item)"
+                   @click.prevent="go(item)"
                    @mouseenter="activeIndex = item._flatIndex">
-                <!-- Transaction variant: mirrors the tx-row layout in the list -->
+                <!-- Transaction variant: server-rendered TxRowCompact fragment
+                     so cmdk shares one component with every other compact-tx
+                     surface (dashboard recents, rule preview). Click is
+                     prevented on the wrapper and routed through go() which
+                     handles the SPA progress bar + closePalette. -->
                 <template x-if="item._kind === 'tx'">
-                  <div class="bb-tx-card">
-                    <div class="bb-tx-card-avatar"
-                         :style="item.iconColor ? '--avatar-color: ' + item.iconColor : ''">
-                      <i :data-lucide="item.icon"></i>
-                    </div>
-                    <div class="bb-tx-card-main">
-                      <div class="bb-tx-card-title-row">
-                        <span class="bb-tx-card-title" x-text="item.title"></span>
-                        <template x-if="item.tx.pending">
-                          <span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
-                        </template>
-                      </div>
-                      <div class="bb-tx-card-meta">
-                        <template x-if="item.tx.userName">
-                          <span class="bb-tx-card-user" x-text="item.tx.userName.split(' ')[0]"></span>
-                        </template>
-                        <template x-if="item.tx.userName && item.tx.account">
-                          <span class="bb-tx-card-sep">&middot;</span>
-                        </template>
-                        <template x-if="item.tx.account">
-                          <span class="truncate" x-text="item.tx.account"></span>
-                        </template>
-                        <template x-if="item.tx.categoryName">
-                          <span class="bb-tx-card-sep">&middot;</span>
-                        </template>
-                        <template x-if="item.tx.categoryName">
-                          <span class="bb-tx-card-cat">
-                            <template x-if="item.tx.categoryColor">
-                              <span class="bb-cat-dot" :style="'background-color:' + item.tx.categoryColor"></span>
-                            </template>
-                            <span class="truncate" x-text="item.tx.categoryName"></span>
-                          </span>
-                        </template>
-                      </div>
-                    </div>
-                    <div class="bb-tx-card-right">
-                      <div class="bb-tx-card-date" x-text="item.tx.dateLabel"></div>
-                      <div class="bb-tx-amount tabular-nums"
-                           :class="item.tx.amount < 0 ? 'bb-tx-amount--income' : ''"
-                           x-text="item.tx.amountLabel"></div>
-                    </div>
-                  </div>
+                  <div x-html="item.html"></div>
                 </template>
 
                 <!-- Generic command / action variant -->
@@ -1703,20 +1666,10 @@
                   group: 'Transactions',
                   _kind: 'tx',
                   title: tx.name,
-                  icon: tx.category_icon || 'receipt',
-                  iconColor: tx.category_color || null,
-                  href: '/transactions/' + tx.id,
+                  href: tx.href,
                   keywords: '',
-                  tx: {
-                    amount: tx.amount,
-                    amountLabel: tx.amount_label,
-                    dateLabel: tx.date_label,
-                    account: tx.account || '',
-                    userName: tx.user_name || '',
-                    pending: !!tx.pending,
-                    categoryName: tx.category_display_name || '',
-                    categoryColor: tx.category_color || ''
-                  }
+                  // Pre-rendered TxRowCompact HTML; injected via x-html.
+                  html: tx.html
                 };
               });
               setTimeout(function() {

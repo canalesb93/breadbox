@@ -1045,9 +1045,18 @@
    *
    * Selection state is driven by `data-tx-selected` (set imperatively by the
    * bulk store) — no per-row Alpine bindings, no transitions that fire en masse.
+   *
+   * --bb-row-bg mirrors the row's effective background per state so child
+   * elements (e.g. .bb-tx-owner-badge) can draw a ring that blends into the
+   * highlight instead of staying base-100 white. Colors approximate the
+   * bg utilities below by mixing in oklab.
    */
+  .bb-tx-row {
+    --bb-row-bg: var(--color-base-100);
+  }
   .bb-tx-row[data-tx-selected] {
     @apply bg-primary/5;
+    --bb-row-bg: color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100));
   }
 
   /*
@@ -1091,18 +1100,31 @@
 
   .bb-tx-row:hover {
     @apply bg-base-200/40;
+    --bb-row-bg: color-mix(in oklab, var(--color-base-200) 40%, var(--color-base-100));
   }
 
   .bb-tx-row--focused {
     @apply bg-primary/5;
+    --bb-row-bg: color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100));
     box-shadow: inset 3px 0 0 oklch(0.55 0.15 250);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-tx-row--focused {
       @apply bg-primary/10;
+      --bb-row-bg: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
       box-shadow: inset 3px 0 0 oklch(0.65 0.15 250);
     }
+  }
+
+  /* ── Compact tx row (command palette, dashboard recents) ──
+     Inline Tailwind utilities cover hover paint; this just exposes
+     --bb-row-bg so the corner owner badge can track the highlight. */
+  .bb-tx-row-compact {
+    --bb-row-bg: var(--color-base-100);
+  }
+  .bb-tx-row-compact:hover {
+    --bb-row-bg: color-mix(in oklab, var(--color-base-200) 40%, var(--color-base-100));
   }
 
   /* ── Transaction category avatar ── */
@@ -1141,6 +1163,27 @@
       background: oklch(0.985 0 0 / 0.08);
       color: oklch(0.985 0 0 / 0.45);
     }
+  }
+
+  /* ── Owner-identity badge on the tx avatar ──
+     Sits in the bottom-right corner of `.bb-tx-avatar`, ringed in the row
+     background so it punches through the parent rounding cleanly. Mirrors
+     the sm+ meta-line avatar (now removed) so identity is visible on every
+     breakpoint without burning horizontal space. */
+  .bb-tx-owner-badge {
+    @apply absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full object-cover shrink-0;
+    /* Ring tracks the row's effective background (set via `--bb-row-bg` on
+       `.bb-tx-row` per hover/selected/focused state) so the badge blends into
+       the highlight instead of always punching with base-100 white. */
+    box-shadow: 0 0 0 2px var(--bb-row-bg, var(--color-base-100, #fff));
+  }
+
+  .bb-tx-owner-badge--letter {
+    @apply inline-flex items-center justify-center bg-primary/15 text-primary/80;
+  }
+
+  .bb-tx-owner-badge--letter > span {
+    @apply text-[0.5rem] font-semibold leading-none;
   }
 
   /* ── Transaction amount styling ── */
@@ -1427,20 +1470,27 @@
   .bb-cmdk-item {
     @apply mx-2 rounded-lg text-sm cursor-pointer;
     transition: background-color 0.1s ease, color 0.1s ease;
+    /* Default backdrop is the cmdk dialog surface (base-100). When the row
+       lights up below, we re-aim --bb-row-bg so the owner badge ring blends
+       into the highlight instead of staying base-100 white. */
+    --bb-row-bg: var(--color-base-100);
   }
 
   .bb-cmdk-item:hover,
   .bb-cmdk-item[data-active="true"] {
     @apply bg-base-200 text-base-content;
+    --bb-row-bg: var(--color-base-200);
   }
 
   .bb-cmdk-item[data-active="true"] {
     @apply bg-primary/8;
+    --bb-row-bg: color-mix(in oklab, var(--color-primary) 8%, var(--color-base-100));
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-cmdk-item[data-active="true"] {
       @apply bg-primary/12;
+      --bb-row-bg: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100));
     }
   }
 
@@ -1482,70 +1532,17 @@
     @apply flex items-center gap-1 shrink-0;
   }
 
-  /* ── Shared transaction card — used by every "transaction-as-card"
-     preview surface (command palette, rule preview modal, etc.).
-     Pairs with service.TransactionSummary on the backend.
-     Palette-specific padding/hover stays on `.bb-cmdk-item`. ── */
-  .bb-tx-card {
-    @apply flex items-center gap-3;
+  /* Tx rows in the cmdk render via TxRowCompact (server-rendered fragment
+     served by /-/search/transactions). The component already paints itself;
+     the cmdk-item wrapper just contributes spacing + the active highlight
+     handled above. Strip the inner row's own hover paint so it doesn't fight
+     the cmdk active state, and drop the wrapper's default padding so the
+     anchor's padding is the only one in play. */
+  .bb-cmdk-item.bb-cmdk-item--tx {
+    padding: 0;
   }
-
-  /* Command palette keeps its tight horizontal padding; other surfaces
-     apply their own spacing via the parent container. */
-  .bb-cmdk-item .bb-tx-card {
-    @apply px-4 py-2;
-  }
-
-  .bb-tx-card-avatar {
-    --avatar-color: oklch(0.65 0 0);
-    @apply w-8 h-8 rounded-lg flex items-center justify-center shrink-0;
-    background-color: color-mix(in srgb, var(--avatar-color) 15%, transparent);
-    color: var(--avatar-color);
-  }
-
-  .bb-tx-card-avatar svg,
-  .bb-tx-card-avatar i {
-    @apply w-4 h-4;
-  }
-
-  .bb-tx-card-main {
-    @apply flex-1 min-w-0;
-  }
-
-  .bb-tx-card-title-row {
-    @apply flex items-center gap-2;
-  }
-
-  .bb-tx-card-title {
-    @apply text-sm font-medium truncate;
-  }
-
-  .bb-tx-card-meta {
-    @apply flex items-center gap-1.5 mt-0.5 text-xs text-base-content/45 min-w-0;
-  }
-
-  .bb-tx-card-meta > .truncate {
-    @apply min-w-0;
-  }
-
-  .bb-tx-card-user {
-    @apply text-base-content/55 shrink-0;
-  }
-
-  .bb-tx-card-sep {
-    @apply text-base-content/20 shrink-0;
-  }
-
-  .bb-tx-card-cat {
-    @apply inline-flex items-center gap-1 shrink-0 min-w-0;
-  }
-
-  .bb-tx-card-right {
-    @apply flex flex-col items-end shrink-0 leading-tight;
-  }
-
-  .bb-tx-card-date {
-    @apply text-[0.65rem] text-base-content/40 tabular-nums;
+  .bb-cmdk-item .bb-tx-row-compact:hover {
+    background-color: transparent;
   }
 
   /* Palette key hint. Matches `.bb-kbd` exactly so single keys render

@@ -7,7 +7,9 @@ import "breadbox/internal/service"
 // category picker, no expand panel. Mirrors the "tx-row-compact" partial.
 templ TxRowCompact(tx service.AdminTransactionRow) {
 	<a href={ templ.SafeURL("/transactions/" + tx.ID) } class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
-		<!-- Category avatar -->
+		<!-- Category avatar. Owner identity rides as a corner badge — see
+		     tx_row.templ for the rationale (single source of truth across
+		     breakpoints, frees meta-line real estate). -->
 		<div class="relative shrink-0">
 			if tx.CategoryIcon != nil {
 				<div class="bb-tx-avatar bb-tx-avatar--sm" style={ txAvatarColorStyle(tx.CategoryColor) }>
@@ -18,6 +20,15 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 					<span>{ firstChar(tx.Name) }</span>
 				</div>
 			}
+			if tx.UserName != "" {
+				if tx.EffectiveUserID != nil {
+					<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="bb-tx-owner-badge" title={ tx.UserName }/>
+				} else {
+					<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ tx.UserName }>
+						<span>{ firstChar(tx.UserName) }</span>
+					</span>
+				}
+			}
 		</div>
 		<!-- Name + meta line -->
 		<div class="min-w-0 flex-1">
@@ -25,21 +36,16 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 				<span class="text-sm font-medium truncate">{ tx.Name }</span>
 			</div>
 			<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
-				if tx.UserName != "" {
-					if tx.EffectiveUserID != nil {
-						<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title={ tx.UserName }/>
-					} else {
-						<span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title={ tx.UserName }>
-							<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ firstChar(tx.UserName) }</span>
-						</span>
-					}
-				}
 				<span class="truncate shrink min-w-0">{ tx.AccountName }</span>
 				if tx.CategoryDisplayName != nil {
 					<span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
-					<span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
+					<!-- Container shrinks (not shrink-0) so the category can take
+					     whatever the account leaves behind, and truncates on the
+					     text node when actually overflowing. The old `max-w-24`
+					     cap pre-truncated even in wide surfaces (cmdk). -->
+					<span class="items-center gap-1 shrink min-w-0 hidden sm:inline-flex">
 						<span class="w-1.5 h-1.5 rounded-full shrink-0" style={ txCompactCatColor(tx.CategoryColor) }></span>
-						<span class="text-base-content/50 truncate max-w-24">{ deref(tx.CategoryDisplayName) }</span>
+						<span class="text-base-content/50 truncate">{ deref(tx.CategoryDisplayName) }</span>
 					</span>
 				}
 				if tx.AgentReviewed {

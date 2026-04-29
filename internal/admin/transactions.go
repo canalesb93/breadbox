@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bytes"
 	"errors"
 	"math"
 	"net/http"
@@ -1527,10 +1528,23 @@ func BulkUpdateTransactionsAdminHandler(a *app.App, sm *scs.SessionManager, svc 
 	}
 }
 
+// quickSearchResult is the wire shape served to the command palette. We
+// pre-render TxRowCompact server-side so the cmdk surface uses the exact
+// same component (and CSS) as the dashboard recents and rule-preview lists
+// — single source of truth for the "transaction-as-a-card" look.
+type quickSearchResult struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Href    string `json:"href"`
+	HTML    string `json:"html"`
+	Pending bool   `json:"pending,omitempty"`
+}
+
 // QuickSearchTransactionsHandler serves GET /-/search/transactions.
-// Returns []service.TransactionSummary — the shared DTO used by every
-// "transaction-as-a-card" preview surface (command palette, future rule
-// preview modal, etc.). Formatting lives in service.ToTransactionSummary.
+// Returns rendered TxRowCompact fragments for the command palette to
+// inject via x-html. Keeping rendering on the server (instead of a
+// client-side template clone) means cmdk shares one source of truth
+// with every other compact-tx surface.
 func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -1551,13 +1565,24 @@ func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 
 		result, err := svc.ListTransactionsAdmin(r.Context(), params)
 		if err != nil {
-			writeJSON(w, http.StatusOK, []service.TransactionSummary{})
+			writeJSON(w, http.StatusOK, []quickSearchResult{})
 			return
 		}
 
-		items := make([]service.TransactionSummary, 0, len(result.Transactions))
+		ctx := r.Context()
+		items := make([]quickSearchResult, 0, len(result.Transactions))
 		for _, tx := range result.Transactions {
-			items = append(items, service.ToTransactionSummary(tx))
+			var buf bytes.Buffer
+			if err := components.TxRowCompact(tx).Render(ctx, &buf); err != nil {
+				continue
+			}
+			items = append(items, quickSearchResult{
+				ID:      tx.ID,
+				Name:    tx.Name,
+				Href:    "/transactions/" + tx.ID,
+				HTML:    buf.String(),
+				Pending: tx.Pending,
+			})
 		}
 
 		writeJSON(w, http.StatusOK, items)
