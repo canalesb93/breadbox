@@ -1,5 +1,7 @@
 package components
 
+import "fmt"
+
 // TxRowFeed is the dense, single-line transaction row used by the home
 // /feed inside sync, agent_session, and bulk_action sample lists. Trades
 // the two-line `tx_row_compact` layout (name + meta) for one glanceable
@@ -30,7 +32,11 @@ type TxRowFeedProps struct {
 	Pending       bool
 	CategoryColor *string
 	CategoryIcon  *string
-	Dimmed        bool
+	// TagCount surfaces inline as a small `[tag] N` chip when > 0 so a
+	// quick scan of the row hints "this transaction already carries
+	// labels". Zero hides the chip entirely.
+	TagCount int
+	Dimmed   bool
 }
 
 templ TxRowFeed(p TxRowFeedProps) {
@@ -64,6 +70,14 @@ templ TxRowFeed(p TxRowFeedProps) {
 		<span class={ "text-sm font-medium truncate flex-1 min-w-0", templ.KV("text-base-content/65", p.Dimmed) }>
 			{ TitleCase(p.Description) }
 		</span>
+		<!-- Tag chip — surfaces a `[tag] N` hint when the tx already
+		     carries labels. Hidden on zero so the row stays clean. -->
+		if p.TagCount > 0 {
+			<span class="inline-flex items-center gap-0.5 text-xs text-base-content/45 tabular-nums shrink-0" title={ TxRowFeedTagTitle(p.TagCount) }>
+				<i data-lucide="tag" class="w-3 h-3"></i>
+				<span>{ fmt.Sprintf("%d", p.TagCount) }</span>
+			</span>
+		}
 		<!-- Pending mark, kept inline so the row height stays stable. -->
 		if p.Pending {
 			<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning/70" title="Pending — not yet posted"></i>
@@ -82,6 +96,15 @@ func txRowFeedAmountClass(amount float64) string {
 		return "text-success"
 	}
 	return "text-base-content"
+}
+
+// TxRowFeedTagTitle returns the tooltip text for the inline tag chip,
+// pluralised so a single-tag row reads "1 tag" instead of "1 tags".
+func TxRowFeedTagTitle(n int) string {
+	if n == 1 {
+		return "1 tag"
+	}
+	return fmt.Sprintf("%d tags", n)
 }
 
 // TxRowFeedAmountWithSign formats an amount for the feed one-liner: a

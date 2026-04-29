@@ -156,6 +156,10 @@ type FeedTransactionRef struct {
 	CategoryColor       *string
 	CategoryIcon        *string
 	CategorySlug        *string
+
+	// TagCount is the current number of tags on the transaction. Drives
+	// the small `[tag] N` chip on the feed one-liner when > 0.
+	TagCount int
 }
 
 // FeedSync is the sync-card payload. Inline transaction samples and rule
