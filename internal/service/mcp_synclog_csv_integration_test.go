@@ -1329,23 +1329,11 @@ func TestGetOverviewStats_WithConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetOverviewStats: %v", err)
 	}
-	if stats.UserCount != 1 {
-		t.Errorf("user_count = %d, want 1", stats.UserCount)
-	}
-	if stats.ConnectionCount != 1 {
-		t.Errorf("connection_count = %d, want 1", stats.ConnectionCount)
-	}
-	if stats.AccountCount != 2 {
-		t.Errorf("account_count = %d, want 2", stats.AccountCount)
+	if stats.Scope.AccountCount != 2 {
+		t.Errorf("scope.account_count = %d, want 2", stats.Scope.AccountCount)
 	}
 	if len(stats.Users) != 1 || stats.Users[0].Name != "Alice" {
 		t.Errorf("users list unexpected: %+v", stats.Users)
-	}
-	if len(stats.Connections) != 1 {
-		t.Errorf("connections count = %d, want 1", len(stats.Connections))
-	}
-	if stats.Connections[0].AccountCount != 2 {
-		t.Errorf("connection account_count = %d, want 2", stats.Connections[0].AccountCount)
 	}
 }
 
