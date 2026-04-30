@@ -294,11 +294,11 @@ func TestCompactIDsBytesFieldOrdering(t *testing.T) {
 	}
 }
 
-// TestCompactIDsBytesFKPairs verifies that FK sibling pairs like
-// account_id/account_short_id are collapsed to a single account_id carrying
-// the short value.
-func TestCompactIDsBytesFKPairs(t *testing.T) {
-	input := []byte(`{"id":"own-uuid","short_id":"ownshort","account_id":"acct-uuid","account_short_id":"acctshort","category_id":"cat-uuid","category_short_id":"catshort","name":"t1"}`)
+// TestCompactIDsBytesFKsPassThrough verifies that FK fields are emitted
+// verbatim — they already carry short_ids resolved at the SQL layer, and the
+// rewriter only handles each object's own id/short_id pair.
+func TestCompactIDsBytesFKsPassThrough(t *testing.T) {
+	input := []byte(`{"id":"own-uuid","short_id":"ownshort","account_id":"acctshort","category_id":"catshort","name":"t1"}`)
 	got := compactIDsBytes(input)
 	var parsed map[string]any
 	if err := json.Unmarshal(got, &parsed); err != nil {
@@ -315,30 +315,7 @@ func TestCompactIDsBytesFKPairs(t *testing.T) {
 			t.Errorf("%s: got %v want %q", k, parsed[k], v)
 		}
 	}
-	for _, k := range []string{"short_id", "account_short_id", "category_short_id"} {
-		if _, has := parsed[k]; has {
-			t.Errorf("%s should be removed", k)
-		}
-	}
-}
-
-// TestCompactIDsBytesFKNullShort verifies that a null short_id sibling drops
-// the _short_id key but leaves the _id value untouched (compaction would
-// otherwise discard a valid UUID).
-func TestCompactIDsBytesFKNullShort(t *testing.T) {
-	input := []byte(`{"id":"own-uuid","short_id":"ownshort","account_id":"acct-uuid","account_short_id":null}`)
-	got := compactIDsBytes(input)
-	var parsed map[string]any
-	if err := json.Unmarshal(got, &parsed); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if parsed["id"] != "ownshort" {
-		t.Errorf("id: got %v", parsed["id"])
-	}
-	if parsed["account_id"] != "acct-uuid" {
-		t.Errorf("account_id: expected preserved UUID, got %v", parsed["account_id"])
-	}
-	if _, has := parsed["account_short_id"]; has {
-		t.Error("account_short_id should be removed even when null")
+	if _, has := parsed["short_id"]; has {
+		t.Error("short_id should be removed")
 	}
 }

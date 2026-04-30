@@ -37,7 +37,11 @@ type QueryTransactionsInput struct {
 
 Use `*float64` (not `float64`) for optional numeric filters so zero is a valid filter value.
 
-Outputs go through `jsonResult()` which calls `compactIDs()` — replaces every `id` field with the `short_id` value and drops the `short_id` field. Agents see compact 8-char IDs; REST API consumers still get both.
+Outputs go through `jsonResult()` which calls `compactIDsBytes()` — collapses each object's own `id`/`short_id` pair so the `id` field carries the 8-char short value and the separate `short_id` key is dropped.
+
+FK fields (`account_id`, `transaction_id`, `rule_id`, `user_id`, `connection_id`, …) carry the **referenced row's `short_id`** directly. Resolution happens at the SQL layer in service queries (JOINs that select the FK target's `short_id`) — not in the byte rewriter, which only touches the row's own pair. There is no separate `*_short_id` sibling on responses. Categories and tags are referenced by `*_slug` instead — slugs are the canonical handle for those entities.
+
+Agents see one compact 8-char ID per reference. REST consumers see the same shape (FK fields carry shorts) since the SQL resolution is shared; only the row's own-`id` rewriting is MCP-only.
 
 Errors: return with `IsError: true` and a text content block `{"error": "message"}`. Never panic.
 
