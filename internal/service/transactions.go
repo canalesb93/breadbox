@@ -99,7 +99,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	args := make([]any, 0, 16)
 	argN := 1
 
-	buf.WriteString("SELECT t.id, t.short_id, t.account_id, t.provider_transaction_id, t.provider_pending_transaction_id, " +
+	buf.WriteString("SELECT t.id, t.short_id, t.provider_transaction_id, t.provider_pending_transaction_id, " +
 		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
 		"t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name, " +
 		"t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence, " +
@@ -316,7 +316,6 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		var (
 			id                     pgtype.UUID
 			shortID                string
-			accountID              pgtype.UUID
 			externalTransactionID  string
 			pendingTransactionID   pgtype.Text
 			amount                 pgtype.Numeric
@@ -353,7 +352,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		)
 
 		if err := rows.Scan(
-			&id, &shortID, &accountID, &externalTransactionID, &pendingTransactionID,
+			&id, &shortID, &externalTransactionID, &pendingTransactionID,
 			&amount, &isoCurrencyCode, &unofficialCurrencyCode,
 			&date, &authorizedDate, &datetime, &authorizedDatetime,
 			&name, &merchantName, &categoryPrimary, &categoryDetailed,
@@ -399,8 +398,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		transactions = append(transactions, TransactionResponse{
 			ID:                  formatUUID(id),
 			ShortID:             shortID,
-			AccountID:           uuidPtr(accountID),
-			AccountShortID:      &accountShortIDVal,
+			AccountID:           &accountShortIDVal,
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
 			AttributedUserID:    uuidPtr(attributedUserID),
@@ -1211,8 +1209,53 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 	if err != nil {
 		return nil, ErrNotFound
 	}
-	txn, err := s.Queries.GetTransaction(ctx, uid)
-	if err != nil {
+
+	// Dynamic SQL with JOIN so account_id can carry the account's short_id
+	// directly (matching ListTransactions). Avoids a second round-trip just to
+	// look up the FK's short_id.
+	const q = `
+		SELECT t.id, t.short_id, a.short_id AS account_short_id,
+			t.amount, t.iso_currency_code, t.date, t.authorized_date,
+			t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name,
+			t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence,
+			t.provider_payment_channel, t.pending, t.created_at, t.updated_at,
+			t.category_id, t.category_override
+		FROM transactions t
+		LEFT JOIN accounts a ON a.id = t.account_id
+		WHERE t.id = $1 AND t.deleted_at IS NULL
+	`
+
+	var (
+		txID                pgtype.UUID
+		shortID             string
+		accountShortID      pgtype.Text
+		amount              pgtype.Numeric
+		isoCurrencyCode     pgtype.Text
+		date                pgtype.Date
+		authorizedDate      pgtype.Date
+		datetime            pgtype.Timestamptz
+		authorizedDatetime  pgtype.Timestamptz
+		providerName        string
+		providerMerchant    pgtype.Text
+		providerCatPrimary  pgtype.Text
+		providerCatDetailed pgtype.Text
+		providerCatConf     pgtype.Text
+		providerChannel     pgtype.Text
+		pending             bool
+		createdAt           pgtype.Timestamptz
+		updatedAt           pgtype.Timestamptz
+		categoryID          pgtype.UUID
+		categoryOverride    bool
+	)
+
+	if err := s.Pool.QueryRow(ctx, q, uid).Scan(
+		&txID, &shortID, &accountShortID,
+		&amount, &isoCurrencyCode, &date, &authorizedDate,
+		&datetime, &authorizedDatetime, &providerName, &providerMerchant,
+		&providerCatPrimary, &providerCatDetailed, &providerCatConf,
+		&providerChannel, &pending, &createdAt, &updatedAt,
+		&categoryID, &categoryOverride,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -1220,40 +1263,39 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 	}
 
 	amountVal := 0.0
-	if f := numericFloat(txn.Amount); f != nil {
+	if f := numericFloat(amount); f != nil {
 		amountVal = *f
 	}
 
 	var dateVal string
-	if ds := dateStr(txn.Date); ds != nil {
+	if ds := dateStr(date); ds != nil {
 		dateVal = *ds
 	}
 
 	resp := &TransactionResponse{
-		ID:                  formatUUID(txn.ID),
-		ShortID:             txn.ShortID,
-		AccountID:           uuidPtr(txn.AccountID),
-		Amount:              amountVal,
-		IsoCurrencyCode:     textPtr(txn.IsoCurrencyCode),
-		Date:                dateVal,
-		AuthorizedDate:      dateStr(txn.AuthorizedDate),
-		Datetime:            timestampStr(txn.Datetime),
-		AuthorizedDatetime:  timestampStr(txn.AuthorizedDatetime),
-		ProviderName:               txn.ProviderName,
-		ProviderMerchantName:       textPtr(txn.ProviderMerchantName),
-		ProviderCategoryPrimary:    textPtr(txn.ProviderCategoryPrimary),
-		ProviderCategoryDetailed:   textPtr(txn.ProviderCategoryDetailed),
-		ProviderCategoryConfidence: textPtr(txn.ProviderCategoryConfidence),
-		CategoryOverride:           txn.CategoryOverride,
-		ProviderPaymentChannel:     textPtr(txn.ProviderPaymentChannel),
-		Pending:             txn.Pending,
-		CreatedAt:           pgconv.TimestampStr(txn.CreatedAt),
-		UpdatedAt:           pgconv.TimestampStr(txn.UpdatedAt),
+		ID:                         formatUUID(txID),
+		ShortID:                    shortID,
+		AccountID:                  textPtr(accountShortID),
+		Amount:                     amountVal,
+		IsoCurrencyCode:            textPtr(isoCurrencyCode),
+		Date:                       dateVal,
+		AuthorizedDate:             dateStr(authorizedDate),
+		Datetime:                   timestampStr(datetime),
+		AuthorizedDatetime:         timestampStr(authorizedDatetime),
+		ProviderName:               providerName,
+		ProviderMerchantName:       textPtr(providerMerchant),
+		ProviderCategoryPrimary:    textPtr(providerCatPrimary),
+		ProviderCategoryDetailed:   textPtr(providerCatDetailed),
+		ProviderCategoryConfidence: textPtr(providerCatConf),
+		CategoryOverride:           categoryOverride,
+		ProviderPaymentChannel:     textPtr(providerChannel),
+		Pending:                    pending,
+		CreatedAt:                  pgconv.TimestampStr(createdAt),
+		UpdatedAt:                  pgconv.TimestampStr(updatedAt),
 	}
 
-	// Load structured category info if category_id is set
-	if txn.CategoryID.Valid {
-		cat, err := s.Queries.GetCategoryByID(ctx, txn.CategoryID)
+	if categoryID.Valid {
+		cat, err := s.Queries.GetCategoryByID(ctx, categoryID)
 		if err == nil {
 			catID := formatUUID(cat.ID)
 			catInfo := &TransactionCategoryInfo{

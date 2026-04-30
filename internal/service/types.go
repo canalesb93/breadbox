@@ -38,7 +38,6 @@ type TransactionResponse struct {
 	ID                  string                   `json:"id"`
 	ShortID             string                   `json:"short_id"`
 	AccountID           *string                  `json:"account_id"`
-	AccountShortID      *string                  `json:"account_short_id,omitempty"`
 	AccountName         *string                  `json:"account_name"`
 	UserName            *string                  `json:"user_name"`
 	AttributedUserID    *string                  `json:"attributed_user_id,omitempty"`
