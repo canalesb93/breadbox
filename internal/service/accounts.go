@@ -77,7 +77,9 @@ func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccoun
 
 	if acct.ConnectionID != nil {
 		detail.ConnectionID = *acct.ConnectionID
-		connID, err := pgconv.ParseUUID(*acct.ConnectionID)
+		// acct.ConnectionID carries the connection's short_id; resolve through
+		// the service helper (accepts UUID or short_id) before fetching.
+		connID, err := s.resolveConnectionID(ctx, *acct.ConnectionID)
 		if err == nil {
 			conn, err := s.Queries.GetBankConnection(ctx, connID)
 			if err == nil {
@@ -95,8 +97,8 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
 		ShortID:           r.ShortID,
-		ConnectionID:      uuidPtr(r.ConnectionID),
-		UserID:            uuidPtr(r.UserID),
+		ConnectionID:      textPtr(r.ConnectionShortID),
+		UserID:            textPtr(r.UserShortID),
 		InstitutionName:   textPtr(r.InstitutionName),
 		Name:              r.Name,
 		OfficialName:      textPtr(r.OfficialName),
@@ -116,11 +118,12 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 }
 
 func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
+	connShort := r.ConnectionShortID
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
 		ShortID:           r.ShortID,
-		ConnectionID:      uuidPtr(r.ConnectionID),
-		UserID:            uuidPtr(r.UserID),
+		ConnectionID:      &connShort,
+		UserID:            textPtr(r.UserShortID),
 		InstitutionName:   textPtr(r.InstitutionName),
 		Name:              r.Name,
 		OfficialName:      textPtr(r.OfficialName),
@@ -143,8 +146,8 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
 		ShortID:           r.ShortID,
-		ConnectionID:      uuidPtr(r.ConnectionID),
-		UserID:            uuidPtr(r.UserID),
+		ConnectionID:      textPtr(r.ConnectionShortID),
+		UserID:            textPtr(r.UserShortID),
 		InstitutionName:   textPtr(r.InstitutionName),
 		Name:              r.Name,
 		OfficialName:      textPtr(r.OfficialName),
