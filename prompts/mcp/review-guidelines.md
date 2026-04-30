@@ -25,7 +25,7 @@ RULE CREATION:
 - Fields: provider_name, provider_merchant_name, amount, provider_category_primary (raw provider category), provider_category_detailed, pending, provider, account_id, user_id, user_name
 
 BEFORE CREATING A RULE:
-1. Check list_transaction_rules to avoid duplicates
+1. Read breadbox://rules to avoid duplicates
 2. Use preview_rule to test your conditions — verify match count and review sample transactions
 3. Query some transactions with fields=core,category to see what provider_category_primary values exist
 
@@ -45,11 +45,11 @@ RULE NAMING:
 - Use descriptive names: "[pattern type]: [match] → [category]"
 - Examples: "provider_category_primary: dining → food_and_drink_restaurant", "provider_name: Starbucks → food_and_drink_coffee"
 
-RULE PRIORITY & CONFLICTS:
-- Rules are evaluated in priority order during sync (higher priority number wins)
-- More specific rules should have higher priority than broad ones
-  - Per-merchant rules (priority 20-30) > name-pattern rules (priority 10-20) > provider_category_primary rules (priority 1-10)
-- Check for conflicts before creating. If overlap exists, set priority to ensure the correct one wins.
+RULE PIPELINE STAGES & CONFLICTS:
+- Rules fire in priority-ASC order during sync (lower priority runs first; later stages observe earlier-stage tag/category mutations).
+- Pass `stage` (not raw `priority`) when authoring rules — `baseline` (broad defaults) → `standard` (default) → `refinement` (reacts to earlier stages) → `override` (last word). Stage resolves to priority 0/10/50/100. If both are supplied, raw priority wins.
+- Recommended mapping by pattern: `provider_category_primary` rules → `baseline` or `standard`; name-pattern rules (`contains` on `provider_name`) → `standard`; per-merchant rules → `refinement` or `override`.
+- Check breadbox://rules before creating. If two rules can match the same transaction, the higher-stage one wins under last-writer semantics.
 
 Use batch_create_rules (max 100) to create multiple rules efficiently.
 Prefer contains over exact match — bank feeds format merchant names inconsistently.

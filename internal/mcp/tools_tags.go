@@ -13,29 +13,13 @@ import (
 
 // --- Input types ---
 
-type listTagsInput struct {
-	ReadSessionContext
-}
-
 type listAnnotationsInput struct {
 	ReadSessionContext
 	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
-	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync. Empty = all kinds. Pass ['comment'] for the comment-only timeline (replaces list_transaction_comments). Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated) for the specific event. Pass ['sync'] to see initial-import + pending-flip rows."`
+	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync. Empty = all kinds. Pass ['comment'] for the comment-only timeline. Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated) for the specific event. Pass ['sync'] to see initial-import + pending-flip rows."`
 	ActorTypes    []string `json:"actor_types,omitempty" jsonschema:"Optional actor-type filter: any of user, agent, system. Empty = all actors. Pass ['user'] for the canonical 'any human input?' check — drops rule churn and prior agent activity in one filter. Combine with kinds for fine-grained slices."`
 	Since         string   `json:"since,omitempty" jsonschema:"Optional RFC3339 timestamp; return only annotations whose created_at is strictly after this time. Lets an agent that already saw the timeline once skip to the new tail. Malformed timestamps are rejected with a clear error."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Optional cap on returned rows — returns the most recent N (timeline tail) in chronological order. 0 (default) = full timeline; max 200; negative is rejected. Pair with since to bound a delta read."`
-}
-
-type addTransactionTagInput struct {
-	WriteSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
-	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to add (e.g. 'needs-review'). Auto-created as persistent if not registered."`
-}
-
-type removeTransactionTagInput struct {
-	WriteSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
-	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to remove"`
 }
 
 type createTagInput struct {
@@ -62,15 +46,6 @@ type deleteTagInput struct {
 }
 
 // --- Handlers ---
-
-func (s *MCPServer) handleListTags(_ context.Context, _ *mcpsdk.CallToolRequest, _ listTagsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	tags, err := s.svc.ListTags(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(tags)
-}
 
 func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolRequest, input listAnnotationsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
@@ -310,46 +285,6 @@ func toMCPAnnotations(in []service.Annotation) []mcpAnnotation {
 		out[i] = toMCPAnnotation(a)
 	}
 	return out
-}
-
-func (s *MCPServer) handleAddTransactionTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionTagInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.TransactionID == "" || input.TagSlug == "" {
-		return errorResult(fmt.Errorf("transaction_id and tag_slug are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	added, alreadyPresent, err := s.svc.AddTransactionTag(context.Background(), input.TransactionID, input.TagSlug, actor)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(map[string]any{
-		"added":           added,
-		"already_present": alreadyPresent,
-		"tag_slug":        input.TagSlug,
-		"transaction_id":  input.TransactionID,
-	})
-}
-
-func (s *MCPServer) handleRemoveTransactionTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input removeTransactionTagInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.TransactionID == "" || input.TagSlug == "" {
-		return errorResult(fmt.Errorf("transaction_id and tag_slug are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	removed, alreadyAbsent, err := s.svc.RemoveTransactionTag(context.Background(), input.TransactionID, input.TagSlug, actor)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(map[string]any{
-		"removed":        removed,
-		"already_absent": alreadyAbsent,
-		"tag_slug":       input.TagSlug,
-		"transaction_id": input.TransactionID,
-	})
 }
 
 func (s *MCPServer) handleCreateTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTagInput) (*mcpsdk.CallToolResult, any, error) {

@@ -91,7 +91,7 @@ If two rules can match the same transaction, the higher priority wins; ties reso
 
 ## Authoring checklist
 
-1. Check `list_transaction_rules` to avoid duplicates.
+1. Read `breadbox://rules` to avoid duplicates.
 2. `preview_rule` your conditions to verify match count and review a sample of matched transactions.
 3. Pick the right priority band for the pattern type.
 4. Use `category_slug` (never `category_id`).

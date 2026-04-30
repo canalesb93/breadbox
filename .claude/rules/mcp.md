@@ -71,6 +71,17 @@ Good descriptions are load-bearing — they're the only documentation agents see
 
 The "review queue" is just transactions tagged `needs-review`. A seeded system rule (NULL conditions, `trigger=on_create`, action `add_tag: needs-review`) auto-tags every newly-synced transaction. Disable that rule to opt out of auto-review.
 
-Agents follow a uniform loop: `query_transactions(tags=["needs-review"])` to find work, `update_transactions(operations=[…])` to set category + remove the tag (an optional note lands on the `tag_removed` annotation) atomically per transaction. Max 50 ops per call.
+Agents follow a uniform loop: `query_transactions(tags=["needs-review"])` to find work, `update_transactions(operations=[…])` to set category + remove the tag (and pair the change with a `comment` for the audit trail) atomically per transaction. Max 50 ops per call.
 
-Tag/annotation tools: `list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `list_annotations`, plus tag CRUD admin tools (`create_tag`, `update_tag`, `delete_tag`).
+`update_transactions` is the universal per-row write — tag adds, tag removes, category sets, category resets (`reset_category: true`), and comments all flow through it. The bare-row and bulk variants (`add_transaction_tag`, `remove_transaction_tag`, `categorize_transaction`, `reset_transaction_category`, `add_transaction_comment`, `bulk_recategorize`, `batch_categorize_transactions`) were collapsed into it during the MCP overhaul.
+
+Annotations are read via `list_annotations`. Tag *vocabulary* admin (introducing, renaming, deleting tag definitions) goes through `create_tag`, `update_tag`, `delete_tag`.
+
+## Reference data: dual surface (resources + tool mirrors)
+
+Bounded reference data is exposed two ways:
+
+- **Resources (preferred)** — `breadbox://overview`, `://accounts`, `://categories`, `://tags`, `://users`, `://rules`, `://sync-status`. Surfaced in Claude.ai's paperclip menu and the Inspector resource picker. Application-driven, user-controlled.
+- **Tool mirrors (compat)** — `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `list_transaction_rules`, `get_sync_status`. Same payload, called as tools. Kept because not every MCP client implements the resources/* methods — without these, those clients can't read this data at all.
+
+Both surfaces share the same service-layer call path (no logic duplication), so payload shape stays in sync. When adding a new bounded reference resource, register both: a resource handler in `resources.go` and a tool mirror in `tools_reads.go`.

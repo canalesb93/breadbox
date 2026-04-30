@@ -232,25 +232,6 @@ func asArray(t *testing.T, label string, v any) []any {
 
 // --- Tests ---
 
-// TestListAccountsResponseShape pins the fields documented for list_accounts
-// and guards the #685 finding that `provider` is NOT on AccountResponse (it
-// lives on ConnectionResponse).
-func TestListAccountsResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleListAccounts(f.ctx, nil, listAccountsInput{})
-	out := decodeToolResult[[]any](t, "list_accounts", res, err)
-	if len(out) == 0 {
-		t.Fatal("expected at least one account")
-	}
-	acct := asObject(t, "list_accounts[0]", out[0])
-	requireKeys(t, "list_accounts[0]", acct,
-		"id", "connection_id", "user_id", "name", "type",
-		"balance_current", "iso_currency_code",
-		"created_at", "updated_at", "is_dependent_linked",
-	)
-	requireAbsent(t, "list_accounts[0]", acct, "provider")
-}
-
 // TestListAnnotationsResponseShape pins annotation event shape: generic `kind`
 // (comment | rule | tag | category) paired with an `action` field for the
 // specific event, actor split across actor_type/actor_name/actor_id (not a
@@ -294,23 +275,18 @@ func TestListAnnotationsResponseShape(t *testing.T) {
 func TestListAnnotationsKindsFilter(t *testing.T) {
 	f := seedFixtures(t)
 
-	// Seed at least one comment so list_transaction_comments has something to
-	// return — the base fixture only seeds a tag-added annotation. Also remove
-	// the seeded tag to produce a tag-removed event so the kinds=['tag'] check
-	// has both sides to find.
-	addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
-		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "kinds-parity"},
-		TransactionID:       f.txnID,
-		Content:             "Kinds-filter parity check",
-	})
-	_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
-
-	rmRes, _, err := f.svc.handleRemoveTransactionTag(f.ctx, nil, removeTransactionTagInput{
-		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "kinds-tag-pair"},
-		TransactionID:       f.txnID,
-		TagSlug:             "needs-review",
-	})
-	_ = decodeToolResult[map[string]any](t, "remove_transaction_tag", rmRes, err)
+	// Seed a comment + tag-removed event directly via the service layer so
+	// the unfiltered timeline carries comment + tag-added + tag-removed rows.
+	if _, err := f.svc.svc.CreateComment(f.ctx, service.CreateCommentParams{
+		TransactionID: f.txnID,
+		Content:       "Kinds-filter parity check",
+		Actor:         service.SystemActor(),
+	}); err != nil {
+		t.Fatalf("seed comment: %v", err)
+	}
+	if _, _, err := f.svc.svc.RemoveTransactionTag(f.ctx, f.txnID, "needs-review", service.SystemActor()); err != nil {
+		t.Fatalf("seed tag-removed: %v", err)
+	}
 
 	// Unfiltered: full timeline includes the tag add + tag remove + comment.
 	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
@@ -372,20 +348,12 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 		t.Errorf("kinds=['tag'] should surface both actions; sawAdded=%v sawRemoved=%v", sawAdded, sawRemoved)
 	}
 
-	// Parity with the deprecated list_transaction_comments tool: same set
-	// of annotation IDs.
-	legacyRes, _, err := f.svc.handleListTransactionComments(f.ctx, nil, listTransactionCommentsInput{
-		TransactionID: f.txnID,
-	})
-	legacy := decodeToolResult[[]any](t, "list_transaction_comments", legacyRes, err)
-	if len(legacy) != len(comments) {
-		t.Fatalf("parity: list_transaction_comments returned %d rows, list_annotations(kinds=['comment']) returned %d", len(legacy), len(comments))
-	}
-	for i, raw := range legacy {
-		c := asObject(t, "list_transaction_comments[parity]", raw)
-		id, _ := c["id"].(string)
-		if _, ok := commentIDs[id]; !ok {
-			t.Errorf("list_transaction_comments[%d] id=%q missing from list_annotations(kinds=['comment'])", i, id)
+	// commentIDs is collected above for the parity check (formerly against
+	// the deprecated list_transaction_comments tool); kept as a sanity check
+	// that every kinds=['comment'] row carries a non-empty id.
+	for id := range commentIDs {
+		if id == "" {
+			t.Errorf("kinds=['comment'] row missing id")
 		}
 	}
 
@@ -415,31 +383,6 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 // TestListTransactionMatchesResponseShape pins matched_on (not matched_fields),
 // match_confidence (not confidence), account_link_id (not link_id), plus
 // the denormalized txn fields agents rely on.
-func TestListTransactionMatchesResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleListTransactionMatches(f.ctx, nil, listTransactionMatchesInput{
-		LinkID: f.linkID,
-	})
-	out := decodeToolResult[[]any](t, "list_transaction_matches", res, err)
-	if len(out) == 0 {
-		t.Fatal("expected at least one match")
-	}
-	m := asObject(t, "list_transaction_matches[0]", out[0])
-	requireKeys(t, "list_transaction_matches[0]", m,
-		"id", "account_link_id",
-		"primary_transaction_id", "dependent_transaction_id",
-		"match_confidence", "matched_on",
-		"primary_txn_name", "dependent_txn_name",
-		"amount", "date", "created_at",
-	)
-	requireAbsent(t, "list_transaction_matches[0]", m,
-		"matched_fields", "confidence", "link_id",
-	)
-	if _, ok := m["matched_on"].([]any); !ok {
-		t.Errorf("matched_on should be array, got %T", m["matched_on"])
-	}
-}
-
 // TestCreateSessionResponseShape pins session response fields; `actor` and
 // `completed_at` must not appear.
 func TestCreateSessionResponseShape(t *testing.T) {
@@ -488,64 +431,10 @@ func TestSubmitReportResponseShape(t *testing.T) {
 	requireAbsent(t, "submit_report", out, "session_id")
 }
 
-// TestBulkRecategorizeResponseShape pins matched_count / updated_count (not
-// matched / updated).
-func TestBulkRecategorizeResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	nameContains := "Whole Foods"
-	res, _, err := f.svc.handleBulkRecategorize(f.ctx, nil, bulkRecategorizeInput{
-		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "shape"},
-		ToCategory:          "food_and_drink_groceries",
-		NameContains:        nameContains,
-	})
-	out := decodeToolResult[map[string]any](t, "bulk_recategorize", res, err)
-	requireKeys(t, "bulk_recategorize", out, "matched_count", "updated_count")
-	requireAbsent(t, "bulk_recategorize", out, "matched", "updated")
-}
-
-// TestListCategoriesResponseShape pins bare-array response + the required
-// category fields.
-func TestListCategoriesResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleListCategories(f.ctx, nil, listCategoriesInput{})
-	out := decodeToolResult[[]any](t, "list_categories", res, err)
-	if len(out) == 0 {
-		t.Fatal("expected at least one category")
-	}
-	cat := asObject(t, "list_categories[0]", out[0])
-	requireKeys(t, "list_categories[0]", cat,
-		"id", "slug", "display_name",
-		"is_system", "parent_id", "created_at", "updated_at",
-	)
-}
-
-// TestListTransactionCommentsResponseShape pins author_type/author_id/author_name
-// (not a single `author` string).
-func TestListTransactionCommentsResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-
-	addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
-		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "shape"},
-		TransactionID:       f.txnID,
-		Content:             "Regression check comment",
-	})
-	_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
-
-	res, _, err := f.svc.handleListTransactionComments(f.ctx, nil, listTransactionCommentsInput{
-		TransactionID: f.txnID,
-	})
-	out := decodeToolResult[[]any](t, "list_transaction_comments", res, err)
-	if len(out) == 0 {
-		t.Fatal("expected at least one comment")
-	}
-	c := asObject(t, "list_transaction_comments[0]", out[0])
-	requireKeys(t, "list_transaction_comments[0]", c,
-		"id", "transaction_id",
-		"author_type", "author_name",
-		"content", "created_at", "updated_at",
-	)
-	requireAbsent(t, "list_transaction_comments[0]", c, "author")
-}
+// (The bulk_recategorize, list_categories, and list_transaction_comments
+// shape regressions tested previously here exercised tools that have been
+// dropped from the MCP registry. Their underlying service paths are still
+// exercised by internal/service integration tests.)
 
 // TestTransactionSummaryResponseShape pins the {summary, totals, filters}
 // envelope + the row fields (category, total_amount, transaction_count).
@@ -575,27 +464,6 @@ func TestTransactionSummaryResponseShape(t *testing.T) {
 }
 
 // TestMerchantSummaryResponseShape pins {merchants, totals, filters} + row fields.
-func TestMerchantSummaryResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleMerchantSummary(f.ctx, nil, merchantSummaryInput{
-		StartDate: "2026-01-01",
-		EndDate:   "2026-12-31",
-		MinCount:  1,
-	})
-	out := decodeToolResult[map[string]any](t, "merchant_summary", res, err)
-	requireKeys(t, "merchant_summary", out, "merchants", "totals", "filters")
-
-	rows := asArray(t, "merchant_summary.merchants", out["merchants"])
-	if len(rows) == 0 {
-		t.Fatal("expected at least one merchant row")
-	}
-	row := asObject(t, "merchant_summary.merchants[0]", rows[0])
-	requireKeys(t, "merchant_summary.merchants[0]", row,
-		"merchant", "transaction_count", "total_amount",
-		"avg_amount", "first_date", "last_date",
-	)
-}
-
 // TestQueryTransactionsResponseShape pins category as an object (not a slug
 // string) and the wrapper envelope.
 func TestQueryTransactionsResponseShape(t *testing.T) {
@@ -624,18 +492,6 @@ func TestQueryTransactionsResponseShape(t *testing.T) {
 	default:
 		t.Errorf("category must be object or null, got %T (%v)", v, v)
 	}
-}
-
-// TestListTransactionRulesResponseShape pins {rules, has_more, total} and
-// absence of a legacy {data: [...]} wrapper.
-func TestListTransactionRulesResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{})
-	out := decodeToolResult[map[string]any](t, "list_transaction_rules", res, err)
-	requireKeys(t, "list_transaction_rules", out,
-		"rules", "has_more", "total",
-	)
-	requireAbsent(t, "list_transaction_rules", out, "data")
 }
 
 // TestPreviewRuleResponseShape pins `sample_matches` (not `sample`) + sample
@@ -667,22 +523,6 @@ func TestPreviewRuleResponseShape(t *testing.T) {
 	requireAbsent(t, "preview_rule.sample_matches[0]", sample, "id", "provider_merchant_name")
 }
 
-// TestListTagsResponseShape pins required tag fields, including updated_at
-// (newly added per the #685 verification pass).
-func TestListTagsResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleListTags(f.ctx, nil, listTagsInput{})
-	out := decodeToolResult[[]any](t, "list_tags", res, err)
-	if len(out) == 0 {
-		t.Fatal("expected at least one tag")
-	}
-	tag := asObject(t, "list_tags[0]", out[0])
-	requireKeys(t, "list_tags[0]", tag,
-		"id", "slug", "display_name", "description",
-		"created_at", "updated_at",
-	)
-}
-
 // TestListAnnotationsActorTypesFilter exercises the actor_types filter — the
 // canonical "any human input?" check. Seeds events from all three actor
 // kinds (user, agent, system) and asserts each filter slice returns only
@@ -700,12 +540,13 @@ func TestListAnnotationsActorTypesFilter(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed user comment: %v", err)
 	}
-	addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
-		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "agent-input"},
-		TransactionID:       f.txnID,
-		Content:             "Auto-tagged via review loop.",
-	})
-	_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+	if _, err := f.svc.svc.CreateComment(f.ctx, service.CreateCommentParams{
+		TransactionID: f.txnID,
+		Content:       "Auto-tagged via review loop.",
+		Actor:         service.Actor{Type: "agent", Name: "test-agent"},
+	}); err != nil {
+		t.Fatalf("seed agent comment: %v", err)
+	}
 
 	// Unfiltered baseline: at least one row from each actor type.
 	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
@@ -821,12 +662,13 @@ func TestListAnnotationsSinceFilter(t *testing.T) {
 
 	// Add three new annotations after the cursor.
 	for i := 0; i < 3; i++ {
-		addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
-			WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "since-test"},
-			TransactionID:       f.txnID,
-			Content:             fmt.Sprintf("post-cursor comment %d", i),
-		})
-		_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+		if _, err := f.svc.svc.CreateComment(f.ctx, service.CreateCommentParams{
+			TransactionID: f.txnID,
+			Content:       fmt.Sprintf("post-cursor comment %d", i),
+			Actor:         service.SystemActor(),
+		}); err != nil {
+			t.Fatalf("seed comment %d: %v", i, err)
+		}
 	}
 
 	deltaRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
@@ -856,12 +698,13 @@ func TestListAnnotationsLimit(t *testing.T) {
 
 	// Seed several events so we have a meaningful timeline to slice.
 	for i := 0; i < 5; i++ {
-		addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
-			WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "limit-test"},
-			TransactionID:       f.txnID,
-			Content:             fmt.Sprintf("limit-test comment %d", i),
-		})
-		_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+		if _, err := f.svc.svc.CreateComment(f.ctx, service.CreateCommentParams{
+			TransactionID: f.txnID,
+			Content:       fmt.Sprintf("limit-test comment %d", i),
+			Actor:         service.SystemActor(),
+		}); err != nil {
+			t.Fatalf("seed comment %d: %v", i, err)
+		}
 		time.Sleep(1 * time.Millisecond)
 	}
 

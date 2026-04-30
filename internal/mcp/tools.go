@@ -46,25 +46,20 @@ type createSessionInput struct {
 
 // --- Input types ---
 
-type listAccountsInput struct {
-	ReadSessionContext
-	UserID string `json:"user_id,omitempty" jsonschema:"Filter accounts by user ID"`
-}
-
 type queryTransactionsInput struct {
 	ReadSessionContext
 	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). Use list_categories to find slugs."`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). See breadbox://categories for the slug list."`
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
 	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
 	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
-	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics). Use list_tags to see available tags."`
+	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics). See breadbox://tags for the available vocabulary."`
 	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
@@ -90,34 +85,6 @@ type countTransactionsInput struct {
 	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 }
 
-type triggerSyncInput struct {
-	WriteSessionContext
-	ConnectionID string `json:"connection_id,omitempty" jsonschema:"Sync a specific connection by ID. If omitted syncs all connections."`
-}
-
-type categorizeTransactionInput struct {
-	WriteSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to categorize"`
-	CategoryID    string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
-	CategorySlug  string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
-}
-
-type resetTransactionCategoryInput struct {
-	WriteSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to reset"`
-}
-
-type addTransactionCommentInput struct {
-	WriteSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction to comment on"`
-	Content       string `json:"content" jsonschema:"required,Free-standing comment about the transaction (markdown supported, max 10000 chars). For rationale tied to a tag change or category set, pass it via update_transactions — either as the inline 'comment' field or the 'note' on a tags_to_add/tags_to_remove entry — so the audit trail stays as a single linked annotation."`
-}
-
-type listTransactionCommentsInput struct {
-	ReadSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
-}
-
 type transactionSummaryInput struct {
 	ReadSessionContext
 	StartDate      string `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 30 days ago."`
@@ -127,43 +94,6 @@ type transactionSummaryInput struct {
 	UserID         string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
 	Category       string `json:"category,omitempty" jsonschema:"Filter by primary category before aggregating"`
 	IncludePending *bool  `json:"include_pending,omitempty" jsonschema:"Include pending transactions (default false)"`
-}
-
-type merchantSummaryInput struct {
-	ReadSessionContext
-	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 90 days ago."`
-	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
-	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
-	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount"`
-	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount"`
-	Search        string   `json:"search,omitempty" jsonschema:"Search merchant/transaction names. Comma-separated values are ORed."`
-	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
-	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text. Comma-separated values are ORed."`
-	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count to include a merchant (default 1). Set to 2+ to find recurring charges."`
-	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only include spending (positive amounts). Default false."`
-}
-
-type listCategoriesInput struct {
-	ReadSessionContext
-}
-
-type listUsersInput struct {
-	ReadSessionContext
-}
-
-type getSyncStatusInput struct {
-	ReadSessionContext
-}
-
-type exportCategoriesInput struct {
-	ReadSessionContext
-}
-
-type importCategoriesInput struct {
-	WriteSessionContext
-	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. The merge_into column is optional — set to a target slug to merge the source category into the target (transactions reassigned then source deleted)."`
 }
 
 // --- Handlers ---
@@ -183,16 +113,31 @@ func (s *MCPServer) handleCreateSession(reqCtx context.Context, _ *mcpsdk.CallTo
 	return jsonResult(session)
 }
 
-func (s *MCPServer) handleListAccounts(_ context.Context, _ *mcpsdk.CallToolRequest, input listAccountsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	accounts, err := s.svc.ListAccounts(ctx, optStr(input.UserID))
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(accounts)
-}
-
+// handleQueryTransactions runs the canonical transaction read.
+//
+// Example call (find every needs-review transaction in March, lean fields):
+//
+//	{
+//	  "tags": ["needs-review"],
+//	  "start_date": "2026-03-01",
+//	  "end_date": "2026-04-01",
+//	  "fields": "core,category",
+//	  "limit": 100
+//	}
+//
+// Example response:
+//
+//	{
+//	  "transactions": [
+//	    {"id":"k7Xm9pQ2","date":"2026-03-15","amount":4.5,
+//	     "provider_name":"Starbucks","iso_currency_code":"USD",
+//	     "category":{"slug":"food_and_drink_coffee","display_name":"Coffee"}},
+//	    ...
+//	  ],
+//	  "next_cursor": "eyJkYXRlIjoi...",
+//	  "has_more": true,
+//	  "limit": 100
+//	}
 func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToolRequest, input queryTransactionsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	params := service.TransactionListParams{
@@ -284,140 +229,27 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	return jsonResult(map[string]int64{"count": count})
 }
 
-func (s *MCPServer) handleListCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ listCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	categories, err := s.svc.ListCategoryTree(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(categories)
-}
-
-func (s *MCPServer) handleListUsers(_ context.Context, _ *mcpsdk.CallToolRequest, _ listUsersInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	users, err := s.svc.ListUsers(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(users)
-}
-
-func (s *MCPServer) handleGetSyncStatus(_ context.Context, _ *mcpsdk.CallToolRequest, _ getSyncStatusInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	connections, err := s.svc.ListConnections(ctx, nil)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(connections)
-}
-
-func (s *MCPServer) handleTriggerSync(ctx context.Context, _ *mcpsdk.CallToolRequest, input triggerSyncInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	ctx = context.Background()
-	connectionID := optStr(input.ConnectionID)
-
-	if err := s.svc.TriggerSync(ctx, connectionID); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	msg := "Sync triggered for all connections."
-	if connectionID != nil {
-		msg = fmt.Sprintf("Sync triggered for connection %s.", *connectionID)
-	}
-
-	return &mcpsdk.CallToolResult{
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: msg},
-		},
-	}, nil, nil
-}
-
-func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.CallToolRequest, input categorizeTransactionInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	ctx = context.Background()
-	if input.TransactionID == "" {
-		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
-	}
-	if input.CategoryID == "" && input.CategorySlug == "" {
-		return errorResult(fmt.Errorf("either category_id or category_slug is required")), nil, nil
-	}
-
-	// Resolve category_slug to category_id if provided. category_id takes precedence.
-	categoryID := input.CategoryID
-	if categoryID == "" && input.CategorySlug != "" {
-		cat, err := s.svc.GetCategoryBySlug(ctx, input.CategorySlug)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid category_slug %q: %w", input.CategorySlug, err)), nil, nil
-		}
-		categoryID = cat.ID
-	}
-
-	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, categoryID, actor); err != nil {
-		return errorResult(err), nil, nil
-	}
-	return &mcpsdk.CallToolResult{
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: fmt.Sprintf("Transaction %s categorized successfully.", input.TransactionID)},
-		},
-	}, nil, nil
-}
-
-func (s *MCPServer) handleResetTransactionCategory(ctx context.Context, _ *mcpsdk.CallToolRequest, input resetTransactionCategoryInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	ctx = context.Background()
-	if input.TransactionID == "" {
-		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
-	}
-	if err := s.svc.ResetTransactionCategory(ctx, input.TransactionID, actor); err != nil {
-		return errorResult(err), nil, nil
-	}
-	return &mcpsdk.CallToolResult{
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: fmt.Sprintf("Transaction %s category reset to automatic.", input.TransactionID)},
-		},
-	}, nil, nil
-}
-
-func (s *MCPServer) handleAddTransactionComment(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionCommentInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.TransactionID == "" || input.Content == "" {
-		return errorResult(fmt.Errorf("transaction_id and content are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	comment, err := s.svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: input.TransactionID,
-		Content:       input.Content,
-		Actor:         actor,
-	})
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(comment)
-}
-
-func (s *MCPServer) handleListTransactionComments(ctx context.Context, _ *mcpsdk.CallToolRequest, input listTransactionCommentsInput) (*mcpsdk.CallToolResult, any, error) {
-	if input.TransactionID == "" {
-		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
-	}
-	comments, err := s.svc.ListComments(ctx, input.TransactionID)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(comments)
-}
-
+// handleTransactionSummary aggregates totals over a window.
+//
+// Example call (last month grouped by category):
+//
+//	{
+//	  "group_by": "category",
+//	  "start_date": "2026-03-01",
+//	  "end_date": "2026-04-01"
+//	}
+//
+// Example response:
+//
+//	{
+//	  "summary": [
+//	    {"category":"food_and_drink_groceries","total_amount":612.40,"transaction_count":18},
+//	    {"category":"food_and_drink_restaurant","total_amount":238.15,"transaction_count":11},
+//	    ...
+//	  ],
+//	  "totals": {"total_amount": 4521.30, "transaction_count": 142, "iso_currency_code": "USD"},
+//	  "filters": {"start_date":"2026-03-01","end_date":"2026-04-01","group_by":"category"}
+//	}
 func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input transactionSummaryInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 
@@ -444,66 +276,6 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 	return jsonResult(result)
 }
 
-func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input merchantSummaryInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	params := service.MerchantSummaryParams{
-		MinCount:      input.MinCount,
-		AccountID:     optStr(input.AccountID),
-		UserID:        optStr(input.UserID),
-		CategorySlug:  optStr(input.CategorySlug),
-		MinAmount:     input.MinAmount,
-		MaxAmount:     input.MaxAmount,
-		Search:        optStr(input.Search),
-		ExcludeSearch: optStr(input.ExcludeSearch),
-	}
-
-	var err error
-	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.SpendingOnly != nil && *input.SpendingOnly {
-		params.SpendingOnly = true
-	}
-
-	result, err := s.svc.GetMerchantSummary(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleExportCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ exportCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	tsv, err := s.svc.ExportCategoriesTSV(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return &mcpsdk.CallToolResult{
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: tsv},
-		},
-	}, nil, nil
-}
-
-func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallToolRequest, input importCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.Content == "" {
-		return errorResult(fmt.Errorf("content is required")), nil, nil
-	}
-	result, err := s.svc.ImportCategoriesTSV(context.Background(), input.Content, false)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
@@ -517,16 +289,6 @@ type createTransactionRuleInput struct {
 	Priority           int                 `json:"priority,omitempty" jsonschema:"Raw pipeline-stage integer, 0..1000. Lower runs first. Prefer 'stage' for shared vocabulary. Canonical values: 0=baseline, 10=standard (default), 50=refinement, 100=override. Higher-priority rules observe earlier-stage rules' tag/category mutations via conditions, and win set_category under last-writer semantics."`
 	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
 	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to existing transactions after creation. Materializes set_category / add_tag / remove_tag; skips add_comment (sync-only). Hit count reflects every condition match, matching sync-time semantics."`
-}
-
-type listTransactionRulesInput struct {
-	ReadSessionContext
-	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
-	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
-	Search       string `json:"search,omitempty" jsonschema:"Search by rule name. Comma-separated values are ORed."`
-	SearchMode   string `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
-	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
-	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 }
 
 type updateTransactionRuleInput struct {
@@ -575,6 +337,34 @@ type previewRuleInput struct {
 	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50). The match_count in the response reflects the full match set, not just the sample."`
 }
 
+// handleCreateTransactionRule wires a single rule into the auto-categorization
+// pipeline. See breadbox://rule-dsl for the condition grammar.
+//
+// Example call (per-merchant override at the refinement stage):
+//
+//	{
+//	  "name": "provider_merchant_name: Costco → groceries",
+//	  "stage": "refinement",
+//	  "trigger": "on_create",
+//	  "conditions": {
+//	    "field": "provider_merchant_name",
+//	    "op": "contains",
+//	    "value": "costco"
+//	  },
+//	  "category_slug": "food_and_drink_groceries"
+//	}
+//
+// Example response:
+//
+//	{
+//	  "id": "p9Q4nT2x",
+//	  "name": "provider_merchant_name: Costco → groceries",
+//	  "trigger": "on_create",
+//	  "priority": 50,
+//	  "actions": [{"type":"set_category","category_slug":"food_and_drink_groceries"}],
+//	  "enabled": true,
+//	  "hit_count": 0
+//	}
 func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
@@ -618,28 +408,6 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		}
 	}
 	return jsonResult(resp)
-}
-
-func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.CallToolRequest, input listTransactionRulesInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	params := service.TransactionRuleListParams{
-		Limit:        input.Limit,
-		Cursor:       input.Cursor,
-		CategorySlug: optStr(input.CategorySlug),
-		Enabled:      input.Enabled,
-		Search:       optStr(input.Search),
-	}
-	var err error
-	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	result, err := s.svc.ListTransactionRules(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
 }
 
 func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
@@ -811,103 +579,6 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 		"rules":   created,
 		"errors":  errors,
 	})
-}
-
-// --- Batch categorize / Bulk recategorize ---
-
-type batchCategorizeInput struct {
-	WriteSessionContext
-	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 500)"`
-}
-
-type batchCategorizeItemInput struct {
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
-	CategorySlug  string `json:"category_slug" jsonschema:"required,Category slug to assign (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
-}
-
-type bulkRecategorizeInput struct {
-	WriteSessionContext
-	FromCategory       string   `json:"from_category,omitempty" jsonschema:"Source category slug — only transactions currently in this category are matched. Optional if other filters are provided."`
-	ToCategory         string   `json:"to_category,omitempty" jsonschema:"Destination category slug — matching transactions are moved here. Required (or provide target_category_slug)."`
-	StartDate          string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate            string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID          string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID             string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	MinAmount          *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
-	MaxAmount          *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
-	Pending            *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search             string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
-	NameContains       string   `json:"name_contains,omitempty" jsonschema:"Filter transactions whose name contains this string"`
-	// Deprecated fields — retained for backward compatibility with older agent sessions.
-	TargetCategorySlug string `json:"target_category_slug,omitempty" jsonschema:"Deprecated: use to_category instead. Destination category slug."`
-	CategorySlug       string `json:"category_slug,omitempty" jsonschema:"Deprecated: use from_category instead. Source category slug filter."`
-}
-
-func (s *MCPServer) handleBatchCategorize(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchCategorizeInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if len(input.Items) == 0 {
-		return errorResult(fmt.Errorf("items array is required and must not be empty")), nil, nil
-	}
-
-	actor := service.ActorFromContext(ctx)
-	items := make([]service.BatchCategorizeItem, len(input.Items))
-	for i, item := range input.Items {
-		items[i] = service.BatchCategorizeItem{
-			TransactionID: item.TransactionID,
-			CategorySlug:  item.CategorySlug,
-		}
-	}
-
-	result, err := s.svc.BatchSetTransactionCategory(ctx, items, actor)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallToolRequest, input bulkRecategorizeInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	// Prefer new param names; fall back to deprecated aliases for backward compatibility.
-	toCategory := input.ToCategory
-	if toCategory == "" {
-		toCategory = input.TargetCategorySlug
-	}
-	fromCategory := input.FromCategory
-	if fromCategory == "" {
-		fromCategory = input.CategorySlug
-	}
-
-	if toCategory == "" {
-		return errorResult(fmt.Errorf("to_category is required")), nil, nil
-	}
-
-	params := service.BulkRecategorizeParams{
-		TargetCategorySlug: toCategory,
-		AccountID:          optStr(input.AccountID),
-		UserID:             optStr(input.UserID),
-		CategorySlug:       optStr(fromCategory),
-		MinAmount:          input.MinAmount,
-		MaxAmount:          input.MaxAmount,
-		Pending:            input.Pending,
-		Search:             optStr(input.Search),
-		NameContains:       optStr(input.NameContains),
-	}
-
-	var err error
-	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	result, err := s.svc.BulkRecategorizeByFilter(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
 }
 
 // --- Agent Reports ---
