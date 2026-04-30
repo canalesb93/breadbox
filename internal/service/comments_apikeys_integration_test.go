@@ -730,8 +730,16 @@ func TestGetOverviewStats_WithData(t *testing.T) {
 	if stats.Users[0].Name != "Alice" {
 		t.Errorf("user name = %q, want Alice", stats.Users[0].Name)
 	}
+	// Overview emits short_ids (resource path bypasses compactIDsBytes, so
+	// the value must come out of the SQL layer already-shortened).
+	if stats.Users[0].ID != user.ShortID {
+		t.Errorf("user.id = %q, want short_id %q", stats.Users[0].ID, user.ShortID)
+	}
 	if len(stats.Connections) != 1 {
 		t.Errorf("connections = %d, want 1", len(stats.Connections))
+	}
+	if stats.Connections[0].ID != conn.ShortID {
+		t.Errorf("connection.id = %q, want short_id %q", stats.Connections[0].ID, conn.ShortID)
 	}
 	if _, ok := stats.AccountsByType["depository"]; !ok {
 		t.Error("expected depository in accounts_by_type")
