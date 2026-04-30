@@ -199,8 +199,12 @@ func mapAnnotationKinds(kinds []string) ([]string, error) {
 // payload keys; the underlying `payload` is preserved for raw access.
 // `subject` is the canonical object of the event (tag display name,
 // category display name, rule name, or comment body preview), and the
-// top-level resource refs (`tag_slug`, `category_slug`, `rule_name`) make
-// cross-linking cheap.
+// top-level resource refs (`tag_slug`, `category_slug`, `rule_name`,
+// `rule_id`) make cross-linking cheap.
+//
+// Tags and categories are referenced by slug only — the slug is the canonical
+// stable handle for both. Rules are referenced by `rule_id` carrying the
+// rule's 8-char short_id (no separate `rule_short_id`).
 type mcpAnnotation struct {
 	ID            string                 `json:"id"`
 	ShortID       string                 `json:"short_id"`
@@ -216,13 +220,12 @@ type mcpAnnotation struct {
 	TagSlug       string                 `json:"tag_slug,omitempty"`
 	CategorySlug  string                 `json:"category_slug,omitempty"`
 	RuleName      string                 `json:"rule_name,omitempty"`
+	RuleID        string                 `json:"rule_id,omitempty"`
 	ActorType     string                 `json:"actor_type"`
 	ActorID       *string                `json:"actor_id,omitempty"`
 	ActorName     string                 `json:"actor_name"`
 	SessionID     *string                `json:"session_id,omitempty"`
 	Payload       map[string]interface{} `json:"payload,omitempty"`
-	TagID         *string                `json:"tag_id,omitempty"`
-	RuleID        *string                `json:"rule_id,omitempty"`
 	CreatedAt     string                 `json:"created_at"`
 }
 
@@ -274,15 +277,31 @@ func toMCPAnnotation(a service.Annotation) mcpAnnotation {
 		TagSlug:       a.TagSlug,
 		CategorySlug:  a.CategorySlug,
 		RuleName:      a.RuleName,
+		// Surface the rule's short_id as `rule_id` (canonical handle for
+		// agents). Falls back to the FK column's UUID for raw rows where
+		// enrichment hasn't populated RuleShortID yet.
+		RuleID:        ruleHandle(a),
 		ActorType:     a.ActorType,
 		ActorID:       a.ActorID,
 		ActorName:     a.ActorName,
 		SessionID:     a.SessionID,
 		Payload:       a.Payload,
-		TagID:         a.TagID,
-		RuleID:        a.RuleID,
 		CreatedAt:     a.CreatedAt,
 	}
+}
+
+// ruleHandle picks the rule's short_id when the enrichment pipeline has
+// surfaced it; falls back to the raw rule_id UUID otherwise so rows fetched
+// in Raw mode still link to a real entity. Empty when the annotation has no
+// rule (most kinds).
+func ruleHandle(a service.Annotation) string {
+	if a.RuleShortID != "" {
+		return a.RuleShortID
+	}
+	if a.RuleID != nil {
+		return *a.RuleID
+	}
+	return ""
 }
 
 func toMCPAnnotations(in []service.Annotation) []mcpAnnotation {
