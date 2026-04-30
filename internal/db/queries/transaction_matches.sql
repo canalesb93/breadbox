@@ -17,10 +17,17 @@ SELECT * FROM transaction_matches WHERE primary_transaction_id = $1;
 SELECT * FROM transaction_matches WHERE dependent_transaction_id = $1;
 
 -- name: ListTransactionMatchesByLink :many
-SELECT tm.*,
+-- Carries the JOINed primary/dependent transaction short_ids and the parent
+-- account_link's short_id so the API response can return short_id values
+-- without per-row resolution.
+SELECT tm.id, tm.short_id, tm.match_confidence, tm.matched_on, tm.created_at,
+       al.short_id AS account_link_short_id,
+       pt.short_id AS primary_transaction_short_id,
+       dt.short_id AS dependent_transaction_short_id,
        pt.provider_name AS primary_txn_name, pt.amount AS primary_txn_amount, pt.date AS primary_txn_date, pt.provider_merchant_name AS primary_txn_merchant,
        dt.provider_name AS dependent_txn_name, dt.amount AS dependent_txn_amount, dt.date AS dependent_txn_date, dt.provider_merchant_name AS dependent_txn_merchant
 FROM transaction_matches tm
+JOIN account_links al ON al.id = tm.account_link_id
 JOIN transactions pt ON tm.primary_transaction_id = pt.id
 JOIN transactions dt ON tm.dependent_transaction_id = dt.id
 WHERE tm.account_link_id = $1

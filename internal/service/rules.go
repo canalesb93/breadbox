@@ -1921,10 +1921,8 @@ func (s *Service) ruleRowToResponse(ctx context.Context, row *ruleRow) *Transact
 	resp := row.toResponseBase()
 	if slug := categoryActionSlug(resp.Actions); slug != "" {
 		if cat, err := s.GetCategoryBySlug(ctx, slug); err == nil {
-			id := cat.ID
 			slugCopy := cat.Slug
 			nameCopy := cat.DisplayName
-			resp.CategoryID = &id
 			resp.CategorySlug = &slugCopy
 			resp.CategoryName = &nameCopy
 			if cat.Icon != nil {
@@ -1956,14 +1954,13 @@ func (s *Service) convertRuleRows(ctx context.Context, scanned []ruleRow) []Tran
 
 	// Resolve each unique slug once.
 	type catInfo struct {
-		id, slug, displayName string
-		icon, color           *string
+		slug, displayName string
+		icon, color       *string
 	}
 	cache := make(map[string]catInfo, len(seen))
 	for slug := range seen {
 		if cat, err := s.GetCategoryBySlug(ctx, slug); err == nil {
 			cache[slug] = catInfo{
-				id:          cat.ID,
 				slug:        cat.Slug,
 				displayName: cat.DisplayName,
 				icon:        cat.Icon,
@@ -1978,10 +1975,8 @@ func (s *Service) convertRuleRows(ctx context.Context, scanned []ruleRow) []Tran
 		resp := scanned[i].toResponseBase()
 		if slug := categoryActionSlug(resp.Actions); slug != "" {
 			if info, ok := cache[slug]; ok {
-				id := info.id
 				slugCopy := info.slug
 				nameCopy := info.displayName
-				resp.CategoryID = &id
 				resp.CategorySlug = &slugCopy
 				resp.CategoryName = &nameCopy
 				resp.CategoryIcon = info.icon

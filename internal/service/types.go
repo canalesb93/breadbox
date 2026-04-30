@@ -496,11 +496,11 @@ type TransactionRuleResponse struct {
 	Conditions    Condition    `json:"conditions"`
 	Actions       []RuleAction `json:"actions"`
 	Trigger       string       `json:"trigger"`
-	// CategoryID/CategorySlug/CategoryName/CategoryIcon/CategoryColor are derived
-	// from the first set_category action in Actions (kept for API back-compat and
-	// admin UI convenience). Category info is no longer a denormalized column on
-	// transaction_rules — these are populated at response time.
-	CategoryID    *string `json:"category_id,omitempty"`
+	// CategorySlug/CategoryName/CategoryIcon/CategoryColor are derived from the
+	// first set_category action in Actions (kept for admin UI convenience).
+	// Category info is no longer a denormalized column on transaction_rules —
+	// these are populated at response time. Categories are referenced by slug
+	// (canonical stable handle), so there's no separate CategoryID field.
 	CategorySlug  *string `json:"category_slug,omitempty"`
 	CategoryName  *string `json:"category_display_name,omitempty"`
 	CategoryIcon  *string `json:"category_icon,omitempty"`

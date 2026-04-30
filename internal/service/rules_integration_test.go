@@ -862,12 +862,10 @@ func TestCreateTransactionRule_WithActions(t *testing.T) {
 	if rule.Actions[0].Type != "set_category" || rule.Actions[0].CategorySlug != "food_and_drink" {
 		t.Errorf("action mismatch: %+v", rule.Actions[0])
 	}
-	// category_slug/id should be populated from the set_category action
+	// category_slug should be populated from the set_category action.
+	// (category_id was dropped — slug is the canonical handle.)
 	if rule.CategorySlug == nil || *rule.CategorySlug != "food_and_drink" {
 		t.Errorf("category_slug not populated from actions")
-	}
-	if rule.CategoryID == nil {
-		t.Error("category_id not populated from actions")
 	}
 }
 

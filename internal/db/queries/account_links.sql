@@ -8,6 +8,8 @@ SELECT id FROM account_links WHERE short_id = $1;
 
 -- name: GetAccountLink :one
 SELECT al.*,
+       pa.short_id AS primary_account_short_id,
+       da.short_id AS dependent_account_short_id,
        pa.name AS primary_account_name,
        COALESCE(pa.display_name, pa.name) AS primary_account_display_name,
        da.name AS dependent_account_name,
@@ -25,6 +27,8 @@ WHERE al.id = $1;
 
 -- name: ListAccountLinks :many
 SELECT al.*,
+       pa.short_id AS primary_account_short_id,
+       da.short_id AS dependent_account_short_id,
        pa.name AS primary_account_name,
        COALESCE(pa.display_name, pa.name) AS primary_account_display_name,
        da.name AS dependent_account_name,
