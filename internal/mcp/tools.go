@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"breadbox/internal/service"
 
@@ -999,12 +998,16 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	}, nil, nil
 }
 
-// compactIDs recursively walks a JSON structure and compacts ID pairs in place.
-// For every key ending in "_short_id" (or the bare "short_id") with a non-null
-// string value, the sibling "{prefix}_id" (or bare "id") field is replaced with
-// the short_id value and the "_short_id" key is removed. This covers both an
-// object's own id/short_id pair and its FK references (e.g. account_id +
-// account_short_id → account_id=<short>).
+// compactIDs recursively walks a JSON structure and compacts each object's own
+// id/short_id pair in place. When a "short_id" key with a non-null string
+// value sits next to a sibling "id" field, the "id" value is replaced with
+// the short_id value and the "short_id" key is removed.
+//
+// FK fields (e.g. account_id, transaction_id, rule_id) carry their referenced
+// row's short_id directly — that resolution happens at the SQL layer in the
+// service queries (JOINs that select the FK target's short_id). No
+// "*_short_id" sibling appears in production responses, and FK keys are
+// emitted as-is here.
 func compactIDs(v any) {
 	switch val := v.(type) {
 	case map[string]any:
@@ -1045,30 +1048,29 @@ func compactIDPairs(m map[string]any) {
 	}
 }
 
-// shortIDPrefix reports whether key names a short-id sibling and returns its
-// prefix. "short_id" → ("", true); "account_short_id" → ("account", true);
-// anything else → ("", false).
+// shortIDPrefix reports whether key names the row's own short-id sibling.
+// Only the bare "short_id" key is recognized — FK fields are pre-resolved to
+// short_ids at the SQL layer and are emitted as-is by compaction.
 func shortIDPrefix(key string) (string, bool) {
 	if key == "short_id" {
 		return "", true
-	}
-	if strings.HasSuffix(key, "_short_id") && len(key) > len("_short_id") {
-		return key[:len(key)-len("_short_id")], true
 	}
 	return "", false
 }
 
 // compactIDsBytes performs id/short_id compaction directly on JSON bytes,
 // avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream and
-// collapses short-id sibling pairs:
+// collapses each object's own id/short_id pair:
 //
-//   - own id: {"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
-//   - FK id:  {"account_id":"<uuid>","account_short_id":"<short>"} →
-//             {"account_id":"<short>"}
+//   {"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
 //
-// Any key ending in "_short_id" (or the bare "short_id") triggers the rewrite;
-// the "_short_id" key is always dropped. If the sibling id field is missing or
-// the short-id value is null, the id value is left untouched.
+// Only the bare "short_id" key triggers the rewrite; the "short_id" key is
+// then dropped. If the sibling "id" field is missing or "short_id" is null,
+// the id value is left untouched.
+//
+// FK fields (account_id, transaction_id, rule_id, …) already carry their
+// referenced row's short_id — resolved at the SQL layer in the service
+// queries — and are emitted unchanged.
 func compactIDsBytes(data []byte) []byte {
 	// Quick check: if no short_id key exists anywhere, return as-is. Matches
 	// both "short_id" and any "*_short_id" suffix.
@@ -1206,14 +1208,12 @@ func compactIDsScanObject(data []byte, pos int, out []byte) (int, []byte) {
 	return pos, out
 }
 
-// idKeyPrefix reports whether key names an id sibling and returns its prefix.
-// "id" → ("", true); "account_id" → ("account", true); else ("", false).
+// idKeyPrefix reports whether key names the row's own id sibling. Only the
+// bare "id" key is recognized — FK *_id fields carry their referenced row's
+// short_id directly (resolved at the SQL layer) and are emitted unchanged.
 func idKeyPrefix(key string) (string, bool) {
 	if key == "id" {
 		return "", true
-	}
-	if strings.HasSuffix(key, "_id") && len(key) > len("_id") {
-		return key[:len(key)-len("_id")], true
 	}
 	return "", false
 }
