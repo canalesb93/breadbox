@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // OverviewStats contains high-level statistics about the Breadbox dataset.
@@ -111,8 +109,10 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		return nil, fmt.Errorf("count unmapped: %w", err)
 	}
 
-	// Users list
-	userRows, err := s.Pool.Query(ctx, "SELECT id, name FROM users ORDER BY name")
+	// Users list. ID carries the user's 8-char short_id (matches the
+	// service-layer convention; resource handler bypasses compactIDsBytes
+	// so we must emit the right shape directly).
+	userRows, err := s.Pool.Query(ctx, "SELECT short_id, name FROM users ORDER BY name")
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
@@ -120,11 +120,9 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	stats.Users = []OverviewUser{}
 	for userRows.Next() {
 		var u OverviewUser
-		var id pgtype.UUID
-		if err := userRows.Scan(&id, &u.Name); err != nil {
+		if err := userRows.Scan(&u.ID, &u.Name); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
-		u.ID = formatUUID(id)
 		stats.Users = append(stats.Users, u)
 	}
 	if err := userRows.Err(); err != nil {
@@ -150,10 +148,10 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		return nil, fmt.Errorf("account type rows: %w", err)
 	}
 
-	// Connections with account counts
+	// Connections with account counts. ID carries the connection's short_id.
 	stats.Connections = []OverviewConnection{}
 	connRows, err := s.Pool.Query(ctx, `
-		SELECT bc.id, bc.provider, bc.institution_name, bc.status, bc.last_synced_at,
+		SELECT bc.short_id, bc.provider, bc.institution_name, bc.status, bc.last_synced_at,
 			(SELECT COUNT(*) FROM accounts WHERE connection_id = bc.id)
 		FROM bank_connections bc
 		WHERE bc.status != 'disconnected'
@@ -164,13 +162,11 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	defer connRows.Close()
 	for connRows.Next() {
 		var c OverviewConnection
-		var id pgtype.UUID
 		var instName *string
 		var lastSynced *time.Time
-		if err := connRows.Scan(&id, &c.Provider, &instName, &c.Status, &lastSynced, &c.AccountCount); err != nil {
+		if err := connRows.Scan(&c.ID, &c.Provider, &instName, &c.Status, &lastSynced, &c.AccountCount); err != nil {
 			return nil, fmt.Errorf("scan connection: %w", err)
 		}
-		c.ID = formatUUID(id)
 		c.InstitutionName = instName
 		if lastSynced != nil {
 			s := lastSynced.UTC().Format(time.RFC3339)
