@@ -110,8 +110,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.category_id, t.category_override, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
-		"t.attributed_user_id, au.name AS attributed_user_name, " +
-		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
+		"au.short_id AS attributed_user_short_id, au.name AS attributed_user_name, " +
+		"COALESCE(au.short_id, u.short_id) AS effective_user_short_id " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -346,9 +346,9 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			catColor               pgtype.Text
 			catPrimarySlug         pgtype.Text
 			catPrimaryDisplayName  pgtype.Text
-			attributedUserID       pgtype.UUID
+			attributedUserShortID  pgtype.Text
 			attributedUserName     pgtype.Text
-			effectiveUserID        pgtype.UUID
+			effectiveUserShortID   pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -362,8 +362,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&categoryID, &categoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
-			&attributedUserID, &attributedUserName,
-			&effectiveUserID,
+			&attributedUserShortID, &attributedUserName,
+			&effectiveUserShortID,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -401,9 +401,9 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			AccountID:           &accountShortIDVal,
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
-			AttributedUserID:    uuidPtr(attributedUserID),
+			AttributedUserID:    textPtr(attributedUserShortID),
 			AttributedUserName:  textPtr(attributedUserName),
-			EffectiveUserID:     uuidPtr(effectiveUserID),
+			EffectiveUserID:     textPtr(effectiveUserShortID),
 			Amount:              amountVal,
 			IsoCurrencyCode:     textPtr(isoCurrencyCode),
 			Date:                dateVal,
@@ -1210,11 +1210,13 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		return nil, ErrNotFound
 	}
 
-	// Dynamic SQL with JOIN so account_id can carry the account's short_id
-	// directly (matching ListTransactions). Avoids a second round-trip just to
-	// look up the FK's short_id.
+	// Dynamic SQL with JOINs so FK fields carry the referenced row's short_id
+	// directly (matching ListTransactions). Avoids per-FK round-trips.
 	const q = `
 		SELECT t.id, t.short_id, a.short_id AS account_short_id,
+			au.short_id AS attributed_user_short_id, au.name AS attributed_user_name,
+			COALESCE(au.short_id, u.short_id) AS effective_user_short_id,
+			COALESCE(au.name, u.name) AS user_name,
 			t.amount, t.iso_currency_code, t.date, t.authorized_date,
 			t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name,
 			t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence,
@@ -1222,34 +1224,43 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 			t.category_id, t.category_override
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
+		LEFT JOIN bank_connections bc ON bc.id = a.connection_id
+		LEFT JOIN users u ON u.id = bc.user_id
+		LEFT JOIN users au ON au.id = t.attributed_user_id
 		WHERE t.id = $1 AND t.deleted_at IS NULL
 	`
 
 	var (
-		txID                pgtype.UUID
-		shortID             string
-		accountShortID      pgtype.Text
-		amount              pgtype.Numeric
-		isoCurrencyCode     pgtype.Text
-		date                pgtype.Date
-		authorizedDate      pgtype.Date
-		datetime            pgtype.Timestamptz
-		authorizedDatetime  pgtype.Timestamptz
-		providerName        string
-		providerMerchant    pgtype.Text
-		providerCatPrimary  pgtype.Text
-		providerCatDetailed pgtype.Text
-		providerCatConf     pgtype.Text
-		providerChannel     pgtype.Text
-		pending             bool
-		createdAt           pgtype.Timestamptz
-		updatedAt           pgtype.Timestamptz
-		categoryID          pgtype.UUID
-		categoryOverride    bool
+		txID                  pgtype.UUID
+		shortID               string
+		accountShortID        pgtype.Text
+		attributedUserShortID pgtype.Text
+		attributedUserName    pgtype.Text
+		effectiveUserShortID  pgtype.Text
+		userName              pgtype.Text
+		amount                pgtype.Numeric
+		isoCurrencyCode       pgtype.Text
+		date                  pgtype.Date
+		authorizedDate        pgtype.Date
+		datetime              pgtype.Timestamptz
+		authorizedDatetime    pgtype.Timestamptz
+		providerName          string
+		providerMerchant      pgtype.Text
+		providerCatPrimary    pgtype.Text
+		providerCatDetailed   pgtype.Text
+		providerCatConf       pgtype.Text
+		providerChannel       pgtype.Text
+		pending               bool
+		createdAt             pgtype.Timestamptz
+		updatedAt             pgtype.Timestamptz
+		categoryID            pgtype.UUID
+		categoryOverride      bool
 	)
 
 	if err := s.Pool.QueryRow(ctx, q, uid).Scan(
 		&txID, &shortID, &accountShortID,
+		&attributedUserShortID, &attributedUserName,
+		&effectiveUserShortID, &userName,
 		&amount, &isoCurrencyCode, &date, &authorizedDate,
 		&datetime, &authorizedDatetime, &providerName, &providerMerchant,
 		&providerCatPrimary, &providerCatDetailed, &providerCatConf,
@@ -1276,6 +1287,10 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		ID:                         formatUUID(txID),
 		ShortID:                    shortID,
 		AccountID:                  textPtr(accountShortID),
+		UserName:                   textPtr(userName),
+		AttributedUserID:           textPtr(attributedUserShortID),
+		AttributedUserName:         textPtr(attributedUserName),
+		EffectiveUserID:            textPtr(effectiveUserShortID),
 		Amount:                     amountVal,
 		IsoCurrencyCode:            textPtr(isoCurrencyCode),
 		Date:                       dateVal,
