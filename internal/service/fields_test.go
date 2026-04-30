@@ -326,42 +326,23 @@ func TestFilterTransactionFields_UserNameFallsBackToOwner(t *testing.T) {
 	}
 }
 
-// When AccountShortID is set, filtering account_id must also emit account_short_id.
-func TestFilterTransactionFields_AccountShortIDIncluded(t *testing.T) {
-	accountID := "acct-uuid-123"
+// account_id carries the account's short_id (single field, no paired
+// account_short_id sibling).
+func TestFilterTransactionFields_AccountIDIsShort(t *testing.T) {
 	accountShort := "Ab12CdEf"
 	txn := TransactionResponse{
-		ID:             "txn-1",
-		AccountID:      &accountID,
-		AccountShortID: &accountShort,
-	}
-
-	fields := map[string]bool{"id": true, "account_id": true}
-	result := FilterTransactionFields(txn, fields)
-
-	if gotID, _ := result["account_id"].(*string); gotID == nil || *gotID != accountID {
-		t.Errorf("expected account_id %q, got %v", accountID, result["account_id"])
-	}
-	gotShort, ok := result["account_short_id"].(*string)
-	if !ok || *gotShort != accountShort {
-		t.Errorf("expected account_short_id %q, got %v", accountShort, result["account_short_id"])
-	}
-}
-
-// When AccountShortID is nil, account_short_id must be absent from the result
-// (the key is omitted entirely, not set to a nil pointer).
-func TestFilterTransactionFields_AccountShortIDOmittedWhenNil(t *testing.T) {
-	accountID := "acct-uuid-123"
-	txn := TransactionResponse{
 		ID:        "txn-1",
-		AccountID: &accountID,
+		AccountID: &accountShort,
 	}
 
 	fields := map[string]bool{"id": true, "account_id": true}
 	result := FilterTransactionFields(txn, fields)
 
+	if gotID, _ := result["account_id"].(*string); gotID == nil || *gotID != accountShort {
+		t.Errorf("expected account_id %q, got %v", accountShort, result["account_id"])
+	}
 	if _, present := result["account_short_id"]; present {
-		t.Error("account_short_id should be omitted when AccountShortID is nil")
+		t.Error("account_short_id should not be emitted (collapsed into account_id)")
 	}
 }
 

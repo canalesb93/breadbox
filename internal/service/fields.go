@@ -115,9 +115,6 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 			m["short_id"] = t.ShortID
 		case "account_id":
 			m["account_id"] = t.AccountID
-			if t.AccountShortID != nil {
-				m["account_short_id"] = t.AccountShortID
-			}
 		case "account_name":
 			m["account_name"] = t.AccountName
 		case "user_name":
