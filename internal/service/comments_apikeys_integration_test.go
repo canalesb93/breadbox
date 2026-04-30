@@ -684,17 +684,23 @@ func TestGetOverviewStats_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetOverviewStats failed: %v", err)
 	}
-	if stats.UserCount != 0 {
-		t.Errorf("user_count = %d, want 0", stats.UserCount)
+	if len(stats.Users) != 0 {
+		t.Errorf("users = %d, want 0", len(stats.Users))
 	}
-	if stats.ConnectionCount != 0 {
-		t.Errorf("connection_count = %d, want 0", stats.ConnectionCount)
+	if stats.Scope.AccountCount != 0 {
+		t.Errorf("scope.account_count = %d, want 0", stats.Scope.AccountCount)
 	}
-	if stats.AccountCount != 0 {
-		t.Errorf("account_count = %d, want 0", stats.AccountCount)
+	if stats.Scope.TransactionCount != 0 {
+		t.Errorf("scope.transaction_count = %d, want 0", stats.Scope.TransactionCount)
 	}
-	if stats.TransactionCount != 0 {
-		t.Errorf("transaction_count = %d, want 0", stats.TransactionCount)
+	if stats.Freshness.ErroredConnectionCount != 0 {
+		t.Errorf("freshness.errored_connection_count = %d, want 0", stats.Freshness.ErroredConnectionCount)
+	}
+	if stats.Freshness.LastSyncAt != nil {
+		t.Errorf("freshness.last_sync_at = %v, want nil", *stats.Freshness.LastSyncAt)
+	}
+	if stats.Backlog.NeedsReviewCount != 0 {
+		t.Errorf("backlog.needs_review_count = %d, want 0", stats.Backlog.NeedsReviewCount)
 	}
 }
 
@@ -708,64 +714,60 @@ func TestGetOverviewStats_WithData(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acct.ID, "txn_ov_1", "Coffee", 550, "2024-06-01")
 	testutil.MustCreateTransaction(t, queries, acct.ID, "txn_ov_2", "Lunch", 1250, "2024-06-02")
 
+	_ = conn // referenced for the connection-fixture setup; not asserted on directly
+
 	stats, err := svc.GetOverviewStats(ctx)
 	if err != nil {
 		t.Fatalf("GetOverviewStats failed: %v", err)
 	}
-	if stats.UserCount != 1 {
-		t.Errorf("user_count = %d, want 1", stats.UserCount)
+	if stats.Scope.AccountCount != 1 {
+		t.Errorf("scope.account_count = %d, want 1", stats.Scope.AccountCount)
 	}
-	if stats.ConnectionCount != 1 {
-		t.Errorf("connection_count = %d, want 1", stats.ConnectionCount)
-	}
-	if stats.AccountCount != 1 {
-		t.Errorf("account_count = %d, want 1", stats.AccountCount)
-	}
-	if stats.TransactionCount != 2 {
-		t.Errorf("transaction_count = %d, want 2", stats.TransactionCount)
+	if stats.Scope.TransactionCount != 2 {
+		t.Errorf("scope.transaction_count = %d, want 2", stats.Scope.TransactionCount)
 	}
 	if len(stats.Users) != 1 {
-		t.Errorf("users = %d, want 1", len(stats.Users))
+		t.Fatalf("users = %d, want 1", len(stats.Users))
 	}
 	if stats.Users[0].Name != "Alice" {
 		t.Errorf("user name = %q, want Alice", stats.Users[0].Name)
 	}
-	// Overview emits short_ids (resource path bypasses compactIDsBytes, so
-	// the value must come out of the SQL layer already-shortened).
+	// Overview emits short_ids — the SQL projection selects users.short_id.
 	if stats.Users[0].ID != user.ShortID {
 		t.Errorf("user.id = %q, want short_id %q", stats.Users[0].ID, user.ShortID)
 	}
-	if len(stats.Connections) != 1 {
-		t.Errorf("connections = %d, want 1", len(stats.Connections))
+	// Two transactions just got inserted, so both windows should pick them up.
+	if stats.Freshness.TransactionsAddedLast24h != 2 {
+		t.Errorf("freshness.transactions_added_last_24h = %d, want 2", stats.Freshness.TransactionsAddedLast24h)
 	}
-	if stats.Connections[0].ID != conn.ShortID {
-		t.Errorf("connection.id = %q, want short_id %q", stats.Connections[0].ID, conn.ShortID)
-	}
-	if _, ok := stats.AccountsByType["depository"]; !ok {
-		t.Error("expected depository in accounts_by_type")
+	if stats.Freshness.TransactionsAddedLast7d != 2 {
+		t.Errorf("freshness.transactions_added_last_7d = %d, want 2", stats.Freshness.TransactionsAddedLast7d)
 	}
 }
 
-func TestGetOverviewStats_DisconnectedExcluded(t *testing.T) {
+func TestGetOverviewStats_DisconnectedAndErroredConnections(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Bob")
-	conn := testutil.MustCreateConnection(t, queries, user.ID, "conn_disconn")
+	disconn := testutil.MustCreateConnection(t, queries, user.ID, "conn_disconn")
+	errored := testutil.MustCreateConnection(t, queries, user.ID, "conn_errored")
 
-	// Disconnect it
-	_, err := pool.Exec(ctx,
-		"UPDATE bank_connections SET status = 'disconnected' WHERE id = $1", conn.ID)
-	if err != nil {
+	if _, err := pool.Exec(ctx,
+		"UPDATE bank_connections SET status = 'disconnected' WHERE id = $1", disconn.ID); err != nil {
 		t.Fatalf("disconnect: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		"UPDATE bank_connections SET status = 'error' WHERE id = $1", errored.ID); err != nil {
+		t.Fatalf("set error status: %v", err)
 	}
 
 	stats, err := svc.GetOverviewStats(ctx)
 	if err != nil {
 		t.Fatalf("GetOverviewStats failed: %v", err)
 	}
-	if stats.ConnectionCount != 0 {
-		t.Errorf("disconnected connection should be excluded, got count = %d", stats.ConnectionCount)
+	if stats.Freshness.ErroredConnectionCount != 1 {
+		t.Errorf("freshness.errored_connection_count = %d, want 1 (disconnected excluded)", stats.Freshness.ErroredConnectionCount)
 	}
 }
 

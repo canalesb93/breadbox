@@ -6,118 +6,97 @@ import (
 	"time"
 )
 
-// OverviewStats contains high-level statistics about the Breadbox dataset.
+// OverviewStats answers three questions about the dataset, in order: how big
+// is it (Scope), is it current (Freshness), and what's open / needs attention
+// (Backlog). The household roster is included as a small directory so the
+// agent has the user list in hand without an extra resource read. Detail
+// beyond this — per-account balances, per-connection sync timestamps, the
+// category taxonomy — is available via the corresponding live resources.
 type OverviewStats struct {
-	UserCount               int                    `json:"user_count"`
-	ConnectionCount         int                    `json:"connection_count"`
-	AccountCount            int                    `json:"account_count"`
-	TransactionCount        int64                  `json:"transaction_count"`
-	PendingTransactionCount int64                  `json:"pending_transaction_count"`
-	CategoryCount           int                    `json:"category_count"`
-	UnmappedCount           int                    `json:"unmapped_transaction_count"`
-	EarliestDate            string                 `json:"earliest_transaction_date,omitempty"`
-	LatestDate              string                 `json:"latest_transaction_date,omitempty"`
-	Users                   []OverviewUser         `json:"users"`
-	AccountsByType          map[string]int         `json:"accounts_by_type"`
-	Connections             []OverviewConnection   `json:"connections"`
-	SpendingSummary30d      *OverviewSpending      `json:"spending_summary_30d,omitempty"`
-	Permissions             *OverviewPermissions   `json:"permissions,omitempty"`
+	Users     []OverviewUser    `json:"users"`
+	Scope     OverviewScope     `json:"scope"`
+	Freshness OverviewFreshness `json:"freshness"`
+	Backlog   OverviewBacklog   `json:"backlog"`
 }
 
-// OverviewPermissions describes what the current API key/session can do.
-type OverviewPermissions struct {
-	Role                    string `json:"role"`
-	CanReadAllTransactions  bool   `json:"can_read_all_transactions"`
-	CanEditTransactions     bool   `json:"can_edit_transactions"`
-	CanManageConnections    bool   `json:"can_manage_connections"`
-	CanManageSettings       bool   `json:"can_manage_settings"`
-}
-
-// OverviewUser is a minimal user representation for the overview.
+// OverviewUser is the minimal household-roster row.
 type OverviewUser struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// OverviewConnection is a connection summary for the overview.
-type OverviewConnection struct {
-	ID              string  `json:"id"`
-	Provider        string  `json:"provider"`
-	InstitutionName *string `json:"institution_name"`
-	Status          string  `json:"status"`
-	LastSyncedAt    *string `json:"last_synced_at"`
-	AccountCount    int     `json:"account_count"`
+// OverviewScope: how big is the dataset.
+type OverviewScope struct {
+	TransactionCount          int64  `json:"transaction_count"`
+	AccountCount              int    `json:"account_count"`
+	CategoryCount             int    `json:"category_count"`
+	EarliestTransactionDate   string `json:"earliest_transaction_date,omitempty"`
+	LatestTransactionDate     string `json:"latest_transaction_date,omitempty"`
 }
 
-// OverviewSpending is a 30-day spending summary for the overview.
-type OverviewSpending struct {
-	TotalAmount      float64                `json:"total_amount"`
-	TransactionCount int64                  `json:"transaction_count"`
-	IsoCurrencyCode  string                 `json:"iso_currency_code"`
-	TopCategories    []OverviewCategorySpend `json:"top_categories"`
+// OverviewFreshness: is the data current.
+//
+// `last_sync_at` is the most recent successful sync across all active
+// connections. `transactions_added_last_*` count rows whose `created_at`
+// falls in the window — i.e., when Breadbox first ingested them, not when
+// the underlying transaction occurred. That distinction matters: a fresh
+// connection can backfill years of history in one go, but the freshness of
+// the *dataset* tracks ingest time.
+type OverviewFreshness struct {
+	LastSyncAt              *string `json:"last_sync_at,omitempty"`
+	ErroredConnectionCount  int     `json:"errored_connection_count"`
+	PendingTransactionCount int64   `json:"pending_transaction_count"`
+	TransactionsAddedLast24h int64  `json:"transactions_added_last_24h"`
+	TransactionsAddedLast7d  int64  `json:"transactions_added_last_7d"`
 }
 
-// OverviewCategorySpend is a category spending row for the overview.
-type OverviewCategorySpend struct {
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	Count    int64   `json:"count"`
+// OverviewBacklog: what's open / needs human attention.
+type OverviewBacklog struct {
+	NeedsReviewCount         int64 `json:"needs_review_count"`
+	UnmappedTransactionCount int64 `json:"unmapped_transaction_count"`
 }
 
-// GetOverviewStats returns aggregate counts and the transaction date range.
+// dependentExclusionWhere is the standard predicate that excludes
+// dependent-linked transactions from counts so a shared credit card doesn't
+// double up. Inlined into every count query so the numbers consistently
+// reflect the user-facing definition of "transactions in this dataset".
+const dependentExclusionWhere = `
+	(a.is_dependent_linked = FALSE OR NOT EXISTS (
+		SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id
+	))
+`
+
+// GetOverviewStats returns the lightweight dataset overview served via
+// `breadbox://overview`. Detail consumers (per-connection sync, per-account
+// balances, full user/tag/category lists) read the dedicated resources.
 func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) {
 	stats := &OverviewStats{}
 
-	err := s.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&stats.UserCount)
-	if err != nil {
-		return nil, fmt.Errorf("count users: %w", err)
-	}
-
-	err = s.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM bank_connections WHERE status != 'disconnected'").Scan(&stats.ConnectionCount)
-	if err != nil {
-		return nil, fmt.Errorf("count connections: %w", err)
-	}
-
-	err = s.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM accounts").Scan(&stats.AccountCount)
-	if err != nil {
-		return nil, fmt.Errorf("count accounts: %w", err)
-	}
-
-	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*), COALESCE(MIN(date)::text, ''), COALESCE(MAX(date)::text, '') FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))").
-		Scan(&stats.TransactionCount, &stats.EarliestDate, &stats.LatestDate)
-	if err != nil {
+	// Scope.
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*), COALESCE(MIN(date)::text, ''), COALESCE(MAX(date)::text, '')
+		   FROM transactions t
+		   JOIN accounts a ON t.account_id = a.id
+		  WHERE t.deleted_at IS NULL AND `+dependentExclusionWhere).
+		Scan(&stats.Scope.TransactionCount, &stats.Scope.EarliestTransactionDate, &stats.Scope.LatestTransactionDate); err != nil {
 		return nil, fmt.Errorf("count transactions: %w", err)
 	}
 
-	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND t.pending = true AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))").
-		Scan(&stats.PendingTransactionCount)
-	if err != nil {
-		return nil, fmt.Errorf("count pending: %w", err)
+	if err := s.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM accounts`).Scan(&stats.Scope.AccountCount); err != nil {
+		return nil, fmt.Errorf("count accounts: %w", err)
 	}
 
-	err = s.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM categories").Scan(&stats.CategoryCount)
-	if err != nil {
+	if err := s.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM categories`).Scan(&stats.Scope.CategoryCount); err != nil {
 		return nil, fmt.Errorf("count categories: %w", err)
 	}
 
-	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.category_id IS NULL AND t.deleted_at IS NULL AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))").
-		Scan(&stats.UnmappedCount)
-	if err != nil {
-		return nil, fmt.Errorf("count unmapped: %w", err)
-	}
-
-	// Users list. ID carries the user's 8-char short_id (matches the
-	// service-layer convention; resource handler bypasses compactIDsBytes
-	// so we must emit the right shape directly).
-	userRows, err := s.Pool.Query(ctx, "SELECT short_id, name FROM users ORDER BY name")
+	// Household roster.
+	stats.Users = []OverviewUser{}
+	userRows, err := s.Pool.Query(ctx, `SELECT short_id, name FROM users ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
 	defer userRows.Close()
-	stats.Users = []OverviewUser{}
 	for userRows.Next() {
 		var u OverviewUser
 		if err := userRows.Scan(&u.ID, &u.Name); err != nil {
@@ -129,112 +108,71 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		return nil, fmt.Errorf("user rows: %w", err)
 	}
 
-	// Accounts by type
-	stats.AccountsByType = map[string]int{}
-	typeRows, err := s.Pool.Query(ctx, "SELECT type, COUNT(*) FROM accounts GROUP BY type ORDER BY COUNT(*) DESC")
-	if err != nil {
-		return nil, fmt.Errorf("accounts by type: %w", err)
+	// Freshness.
+	var lastSync *time.Time
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT MAX(last_synced_at) FROM bank_connections WHERE status != 'disconnected'`).
+		Scan(&lastSync); err != nil {
+		return nil, fmt.Errorf("max last_synced_at: %w", err)
 	}
-	defer typeRows.Close()
-	for typeRows.Next() {
-		var t string
-		var c int
-		if err := typeRows.Scan(&t, &c); err != nil {
-			return nil, fmt.Errorf("scan account type: %w", err)
-		}
-		stats.AccountsByType[t] = c
-	}
-	if err := typeRows.Err(); err != nil {
-		return nil, fmt.Errorf("account type rows: %w", err)
+	if lastSync != nil {
+		formatted := lastSync.UTC().Format(time.RFC3339)
+		stats.Freshness.LastSyncAt = &formatted
 	}
 
-	// Connections with account counts. ID carries the connection's short_id.
-	stats.Connections = []OverviewConnection{}
-	connRows, err := s.Pool.Query(ctx, `
-		SELECT bc.short_id, bc.provider, bc.institution_name, bc.status, bc.last_synced_at,
-			(SELECT COUNT(*) FROM accounts WHERE connection_id = bc.id)
-		FROM bank_connections bc
-		WHERE bc.status != 'disconnected'
-		ORDER BY bc.institution_name`)
-	if err != nil {
-		return nil, fmt.Errorf("list connections: %w", err)
-	}
-	defer connRows.Close()
-	for connRows.Next() {
-		var c OverviewConnection
-		var instName *string
-		var lastSynced *time.Time
-		if err := connRows.Scan(&c.ID, &c.Provider, &instName, &c.Status, &lastSynced, &c.AccountCount); err != nil {
-			return nil, fmt.Errorf("scan connection: %w", err)
-		}
-		c.InstitutionName = instName
-		if lastSynced != nil {
-			s := lastSynced.UTC().Format(time.RFC3339)
-			c.LastSyncedAt = &s
-		}
-		stats.Connections = append(stats.Connections, c)
-	}
-	if err := connRows.Err(); err != nil {
-		return nil, fmt.Errorf("connection rows: %w", err)
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM bank_connections WHERE status IN ('error', 'pending_reauth')`).
+		Scan(&stats.Freshness.ErroredConnectionCount); err != nil {
+		return nil, fmt.Errorf("count errored connections: %w", err)
 	}
 
-	// 30-day spending summary
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
-	var spendTotal float64
-	var spendCount int64
-	var spendCurrency *string
-	var currencyCount int
-	err = s.Pool.QueryRow(ctx, `
-		SELECT COALESCE(SUM(t.amount), 0), COUNT(*), COUNT(DISTINCT t.iso_currency_code)
-		FROM transactions t
-		JOIN accounts a ON t.account_id = a.id
-		WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`,
-		thirtyDaysAgo).Scan(&spendTotal, &spendCount, &currencyCount)
-	if err != nil {
-		return nil, fmt.Errorf("spending summary: %w", err)
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions t
+		   JOIN accounts a ON t.account_id = a.id
+		  WHERE t.deleted_at IS NULL AND t.pending = true AND `+dependentExclusionWhere).
+		Scan(&stats.Freshness.PendingTransactionCount); err != nil {
+		return nil, fmt.Errorf("count pending: %w", err)
 	}
 
-	if spendCount > 0 && currencyCount == 1 {
-		err = s.Pool.QueryRow(ctx, `
-			SELECT t.iso_currency_code FROM transactions t
-			JOIN accounts a ON t.account_id = a.id
-			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id)) LIMIT 1`,
-			thirtyDaysAgo).Scan(&spendCurrency)
-		if err != nil {
-			return nil, fmt.Errorf("spending currency: %w", err)
-		}
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions t
+		   JOIN accounts a ON t.account_id = a.id
+		  WHERE t.deleted_at IS NULL
+		    AND t.created_at >= NOW() - INTERVAL '24 hours'
+		    AND `+dependentExclusionWhere).
+		Scan(&stats.Freshness.TransactionsAddedLast24h); err != nil {
+		return nil, fmt.Errorf("count txns added 24h: %w", err)
+	}
 
-		spending := &OverviewSpending{
-			TotalAmount:      spendTotal,
-			TransactionCount: spendCount,
-			IsoCurrencyCode:  *spendCurrency,
-			TopCategories:    []OverviewCategorySpend{},
-		}
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions t
+		   JOIN accounts a ON t.account_id = a.id
+		  WHERE t.deleted_at IS NULL
+		    AND t.created_at >= NOW() - INTERVAL '7 days'
+		    AND `+dependentExclusionWhere).
+		Scan(&stats.Freshness.TransactionsAddedLast7d); err != nil {
+		return nil, fmt.Errorf("count txns added 7d: %w", err)
+	}
 
-		catRows, err := s.Pool.Query(ctx, `
-			SELECT COALESCE(t.provider_category_primary, 'UNCATEGORIZED'), SUM(t.amount), COUNT(*)
-			FROM transactions t
-			JOIN accounts a ON t.account_id = a.id
-			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))
-			GROUP BY t.provider_category_primary
-			ORDER BY SUM(t.amount) DESC
-			LIMIT 5`, thirtyDaysAgo)
-		if err != nil {
-			return nil, fmt.Errorf("top categories: %w", err)
-		}
-		defer catRows.Close()
-		for catRows.Next() {
-			var cs OverviewCategorySpend
-			if err := catRows.Scan(&cs.Category, &cs.Amount, &cs.Count); err != nil {
-				return nil, fmt.Errorf("scan category spend: %w", err)
-			}
-			spending.TopCategories = append(spending.TopCategories, cs)
-		}
-		if err := catRows.Err(); err != nil {
-			return nil, fmt.Errorf("category spend rows: %w", err)
-		}
+	// Backlog.
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions t
+		   JOIN accounts a ON t.account_id = a.id
+		   JOIN transaction_tags tt ON tt.transaction_id = t.id
+		   JOIN tags tg ON tg.id = tt.tag_id
+		  WHERE t.deleted_at IS NULL
+		    AND tg.slug = 'needs-review'
+		    AND `+dependentExclusionWhere).
+		Scan(&stats.Backlog.NeedsReviewCount); err != nil {
+		return nil, fmt.Errorf("count needs-review: %w", err)
+	}
 
-		stats.SpendingSummary30d = spending
+	if err := s.Pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions t
+		   JOIN accounts a ON t.account_id = a.id
+		  WHERE t.deleted_at IS NULL AND t.category_id IS NULL AND `+dependentExclusionWhere).
+		Scan(&stats.Backlog.UnmappedTransactionCount); err != nil {
+		return nil, fmt.Errorf("count unmapped: %w", err)
 	}
 
 	return stats, nil

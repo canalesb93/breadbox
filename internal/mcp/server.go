@@ -2,17 +2,70 @@ package mcp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"time"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 	"breadbox/prompts"
+	"breadbox/static"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// breadboxImplementation is the Implementation block sent in every
+// initialize response. Title, websiteUrl, and the icon are spec-optional
+// fields that surface in connector pickers (Claude.ai's Settings →
+// Connectors list, MCP Inspector, etc.) — without them the connector
+// renders as "breadbox <version>" with no icon and no link to docs.
+//
+// The icon is the same package outline used by the admin UI's favicon,
+// inlined as a data URI so the metadata is host-agnostic (works on
+// localhost, dev.breadbox.host, or any future deployment without
+// pointing at an external asset URL).
+func breadboxImplementation(version string) *mcpsdk.Implementation {
+	impl := &mcpsdk.Implementation{
+		Name:       "breadbox",
+		Title:      "Breadbox",
+		Version:    version,
+		WebsiteURL: "https://breadbox.sh",
+	}
+	if icon := loadBreadboxIcon(); icon != nil {
+		impl.Icons = []mcpsdk.Icon{*icon}
+	}
+	return impl
+}
+
+var (
+	breadboxIcon     *mcpsdk.Icon
+	breadboxIconOnce bool
+)
+
+// loadBreadboxIcon reads the favicon from the embedded static FS once and
+// caches the resulting Icon. If the read fails (shouldn't, since the file
+// is embedded at build time), it returns nil and the implementation goes
+// out without icons rather than failing the initialize response.
+func loadBreadboxIcon() *mcpsdk.Icon {
+	if breadboxIconOnce {
+		return breadboxIcon
+	}
+	breadboxIconOnce = true
+	data, err := fs.ReadFile(static.FS, "favicon.svg")
+	if err != nil {
+		return nil
+	}
+	src := "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString(data)
+	breadboxIcon = &mcpsdk.Icon{
+		Source:   src,
+		MIMEType: "image/svg+xml",
+		Sizes:    []string{"any"},
+	}
+	return breadboxIcon
+}
 
 // Default MCP prompts sourced from the top-level prompts/ package — the
 // canonical place to edit them is prompts/mcp/*.md. Used when the user has
@@ -286,7 +339,7 @@ func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
 	}
 
 	server := mcpsdk.NewServer(
-		&mcpsdk.Implementation{Name: "breadbox", Version: s.version},
+		breadboxImplementation(s.version),
 		&mcpsdk.ServerOptions{Instructions: instructions},
 	)
 
@@ -309,28 +362,98 @@ func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
 	return server
 }
 
-// registerResources adds MCP resources to a server.
+// registerResources adds MCP resources to a server. The catalog is
+// agent-facing first: most resources are audienced to the assistant only.
+// A handful (overview, accounts, review-guidelines, report-format) are
+// dual-audience because users have a real "attach this in chat" flow for
+// them — those show up in Claude.ai's paperclip / attachment menu.
 func (s *MCPServer) registerResources(server *mcpsdk.Server) {
+	// Top-level live snapshot — read first.
 	server.AddResource(&mcpsdk.Resource{
 		Name:        "Overview",
+		Title:       "Household Overview",
 		URI:         "breadbox://overview",
-		Description: "Live summary of the Breadbox data model: user, connection, account, and transaction counts plus the transaction date range. Read this first to understand the dataset scope.",
+		Description: "Live summary of the dataset: users, connections, accounts, transaction counts and date range, recent spending. Read on connect for context.",
 		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 1.0, liveResourceModTime),
 	}, s.handleOverviewResource)
 
+	// Live state resources — replace what would otherwise be list_* tool calls.
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Accounts",
+		Title:       "Bank Accounts",
+		URI:         "breadbox://accounts",
+		Description: "Bank accounts (checking, savings, credit cards, loans, investments) with balances, institution names, and currency.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.6, liveResourceModTime),
+	}, s.handleAccountsResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Categories",
+		Title:       "Category Taxonomy",
+		URI:         "breadbox://categories",
+		Description: "Two-level category taxonomy keyed by slug. Source for valid category_slug values when categorizing or authoring rules.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceAssistantOnly, 0.5, liveResourceModTime),
+	}, s.handleCategoriesResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Tags",
+		Title:       "Tag Vocabulary",
+		URI:         "breadbox://tags",
+		Description: "Current tag vocabulary keyed by slug. The 'needs-review' tag is the review-queue handle.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceAssistantOnly, 0.5, liveResourceModTime),
+	}, s.handleTagsResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Users",
+		Title:       "Household Members",
+		URI:         "breadbox://users",
+		Description: "Household members with their roles (admin, editor, viewer).",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceAssistantOnly, 0.5, liveResourceModTime),
+	}, s.handleUsersResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Sync Status",
+		Title:       "Connection Sync Status",
+		URI:         "breadbox://sync-status",
+		Description: "Per-connection sync status and last-sync timestamps. Read to verify data freshness before answering questions about recent activity.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
+	}, s.handleSyncStatusResource)
+
+	// Workflow guides — markdown, user-overridable via app_config.
 	server.AddResource(&mcpsdk.Resource{
 		Name:        "Review Guidelines",
+		Title:       "Transaction Review Guidelines",
 		URI:         "breadbox://review-guidelines",
-		Description: "Guidelines for reviewing transactions and creating rules. Read this before processing any reviews or creating transaction rules.",
+		Description: "Principles for reviewing transactions and creating rules. Read before touching the review queue.",
 		MIMEType:    "text/markdown",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.8, staticPromptModTime),
 	}, s.handleReviewGuidelinesResource)
 
 	server.AddResource(&mcpsdk.Resource{
 		Name:        "Report Format",
+		Title:       "Spending Report Format",
 		URI:         "breadbox://report-format",
-		Description: "Report structure templates and formatting guidelines. Read this before submitting reports via submit_report.",
+		Description: "Report structure and formatting guidelines. Read before submit_report.",
 		MIMEType:    "text/markdown",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.8, staticPromptModTime),
 	}, s.handleReportFormatResource)
+
+	// Authoring reference — only relevant when the agent is creating rules.
+	// Carrying the grammar here instead of in create_transaction_rule's
+	// description keeps tools/list lean.
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Rule DSL",
+		Title:       "Transaction Rule DSL",
+		URI:         "breadbox://rule-dsl",
+		Description: "Condition grammar, action types, priority bands, sync-vs-retroactive semantics, provider quirks. Read before authoring rules.",
+		MIMEType:    "text/markdown",
+		Annotations: resourceAnnotations(audienceAssistantOnly, 0.7, staticPromptModTime),
+	}, staticMarkdownResource("breadbox://rule-dsl", DefaultRuleDSL))
 }
 
 // AllToolDefs returns the full tool registry for admin display.
