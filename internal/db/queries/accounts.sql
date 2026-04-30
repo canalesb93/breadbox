@@ -35,18 +35,36 @@ FROM accounts WHERE external_account_id = $1;
 SELECT id FROM accounts WHERE short_id = $1;
 
 -- name: ListAccounts :many
-SELECT a.*, bc.institution_name, bc.user_id, bc.status as connection_status
-FROM accounts a LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+SELECT a.*,
+  bc.short_id AS connection_short_id,
+  bc.institution_name,
+  u.short_id AS user_short_id,
+  bc.status as connection_status
+FROM accounts a
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+LEFT JOIN users u ON u.id = bc.user_id
 ORDER BY bc.institution_name, a.name;
 
 -- name: ListAccountsByUser :many
-SELECT a.*, bc.institution_name, bc.user_id, bc.status as connection_status
-FROM accounts a JOIN bank_connections bc ON a.connection_id = bc.id
+SELECT a.*,
+  bc.short_id AS connection_short_id,
+  bc.institution_name,
+  u.short_id AS user_short_id,
+  bc.status as connection_status
+FROM accounts a
+JOIN bank_connections bc ON a.connection_id = bc.id
+LEFT JOIN users u ON u.id = bc.user_id
 WHERE bc.user_id = $1 ORDER BY bc.institution_name, a.name;
 
 -- name: GetAccount :one
-SELECT a.*, bc.institution_name, bc.user_id, bc.status as connection_status
-FROM accounts a LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+SELECT a.*,
+  bc.short_id AS connection_short_id,
+  bc.institution_name,
+  u.short_id AS user_short_id,
+  bc.status as connection_status
+FROM accounts a
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+LEFT JOIN users u ON u.id = bc.user_id
 WHERE a.id = $1;
 
 -- name: UpdateAccountDisplayName :one

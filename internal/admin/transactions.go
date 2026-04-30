@@ -20,7 +20,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DateGroup holds transactions grouped by a single date.
@@ -737,11 +736,11 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 					connectionID = *acct.ConnectionID
 				}
 				// Fetch user name from the account's user_id.
+				// acct.UserID carries the user's short_id (resolved at the
+				// SQL layer in ListAccounts/GetAccount).
 				if acct.UserID != nil {
-					var uid pgtype.UUID
-					if scanErr := uid.Scan(*acct.UserID); scanErr == nil {
-						u, uErr := a.Queries.GetUser(ctx, uid)
-						if uErr == nil {
+					if uid, err := a.Queries.GetUserUUIDByShortID(ctx, *acct.UserID); err == nil {
+						if u, uErr := a.Queries.GetUser(ctx, uid); uErr == nil {
 							userName = u.Name
 						}
 					}

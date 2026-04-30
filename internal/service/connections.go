@@ -25,7 +25,7 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 			result[i] = ConnectionResponse{
 				ID:              formatUUID(r.ID),
 				ShortID:         r.ShortID,
-				UserID:          uuidPtr(r.UserID),
+				UserID:          textPtr(r.UserShortID),
 				UserName:        textPtr(r.UserName),
 				Provider:        string(r.Provider),
 				InstitutionID:   textPtr(r.InstitutionID),
@@ -50,7 +50,7 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 		result[i] = ConnectionResponse{
 			ID:              formatUUID(r.ID),
 			ShortID:         r.ShortID,
-			UserID:          uuidPtr(r.UserID),
+			UserID:          textPtr(r.UserShortID),
 			UserName:        textPtr(r.UserName),
 			Provider:        string(r.Provider),
 			InstitutionID:   textPtr(r.InstitutionID),
@@ -84,7 +84,7 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 		ConnectionResponse: ConnectionResponse{
 			ID:              formatUUID(conn.ID),
 			ShortID:         conn.ShortID,
-			UserID:          uuidPtr(conn.UserID),
+			UserID:          textPtr(conn.UserShortID),
 			UserName:        textPtr(conn.UserName),
 			Provider:        string(conn.Provider),
 			InstitutionID:   textPtr(conn.InstitutionID),
@@ -109,7 +109,7 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 		slResp := SyncLogResponse{
 			ID:            formatUUID(syncLog.ID),
 			ShortID:       syncLog.ShortID,
-			ConnectionID:  formatUUID(syncLog.ConnectionID),
+			ConnectionID:  conn.ShortID,
 			Trigger:       string(syncLog.Trigger),
 			Status:        string(syncLog.Status),
 			AddedCount:    syncLog.AddedCount,
