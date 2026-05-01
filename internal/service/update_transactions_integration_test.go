@@ -9,6 +9,8 @@ import (
 
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // strPtr is a tiny helper for the *string sites in UpdateTransactionsOp.
@@ -307,5 +309,206 @@ func TestUpdateTransactions_RejectsTooMany(t *testing.T) {
 	}
 	if !errors.Is(err, service.ErrInvalidParameter) {
 		t.Errorf("expected ErrInvalidParameter, got %v", err)
+	}
+}
+
+// TestUpdateTransactions_ResetCategoryNoOverride guards against the edge case
+// where reset_category fires on a transaction that never had a manual override.
+// The collapse of reset_transaction_category into update_transactions made this
+// path easy to silently break: the SQL `UPDATE … SET category_override=FALSE`
+// is idempotent (rows-affected stays 1 because the row exists), so we want to
+// confirm the handler still drops to uncategorized AND still emits the
+// category_set annotation rather than short-circuiting on the no-op flag flip.
+func TestUpdateTransactions_ResetCategoryNoOverride(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	txn := testutil.MustCreateTransaction(t, queries, acctID, "extResetNoOverride", "Trader Joes", 1500, "2026-04-04")
+
+	testutil.MustCreateCategory(t, queries, "uncategorized", "Uncategorized")
+	actor := service.Actor{Type: "user", ID: "u1", Name: "Tester"}
+
+	// Pre-condition: brand-new transaction, no manual override, no category set.
+	pre, err := svc.GetTransaction(ctx, txn.ShortID)
+	if err != nil {
+		t.Fatalf("GetTransaction pre: %v", err)
+	}
+	if pre.CategoryOverride {
+		t.Fatalf("seed precondition: expected category_override=false on fresh txn, got true")
+	}
+
+	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			ResetCategory: true,
+		}},
+		Actor: actor,
+	})
+	if err != nil {
+		t.Fatalf("reset (no prior override): %v", err)
+	}
+	if len(results) != 1 || results[0].Status != "ok" {
+		t.Fatalf("expected per-op ok, got %+v", results)
+	}
+
+	got, err := svc.GetTransaction(ctx, txn.ShortID)
+	if err != nil {
+		t.Fatalf("GetTransaction post: %v", err)
+	}
+	if got.CategoryOverride {
+		t.Errorf("category_override=true after reset, want false")
+	}
+	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
+		t.Errorf("expected category=uncategorized after reset, got %+v", got.Category)
+	}
+	// Annotation must still be written even when the override was already false —
+	// the audit trail is what callers (and the timeline UI) rely on.
+	if n := testutil.MustCountAnnotations(t, queries, txn.ID, "category_set"); n != 1 {
+		t.Errorf("expected exactly 1 category_set annotation from the reset, got %d", n)
+	}
+}
+
+// TestUpdateTransactions_ResetCombinedWithTagAndComment guards the order of
+// operations inside runUpdateOpInTx now that reset_category shares the
+// compound op. The contract is: reset runs first, then tag adds/removes, then
+// the comment — and every per-row change writes its own annotation. A
+// regression that ran reset *after* the tag write would leave the category in
+// the wrong state; one that swallowed the comment annotation would break the
+// review-loop audit trail.
+func TestUpdateTransactions_ResetCombinedWithTagAndComment(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	txn := testutil.MustCreateTransaction(t, queries, acctID, "extResetCombined", "Costco", 9876, "2026-04-05")
+
+	testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+	testutil.MustCreateCategory(t, queries, "uncategorized", "Uncategorized")
+	actor := service.Actor{Type: "user", ID: "u1", Name: "Tester"}
+
+	// Set an override so the reset has something to clear.
+	if _, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			CategorySlug:  strPtr("food_and_drink_groceries"),
+		}},
+		Actor: actor,
+	}); err != nil {
+		t.Fatalf("seed override: %v", err)
+	}
+
+	// Compound: reset_category + add a new tag + comment in a single op.
+	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			ResetCategory: true,
+			TagsToAdd:     []service.UpdateTransactionsTagOp{{Slug: "rethink"}},
+			Comment:       strPtr("Reverting categorization — merchant ambiguous."),
+		}},
+		Actor: actor,
+	})
+	if err != nil {
+		t.Fatalf("compound reset+tag+comment: %v", err)
+	}
+	if len(results) != 1 || results[0].Status != "ok" {
+		t.Fatalf("expected per-op ok, got %+v", results)
+	}
+
+	// Final state: override cleared, dropped to uncategorized, new tag attached.
+	got, err := svc.GetTransaction(ctx, txn.ShortID)
+	if err != nil {
+		t.Fatalf("GetTransaction: %v", err)
+	}
+	if got.CategoryOverride {
+		t.Error("category_override=true after reset, want false")
+	}
+	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
+		t.Errorf("expected uncategorized after reset, got %+v", got.Category)
+	}
+	tags, err := svc.ListTransactionTags(ctx, txn.ShortID)
+	if err != nil {
+		t.Fatalf("ListTransactionTags: %v", err)
+	}
+	hasRethink := false
+	for _, tg := range tags {
+		if tg.Slug == "rethink" {
+			hasRethink = true
+		}
+	}
+	if !hasRethink {
+		t.Error("expected 'rethink' tag attached after compound op")
+	}
+
+	// Annotation correctness: every per-row change in the compound op should
+	// have written exactly one annotation. Two category_set (one from the seed
+	// override, one from the reset), one tag_added, one comment.
+	if n := testutil.MustCountAnnotations(t, queries, txn.ID, "category_set"); n != 2 {
+		t.Errorf("expected 2 category_set annotations (seed override + reset), got %d", n)
+	}
+	if n := testutil.MustCountAnnotations(t, queries, txn.ID, "tag_added"); n != 1 {
+		t.Errorf("expected 1 tag_added annotation, got %d", n)
+	}
+	if n := testutil.MustCountAnnotations(t, queries, txn.ID, "comment"); n != 1 {
+		t.Errorf("expected 1 comment annotation, got %d", n)
+	}
+}
+
+// TestApplyRulesRespectsOverrideFromUpdateTransactions covers the cross-cutting
+// invariant that update_transactions' category_slug write sets
+// category_override=true, and that retroactive ApplyAllRulesRetroactively
+// honors that flag. Before the collapse, the categorize_transaction tool
+// was the canonical override-setter; folding it into update_transactions
+// made it easy to drop the override flag silently. This test would catch
+// that regression.
+func TestApplyRulesRespectsOverrideFromUpdateTransactions(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Two categories: the user-pinned one and the one the rule would set.
+	pinnedCat := testutil.MustCreateCategory(t, queries, "personal_misc", "Personal")
+	testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+
+	// Transaction that would otherwise match a "Costco → groceries" rule.
+	txn := testutil.MustCreateTransaction(t, queries, acctID, "extOverride", "Costco Wholesale", 5000, "2026-04-06")
+
+	// Pin via update_transactions (the canonical override-setter post-collapse).
+	if _, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			CategorySlug:  strPtr("personal_misc"),
+		}},
+		Actor: service.Actor{Type: "user", ID: "u1", Name: "Tester"},
+	}); err != nil {
+		t.Fatalf("seed override via update_transactions: %v", err)
+	}
+
+	// Create a competing rule that would set groceries.
+	if _, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name: "Costco → Groceries",
+		Conditions: service.Condition{
+			Field: "provider_name",
+			Op:    "contains",
+			Value: "Costco",
+		},
+		CategorySlug: "food_and_drink_groceries",
+		Priority:     100,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	}); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	// Run the retroactive pipeline. The override must hold.
+	if _, err := svc.ApplyAllRulesRetroactively(ctx); err != nil {
+		t.Fatalf("ApplyAllRulesRetroactively: %v", err)
+	}
+
+	var catID pgtype.UUID
+	if err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE id = $1", txn.ID).Scan(&catID); err != nil {
+		t.Fatalf("query category_id: %v", err)
+	}
+	if catID != pinnedCat.ID {
+		t.Errorf("expected user-pinned category to survive apply_rules; got category_id=%v want %v",
+			catID, pinnedCat.ID)
 	}
 }

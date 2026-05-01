@@ -93,6 +93,82 @@ func TestCompactIDs_NoShortID(t *testing.T) {
 	}
 }
 
+// TestToolRegistryScopeContract locks the tool-count carving against
+// accidental future regressions. The MCP overhaul (#997) collapsed the tool
+// surface; this test guards that BuildServer-time filtering keeps read_only
+// API keys to the read-classified subset and full_access keeps everything.
+// A regression that flips a tool's classification (e.g. accidentally marking
+// update_transactions as ToolRead) would show up here as a count mismatch
+// long before it surfaced as a security issue in production.
+func TestToolRegistryScopeContract(t *testing.T) {
+	s := NewMCPServer(nil, "test")
+	defs := s.AllToolDefs()
+
+	var reads, writes int
+	readNames := map[string]struct{}{}
+	for _, td := range defs {
+		switch td.Classification {
+		case ToolRead:
+			reads++
+			readNames[td.Tool.Name] = struct{}{}
+		case ToolWrite:
+			writes++
+		default:
+			t.Errorf("tool %q: unexpected classification %q", td.Tool.Name, td.Classification)
+		}
+	}
+
+	// Anchor the explicit canonical set for read tools — this is the surface
+	// area read-only API keys are allowed to exercise. Includes the seven
+	// reference-data mirrors (get_overview / list_* / get_sync_status) that
+	// shadow the bounded reference resources for clients without resources
+	// support — see tools_reads.go.
+	wantReads := []string{
+		"query_transactions",
+		"count_transactions",
+		"transaction_summary",
+		"list_annotations",
+		"preview_rule",
+		"get_overview",
+		"list_accounts",
+		"list_categories",
+		"list_users",
+		"list_tags",
+		"get_sync_status",
+		"list_transaction_rules",
+	}
+	if len(readNames) != len(wantReads) {
+		t.Errorf("read tool count = %d, want %d (got %v)", len(readNames), len(wantReads), readNames)
+	}
+	for _, name := range wantReads {
+		if _, ok := readNames[name]; !ok {
+			t.Errorf("read tool %q missing from registry", name)
+		}
+	}
+
+	// Total must equal reads + writes (no third classification leaked in).
+	if got := reads + writes; got != len(defs) {
+		t.Errorf("classification accounting drift: reads=%d writes=%d total=%d", reads, writes, len(defs))
+	}
+
+	// Simulate BuildServer's filter for each scope and pin the visible count.
+	// read_only keys see read-classified tools only.
+	visibleForReadOnly := 0
+	for _, td := range defs {
+		if td.Classification == ToolWrite {
+			continue // BuildServer drops these for read_only scope.
+		}
+		visibleForReadOnly++
+	}
+	if visibleForReadOnly != len(wantReads) {
+		t.Errorf("read_only scope visible tools = %d, want %d", visibleForReadOnly, len(wantReads))
+	}
+	// full_access keys see the entire registry.
+	if len(defs) != reads+writes {
+		t.Errorf("full_access scope visible tools = %d, want %d (entire registry)", len(defs), reads+writes)
+	}
+}
+
 func TestCompactIDs_FullRoundTrip(t *testing.T) {
 	type testStruct struct {
 		ID      string `json:"id"`

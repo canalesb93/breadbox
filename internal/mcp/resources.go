@@ -89,11 +89,18 @@ func staticMarkdownResource(uri, content string) func(context.Context, *mcpsdk.R
 	}
 }
 
-// marshalResourceJSON marshals v as indented JSON and runs compactIDsBytes
+// marshalResourceJSON marshals v as compact JSON and runs compactIDsBytes
 // so the resource payload follows the same compact-ID convention as MCP tool
 // responses.
+//
+// Compact (no-indent) marshalling is load-bearing: the byte-scanner in
+// compactIDsBytes was designed for the output of json.Marshal and does not
+// handle the whitespace json.MarshalIndent inserts between values. On
+// payloads with deeply nested objects (the rule list's conditions JSONB hit
+// this), the scanner could mis-step into an infinite loop. Sticking to plain
+// Marshal keeps the resource and tool surfaces using identical byte layouts.
 func marshalResourceJSON(v any) ([]byte, error) {
-	raw, err := json.MarshalIndent(v, "", "  ")
+	raw, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
