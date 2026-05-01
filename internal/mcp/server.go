@@ -444,6 +444,38 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		MIMEType:    "text/markdown",
 		Annotations: resourceAnnotations(audienceAssistantOnly, 0.7, staticPromptModTime),
 	}, staticMarkdownResource("breadbox://rule-dsl", DefaultRuleDSL))
+
+	// --- Resource templates ---
+	// Drill-downs into a single entity. URIs come back from tool results as
+	// `resource_link` blocks (PR 05 in this stack) and resolve through these
+	// handlers. dual-audience so they appear in template-aware pickers as
+	// well; priority is below top-level resources.
+	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
+		Name:        "Transaction",
+		Title:       "Transaction Detail",
+		URITemplate: "breadbox://transaction/{short_id}",
+		Description: "Single transaction with its activity timeline (annotations). short_id is the 8-char base62 id surfaced everywhere by query_transactions.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
+	}, s.handleTransactionTemplate)
+
+	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
+		Name:        "Account",
+		Title:       "Account Detail",
+		URITemplate: "breadbox://account/{short_id}",
+		Description: "Single bank account with balance, currency, and the most recent 25 transactions. short_id is the 8-char base62 id surfaced by list_accounts.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
+	}, s.handleAccountTemplate)
+
+	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
+		Name:        "Household Member",
+		Title:       "Household Member Detail",
+		URITemplate: "breadbox://user/{short_id}",
+		Description: "Single household member with their connected accounts. short_id is the 8-char base62 id surfaced by list_users.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
+	}, s.handleUserTemplate)
 }
 
 // AllToolDefs returns the full tool registry for admin display.

@@ -85,3 +85,13 @@ Bounded reference data is exposed two ways:
 - **Tool mirrors (compat)** — `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `list_transaction_rules`, `get_sync_status`. Same payload, called as tools. Kept because not every MCP client implements the resources/* methods — without these, those clients can't read this data at all.
 
 Both surfaces share the same service-layer call path (no logic duplication), so payload shape stays in sync. When adding a new bounded reference resource, register both: a resource handler in `resources.go` and a tool mirror in `tools_reads.go`.
+
+## Resource templates (drill-downs)
+
+Per-entity detail views are exposed as MCP resource templates registered with `Server.AddResourceTemplate`:
+
+- `breadbox://transaction/{short_id}` — `{transaction, annotations}`
+- `breadbox://account/{short_id}` — `{account, recent_transactions}` (capped at 25)
+- `breadbox://user/{short_id}` — `{user, accounts}`
+
+Template handlers parse the trailing `{short_id}` via `extractTemplateParam`, resolve through the standard service `Get*` methods (which accept either UUID or short_id), and return `mcpsdk.ResourceNotFoundError(uri)` on miss. URIs come back to chat as clickable items via `resource_link` content blocks emitted by tools (planned in a follow-up PR).
