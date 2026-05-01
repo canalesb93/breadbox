@@ -1,4 +1,14 @@
-# Stage 1: Build (runs natively on the build host, cross-compiles Go)
+# Stage 1: Build the v2 SPA bundle. Pinned bun image, runs natively on
+# BUILDPLATFORM (not under QEMU). Output (web/dist/) is copied into the Go
+# builder below.
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS web-builder
+WORKDIR /web
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY web/ ./
+RUN bun run build
+
+# Stage 2: Build Go binary (runs natively on the build host, cross-compiles Go)
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 ARG VERSION=dev
@@ -9,6 +19,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+# Replace the committed dist/.gitkeep stub with the real SPA bundle from the
+# web-builder stage so //go:embed all:dist picks up the real files.
+COPY --from=web-builder /web/dist/ ./web/dist/
 
 # Generate sqlc code (generated files are gitignored)
 # Use pre-built binary — compiling from source is very slow under QEMU emulation.
@@ -28,19 +42,11 @@ RUN apk add --no-cache libstdc++ libgcc \
     && chmod +x tailwindcss-extra \
     && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify
 
-# Build v2 SPA: install bun, then bundle web/dist via Vite. The stub
-# dist/index.html committed to the repo is overwritten here. Runs natively on
-# BUILDPLATFORM (not under QEMU) to avoid emulated-Node slowness.
-RUN apk add --no-cache bash unzip \
-    && curl -fsSL https://bun.sh/install | bash \
-    && /root/.bun/bin/bun install --frozen-lockfile --cwd web \
-    && /root/.bun/bin/bun run --cwd web build
-
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \
     -o /breadbox ./cmd/breadbox
 
-# Stage 2: Runtime
+# Stage 3: Runtime
 FROM alpine:3.21
 
 # CA certificates: required for TLS connections to Plaid API and PostgreSQL
