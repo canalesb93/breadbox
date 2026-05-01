@@ -11,6 +11,11 @@ Bounded reference data has both a resource and a tool mirror with the same paylo
 - `breadbox://sync-status` ↔ `get_sync_status`
 - `breadbox://rules` ↔ `list_transaction_rules`
 
+Per-entity drilldowns are exposed as resource templates (resolve a single short_id):
+- `breadbox://transaction/{short_id}` — full transaction + recent annotations
+- `breadbox://account/{short_id}` — account detail + last 25 transactions
+- `breadbox://user/{short_id}` — household member + connected accounts
+
 ## Conventions
 - **Amount sign**: positive = money out, negative = money in. Never sum across `iso_currency_code`.
 - **Compact IDs**: to save on tokens, tools/resources use a 8-char base62 `short_id`; prefer over long form id (uuid)

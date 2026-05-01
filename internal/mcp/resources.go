@@ -3,7 +3,10 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -220,3 +223,139 @@ var (
 	audienceUserAndAssistant = []mcpsdk.Role{"user", "assistant"}
 	audienceAssistantOnly    = []mcpsdk.Role{"assistant"}
 )
+
+// --- Resource templates ---
+//
+// Templates resolve parameterized URIs that drill into a single entity. They
+// are how `resource_link` content blocks emitted by tool results (PR 05) turn
+// into clickable, attachable items in chat. The template URI format follows
+// RFC 6570 ("breadbox://transaction/{short_id}"); the SDK matches incoming
+// URIs against the template and routes to the handler.
+//
+// Discoverability today: most MCP hosts surface templates through the same
+// attachment menu as plain resources, but template-parameter UI is uneven.
+// The reliable path is `resource_link` blocks emitted from tool results —
+// those render as clickable rows the user can attach. PR 03 of this stack
+// adds those links; PR 04 (this PR) just makes the URIs resolvable.
+
+// templateRecentTransactionLimit caps the recent-transactions slice on
+// account/user template responses. Keeps payloads bounded for UI rendering.
+const templateRecentTransactionLimit = 25
+
+// templateAnnotationLimit caps the annotation tail on transaction template
+// responses. Most transaction timelines are short, but a noisy rule could
+// produce dozens of rows; cap mirrors list_annotations' default-friendly
+// budget.
+const templateAnnotationLimit = 50
+
+// extractTemplateParam pulls the trailing path segment from a templated URI.
+// "breadbox://transaction/abc12345" → "abc12345". Returns the URL-decoded
+// value (URLs may percent-encode special characters).
+func extractTemplateParam(uri, prefix string) (string, error) {
+	if !strings.HasPrefix(uri, prefix) {
+		return "", fmt.Errorf("uri %q does not match template prefix %q", uri, prefix)
+	}
+	tail := strings.TrimPrefix(uri, prefix)
+	if tail == "" {
+		return "", fmt.Errorf("uri %q is missing template parameter", uri)
+	}
+	// Reject any further path segments — templates only support a single
+	// trailing identifier today.
+	if strings.Contains(tail, "/") {
+		return "", fmt.Errorf("uri %q has unexpected path segment", uri)
+	}
+	decoded, err := url.PathUnescape(tail)
+	if err != nil {
+		return "", fmt.Errorf("decode template parameter: %w", err)
+	}
+	return decoded, nil
+}
+
+// templateNotFound returns the SDK's standard resource-not-found error so
+// clients can branch on the canonical -32002 error code.
+func templateNotFound(uri string) error {
+	return mcpsdk.ResourceNotFoundError(uri)
+}
+
+func (s *MCPServer) handleTransactionTemplate(ctx context.Context, req *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	uri := req.Params.URI
+	id, err := extractTemplateParam(uri, "breadbox://transaction/")
+	if err != nil {
+		return nil, err
+	}
+
+	txn, err := s.svc.GetTransaction(ctx, id)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return nil, templateNotFound(uri)
+		}
+		return nil, fmt.Errorf("get transaction %s: %w", id, err)
+	}
+
+	annotations, err := s.svc.ListAnnotations(ctx, id, service.ListAnnotationsParams{
+		Limit: templateAnnotationLimit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list annotations for %s: %w", id, err)
+	}
+
+	return jsonResourceResult(uri, map[string]any{
+		"transaction": txn,
+		"annotations": toMCPAnnotations(annotations),
+	})
+}
+
+func (s *MCPServer) handleAccountTemplate(ctx context.Context, req *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	uri := req.Params.URI
+	id, err := extractTemplateParam(uri, "breadbox://account/")
+	if err != nil {
+		return nil, err
+	}
+
+	acct, err := s.svc.GetAccount(ctx, id)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return nil, templateNotFound(uri)
+		}
+		return nil, fmt.Errorf("get account %s: %w", id, err)
+	}
+
+	recent, err := s.svc.ListTransactions(ctx, service.TransactionListParams{
+		AccountID: &id,
+		Limit:     templateRecentTransactionLimit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list transactions for %s: %w", id, err)
+	}
+
+	return jsonResourceResult(uri, map[string]any{
+		"account":             acct,
+		"recent_transactions": recent.Transactions,
+	})
+}
+
+func (s *MCPServer) handleUserTemplate(ctx context.Context, req *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	uri := req.Params.URI
+	id, err := extractTemplateParam(uri, "breadbox://user/")
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.svc.GetUser(ctx, id)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return nil, templateNotFound(uri)
+		}
+		return nil, fmt.Errorf("get user %s: %w", id, err)
+	}
+
+	accounts, err := s.svc.ListAccounts(ctx, &id)
+	if err != nil {
+		return nil, fmt.Errorf("list accounts for %s: %w", id, err)
+	}
+
+	return jsonResourceResult(uri, map[string]any{
+		"user":     user,
+		"accounts": accounts,
+	})
+}
