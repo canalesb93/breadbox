@@ -20,32 +20,25 @@ import (
 // --- Input types ---
 
 type listAccountsInput struct {
-	ReadSessionContext
 	UserID string `json:"user_id,omitempty" jsonschema:"Filter accounts by user ID"`
 }
 
 type listCategoriesInput struct {
-	ReadSessionContext
 }
 
 type listUsersInput struct {
-	ReadSessionContext
 }
 
 type listTagsInput struct {
-	ReadSessionContext
 }
 
 type getSyncStatusInput struct {
-	ReadSessionContext
 }
 
 type getOverviewInput struct {
-	ReadSessionContext
 }
 
 type listTransactionRulesInput struct {
-	ReadSessionContext
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
 	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
 	Search       string `json:"search,omitempty" jsonschema:"Search by rule name. Comma-separated values are ORed."`

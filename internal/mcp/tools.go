@@ -12,42 +12,9 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// --- Session context types ---
-
-// sessionContextProvider extracts session tracking fields from tool inputs.
-type sessionContextProvider interface {
-	GetSessionID() string
-	GetReason() string
-}
-
-// WriteSessionContext is embedded in write tool inputs. session_id and reason are required.
-type WriteSessionContext struct {
-	SessionID string `json:"session_id" jsonschema:"required,Session ID from create_session tool. Call create_session first."`
-	Reason    string `json:"reason" jsonschema:"required,Brief reason for this action (e.g. 'categorizing grocery transactions')."`
-}
-
-func (w WriteSessionContext) GetSessionID() string { return w.SessionID }
-func (w WriteSessionContext) GetReason() string    { return w.Reason }
-
-// ReadSessionContext is embedded in read tool inputs. Both fields are optional.
-type ReadSessionContext struct {
-	SessionID string `json:"session_id,omitempty" jsonschema:"Optional session ID to associate this read with a session."`
-	Reason    string `json:"reason,omitempty" jsonschema:"Optional brief reason for this query."`
-}
-
-func (r ReadSessionContext) GetSessionID() string { return r.SessionID }
-func (r ReadSessionContext) GetReason() string    { return r.Reason }
-
-// --- Session tool input ---
-
-type createSessionInput struct {
-	Purpose string `json:"purpose" jsonschema:"required,Brief label for this session (e.g. 'weekly transaction review', 'rule creation for dining')."`
-}
-
 // --- Input types ---
 
 type queryTransactionsInput struct {
-	ReadSessionContext
 	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
@@ -69,7 +36,6 @@ type queryTransactionsInput struct {
 }
 
 type countTransactionsInput struct {
-	ReadSessionContext
 	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
@@ -86,7 +52,6 @@ type countTransactionsInput struct {
 }
 
 type transactionSummaryInput struct {
-	ReadSessionContext
 	StartDate      string `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 30 days ago."`
 	EndDate        string `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
 	GroupBy        string `json:"group_by" jsonschema:"required,How to group results: category, month, week, day, or category_month"`
@@ -97,21 +62,6 @@ type transactionSummaryInput struct {
 }
 
 // --- Handlers ---
-
-func (s *MCPServer) handleCreateSession(reqCtx context.Context, _ *mcpsdk.CallToolRequest, input createSessionInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(reqCtx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.Purpose == "" {
-		return errorResult(fmt.Errorf("purpose is required")), nil, nil
-	}
-	actor := service.ActorFromContext(reqCtx)
-	session, err := s.svc.CreateMCPSession(context.Background(), actor, input.Purpose)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(session)
-}
 
 // handleQueryTransactions runs the canonical transaction read.
 //
@@ -279,7 +229,6 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
-	WriteSessionContext
 	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
 	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition tree. Omit or pass {} to match every transaction. Leaf: {\"field\":\"...\",\"op\":\"...\",\"value\":...}. Combinators: {\"and\":[...]}, {\"or\":[...]}, {\"not\":{...}} (nest freely, max depth 10). Fields: provider_name provider_merchant_name amount provider_category_primary provider_category_detailed category(assigned slug, live-updated by earlier-stage rules) pending provider account_id account_name user_id user_name tags. Ops: string/category=eq|neq|contains|not_contains|matches(RE2)|in; numeric=eq|neq|gt|gte|lt|lte; bool=eq|neq; tags=contains|not_contains|in. Nested example: {\"or\":[{\"and\":[{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},{\"field\":\"amount\",\"op\":\"gte\",\"value\":5}]},{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"}]}. Full spec: docs/rule-dsl.md."`
 	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"}. Actions compose: a rule can set a category AND add a tag AND add a comment in the same match. add_comment fires only at sync time (not on retroactive apply). remove_tag net-diffs against add_tag within the same sync pass. If omitted, use category_slug instead."`
@@ -292,7 +241,6 @@ type createTransactionRuleInput struct {
 }
 
 type updateTransactionRuleInput struct {
-	WriteSessionContext
 	ID           string               `json:"id" jsonschema:"required,UUID of the rule to update"`
 	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule. Omit to leave unchanged."`
 	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to explicitly change to match-all. Omit entirely to leave conditions unchanged."`
@@ -306,12 +254,10 @@ type updateTransactionRuleInput struct {
 }
 
 type deleteTransactionRuleInput struct {
-	WriteSessionContext
 	ID string `json:"id" jsonschema:"required,UUID of the rule to delete"`
 }
 
 type batchCreateRulesInput struct {
-	WriteSessionContext
 	Rules []batchRuleItem `json:"rules" jsonschema:"required,Array of rules to create. Ideal for composable pipelines. Example — tagging then categorizing then flagging: [{\"name\":\"Tag coffee shops\",\"priority\":0,\"conditions\":{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"coffee\"}]},{\"name\":\"Categorize coffee-tagged\",\"priority\":10,\"conditions\":{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},\"actions\":[{\"type\":\"set_category\",\"category_slug\":\"food_and_drink_coffee\"}]},{\"name\":\"Flag expensive coffee\",\"priority\":50,\"conditions\":{\"and\":[{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},{\"field\":\"amount\",\"op\":\"gt\",\"value\":15}]},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"expensive\"}]}]"`
 }
 
@@ -327,12 +273,10 @@ type batchRuleItem struct {
 }
 
 type applyRulesInput struct {
-	WriteSessionContext
 	RuleID string `json:"rule_id,omitempty" jsonschema:"Optional ID (UUID or short_id) of a specific rule to apply. When supplied, only that rule runs — no chaining. Omit to apply all active rules in pipeline-stage order (priority ASC); earlier rules' tag/category mutations feed later rules' conditions, exactly like sync-time. Materializes set_category / add_tag / remove_tag; add_comment stays sync-only. Ignores rule.trigger (retroactive is a bulk op)."`
 }
 
 type previewRuleInput struct {
-	ReadSessionContext
 	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions. Same grammar as create_transaction_rule.conditions. Preview evaluates this single condition in isolation against stored data — it does NOT simulate the full rule pipeline, so tags or categories that other rules would have added don't influence the result. Use this to answer 'what does this condition match today' before creating the rule."`
 	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50). The match_count in the response reflects the full match set, not just the sample."`
 }
@@ -584,7 +528,6 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 // --- Agent Reports ---
 
 type submitReportInput struct {
-	WriteSessionContext
 	Title    string   `json:"title" jsonschema:"required,A concise 1-2 sentence summary that reads like a notification or message. This is the primary thing the family sees on their dashboard — make it informative and self-contained. Good: 'Reviewed 47 transactions this week — 3 recategorized and no suspicious activity found.' Bad: 'Weekly Review Complete' (too vague to be useful without opening the full report)."`
 	Body     string   `json:"body" jsonschema:"required,Detailed breakdown in markdown format with supporting data. This is shown when the user expands the report for more detail. Use headers and bullet points and transaction links: [Transaction Name](/transactions/TRANSACTION_ID)."`
 	Priority string   `json:"priority" jsonschema:"Severity level. Valid values: info (default — routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
@@ -600,7 +543,12 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 	}
 
 	actor := service.ActorFromContext(reqCtx)
-	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author, input.SessionID)
+	// session_id is no longer an input field — the dispatcher resolves
+	// the transport-bound audit session and stamps it on the request
+	// context. Reports created via submit_report still link back to the
+	// surrounding session row in the audit timeline.
+	sessionID := auditSessionFromContext(reqCtx)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author, sessionID)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

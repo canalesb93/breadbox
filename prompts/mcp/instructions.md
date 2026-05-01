@@ -19,3 +19,4 @@ Per-entity drilldowns are exposed as resource templates (resolve a single short_
 ## Conventions
 - **Amount sign**: positive = money out, negative = money in. Never sum across `iso_currency_code`.
 - **Compact IDs**: to save on tokens, tools/resources use a 8-char base62 `short_id`; prefer over long form id (uuid)
+- **Audit sessions are automatic.** Every tool call is logged under an audit-session row keyed off the transport connection (the `MCP-Session-Id` header for HTTP, a per-process id for stdio). Agents no longer need to call `create_session` — the row is lazy-created on first tool call and inherits `clientInfo` from the `initialize` request. To label a specific call, pass an optional `reason` string in `tools/call._meta` (the spec's per-request metadata slot); it surfaces in the audit timeline alongside the call.

@@ -3,6 +3,23 @@ INSERT INTO mcp_sessions (api_key_id, api_key_name, purpose)
 VALUES ($1, $2, $3)
 RETURNING *;
 
+-- name: CreateMCPSessionWithTransport :one
+INSERT INTO mcp_sessions (
+    api_key_id, api_key_name, purpose,
+    transport_id,
+    client_name, client_version, client_title, client_description, client_website_url
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING *;
+
+-- name: GetMCPSessionByTransportID :one
+-- Latest session for a given transport id. Used by the tool-call
+-- dispatcher to resolve the audit-session row without a round-trip.
+SELECT * FROM mcp_sessions
+WHERE transport_id = $1
+ORDER BY created_at DESC
+LIMIT 1;
+
 -- name: GetMCPSessionByID :one
 SELECT * FROM mcp_sessions WHERE id = $1;
 

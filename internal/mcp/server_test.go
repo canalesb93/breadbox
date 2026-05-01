@@ -312,3 +312,60 @@ func TestCompactIDs_FullRoundTrip(t *testing.T) {
 		t.Fatal("expected short_id removed from output")
 	}
 }
+
+// TestTransportBindingHelpers locks the contract for the transport-bound
+// audit session helpers introduced in PR 07. resolveTransportID must always
+// return a non-empty string (so every call lands on a row, even stdio with
+// no native session id), metaReason must read tools/call._meta.reason
+// without panicking on nil paths, and contextWithAuditSession round-trips
+// through auditSessionFromContext. A regression that drops the stdio
+// fallback would leave stdio tool calls unbound.
+func TestTransportBindingHelpers(t *testing.T) {
+	s := NewMCPServer(nil, "test")
+
+	// resolveTransportID with nil request → stdio fallback.
+	if got := s.resolveTransportID(nil); got == "" {
+		t.Error("resolveTransportID(nil): empty fallback id")
+	}
+	// resolveTransportID with no Session → stdio fallback.
+	if got := s.resolveTransportID(&mcpsdk.CallToolRequest{}); got == "" {
+		t.Error("resolveTransportID(no-session): empty fallback id")
+	}
+	// Two NewMCPServer instances should differ on stdio fallback so concurrent
+	// stdio invocations don't collide on the same audit row. (shortid is
+	// random; we just assert non-empty + uniqueness when generation succeeds.)
+	s2 := NewMCPServer(nil, "test2")
+	if s.stdioFallbackTransportID == s2.stdioFallbackTransportID {
+		// Acceptable only if shortid generation failed and both fell back
+		// to "stdio-fallback". Don't fail the test on that path.
+		if s.stdioFallbackTransportID != "stdio-fallback" {
+			t.Errorf("stdio fallbacks collided: %q", s.stdioFallbackTransportID)
+		}
+	}
+
+	// metaReason: nil-safe + reads the optional reason key.
+	if got := metaReason(nil); got != "" {
+		t.Errorf("metaReason(nil) = %q, want \"\"", got)
+	}
+	emptyReq := &mcpsdk.CallToolRequest{Params: &mcpsdk.CallToolParamsRaw{}}
+	if got := metaReason(emptyReq); got != "" {
+		t.Errorf("metaReason(no-meta) = %q, want \"\"", got)
+	}
+	withReasonReq := &mcpsdk.CallToolRequest{Params: &mcpsdk.CallToolParamsRaw{
+		Meta: mcpsdk.Meta{"reason": "weekly review"},
+	}}
+	if got := metaReason(withReasonReq); got != "weekly review" {
+		t.Errorf("metaReason(with-meta) = %q, want \"weekly review\"", got)
+	}
+
+	// auditSession context round-trip.
+	ctx := contextWithAuditSession(t.Context(), "abc12345")
+	if got := auditSessionFromContext(ctx); got != "abc12345" {
+		t.Errorf("auditSessionFromContext = %q, want \"abc12345\"", got)
+	}
+	// Empty session id → no-op (don't store empty values on ctx).
+	emptyCtx := contextWithAuditSession(t.Context(), "")
+	if got := auditSessionFromContext(emptyCtx); got != "" {
+		t.Errorf("auditSessionFromContext(empty) = %q, want \"\"", got)
+	}
+}

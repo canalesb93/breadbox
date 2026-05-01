@@ -11,7 +11,6 @@ import (
 
 // updateTransactionsInput is the top-level input for the update_transactions tool.
 type updateTransactionsInput struct {
-	WriteSessionContext
 	Operations []transactionOperationInput `json:"operations" jsonschema:"required,Array of per-transaction operations. Max 50. Each item can set a category AND add/remove tags AND attach a comment in a single atomic op. Use the 'comment' field to record decision rationale; tag adds/removes carry no per-action note. Example: [{\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"clearly groceries\"}]"`
 	OnError    string                      `json:"on_error,omitempty" jsonschema:"\"continue\" (default — each op runs in its own DB tx, partial failures don't undo successful items) or \"abort\" (whole batch is one DB tx, rolls back on first error)."`
 }

@@ -11,6 +11,7 @@ import (
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
+	"breadbox/internal/shortid"
 	"breadbox/prompts"
 	"breadbox/static"
 
@@ -144,16 +145,122 @@ type MCPServer struct {
 	svc      *service.Service
 	version  string
 	allTools []ToolDef
+	// stdioFallbackTransportID is the per-process transport id used when
+	// the underlying connection has no native session id (stdio). Stable
+	// for the lifetime of the process so every tool call from the same
+	// `breadbox mcp-stdio` invocation lands on the same audit-session
+	// row. HTTP requests get the real MCP-Session-Id from the SDK and
+	// ignore this field.
+	stdioFallbackTransportID string
 }
 
 // NewMCPServer creates a new MCP server with all tools registered in a registry.
 func NewMCPServer(svc *service.Service, version string) *MCPServer {
 	s := &MCPServer{
-		svc:     svc,
-		version: version,
+		svc:                      svc,
+		version:                  version,
+		stdioFallbackTransportID: stdioFallbackID(),
 	}
 	s.buildToolRegistry()
 	return s
+}
+
+// stdioFallbackID returns a stable per-process transport id for stdio
+// connections that don't surface a native session id. Defends against the
+// shortid generator's error path by falling back to a fixed prefix — better
+// to land every call on one row than to scatter them.
+func stdioFallbackID() string {
+	id, err := shortid.Generate()
+	if err != nil || id == "" {
+		return "stdio-fallback"
+	}
+	return "stdio-" + id
+}
+
+// resolveTransportID returns the transport-level identity for an in-flight
+// tool call. Streamable HTTP gives every connection a session id (the value
+// of MCP-Session-Id, surfaced via req.Session.ID()); stdio has none, so we
+// substitute the per-process fallback so audit logging still groups calls
+// from one `breadbox mcp-stdio` invocation under one row.
+func (s *MCPServer) resolveTransportID(req *mcpsdk.CallToolRequest) string {
+	if req == nil || req.Session == nil {
+		return s.stdioFallbackTransportID
+	}
+	if id := req.Session.ID(); id != "" {
+		return id
+	}
+	return s.stdioFallbackTransportID
+}
+
+// ensureAuditSession resolves (lazy-creating on first call) the
+// mcp_sessions row bound to a transport id and returns its UUID as a
+// string for LogToolCall. Captures clientInfo from the initialize
+// request so the audit row carries the host's name/version. Logging
+// failures are swallowed here — the audit trail must not block tool
+// execution. Returns "" when the actor isn't an API key (the row schema
+// treats that as legacy).
+func (s *MCPServer) ensureAuditSession(ctx context.Context, req *mcpsdk.CallToolRequest, transportID string) string {
+	if transportID == "" {
+		return ""
+	}
+	actor := service.ActorFromContext(ctx)
+
+	var info service.MCPClientInfo
+	if req != nil && req.Session != nil {
+		if ip := req.Session.InitializeParams(); ip != nil && ip.ClientInfo != nil {
+			// SDK v1.5.0's Implementation block exposes Name, Title,
+			// Version, WebsiteURL, Icons. There's no Description field
+			// today; leave the column empty when the host doesn't
+			// supply one.
+			info = service.MCPClientInfo{
+				Name:       ip.ClientInfo.Name,
+				Version:    ip.ClientInfo.Version,
+				Title:      ip.ClientInfo.Title,
+				WebsiteURL: ip.ClientInfo.WebsiteURL,
+			}
+		}
+	}
+
+	session, err := s.svc.EnsureMCPSessionForTransport(ctx, transportID, actor, info)
+	if err != nil {
+		return ""
+	}
+	return session.ID
+}
+
+// metaReason pulls the optional "reason" string out of a tool call's
+// _meta block. Hosts use this to label the call ("processing review
+// queue") without polluting the tool's input schema.
+func metaReason(req *mcpsdk.CallToolRequest) string {
+	if req == nil || req.Params == nil {
+		return ""
+	}
+	meta := req.Params.GetMeta()
+	if meta == nil {
+		return ""
+	}
+	if v, ok := meta["reason"].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// auditSessionContextKey carries the resolved audit-session UUID through
+// to handlers that need to bind a created row to it (e.g. submit_report
+// → agent_reports.session_id). The dispatcher stamps this on ctx after
+// resolving the transport binding, before invoking the handler.
+type auditSessionContextKey struct{}
+
+func contextWithAuditSession(ctx context.Context, sessionID string) context.Context {
+	if sessionID == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, auditSessionContextKey{}, sessionID)
+}
+
+func auditSessionFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(auditSessionContextKey{}).(string)
+	return v
 }
 
 // buildToolRegistry populates the allTools slice with all available tools and
@@ -164,15 +271,11 @@ func NewMCPServer(svc *service.Service, version string) *MCPServer {
 // file — but each resource also has a tool mirror in tools_reads.go so MCP
 // clients that don't implement the resources/* methods can still read it.
 func (s *MCPServer) buildToolRegistry() {
-	svc := s.svc
 	s.allTools = []ToolDef{
-		// Audit session — explicit handle so write tools can be tied to a
-		// logical task. (A future PR replaces this with transport-bound
-		// session binding via MCP-Session-Id.)
-		makeToolDefLogged(ToolSpec{
-			Name: "create_session", Title: "Start Audit Session", Classification: ToolWrite,
-			Description: "Start an audit session before performing write operations. Returns a session_id to include on all subsequent tool calls. One session per logical task (e.g. 'weekly transaction review', 'rule creation for dining').",
-		}, s.handleCreateSession, svc),
+		// Audit sessions are bound to the transport connection (MCP-Session-Id
+		// for HTTP, the per-process fallback id for stdio). Each tool call
+		// resolves its session via resolveTransportID + ensureAuditSession in
+		// the dispatcher, so agents no longer need to call create_session.
 
 		// --- Reference data (mirrors resources for clients without resource support) ---
 		// Resources are the preferred surface: breadbox://overview, ://accounts,
@@ -181,45 +284,45 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged(ToolSpec{
 			Name: "get_overview", Title: "Household Overview", Classification: ToolRead,
 			Description: "Get a household snapshot: scope (users, accounts, currencies), freshness (latest sync, errored connections, recent transactions), and backlog (pending review queue). Mirror of breadbox://overview — call this when your client doesn't support MCP resources, or when you want the snapshot inline as a tool result. Read once at the top of a session to ground every later filter (account ids, currency, attribution).",
-		}, s.handleGetOverview, svc),
+		}, s.handleGetOverview, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_accounts", Title: "List Accounts", Classification: ToolRead,
 			Description: "List bank accounts. Mirror of breadbox://accounts. Each account carries balance, type, currency, and the connection it belongs to. Filter by user_id to scope to a specific household member.",
-		}, s.handleListAccounts, svc),
+		}, s.handleListAccounts, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_categories", Title: "List Categories", Classification: ToolRead,
 			Description: "List the category taxonomy as a flat array. Mirror of breadbox://categories. Use the returned slugs (e.g. 'food_and_drink_groceries') as the canonical handle for category filters and category_slug fields on writes.",
-		}, s.handleListCategories, svc),
+		}, s.handleListCategories, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_users", Title: "List Household Members", Classification: ToolRead,
 			Description: "List household members. Mirror of breadbox://users. Each user carries display name, role, and short_id — use the short_id as user_id on transaction filters and account scoping.",
-		}, s.handleListUsers, svc),
+		}, s.handleListUsers, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_tags", Title: "List Tags", Classification: ToolRead,
 			Description: "List the tag vocabulary. Mirror of breadbox://tags. Tags are referenced by slug everywhere (filter, add, remove). New tag slugs auto-register the first time update_transactions adds them — read this list before authoring rules to avoid accidental near-duplicates.",
-		}, s.handleListTags, svc),
+		}, s.handleListTags, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "get_sync_status", Title: "Sync Status", Classification: ToolRead,
 			Description: "Get connection sync status: provider, status (active|error|pending_reauth|disconnected), last sync time, last error. Mirror of breadbox://sync-status. Call this before reasoning about freshness — an errored or pending_reauth connection means transactions you'd expect to be there might not be.",
-		}, s.handleGetSyncStatus, svc),
+		}, s.handleGetSyncStatus, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_transaction_rules", Title: "List Rules", Classification: ToolRead,
 			Description: "List transaction rules with their conditions, actions, and pipeline stage. Mirror of breadbox://rules. Filter by category_slug, enabled, or search by name. Read this before authoring new rules to avoid duplicates.",
-		}, s.handleListTransactionRules, svc),
+		}, s.handleListTransactionRules, s),
 
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transactions", Title: "Query Transactions", Classification: ToolRead,
 			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
-		}, s.handleQueryTransactions, svc),
+		}, s.handleQueryTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "count_transactions", Title: "Count Transactions", Classification: ToolRead,
 			Description: "Count transactions matching optional filters. Same filters as query_transactions except cursor, limit, sort_by, and sort_order. Use this to get totals before paginating, or to compare counts across date ranges or categories.",
-		}, s.handleCountTransactions, svc),
+		}, s.handleCountTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "transaction_summary", Title: "Spending Summary", Classification: ToolRead,
 			Description: "Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
-		}, s.handleTransactionSummary, svc),
+		}, s.handleTransactionSummary, s),
 
 		// --- Apply review decisions ---
 		// update_transactions is the universal write for review work. It
@@ -232,13 +335,13 @@ func (s *MCPServer) buildToolRegistry() {
 			Name: "update_transactions", Title: "Update Transactions", Classification: ToolWrite,
 			Description: "Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The canonical tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error).",
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleUpdateTransactions, svc),
+		}, s.handleUpdateTransactions, s),
 
 		// --- Activity timeline ---
 		makeToolDefLogged(ToolSpec{
 			Name: "list_annotations", Title: "List Activity Timeline", Classification: ToolRead,
 			Description: "List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Filters compose: `kinds=['comment']` is the comment-only view; `actor_types=['user']` is the canonical 'any human input?' check (drops rule churn + agent activity); `since` (RFC3339) skips rows you've already seen; `limit` returns the most recent N (capped at 200). Empty filters return the full timeline. Recommended pattern: before overriding your own categorization, call list_annotations(transaction_id, actor_types=['user']) — if any row exists, a human has weighed in and that decision wins.",
-		}, s.handleListAnnotations, svc),
+		}, s.handleListAnnotations, s),
 
 		// --- Rules ---
 		// See breadbox://rule-dsl for the condition grammar and breadbox://rules
@@ -246,32 +349,32 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged(ToolSpec{
 			Name: "create_transaction_rule", Title: "Create Rule", Classification: ToolWrite,
 			Description: "Create a transaction rule for automatic categorization, tagging, or commenting. Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category. Before creating, read breadbox://rules to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Full DSL: breadbox://rule-dsl.",
-		}, s.handleCreateTransactionRule, svc),
+		}, s.handleCreateTransactionRule, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "batch_create_rules", Title: "Create Rules in Batch", Classification: ToolWrite,
 			Description: "Create multiple transaction rules at once. More efficient than looping create_transaction_rule. Ideal for composable pipelines — use `stage` (baseline|standard|refinement|override) on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` is preferred over raw `priority` for cross-agent consistency; if both are supplied, priority wins. Each item follows the same shape as create_transaction_rule. Returns created rules plus any per-item errors so partial success is recoverable.",
-		}, s.handleBatchCreateRules, svc),
+		}, s.handleBatchCreateRules, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_transaction_rule", Title: "Update Rule", Classification: ToolWrite,
 			Description: "Update a transaction rule's fields. Every field is optional; omit to leave unchanged. Pass conditions={} to explicitly clear conditions (match-all). Pass actions=[...] to replace the entire action set (rules must retain at least one action). Pass expires_at=\"\" to clear expiry. Pass `stage` (baseline|standard|refinement|override) to re-slot a rule into the pipeline without guessing a numeric priority. See breadbox://rule-dsl.",
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleUpdateTransactionRule, svc),
+		}, s.handleUpdateTransactionRule, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "delete_transaction_rule", Title: "Delete Rule", Classification: ToolWrite,
 			Description: "Delete a transaction rule by ID. System-seeded rules (like the needs-review tagger) cannot be deleted — disable them instead with update_transaction_rule.enabled=false.",
 			// Destructive: deletes the rule row. Re-running with the same id
 			// is a no-op (already gone) so still IdempotentHint=true.
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(true), IdempotentHint: true},
-		}, s.handleDeleteTransactionRule, svc),
+		}, s.handleDeleteTransactionRule, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "apply_rules", Title: "Apply Rules Retroactively", Classification: ToolWrite,
 			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (respects category_override), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
 			// Not idempotent — hit_count increments on every run.
-		}, s.handleApplyRules, svc),
+		}, s.handleApplyRules, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "preview_rule", Title: "Preview Rule", Classification: ToolRead,
 			Description: "Dry-run a condition tree against existing transactions without any writes. Returns match_count + total_scanned + a sample of matching transactions. IMPORTANT: this evaluates only the supplied condition in isolation — it does NOT simulate the full rule pipeline, so tags or categories that other rules would have added mid-pass aren't visible. Use this to answer 'what does this condition match today' before creating a rule.",
-		}, s.handlePreviewRule, svc),
+		}, s.handlePreviewRule, s),
 
 		// --- Tag admin ---
 		// Most agents won't need these — add_tag-on-transaction implicitly
@@ -281,34 +384,37 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged(ToolSpec{
 			Name: "create_tag", Title: "Create Tag", Classification: ToolWrite,
 			Description: "Register a new tag in the system. Most agents can skip this — passing a new tag slug to update_transactions auto-creates the tag. Use create_tag only when you need to set display_name/color/icon up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$.",
-		}, s.handleCreateTag, svc),
+		}, s.handleCreateTag, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_tag", Title: "Update Tag", Classification: ToolWrite,
 			Description: "Update a tag's mutable fields (display_name, description, color, icon). Slug is immutable — to rename, create a new tag + bulk re-tag + delete old. Identify the tag by UUID, short ID, or slug.",
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleUpdateTag, svc),
+		}, s.handleUpdateTag, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "delete_tag", Title: "Delete Tag", Classification: ToolWrite,
 			Description: "Delete a tag. Cascades to transaction_tags (removes the tag from every transaction). Annotations that reference the tag keep their rows with tag_id=NULL (preserves audit trail). Identify the tag by UUID, short ID, or slug.",
 			// Destructive: cascades to transaction_tags. Idempotent on
 			// re-run (already gone).
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(true), IdempotentHint: true},
-		}, s.handleDeleteTag, svc),
+		}, s.handleDeleteTag, s),
 
 		// --- Reporting ---
 		makeToolDefLogged(ToolSpec{
 			Name: "submit_report", Title: "Submit Report", Classification: ToolWrite,
 			Description: "Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role. See breadbox://report-format for structure conventions.",
 			// Not idempotent — every call posts a new dashboard message.
-		}, s.handleSubmitReport, svc),
+		}, s.handleSubmitReport, s),
 	}
 }
 
-// makeToolDefLogged creates a ToolDef with logging and session enforcement.
-// This is called during buildToolRegistry when s.svc is available. If
-// spec.Annotations is nil, defaults are derived from the classification (read
-// → ReadOnlyHint=true, write → DestructiveHint=false).
-func makeToolDefLogged[T any](spec ToolSpec, handler func(context.Context, *mcpsdk.CallToolRequest, T) (*mcpsdk.CallToolResult, any, error), svc *service.Service) ToolDef {
+// makeToolDefLogged creates a ToolDef with logging and transport-bound audit
+// session resolution. This is called during buildToolRegistry; the *MCPServer
+// argument carries the service handle plus the transport-binding helpers
+// (resolveTransportID, ensureAuditSession). If spec.Annotations is nil,
+// defaults are derived from the classification (read → ReadOnlyHint=true,
+// write → DestructiveHint=false).
+func makeToolDefLogged[T any](spec ToolSpec, handler func(context.Context, *mcpsdk.CallToolRequest, T) (*mcpsdk.CallToolResult, any, error), s *MCPServer) ToolDef {
+	svc := s.svc
 	annotations := spec.Annotations
 	if annotations == nil {
 		annotations = defaultAnnotations(spec.Classification, spec.Title)
@@ -331,22 +437,28 @@ func makeToolDefLogged[T any](spec ToolSpec, handler func(context.Context, *mcps
 		Classification: spec.Classification,
 		register: func(server *mcpsdk.Server) {
 			wrappedHandler := func(ctx context.Context, req *mcpsdk.CallToolRequest, input T) (*mcpsdk.CallToolResult, any, error) {
-				// Extract session context via interface.
-				var sessionID, reason string
-				if sc, ok := any(input).(sessionContextProvider); ok {
-					sessionID = sc.GetSessionID()
-					reason = sc.GetReason()
-				}
+				// Resolve the audit session bound to this transport
+				// connection. For Streamable HTTP that's keyed off the
+				// MCP-Session-Id header (req.Session.ID()); for stdio
+				// the session has no native id, so we fall back to the
+				// MCPServer's per-process id stamped at NewMCPServer.
+				// Lazy-create the mcp_sessions row on first call so the
+				// audit trail captures clientInfo without requiring
+				// agents to explicitly call create_session.
+				transportID := s.resolveTransportID(req)
+				auditSessionID := s.ensureAuditSession(ctx, req, transportID)
 
-				// Enforce session_id + reason on write tools (except create_session).
-				if spec.Classification == ToolWrite && spec.Name != "create_session" {
-					if sessionID == "" {
-						return errorResult(fmt.Errorf("session_id is required for write operations; call create_session first")), nil, nil
-					}
-					if reason == "" {
-						return errorResult(fmt.Errorf("reason is required for write operations")), nil, nil
-					}
-				}
+				// Optional per-call reason via _meta.reason — replaces the
+				// previously-required `reason` input field on every write
+				// tool. Hosts can keep tagging high-cardinality writes
+				// without polluting the tool's input schema.
+				reason := metaReason(req)
+
+				// Stash the resolved audit-session id on the context so
+				// handlers that bind their created rows to it
+				// (submit_report → agent_reports.session_id) don't have
+				// to re-resolve the transport binding themselves.
+				ctx = contextWithAuditSession(ctx, auditSessionID)
 
 				start := time.Now()
 				result, out, err := handler(ctx, req, input)
@@ -371,7 +483,7 @@ func makeToolDefLogged[T any](spec ToolSpec, handler func(context.Context, *mcps
 					actor := service.ActorFromContext(ctx)
 					isErr := (result != nil && result.IsError) || err != nil
 					svc.LogToolCall(logCtx, service.ToolCallLogInput{
-						SessionID:      sessionID,
+						SessionID:      auditSessionID,
 						ToolName:       spec.Name,
 						Classification: string(spec.Classification),
 						Reason:         reason,
