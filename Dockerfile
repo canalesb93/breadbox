@@ -28,6 +28,14 @@ RUN apk add --no-cache libstdc++ libgcc \
     && chmod +x tailwindcss-extra \
     && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify
 
+# Build v2 SPA: install bun, then bundle web/dist via Vite. The stub
+# dist/index.html committed to the repo is overwritten here. Runs natively on
+# BUILDPLATFORM (not under QEMU) to avoid emulated-Node slowness.
+RUN apk add --no-cache bash unzip \
+    && curl -fsSL https://bun.sh/install | bash \
+    && /root/.bun/bin/bun install --frozen-lockfile --cwd web \
+    && /root/.bun/bin/bun run --cwd web build
+
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \
     -o /breadbox ./cmd/breadbox

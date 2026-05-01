@@ -123,10 +123,24 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
         # also picks up the right port.
         echo "PORT=$PORT" >> "$CLAUDE_ENV_FILE"
         echo "SERVER_PORT=$PORT" >> "$CLAUDE_ENV_FILE"
-        echo "    Assigned port $PORT (PORT + SERVER_PORT exported)"
+        # Vite port = backend port + 1000 (deterministic mapping so parallel
+        # worktree sessions never collide on 5173). Consumed by `make web-dev`.
+        VITE_PORT=$((PORT + 1000))
+        echo "VITE_PORT=$VITE_PORT" >> "$CLAUDE_ENV_FILE"
+        echo "    Assigned port $PORT (PORT + SERVER_PORT + VITE_PORT=$VITE_PORT exported)"
       else
         echo "WARN: no available port in 8081-8099"
       fi
+    fi
+  fi
+
+  # v2 SPA: prime web/node_modules so `make web-dev` doesn't block on first
+  # run. Skip if bun isn't installed (single-PR backend work doesn't need it).
+  if [ -f web/package.json ] && command -v bun &>/dev/null; then
+    if [ ! -d web/node_modules ] || [ web/bun.lock -nt web/node_modules ]; then
+      echo "==> Installing web/ deps..."
+      (cd web && bun install --frozen-lockfile 2>&1 | tail -3) \
+        || echo "WARN: bun install failed — run 'cd web && bun install' manually"
     fi
   fi
 
@@ -175,6 +189,24 @@ fi
 echo "==> Building CSS (downloads tailwindcss-extra if needed)..."
 if ! make css 2>&1; then
   echo "WARN: make css failed"
+fi
+
+# --- v2 SPA deps (bun) ---
+# Install bun + web/ deps so `make web-dev` and `make build` work without
+# a second round-trip. Skip if web/package.json doesn't exist.
+if [ -f web/package.json ]; then
+  if ! command -v bun &>/dev/null; then
+    echo "==> Installing bun..."
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 \
+      && export PATH="$HOME/.bun/bin:$PATH" \
+      && echo "    bun installed" \
+      || echo "WARN: bun install failed"
+  fi
+  if command -v bun &>/dev/null; then
+    echo "==> Installing web/ deps..."
+    (cd web && bun install --frozen-lockfile 2>&1 | tail -3) \
+      || echo "WARN: bun install in web/ failed"
+  fi
 fi
 
 # --- Graphite CLI (for stacked PRs) ---

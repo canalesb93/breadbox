@@ -61,6 +61,17 @@ jobs:
       - name: Build CSS
         run: make css
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build v2 SPA
+        run: |
+          cd web
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Check for duplicate migration versions
         run: |
           dupes=$(ls internal/db/migrations/*.sql | sed 's/.*\///' | sed 's/_.*//' | sort | uniq -d)
@@ -173,6 +184,17 @@ jobs:
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
           templ generate
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build v2 SPA
+        run: |
+          cd web
+          bun install --frozen-lockfile
+          bun run build
 
       - name: Build binary
         env:

@@ -18,12 +18,18 @@ type ErrorDetail struct {
 
 // WriteError writes a JSON error response with the given HTTP status code.
 func WriteError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{
+	WriteJSON(w, status, ErrorResponse{
 		Error: ErrorDetail{
 			Code:    code,
 			Message: message,
 		},
 	})
+}
+
+// WriteJSON writes v as JSON with the given HTTP status code. Shared across
+// REST handlers, admin handlers, and the v2 SPA backend.
+func WriteJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }
