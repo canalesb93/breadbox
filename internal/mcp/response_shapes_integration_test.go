@@ -155,6 +155,11 @@ func formatUUIDTest(t *testing.T, u pgtype.UUID) string {
 // decodeToolResult returns the JSON-decoded payload from a tool's
 // CallToolResult. Fails the test when IsError is true so shape regressions are
 // diagnosable without hunting error envelopes.
+//
+// Also asserts StructuredContent parity with the TextContent block — every
+// successful tool response must populate both, and the two views must
+// marshal back to identical JSON. Locks the dual-output contract on every
+// tool exercised by the integration suite without per-test boilerplate.
 func decodeToolResult[T any](t *testing.T, name string, res *mcpsdk.CallToolResult, err error) T {
 	t.Helper()
 	if err != nil {
@@ -177,6 +182,17 @@ func decodeToolResult[T any](t *testing.T, name string, res *mcpsdk.CallToolResu
 	tc, ok := res.Content[0].(*mcpsdk.TextContent)
 	if !ok {
 		t.Fatalf("%s: expected TextContent, got %T", name, res.Content[0])
+	}
+	if res.StructuredContent == nil {
+		t.Errorf("%s: StructuredContent missing — every jsonResult-backed tool must populate both views", name)
+	} else {
+		structuredBytes, marshalErr := json.Marshal(res.StructuredContent)
+		if marshalErr != nil {
+			t.Errorf("%s: marshal StructuredContent: %v", name, marshalErr)
+		} else if string(structuredBytes) != tc.Text {
+			t.Errorf("%s: StructuredContent / TextContent drift\n  text:       %s\n  structured: %s",
+				name, tc.Text, string(structuredBytes))
+		}
 	}
 	var out T
 	if err := json.Unmarshal([]byte(tc.Text), &out); err != nil {

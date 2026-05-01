@@ -1,8 +1,11 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
+
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // TestBuildServerAllTools verifies that all MCP tool input schemas are valid.
@@ -221,6 +224,67 @@ func TestToolAnnotationsContract(t *testing.T) {
 				t.Errorf("tool %q: DestructiveHint = %v, want %v", name, got, want)
 			}
 		}
+	}
+}
+
+// TestJSONResult_StructuredContent locks the dual-output contract on
+// jsonResult: every tool response carries the JSON in BOTH the TextContent
+// block (for backwards compatibility with pre-2025-06-18 clients) AND the
+// StructuredContent slot (for newer clients that validate against
+// OutputSchema). The two views must be byte-identical after compaction so
+// hosts that branch on either field see the same data.
+//
+// Catches a regression where someone re-orders the unmarshal step or skips
+// compaction on one path — agents would silently see different short_id
+// values across the two views.
+func TestJSONResult_StructuredContent(t *testing.T) {
+	type row struct {
+		ID      string `json:"id"`
+		ShortID string `json:"short_id"`
+		Name    string `json:"name"`
+	}
+	type result struct {
+		Rows []row `json:"rows"`
+	}
+
+	v := result{Rows: []row{
+		{ID: "long-uuid-1", ShortID: "Aa11Bb22", Name: "First"},
+		{ID: "long-uuid-2", ShortID: "Cc33Dd44", Name: "Second"},
+	}}
+
+	res, _, err := jsonResult(v)
+	if err != nil {
+		t.Fatalf("jsonResult: %v", err)
+	}
+	if res.StructuredContent == nil {
+		t.Fatal("StructuredContent missing")
+	}
+	if len(res.Content) != 1 {
+		t.Fatalf("Content len = %d, want 1", len(res.Content))
+	}
+	tc, ok := res.Content[0].(*mcpsdk.TextContent)
+	if !ok {
+		t.Fatalf("Content[0] type = %T, want *TextContent", res.Content[0])
+	}
+
+	// Round-trip the structured value back to bytes and compare against the
+	// text block. They must be the same JSON — same fields, same compacted
+	// short_id value on every row.
+	structuredBytes, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatalf("marshal structured: %v", err)
+	}
+	if string(structuredBytes) != tc.Text {
+		t.Errorf("StructuredContent / TextContent drift:\n  text:       %s\n  structured: %s",
+			tc.Text, string(structuredBytes))
+	}
+
+	// Both views must show the compacted id (Aa11Bb22), not the long UUID.
+	if !bytes.Contains(structuredBytes, []byte(`"id":"Aa11Bb22"`)) {
+		t.Errorf("StructuredContent did not compact id: %s", string(structuredBytes))
+	}
+	if bytes.Contains(structuredBytes, []byte("short_id")) {
+		t.Errorf("StructuredContent still carries short_id field: %s", string(structuredBytes))
 	}
 }
 
