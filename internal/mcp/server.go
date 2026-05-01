@@ -117,127 +117,103 @@ func NewMCPServer(svc *service.Service, version string) *MCPServer {
 	return s
 }
 
-// buildToolRegistry populates the allTools slice with all available tools and their classifications.
+// buildToolRegistry populates the allTools slice with all available tools and
+// their classifications. The registry carves around what an agent does
+// (query, decide, write, configure) rather than every underlying entity.
+// Bounded reference data (accounts, categories, tags, users, sync status,
+// rules, overview) is preferred via resources — see registerResources in this
+// file — but each resource also has a tool mirror in tools_reads.go so MCP
+// clients that don't implement the resources/* methods can still read it.
 func (s *MCPServer) buildToolRegistry() {
 	svc := s.svc
 	s.allTools = []ToolDef{
+		// Audit session — explicit handle so write tools can be tied to a
+		// logical task. (A future PR replaces this with transport-bound
+		// session binding via MCP-Session-Id.)
 		makeToolDefLogged("create_session", ToolWrite,
 			"Start an audit session before performing write operations. Returns a session_id to include on all subsequent tool calls. One session per logical task (e.g. 'weekly transaction review', 'rule creation for dining').",
 			s.handleCreateSession, svc),
+
+		// --- Reference data (mirrors resources for clients without resource support) ---
+		// Resources are the preferred surface: breadbox://overview, ://accounts,
+		// ://categories, ://tags, ://users, ://sync-status, ://rules. These tool
+		// mirrors keep clients that don't implement resources/* unblocked.
+		makeToolDefLogged("get_overview", ToolRead,
+			"Get a household snapshot: scope (users, accounts, currencies), freshness (latest sync, errored connections, recent transactions), and backlog (pending review queue). Mirror of breadbox://overview — call this when your client doesn't support MCP resources, or when you want the snapshot inline as a tool result. Read once at the top of a session to ground every later filter (account ids, currency, attribution).",
+			s.handleGetOverview, svc),
 		makeToolDefLogged("list_accounts", ToolRead,
-			"List all bank accounts synced from Plaid, Teller, or CSV import. Each account belongs to a bank connection and optionally a user (family member). Returns account type, balances, institution name, and currency. Filter by user_id to see one family member's accounts.",
+			"List bank accounts. Mirror of breadbox://accounts. Each account carries balance, type, currency, and the connection it belongs to. Filter by user_id to scope to a specific household member.",
 			s.handleListAccounts, svc),
+		makeToolDefLogged("list_categories", ToolRead,
+			"List the category taxonomy as a flat array. Mirror of breadbox://categories. Use the returned slugs (e.g. 'food_and_drink_groceries') as the canonical handle for category filters and category_slug fields on writes.",
+			s.handleListCategories, svc),
+		makeToolDefLogged("list_users", ToolRead,
+			"List household members. Mirror of breadbox://users. Each user carries display name, role, and short_id — use the short_id as user_id on transaction filters and account scoping.",
+			s.handleListUsers, svc),
+		makeToolDefLogged("list_tags", ToolRead,
+			"List the tag vocabulary. Mirror of breadbox://tags. Tags are referenced by slug everywhere (filter, add, remove). New tag slugs auto-register the first time update_transactions adds them — read this list before authoring rules to avoid accidental near-duplicates.",
+			s.handleListTags, svc),
+		makeToolDefLogged("get_sync_status", ToolRead,
+			"Get connection sync status: provider, status (active|error|pending_reauth|disconnected), last sync time, last error. Mirror of breadbox://sync-status. Call this before reasoning about freshness — an errored or pending_reauth connection means transactions you'd expect to be there might not be.",
+			s.handleGetSyncStatus, svc),
+		makeToolDefLogged("list_transaction_rules", ToolRead,
+			"List transaction rules with their conditions, actions, and pipeline stage. Mirror of breadbox://rules. Filter by category_slug, enabled, or search by name. Read this before authoring new rules to avoid duplicates.",
+			s.handleListTransactionRules, svc),
+
+		// --- Query + aggregate ---
 		makeToolDefLogged("query_transactions", ToolRead,
-			"Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
+			"Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
 			s.handleQueryTransactions, svc),
 		makeToolDefLogged("count_transactions", ToolRead,
 			"Count transactions matching optional filters. Same filters as query_transactions except cursor, limit, sort_by, and sort_order. Use this to get totals before paginating, or to compare counts across date ranges or categories.",
 			s.handleCountTransactions, svc),
-		makeToolDefLogged("list_categories", ToolRead,
-			"List the full category taxonomy as a tree. Categories have: slug (stable identifier for filtering), display_name (human label), icon, color, and optional children. Use category slugs with the category_slug filter in query_transactions and count_transactions. Parent slugs include all children when filtering.",
-			s.handleListCategories, svc),
-		makeToolDefLogged("list_users", ToolRead,
-			"List all users (family members) in the system. Each user can own bank connections and their associated accounts. Use the returned user IDs to filter accounts or transactions by family member.",
-			s.handleListUsers, svc),
-		makeToolDefLogged("get_sync_status", ToolRead,
-			"Get the status of all bank connections including provider type (plaid/teller/csv), sync status (active/error/pending_reauth), last sync time, and any error details. Use this to check data freshness or diagnose sync issues.",
-			s.handleGetSyncStatus, svc),
-		makeToolDefLogged("trigger_sync", ToolWrite,
-			"Trigger a manual sync of bank data from the provider (Plaid or Teller). Optionally specify a connection_id to sync a single connection; otherwise syncs all active connections. Returns immediately — the sync runs in the background. Check get_sync_status for results.",
-			s.handleTriggerSync, svc),
-		makeToolDefLogged("categorize_transaction", ToolWrite,
-			"Manually override a transaction's category. Pass transaction_id plus either category_id or category_slug (e.g. 'food_and_drink_groceries'). Use list_categories to find valid slugs/IDs. This creates a permanent override that won't be changed by automatic sync.",
-			s.handleCategorizeTransaction, svc),
-		makeToolDefLogged("reset_transaction_category", ToolWrite,
-			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
-			s.handleResetTransactionCategory, svc),
-		makeToolDefLogged("add_transaction_comment", ToolWrite,
-			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when the comment is the rationale for a tag change or category set, pass it inline on the same update_transactions operation as the change (use the `comment` field) so the activity log links the rationale to the action atomically.",
-			s.handleAddTransactionComment, svc),
-		makeToolDefLogged("list_transaction_comments", ToolRead,
-			"Deprecated: prefer list_annotations with kinds=['comment']. Returns the same comment data with renamed fields (author_* instead of actor_*, content lifted out of payload). Will be removed in a future release.",
-			s.handleListTransactionComments, svc),
 		makeToolDefLogged("transaction_summary", ToolRead,
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
 			s.handleTransactionSummary, svc),
-		makeToolDefLogged("merchant_summary", ToolRead,
-			"List distinct merchants with aggregated stats: transaction count, total spent, average amount, and date range. Returns a compact merchant-level index — use this to scan for recurring charges, identify top merchants, or find unknown subscriptions. Then drill into specific merchants with query_transactions using the search filter. Default date range: 90 days. Set min_count=2 to find recurring charges, min_count=3 for likely subscriptions.",
-			s.handleMerchantSummary, svc),
-		makeToolDefLogged("export_categories", ToolRead,
-			"Export all category definitions as TSV text. The returned format can be edited externally (in a text editor, by an AI agent, etc.) and re-imported via import_categories. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. Slugs are immutable identifiers; display_name and other fields can be changed. The merge_into column is empty on export.",
-			s.handleExportCategories, svc),
-		makeToolDefLogged("import_categories", ToolWrite,
-			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version. To merge/consolidate categories, set the merge_into column to the target category slug — all transactions and mappings from the source are reassigned to the target, then the source is deleted. This is useful for simplifying a complex taxonomy without losing transaction categorization.",
-			s.handleImportCategories, svc),
+
+		// --- Apply review decisions ---
+		// update_transactions is the universal write for review work. It
+		// absorbs the per-row variants (categorize, batch-categorize, tag
+		// add/remove, comment, reset-category) so an agent can land a full
+		// decision atomically per transaction.
+		makeToolDefLogged("update_transactions", ToolWrite,
+			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The canonical tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error).",
+			s.handleUpdateTransactions, svc),
+
+		// --- Activity timeline ---
+		makeToolDefLogged("list_annotations", ToolRead,
+			"List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Filters compose: `kinds=['comment']` is the comment-only view; `actor_types=['user']` is the canonical 'any human input?' check (drops rule churn + agent activity); `since` (RFC3339) skips rows you've already seen; `limit` returns the most recent N (capped at 200). Empty filters return the full timeline. Recommended pattern: before overriding your own categorization, call list_annotations(transaction_id, actor_types=['user']) — if any row exists, a human has weighed in and that decision wins.",
+			s.handleListAnnotations, svc),
+
+		// --- Rules ---
+		// See breadbox://rule-dsl for the condition grammar and breadbox://rules
+		// for the current ruleset.
 		makeToolDefLogged("create_transaction_rule", ToolWrite,
-			"Create a transaction rule for automatic categorization, tagging, or commenting. Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category. Before creating, check list_transaction_rules to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Full DSL spec + roadmap in docs/rule-dsl.md.",
+			"Create a transaction rule for automatic categorization, tagging, or commenting. Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category. Before creating, read breadbox://rules to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Full DSL: breadbox://rule-dsl.",
 			s.handleCreateTransactionRule, svc),
-		makeToolDefLogged("list_transaction_rules", ToolRead,
-			"List transaction rules with optional filters (category, enabled status, name search). Always call before creating new rules to avoid duplicates. Rules are returned with their actions, trigger, priority, hit_count, and last_hit_at — useful for spotting stale or never-matching rules.",
-			s.handleListTransactionRules, svc),
+		makeToolDefLogged("batch_create_rules", ToolWrite,
+			"Create multiple transaction rules at once. More efficient than looping create_transaction_rule. Ideal for composable pipelines — use `stage` (baseline|standard|refinement|override) on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` is preferred over raw `priority` for cross-agent consistency; if both are supplied, priority wins. Each item follows the same shape as create_transaction_rule. Returns created rules plus any per-item errors so partial success is recoverable.",
+			s.handleBatchCreateRules, svc),
 		makeToolDefLogged("update_transaction_rule", ToolWrite,
-			"Update a transaction rule's fields. Every field is optional; omit to leave unchanged. Pass conditions={} to explicitly clear conditions (match-all). Pass actions=[...] to replace the entire action set (rules must retain at least one action). Pass expires_at=\"\" to clear expiry. Pass `stage` (baseline|standard|refinement|override) to re-slot a rule into the pipeline without guessing a numeric priority. See docs/rule-dsl.md for DSL.",
+			"Update a transaction rule's fields. Every field is optional; omit to leave unchanged. Pass conditions={} to explicitly clear conditions (match-all). Pass actions=[...] to replace the entire action set (rules must retain at least one action). Pass expires_at=\"\" to clear expiry. Pass `stage` (baseline|standard|refinement|override) to re-slot a rule into the pipeline without guessing a numeric priority. See breadbox://rule-dsl.",
 			s.handleUpdateTransactionRule, svc),
 		makeToolDefLogged("delete_transaction_rule", ToolWrite,
 			"Delete a transaction rule by ID. System-seeded rules (like the needs-review tagger) cannot be deleted — disable them instead with update_transaction_rule.enabled=false.",
 			s.handleDeleteTransactionRule, svc),
-		makeToolDefLogged("batch_create_rules", ToolWrite,
-			"Create multiple transaction rules at once. More efficient than looping create_transaction_rule. Ideal for composable pipelines — use `stage` (baseline|standard|refinement|override) on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` is preferred over raw `priority` for cross-agent consistency; if both are supplied, priority wins. Each item follows the same shape as create_transaction_rule. Returns created rules plus any per-item errors so partial success is recoverable.",
-			s.handleBatchCreateRules, svc),
 		makeToolDefLogged("apply_rules", ToolWrite,
 			"Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (respects category_override), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
 			s.handleApplyRules, svc),
 		makeToolDefLogged("preview_rule", ToolRead,
 			"Dry-run a condition tree against existing transactions without any writes. Returns match_count + total_scanned + a sample of matching transactions. IMPORTANT: this evaluates only the supplied condition in isolation — it does NOT simulate the full rule pipeline, so tags or categories that other rules would have added mid-pass aren't visible. Use this to answer 'what does this condition match today' before creating a rule.",
 			s.handlePreviewRule, svc),
-		makeToolDefLogged("batch_categorize_transactions", ToolWrite,
-			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 500 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
-			s.handleBatchCategorize, svc),
-		makeToolDefLogged("bulk_recategorize", ToolWrite,
-			"Moves transactions matching `from_category` (and other filters) to `to_category`. Requires `to_category` and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., move all transactions currently in `general_merchandise` within a date range to `groceries`. Returns matched/updated counts. Note: the legacy params `target_category_slug` and `category_slug` are still accepted but deprecated — prefer `to_category`/`from_category`.",
-			s.handleBulkRecategorize, svc),
-		makeToolDefLogged("list_account_links", ToolRead,
-			"List account links between primary and dependent/authorized-user accounts. Account links deduplicate transactions that appear in both a primary cardholder and authorized user's bank feeds. Returns link details, match counts, and unmatched transaction counts.",
-			s.handleListAccountLinks, svc),
-		makeToolDefLogged("create_account_link", ToolWrite,
-			"Link a dependent account to a primary account for cross-connection deduplication. When two family members connect the same credit card (e.g., primary cardholder and authorized user), transactions appear in both feeds. This link pairs matching transactions by date+amount, excludes the dependent's copies from totals, and attributes matched primary-side transactions to the dependent user. Automatically runs initial reconciliation after creation.",
-			s.handleCreateAccountLink, svc),
-		makeToolDefLogged("delete_account_link", ToolWrite,
-			"Remove an account link and clear all transaction attribution set by it. Transactions from the dependent account will be included in totals again.",
-			s.handleDeleteAccountLink, svc),
-		makeToolDefLogged("reconcile_account_link", ToolWrite,
-			"Manually trigger match reconciliation for an account link. Finds unmatched dependent transactions and attempts to pair them with primary account transactions by date and exact amount. Matched primary transactions are attributed to the dependent user.",
-			s.handleReconcileAccountLink, svc),
-		makeToolDefLogged("list_transaction_matches", ToolRead,
-			"List matched transaction pairs for an account link. Shows which primary-side transactions have been matched to dependent-side transactions, with match confidence and the fields that matched.",
-			s.handleListTransactionMatches, svc),
-		makeToolDefLogged("confirm_match", ToolWrite,
-			"Confirm an auto-matched transaction pair as correct. Changes match confidence from 'auto' to 'confirmed'.",
-			s.handleConfirmMatch, svc),
-		makeToolDefLogged("reject_match", ToolWrite,
-			"Reject a false auto-match between two transactions. Removes the match record and restores the primary transaction's original user attribution.",
-			s.handleRejectMatch, svc),
-		makeToolDefLogged("submit_report", ToolWrite,
-			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
-			s.handleSubmitReport, svc),
-		// --- Tags + annotations ---
-		makeToolDefLogged("list_tags", ToolRead,
-			"List all tags registered in the system. Each tag has a slug (stable identifier) and a display_name. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
-			s.handleListTags, svc),
-		makeToolDefLogged("list_annotations", ToolRead,
-			"List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Filters compose: `kinds=['comment']` is the comment-only view (replaces deprecated list_transaction_comments); `actor_types=['user']` is the canonical 'any human input?' check (drops rule churn + agent activity); `since` (RFC3339) skips rows you've already seen; `limit` returns the most recent N (capped at 200). Empty filters return the full timeline. Recommended patterns: before overriding your own categorization, call list_annotations(transaction_id, actor_types=['user']) — if any row exists, a human has weighed in and that decision wins.",
-			s.handleListAnnotations, svc),
-		makeToolDefLogged("add_transaction_tag", ToolWrite,
-			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Idempotent: returns already_present=true if the tag was already attached. To record decision context for a tag change, leave a comment on the same transaction (add_transaction_comment, or the `comment` field on update_transactions).",
-			s.handleAddTransactionTag, svc),
-		makeToolDefLogged("remove_transaction_tag", ToolWrite,
-			"Remove a tag from a transaction. Idempotent: returns already_absent=true if the tag wasn't attached. To record why the tag was removed (e.g. closing a needs-review item), pair this with a comment on the same transaction — see update_transactions for the atomic compound op.",
-			s.handleRemoveTransactionTag, svc),
-		makeToolDefLogged("update_transactions", ToolWrite,
-			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error).",
-			s.handleUpdateTransactions, svc),
+
+		// --- Tag admin ---
+		// Most agents won't need these — add_tag-on-transaction implicitly
+		// creates new tag slugs via update_transactions. These are for
+		// curating the tag vocabulary itself (renames, deletes, deliberate
+		// up-front display_name/color/icon).
 		makeToolDefLogged("create_tag", ToolWrite,
-			"Register a new tag in the system. Admin-only write — agents can auto-create tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/icon up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$.",
+			"Register a new tag in the system. Most agents can skip this — passing a new tag slug to update_transactions auto-creates the tag. Use create_tag only when you need to set display_name/color/icon up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$.",
 			s.handleCreateTag, svc),
 		makeToolDefLogged("update_tag", ToolWrite,
 			"Update a tag's mutable fields (display_name, description, color, icon). Slug is immutable — to rename, create a new tag + bulk re-tag + delete old. Identify the tag by UUID, short ID, or slug.",
@@ -245,6 +221,11 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("delete_tag", ToolWrite,
 			"Delete a tag. Cascades to transaction_tags (removes the tag from every transaction). Annotations that reference the tag keep their rows with tag_id=NULL (preserves audit trail). Identify the tag by UUID, short ID, or slug.",
 			s.handleDeleteTag, svc),
+
+		// --- Reporting ---
+		makeToolDefLogged("submit_report", ToolWrite,
+			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role. See breadbox://report-format for structure conventions.",
+			s.handleSubmitReport, svc),
 	}
 }
 
@@ -423,6 +404,15 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		MIMEType:    "application/json",
 		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
 	}, s.handleSyncStatusResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Rules",
+		Title:       "Transaction Rules",
+		URI:         "breadbox://rules",
+		Description: "Currently registered transaction rules with their conditions, actions, trigger, priority, hit_count, and last_hit_at. Read before authoring new rules to avoid duplicates and to spot stale or never-matching rules.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
+	}, s.handleRulesResource)
 
 	// Workflow guides — markdown, user-overridable via app_config.
 	server.AddResource(&mcpsdk.Resource{

@@ -14,11 +14,15 @@ import (
 )
 
 // UpdateTransactionsOp describes a single per-transaction compound op used by
-// UpdateTransactions. Each op can set a category, add/remove tags, and attach
-// a comment. All four changes are applied atomically per transaction.
+// UpdateTransactions. Each op can set or reset a category, add/remove tags,
+// and attach a comment. All four changes are applied atomically per
+// transaction. CategorySlug and ResetCategory are mutually exclusive — set
+// CategorySlug to override the category, or ResetCategory to clear an
+// existing override and let rules re-categorize, never both.
 type UpdateTransactionsOp struct {
 	TransactionID string
 	CategorySlug  *string
+	ResetCategory bool
 	TagsToAdd     []UpdateTransactionsTagOp
 	TagsToRemove  []UpdateTransactionsTagOp
 	Comment       *string
@@ -165,7 +169,32 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 
 	qtx := s.Queries.WithTx(tx)
 
-	// 1. Category.
+	if op.CategorySlug != nil && op.ResetCategory {
+		return fmt.Errorf("%w: category_slug and reset_category are mutually exclusive", ErrInvalidParameter)
+	}
+
+	// 1a. Reset (clear override + drop to uncategorized).
+	if op.ResetCategory {
+		rowsAffected, err := qtx.ClearTransactionCategoryOverride(ctx, txnUID)
+		if err != nil {
+			return fmt.Errorf("clear override: %w", err)
+		}
+		if rowsAffected == 0 {
+			return fmt.Errorf("%w: transaction not found", ErrNotFound)
+		}
+		uncategorized, err := qtx.GetCategoryBySlug(ctx, "uncategorized")
+		if err != nil {
+			return fmt.Errorf("get uncategorized: %w", err)
+		}
+		if _, err := tx.Exec(ctx, "UPDATE transactions SET category_id = $1 WHERE id = $2", uncategorized.ID, txnUID); err != nil {
+			return fmt.Errorf("reset category: %w", err)
+		}
+		if err := writeCategorySetAnnotation(ctx, qtx, txnUID, actor, "uncategorized", true); err != nil {
+			return err
+		}
+	}
+
+	// 1b. Set category override.
 	if op.CategorySlug != nil {
 		slug := strings.TrimSpace(*op.CategorySlug)
 		if slug == "" {

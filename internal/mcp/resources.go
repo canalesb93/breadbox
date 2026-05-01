@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"breadbox/internal/service"
 	"breadbox/prompts"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -155,6 +156,21 @@ func (s *MCPServer) handleSyncStatusResource(ctx context.Context, _ *mcpsdk.Read
 		return nil, fmt.Errorf("list connections: %w", err)
 	}
 	return jsonResourceResult("breadbox://sync-status", map[string]any{"connections": conns})
+}
+
+// rulesResourceLimit caps the rules resource payload. The rule list is small
+// in practice (households tend to have tens, not thousands of rules), but the
+// cap keeps the resource bounded and predictable.
+const rulesResourceLimit = 200
+
+func (s *MCPServer) handleRulesResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	result, err := s.svc.ListTransactionRules(ctx, service.TransactionRuleListParams{
+		Limit: rulesResourceLimit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list rules: %w", err)
+	}
+	return jsonResourceResult("breadbox://rules", result)
 }
 
 // resourceAnnotations builds the standard *mcpsdk.Annotations payload used on

@@ -211,6 +211,88 @@ func TestUpdateTransactions_TagRemoval(t *testing.T) {
 	}
 }
 
+// TestUpdateTransactions_ResetCategory verifies that ResetCategory clears a
+// prior manual override the same way the standalone ResetTransactionCategory
+// service did (it's the absorbed replacement after the MCP tool collapse).
+func TestUpdateTransactions_ResetCategory(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	txn := testutil.MustCreateTransaction(t, queries, acctID, "extReset1", "Whole Foods", 4321, "2026-04-01")
+
+	testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+	testutil.MustCreateCategory(t, queries, "uncategorized", "Uncategorized")
+	actor := service.Actor{Type: "user", ID: "u1", Name: "Tester"}
+
+	// First, set an override so there's something to reset.
+	if _, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			CategorySlug:  strPtr("food_and_drink_groceries"),
+		}},
+		Actor: actor,
+	}); err != nil {
+		t.Fatalf("seed override: %v", err)
+	}
+
+	// Reset clears the override and drops to uncategorized.
+	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			ResetCategory: true,
+			Comment:       strPtr("Letting rules re-categorize."),
+		}},
+		Actor: actor,
+	})
+	if err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if len(results) != 1 || results[0].Status != "ok" {
+		t.Fatalf("expected ok, got %+v", results)
+	}
+
+	// Verify the override flag is cleared and category is uncategorized.
+	got, err := svc.GetTransaction(ctx, txn.ShortID)
+	if err != nil {
+		t.Fatalf("GetTransaction: %v", err)
+	}
+	if got.CategoryOverride {
+		t.Errorf("category_override = true, want false after reset")
+	}
+	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
+		t.Errorf("expected category=uncategorized after reset, got %+v", got.Category)
+	}
+}
+
+// TestUpdateTransactions_ResetAndSetMutuallyExclusive verifies the validation
+// that rejects supplying both category_slug and reset_category in one op.
+func TestUpdateTransactions_ResetAndSetMutuallyExclusive(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	txn := testutil.MustCreateTransaction(t, queries, acctID, "extReset2", "Costco", 1234, "2026-04-01")
+
+	testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+
+	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
+		Operations: []service.UpdateTransactionsOp{{
+			TransactionID: txn.ShortID,
+			CategorySlug:  strPtr("food_and_drink_groceries"),
+			ResetCategory: true,
+		}},
+		Actor: service.SystemActor(),
+	})
+	if err != nil {
+		t.Fatalf("UpdateTransactions returned top-level error: %v", err)
+	}
+	if len(results) != 1 || results[0].Status != "error" {
+		t.Fatalf("expected per-op error status, got %+v", results)
+	}
+	if results[0].Error == nil || results[0].Error.Code != "INVALID_PARAMETER" {
+		t.Errorf("expected INVALID_PARAMETER, got %+v", results[0].Error)
+	}
+}
+
 // TestUpdateTransactions_RejectsTooMany verifies the 50-op cap.
 func TestUpdateTransactions_RejectsTooMany(t *testing.T) {
 	svc, _, _ := newService(t)
