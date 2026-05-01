@@ -169,6 +169,61 @@ func TestToolRegistryScopeContract(t *testing.T) {
 	}
 }
 
+// TestToolAnnotationsContract pins the per-tool MCP metadata that hosts use
+// to render the connector picker (Title) and decide whether to confirm a
+// call (Annotations.DestructiveHint). A registration that forgets to set
+// Title would render as the tool's snake_case name in Claude.ai's Settings →
+// Connectors → Configure tools list; one that drops DestructiveHint=true
+// from a delete_* tool would let the host invoke it without prompting.
+//
+// Asserts:
+//   - every tool has a non-empty Title.
+//   - every read tool has Annotations.ReadOnlyHint=true.
+//   - the canonical destructive set (delete_*) carries
+//     DestructiveHint=true. Reversible writes default to false.
+func TestToolAnnotationsContract(t *testing.T) {
+	s := NewMCPServer(nil, "test")
+	defs := s.AllToolDefs()
+
+	wantDestructive := map[string]bool{
+		"delete_tag":              true,
+		"delete_transaction_rule": true,
+	}
+
+	for _, td := range defs {
+		name := td.Tool.Name
+		if td.Tool.Title == "" {
+			t.Errorf("tool %q: missing Title (would render as snake_case in connector picker)", name)
+		}
+		if td.Tool.Annotations == nil {
+			t.Errorf("tool %q: missing Annotations", name)
+			continue
+		}
+		ann := td.Tool.Annotations
+
+		// Read tools must advertise ReadOnlyHint=true so hosts that suppress
+		// confirmation prompts based on it can flow read calls through
+		// without friction.
+		if td.Classification == ToolRead && !ann.ReadOnlyHint {
+			t.Errorf("tool %q: ToolRead must set Annotations.ReadOnlyHint=true", name)
+		}
+
+		// Destructive contract: the canonical destructive set must opt in;
+		// every other write must explicitly opt out (DestructiveHint=false)
+		// so hosts don't fall back to the spec's true default.
+		if td.Classification == ToolWrite && name != "create_session" {
+			want := wantDestructive[name]
+			if ann.DestructiveHint == nil {
+				t.Errorf("tool %q: write tool must set DestructiveHint explicitly", name)
+				continue
+			}
+			if got := *ann.DestructiveHint; got != want {
+				t.Errorf("tool %q: DestructiveHint = %v, want %v", name, got, want)
+			}
+		}
+	}
+}
+
 func TestCompactIDs_FullRoundTrip(t *testing.T) {
 	type testStruct struct {
 		ID      string `json:"id"`
