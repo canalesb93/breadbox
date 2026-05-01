@@ -179,6 +179,11 @@ func SessionAccountID(sm *scs.SessionManager, r *http.Request) string {
 	return sm.GetString(r.Context(), sessionKeyAccountID)
 }
 
+// SessionUsername returns the auth_accounts.username for the current session.
+func SessionUsername(sm *scs.SessionManager, r *http.Request) string {
+	return sm.GetString(r.Context(), sessionKeyAccountUsername)
+}
+
 // IsAdmin returns true if the current session has admin role.
 func IsAdmin(sm *scs.SessionManager, r *http.Request) bool {
 	return SessionRole(sm, r) == RoleAdmin

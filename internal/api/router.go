@@ -11,6 +11,7 @@ import (
 	"breadbox/internal/service"
 	"breadbox/internal/webhook"
 	"breadbox/static"
+	webui "breadbox/web"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -124,6 +125,23 @@ func NewRouter(a *app.App, version string) http.Handler {
 	// Admin dashboard: session manager + template renderer + admin router.
 	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
 	sm := admin.NewSessionManager(a.DB, isSecure)
+
+	// v2 SPA — internal frontend API and embedded static bundle.
+	// /web/v1/* is session-only, never accepts API keys, and carries zero
+	// stability promise (it is exclusively consumed by the v2 SPA).
+	r.Group(func(r chi.Router) {
+		r.Use(sm.LoadAndSave)
+		r.Route("/web/v1", func(r chi.Router) {
+			r.Use(webui.RequireSessionJSON(sm))
+			r.Get("/me", webui.MeHandler(sm))
+		})
+		// /v2/* — embedded SPA static bundle. The session middleware lets
+		// the SPA shell load on /login, but the SPA's own queries
+		// (/web/v1/me) gate the authenticated content.
+		r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
+		r.Handle("/v2/*", webui.Handler())
+	})
+
 	tr, err := admin.NewTemplateRenderer(sm)
 	if err != nil {
 		a.Logger.Error("failed to initialize template renderer", "error", err)

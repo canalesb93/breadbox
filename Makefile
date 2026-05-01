@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check
+.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev
 
 PORT ?= 8080
 
@@ -99,8 +99,27 @@ dev-stop:
 		echo "Stopped dev instances on ports 8080-8099: $$pids"; \
 	fi
 
-build: generate
+build: generate web
 	go build -o breadbox ./cmd/breadbox
+
+# web-install: install bun dependencies for the v2 SPA. Idempotent — bun
+# install short-circuits when the lockfile is unchanged.
+web-install:
+	@if ! command -v bun &>/dev/null; then \
+		echo "Error: bun is not installed. Install via 'curl -fsSL https://bun.sh/install | bash'."; \
+		exit 1; \
+	fi
+	cd web && bun install --frozen-lockfile
+
+# web: build the v2 SPA bundle. Runs before 'make build' so the Go binary
+# embeds a real bundle instead of the committed stub.
+web: web-install
+	cd web && bun run build
+
+# web-dev: start the Vite dev server with HMR. Proxies /api/* and /web/v1/*
+# to the Go backend on $(PORT). Run 'make dev' in another terminal first.
+web-dev: web-install
+	cd web && BREADBOX_BACKEND_PORT=$(PORT) bun run dev
 
 test: generate
 	go test ./...

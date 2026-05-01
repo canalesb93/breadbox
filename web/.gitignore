@@ -1,0 +1,11 @@
+node_modules
+*.tsbuildinfo
+*.log
+.vite
+
+# Build output: dist/ is gitignored, except .gitkeep which keeps the
+# directory present so //go:embed all:dist always finds at least one file.
+# Real builds populate dist/index.html and dist/assets/*; the Go handler
+# falls back to an inline stub when those files are missing.
+dist/*
+!dist/.gitkeep
