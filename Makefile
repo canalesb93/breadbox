@@ -118,8 +118,12 @@ web: web-install
 
 # web-dev: start the Vite dev server with HMR. Proxies /api/* and /web/v1/*
 # to the Go backend on $(PORT). Run 'make dev' in another terminal first.
+# VITE_PORT defaults to PORT+1000 (e.g. backend 8081 → vite 9081) so parallel
+# worktree sessions get deterministic, non-colliding Vite ports. Override
+# with `make web-dev VITE_PORT=...`.
+VITE_PORT ?= $(shell echo $$(($(PORT) + 1000)))
 web-dev: web-install
-	cd web && BREADBOX_BACKEND_PORT=$(PORT) bun run dev
+	cd web && BREADBOX_BACKEND_PORT=$(PORT) VITE_PORT=$(VITE_PORT) bun run dev
 
 test: generate
 	go test ./...
