@@ -662,10 +662,24 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	// Operates directly on JSON bytes to avoid unmarshal→remarshal overhead.
 	data = compactIDsBytes(data)
 
+	// StructuredContent is the post-2025-06-18 spec slot for typed tool
+	// output. We populate it alongside the TextContent block so:
+	//   - clients on the new spec get the structured payload they can
+	//     validate against an OutputSchema (added incrementally on per-tool
+	//     defs).
+	//   - clients still on the older spec keep getting the same TextContent
+	//     bytes they always have — backwards-compatible.
+	// Stash the *compacted* bytes as a json.RawMessage rather than
+	// unmarshalling into any. Round-tripping through map[string]any sorts
+	// keys alphabetically on the remarshal, which would silently drift the
+	// structured view from the text view; RawMessage is encoding/json's
+	// designated escape hatch — Marshal emits the bytes verbatim.
+
 	return &mcpsdk.CallToolResult{
 		Content: []mcpsdk.Content{
 			&mcpsdk.TextContent{Text: string(data)},
 		},
+		StructuredContent: json.RawMessage(data),
 	}, nil, nil
 }
 
