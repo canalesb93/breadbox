@@ -24,6 +24,14 @@ paths:
 2. Tool name is in `mcp_disabled_tools` JSON array
 3. API key scope is `read_only`
 
+## Audit sessions (transport-bound)
+
+Every tool call is logged under an `mcp_sessions` row keyed off the transport connection — `MCP-Session-Id` for Streamable HTTP, a per-process fallback id for stdio. The dispatcher in `makeToolDefLogged` resolves the session via `MCPServer.ensureAuditSession`, which lazy-creates the row on first call and stamps it with `clientInfo` from the `initialize` request. There is no `create_session` tool — the binding is implicit.
+
+Per-call labels travel via `tools/call._meta.reason` (`metaReason(req)`); the dispatcher pulls it and stamps it on the `mcp_tool_calls.reason` column. Tool input schemas no longer carry `session_id` or `reason` fields.
+
+Handlers that need to bind a created row to the session (e.g. `submit_report` → `agent_reports.session_id`) read the resolved id from context via `auditSessionFromContext(ctx)` — the dispatcher stamps it before invoking the handler.
+
 ## Input/output conventions
 
 Tool inputs are typed structs with `jsonschema` tags:

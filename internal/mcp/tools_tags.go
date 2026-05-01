@@ -14,7 +14,6 @@ import (
 // --- Input types ---
 
 type listAnnotationsInput struct {
-	ReadSessionContext
 	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync. Empty = all kinds. Pass ['comment'] for the comment-only timeline. Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated) for the specific event. Pass ['sync'] to see initial-import + pending-flip rows."`
 	ActorTypes    []string `json:"actor_types,omitempty" jsonschema:"Optional actor-type filter: any of user, agent, system. Empty = all actors. Pass ['user'] for the canonical 'any human input?' check — drops rule churn and prior agent activity in one filter. Combine with kinds for fine-grained slices."`
@@ -23,7 +22,6 @@ type listAnnotationsInput struct {
 }
 
 type createTagInput struct {
-	WriteSessionContext
 	Slug        string  `json:"slug" jsonschema:"required,Tag slug. Lowercase alphanumerics with hyphens/colons, e.g. 'needs-review' or 'subscription:monthly'."`
 	DisplayName string  `json:"display_name" jsonschema:"required,Human-readable name (e.g. 'Needs Review')."`
 	Description string  `json:"description,omitempty" jsonschema:"Optional description."`
@@ -32,7 +30,6 @@ type createTagInput struct {
 }
 
 type updateTagInput struct {
-	WriteSessionContext
 	ID          string  `json:"id" jsonschema:"required,Tag UUID, short ID, or slug."`
 	DisplayName *string `json:"display_name,omitempty" jsonschema:"New display name."`
 	Description *string `json:"description,omitempty" jsonschema:"New description."`
@@ -41,7 +38,6 @@ type updateTagInput struct {
 }
 
 type deleteTagInput struct {
-	WriteSessionContext
 	ID string `json:"id" jsonschema:"required,Tag UUID, short ID, or slug."`
 }
 

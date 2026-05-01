@@ -397,47 +397,16 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 	}
 }
 
-// TestListTransactionMatchesResponseShape pins matched_on (not matched_fields),
-// match_confidence (not confidence), account_link_id (not link_id), plus
-// the denormalized txn fields agents rely on.
-// TestCreateSessionResponseShape pins session response fields; `actor` and
-// `completed_at` must not appear.
-func TestCreateSessionResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	res, _, err := f.svc.handleCreateSession(f.ctx, nil, createSessionInput{
-		Purpose: "shape regression test",
-	})
-	out := decodeToolResult[map[string]any](t, "create_session", res, err)
-	requireKeys(t, "create_session", out,
-		"id", "purpose", "api_key_name", "created_at",
-	)
-	requireAbsent(t, "create_session", out, "actor", "completed_at")
-}
-
 // TestSubmitReportResponseShape pins created_by_* fields + body/read_at, and
 // guards against re-introducing a `session_id` echo (the link is server-side
-// only).
+// only — sourced from the transport-bound audit session, not from input).
 func TestSubmitReportResponseShape(t *testing.T) {
 	f := seedFixtures(t)
 
-	// submit_report requires a prior session id (enforced by the wrapper around
-	// write tools). Handlers invoked directly bypass that check, but we still
-	// pass a valid session_id/reason so the signature matches the real call
-	// path documented in rules.
-	sessRes, _, err := f.svc.handleCreateSession(f.ctx, nil, createSessionInput{
-		Purpose: "regression: submit_report",
-	})
-	sessOut := decodeToolResult[map[string]any](t, "create_session", sessRes, err)
-	sessionID, _ := sessOut["id"].(string)
-	if sessionID == "" {
-		t.Fatalf("create_session did not return id: %v", sessOut)
-	}
-
 	res, _, err := f.svc.handleSubmitReport(f.ctx, nil, submitReportInput{
-		WriteSessionContext: WriteSessionContext{SessionID: sessionID, Reason: "shape test"},
-		Title:               "Shape regression report",
-		Body:                "## Summary\nRegression check.",
-		Priority:            "info",
+		Title:    "Shape regression report",
+		Body:     "## Summary\nRegression check.",
+		Priority: "info",
 	})
 	out := decodeToolResult[map[string]any](t, "submit_report", res, err)
 	requireKeys(t, "submit_report", out,
@@ -838,17 +807,7 @@ func TestUpdateTransactionsHandler_ResetCategoryShape(t *testing.T) {
 		t.Fatalf("seed override: %v", err)
 	}
 
-	sessRes, _, err := f.svc.handleCreateSession(f.ctx, nil, createSessionInput{
-		Purpose: "regression: update_transactions reset_category",
-	})
-	sessOut := decodeToolResult[map[string]any](t, "create_session", sessRes, err)
-	sessionID, _ := sessOut["id"].(string)
-	if sessionID == "" {
-		t.Fatalf("create_session did not return id")
-	}
-
 	res, _, err := f.svc.handleUpdateTransactions(f.ctx, nil, updateTransactionsInput{
-		WriteSessionContext: WriteSessionContext{SessionID: sessionID, Reason: "reset shape test"},
 		Operations: []transactionOperationInput{{
 			TransactionID: f.txnID,
 			ResetCategory: true,

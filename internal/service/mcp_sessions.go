@@ -86,6 +86,78 @@ func (s *Service) CreateMCPSession(ctx context.Context, actor Actor, purpose str
 	return mcpSessionFromRow(row), nil
 }
 
+// MCPClientInfo mirrors the MCP `clientInfo` block from the initialize
+// request. Name + Version are required by the spec; Title /
+// Description / WebsiteURL are SEP-973 additions hosts may set for
+// richer audit display. All optional fields are pgtype-friendly via
+// pgconv.TextIfNotEmpty at the call site.
+type MCPClientInfo struct {
+	Name        string
+	Version     string
+	Title       string
+	Description string
+	WebsiteURL  string
+}
+
+// EnsureMCPSessionForTransport returns the audit-session row bound to a
+// transport-level identity (MCP-Session-Id for HTTP, a process-start
+// id for stdio), creating one on first use. Subsequent tool calls on
+// the same transport reuse the row so every call lands under one
+// audit session without an explicit create_session round-trip.
+//
+// transportID = "" disables the binding; the caller falls back to a
+// per-call ad-hoc row (legacy code path).
+func (s *Service) EnsureMCPSessionForTransport(ctx context.Context, transportID string, actor Actor, client MCPClientInfo) (MCPSessionResponse, error) {
+	if transportID == "" {
+		return MCPSessionResponse{}, fmt.Errorf("%w: transport_id is required", ErrInvalidParameter)
+	}
+
+	if row, err := s.Queries.GetMCPSessionByTransportID(ctx, pgconv.TextIfNotEmpty(transportID)); err == nil {
+		return mcpSessionFromRow(row), nil
+	}
+
+	purpose := client.purposeLabel()
+
+	row, err := s.Queries.CreateMCPSessionWithTransport(ctx, db.CreateMCPSessionWithTransportParams{
+		ApiKeyID:          actor.ID,
+		ApiKeyName:        actor.Name,
+		Purpose:           purpose,
+		TransportID:       pgconv.TextIfNotEmpty(transportID),
+		ClientName:        pgconv.TextIfNotEmpty(client.Name),
+		ClientVersion:     pgconv.TextIfNotEmpty(client.Version),
+		ClientTitle:       pgconv.TextIfNotEmpty(client.Title),
+		ClientDescription: pgconv.TextIfNotEmpty(client.Description),
+		ClientWebsiteUrl:  pgconv.TextIfNotEmpty(client.WebsiteURL),
+	})
+	if err != nil {
+		// Race: another concurrent first call may have just inserted
+		// the row. Re-read once before giving up.
+		if row2, err2 := s.Queries.GetMCPSessionByTransportID(ctx, pgconv.TextIfNotEmpty(transportID)); err2 == nil {
+			return mcpSessionFromRow(row2), nil
+		}
+		return MCPSessionResponse{}, fmt.Errorf("create mcp session for transport: %w", err)
+	}
+	return mcpSessionFromRow(row), nil
+}
+
+// purposeLabel renders a human-readable purpose for the audit row when
+// the binding is implicit (no create_session call). The format mirrors
+// what an agent would have typed if asked.
+func (c MCPClientInfo) purposeLabel() string {
+	switch {
+	case c.Title != "" && c.Version != "":
+		return fmt.Sprintf("%s %s session", c.Title, c.Version)
+	case c.Title != "":
+		return fmt.Sprintf("%s session", c.Title)
+	case c.Name != "" && c.Version != "":
+		return fmt.Sprintf("%s %s session", c.Name, c.Version)
+	case c.Name != "":
+		return fmt.Sprintf("%s session", c.Name)
+	default:
+		return "MCP session"
+	}
+}
+
 // GetMCPSession retrieves a session by ID or short_id.
 func (s *Service) GetMCPSession(ctx context.Context, idOrShort string) (MCPSessionResponse, error) {
 	if idOrShort == "" {
