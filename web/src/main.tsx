@@ -11,7 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { RootLayout } from "@/routes/__root";
 import { HomePage } from "@/routes/home";
 import { Placeholder } from "@/routes/placeholder";
-import { NAV } from "@/lib/nav";
+import { NAV_LEAVES } from "@/lib/nav";
 import "@/globals.css";
 
 const rootRoute = createRootRoute({ component: RootLayout });
@@ -22,16 +22,12 @@ const indexRoute = createRoute({
   component: HomePage,
 });
 
-const placeholderRoutes = NAV.flatMap((group) =>
-  group.items
-    .filter((item) => item.to !== "/")
-    .map((item) =>
-      createRoute({
-        getParentRoute: () => rootRoute,
-        path: item.to,
-        component: () => <Placeholder title={item.title} />,
-      }),
-    ),
+const placeholderRoutes = NAV_LEAVES.filter((leaf) => leaf.to !== "/").map((leaf) =>
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: leaf.to,
+    component: () => <Placeholder title={leaf.title} />,
+  }),
 );
 
 const routeTree = rootRoute.addChildren([indexRoute, ...placeholderRoutes]);

@@ -1,4 +1,5 @@
-import { Outlet } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { Outlet, useRouterState } from "@tanstack/react-router";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -6,23 +7,24 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { useRouterState } from "@tanstack/react-router";
-import { NAV } from "@/lib/nav";
-
-function pageTitle(pathname: string): { group: string; title: string } {
-  for (const group of NAV) {
-    for (const item of group.items) {
-      const match =
-        item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-      if (match) return { group: group.label, title: item.title };
-    }
-  }
-  return { group: "", title: "Breadbox" };
-}
+import { NAV_LEAVES, isNavMatch } from "@/lib/nav";
+import { useMe } from "@/api/queries/me";
+import { ApiError } from "@/api/client";
 
 export function RootLayout() {
-  const { location } = useRouterState();
-  const { group, title } = pageTitle(location.pathname);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const match = NAV_LEAVES.find((leaf) => isNavMatch(leaf, pathname));
+  const group = match?.group ?? "";
+  const title = match?.title ?? "Breadbox";
+
+  // Redirect to /login when the session is missing. The api client surfaces
+  // 401 as an ApiError; this is the single place that knows what to do.
+  const { error } = useMe();
+  useEffect(() => {
+    if (error instanceof ApiError && error.status === 401) {
+      window.location.href = "/login";
+    }
+  }, [error]);
 
   return (
     <SidebarProvider>

@@ -8,8 +8,8 @@ export function Placeholder({ title }: { title: string }) {
       </div>
       <h2 className="text-lg font-semibold">{title}</h2>
       <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-        This page is part of the v2 admin shell. The implementation lands in a
-        future PR — see <code>v2-frontend-plan.md</code> for the build order.
+        This page is part of the v2 admin shell. The full implementation lands
+        in a follow-up PR.
       </p>
     </div>
   );

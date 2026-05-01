@@ -1,21 +1,18 @@
 // Package webui embeds the v2 SPA build (web/dist) and serves it under /v2/*.
 //
-// Real builds (make build, Dockerfile, CI) run `bun run build` to populate
-// web/dist/ before compiling the Go binary. Only web/dist/.gitkeep is
-// committed — real bundle files are gitignored. When the bundle is absent
-// (e.g. someone ran `go build ./...` without first building the SPA), the
-// handler serves an inline stub explaining how to build it.
+// When the bundle hasn't been built (only web/dist/.gitkeep present),
+// Handler() returns a stub explaining how to build it instead of 404ing.
 package webui
 
 import (
 	"embed"
-	"encoding/json"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 
 	"breadbox/internal/admin"
+	mw "breadbox/internal/middleware"
 
 	"github.com/alexedwards/scs/v2"
 )
@@ -44,56 +41,35 @@ const stubHTML = `<!doctype html>
 </html>`
 
 // Handler returns the v2 SPA static handler with SPA fallback. Mount under
-// /v2/. Any request for an unknown path that lacks a file extension returns
-// index.html so the client router can resolve it. If the bundle is absent
-// (no dist/index.html), every request gets a stub HTML page instead.
+// /v2/. Extension-less paths are rewritten to / so the client router resolves
+// them. If the bundle is absent, every request gets a stub HTML page.
 func Handler() http.Handler {
 	sub, err := fs.Sub(distFS, "dist")
 	if err != nil {
-		// Build-time guarantee: dist/ always exists (.gitkeep is committed).
 		panic(err)
 	}
 
-	bundleBuilt := false
-	if _, err := fs.Stat(sub, "index.html"); err == nil {
-		bundleBuilt = true
-	}
-
-	if !bundleBuilt {
+	if _, err := fs.Stat(sub, "index.html"); err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = w.Write([]byte(stubHTML))
 		})
 	}
 
-	fileServer := http.FileServer(http.FS(sub))
+	fileServer := http.StripPrefix("/v2", http.FileServer(http.FS(sub)))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Strip the /v2 prefix so the file server sees paths relative to dist/.
 		trimmed := strings.TrimPrefix(r.URL.Path, "/v2")
-		if trimmed == "" {
-			trimmed = "/"
+		// Extension-less paths under /v2/* are client routes — rewrite to /
+		// so the file server returns index.html.
+		if trimmed != "" && trimmed != "/" && path.Ext(trimmed) == "" {
+			r.URL.Path = "/v2/"
 		}
-
-		// SPA fallback: paths without an extension that aren't found should
-		// serve index.html so client routing can resolve them.
-		if path.Ext(trimmed) == "" && trimmed != "/" {
-			if _, err := fs.Stat(sub, strings.TrimPrefix(trimmed, "/")); err != nil {
-				r2 := r.Clone(r.Context())
-				r2.URL.Path = "/"
-				fileServer.ServeHTTP(w, r2)
-				return
-			}
-		}
-
-		// Long-cache hashed assets (Vite includes content hashes in filenames).
+		// Long-cache hashed assets (Vite content-hashes filenames).
 		if strings.HasPrefix(trimmed, "/assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
-
-		r2 := r.Clone(r.Context())
-		r2.URL.Path = trimmed
-		fileServer.ServeHTTP(w, r2)
+		fileServer.ServeHTTP(w, r)
 	})
 }
 
@@ -109,27 +85,22 @@ type MeResponse struct {
 // must run before this.
 func MeHandler(sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resp := MeResponse{
+		mw.WriteJSON(w, http.StatusOK, MeResponse{
 			AccountID: admin.SessionAccountID(sm, r),
 			Username:  admin.SessionUsername(sm, r),
 			Role:      admin.SessionRole(sm, r),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		})
 	}
 }
 
-// RequireSessionJSON is chi middleware that gates /web/v1/* endpoints behind
-// a session cookie. Unlike admin.RequireAuth, it returns a JSON 401 instead
-// of redirecting to /login — the SPA handles redirect on its own, and an
-// HTML redirect would break a JSON fetch.
+// RequireSessionJSON gates /web/v1/* endpoints behind a session cookie.
+// Returns JSON 401 instead of redirecting to /login (which would break a
+// JSON fetch — the SPA handles redirect on its own).
 func RequireSessionJSON(sm *scs.SessionManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if admin.SessionAccountID(sm, r) == "" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusUnauthorized)
-				_, _ = w.Write([]byte(`{"error":{"code":"UNAUTHORIZED","message":"Session required"}}`))
+				mw.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Session required")
 				return
 			}
 			next.ServeHTTP(w, r)

@@ -6,10 +6,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import type { NavGroup } from "@/lib/nav";
+import { isNavMatch, type NavGroup } from "@/lib/nav";
 
 export function NavMain({ group }: { group: NavGroup }) {
-  const { location } = useRouterState();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
     <SidebarGroup>
@@ -17,13 +17,13 @@ export function NavMain({ group }: { group: NavGroup }) {
       <SidebarMenu>
         {group.items.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            item.to === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(item.to);
           return (
             <SidebarMenuItem key={item.to}>
-              <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+              <SidebarMenuButton
+                asChild
+                isActive={isNavMatch(item, pathname)}
+                tooltip={item.title}
+              >
                 <Link to={item.to}>
                   <Icon />
                   <span>{item.title}</span>

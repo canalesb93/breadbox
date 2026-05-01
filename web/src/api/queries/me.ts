@@ -7,6 +7,5 @@ export function useMe() {
     queryKey: ["me"],
     queryFn: () => api<Me>("/web/v1/me"),
     staleTime: 60_000,
-    retry: false,
   });
 }

@@ -27,6 +27,14 @@ export interface NavGroup {
   items: NavLeaf[];
 }
 
+export interface NavLeafWithGroup extends NavLeaf {
+  group: string;
+}
+
+export function isNavMatch(item: NavLeaf, pathname: string): boolean {
+  return item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+}
+
 export const NAV: NavGroup[] = [
   {
     label: "Money",
@@ -63,3 +71,7 @@ export const NAV: NavGroup[] = [
     ],
   },
 ];
+
+export const NAV_LEAVES: NavLeafWithGroup[] = NAV.flatMap((g) =>
+  g.items.map((item) => ({ ...item, group: g.label })),
+);

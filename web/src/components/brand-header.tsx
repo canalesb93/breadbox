@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Sandwich } from "lucide-react";
+import { Box } from "lucide-react";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -10,14 +10,12 @@ export function BrandHeader() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton size="lg" asChild>
+        <SidebarMenuButton tooltip="Breadbox" asChild>
           <Link to="/">
-            <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-              <Sandwich className="size-4" />
-            </div>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">Breadbox</span>
-              <span className="truncate text-xs text-muted-foreground">v2 · preview</span>
+            <Box className="text-primary" />
+            <div className="flex flex-1 items-baseline gap-1.5 truncate">
+              <span className="font-semibold">Breadbox</span>
+              <span className="text-xs text-muted-foreground">v2 · preview</span>
             </div>
           </Link>
         </SidebarMenuButton>

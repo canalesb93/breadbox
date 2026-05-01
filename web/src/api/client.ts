@@ -14,11 +14,6 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
 
-  if (res.status === 401) {
-    window.location.href = "/login";
-    throw new ApiError(401, "UNAUTHORIZED", "Session expired");
-  }
-
   if (!res.ok) {
     let code = "HTTP_ERROR";
     let message = res.statusText;
