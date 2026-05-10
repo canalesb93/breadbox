@@ -187,6 +187,10 @@ URL: https://your-host/mcp
 Header: X-API-Key: bb_your_api_key
 ```
 
+## REST API
+
+Every endpoint under `/api/v1/*` is described in [`openapi.yaml`](./openapi.yaml) (OpenAPI 3.1) at the repo root. Point your favourite SDK generator (`openapi-generator`, `openapi-typescript`, etc.) at that file. The prose companion lives in [`docs/api-reference.md`](docs/api-reference.md); when the two disagree, the OpenAPI spec wins — CI enforces parity via `TestOpenAPIDrift`.
+
 ## Configuration
 
 All configuration via environment variables. See `.env.example` for the full list.

@@ -1,5 +1,7 @@
 # API Quick Reference
 
+> **Canonical contract:** `openapi.yaml` at the repo root is the canonical machine-readable spec. This Markdown file is the prose companion and may lag the spec — when in doubt, the OpenAPI document wins. CI fails on drift between the two via `TestOpenAPIDrift` (`internal/api/openapi_drift_test.go`).
+
 Complete list of all REST API endpoints. All endpoints are prefixed with `/api/v1/` unless noted otherwise.
 
 ## Authentication
