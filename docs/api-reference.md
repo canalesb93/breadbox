@@ -181,6 +181,100 @@ Destructive: deletes every `bank_connections`, `accounts`, and `transactions` ro
 
 Responds `200` with the count of removed transactions, `404 NOT_FOUND` when the user does not exist.
 
+### Login accounts
+
+A "login account" is the auth identity that can sign in to the admin UI; each
+one is linked to exactly one household member (user). Headless deployments
+manage these via the endpoints below to provision admin access without an
+interactive setup session.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET    | `/users/{user_id}/login` | Write | List the login account(s) for a user |
+| POST   | `/users/{user_id}/login` | Write | Create a login account for a user; returns the one-time `setup_token` |
+| PATCH  | `/users/{user_id}/login/{login_id}` | Write | Update the role (`admin`, `editor`, or `viewer`) |
+| DELETE | `/users/{user_id}/login/{login_id}` | Write | Delete the login account (does not delete the user) |
+| POST   | `/users/{user_id}/login/{login_id}/regenerate-token` | Write | Regenerate the setup token; returns the new plaintext token |
+
+All login-account endpoints require **write scope** even for reads — the list
+of login identities is sensitive (it lets a leaked key enumerate who can sign
+in).
+
+`{user_id}` accepts either the user's UUID or 8-char `short_id`. `{login_id}`
+is the auth-account UUID (returned as `id` on every response).
+
+#### `POST /users/{user_id}/login`
+
+Request:
+
+```json
+{
+  "username": "alice@example.com",
+  "role": "admin"
+}
+```
+
+`username` is treated as an email address (validated) and must be unique
+across the entire deployment. `role` is one of `admin`, `editor`, or
+`viewer`.
+
+Success response (`201 Created`):
+
+```json
+{
+  "id": "0d6a8e02-...",
+  "user_id": "8c3f...",
+  "user_name": "Alice",
+  "user_email": null,
+  "username": "alice@example.com",
+  "role": "admin",
+  "has_password": false,
+  "setup_token": "f3a1c4...",
+  "setup_token_expires_at": "2026-05-16T12:34:56Z",
+  "created_at": "2026-05-09T12:34:56Z",
+  "updated_at": "2026-05-09T12:34:56Z"
+}
+```
+
+The `setup_token` is the one-time secret the user redeems to set their
+initial password. **It is exposed only on this `POST` response and on
+`POST .../regenerate-token`.** Subsequent `GET` and `PATCH` responses never
+include it; if it's lost, regenerate a fresh one.
+
+Error codes:
+
+- `400 INVALID_PARAMETER` — missing/invalid `username` (must be an email),
+  missing `role`, or unknown `role`.
+- `404 NOT_FOUND` — `user_id` does not exist.
+- `409 USERNAME_TAKEN` — another login already uses that username.
+- `409 LOGIN_EXISTS` — this user already has a login account.
+
+#### `PATCH /users/{user_id}/login/{login_id}`
+
+Request:
+
+```json
+{ "role": "viewer" }
+```
+
+Returns `200 OK` with the updated login account (no `setup_token`).
+
+#### `DELETE /users/{user_id}/login/{login_id}`
+
+Returns `204 No Content`. The linked household member is **not** deleted; only
+the auth identity is removed.
+
+#### `POST /users/{user_id}/login/{login_id}/regenerate-token`
+
+Returns `200 OK` with a fresh plaintext token:
+
+```json
+{ "setup_token": "9b2d4f..." }
+```
+
+Fails with `409 PASSWORD_ALREADY_SET` if the account already redeemed a token
+and chose a password — there's nothing to regenerate at that point.
+
 ## Connections
 
 | Method | Endpoint | Auth | Description |
