@@ -26,7 +26,7 @@ const MaxCommentLength = 10000
 func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
 	if content == "" || len(content) > MaxCommentLength {
-		return nil, fmt.Errorf("content must be between 1 and %d characters", MaxCommentLength)
+		return nil, fmt.Errorf("%w: content must be between 1 and %d characters", ErrInvalidParameter, MaxCommentLength)
 	}
 
 	// Verify transaction exists and is not soft-deleted.
@@ -132,7 +132,7 @@ func (s *Service) ListComments(ctx context.Context, transactionID string) ([]Com
 func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
 	if content == "" || len(content) > MaxCommentLength {
-		return nil, fmt.Errorf("content must be between 1 and %d characters", MaxCommentLength)
+		return nil, fmt.Errorf("%w: content must be between 1 and %d characters", ErrInvalidParameter, MaxCommentLength)
 	}
 
 	annID, err := s.resolveAnnotationID(ctx, id)
