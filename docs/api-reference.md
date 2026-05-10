@@ -204,6 +204,168 @@ The handler returns `202 Accepted` immediately and runs the sync asynchronously;
 { "status": "sync_triggered" }
 ```
 
+### Sync visibility
+
+`POST /sync` is fire-and-forget — these GET endpoints close the loop. They wrap the same data the admin dashboard uses, so REST clients can poll progress, audit prior runs, and read provider health without scraping HTML. All read-scope. Pair them with the connection-management endpoints under `/connections/{id}` for per-connection drilldowns.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/sync/logs` | Read | Paginated history with filters |
+| GET | `/sync/logs/{id}` | Read | Single log + per-account rows |
+| GET | `/sync/health` | Read | Aggregate sync health (last 24h) |
+| GET | `/sync/health/providers` | Read | Per-provider health summary |
+| GET | `/sync/stats` | Read | Aggregate stats matching the same filter set as `/sync/logs` |
+
+#### `GET /sync/logs`
+
+| Query param | Type | Description |
+|-------------|------|-------------|
+| `connection_id` | string | UUID or short_id. Restrict to one connection. |
+| `status` | string | One of `in_progress`, `success`, `error`. |
+| `trigger` | string | One of `cron`, `webhook`, `manual`, `initial`. |
+| `from` | string (RFC3339) | Lower bound on `started_at` (inclusive). |
+| `to` | string (RFC3339) | Upper bound on `started_at` (exclusive). Must be after `from`. |
+| `limit` | int | Default 50, max 200. |
+| `cursor` | string | Opaque cursor returned by a prior page. Treat as a black box. |
+
+Response (`200 OK`):
+
+```json
+{
+  "sync_logs": [
+    {
+      "id": "01J...",
+      "connection_id": "01J...",
+      "institution_name": "Chase",
+      "trigger": "manual",
+      "status": "success",
+      "added_count": 12,
+      "modified_count": 1,
+      "removed_count": 0,
+      "unchanged_count": 47,
+      "started_at": "2026-04-26T12:00:00Z",
+      "completed_at": "2026-04-26T12:00:02Z",
+      "duration": "2.041s",
+      "duration_ms": 2041,
+      "accounts_affected": 3
+    }
+  ],
+  "next_cursor": "eyJwIjoyfQ",
+  "has_more": true,
+  "limit": 50,
+  "total": 173
+}
+```
+
+`error_message`, `friendly_error_message`, and `warning_message` are present only when populated. The list omits the per-rule breakdown — fetch a single log to see `rule_hits`. `400 INVALID_PARAMETER` is returned for malformed filter values; `400 INVALID_CURSOR` for a cursor that fails to decode.
+
+#### `GET /sync/logs/{id}`
+
+Path id must be the sync log UUID (sync logs do not expose a short_id alias on the REST surface). Response embeds the per-account breakdown plus the per-rule hit counts:
+
+```json
+{
+  "id": "01J...",
+  "connection_id": "01J...",
+  "institution_name": "Chase",
+  "provider": "plaid",
+  "trigger": "manual",
+  "status": "success",
+  "added_count": 12,
+  "modified_count": 1,
+  "removed_count": 0,
+  "unchanged_count": 47,
+  "started_at": "2026-04-26T12:00:00Z",
+  "completed_at": "2026-04-26T12:00:02Z",
+  "duration": "2.041s",
+  "accounts_affected": 3,
+  "rule_hits": [
+    { "rule_id": "01J...", "rule_name": "Coffee → Food & Drink", "count": 4 }
+  ],
+  "total_rule_hits": 4,
+  "accounts": [
+    {
+      "id": "01J...",
+      "sync_log_id": "01J...",
+      "account_id": "01J...",
+      "account_name": "Checking",
+      "added_count": 8,
+      "modified_count": 1,
+      "removed_count": 0,
+      "unchanged_count": 30
+    }
+  ]
+}
+```
+
+`404 NOT_FOUND` when the id doesn't resolve.
+
+#### `GET /sync/health`
+
+Aggregate over the last 24h, plus the most recent sync's status and the overall verdict (`healthy`, `degraded`, `unhealthy`). Useful as a single-shot dashboard probe.
+
+```json
+{
+  "overall_health": "healthy",
+  "last_sync_time": "5 minutes ago",
+  "last_sync_status": "success",
+  "recent_sync_count": 12,
+  "recent_success_rate": 100.0,
+  "recent_error_count": 0,
+  "connection_errors": 0,
+  "next_sync_time": ""
+}
+```
+
+`last_sync_time` is a human-readable relative timestamp ("5 minutes ago"), not RFC3339 — it mirrors what the admin dashboard renders. Pair with `/sync/logs?limit=1` if you need an absolute timestamp.
+
+#### `GET /sync/health/providers`
+
+Per-provider snapshot. Keyed by provider type (`plaid`, `teller`, `csv`):
+
+```json
+{
+  "providers": {
+    "plaid": {
+      "provider": "plaid",
+      "connection_count": 3,
+      "account_count": 7,
+      "last_sync_status": "success",
+      "last_sync_time": "5 minutes ago"
+    },
+    "teller": {
+      "provider": "teller",
+      "connection_count": 1,
+      "account_count": 2,
+      "last_sync_status": "error",
+      "last_sync_time": "1 hour ago",
+      "last_sync_error": "401 unauthorized"
+    }
+  }
+}
+```
+
+Disconnected connections are excluded from the connection / account counts (they don't sync).
+
+#### `GET /sync/stats`
+
+Same filter set as `/sync/logs` (`connection_id`, `status`, `trigger`, `from`, `to`). Returns aggregate counters for the matching slice — useful for "out of N runs matching this filter, X succeeded" UIs without paginating the full list.
+
+```json
+{
+  "total_syncs": 173,
+  "success_count": 168,
+  "error_count": 5,
+  "warning_count": 2,
+  "success_rate": 97.11,
+  "avg_duration_ms": 1842.5,
+  "total_added": 4203,
+  "total_modified": 87,
+  "total_removed": 12,
+  "total_unchanged": 18230
+}
+```
+
 ### POST `/transactions/update`
 
 Atomic multi-field batch. Each operation can set a category (or clear an override), add/remove tags, and attach a comment — all atomic per transaction. REST sibling of the MCP `update_transactions` tool.
