@@ -649,12 +649,30 @@ Rules auto-categorize transactions during sync by matching conditions on transac
 |--------|----------|------|-------------|
 | GET | `/rules` | Read | List all rules with filters |
 | GET | `/rules/{id}` | Read | Get a single rule |
+| GET | `/rules/{id}/sync-history` | Read | Last N sync runs that triggered this rule (default 10, max 100) |
 | POST | `/rules` | Write | Create a rule |
+| POST | `/rules/batch` | Write | Bulk-create rules (mirrors MCP `batch_create_rules`, max 50 per call) |
 | PUT | `/rules/{id}` | Write | Update a rule |
 | DELETE | `/rules/{id}` | Write | Delete a rule |
-| POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively |
-| POST | `/rules/apply-all` | Write | Apply all active rules retroactively |
+| POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively (skips `category_override=true` rows) |
+| POST | `/rules/apply-all` | Write | Apply all active rules retroactively (pipeline-stage order, skips overrides) |
 | POST | `/rules/preview` | Write | Dry-run a condition against existing transactions |
+
+`POST /rules/batch` and the apply endpoints both have integration coverage in `internal/api/rules_batch_integration_test.go` and `internal/api/rules_apply_integration_test.go`. The apply tests assert the `category_override=true` sacred-cow contract: a manually-overridden transaction is never recategorized by retroactive apply, even when its conditions match.
+
+`POST /rules/batch` request body mirrors the MCP `batch_create_rules` shape:
+
+```json
+{
+  "rules": [
+    { "name": "...", "category_slug": "...", "conditions": { ... } },
+    { "name": "...", "actions": [ ... ], "trigger": "always" }
+  ],
+  "on_error": "continue"
+}
+```
+
+`on_error` defaults to `continue` (per-op failures are isolated). With `on_error=abort`, the first failure rolls back any rules created earlier in the batch and returns a per-op `results[]` envelope with `aborted: true`. Top-level `400 INVALID_PARAMETER` is reserved for malformed input (empty rules array, > 50 entries, unknown `on_error`).
 
 ### Rule Condition Structure
 

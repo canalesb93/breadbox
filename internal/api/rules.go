@@ -245,6 +245,229 @@ func ApplyAllRulesHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// batchCreateRulesRequest mirrors the MCP `batch_create_rules` tool's input
+// shape 1:1 (snake_case, identical field names).
+type batchCreateRulesRequest struct {
+	Rules   []batchCreateRuleItem `json:"rules"`
+	OnError string                `json:"on_error"`
+}
+
+// batchCreateRuleItem is a single rule create payload, mirroring the
+// per-item shape used by both the single-create REST handler and the MCP
+// batch_create_rules tool.
+type batchCreateRuleItem struct {
+	Name         string               `json:"name"`
+	Conditions   *service.Condition   `json:"conditions"`
+	Actions      []service.RuleAction `json:"actions"`
+	CategorySlug string               `json:"category_slug"`
+	Trigger      string               `json:"trigger"`
+	Stage        string               `json:"stage"`
+	Priority     int                  `json:"priority"`
+	ExpiresIn    string               `json:"expires_in"`
+}
+
+// batchCreateRuleResult is a single per-op outcome.
+type batchCreateRuleResult struct {
+	Index   int                          `json:"index"`
+	Status  string                       `json:"status"` // "ok" or "error"
+	RuleID  string                       `json:"rule_id,omitempty"`
+	Rule    *service.TransactionRuleResponse `json:"rule,omitempty"`
+	Error   *batchCreateRuleResultError  `json:"error,omitempty"`
+}
+
+type batchCreateRuleResultError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// BatchCreateRulesHandler is the REST sibling of the MCP `batch_create_rules`
+// tool. Up to 50 rules per call. Per-op errors live inside `results[]`; the
+// top-level call returns 200 unless the input itself is malformed (empty/
+// oversized rules array), in which case it returns `400 INVALID_PARAMETER`.
+//
+// In `on_error=continue` (default), each rule's failure is isolated. In
+// `on_error=abort`, the first failure wraps the previously-created rules in a
+// rollback by deleting them and returns the partial-results envelope with
+// `aborted=true`.
+//
+// POST /rules/batch
+func BatchCreateRulesHandler(svc *service.Service) http.HandlerFunc {
+	const maxBatchSize = 50
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input batchCreateRulesRequest
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+
+		if len(input.Rules) == 0 {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "rules array is required and must not be empty")
+			return
+		}
+		if len(input.Rules) > maxBatchSize {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"too many rules in batch (max 50)")
+			return
+		}
+
+		onError := input.OnError
+		if onError == "" {
+			onError = "continue"
+		}
+		if onError != "continue" && onError != "abort" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "on_error must be 'continue' or 'abort'")
+			return
+		}
+
+		actor := service.ActorFromContext(r.Context())
+
+		results := make([]batchCreateRuleResult, 0, len(input.Rules))
+		var createdIDs []string
+		succeeded := 0
+		failed := 0
+		aborted := false
+
+		for i, item := range input.Rules {
+			res := batchCreateRuleResult{Index: i, Status: "ok"}
+
+			if item.Name == "" {
+				failed++
+				res.Status = "error"
+				res.Error = &batchCreateRuleResultError{
+					Code:    "VALIDATION_ERROR",
+					Message: "name is required",
+				}
+				results = append(results, res)
+				if onError == "abort" {
+					aborted = true
+					break
+				}
+				continue
+			}
+			if len(item.Actions) == 0 && item.CategorySlug == "" {
+				failed++
+				res.Status = "error"
+				res.Error = &batchCreateRuleResultError{
+					Code:    "VALIDATION_ERROR",
+					Message: "either actions or category_slug is required",
+				}
+				results = append(results, res)
+				if onError == "abort" {
+					aborted = true
+					break
+				}
+				continue
+			}
+
+			params := service.CreateTransactionRuleParams{
+				Name:         item.Name,
+				Actions:      item.Actions,
+				CategorySlug: item.CategorySlug,
+				Trigger:      item.Trigger,
+				Priority:     item.Priority,
+				Stage:        item.Stage,
+				ExpiresIn:    item.ExpiresIn,
+				Actor:        actor,
+			}
+			if item.Conditions != nil {
+				params.Conditions = *item.Conditions
+			}
+
+			rule, err := svc.CreateTransactionRule(r.Context(), params)
+			if err != nil {
+				failed++
+				res.Status = "error"
+				code, msg := batchCreateRuleErrorMapping(err)
+				res.Error = &batchCreateRuleResultError{Code: code, Message: msg}
+				results = append(results, res)
+				if onError == "abort" {
+					aborted = true
+					break
+				}
+				continue
+			}
+
+			succeeded++
+			res.RuleID = rule.ID
+			res.Rule = rule
+			results = append(results, res)
+			createdIDs = append(createdIDs, rule.ID)
+		}
+
+		// Abort mode: roll back any rules created before the failure so the
+		// batch is all-or-nothing.
+		if aborted && len(createdIDs) > 0 {
+			for _, id := range createdIDs {
+				_ = svc.DeleteTransactionRule(r.Context(), id)
+			}
+			succeeded = 0
+		}
+
+		payload := map[string]any{
+			"results":   results,
+			"succeeded": succeeded,
+			"failed":    failed,
+		}
+		if aborted {
+			payload["aborted"] = true
+		}
+		writeData(w, payload)
+	}
+}
+
+// batchCreateRuleErrorMapping translates a service-layer error from
+// CreateTransactionRule into the per-op error envelope's (code, message).
+func batchCreateRuleErrorMapping(err error) (string, string) {
+	switch {
+	case errors.Is(err, service.ErrInvalidParameter):
+		return "VALIDATION_ERROR", err.Error()
+	case errors.Is(err, service.ErrCategoryNotFound):
+		return "VALIDATION_ERROR", "Category not found"
+	default:
+		return "INTERNAL_ERROR", err.Error()
+	}
+}
+
+// GetRuleSyncHistoryHandler returns recent sync runs that triggered this rule
+// (last N rows from sync_logs where rule_hits contains this rule's UUID).
+//
+// GET /rules/{id}/sync-history?limit=10
+func GetRuleSyncHistoryHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		limit, err := parseIntParam(r.URL.Query(), "limit", 10, 1, 100)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+
+		// Resolve via Get to enforce existence + accept short_id. The service
+		// helper returns the canonical UUID-form ID on the response, which is
+		// the key sync_logs.rule_hits is indexed by.
+		rule, err := svc.GetTransactionRule(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get rule")
+			return
+		}
+
+		history, err := svc.GetRuleSyncHistory(r.Context(), rule.ID, limit)
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get rule sync history")
+			return
+		}
+		if history == nil {
+			history = []map[string]any{}
+		}
+
+		writeData(w, map[string]any{"history": history})
+	}
+}
+
 // PreviewRuleHandler previews a rule's conditions against existing transactions.
 func PreviewRuleHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
