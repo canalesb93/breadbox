@@ -42,3 +42,54 @@ func GetAccountHandler(svc *service.Service) http.HandlerFunc {
 		writeData(w, account)
 	}
 }
+
+// GetAccountDetailHandler returns the full detail payload for an account,
+// including the most recent transactions and balances by currency.
+// GET /api/v1/accounts/{id}/detail
+func GetAccountDetailHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		detail, err := svc.GetAccountDetailResponse(r.Context(), id, 25)
+		if err != nil {
+			writeServiceError(w, err, "Account not found", "Failed to get account detail")
+			return
+		}
+
+		writeData(w, detail)
+	}
+}
+
+// updateAccountRequest is the JSON body for PATCH /accounts/{id}. Every
+// field is optional; omit a key to leave the corresponding column unchanged.
+// To clear `display_name`, send an explicit empty string.
+type updateAccountRequest struct {
+	DisplayName       *string `json:"display_name,omitempty"`
+	IsExcluded        *bool   `json:"is_excluded,omitempty"`
+	IsDependentLinked *bool   `json:"is_dependent_linked,omitempty"`
+}
+
+// UpdateAccountHandler partially updates a single account.
+// PATCH /api/v1/accounts/{id}
+func UpdateAccountHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		var req updateAccountRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+
+		account, err := svc.UpdateAccount(r.Context(), id, service.UpdateAccountParams{
+			DisplayName:       req.DisplayName,
+			IsExcluded:        req.IsExcluded,
+			IsDependentLinked: req.IsDependentLinked,
+		})
+		if err != nil {
+			writeServiceError(w, err, "Account not found", "Failed to update account")
+			return
+		}
+
+		writeData(w, account)
+	}
+}

@@ -106,6 +106,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		// Read endpoints
 		r.Get("/accounts", ListAccountsHandler(svc))
 		r.Get("/accounts/{id}", GetAccountHandler(svc))
+		r.Get("/accounts/{id}/detail", GetAccountDetailHandler(svc))
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
@@ -138,6 +139,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		// Write endpoints — require full_access scope
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireWriteScope())
+			r.Patch("/accounts/{id}", UpdateAccountHandler(svc))
 			r.Patch("/transactions/{id}/category", SetTransactionCategoryHandler(svc))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryHandler(svc))
 			r.Post("/categories", CreateCategoryHandler(svc))

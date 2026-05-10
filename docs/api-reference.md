@@ -35,6 +35,42 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 |--------|----------|------|-------------|
 | GET | `/accounts` | Read | List all accounts |
 | GET | `/accounts/{id}` | Read | Get a single account |
+| GET | `/accounts/{id}/detail` | Read | Get account detail with last 25 transactions and per-currency balances |
+| PATCH | `/accounts/{id}` | Write | Partially update mutable fields on a single account |
+
+### `GET /accounts/{id}/detail`
+
+Returns the standard `AccountResponse` fields plus:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string \| null | User-supplied display label (overrides `name` in admin UI) |
+| `excluded` | bool | When true, the account is hidden from totals and skipped during sync |
+| `provider` | string | `plaid`, `teller`, or `csv` |
+| `connection_user_name` | string | Household member who owns the connection (display name) |
+| `connection_short_id` | string | Connection short_id (also surfaced as `connection_id` on the base shape) |
+| `balances` | array | One entry per currency (single-element today; future-proofs for multi-currency accounts). Each entry has `iso_currency_code`, `balance_current`, `balance_available`, `balance_limit`. |
+| `recent_transactions` | array | Up to 25 most recent transactions for this account, sorted date-DESC. Each entry uses the standard `TransactionResponse` shape. |
+
+### `PATCH /accounts/{id}`
+
+Body: every field is optional. Omit a key to leave the corresponding column unchanged. To clear `display_name` and fall back to the institution-supplied `name`, send an explicit empty string.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string | User-supplied label. Empty string clears the override. |
+| `is_excluded` | bool | Hide the account from totals and skip it during sync. |
+| `is_dependent_linked` | bool | Whether the account participates in dependent-link attribution. Normally driven by `account_links` lifecycle; exposed here for parity with the admin UI. |
+
+```json
+{
+  "display_name": "Joint Checking",
+  "is_excluded": false,
+  "is_dependent_linked": true
+}
+```
+
+Response: `200 OK` with the updated `AccountResponse`. Returns `404 NOT_FOUND` when the account doesn't exist.
 
 ## Transactions
 

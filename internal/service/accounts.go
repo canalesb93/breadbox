@@ -55,6 +55,133 @@ func (s *Service) GetAccount(ctx context.Context, id string) (*AccountResponse, 
 	return &resp, nil
 }
 
+// UpdateAccountParams carries the optional, mutable fields a caller can
+// patch on an account. nil fields are left untouched. Only one DB write is
+// performed regardless of how many fields are set; nothing is written when
+// every field is nil.
+type UpdateAccountParams struct {
+	// DisplayName: nil = no change, non-nil "" = clear (NULL),
+	// non-nil value = set.
+	DisplayName *string
+	// IsExcluded toggles whether the account participates in totals/sync.
+	IsExcluded *bool
+	// IsDependentLinked controls the dependent-linked flag (normally driven
+	// by account_links lifecycle but exposed here for parity with admin).
+	IsDependentLinked *bool
+}
+
+// UpdateAccount partially updates a single account. Returns the refreshed
+// AccountResponse. ErrNotFound when the id resolves to no account.
+func (s *Service) UpdateAccount(ctx context.Context, id string, params UpdateAccountParams) (*AccountResponse, error) {
+	uid, err := s.resolveAccountID(ctx, id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if _, err := s.Queries.GetAccount(ctx, uid); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get account: %w", err)
+	}
+
+	if params.DisplayName == nil && params.IsExcluded == nil && params.IsDependentLinked == nil {
+		// Nothing to do — return the current state.
+		return s.GetAccount(ctx, id)
+	}
+
+	// Build a single COALESCE-style UPDATE so all mutable fields land in one
+	// statement. We pass typed sentinels for "no change" (nil) so each
+	// column is left as its current value.
+	const q = `
+		UPDATE accounts SET
+		  display_name        = CASE WHEN $2::bool THEN $3::text ELSE display_name        END,
+		  excluded            = CASE WHEN $4::bool THEN $5::bool ELSE excluded            END,
+		  is_dependent_linked = CASE WHEN $6::bool THEN $7::bool ELSE is_dependent_linked END,
+		  updated_at = NOW()
+		WHERE id = $1`
+
+	dnSet := params.DisplayName != nil
+	var dnVal any
+	if dnSet {
+		// Treat empty string as a "clear" (NULL).
+		if *params.DisplayName == "" {
+			dnVal = nil
+		} else {
+			dnVal = *params.DisplayName
+		}
+	}
+
+	exSet := params.IsExcluded != nil
+	var exVal any
+	if exSet {
+		exVal = *params.IsExcluded
+	} else {
+		exVal = false
+	}
+
+	dlSet := params.IsDependentLinked != nil
+	var dlVal any
+	if dlSet {
+		dlVal = *params.IsDependentLinked
+	} else {
+		dlVal = false
+	}
+
+	if _, err := s.Pool.Exec(ctx, q, uid, dnSet, dnVal, exSet, exVal, dlSet, dlVal); err != nil {
+		return nil, fmt.Errorf("update account: %w", err)
+	}
+
+	return s.GetAccount(ctx, id)
+}
+
+// GetAccountDetailResponse returns the public REST detail payload for an
+// account, including the most recent N transactions and balances by
+// currency. Wraps GetAccountDetail (admin-shape) and ListTransactions for
+// the recent-transactions slice. limit defaults to 25 when <= 0 and is
+// capped at 100.
+func (s *Service) GetAccountDetailResponse(ctx context.Context, id string, limit int) (*AccountDetailResponse, error) {
+	detail, err := s.GetAccountDetail(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	acctID := detail.AccountResponse.ShortID
+	txnList, err := s.ListTransactions(ctx, TransactionListParams{
+		Limit:     limit,
+		AccountID: &acctID,
+		// Account detail surfaces dependent-linked rows too — they're
+		// part of this account's history regardless of attribution.
+		IncludeDependent: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list account transactions: %w", err)
+	}
+
+	resp := &AccountDetailResponse{
+		AccountResponse:    detail.AccountResponse,
+		DisplayName:        detail.DisplayName,
+		Excluded:           detail.Excluded,
+		Provider:           detail.Provider,
+		UserName:           detail.UserName,
+		ConnectionShortID:  detail.ConnectionID,
+		Balances: []AccountBalance{{
+			IsoCurrencyCode:  detail.AccountResponse.IsoCurrencyCode,
+			BalanceCurrent:   detail.AccountResponse.BalanceCurrent,
+			BalanceAvailable: detail.AccountResponse.BalanceAvailable,
+			BalanceLimit:     detail.AccountResponse.BalanceLimit,
+		}},
+		RecentTransactions: txnList.Transactions,
+	}
+	return resp, nil
+}
+
 func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccountDetail, error) {
 	uid, err := s.resolveAccountID(ctx, id)
 	if err != nil {

@@ -54,6 +54,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		// Read endpoints — all API keys.
 		r.Get("/accounts", ListAccountsHandler(svc))
 		r.Get("/accounts/{id}", GetAccountHandler(svc))
+		r.Get("/accounts/{id}/detail", GetAccountDetailHandler(svc))
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
@@ -87,6 +88,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireWriteScope())
+			r.Patch("/accounts/{id}", UpdateAccountHandler(svc))
 			r.Patch("/transactions/{id}/category", SetTransactionCategoryHandler(svc))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryHandler(svc))
 			r.Post("/categories", CreateCategoryHandler(svc))

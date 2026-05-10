@@ -356,6 +356,34 @@ type AdminAccountDetail struct {
 	ConnectionID    string
 }
 
+// AccountDetailResponse is the public REST detail payload returned from
+// GET /api/v1/accounts/{id}/detail. It composes the standard
+// AccountResponse with a few admin-only fields and the most recent
+// transactions for the account. Per-currency balances are returned on
+// the embedded AccountResponse fields (BalanceCurrent / IsoCurrencyCode);
+// `Balances` is the array form for forward compatibility with multi-currency
+// accounts (always single-element today).
+type AccountDetailResponse struct {
+	AccountResponse
+	DisplayName        *string                  `json:"display_name"`
+	Excluded           bool                     `json:"excluded"`
+	Provider           string                   `json:"provider,omitempty"`
+	UserName           string                   `json:"connection_user_name,omitempty"`
+	ConnectionShortID  string                   `json:"connection_short_id,omitempty"`
+	Balances           []AccountBalance         `json:"balances"`
+	RecentTransactions []TransactionResponse    `json:"recent_transactions"`
+}
+
+// AccountBalance represents a balance in a single currency. Today every
+// Breadbox account has a single balance; the slice shape exists so the
+// payload stays stable if multi-currency accounts ever land.
+type AccountBalance struct {
+	IsoCurrencyCode  *string  `json:"iso_currency_code"`
+	BalanceCurrent   *float64 `json:"balance_current"`
+	BalanceAvailable *float64 `json:"balance_available"`
+	BalanceLimit     *float64 `json:"balance_limit"`
+}
+
 // Comment types
 
 type CreateCommentParams struct {
