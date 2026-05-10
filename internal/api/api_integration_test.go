@@ -186,6 +186,8 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 			r.Post("/sync", TriggerSyncHandler(svc))
+			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
+			r.Post("/connections/csv/import", CSVImportHandler(svc))
 			r.Post("/connections/{id}/sync", SyncConnectionHandler(svc))
 			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
 			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))
