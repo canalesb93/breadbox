@@ -111,6 +111,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | POST | `/connections/{id}/reauth-complete` | Write | Mark connection active again after the user finishes the re-auth flow |
 | POST | `/connections/plaid/link-token` | Write | Start a new Plaid Link flow — returns a fresh link token |
 | POST | `/connections/plaid/exchange` | Write | Exchange the Plaid public token for a stored connection + accounts |
+| POST | `/connections/teller` | Write | Register a Teller connection from the enrollment payload Teller Connect returns |
 
 `{id}` accepts either the connection's UUID or 8-char short_id.
 
@@ -300,6 +301,62 @@ Errors:
 - `400 INVALID_PARAMETER` — required field missing; Plaid provider not configured on this server.
 - `404 NOT_FOUND` — `user_id` doesn't match any household member.
 - `502 PROVIDER_ERROR` — upstream Plaid token exchange failed.
+- `500 INTERNAL_ERROR` — DB write failed (the provider call already succeeded; safe to retry).
+
+### Teller Connect flow (new connection)
+
+Teller's enrollment flow is materially different from Plaid's: Teller Connect
+runs entirely client-side without a server-issued init token, so there is **no
+link-token step**. Just one POST to register the connection:
+
+1. Client / host: load Teller Connect with the application's `TELLER_APP_ID`
+   (returned by `GET /settings/providers` so the host doesn't have to hard-code
+   it). The user authenticates with their bank inside Teller's UI; on success
+   Teller fires `onSuccess` with an `enrollment` payload containing
+   `access_token`, `enrollment.id`, the matched institution, and the accounts
+   it discovered.
+2. Server: `POST /connections/teller` with the enrollment payload →
+   Breadbox calls Teller's `GET /accounts` with the access token to confirm
+   the discovered accounts, encrypts the access token, creates the
+   `BankConnection` row, and upserts the accounts Teller authoritatively
+   reports. Subsequent syncs run automatically on the global cron.
+
+This endpoint mirrors the admin `POST /admin/api/exchange-token` handler with
+`provider: "teller"` and persists data through the same service-layer write
+path as `POST /connections/plaid/exchange`.
+
+### POST `/connections/teller`
+
+Registers a new Teller connection.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | string | Required. UUID or 8-char short_id of the owning user. |
+| `institution_id` | string | Optional. Teller institution identifier (e.g. `chase`). |
+| `institution_name` | string | Required. Display name (e.g. `Chase`). Forwarded to the Teller exchange so the persisted connection carries the right label. |
+| `access_token` | string | Required. The `access_token` Teller handed back in `onSuccess`. |
+| `enrollment_id` | string | Required. The `enrollment.id` Teller handed back in `onSuccess`. Becomes the connection's `external_id`. |
+| `accounts` | array | Optional. The account metadata array Teller's `onSuccess` returns (id / name / type / subtype / last_four). **Informational only** — the rows persisted come from Teller's `GET /accounts` response, not from this field. |
+
+Returns `201`:
+
+```json
+{
+  "connection_id": "abc12345",
+  "institution_name": "Chase",
+  "status": "active"
+}
+```
+
+`connection_id` is the new connection's 8-char short_id.
+
+Errors:
+
+- `400 INVALID_PARAMETER` — required field missing; Teller provider not configured on this server.
+- `404 NOT_FOUND` — `user_id` doesn't match any household member.
+- `502 PROVIDER_ERROR` — upstream Teller call failed.
 - `500 INTERNAL_ERROR` — DB write failed (the provider call already succeeded; safe to retry).
 
 ## Sync
