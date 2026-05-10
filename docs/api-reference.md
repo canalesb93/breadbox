@@ -107,6 +107,8 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | POST | `/connections/{id}/paused` | Write | Pause or resume scheduled syncs for a connection |
 | POST | `/connections/{id}/sync-interval` | Write | Set or clear a per-connection sync-interval override |
 | DELETE | `/connections/{id}` | Write | Soft-disconnect a connection (clears tokens, hides from list) |
+| POST | `/connections/{id}/reauth` | Write | Start the provider re-auth flow — returns a fresh link token |
+| POST | `/connections/{id}/reauth-complete` | Write | Mark connection active again after the user finishes the re-auth flow |
 
 `{id}` accepts either the connection's UUID or 8-char short_id.
 
@@ -179,6 +181,47 @@ Soft-disconnect: flips status to `disconnected`, wipes the encrypted access toke
 Returns `204 No Content`. Calling on a missing or already-disconnected connection returns `404 NOT_FOUND` (idempotent at the API surface).
 
 Provider-side credential revocation (e.g. Plaid's `/item/remove`) is **not** performed by the REST endpoint — it is admin-handler-only because the public service layer doesn't carry the provider registry. The connection is unusable from Breadbox's side regardless.
+
+### POST `/connections/{id}/reauth`
+
+Starts a provider re-auth flow for a connection in `pending_reauth` (or any
+broken) state. Calls the provider for a short-lived link token; the client
+hands the token to the provider's UI (Plaid Link, Teller Connect, etc.) and
+calls `/reauth-complete` once the user finishes.
+
+Body: none.
+
+Returns `200`:
+
+```json
+{
+  "link_token": "link-sandbox-...",
+  "expiration": "2026-05-09T16:30:00Z"
+}
+```
+
+Errors:
+
+- `404 NOT_FOUND` — connection doesn't exist.
+- `400 INVALID_PARAMETER` — connection's provider isn't configured on this server.
+- `502 PROVIDER_ERROR` — upstream provider call failed.
+
+### POST `/connections/{id}/reauth-complete`
+
+Marks a previously broken connection active again and clears `error_code` /
+`error_message`. Call this after the user has completed the provider re-auth
+UI started by `/reauth`. Body is ignored — Plaid's OAuth redirect path
+exchanges the public token out-of-band, so no payload is required today.
+
+Returns `200`:
+
+```json
+{ "status": "active" }
+```
+
+Errors:
+
+- `404 NOT_FOUND` — connection doesn't exist.
 
 ## Sync
 

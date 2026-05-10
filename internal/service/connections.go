@@ -269,6 +269,45 @@ func (s *Service) UpdateConnectionSyncInterval(ctx context.Context, id string, i
 	return buildConnectionDetailResponse(conn), nil
 }
 
+// ResolveConnectionUUID resolves a UUID-or-short_id input into a pgtype.UUID
+// without fetching the row. Returns ErrNotFound for an unknown short_id and a
+// wrapped parse error for an invalid UUID. Public so non-service callers
+// (admin handlers, REST handlers that need to call providers directly) can
+// honor the same short-id contract the service layer enforces internally.
+func (s *Service) ResolveConnectionUUID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
+	return s.resolveConnectionID(ctx, idOrShort)
+}
+
+// ReactivateConnection clears a broken connection's error state and flips
+// status back to 'active'. Used by the reauth-complete flow after the user
+// has completed the provider's re-authentication UI. Returns ErrNotFound
+// when the row is missing.
+func (s *Service) ReactivateConnection(ctx context.Context, id string, _ Actor) error {
+	uid, err := s.resolveConnectionID(ctx, id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	// UpdateBankConnectionStatus is :exec and silently succeeds against a
+	// missing id, so verify existence first to keep the 404 contract.
+	if _, err := s.Queries.GetBankConnection(ctx, uid); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("get bank connection: %w", err)
+	}
+
+	if err := s.Queries.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
+		ID:           uid,
+		Status:       db.ConnectionStatusActive,
+		ErrorCode:    pgtype.Text{},
+		ErrorMessage: pgtype.Text{},
+	}); err != nil {
+		return fmt.Errorf("reactivate bank connection: %w", err)
+	}
+	return nil
+}
+
 func buildConnectionDetailResponse(conn db.GetConnectionForAPIRow) *ConnectionDetailResponse {
 	resp := &ConnectionDetailResponse{
 		ConnectionResponse: ConnectionResponse{
