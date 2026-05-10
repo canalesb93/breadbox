@@ -455,6 +455,104 @@ func BatchCategorizeHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// updateTransactionsRequest mirrors the MCP `update_transactions` tool's
+// input shape 1:1 (snake_case, identical field names). REST sibling of
+// internal/mcp/tools_update_transactions.go.
+type updateTransactionsRequest struct {
+	Operations []updateTransactionsOpRequest `json:"operations"`
+	OnError    string                        `json:"on_error"`
+}
+
+// updateTransactionsOpRequest is a single per-transaction compound operation.
+type updateTransactionsOpRequest struct {
+	TransactionID string             `json:"transaction_id"`
+	CategorySlug  *string            `json:"category_slug,omitempty"`
+	ResetCategory bool               `json:"reset_category,omitempty"`
+	TagsToAdd     []updateTagOpEntry `json:"tags_to_add,omitempty"`
+	TagsToRemove  []updateTagOpEntry `json:"tags_to_remove,omitempty"`
+	Comment       *string            `json:"comment,omitempty"`
+}
+
+// updateTagOpEntry is a single tag add/remove entry.
+type updateTagOpEntry struct {
+	Slug string `json:"slug"`
+}
+
+// UpdateTransactionsHandler is the REST sibling of the MCP `update_transactions`
+// tool. Each operation can set a category (or clear an override), add/remove
+// tags, and attach a comment — all atomic per transaction. Up to 50 ops per
+// call. Per-op errors live inside `results[]`; the top-level call returns
+// `200 OK` unless the input itself is malformed (empty/oversized operations,
+// invalid `on_error`), in which case it returns `400 INVALID_PARAMETER`.
+//
+// POST /transactions/update
+func UpdateTransactionsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input updateTransactionsRequest
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+
+		ops := make([]service.UpdateTransactionsOp, len(input.Operations))
+		for i, op := range input.Operations {
+			ops[i] = service.UpdateTransactionsOp{
+				TransactionID: op.TransactionID,
+				CategorySlug:  op.CategorySlug,
+				ResetCategory: op.ResetCategory,
+				Comment:       op.Comment,
+			}
+			for _, t := range op.TagsToAdd {
+				ops[i].TagsToAdd = append(ops[i].TagsToAdd, service.UpdateTransactionsTagOp{Slug: t.Slug})
+			}
+			for _, t := range op.TagsToRemove {
+				ops[i].TagsToRemove = append(ops[i].TagsToRemove, service.UpdateTransactionsTagOp{Slug: t.Slug})
+			}
+		}
+
+		actor := service.ActorFromContext(r.Context())
+		results, err := svc.UpdateTransactions(r.Context(), service.UpdateTransactionsParams{
+			Operations: ops,
+			OnError:    input.OnError,
+			Actor:      actor,
+		})
+		// Top-level validation errors (empty ops, > 50 ops, bad on_error)
+		// surface as 400. Per-op errors live inside `results[]`.
+		if err != nil && len(results) == 0 {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update transactions")
+			return
+		}
+
+		// abort mode with a partial-batch failure: results is populated AND
+		// err is set. Mirror the MCP envelope — return 200 with the partial
+		// results plus an `aborted` flag, so callers can see the per-op
+		// outcomes before the rollback.
+		succeeded := 0
+		failed := 0
+		for _, r := range results {
+			if r.Status == "ok" {
+				succeeded++
+			} else {
+				failed++
+			}
+		}
+
+		payload := map[string]any{
+			"results":   results,
+			"succeeded": succeeded,
+			"failed":    failed,
+		}
+		if err != nil {
+			payload["aborted"] = true
+			payload["error"] = err.Error()
+		}
+		writeData(w, payload)
+	}
+}
+
 // BulkRecategorizeHandler handles POST /api/v1/transactions/bulk-recategorize.
 func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
