@@ -50,6 +50,8 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | POST | `/transactions/batch-categorize` | Write | Batch categorize multiple transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | Write | Bulk recategorize by filter (server-side UPDATE) |
 | POST | `/transactions/update` | Write | Atomic multi-field batch (category + tags + comment per row, max 50 ops) |
+| DELETE | `/transactions/{id}` | Write | Soft-delete a transaction (sets `deleted_at`; hidden from all reads). |
+| POST | `/transactions/{id}/restore` | Write | Restore a soft-deleted transaction. |
 
 ### Transaction Query Parameters
 
@@ -160,6 +162,19 @@ Each operation:
 ```
 
 Per-op errors are reported inside `results[]`; the top-level response is still `200`. The whole call returns `400 INVALID_PARAMETER` only on malformed input (empty `operations`, more than 50, bad `on_error`). In `abort` mode a partial-batch failure rolls back the DB transaction and the response includes `aborted: true` plus the partial per-op outcomes.
+
+### DELETE `/transactions/{id}` and POST `/transactions/{id}/restore`
+
+Soft-delete and undo. `DELETE /transactions/{id}` sets the row's `deleted_at` timestamp; every read endpoint (list, get, summary, merchants, count, …) filters on `deleted_at IS NULL`, so a deleted transaction immediately disappears from all responses. The DB row is preserved so `POST /transactions/{id}/restore` can clear `deleted_at` and bring it back.
+
+Both endpoints return `204 No Content` on success and write a `transaction_deleted` / `transaction_restored` annotation on the activity timeline attributed to the calling API key.
+
+Both are idempotent at the API surface — a no-op returns `404 NOT_FOUND`:
+
+- `DELETE` on a transaction that doesn't exist or is already soft-deleted → `404`.
+- `POST /restore` on a transaction that doesn't exist or isn't currently soft-deleted → `404`.
+
+Path id accepts either a UUID or short_id for live (non-deleted) rows. Restore on a soft-deleted row must use the UUID — the short_id resolver itself filters on `deleted_at IS NULL` and won't find a deleted row by its short id.
 
 ## Transaction Comments
 

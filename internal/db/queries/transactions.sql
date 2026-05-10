@@ -55,6 +55,16 @@ UPDATE transactions SET deleted_at = NOW()
 WHERE account_id IN (SELECT id FROM accounts WHERE connection_id = $1)
   AND deleted_at IS NULL;
 
+-- name: SoftDeleteTransactionByID :execrows
+UPDATE transactions
+SET deleted_at = NOW()
+WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: RestoreTransactionByID :execrows
+UPDATE transactions
+SET deleted_at = NULL
+WHERE id = $1 AND deleted_at IS NOT NULL;
+
 -- name: GetTransaction :one
 SELECT * FROM transactions WHERE id = $1 AND deleted_at IS NULL;
 

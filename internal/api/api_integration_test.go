@@ -144,6 +144,8 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/transactions/batch-categorize", BatchCategorizeHandler(svc))
 			r.Post("/transactions/bulk-recategorize", BulkRecategorizeHandler(svc))
 			r.Post("/transactions/update", UpdateTransactionsHandler(svc))
+			r.Delete("/transactions/{id}", DeleteTransactionHandler(svc))
+			r.Post("/transactions/{id}/restore", RestoreTransactionHandler(svc))
 			r.Post("/account-links", CreateAccountLinkHandler(svc))
 			r.Put("/account-links/{id}", UpdateAccountLinkHandler(svc))
 			r.Delete("/account-links/{id}", DeleteAccountLinkHandler(svc))

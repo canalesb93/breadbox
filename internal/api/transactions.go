@@ -430,6 +430,53 @@ func ResetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// DeleteTransactionHandler soft-deletes a transaction by setting its
+// `deleted_at` timestamp. All read paths filter on `deleted_at IS NULL`, so
+// the row immediately disappears from list/get/summary/etc. The DB row is
+// preserved so a subsequent restore call can bring it back.
+//
+// DELETE /transactions/{id}
+//
+// Returns 204 on success. Returns 404 NOT_FOUND when the transaction
+// doesn't exist or is already soft-deleted — the call is idempotent at the
+// API surface (already-gone == not found).
+func DeleteTransactionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		actor := service.ActorFromContext(r.Context())
+		if err := svc.SoftDeleteTransaction(r.Context(), id, actor); err != nil {
+			writeServiceError(w, err, "Transaction not found", "Failed to delete transaction")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// RestoreTransactionHandler clears the soft-delete flag on a previously
+// deleted transaction, bringing it back into all read paths.
+//
+// POST /transactions/{id}/restore
+//
+// Returns 204 on success. Returns 404 NOT_FOUND when the transaction
+// doesn't exist or isn't currently soft-deleted (nothing to restore).
+//
+// Note: the path-id must be a UUID for soft-deleted rows because the
+// short_id → UUID resolver itself filters on `deleted_at IS NULL` and
+// won't find a deleted row by short_id. Live (non-deleted) ids resolve
+// via either form, but they fall through to the "not currently deleted"
+// 404 anyway.
+func RestoreTransactionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		actor := service.ActorFromContext(r.Context())
+		if err := svc.RestoreTransaction(r.Context(), id, actor); err != nil {
+			writeServiceError(w, err, "Transaction not found", "Failed to restore transaction")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // BatchCategorizeHandler handles POST /api/v1/transactions/batch-categorize.
 func BatchCategorizeHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
