@@ -118,6 +118,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		r.Get("/rules", ListRulesHandler(svc))
 		r.Get("/rules/{id}", GetRuleHandler(svc))
 		r.Get("/transactions/{transaction_id}/comments", ListCommentsHandler(svc))
+		r.Get("/transactions/{id}/annotations", ListAnnotationsHandler(svc))
 		r.Get("/account-links", ListAccountLinksHandler(svc))
 		r.Get("/account-links/{id}", GetAccountLinkHandler(svc))
 		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
