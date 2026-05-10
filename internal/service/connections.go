@@ -7,10 +7,77 @@ import (
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/provider"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// RegisterNewConnectionParams is the input for RegisterNewConnection. The
+// caller (REST or admin handler) has already exchanged the provider's public
+// token and produced an encrypted credentials blob — this method only
+// performs the DB writes (CreateBankConnection + UpsertAccount per account)
+// so both surfaces share one persistence path.
+type RegisterNewConnectionParams struct {
+	UserID          pgtype.UUID
+	Provider        string
+	InstitutionID   string
+	InstitutionName string
+	Conn            provider.Connection
+	Accounts        []provider.Account
+}
+
+// RegisterNewConnectionResult carries the freshly-persisted connection's
+// stable identifiers so the caller can shape its API response.
+type RegisterNewConnectionResult struct {
+	ID      pgtype.UUID
+	ShortID string
+}
+
+// RegisterNewConnection persists a freshly-exchanged bank connection plus
+// the accounts the provider returned. Account upsert errors are logged but
+// do not fail the call — the connection itself is the source of truth and
+// we'd rather have a connection with N-1 accounts than no connection at all
+// (matches admin ExchangeTokenHandler behavior).
+//
+// The provider exchange (and the encryption of the access token) must
+// already have happened — Conn.EncryptedCredentials and Conn.ExternalID are
+// stored verbatim. This keeps the service layer provider-agnostic.
+func (s *Service) RegisterNewConnection(ctx context.Context, p RegisterNewConnectionParams) (RegisterNewConnectionResult, error) {
+	bankConn, err := s.Queries.CreateBankConnection(ctx, db.CreateBankConnectionParams{
+		UserID:               p.UserID,
+		Provider:             db.ProviderType(p.Provider),
+		InstitutionID:        pgconv.Text(p.InstitutionID),
+		InstitutionName:      pgconv.Text(p.InstitutionName),
+		ExternalID:           pgconv.Text(p.Conn.ExternalID),
+		EncryptedCredentials: p.Conn.EncryptedCredentials,
+		Status:               db.ConnectionStatusActive,
+	})
+	if err != nil {
+		return RegisterNewConnectionResult{}, fmt.Errorf("create bank connection: %w", err)
+	}
+
+	for _, acct := range p.Accounts {
+		if _, err := s.Queries.UpsertAccount(ctx, db.UpsertAccountParams{
+			ConnectionID:      bankConn.ID,
+			ExternalAccountID: acct.ExternalID,
+			Name:              acct.Name,
+			OfficialName:      pgconv.TextIfNotEmpty(acct.OfficialName),
+			Type:              acct.Type,
+			Subtype:           pgconv.TextIfNotEmpty(acct.Subtype),
+			Mask:              pgconv.TextIfNotEmpty(acct.Mask),
+			IsoCurrencyCode:   pgconv.TextIfNotEmpty(acct.ISOCurrencyCode),
+		}); err != nil {
+			s.Logger.Error("upsert account during connection register",
+				"error", err,
+				"external_id", acct.ExternalID,
+				"connection_id", pgconv.FormatUUID(bankConn.ID),
+			)
+		}
+	}
+
+	return RegisterNewConnectionResult{ID: bankConn.ID, ShortID: bankConn.ShortID}, nil
+}
 
 func (s *Service) ListConnections(ctx context.Context, userID *string) ([]ConnectionResponse, error) {
 	if userID != nil {
@@ -276,6 +343,14 @@ func (s *Service) UpdateConnectionSyncInterval(ctx context.Context, id string, i
 // honor the same short-id contract the service layer enforces internally.
 func (s *Service) ResolveConnectionUUID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
 	return s.resolveConnectionID(ctx, idOrShort)
+}
+
+// ResolveUserUUID resolves a UUID-or-short_id input into a pgtype.UUID
+// without fetching the row. Same contract as ResolveConnectionUUID — public so
+// non-service callers (admin and REST handlers) can honor the short-id
+// contract uniformly when they need a user UUID for direct DB writes.
+func (s *Service) ResolveUserUUID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
+	return s.resolveUserID(ctx, idOrShort)
 }
 
 // ReactivateConnection clears a broken connection's error state and flips
