@@ -1,0 +1,2136 @@
+openapi: 3.1.0
+info:
+  title: Breadbox REST API
+  version: "1.0.0"
+  summary: Self-hosted financial-data REST API for households and AI agents.
+  description: |
+    Machine-readable contract for the Breadbox REST API. Every `/api/v1/*` endpoint
+    declared on the production chi router is represented here. The companion prose
+    document at `docs/api-reference.md` may lag this spec; when in doubt, this file
+    is canonical.
+
+    ## Authentication
+
+    All `/api/v1/*` endpoints require an API key passed via the `X-API-Key` header.
+    Keys carry one of two scopes:
+
+    - `read_only` — may call any read endpoint (`GET`).
+    - `full_access` — may call read endpoints **and** all write endpoints
+      (`POST`, `PATCH`, `PUT`, `DELETE`, plus a handful of `GET`s like `/api-keys`
+      and `/users/{user_id}/login` that return sensitive data).
+
+    Endpoints requiring `full_access` are flagged with the phrase **Requires
+    `full_access` scope.** in their description. OpenAPI does not natively
+    distinguish scopes on a single API-key scheme, so the enforcement boundary is
+    documented per-operation rather than encoded in the security block.
+
+    ## Amount convention
+
+    Transaction amounts use `NUMERIC(12,2)` and are paired with `iso_currency_code`.
+    Positive = money out (debits, purchases, fees). Negative = money in (credits,
+    deposits, refunds). Never sum across `iso_currency_code`.
+
+    ## Identifiers
+
+    Every entity has both a UUID `id` and an 8-character base62 `short_id`. REST
+    responses include both. Path parameters that accept `{id}` accept either form;
+    short IDs are usually preferable for humans.
+
+    ## Pagination
+
+    Cursor pagination is used on transaction-shaped lists. Pass the previous
+    response's `next_cursor` as `?cursor=` to fetch the next page. Bounded
+    resources (accounts, users, connections, categories) return bare arrays.
+
+    ## Errors
+
+    All error responses share the envelope `{ "error": { "code": "...",
+    "message": "..." } }`. Codes are stable contracts in `UPPER_SNAKE_CASE`.
+  contact:
+    name: Breadbox
+    url: https://breadbox.sh
+  license:
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+
+servers:
+  - url: https://breadbox.example.com
+    description: Self-hosted Breadbox instance (replace host with your deployment).
+
+security:
+  - apiKeyAuth: []
+
+tags:
+  - name: Health
+    description: Liveness and readiness probes. No authentication.
+  - name: Version
+    description: Server version metadata.
+  - name: Accounts
+  - name: Transactions
+  - name: Comments
+  - name: Annotations
+  - name: Tags
+  - name: Categories
+  - name: Connections
+  - name: Sync
+  - name: Rules
+  - name: Account Links
+  - name: Reports
+  - name: Users
+  - name: API Keys
+  - name: Settings
+
+paths:
+  # -- Health & version (no auth) --
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns HTTP 200 with no dependency checks. Suitable for load-balancer health checks.
+      security: []
+      responses:
+        "200":
+          description: Server is up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe (alias)
+      description: Identical to `/health`.
+      security: []
+      responses:
+        "200":
+          description: Server is up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Verifies database connectivity and that the scheduler is running.
+      security: []
+      responses:
+        "200":
+          description: Server is ready to take traffic.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+        "503":
+          description: A dependency is unavailable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/version:
+    get:
+      tags: [Version]
+      summary: Get server version
+      description: Returns the running server version plus update-availability metadata. No authentication.
+      security: []
+      responses:
+        "200":
+          description: Version information.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionResponse" }
+
+  # -- Accounts --
+  /api/v1/accounts:
+    get:
+      tags: [Accounts]
+      summary: List accounts
+      description: Returns every account visible to the API key. Bounded resource — no pagination.
+      parameters:
+        - $ref: "#/components/parameters/Fields"
+      responses:
+        "200":
+          description: Array of accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Account" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/accounts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+    get:
+      tags: [Accounts]
+      summary: Get account
+      parameters:
+        - $ref: "#/components/parameters/Fields"
+      responses:
+        "200":
+          description: Single account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Accounts]
+      summary: Update account
+      description: |
+        Partially update mutable fields on a single account. Omit a key to leave
+        the column unchanged. Send an explicit empty string to clear `display_name`.
+
+        **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountUpdate" }
+      responses:
+        "200":
+          description: Updated account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/accounts/{id}/detail:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+    get:
+      tags: [Accounts]
+      summary: Get account detail
+      description: Returns the standard account fields plus per-currency balances and the most recent 25 transactions.
+      responses:
+        "200":
+          description: Account detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # -- Transactions --
+  /api/v1/transactions:
+    get:
+      tags: [Transactions]
+      summary: List transactions
+      description: Filterable, cursor-paginated transaction query.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Fields"
+        - { name: account_id, in: query, schema: { type: string }, description: Filter by account UUID or short_id (repeatable). }
+        - { name: connection_id, in: query, schema: { type: string }, description: Filter by connection. }
+        - { name: user_id, in: query, schema: { type: string }, description: Filter by attributed user (uses `COALESCE(attributed_user_id, connection.user_id)`). }
+        - { name: category_id, in: query, schema: { type: string }, description: Filter by category. }
+        - { name: tag, in: query, schema: { type: string }, description: Filter by tag slug. }
+        - { name: search, in: query, schema: { type: string }, description: Substring/word/fuzzy search on name + merchant_name. Comma-separated values are OR'd. }
+        - { name: search_mode, in: query, schema: { type: string, enum: [contains, words, fuzzy] }, description: Search algorithm. }
+        - { name: exclude_search, in: query, schema: { type: string }, description: Negative search filter (NOT ILIKE). Min 2 chars. }
+        - { name: date_from, in: query, schema: { type: string, format: date } }
+        - { name: date_to, in: query, schema: { type: string, format: date } }
+        - { name: amount_min, in: query, schema: { type: number } }
+        - { name: amount_max, in: query, schema: { type: number } }
+        - { name: pending, in: query, schema: { type: boolean } }
+        - { name: deleted, in: query, schema: { type: string, enum: [include, only] }, description: Whether to include or restrict to soft-deleted transactions. }
+        - { name: category_override, in: query, schema: { type: boolean }, description: Filter by manual override flag. }
+      responses:
+        "200":
+          description: Paginated transaction list.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TransactionListResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/transactions/count:
+    get:
+      tags: [Transactions]
+      summary: Count transactions
+      description: Returns the count of transactions matching the same filter set as `GET /transactions`.
+      responses:
+        "200":
+          description: Count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer, format: int64 }
+                  iso_currency_code: { type: string, nullable: true }
+  /api/v1/transactions/summary:
+    get:
+      tags: [Transactions]
+      summary: Transaction summary
+      description: Aggregate totals (income, spending, net) grouped by currency.
+      responses:
+        "200":
+          description: Summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/transactions/merchants:
+    get:
+      tags: [Transactions]
+      summary: Merchant summary
+      description: Top merchants by spending, with counts and totals per currency.
+      responses:
+        "200":
+          description: Merchant summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/transactions/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Transactions]
+      summary: Get transaction
+      parameters: [{ $ref: "#/components/parameters/Fields" }]
+      responses:
+        "200":
+          description: Transaction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transaction" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Delete transaction
+      description: Soft-deletes the transaction (sets `deleted_at`). **Requires `full_access` scope.**
+      responses:
+        "204": { description: Deleted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/transactions/{id}/restore:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Transactions]
+      summary: Restore deleted transaction
+      description: Clears `deleted_at`. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Restored transaction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transaction" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/transactions/{id}/category:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    patch:
+      tags: [Transactions]
+      summary: Set transaction category
+      description: Sets `category_id` and `category_override = true`. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category_id]
+              properties:
+                category_id: { type: string, description: Category UUID or short_id. }
+      responses:
+        "200":
+          description: Updated transaction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transaction" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Reset transaction category
+      description: Clears the manual override and re-runs rule attribution. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated transaction.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Transaction" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/transactions/batch-categorize:
+    post:
+      tags: [Transactions]
+      summary: Batch categorize transactions
+      description: Apply a category to many transactions in one call. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transaction_ids, category_id]
+              properties:
+                transaction_ids:
+                  type: array
+                  items: { type: string }
+                category_id: { type: string }
+      responses:
+        "200":
+          description: Updated count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/transactions/bulk-recategorize:
+    post:
+      tags: [Transactions]
+      summary: Bulk recategorize transactions
+      description: |
+        Re-run categorization across a filtered set of transactions. Useful after
+        rule changes. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Recategorization summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/transactions/update:
+    post:
+      tags: [Transactions]
+      summary: Update transactions in bulk
+      description: |
+        Apply a patch (category, tags, attribution, etc.) to a filtered or
+        explicit set of transactions. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Update result.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/transactions/{id}/annotations:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Annotations]
+      summary: List annotations on a transaction
+      description: Annotations are append-only structured notes left by users or agents.
+      responses:
+        "200":
+          description: Annotations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Annotation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/transactions/{id}/tags:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Tags]
+      summary: Add a tag to a transaction
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug]
+              properties:
+                slug: { type: string }
+      responses:
+        "200":
+          description: Updated transaction tag membership.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/transactions/{id}/tags/{slug}:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Tags]
+      summary: Remove a tag from a transaction
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Removed. }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions/{transaction_id}/comments:
+    parameters:
+      - { name: transaction_id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Comments]
+      summary: List comments on a transaction
+      responses:
+        "200":
+          description: Comments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Comment" }
+    post:
+      tags: [Comments]
+      summary: Create comment
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "201":
+          description: Created comment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+  /api/v1/transactions/{transaction_id}/comments/{id}:
+    parameters:
+      - { name: transaction_id, in: path, required: true, schema: { type: string } }
+      - $ref: "#/components/parameters/IDPath"
+    put:
+      tags: [Comments]
+      summary: Update comment
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        "200":
+          description: Updated comment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+    delete:
+      tags: [Comments]
+      summary: Delete comment
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+
+  # -- Categories --
+  /api/v1/categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      description: Returns the household's categories (2-level hierarchy). Bounded resource.
+      responses:
+        "200":
+          description: Categories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Category" }
+    post:
+      tags: [Categories]
+      summary: Create category
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CategoryCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/categories/export:
+    get:
+      tags: [Categories]
+      summary: Export categories as TSV
+      description: Returns the full category table as `text/tab-separated-values` for backup or migration.
+      responses:
+        "200":
+          description: TSV body.
+          content:
+            text/tab-separated-values:
+              schema: { type: string }
+  /api/v1/categories/import:
+    post:
+      tags: [Categories]
+      summary: Import categories from TSV
+      description: Bulk-create or upsert categories from a TSV body. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          text/tab-separated-values:
+            schema: { type: string }
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Import summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/categories/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Categories]
+      summary: Get category
+      responses:
+        "200":
+          description: Category.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Categories]
+      summary: Update category
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CategoryUpdate" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+    delete:
+      tags: [Categories]
+      summary: Delete category
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/categories/{id}/merge:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Categories]
+      summary: Merge another category into this one
+      description: |
+        Reassigns transactions, rules, and child categories from `from_category_id`
+        into the path category, then deletes the source. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_category_id]
+              properties:
+                from_category_id: { type: string }
+      responses:
+        "200":
+          description: Merge summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  # -- Connections --
+  /api/v1/connections:
+    get:
+      tags: [Connections]
+      summary: List connections
+      responses:
+        "200":
+          description: Connections.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Connections]
+      summary: Get connection
+      responses:
+        "200":
+          description: Connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Connections]
+      summary: Disconnect (soft-delete) a connection
+      description: Sets `status='disconnected'`. Accounts/transactions are preserved with `connection_id` set to NULL. **Requires `full_access` scope.**
+      responses:
+        "204": { description: Disconnected. }
+  /api/v1/connections/{id}/status:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Connections]
+      summary: Get connection status
+      responses:
+        "200":
+          description: Status info.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/connections/{id}/sync:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Connections, Sync]
+      summary: Trigger sync on a connection
+      description: Enqueues a manual sync. **Requires `full_access` scope.**
+      responses:
+        "202":
+          description: Sync started.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/connections/{id}/paused:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Connections]
+      summary: Pause or resume a connection
+      description: Toggles automated sync. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paused]
+              properties:
+                paused: { type: boolean }
+      responses:
+        "200":
+          description: Updated connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/{id}/sync-interval:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Connections]
+      summary: Update connection sync interval
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interval_seconds]
+              properties:
+                interval_seconds: { type: integer }
+      responses:
+        "200":
+          description: Updated connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/{id}/reauth:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Connections]
+      summary: Begin reauth flow
+      description: |
+        Provider-specific reauth handshake. For Plaid this returns a `link_token`
+        in update mode. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Reauth payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/connections/{id}/reauth-complete:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Connections]
+      summary: Complete reauth flow
+      description: Confirms reauth and flips `status='active'`. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/plaid/link-token:
+    post:
+      tags: [Connections]
+      summary: Issue a Plaid Link token
+      description: |
+        Returns a Plaid-issued `link_token` for initial connection (or update mode
+        when `connection_id` is supplied). **Requires `full_access` scope.**
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Token payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  link_token: { type: string }
+                additionalProperties: true
+  /api/v1/connections/plaid/exchange:
+    post:
+      tags: [Connections]
+      summary: Exchange a Plaid public_token
+      description: |
+        Trades a one-time `public_token` for a long-lived access token, persists
+        the connection, and triggers an initial sync. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [public_token]
+              properties:
+                public_token: { type: string }
+                user_id: { type: string }
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Created connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/teller:
+    post:
+      tags: [Connections]
+      summary: Create a Teller connection
+      description: Persists a Teller `enrollment_id` + access token after the Connect.js flow. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/csv/preview:
+    post:
+      tags: [Connections]
+      summary: Preview a CSV import
+      description: |
+        Parses a CSV body and returns the inferred column mapping plus a sample of
+        rows. No data is persisted. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+          text/csv:
+            schema: { type: string }
+      responses:
+        "200":
+          description: Preview.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/connections/csv/import:
+    post:
+      tags: [Connections]
+      summary: Import a CSV
+      description: Persists CSV rows as transactions under a CSV-type connection. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Import summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  # -- Sync --
+  /api/v1/sync:
+    post:
+      tags: [Sync]
+      summary: Trigger a sync across all active connections
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "202":
+          description: Sync started.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/sync/logs:
+    get:
+      tags: [Sync]
+      summary: List sync logs
+      description: Cursor-paginated list of sync runs across all connections.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - { name: connection_id, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [in_progress, success, error] } }
+        - { name: trigger, in: query, schema: { type: string, enum: [cron, webhook, manual, initial] } }
+      responses:
+        "200":
+          description: Sync logs.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncLogListResponse" }
+  /api/v1/sync/logs/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Sync]
+      summary: Get a sync log
+      responses:
+        "200":
+          description: Sync log.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncLog" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/sync/health:
+    get:
+      tags: [Sync]
+      summary: Sync health overview
+      description: Fleet-wide sync health (counts of `error`, `pending_reauth`, stale connections).
+      responses:
+        "200":
+          description: Health summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/sync/health/providers:
+    get:
+      tags: [Sync]
+      summary: Provider-grouped sync health
+      responses:
+        "200":
+          description: Per-provider health.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/sync/stats:
+    get:
+      tags: [Sync]
+      summary: Sync statistics
+      description: Sync run counts and timing aggregates over a configurable window.
+      responses:
+        "200":
+          description: Stats.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  # -- Rules --
+  /api/v1/rules:
+    get:
+      tags: [Rules]
+      summary: List rules
+      description: Cursor-paginated list of transaction rules.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - { name: enabled, in: query, schema: { type: boolean } }
+        - { name: category_id, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: search_mode, in: query, schema: { type: string, enum: [contains, words, fuzzy] } }
+      responses:
+        "200":
+          description: Rules.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleListResponse" }
+    post:
+      tags: [Rules]
+      summary: Create rule
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Rule" }
+  /api/v1/rules/batch:
+    post:
+      tags: [Rules]
+      summary: Batch create rules
+      description: Create many rules in a single transaction. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules]
+              properties:
+                rules:
+                  type: array
+                  items: { $ref: "#/components/schemas/RuleCreate" }
+      responses:
+        "201":
+          description: Created rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+  /api/v1/rules/preview:
+    post:
+      tags: [Rules]
+      summary: Preview rule matches
+      description: |
+        Dry-runs a rule definition against existing transactions and returns the
+        first N matches without persisting. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleCreate" }
+      responses:
+        "200":
+          description: Preview matches.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/rules/apply-all:
+    post:
+      tags: [Rules]
+      summary: Apply all rules retroactively
+      description: |
+        Replays every enabled rule against the historical transaction set
+        (skipping `category_override = true`). **Requires `full_access` scope.**
+      responses:
+        "202":
+          description: Application summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/rules/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Rules]
+      summary: Get rule
+      responses:
+        "200":
+          description: Rule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Rule" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Rules]
+      summary: Update rule
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RuleCreate" }
+      responses:
+        "200":
+          description: Updated rule.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Rule" }
+    delete:
+      tags: [Rules]
+      summary: Delete rule
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/rules/{id}/apply:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Rules]
+      summary: Apply a single rule retroactively
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "202":
+          description: Application summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/rules/{id}/sync-history:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Rules]
+      summary: Rule sync history
+      description: Recent sync-time evaluations of this rule.
+      responses:
+        "200":
+          description: History.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  # -- Tags --
+  /api/v1/tags:
+    get:
+      tags: [Tags]
+      summary: List tags
+      responses:
+        "200":
+          description: Tags.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Tag" }
+    post:
+      tags: [Tags]
+      summary: Create tag
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagCreate" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tag" }
+  /api/v1/tags/{slug}:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Tags]
+      summary: Get tag
+      responses:
+        "200":
+          description: Tag.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tag" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Tags]
+      summary: Update tag
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated tag.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Tag" }
+    delete:
+      tags: [Tags]
+      summary: Delete tag
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+
+  # -- Users --
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List users
+      responses:
+        "200":
+          description: Users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+    post:
+      tags: [Users]
+      summary: Create user
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201":
+          description: Created user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+  /api/v1/users/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Users]
+      summary: Get user
+      responses:
+        "200":
+          description: User.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Users]
+      summary: Update user
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+    delete:
+      tags: [Users]
+      summary: Delete user
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/users/{id}/wipe-data:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Users]
+      summary: Wipe a user's connections, accounts, and transactions
+      description: |
+        Destructive — disconnects every connection owned by this user and
+        cascades through accounts/transactions per the FK policy.
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Wipe summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/users/{user_id}/login:
+    parameters:
+      - { name: user_id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Users]
+      summary: List a user's login methods
+      description: |
+        Returns admin login records (email/password, magic-link, etc.) for the
+        target user. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Logins.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserLogin" }
+    post:
+      tags: [Users]
+      summary: Create a login method for a user
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created login.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserLogin" }
+  /api/v1/users/{user_id}/login/{login_id}:
+    parameters:
+      - { name: user_id, in: path, required: true, schema: { type: string } }
+      - { name: login_id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Users]
+      summary: Update a login method
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated login.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserLogin" }
+    delete:
+      tags: [Users]
+      summary: Delete a login method
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/users/{user_id}/login/{login_id}/regenerate-token:
+    parameters:
+      - { name: user_id, in: path, required: true, schema: { type: string } }
+      - { name: login_id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Users]
+      summary: Regenerate a login's API/magic-link token
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "200":
+          description: Token payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  # -- Account links --
+  /api/v1/account-links:
+    get:
+      tags: [Account Links]
+      summary: List account links
+      responses:
+        "200":
+          description: Account links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AccountLink" }
+    post:
+      tags: [Account Links]
+      summary: Create account link
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLink" }
+  /api/v1/account-links/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Account Links]
+      summary: Get account link
+      responses:
+        "200":
+          description: Account link.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLink" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Account Links]
+      summary: Update account link
+      description: "**Requires `full_access` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountLink" }
+    delete:
+      tags: [Account Links]
+      summary: Delete account link
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/account-links/{id}/matches:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Account Links]
+      summary: List transaction matches for a link
+      description: Cursor-paginated list of matched transaction pairs across the linked accounts.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - { name: confidence, in: query, schema: { type: string, enum: [auto, confirmed, rejected] } }
+      responses:
+        "200":
+          description: Matches.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/account-links/{id}/reconcile:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Account Links]
+      summary: Re-run reconciliation for a link
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "202":
+          description: Reconcile summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/transaction-matches/{id}/confirm:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Account Links]
+      summary: Confirm a transaction match
+      description: Promotes an `auto` match to `confirmed`. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated match.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/transaction-matches/{id}/reject:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Account Links]
+      summary: Reject a transaction match
+      description: Marks the match `rejected`. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated match.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/transaction-matches/manual:
+    post:
+      tags: [Account Links]
+      summary: Manually pair two transactions
+      description: Creates a `confirmed` match between two transactions. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [primary_transaction_id, mirror_transaction_id]
+              properties:
+                primary_transaction_id: { type: string }
+                mirror_transaction_id: { type: string }
+                account_link_id: { type: string }
+      responses:
+        "201":
+          description: Created match.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  # -- Reports --
+  /api/v1/reports:
+    get:
+      tags: [Reports]
+      summary: List agent reports
+      description: Bounded by recency; not cursor-paginated.
+      responses:
+        "200":
+          description: Reports.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Report" }
+    post:
+      tags: [Reports]
+      summary: Submit a report
+      description: AI agents call this to record summaries or flagged transactions. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+  /api/v1/reports/unread-count:
+    get:
+      tags: [Reports]
+      summary: Unread report count
+      responses:
+        "200":
+          description: Count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+  /api/v1/reports/read-all:
+    post:
+      tags: [Reports]
+      summary: Mark all reports as read
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: All marked read. }
+  /api/v1/reports/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Reports]
+      summary: Get a report
+      responses:
+        "200":
+          description: Report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Reports]
+      summary: Delete a report
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/reports/{id}/read:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    patch:
+      tags: [Reports]
+      summary: Mark report as read
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "200":
+          description: Updated report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+  /api/v1/reports/{id}/unread:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    patch:
+      tags: [Reports]
+      summary: Mark report as unread
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "200":
+          description: Updated report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+
+  # -- API keys --
+  /api/v1/api-keys:
+    get:
+      tags: [API Keys]
+      summary: List API keys
+      description: Returns metadata only (prefix, scope, last_used_at). The plaintext key is never returned. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: API keys.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/APIKey" }
+    post:
+      tags: [API Keys]
+      summary: Create API key
+      description: |
+        Returns the plaintext key **once** in `key`. Persist it immediately —
+        subsequent reads expose only the prefix. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scope]
+              properties:
+                name: { type: string }
+                scope: { type: string, enum: [full_access, read_only] }
+      responses:
+        "201":
+          description: Created key (plaintext returned once).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/APIKey"
+                  - type: object
+                    properties:
+                      key: { type: string, description: Plaintext key. Shown once on creation. }
+  /api/v1/api-keys/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    delete:
+      tags: [API Keys]
+      summary: Revoke an API key
+      description: Soft-revokes by setting `revoked_at`. **Requires `full_access` scope.**
+      responses:
+        "204": { description: Revoked. }
+
+  # -- Settings / providers --
+  /api/v1/settings/providers:
+    get:
+      tags: [Settings]
+      summary: Get provider configuration
+      description: Returns current Plaid + Teller config flags. Secrets are masked.
+      responses:
+        "200":
+          description: Provider config.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderConfig" }
+  /api/v1/settings/providers/plaid:
+    put:
+      tags: [Settings]
+      summary: Update Plaid configuration
+      description: |
+        Persists Plaid credentials in the encrypted `app_config` table. Pass null
+        for any field to clear it. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated config.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderConfig" }
+  /api/v1/settings/providers/teller:
+    put:
+      tags: [Settings]
+      summary: Update Teller configuration
+      description: |
+        Persists Teller credentials (application ID, certificate, key) in the
+        encrypted `app_config` table. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated config.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderConfig" }
+
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Breadbox API key with format `bb_<base62>`. Carries either `read_only`
+        or `full_access` scope. Write endpoints (and a handful of sensitive
+        reads — `/api-keys`, `/users/{user_id}/login`) require `full_access`;
+        endpoints that require it are flagged in their description.
+
+  parameters:
+    IDPath:
+      name: id
+      in: path
+      required: true
+      description: UUID or 8-char short_id.
+      schema: { type: string }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque pagination cursor returned by a previous list response.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size (default 50, capped per-endpoint).
+      schema: { type: integer, minimum: 1, maximum: 200 }
+    Fields:
+      name: fields
+      in: query
+      required: false
+      description: |
+        Comma-separated field selector. Accepts column names and aliases
+        (`minimal`, `core`, `category`, `timestamps`, `triage`, `review_core`,
+        `transaction_core`). `id` and `short_id` are always included.
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Invalid input.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: API key lacks the required scope.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: Conflict with current state.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Per-key rate limit exceeded.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, description: Stable UPPER_SNAKE_CASE error code. }
+            message: { type: string }
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+    VersionResponse:
+      type: object
+      properties:
+        version: { type: string }
+        latest: { type: string, nullable: true }
+        update_available: { type: boolean }
+    Account:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        short_id: { type: string }
+        name: { type: string }
+        display_name: { type: string, nullable: true }
+        official_name: { type: string, nullable: true }
+        type: { type: string }
+        subtype: { type: string, nullable: true }
+        mask: { type: string, nullable: true }
+        iso_currency_code: { type: string, nullable: true }
+        balance_current: { type: string, nullable: true, description: Decimal as string. }
+        balance_available: { type: string, nullable: true }
+        balance_limit: { type: string, nullable: true }
+        is_excluded: { type: boolean }
+        is_dependent_linked: { type: boolean }
+        connection_id: { type: string, nullable: true }
+        provider: { type: string, enum: [plaid, teller, csv] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    AccountUpdate:
+      type: object
+      properties:
+        display_name: { type: string, description: Empty string clears the override. }
+        is_excluded: { type: boolean }
+        is_dependent_linked: { type: boolean }
+    AccountDetail:
+      allOf:
+        - $ref: "#/components/schemas/Account"
+        - type: object
+          properties:
+            connection_user_name: { type: string }
+            connection_short_id: { type: string }
+            balances:
+              type: array
+              items:
+                type: object
+                properties:
+                  iso_currency_code: { type: string }
+                  balance_current: { type: string, nullable: true }
+                  balance_available: { type: string, nullable: true }
+                  balance_limit: { type: string, nullable: true }
+            recent_transactions:
+              type: array
+              items: { $ref: "#/components/schemas/Transaction" }
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        short_id: { type: string }
+        account_id: { type: string }
+        connection_id: { type: string, nullable: true }
+        attributed_user_id: { type: string, nullable: true }
+        date: { type: string, format: date }
+        authorized_date: { type: string, format: date, nullable: true }
+        amount: { type: string, description: "Decimal as string. Positive = money out, negative = money in." }
+        iso_currency_code: { type: string }
+        name: { type: string }
+        merchant_name: { type: string, nullable: true }
+        category_id: { type: string, nullable: true }
+        category_override: { type: boolean }
+        pending: { type: boolean }
+        deleted_at: { type: string, format: date-time, nullable: true }
+        tags:
+          type: array
+          items: { type: string, description: Tag slug. }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    TransactionListResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items: { $ref: "#/components/schemas/Transaction" }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+        limit: { type: integer }
+    Annotation:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        transaction_id: { type: string }
+        actor_type: { type: string, enum: [user, agent, system] }
+        actor_id: { type: string, nullable: true }
+        actor_name: { type: string, nullable: true }
+        kind: { type: string }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    Comment:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        transaction_id: { type: string }
+        author_type: { type: string }
+        author_id: { type: string, nullable: true }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    Tag:
+      type: object
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        color: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    TagCreate:
+      type: object
+      required: [slug, name]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        color: { type: string }
+    Category:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        name: { type: string }
+        parent_id: { type: string, nullable: true }
+        kind: { type: string, description: "`income` | `expense` | `transfer`." }
+        archived: { type: boolean }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    CategoryCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        parent_id: { type: string, nullable: true }
+        kind: { type: string }
+    CategoryUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        parent_id: { type: string, nullable: true }
+        kind: { type: string }
+        archived: { type: boolean }
+    Connection:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        user_id: { type: string }
+        provider: { type: string, enum: [plaid, teller, csv] }
+        institution_name: { type: string, nullable: true }
+        institution_id: { type: string, nullable: true }
+        status: { type: string, enum: [active, error, pending_reauth, disconnected] }
+        paused: { type: boolean }
+        sync_interval_seconds: { type: integer, nullable: true }
+        last_sync_at: { type: string, format: date-time, nullable: true }
+        next_sync_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    SyncLog:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        connection_id: { type: string }
+        status: { type: string, enum: [in_progress, success, error] }
+        trigger: { type: string, enum: [cron, webhook, manual, initial] }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        added_count: { type: integer, nullable: true }
+        modified_count: { type: integer, nullable: true }
+        removed_count: { type: integer, nullable: true }
+        error_message: { type: string, nullable: true }
+      additionalProperties: true
+    SyncLogListResponse:
+      type: object
+      properties:
+        sync_logs:
+          type: array
+          items: { $ref: "#/components/schemas/SyncLog" }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+        limit: { type: integer }
+    Rule:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        name: { type: string }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        creator_type: { type: string, enum: [user, agent, system] }
+        creator_id: { type: string, nullable: true }
+        condition:
+          type: object
+          additionalProperties: true
+          description: Recursive AND/OR/NOT condition tree. See `docs/rule-dsl.md`.
+        actions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        triggers:
+          type: array
+          items: { type: string, enum: [sync, retroactive, manual] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    RuleCreate:
+      type: object
+      required: [name, condition, actions]
+      properties:
+        name: { type: string }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        condition:
+          type: object
+          additionalProperties: true
+        actions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        triggers:
+          type: array
+          items: { type: string, enum: [sync, retroactive, manual] }
+    RuleListResponse:
+      type: object
+      properties:
+        rules:
+          type: array
+          items: { $ref: "#/components/schemas/Rule" }
+        next_cursor: { type: string, nullable: true }
+        has_more: { type: boolean }
+        limit: { type: integer }
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [admin, member, dependent] }
+        email: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    UserCreate:
+      type: object
+      required: [name, kind]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [admin, member, dependent] }
+        email: { type: string }
+    UserLogin:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        user_id: { type: string }
+        kind: { type: string, description: "`password`, `magic_link`, etc." }
+        identifier: { type: string, nullable: true }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    AccountLink:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        primary_account_id: { type: string }
+        mirror_account_id: { type: string }
+        kind: { type: string }
+        confidence: { type: string, enum: [auto, confirmed, rejected] }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    Report:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        title: { type: string }
+        body: { type: string }
+        kind: { type: string }
+        author_type: { type: string }
+        author_id: { type: string, nullable: true }
+        read_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    APIKey:
+      type: object
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        name: { type: string }
+        prefix: { type: string }
+        scope: { type: string, enum: [full_access, read_only] }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
+    ProviderConfig:
+      type: object
+      properties:
+        plaid:
+          type: object
+          additionalProperties: true
+        teller:
+          type: object
+          additionalProperties: true
+      additionalProperties: true

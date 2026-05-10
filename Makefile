@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev
+.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate
 
 PORT ?= 8080
 
@@ -133,6 +133,18 @@ test-integration: generate
 
 lint: generate
 	go vet ./...
+
+# openapi-validate lints the hand-authored openapi.yaml at the repo root.
+# Real CI enforcement is the TestOpenAPIDrift integration test in
+# internal/api — this target exists for local dev convenience and uses
+# swagger-cli (Node) when available because there is no Go-native validator
+# we want to add as a direct dependency.
+openapi-validate:
+	@command -v swagger-cli >/dev/null 2>&1 || { \
+		echo "swagger-cli not found. Install with: npm install -g @apidevtools/swagger-cli"; \
+		exit 1; \
+	}
+	swagger-cli validate openapi.yaml
 
 migrate-up:
 	goose -dir internal/db/migrations postgres "$$DATABASE_URL" up
