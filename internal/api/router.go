@@ -105,6 +105,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
 			r.Post("/connections/plaid/link-token", PlaidLinkTokenHandler(a))
 			r.Post("/connections/plaid/exchange", PlaidExchangeHandler(a))
+			r.Post("/connections/teller", TellerSetupHandler(a))
 			r.Post("/transactions/{transaction_id}/comments", CreateCommentHandler(svc))
 			r.Put("/transactions/{transaction_id}/comments/{id}", UpdateCommentHandler(svc))
 			r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
