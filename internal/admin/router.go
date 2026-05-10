@@ -360,7 +360,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
 			r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
 			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
-			r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm))
+			r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm, svc))
 			r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
 			r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))
 			r.Post("/test-provider/{provider}", ProvidersTestHandler(a))

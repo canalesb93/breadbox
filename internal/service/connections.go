@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (s *Service) ListConnections(ctx context.Context, userID *string) ([]ConnectionResponse, error) {
@@ -128,4 +130,169 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 	}
 
 	return resp, nil
+}
+
+// GetConnection returns full per-connection detail for the management API.
+// Accepts either UUID or short_id. Returns ErrNotFound when the row is
+// missing — but, mirroring the existing GetConnectionStatus contract,
+// disconnected connections are still surfaced (with status="disconnected"),
+// not hidden. Callers wanting "live only" should filter on the response.
+func (s *Service) GetConnection(ctx context.Context, id string) (*ConnectionDetailResponse, error) {
+	uid, err := s.resolveConnectionID(ctx, id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	conn, err := s.Queries.GetConnectionForAPI(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get connection: %w", err)
+	}
+
+	return buildConnectionDetailResponse(conn), nil
+}
+
+// DeleteConnection performs the soft-disconnect flow: revokes the
+// encrypted token cache, soft-deletes related transactions, and flips the
+// connection's status to 'disconnected'. Provider-side credential
+// revocation is NOT performed here (the service has no provider registry);
+// admin handlers stay responsible for the provider.RemoveConnection() call
+// when they need it.
+//
+// Idempotent on a per-row basis: calling on an already-disconnected
+// connection returns ErrNotFound to give callers a deterministic 404.
+func (s *Service) DeleteConnection(ctx context.Context, id string, _ Actor) error {
+	uid, err := s.resolveConnectionID(ctx, id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	// Verify the connection exists AND is not already disconnected before
+	// touching any rows. Mirrors the read-filter behavior used elsewhere
+	// (ListConnectionsForAPI hides disconnected; the sync resolver treats
+	// disconnected as not-found).
+	conn, err := s.Queries.GetBankConnection(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("get bank connection: %w", err)
+	}
+	if conn.Status == db.ConnectionStatusDisconnected {
+		return ErrNotFound
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin delete connection tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	q := s.Queries.WithTx(tx)
+
+	if _, err := q.SoftDeleteTransactionsByConnectionID(ctx, uid); err != nil {
+		return fmt.Errorf("soft delete transactions for connection: %w", err)
+	}
+
+	if err := q.DeleteBankConnection(ctx, uid); err != nil {
+		return fmt.Errorf("delete bank connection: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete connection: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateConnectionPaused flips the paused flag for a connection.
+// Returns ErrNotFound when the connection doesn't exist.
+func (s *Service) UpdateConnectionPaused(ctx context.Context, id string, paused bool, _ Actor) (*ConnectionDetailResponse, error) {
+	uid, err := s.resolveConnectionID(ctx, id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	if _, err := s.Queries.UpdateConnectionPaused(ctx, db.UpdateConnectionPausedParams{
+		ID:     uid,
+		Paused: paused,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update connection paused: %w", err)
+	}
+
+	conn, err := s.Queries.GetConnectionForAPI(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get connection: %w", err)
+	}
+	return buildConnectionDetailResponse(conn), nil
+}
+
+// UpdateConnectionSyncInterval sets the per-connection sync interval
+// override in minutes. Pass nil to revert to the global default. Returns
+// ErrNotFound when the connection doesn't exist.
+func (s *Service) UpdateConnectionSyncInterval(ctx context.Context, id string, intervalMinutes *int, _ Actor) (*ConnectionDetailResponse, error) {
+	uid, err := s.resolveConnectionID(ctx, id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	var interval pgtype.Int4
+	if intervalMinutes != nil && *intervalMinutes > 0 {
+		interval = pgtype.Int4{Int32: int32(*intervalMinutes), Valid: true}
+	}
+
+	if _, err := s.Queries.UpdateConnectionSyncInterval(ctx, db.UpdateConnectionSyncIntervalParams{
+		ID:                          uid,
+		SyncIntervalOverrideMinutes: interval,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("update connection sync interval: %w", err)
+	}
+
+	conn, err := s.Queries.GetConnectionForAPI(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get connection: %w", err)
+	}
+	return buildConnectionDetailResponse(conn), nil
+}
+
+func buildConnectionDetailResponse(conn db.GetConnectionForAPIRow) *ConnectionDetailResponse {
+	resp := &ConnectionDetailResponse{
+		ConnectionResponse: ConnectionResponse{
+			ID:              formatUUID(conn.ID),
+			ShortID:         conn.ShortID,
+			UserID:          textPtr(conn.UserShortID),
+			UserName:        textPtr(conn.UserName),
+			Provider:        string(conn.Provider),
+			InstitutionID:   textPtr(conn.InstitutionID),
+			InstitutionName: textPtr(conn.InstitutionName),
+			Status:          string(conn.Status),
+			ErrorCode:       textPtr(conn.ErrorCode),
+			ErrorMessage:    textPtr(conn.ErrorMessage),
+			LastSyncedAt:    timestampStr(conn.LastSyncedAt),
+			CreatedAt:       pgconv.TimestampStr(conn.CreatedAt),
+			UpdatedAt:       pgconv.TimestampStr(conn.UpdatedAt),
+		},
+		Paused:              conn.Paused,
+		ConsecutiveFailures: conn.ConsecutiveFailures,
+		AccountCount:        int(conn.AccountCount),
+	}
+	if conn.SyncIntervalOverrideMinutes.Valid {
+		v := conn.SyncIntervalOverrideMinutes.Int32
+		resp.SyncIntervalOverrideMinutes = &v
+	}
+	return resp
 }
