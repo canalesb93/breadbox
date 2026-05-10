@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -313,6 +314,168 @@ func (s *Service) DeleteAccountLink(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+// TransactionMatchListParams controls pagination for the matches list.
+type TransactionMatchListParams struct {
+	Limit  int
+	Cursor string
+}
+
+// TransactionMatchListResult is the cursor-paginated response shape for
+// /api/v1/account-links/{id}/matches.
+type TransactionMatchListResult struct {
+	Matches    []TransactionMatchResponse `json:"matches"`
+	NextCursor string                     `json:"next_cursor"`
+	HasMore    bool                       `json:"has_more"`
+	Limit      int                        `json:"limit"`
+}
+
+// ListTransactionMatchesPaginated returns matches for a link with cursor
+// pagination ordered by primary-transaction date desc, then created_at desc.
+// Cursor is opaque (date|id pair). Limit defaults to 50, capped at 200.
+func (s *Service) ListTransactionMatchesPaginated(ctx context.Context, linkID string, params TransactionMatchListParams) (*TransactionMatchListResult, error) {
+	uid, err := s.resolveAccountLinkID(ctx, linkID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	args := []any{uid}
+	where := "WHERE tm.account_link_id = $1"
+
+	if params.Cursor != "" {
+		cursorDate, cursorID, err := DecodeCursor(params.Cursor)
+		if err != nil {
+			return nil, ErrInvalidCursor
+		}
+		cursorUUID, err := pgconv.ParseUUID(cursorID)
+		if err != nil {
+			return nil, ErrInvalidCursor
+		}
+		// (date desc, created_at desc, id desc) compound — use (pt.date, tm.id)
+		// strict less-than to keep the page boundary stable.
+		args = append(args, pgconv.Date(cursorDate), cursorUUID)
+		where += " AND (pt.date, tm.id) < ($2, $3)"
+	}
+
+	// Fetch limit+1 to detect has_more.
+	args = append(args, int32(limit+1))
+	limitClause := fmt.Sprintf("LIMIT $%d", len(args))
+
+	q := `SELECT tm.id, tm.short_id, tm.match_confidence, tm.matched_on, tm.created_at,
+	             al.short_id AS account_link_short_id,
+	             pt.short_id AS primary_transaction_short_id,
+	             dt.short_id AS dependent_transaction_short_id,
+	             pt.provider_name AS primary_txn_name, pt.amount AS primary_txn_amount, pt.date AS primary_txn_date, pt.provider_merchant_name AS primary_txn_merchant,
+	             dt.provider_name AS dependent_txn_name, dt.amount AS dependent_txn_amount, dt.date AS dependent_txn_date, dt.provider_merchant_name AS dependent_txn_merchant
+	      FROM transaction_matches tm
+	      JOIN account_links al ON al.id = tm.account_link_id
+	      JOIN transactions pt ON tm.primary_transaction_id = pt.id
+	      JOIN transactions dt ON tm.dependent_transaction_id = dt.id
+	      ` + where + `
+	      ORDER BY pt.date DESC, tm.id DESC
+	      ` + limitClause
+
+	rows, err := s.Pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list matches paginated: %w", err)
+	}
+	defer rows.Close()
+
+	type rowT struct {
+		id                          pgtype.UUID
+		shortID                     string
+		matchConfidence             string
+		matchedOn                   []string
+		createdAt                   pgtype.Timestamptz
+		accountLinkShortID          string
+		primaryTransactionShortID   string
+		dependentTransactionShortID string
+		primaryName                 string
+		primaryAmount               pgtype.Numeric
+		primaryDate                 pgtype.Date
+		primaryMerchant             pgtype.Text
+		dependentName               string
+		dependentAmount             pgtype.Numeric
+		dependentDate               pgtype.Date
+		dependentMerchant           pgtype.Text
+	}
+
+	var collected []rowT
+	for rows.Next() {
+		var r rowT
+		if err := rows.Scan(
+			&r.id, &r.shortID, &r.matchConfidence, &r.matchedOn, &r.createdAt,
+			&r.accountLinkShortID,
+			&r.primaryTransactionShortID, &r.dependentTransactionShortID,
+			&r.primaryName, &r.primaryAmount, &r.primaryDate, &r.primaryMerchant,
+			&r.dependentName, &r.dependentAmount, &r.dependentDate, &r.dependentMerchant,
+		); err != nil {
+			return nil, fmt.Errorf("scan match row: %w", err)
+		}
+		collected = append(collected, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate match rows: %w", err)
+	}
+
+	hasMore := len(collected) > limit
+	if hasMore {
+		collected = collected[:limit]
+	}
+
+	out := make([]TransactionMatchResponse, 0, len(collected))
+	for _, r := range collected {
+		amountVal := 0.0
+		if f := numericFloat(r.primaryAmount); f != nil {
+			amountVal = *f
+		}
+		var dateVal string
+		if d := dateStr(r.primaryDate); d != nil {
+			dateVal = *d
+		}
+		out = append(out, TransactionMatchResponse{
+			ID:                     formatUUID(r.id),
+			ShortID:                r.shortID,
+			AccountLinkID:          r.accountLinkShortID,
+			PrimaryTransactionID:   r.primaryTransactionShortID,
+			DependentTransactionID: r.dependentTransactionShortID,
+			MatchConfidence:        r.matchConfidence,
+			MatchedOn:              r.matchedOn,
+			CreatedAt:              pgconv.TimestampStr(r.createdAt),
+			PrimaryTxnName:         r.primaryName,
+			PrimaryTxnMerchant:     textPtr(r.primaryMerchant),
+			DependentTxnName:       r.dependentName,
+			DependentTxnMerchant:   textPtr(r.dependentMerchant),
+			Amount:                 amountVal,
+			Date:                   dateVal,
+		})
+	}
+
+	var nextCursor string
+	if hasMore && len(collected) > 0 {
+		last := collected[len(collected)-1]
+		var lastDate time.Time
+		if last.primaryDate.Valid {
+			lastDate = last.primaryDate.Time
+		}
+		nextCursor = EncodeCursor(lastDate, formatUUID(last.id))
+	}
+
+	return &TransactionMatchListResult{
+		Matches:    out,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
+		Limit:      limit,
+	}, nil
 }
 
 // ListTransactionMatches returns all matches for a given link.
