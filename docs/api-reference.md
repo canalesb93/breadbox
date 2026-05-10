@@ -49,6 +49,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | DELETE | `/transactions/{id}/category` | Write | Reset transaction category to provider default |
 | POST | `/transactions/batch-categorize` | Write | Batch categorize multiple transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | Write | Bulk recategorize by filter (server-side UPDATE) |
+| POST | `/transactions/update` | Write | Atomic multi-field batch (category + tags + comment per row, max 50 ops) |
 
 ### Transaction Query Parameters
 
@@ -122,6 +123,43 @@ The handler returns `202 Accepted` immediately and runs the sync asynchronously;
 ```json
 { "status": "sync_triggered" }
 ```
+
+### POST `/transactions/update`
+
+Atomic multi-field batch. Each operation can set a category (or clear an override), add/remove tags, and attach a comment — all atomic per transaction. REST sibling of the MCP `update_transactions` tool.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `operations` | array | Required. Up to 50 ops. |
+| `on_error` | string | `"continue"` (default — each op runs in its own DB tx, partial failures don't undo successful items) or `"abort"` (whole batch is one DB tx, rolls back on first error). |
+
+Each operation:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transaction_id` | string | Required. UUID or short_id. |
+| `category_slug` | string | Optional. Sets `category_override=true`. Mutually exclusive with `reset_category`. |
+| `reset_category` | bool | Optional. Clears the override and drops the transaction back to `uncategorized` so rules can re-categorize. |
+| `tags_to_add` | array | `[{"slug":"..."}]`. Auto-creates the tag if the slug is not yet registered. |
+| `tags_to_remove` | array | `[{"slug":"..."}]`. Unknown slugs are a no-op. |
+| `comment` | string | Optional annotation, attributed to your API key. Max 10000 chars. |
+
+**Response** `200 OK`
+
+```json
+{
+  "results": [
+    {"transaction_id": "k7Xm9pQ2", "status": "ok"},
+    {"transaction_id": "x4Lz1mNa", "status": "error", "error": {"code": "NOT_FOUND", "message": "..."}}
+  ],
+  "succeeded": 1,
+  "failed": 1
+}
+```
+
+Per-op errors are reported inside `results[]`; the top-level response is still `200`. The whole call returns `400 INVALID_PARAMETER` only on malformed input (empty `operations`, more than 50, bad `on_error`). In `abort` mode a partial-batch failure rolls back the DB transaction and the response includes `aborted: true` plus the partial per-op outcomes.
 
 ## Transaction Comments
 
