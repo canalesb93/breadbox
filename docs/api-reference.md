@@ -580,6 +580,121 @@ AI agents can submit summaries and flag transactions for human review.
 
 `rules_applied` is an object keyed by rule ID, mapping to the number of transactions updated by that rule in this retroactive pass. Order is not guaranteed. `total_affected` is the sum across all rules.
 
+## Provider settings
+
+Read and write the configuration for the bank-data providers (Plaid, Teller). These endpoints mirror the admin form handlers under `/settings/providers` so a headless install can bootstrap providers without an admin UI session.
+
+Persistence and hot-reload semantics match the admin flow:
+
+- Values are stored in the `app_config` DB table.
+- Sensitive fields (Plaid secret, Teller cert/key PEM) are AES-256-GCM encrypted at rest using `ENCRYPTION_KEY` — the server fails fast at startup if the key is missing when any provider is configured.
+- Sensitive fields are **redacted** on `GET` — only boolean `*_set` flags are returned. Raw secret/cert bodies are never exposed via REST.
+- Empty / omitted sensitive fields on `PUT` **preserve the existing stored value** — so a caller updating `webhook_url` doesn't need to retype the secret.
+- After a successful `PUT`, the live provider is re-initialized in-process so subsequent syncs use the new credentials immediately.
+
+If a provider is configured via environment variables (`PLAID_CLIENT_ID` / `TELLER_APP_ID`), `PUT` returns `409 PROVIDER_FROM_ENV` — env-driven config is the source of truth and cannot be overridden via the API.
+
+### `GET /settings/providers`
+
+Returns the current (redacted) view of both providers.
+
+**Scope:** read.
+
+**Response 200:**
+
+```json
+{
+  "plaid": {
+    "configured": true,
+    "from_env": false,
+    "client_id": "abc-123",
+    "environment": "sandbox",
+    "webhook_url": "https://example.com/wh",
+    "secret_set": true
+  },
+  "teller": {
+    "configured": false,
+    "from_env": false,
+    "environment": "sandbox",
+    "certificate_set": false,
+    "webhook_secret_set": false
+  }
+}
+```
+
+`configured` is `true` when all required fields for that provider are present (Plaid: `client_id` + secret; Teller: `application_id` + cert/key pair).
+
+### `PUT /settings/providers/plaid`
+
+Set or update Plaid credentials.
+
+**Scope:** write.
+
+**Request body:**
+
+```json
+{
+  "client_id": "abc-123",
+  "secret": "your-plaid-secret",
+  "environment": "sandbox",
+  "webhook_url": "https://example.com/wh"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `client_id` | yes | |
+| `secret` | conditionally | Required on first save. Omit (or send empty string) on subsequent saves to preserve the existing stored secret. |
+| `environment` | no | One of `sandbox`, `development`, `production`. Defaults to `sandbox`. |
+| `webhook_url` | no | Must use `https://` if provided. |
+
+**Response 200:** Same redacted shape as `GET /settings/providers`.
+
+**Errors:**
+
+- `400 INVALID_PARAMETER` — missing `client_id`, invalid `environment`, non-HTTPS `webhook_url`, or no secret available (no existing secret stored and none provided).
+- `409 PROVIDER_FROM_ENV` — `PLAID_CLIENT_ID` is set in the environment.
+- `500 PROVIDER_REINIT_FAILED` — config saved but the live provider failed to reinitialize.
+- `500 INTERNAL_ERROR` — DB write failure.
+
+### `PUT /settings/providers/teller`
+
+Set or update Teller credentials. The PEM cert and private key are accepted as JSON strings (suitable for `cat client.pem | jq -Rs .`).
+
+**Scope:** write.
+
+**Request body:**
+
+```json
+{
+  "application_id": "app_xxxxxxxx",
+  "environment": "sandbox",
+  "certificate": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
+  "private_key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n",
+  "webhook_secret": "optional-webhook-signing-secret"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `application_id` | yes | |
+| `environment` | no | One of `sandbox`, `development`, `production`. Defaults to `sandbox`. |
+| `certificate` | conditionally | PEM body. If both `certificate` and `private_key` are omitted (or empty), the existing encrypted cert is preserved. Must be supplied alongside `private_key`. |
+| `private_key` | conditionally | PEM body for the matching private key. Must be supplied alongside `certificate`. |
+| `webhook_secret` | no | Send an empty string or omit to leave the existing webhook secret unchanged. |
+
+The `certificate` + `private_key` pair is validated server-side via `crypto/tls.X509KeyPair` before being encrypted and stored.
+
+**Response 200:** Same redacted shape as `GET /settings/providers`.
+
+**Errors:**
+
+- `400 INVALID_PARAMETER` — missing `application_id`, invalid `environment`, only one of `certificate` / `private_key` supplied, or the cert/key pair fails X.509 validation.
+- `409 PROVIDER_FROM_ENV` — `TELLER_APP_ID` is set in the environment.
+- `500 ENCRYPTION_KEY_MISSING` — `ENCRYPTION_KEY` is not set on the server; cannot encrypt the cert.
+- `500 PROVIDER_REINIT_FAILED` — config saved but the live provider failed to reinitialize.
+- `500 INTERNAL_ERROR` — DB write failure or encryption error.
+
 ## OAuth / MCP Auth
 
 OAuth 2.1 endpoints for MCP client authentication:
