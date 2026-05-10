@@ -20,6 +20,12 @@ SELECT id FROM users WHERE short_id = $1;
 -- name: CountUsers :one
 SELECT count(*) FROM users;
 
+-- name: DeleteUser :exec
+DELETE FROM users WHERE id = $1;
+
+-- name: CountConnectionsByUser :one
+SELECT count(*) FROM bank_connections WHERE user_id = $1;
+
 -- name: ListUsersWithoutAuthAccount :many
 SELECT u.* FROM users u
 LEFT JOIN auth_accounts aa ON aa.user_id = u.id
