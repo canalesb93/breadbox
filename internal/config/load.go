@@ -101,6 +101,10 @@ func Load() (*Config, error) {
 	// Sync timeout.
 	cfg.SyncTimeoutSeconds = getEnvInt("SYNC_TIMEOUT_SECONDS", 300)
 
+	// API rate limit (per API key with IP fallback).
+	cfg.APIRateLimitRPM = getEnvInt("API_RATE_LIMIT_RPM", 120)
+	cfg.APIRateLimitBurst = getEnvInt("API_RATE_LIMIT_BURST", 60)
+
 	return cfg, nil
 }
 
