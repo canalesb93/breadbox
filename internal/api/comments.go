@@ -1,15 +1,35 @@
 package api
 
 import (
-	"errors"
 	"net/http"
-	"strings"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
 )
+
+// writeCommentServiceError maps a service error from a comment handler to the
+// canonical envelope, overriding NOT_FOUND and FORBIDDEN messages with
+// resource-specific text. Falls back to a 500 INTERNAL_ERROR for anything not
+// covered by the service-error sentinel set.
+func writeCommentServiceError(w http.ResponseWriter, err error, notFoundMessage, forbiddenMessage, internalMessage string) {
+	if resp, ok := mw.MapServiceError(err); ok {
+		switch resp.Code {
+		case "NOT_FOUND":
+			if notFoundMessage != "" {
+				resp.Message = notFoundMessage
+			}
+		case "FORBIDDEN":
+			if forbiddenMessage != "" {
+				resp.Message = forbiddenMessage
+			}
+		}
+		mw.WriteError(w, resp.Status, resp.Code, resp.Message)
+		return
+	}
+	mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", internalMessage)
+}
 
 // ListCommentsHandler returns all comments for a transaction.
 func ListCommentsHandler(svc *service.Service) http.HandlerFunc {
@@ -18,11 +38,7 @@ func ListCommentsHandler(svc *service.Service) http.HandlerFunc {
 
 		comments, err := svc.ListComments(r.Context(), txnID)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list comments")
+			writeServiceError(w, err, "Transaction not found", "Failed to list comments")
 			return
 		}
 
@@ -50,15 +66,7 @@ func CreateCommentHandler(svc *service.Service) http.HandlerFunc {
 			Actor:         actor,
 		})
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-				return
-			}
-			if strings.Contains(err.Error(), "content must be") {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create comment")
+			writeServiceError(w, err, "Transaction not found", "Failed to create comment")
 			return
 		}
 
@@ -85,19 +93,7 @@ func UpdateCommentHandler(svc *service.Service) http.HandlerFunc {
 			Actor:   actor,
 		})
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
-				return
-			}
-			if errors.Is(err, service.ErrForbidden) {
-				mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "You can only edit your own comments")
-				return
-			}
-			if strings.Contains(err.Error(), "content must be") {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update comment")
+			writeCommentServiceError(w, err, "Comment not found", "You can only edit your own comments", "Failed to update comment")
 			return
 		}
 
@@ -112,15 +108,7 @@ func DeleteCommentHandler(svc *service.Service) http.HandlerFunc {
 		actor := service.ActorFromContext(r.Context())
 
 		if err := svc.DeleteComment(r.Context(), commentID, actor); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
-				return
-			}
-			if errors.Is(err, service.ErrForbidden) {
-				mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "You can only delete your own comments")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete comment")
+			writeCommentServiceError(w, err, "Comment not found", "You can only delete your own comments", "Failed to delete comment")
 			return
 		}
 
