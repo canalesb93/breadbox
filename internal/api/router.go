@@ -39,8 +39,17 @@ func NewRouter(a *app.App, version string) http.Handler {
 
 	// REST API v1 — API key authenticated.
 	svc := service.New(a.Queries, a.DB, a.SyncEngine, a.Logger)
+	apiLimiter := mw.NewRateLimiter(mw.RateLimitConfig{
+		RequestsPerMinute: a.Config.APIRateLimitRPM,
+		Burst:             a.Config.APIRateLimitBurst,
+	})
 	r.Route("/api/v1", func(r chi.Router) {
+		// Auth runs first so the rate limiter can identify by API key ID.
+		// /health/* and /api/v1/version are mounted outside this Route block
+		// and are intentionally not rate-limited (cheap, used by load
+		// balancers / monitoring).
 		r.Use(mw.APIKeyAuth(svc))
+		r.Use(apiLimiter.Middleware())
 
 		// Read endpoints — all API keys.
 		r.Get("/accounts", ListAccountsHandler(svc))

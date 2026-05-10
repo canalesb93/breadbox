@@ -71,7 +71,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | `sort_order` | string | `desc` (default), `asc` |
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
 | `cursor` | string | Pagination cursor (only with date sort) |
-| `limit` | int | Results per page (default 50, max 500) |
+| `limit` | int | Results per page (default 100, max 500) |
 
 ## Categories
 
@@ -103,7 +103,25 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/sync` | Write | Trigger manual sync for all connections |
+| POST | `/sync` | Write | Trigger manual sync — all active connections, or one connection if `connection_id` is given |
+
+### Request body
+
+The body is optional. Omit it (or send an empty body) to enqueue **every active** connection for sync. Pass `connection_id` to scope the sync to a single connection.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connection_id` | string | Optional. Connection short_id or UUID. When provided, only that connection is synced. |
+
+```json
+{ "connection_id": "abc12345" }
+```
+
+The handler returns `202 Accepted` immediately and runs the sync asynchronously; observe progress through `/sync/logs` (when shipped) or by polling `/connections/{id}/status`. A non-existent `connection_id` returns `404 NOT_FOUND`. A connection whose status is `disconnected` is treated as not-found by the sync resolver and likewise returns `404 NOT_FOUND`.
+
+```json
+{ "status": "sync_triggered" }
+```
 
 ## Transaction Comments
 
@@ -249,7 +267,7 @@ Two shapes, picked per-resource:
 - **Paginated resources** (transactions, rules) return a **resource-keyed envelope** with cursor pagination:
 
   ```json
-  { "transactions": [...], "next_cursor": "eyJ...", "has_more": true, "limit": 50 }
+  { "transactions": [...], "next_cursor": "eyJ...", "has_more": true, "limit": 100 }
   ```
 
   ```json
@@ -272,3 +290,28 @@ All errors return a JSON envelope:
 ```
 
 Error codes use `UPPER_SNAKE_CASE`. Common codes: `VALIDATION_ERROR`, `NOT_FOUND`, `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMITED`, `INTERNAL_ERROR`.
+
+## Rate limiting
+
+All `/api/v1/*` endpoints are rate-limited per API key using a token bucket. `/health/*` and `/api/v1/version` are exempt (used by load balancers and monitoring).
+
+Defaults: **120 requests/minute, burst 60**. Override with the `API_RATE_LIMIT_RPM` and `API_RATE_LIMIT_BURST` environment variables at server startup. Unauthenticated requests (no valid `X-API-Key` or `Authorization: Bearer`) fall back to bucketing by client IP.
+
+Every response includes:
+
+| Header | Meaning |
+|--------|---------|
+| `X-RateLimit-Limit` | Bucket capacity (burst). |
+| `X-RateLimit-Remaining` | Tokens left after this request. |
+| `X-RateLimit-Reset` | Epoch seconds when the bucket fully refills. |
+
+Over-limit requests return `429 Too Many Requests` with `code: "RATE_LIMITED"` and a `Retry-After` header (seconds to wait before retrying):
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limit exceeded; retry after 1s"
+  }
+}
+```
