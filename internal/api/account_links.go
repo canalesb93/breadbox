@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -119,18 +120,32 @@ func ReconcileAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-// ListTransactionMatchesHandler returns matches for a link.
+// ListTransactionMatchesHandler returns matches for a link with cursor
+// pagination. Response shape mirrors the transactions list envelope:
+// {matches, next_cursor, has_more, limit}. Default limit 50, cap 200.
 func ListTransactionMatchesHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		_ = r.URL.Query().Get("limit") // unused for now, matches are unbounded per link
 
-		matches, err := svc.ListTransactionMatches(r.Context(), id)
+		limit := 0
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n <= 0 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be a positive integer")
+				return
+			}
+			limit = n
+		}
+
+		result, err := svc.ListTransactionMatchesPaginated(r.Context(), id, service.TransactionMatchListParams{
+			Limit:  limit,
+			Cursor: r.URL.Query().Get("cursor"),
+		})
 		if err != nil {
 			writeServiceError(w, err, "Account link not found", "Failed to list matches")
 			return
 		}
-		writeData(w, matches)
+		writeData(w, result)
 	}
 }
 

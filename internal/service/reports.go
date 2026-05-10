@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // AgentReportResponse is the API response type for agent reports.
@@ -155,6 +158,9 @@ func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentRep
 	}
 	row, err := s.Queries.GetAgentReport(ctx, uid)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AgentReportResponse{}, ErrNotFound
+		}
 		return AgentReportResponse{}, fmt.Errorf("get agent report: %w", err)
 	}
 	return agentReportFromRow(row), nil
@@ -212,4 +218,21 @@ func (s *Service) MarkAgentReportUnread(ctx context.Context, reportID string) er
 // MarkAllAgentReportsRead marks all unread reports as read.
 func (s *Service) MarkAllAgentReportsRead(ctx context.Context) error {
 	return s.Queries.MarkAllAgentReportsRead(ctx)
+}
+
+// DeleteAgentReport hard-deletes a single report by ID. Returns ErrNotFound
+// if no report with the given ID exists.
+func (s *Service) DeleteAgentReport(ctx context.Context, reportID string) error {
+	uid, err := pgconv.ParseUUID(reportID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
+	}
+	tag, err := s.Pool.Exec(ctx, "DELETE FROM agent_reports WHERE id = $1", uid)
+	if err != nil {
+		return fmt.Errorf("delete agent report: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

@@ -697,7 +697,7 @@ Account links connect dependent (authorized user) accounts to primary (cardholde
 |--------|----------|------|-------------|
 | GET | `/account-links` | Read | List all account links |
 | GET | `/account-links/{id}` | Read | Get a single link with match stats |
-| GET | `/account-links/{id}/matches` | Read | List matched transaction pairs |
+| GET | `/account-links/{id}/matches` | Read | List matched transaction pairs (cursor-paginated; see below) |
 | POST | `/account-links` | Write | Create a link (auto-runs initial reconciliation) |
 | PUT | `/account-links/{id}` | Write | Update a link |
 | DELETE | `/account-links/{id}` | Write | Delete a link |
@@ -705,6 +705,26 @@ Account links connect dependent (authorized user) accounts to primary (cardholde
 | POST | `/transaction-matches/{id}/confirm` | Write | Confirm a matched pair |
 | POST | `/transaction-matches/{id}/reject` | Write | Reject a matched pair |
 | POST | `/transaction-matches/manual` | Write | Manually match two transactions |
+
+### `GET /account-links/{id}/matches` pagination
+
+Cursor-paginated. Query parameters:
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | int | `50` | Page size. Max `200`. |
+| `cursor` | string | — | Opaque cursor from a previous `next_cursor`. |
+
+Response envelope mirrors the transactions list:
+
+```json
+{
+  "matches": [{ "id": "...", "short_id": "...", "...": "..." }],
+  "next_cursor": "opaque-string-or-empty",
+  "has_more": false,
+  "limit": 50
+}
+```
 
 ## Agent Reports
 
@@ -714,8 +734,12 @@ AI agents can submit summaries and flag transactions for human review.
 |--------|----------|------|-------------|
 | GET | `/reports` | Read | List all reports (bare array, bounded) |
 | GET | `/reports/unread-count` | Read | Count of unread reports |
+| GET | `/reports/{id}` | Read | Get a single report |
 | POST | `/reports` | Write | Submit a report |
 | PATCH | `/reports/{id}/read` | Write | Mark a report as read |
+| PATCH | `/reports/{id}/unread` | Write | Mark a report as unread (returns it to the unread queue) |
+| POST | `/reports/read-all` | Write | Mark every unread report as read |
+| DELETE | `/reports/{id}` | Write | Hard-delete a report |
 
 ### `POST /reports` body
 
@@ -737,6 +761,42 @@ AI agents can submit summaries and flag transactions for human review.
 ```
 
 `rules_applied` is an object keyed by rule ID, mapping to the number of transactions updated by that rule in this retroactive pass. Order is not guaranteed. `total_affected` is the sum across all rules.
+
+## API Keys
+
+Manage the API keys that authenticate `X-API-Key` requests against this server. Useful for headless deployments that need to rotate credentials without a browser session.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api-keys` | Write | List all keys (hashed prefixes only — plaintext is never returned) |
+| POST | `/api-keys` | Write | Create a new key. Response includes `plaintext_key` **once** — store it. |
+| DELETE | `/api-keys/{id}` | Write | Soft-revoke (sets `revoked_at`); subsequent requests using the key get `401 REVOKED_API_KEY` |
+
+All three endpoints are gated by `Write` scope. Listing keys (even with hashes) reveals every credential's name, prefix, and last-used timestamp — enumeration that should not be available to read-only callers. The same scope applies to `POST` and `DELETE` for symmetry.
+
+### `POST /api-keys` body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Human label shown in the admin Access page. |
+| `scope` | string | No | `full_access` (default) or `read_only`. |
+
+### `POST /api-keys` response (201)
+
+```json
+{
+  "id": "...",
+  "name": "deploy-bot",
+  "key_prefix": "bb_aBcD1234",
+  "scope": "full_access",
+  "last_used_at": null,
+  "revoked_at": null,
+  "created_at": "2026-05-09T18:30:00Z",
+  "plaintext_key": "bb_aBcD1234...long..."
+}
+```
+
+The `plaintext_key` field is the **only** time the full key is returned. List and delete responses never include it; the server stores only the SHA-256 hash.
 
 ## Provider settings
 
