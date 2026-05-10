@@ -155,6 +155,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Patch("/users/{user_id}/login/{login_id}", UpdateUserLoginHandler(svc))
 			r.Delete("/users/{user_id}/login/{login_id}", DeleteUserLoginHandler(svc))
 			r.Post("/users/{user_id}/login/{login_id}/regenerate-token", RegenerateLoginTokenHandler(svc))
+			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
+			r.Post("/connections/csv/import", CSVImportHandler(svc))
 		})
 	})
 

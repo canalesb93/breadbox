@@ -291,8 +291,63 @@ and chose a password — there's nothing to regenerate at that point.
 | POST | `/connections/plaid/link-token` | Write | Start a new Plaid Link flow — returns a fresh link token |
 | POST | `/connections/plaid/exchange` | Write | Exchange the Plaid public token for a stored connection + accounts |
 | POST | `/connections/teller` | Write | Register a Teller connection from the enrollment payload Teller Connect returns |
+| POST | `/connections/csv/preview` | Write | Parse a CSV upload and return inferred columns + the first N rows. No persistence. |
+| POST | `/connections/csv/import` | Write | Import a CSV. Creates a new connection if `connection_id` is omitted, otherwise appends to the existing one. |
 
 `{id}` accepts either the connection's UUID or 8-char short_id.
+
+### CSV import (`POST /connections/csv/preview`, `POST /connections/csv/import`)
+
+The CSV endpoints are the headless analog of the admin "Import CSV" wizard. They cover deployments without Plaid or Teller.
+
+Both endpoints accept **two transports** with identical configuration fields. Pick whichever your client makes easier:
+
+| Transport | How the file arrives | How config arrives |
+|-----------|----------------------|--------------------|
+| `multipart/form-data` | `file` form-file field | other fields as form values; `column_mapping` as a JSON string |
+| `application/json` | `csv_base64` (or `csv_data`) string with the file base64-encoded | sibling JSON fields |
+
+**Configuration fields**
+
+| Field | Type | Required for | Notes |
+|-------|------|--------------|-------|
+| `column_mapping` | object `{name: index}` | import | maps the canonical fields (`date`, `amount`, `description`, optional `category`, `merchant_name`, `debit`, `credit`) to 0-indexed CSV columns |
+| `date_format` | string | recommended | Go time-layout (e.g. `"2006-01-02"`); auto-detected when omitted |
+| `positive_is_debit` | bool | optional | bank convention defaults to `false` (positive = credit); set `true` when the source CSV already follows the Breadbox convention (positive = money out) |
+| `has_debit_credit` | bool | optional | set `true` for Capital-One-style two-column amount CSVs; pair with `debit` and `credit` keys in `column_mapping` |
+| `user_id` | string | new connection | UUID or short_id of the household member; falls back to the only user in single-user households |
+| `account_name` | string | new connection | display name; defaults to `"CSV Import"` |
+| `connection_id` | string | append-only | existing CSV connection's UUID or short_id; the new rows attach to its first account |
+| `limit` | int | preview only | max preview rows, default 10, capped at 100 |
+
+`POST /connections/csv/preview` returns `200 OK` with parsed headers, the first N rows, and inferred column mapping; nothing is persisted. `template_name`, `positive_is_debit`, `date_format`, and `has_debit_credit` are emitted only when a known bank template is auto-detected.
+
+`POST /connections/csv/import` returns `201 Created`:
+
+```json
+{
+  "connection_id": "ab12cd34",
+  "account_id": "ef56gh78",
+  "imported_transactions": 125,
+  "updated_transactions": 0,
+  "skipped_duplicates": 3,
+  "total_rows": 128
+}
+```
+
+Re-importing the same CSV is a safe no-op — every row hashes to the same `provider_transaction_id` and the upsert detects the dedup. **Manual category overrides (`category_override = true`) are preserved** across re-imports.
+
+Errors:
+
+| Status | Code | When |
+|--------|------|------|
+| 400 | `INVALID_PARAMETER` | missing/bad fields, malformed CSV, missing `column_mapping` |
+| 404 | `NOT_FOUND` | `connection_id` provided but doesn't exist (or isn't a CSV connection) |
+| 413 | `PAYLOAD_TOO_LARGE` | upload exceeds 50 MB |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` is neither multipart nor JSON |
+| 500 | `INTERNAL_ERROR` | unexpected server failure |
+
+See `docs/csv-import.md` for the full CSV format reference (supported delimiters, BOM handling, dedup hash, bank template list).
 
 ### GET `/connections/{id}`
 
