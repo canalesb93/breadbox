@@ -98,6 +98,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
 			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))
 			r.Delete("/connections/{id}", DeleteConnectionHandler(svc))
+			r.Post("/connections/{id}/reauth", ConnectionReauthHandler(a))
+			r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
 			r.Post("/transactions/{transaction_id}/comments", CreateCommentHandler(svc))
 			r.Put("/transactions/{transaction_id}/comments/{id}", UpdateCommentHandler(svc))
 			r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
