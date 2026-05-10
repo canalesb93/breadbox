@@ -45,6 +45,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | GET | `/transactions/summary` | Read | Aggregated totals by category, month, week, day |
 | GET | `/transactions/merchants` | Read | Merchant-level stats (count, total, avg) |
 | GET | `/transactions/{id}` | Read | Get a single transaction |
+| GET | `/transactions/{id}/annotations` | Read | List the activity-timeline rows for a transaction (comments, rule applications, tag/category changes). Mirror of MCP `list_annotations`. |
 | PATCH | `/transactions/{id}/category` | Write | Set transaction category (override) |
 | DELETE | `/transactions/{id}/category` | Write | Reset transaction category to provider default |
 | POST | `/transactions/batch-categorize` | Write | Batch categorize multiple transactions (max 500) |
@@ -184,6 +185,46 @@ Path id accepts either a UUID or short_id for live (non-deleted) rows. Restore o
 | POST | `/transactions/{id}/comments` | Write | Add a comment to a transaction |
 | PUT | `/transactions/{id}/comments/{comment_id}` | Write | Update a comment |
 | DELETE | `/transactions/{id}/comments/{comment_id}` | Write | Delete a comment |
+
+## Transaction Annotations
+
+`GET /transactions/{id}/annotations` returns the activity-timeline rows for a single transaction — comments, rule applications, tag adds/removes, and category sets. Same payload as the MCP `list_annotations` tool, wrapped in a `{ "annotations": [...] }` envelope. The rendering contract (dedup, soft-delete tombstones, system-event kinds) is documented in `docs/activity-timeline.md`.
+
+Path id accepts either a UUID or short_id (the same resolver as the rest of the transaction endpoints).
+
+| Query param | Type | Description |
+|-------------|------|-------------|
+| `kind` | string (repeatable, comma-separated) | Filter by raw DB kind: `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`, `sync_started`, `sync_updated`. Both `?kind=comment&kind=rule_applied` and `?kind=comment,rule_applied` are accepted. |
+| `actor_type` | string (repeatable, comma-separated) | Filter by actor type: `user`, `agent`, `system`. Same repeatable / comma-separated handling as `kind`. |
+| `since` | string (RFC3339) | Return only rows created strictly after this timestamp. Pair with `limit` to bound a delta read. |
+| `limit` | int | Cap the returned rows to the most recent N (timeline tail), still ordered ASC. `0` (default) returns the full timeline; the server caps at `200`. Negative values are rejected. |
+| `raw` | bool | When `true`, bypass enrichment and dedup. Returns the unmodified DB view — rule-source duplicates and same-actor adjacent comment-vs-tag-note pairs survive, and the derived `summary` / `action` / `subject` fields are empty. |
+
+Example:
+
+```bash
+curl -H "X-API-Key: $BB_API_KEY" \
+  "https://breadbox.example.com/api/v1/transactions/abc12345/annotations?kind=comment&limit=5"
+```
+
+```json
+{
+  "annotations": [
+    {
+      "id": "01J...",
+      "short_id": "ann7zk2x",
+      "transaction_id": "01J...",
+      "kind": "comment",
+      "actor_type": "user",
+      "actor_name": "Alice",
+      "content": "needs receipt",
+      "created_at": "2026-04-26T12:00:00Z"
+    }
+  ]
+}
+```
+
+A 400 `INVALID_PARAMETER` is returned for malformed `since` timestamps or non-numeric / negative `limit` values; 404 `NOT_FOUND` is returned when the path id can't be resolved (the same MCP-shared limitation applies — a syntactically valid but unknown UUID returns an empty list rather than 404).
 
 ## Tags & Reviews
 
