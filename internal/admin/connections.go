@@ -522,43 +522,25 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Create the bank connection record.
-		bankConn, err := a.Queries.CreateBankConnection(r.Context(), db.CreateBankConnectionParams{
-			UserID:           userID,
-			Provider:         db.ProviderType(providerName),
-			InstitutionID:    pgconv.Text(req.InstitutionID),
-			InstitutionName:  pgconv.Text(req.InstitutionName),
-			ExternalID:           pgconv.Text(conn.ExternalID),
-			EncryptedCredentials: conn.EncryptedCredentials,
-			Status:           db.ConnectionStatusActive,
+		// Persist the connection + accounts via the shared service helper.
+		// REST (api.PlaidExchangeHandler) calls the same path so both
+		// surfaces stay byte-identical on what lands in the DB.
+		result, err := a.Service.RegisterNewConnection(r.Context(), service.RegisterNewConnectionParams{
+			UserID:          userID,
+			Provider:        providerName,
+			InstitutionID:   req.InstitutionID,
+			InstitutionName: req.InstitutionName,
+			Conn:            conn,
+			Accounts:        accounts,
 		})
 		if err != nil {
-			a.Logger.Error("create bank connection", "error", err)
+			a.Logger.Error("register new connection", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save connection"})
 			return
 		}
 
-		// Upsert accounts from the exchange response.
-		for _, acct := range accounts {
-			_, err := a.Queries.UpsertAccount(r.Context(), db.UpsertAccountParams{
-				ConnectionID:      bankConn.ID,
-				ExternalAccountID: acct.ExternalID,
-				Name:              acct.Name,
-				OfficialName:      pgconv.TextIfNotEmpty(acct.OfficialName),
-				Type:              acct.Type,
-				Subtype:           pgconv.TextIfNotEmpty(acct.Subtype),
-				Mask:              pgconv.TextIfNotEmpty(acct.Mask),
-				IsoCurrencyCode:   pgconv.TextIfNotEmpty(acct.ISOCurrencyCode),
-			})
-			if err != nil {
-				a.Logger.Error("upsert account", "error", err, "external_id", acct.ExternalID)
-			}
-		}
-
-		connID := pgconv.FormatUUID(bankConn.ID)
-
 		writeJSON(w, http.StatusCreated, exchangeTokenResponse{
-			ConnectionID:    connID,
+			ConnectionID:    pgconv.FormatUUID(result.ID),
 			InstitutionName: req.InstitutionName,
 			Status:          "active",
 		})

@@ -109,6 +109,8 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | DELETE | `/connections/{id}` | Write | Soft-disconnect a connection (clears tokens, hides from list) |
 | POST | `/connections/{id}/reauth` | Write | Start the provider re-auth flow — returns a fresh link token |
 | POST | `/connections/{id}/reauth-complete` | Write | Mark connection active again after the user finishes the re-auth flow |
+| POST | `/connections/plaid/link-token` | Write | Start a new Plaid Link flow — returns a fresh link token |
+| POST | `/connections/plaid/exchange` | Write | Exchange the Plaid public token for a stored connection + accounts |
 
 `{id}` accepts either the connection's UUID or 8-char short_id.
 
@@ -222,6 +224,83 @@ Returns `200`:
 Errors:
 
 - `404 NOT_FOUND` — connection doesn't exist.
+
+### Plaid Link flow (new connection)
+
+Connecting a new Plaid bank account is a three-step dance:
+
+1. Server: `POST /connections/plaid/link-token` → returns a `link_token`.
+2. Client / host: hand `link_token` to Plaid Link. The user authenticates with
+   their bank inside Plaid's UI; on success Plaid returns a `public_token`
+   plus institution and account metadata to the host's `onSuccess` callback.
+3. Server: `POST /connections/plaid/exchange` with the `public_token` →
+   Breadbox exchanges it for a long-lived access token, encrypts it,
+   creates the `BankConnection` row, and upserts the accounts Plaid
+   reports. Subsequent syncs run automatically on the global cron.
+
+These endpoints mirror the admin `POST /admin/api/link-token` and
+`POST /admin/api/exchange-token` handlers and persist data through the same
+service-layer write path.
+
+### POST `/connections/plaid/link-token`
+
+Starts a new Plaid Link session for a household member.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | string | Required. UUID **or** 8-char short_id of the user the new connection will be attached to. |
+
+Returns `200`:
+
+```json
+{
+  "link_token": "link-sandbox-abc123",
+  "expiration": "2026-05-09T16:30:00Z"
+}
+```
+
+Errors:
+
+- `400 INVALID_PARAMETER` — `user_id` missing or malformed; Plaid provider not configured on this server.
+- `404 NOT_FOUND` — `user_id` doesn't match any household member.
+- `502 PROVIDER_ERROR` — upstream Plaid call failed.
+
+### POST `/connections/plaid/exchange`
+
+Exchanges the `public_token` Plaid returned in Link's `onSuccess` for a
+stored `BankConnection` and the accounts Plaid authoritatively reports.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `public_token` | string | Required. The token Plaid handed back in `onSuccess`. |
+| `user_id` | string | Required. UUID or 8-char short_id of the owning user. |
+| `institution_id` | string | Required. Plaid institution identifier (e.g. `ins_109511`). |
+| `institution_name` | string | Required. Display name (e.g. `Chase`). |
+| `accounts` | array | Optional. The account metadata array Plaid Link's `onSuccess` returns (id / name / type / subtype / mask). **Informational only** — the rows persisted come from the provider's exchange response, not from this field. |
+
+Returns `201`:
+
+```json
+{
+  "connection_id": "abc12345",
+  "institution_name": "Chase",
+  "status": "active"
+}
+```
+
+`connection_id` is the new connection's 8-char short_id (use it in any
+downstream `/connections/{id}/...` call).
+
+Errors:
+
+- `400 INVALID_PARAMETER` — required field missing; Plaid provider not configured on this server.
+- `404 NOT_FOUND` — `user_id` doesn't match any household member.
+- `502 PROVIDER_ERROR` — upstream Plaid token exchange failed.
+- `500 INTERNAL_ERROR` — DB write failed (the provider call already succeeded; safe to retry).
 
 ## Sync
 
