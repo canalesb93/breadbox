@@ -39,6 +39,10 @@ func MapServiceError(err error) (ServiceErrorResponse, bool) {
 		return ServiceErrorResponse{Status: http.StatusForbidden, Code: "FORBIDDEN", Message: err.Error()}, true
 	case errors.Is(err, service.ErrSyncInProgress):
 		return ServiceErrorResponse{Status: http.StatusConflict, Code: "SYNC_IN_PROGRESS", Message: err.Error()}, true
+	case errors.Is(err, service.ErrUserHasDependents):
+		return ServiceErrorResponse{Status: http.StatusConflict, Code: "USER_HAS_DEPENDENTS", Message: err.Error()}, true
+	case errors.Is(err, service.ErrEmailConflict):
+		return ServiceErrorResponse{Status: http.StatusConflict, Code: "EMAIL_CONFLICT", Message: err.Error()}, true
 	case errors.Is(err, service.ErrInvalidAPIKey):
 		return ServiceErrorResponse{Status: http.StatusUnauthorized, Code: "INVALID_API_KEY", Message: err.Error()}, true
 	case errors.Is(err, service.ErrRevokedAPIKey):

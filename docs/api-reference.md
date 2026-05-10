@@ -131,6 +131,55 @@ Response: `200 OK` with the updated `AccountResponse`. Returns `404 NOT_FOUND` w
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/users` | Read | List all family members |
+| GET | `/users/{id}` | Read | Get a single household member |
+| POST | `/users` | Write | Create a household member |
+| PATCH | `/users/{id}` | Write | Update mutable fields (name, email) |
+| DELETE | `/users/{id}` | Write | Delete a household member (refused while bank connections still attach) |
+| POST | `/users/{id}/wipe-data` | Write | Destructive — remove all bank connections, accounts, and transactions belonging to this user |
+
+`{id}` accepts either the user's UUID or 8-char short_id.
+
+### POST `/users`
+
+Create a household member. Mirrors the admin "Add family member" form.
+
+```json
+{
+  "name": "Charlie",
+  "email": "charlie@example.com"
+}
+```
+
+- `name` (required) — trimmed; empty value returns `400 INVALID_PARAMETER`.
+- `email` (optional) — must parse as RFC 5322. A duplicate email returns `409 EMAIL_CONFLICT`.
+
+Responds `201` with the created `UserResponse`.
+
+### PATCH `/users/{id}`
+
+Partial update — every field is optional, omitted fields stay unchanged. Pass `email: ""` (a non-null empty string) to clear the stored email.
+
+```json
+{ "name": "Renamed", "email": "new@example.com" }
+```
+
+Responds `200` with the updated `UserResponse`. `404 NOT_FOUND` when the id cannot be resolved; `409 EMAIL_CONFLICT` when the new email is already taken.
+
+### DELETE `/users/{id}`
+
+Hard delete. Refuses with `409 USER_HAS_DEPENDENTS` whenever the user still owns one or more bank connections — call `POST /users/{id}/wipe-data` first if you really mean to remove them.
+
+Responds `204` on success, `404 NOT_FOUND` when the id is unknown.
+
+### POST `/users/{id}/wipe-data`
+
+Destructive: deletes every `bank_connections`, `accounts`, and `transactions` row attached to this user, in a single transaction. Useful as a prerequisite to `DELETE /users/{id}` and as a "reset" hook for development.
+
+```json
+{ "status": "ok", "deleted_transactions": 3 }
+```
+
+Responds `200` with the count of removed transactions, `404 NOT_FOUND` when the user does not exist.
 
 ## Connections
 

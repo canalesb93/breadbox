@@ -116,6 +116,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		r.Get("/categories/export", ExportCategoriesTSVHandler(svc))
 		r.Get("/categories/{id}", GetCategoryHandler(svc))
 		r.Get("/users", ListUsersHandler(svc))
+		r.Get("/users/{id}", GetUserHandler(svc))
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}", GetConnectionHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
@@ -178,6 +179,10 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
 			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))
 			r.Delete("/connections/{id}", DeleteConnectionHandler(svc))
+			r.Post("/users", CreateUserHandler(svc))
+			r.Patch("/users/{id}", UpdateUserHandler(svc))
+			r.Delete("/users/{id}", DeleteUserHandler(svc))
+			r.Post("/users/{id}/wipe-data", WipeUserDataHandler(svc))
 		})
 	})
 	return r

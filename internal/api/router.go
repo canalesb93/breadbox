@@ -64,6 +64,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/categories/export", ExportCategoriesTSVHandler(svc))
 		r.Get("/categories/{id}", GetCategoryHandler(svc))
 		r.Get("/users", ListUsersHandler(svc))
+		r.Get("/users/{id}", GetUserHandler(svc))
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}", GetConnectionHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
@@ -135,6 +136,10 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 			r.Put("/settings/providers/plaid", UpdatePlaidConfigHandler(a))
 			r.Put("/settings/providers/teller", UpdateTellerConfigHandler(a))
+			r.Post("/users", CreateUserHandler(svc))
+			r.Patch("/users/{id}", UpdateUserHandler(svc))
+			r.Delete("/users/{id}", DeleteUserHandler(svc))
+			r.Post("/users/{id}/wipe-data", WipeUserDataHandler(svc))
 		})
 	})
 
