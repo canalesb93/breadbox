@@ -101,7 +101,84 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/connections` | Read | List all bank connections |
+| GET | `/connections/{id}` | Read | Get full connection detail (status, paused, sync interval, account count) |
 | GET | `/connections/{id}/status` | Read | Get connection status and last sync info |
+| POST | `/connections/{id}/sync` | Write | Trigger a sync for this single connection |
+| POST | `/connections/{id}/paused` | Write | Pause or resume scheduled syncs for a connection |
+| POST | `/connections/{id}/sync-interval` | Write | Set or clear a per-connection sync-interval override |
+| DELETE | `/connections/{id}` | Write | Soft-disconnect a connection (clears tokens, hides from list) |
+
+`{id}` accepts either the connection's UUID or 8-char short_id.
+
+### GET `/connections/{id}`
+
+Full per-connection detail. Returns `200` with the connection record:
+
+```json
+{
+  "id": "01J...",
+  "short_id": "abc12345",
+  "user_id": "u1abc234",
+  "user_name": "Alice",
+  "provider": "plaid",
+  "institution_id": "ins_3",
+  "institution_name": "Chase",
+  "status": "active",
+  "error_code": null,
+  "error_message": null,
+  "last_synced_at": "2026-05-09T15:00:00Z",
+  "created_at": "2026-04-01T12:00:00Z",
+  "updated_at": "2026-05-09T15:00:00Z",
+  "paused": false,
+  "sync_interval_override_minutes": null,
+  "consecutive_failures": 0,
+  "account_count": 3
+}
+```
+
+A non-existent id returns `404 NOT_FOUND`. Disconnected connections are still returned (with `status: "disconnected"`) — only the `/connections` list filters them out.
+
+### POST `/connections/{id}/sync`
+
+Per-connection variant of `POST /sync` (body-less). The handler returns `202 Accepted` and runs the sync in the background.
+
+```json
+{ "status": "sync_triggered" }
+```
+
+A non-existent or `disconnected` connection returns `404 NOT_FOUND` (the sync resolver hides disconnected rows).
+
+### POST `/connections/{id}/paused`
+
+Toggle the `paused` flag — paused connections are skipped by the cron scheduler but can still be synced manually via `POST /connections/{id}/sync`.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `paused` | bool | Required. `true` to pause, `false` to resume. |
+
+Returns `200` with the full connection detail (same shape as `GET /connections/{id}`). `404 NOT_FOUND` if the connection is missing.
+
+### POST `/connections/{id}/sync-interval`
+
+Set or clear the per-connection sync-interval override (minutes). When cleared, the connection falls back to the global default.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `interval_minutes` | int / null | Minutes between scheduled syncs. Pass `null` (or omit) to clear the override and revert to the global default. Values `<= 0` are treated as a clear. |
+
+Returns `200` with the full connection detail. `404 NOT_FOUND` if the connection is missing.
+
+### DELETE `/connections/{id}`
+
+Soft-disconnect: flips status to `disconnected`, wipes the encrypted access token, and soft-deletes related transactions in a single DB transaction. The row is preserved (FK policy is `SET NULL` for accounts and transactions, `CASCADE` for `sync_logs`) so historical data stays linked.
+
+Returns `204 No Content`. Calling on a missing or already-disconnected connection returns `404 NOT_FOUND` (idempotent at the API surface).
+
+Provider-side credential revocation (e.g. Plaid's `/item/remove`) is **not** performed by the REST endpoint — it is admin-handler-only because the public service layer doesn't carry the provider registry. The connection is unusable from Breadbox's side regardless.
 
 ## Sync
 

@@ -149,6 +149,18 @@ type ConnectionStatusResponse struct {
 	LastSyncLog         *SyncLogResponse `json:"last_sync_log"`
 }
 
+// ConnectionDetailResponse is the full per-connection detail returned by
+// GET /api/v1/connections/{id}. It extends ConnectionResponse with fields
+// that are useful for management operations (paused flag, per-conn sync
+// interval override, account count).
+type ConnectionDetailResponse struct {
+	ConnectionResponse
+	Paused                      bool   `json:"paused"`
+	SyncIntervalOverrideMinutes *int32 `json:"sync_interval_override_minutes"`
+	ConsecutiveFailures         int32  `json:"consecutive_failures"`
+	AccountCount                int    `json:"account_count"`
+}
+
 type SyncLogResponse struct {
 	ID            string  `json:"id"`
 	ShortID       string  `json:"short_id"`

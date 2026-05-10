@@ -103,7 +103,9 @@ WHERE bc.user_id = $1 AND bc.status != 'disconnected' ORDER BY bc.created_at;
 -- name: GetConnectionForAPI :one
 SELECT bc.id, bc.short_id, u.short_id AS user_short_id, bc.provider, bc.institution_id, bc.institution_name,
        bc.status, bc.error_code, bc.error_message, bc.last_synced_at,
-       bc.created_at, bc.updated_at, u.name as user_name
+       bc.created_at, bc.updated_at, u.name as user_name,
+       bc.paused, bc.sync_interval_override_minutes, bc.consecutive_failures,
+       (SELECT COUNT(*) FROM accounts a WHERE a.connection_id = bc.id) AS account_count
 FROM bank_connections bc LEFT JOIN users u ON bc.user_id = u.id
 WHERE bc.id = $1;
 
