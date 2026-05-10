@@ -74,6 +74,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/reports", ListReportsHandler(svc))
 		r.Get("/reports/unread-count", UnreadReportCountHandler(svc))
 		r.Get("/tags", ListTagsHandler(svc))
+		r.Get("/tags/{slug}", GetTagHandler(svc))
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -111,6 +112,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Patch("/reports/{id}/read", MarkReportReadHandler(svc))
 			r.Post("/transactions/{id}/tags", AddTransactionTagHandler(svc))
 			r.Delete("/transactions/{id}/tags/{slug}", RemoveTransactionTagHandler(svc))
+			r.Post("/tags", CreateTagHandler(svc))
+			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
+			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 		})
 	})
 

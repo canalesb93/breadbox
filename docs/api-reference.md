@@ -192,10 +192,14 @@ The review queue is a tag. Transactions carrying the seeded `needs-review` tag (
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/tags` | Read | List all registered tags |
+| POST | `/tags` | Write | Create a tag. Body: `{"slug":"...","display_name":"...","description":"...","color":"#abc123","icon":"tag"}`. Slug must match `^[a-z0-9][a-z0-9\-:]*[a-z0-9]$`. Returns `409 SLUG_CONFLICT` if the slug is already registered. |
+| GET | `/tags/{slug}` | Read | Get a single tag by UUID, short_id, or slug |
+| PATCH | `/tags/{slug}` | Write | Partial update — every field optional: `{"display_name":"...","description":"...","color":"...","icon":"...","lifecycle":"persistent\|ephemeral"}`. Slug is immutable. |
+| DELETE | `/tags/{slug}` | Write | Delete a tag. Cascades to `transaction_tags`; annotations referencing the tag retain `tag_id=NULL`. Returns `204 No Content`. |
 | POST | `/transactions/{id}/tags` | Write | Attach a tag to a transaction (body: `{"slug":"...","note":"..."}`). Auto-creates the tag if the slug is not yet registered. Idempotent — returns `already_present: true` on repeat calls. |
 | DELETE | `/transactions/{id}/tags/{slug}` | Write | Detach a tag from a transaction. Optional `?note=...` or JSON body `{"note":"..."}` recorded on the `tag_removed` annotation. Idempotent — returns `already_absent: true` when the tag isn't attached. |
 
-Tag CRUD (create/update/delete tag records themselves) remains on the admin dashboard and MCP (`create_tag`, `update_tag`, `delete_tag`) for now; REST CRUD is tracked as a follow-up. For filtering, pass `tags=slug1,slug2` (AND) or `any_tag=slug1,slug2` (OR) to `/transactions` and `/transactions/count`.
+For filtering, pass `tags=slug1,slug2` (AND) or `any_tag=slug1,slug2` (OR) to `/transactions` and `/transactions/count`.
 
 Additional tag-touching operations exposed via MCP: `list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`. The admin dashboard covers the same ground at `/tags`, `/transactions/:id/edit`, and bulk actions on `/transactions`.
 
