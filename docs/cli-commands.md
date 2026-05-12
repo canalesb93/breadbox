@@ -129,7 +129,7 @@ A **connection** is a bank-side OAuth link (Plaid item, Teller enrollment, or CS
 | `breadbox connections link get <session-id>` | R | Check a hosted-link session's status (`active` / `completed` / `failed` / `expired`) and the resulting connection IDs |
 | `breadbox connections relink <connection-id> [--wait]` | W | Mint a relink hosted-link session for an existing (broken or pending-reauth) connection |
 | `breadbox connections disconnect <id>` | W | Mark connection disconnected (preserves history) |
-| `breadbox connections delete <id>` | W | Hard delete (accounts/transactions FK-SET-NULL) |
+| `breadbox connections delete <id>` | W | *Currently aliases `disconnect`* — the REST surface has no hard-delete endpoint today; both verbs hit `DELETE /connections/{id}` (soft-disconnect). |
 
 ## Sync
 

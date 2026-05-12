@@ -64,6 +64,9 @@ func MapExitCode(err error) int {
 	if errors.As(err, &expired) {
 		return ExitUpstream
 	}
+	if errors.Is(err, ErrHostedLinkTimeout) {
+		return ExitUpstream
+	}
 	var apiErr *client.APIError
 	if errors.As(err, &apiErr) {
 		switch {
