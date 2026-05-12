@@ -93,6 +93,62 @@ type CreateHostedLinkResult struct {
 	Token   string
 }
 
+// CreateHostedLinkRelinkParams is the input for minting a relink session.
+// Unlike CreateHostedLinkParams the connection identity comes first — user,
+// provider, single_use, and action are all derived (single_use is always
+// true; action is always "relink"). Used by the REST handler at
+// POST /api/v1/connections/{id}/relink.
+type CreateHostedLinkRelinkParams struct {
+	ConnectionID string
+	RedirectURL  string
+	Label        string
+	TTL          time.Duration
+	Actor        Actor
+}
+
+// CreateHostedLinkRelink mints a relink hosted-link session pinned to one
+// connection. Surfaces ErrNotFound for unknown connection IDs and
+// ErrInvalidState when the connection is already in the disconnected state
+// (re-auth on a disconnected connection makes no sense — soft-deleted bank
+// connections are not recoverable).
+//
+// The session always carries action="relink", single_use=true, and
+// provider/user_id derived from the connection row. Token issuance and the
+// rest of the bookkeeping delegate straight to CreateHostedLink.
+func (s *Service) CreateHostedLinkRelink(ctx context.Context, p CreateHostedLinkRelinkParams) (CreateHostedLinkResult, error) {
+	if p.ConnectionID == "" {
+		return CreateHostedLinkResult{}, fmt.Errorf("%w: connection_id is required", ErrInvalidParameter)
+	}
+	cuid, err := s.ResolveConnectionUUID(ctx, p.ConnectionID)
+	if err != nil {
+		return CreateHostedLinkResult{}, ErrNotFound
+	}
+	conn, err := s.Queries.GetBankConnection(ctx, cuid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CreateHostedLinkResult{}, ErrNotFound
+		}
+		return CreateHostedLinkResult{}, fmt.Errorf("get connection: %w", err)
+	}
+	if conn.Status == db.ConnectionStatusDisconnected {
+		return CreateHostedLinkResult{}, fmt.Errorf("%w: connection is disconnected", ErrInvalidState)
+	}
+
+	// Delegate to the generic create path — it handles user-existence
+	// checks, provider derivation, TTL clamping, token issuance.
+	return s.CreateHostedLink(ctx, CreateHostedLinkParams{
+		UserID:       pgconv.FormatUUID(conn.UserID),
+		Provider:     string(conn.Provider),
+		Action:       HostedLinkActionRelink,
+		ConnectionID: pgconv.FormatUUID(cuid),
+		SingleUse:    true,
+		RedirectURL:  p.RedirectURL,
+		Label:        p.Label,
+		TTL:          p.TTL,
+		Actor:        p.Actor,
+	})
+}
+
 // CreateHostedLink mints a new hosted_link_sessions row plus a one-time
 // bearer token. TTL is clamped: 0 → 15m default, >60m → 60m. Provider must
 // be empty, "plaid", or "teller". Action "relink" requires ConnectionID and

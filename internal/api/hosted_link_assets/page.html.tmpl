@@ -179,12 +179,49 @@
   var sessionData = null;
   var resultIds = [];
 
+  function isRelink() {
+    return sessionData && sessionData.action === 'relink';
+  }
+
   function renderWelcome() {
+    var welcomeH1 = document.querySelector('#state-welcome h1');
+    var welcomeLede = document.getElementById('welcome-lede');
     if (sessionData.label) {
       document.getElementById('welcome-label').textContent = sessionData.label;
     }
     var picker = document.getElementById('provider-picker');
     picker.innerHTML = '';
+
+    if (isRelink()) {
+      // Re-auth flow: no picker, single CTA, copy reflects that we're
+      // reconnecting an already-known bank.
+      welcomeH1.textContent = 'Reconnect your bank';
+      welcomeLede.textContent = 'Your bank needs you to sign in again. We\'ll hand you off to your bank to re-authenticate.';
+      var provider = sessionData.provider || 'plaid';
+      var btn = document.createElement('button');
+      btn.className = 'primary';
+      if (provider === 'plaid') {
+        btn.textContent = 'Reconnect with Plaid';
+        btn.addEventListener('click', startPlaidRelink);
+        picker.appendChild(btn);
+      } else if (provider === 'teller') {
+        btn.textContent = 'Reconnect with Teller';
+        btn.disabled = true;
+        btn.title = 'Teller re-auth ships next';
+        var note = document.createElement('p');
+        note.className = 'small';
+        note.textContent = 'Teller re-auth ships next — please use the admin UI for now.';
+        picker.appendChild(btn);
+        picker.appendChild(note);
+      }
+      show('welcome');
+      return;
+    }
+
+    // Link (new-connection) flow: default copy and picker if no provider
+    // is pinned at mint time.
+    welcomeH1.textContent = 'Connect your bank';
+    welcomeLede.textContent = 'Pick how you\'d like to connect. You\'ll be handed off to your bank for authentication.';
     var pinned = sessionData.provider;
     var options = pinned ? [pinned] : ['plaid', 'teller'];
     options.forEach(function (name) {
@@ -207,6 +244,67 @@
       picker.appendChild(btn);
     });
     show('welcome');
+  }
+
+  function startPlaidRelink() {
+    setLoading('Opening Plaid…');
+    api('POST', '/providers/plaid/start', {}).then(function (data) {
+      if (!data || !data.link_token) {
+        showError('Plaid did not return a link token.');
+        return;
+      }
+      if (typeof Plaid === 'undefined' || !Plaid.create) {
+        showError('Plaid Link failed to load.');
+        return;
+      }
+      var settled = false;
+      // Plaid update mode: onSuccess fires when the user completes re-auth.
+      // onExit fires when the user closes the modal — with err set on a real
+      // error, or err=null on a plain cancel. We must NOT treat a cancel as
+      // success, otherwise the connection would flip "reconnected" without
+      // the user ever re-entering credentials.
+      var handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: function () {
+          if (settled) return;
+          settled = true;
+          setLoading('Reconnecting…');
+          api('POST', '/reauth-complete', {}).then(function () {
+            renderRelinkResult();
+          }).catch(function (err) {
+            showError(err.message || 'Failed to reconnect your bank.');
+          });
+        },
+        onExit: function (err) {
+          if (settled) return;
+          if (err) {
+            settled = true;
+            api('POST', '/fail', {
+              code: err.error_code || 'PLAID_EXIT',
+              message: err.display_message || err.error_message || 'Plaid Link exited with an error.'
+            }).catch(function () {});
+            showError(err.display_message || err.error_message || 'Plaid Link exited.');
+            return;
+          }
+          // Plain cancel — go back to the welcome state so the user can retry.
+          show('welcome');
+        }
+      });
+      handler.open();
+    }).catch(function (err) {
+      showError(err.message || 'Failed to start Plaid re-auth.');
+    });
+  }
+
+  function renderRelinkResult() {
+    var resultH1 = document.querySelector('#state-result h1');
+    var resultLede = document.querySelector('#state-result .lede');
+    if (resultH1) resultH1.textContent = 'Reconnected.';
+    if (resultLede) resultLede.textContent = 'Your bank is reconnected — sync will resume shortly.';
+    document.getElementById('result-list').innerHTML = '';
+    // Single-use relink — never offer "Connect another".
+    document.getElementById('btn-another').classList.add('hidden');
+    show('result');
   }
 
   function startPlaid() {
@@ -277,6 +375,16 @@
     show('welcome');
   });
   document.getElementById('btn-done').addEventListener('click', function () {
+    // Relink sessions are already terminal — /reauth-complete burned the
+    // token. Skip the /complete call so we don't 410 on ourselves.
+    if (isRelink()) {
+      if (sessionData.redirect_url) {
+        window.location.href = sessionData.redirect_url;
+      } else {
+        show('closed');
+      }
+      return;
+    }
     setLoading('Wrapping up…');
     api('POST', '/complete', {}).then(function () {
       if (sessionData.redirect_url) {

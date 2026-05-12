@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -55,6 +56,84 @@ type createHostedLinkResponse struct {
 	hostedLinkSessionResponse
 	Token string `json:"token"`
 	URL   string `json:"url"`
+}
+
+// createHostedLinkRelinkRequest is the JSON body for
+// POST /api/v1/connections/{id}/relink. The connection identity comes from
+// the URL path, so neither `user_id` nor `provider` is accepted on the body
+// — both are derived from the connection row. `single_use` is implicit and
+// always true (re-auth is one-shot).
+type createHostedLinkRelinkRequest struct {
+	RedirectURL      string `json:"redirect_url"`
+	Label            string `json:"label"`
+	ExpiresInSeconds *int   `json:"expires_in_seconds"`
+}
+
+// CreateHostedLinkRelinkHandler serves POST /api/v1/connections/{id}/relink.
+//
+// Mints a re-auth hosted-link session pinned to one existing connection.
+// The session is always `action="relink"`, `single_use=true`, and `provider`
+// is sourced from the connection row — the request body has no say over any
+// of those. The user attribution is the connection's owner; we never accept
+// `user_id` on the body.
+//
+// Disconnected connections cannot be re-authenticated — re-auth on a soft-
+// deleted connection makes no sense — so we surface `409 CONFLICT` in that
+// case via service.ErrInvalidState. Unknown connection IDs return 404.
+//
+// Requires `full_access` scope.
+func CreateHostedLinkRelinkHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		var req createHostedLinkRelinkRequest
+		// Body is optional — accept an empty POST.
+		if r.ContentLength != 0 {
+			if !decodeJSON(w, r, &req) {
+				return
+			}
+		}
+		if req.ExpiresInSeconds != nil {
+			if *req.ExpiresInSeconds < 0 || *req.ExpiresInSeconds > 3600 {
+				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR",
+					"expires_in_seconds must be between 0 and 3600")
+				return
+			}
+		}
+
+		var ttl time.Duration
+		if req.ExpiresInSeconds != nil {
+			ttl = time.Duration(*req.ExpiresInSeconds) * time.Second
+		}
+
+		actor := service.ActorFromContext(r.Context())
+		result, err := svc.CreateHostedLinkRelink(r.Context(), service.CreateHostedLinkRelinkParams{
+			ConnectionID: id,
+			RedirectURL:  req.RedirectURL,
+			Label:        req.Label,
+			TTL:          ttl,
+			Actor:        actor,
+		})
+		if err != nil {
+			// ErrInvalidState — connection is disconnected. The generic
+			// writeServiceError helper doesn't know about ErrInvalidState
+			// (it's deliberately scoped to bounded sentinels), so map it
+			// here to a 409 with the connection-specific code.
+			if errors.Is(err, service.ErrInvalidState) {
+				mw.WriteError(w, http.StatusConflict, "CONNECTION_DISCONNECTED",
+					"Cannot mint a re-auth link for a disconnected connection")
+				return
+			}
+			writeServiceError(w, err, "Connection not found", "Failed to create hosted link")
+			return
+		}
+
+		writeJSON(w, http.StatusCreated, createHostedLinkResponse{
+			hostedLinkSessionResponse: hostedLinkSessionToResponse(result.Session),
+			Token:                     result.Token,
+			URL:                       buildHostedLinkURL(r, result.Token),
+		})
+	}
 }
 
 // CreateHostedLinkHandler serves POST /api/v1/connections/link.

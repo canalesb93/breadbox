@@ -68,6 +68,10 @@ func setupHostedLinkPageEnv(t *testing.T) *hostedLinkPageEnv {
 		exchangeAccounts: []provider.Account{
 			{ExternalID: "ext_acct_1", Name: "Plaid Checking", Type: "depository"},
 		},
+		reauthSession: provider.LinkSession{
+			Token:  "link-reauth-test",
+			Expiry: time.Now().Add(30 * time.Minute),
+		},
 	}
 	ft := &fakeTellerProvider{
 		exchangeConn: provider.Connection{
@@ -93,6 +97,7 @@ func setupHostedLinkPageEnv(t *testing.T) *hostedLinkPageEnv {
 		r.Get("/session", GetHostedLinkPageSessionHandler(svc))
 		r.Post("/providers/{name}/start", HostedLinkPageStartHandler(a))
 		r.Post("/connections", HostedLinkPageConnectionHandler(a))
+		r.Post("/reauth-complete", HostedLinkPageReauthCompleteHandler(svc))
 		r.Post("/complete", HostedLinkPageCompleteHandler(svc))
 		r.Post("/fail", HostedLinkPageFailHandler(svc))
 	})
