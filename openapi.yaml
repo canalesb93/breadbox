@@ -854,6 +854,62 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/connections/link:
+    post:
+      tags: [Connections]
+      summary: Mint a hosted-link session
+      description: |
+        Creates a hosted-link session and returns the URL an end-user should
+        open in their browser to add a new bank connection. The response
+        carries a one-time-only bearer `token` and a fully-qualified `url`
+        (scheme + host + `/link/<token>`). The token is **never** echoed back
+        by `GET /connections/link/{id}` — capture it from this response and
+        keep the URL alongside it.
+
+        - `provider` is optional. Empty means the hosted page presents a picker.
+        - `expires_in_seconds` is clamped to [0, 3600]. `0` (or missing)
+          selects the default of 900s (15 minutes).
+        - Action is always `link` on this endpoint. Relink (re-authenticating
+          an existing connection) is exposed separately via
+          `POST /connections/{id}/relink`.
+
+        **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateHostedLinkRequest" }
+      responses:
+        "201":
+          description: Hosted-link session created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateHostedLinkResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/connections/link/{id}:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    get:
+      tags: [Connections]
+      summary: Poll a hosted-link session
+      description: |
+        Returns the current state of a hosted-link session. Accepts either the
+        canonical UUID or the 8-char short_id as `{id}`.
+
+        The plaintext bearer `token` and the constructed `url` are returned
+        **only** at creation time — this poll endpoint omits them. Use
+        `result_connection_ids` (always present, possibly empty) to find the
+        connections the user added during the session once `status` reaches
+        `completed`.
+
+        Status values: `pending`, `active`, `completed`, `failed`, `expired`.
+      responses:
+        "200":
+          description: Hosted-link session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HostedLinkSession" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/providers:
     get:
       tags: [Connections]
@@ -2164,6 +2220,108 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       additionalProperties: true
+    HostedLinkSession:
+      type: object
+      description: |
+        A hosted-link session is the agent-facing record of a "share this URL
+        with the user so they can connect a bank in their browser" flow.
+        Returned by `GET /connections/link/{id}` and (extended with `token`
+        and `url`) by `POST /connections/link`.
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        user_id: { type: string }
+        provider:
+          type: string
+          description: |
+            `"plaid"`, `"teller"`, or empty string. Empty means the hosted page
+            shows a picker so the user chooses a provider.
+          enum: ["", plaid, teller]
+        action: { type: string, enum: [link, relink] }
+        connection_id:
+          type: string
+          description: Present only for `action: "relink"` — the connection being re-authenticated.
+        single_use: { type: boolean }
+        redirect_url:
+          type: string
+          description: Optional URL the hosted page redirects to after completion.
+        label:
+          type: string
+          description: Optional human-readable label shown in the agent's audit timeline.
+        status:
+          type: string
+          enum: [pending, active, completed, failed, expired, consumed]
+        error_code:
+          type: string
+          description: Present only on `status: "failed"`.
+        error_message:
+          type: string
+          description: Present only on `status: "failed"`.
+        result_connection_ids:
+          type: array
+          items: { type: string }
+          description: |
+            UUIDs of the bank connections the user added during the session.
+            Always present; empty array until at least one connection has been
+            recorded.
+        expires_at: { type: string, format: date-time }
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Stamped when the hosted page first transitions the session to `active`.
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Stamped when the session reaches `completed` or `failed`.
+        created_at: { type: string, format: date-time }
+    CreateHostedLinkRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          description: UUID or short_id of the household user the link is for.
+        provider:
+          type: string
+          description: |
+            Optional. Empty / omitted lets the hosted page display a picker.
+          enum: ["", plaid, teller]
+        single_use:
+          type: boolean
+          default: false
+          description: When true, the session burns after the first successful link.
+        redirect_url:
+          type: string
+          description: Optional URL the hosted page redirects to after completion.
+        label:
+          type: string
+          description: Optional human-readable label for the agent's audit timeline.
+        expires_in_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          description: |
+            TTL in seconds. `0` (or omitted) selects the default of 900 (15
+            minutes). Values above 3600 are rejected.
+    CreateHostedLinkResponse:
+      allOf:
+        - $ref: "#/components/schemas/HostedLinkSession"
+        - type: object
+          required: [token, url]
+          properties:
+            token:
+              type: string
+              description: |
+                Plaintext bearer token. Returned **exactly once** at session
+                creation; never echoed back by `GET /connections/link/{id}`.
+            url:
+              type: string
+              format: uri
+              description: |
+                Fully-qualified URL the end-user should open. Built from the
+                request scheme + host + `/link/<token>`.
     SyncLog:
       type: object
       properties:
