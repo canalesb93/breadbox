@@ -7,14 +7,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -242,7 +239,7 @@ func checkDatabase(ctx context.Context, cfg *config.Config) (doctorCheck, doctor
 
 // checkMigrations compares the applied goose_db_version against embedded migration files.
 func checkMigrations(ctx context.Context, databaseURL string) doctorCheck {
-	latest, err := latestEmbeddedMigration()
+	latest, err := db.LatestEmbeddedMigration()
 	if err != nil {
 		return doctorCheck{
 			Name:        "migrations",
@@ -303,36 +300,6 @@ func checkMigrations(ctx context.Context, databaseURL string) doctorCheck {
 		Status:  doctorStatusPass,
 		Message: fmt.Sprintf("up-to-date (version %d)", applied),
 	}
-}
-
-// latestEmbeddedMigration returns the highest numeric prefix among embedded migrations.
-func latestEmbeddedMigration() (int64, error) {
-	entries, err := fs.ReadDir(db.Migrations, "migrations")
-	if err != nil {
-		return 0, err
-	}
-	prefix := regexp.MustCompile(`^(\d+)_`)
-	var versions []int64
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
-			continue
-		}
-		m := prefix.FindStringSubmatch(e.Name())
-		if len(m) != 2 {
-			continue
-		}
-		var v int64
-		_, err := fmt.Sscanf(m[1], "%d", &v)
-		if err != nil {
-			continue
-		}
-		versions = append(versions, v)
-	}
-	if len(versions) == 0 {
-		return 0, fmt.Errorf("no migrations found")
-	}
-	sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
-	return versions[len(versions)-1], nil
 }
 
 // checkEncryptionKey validates ENCRYPTION_KEY is set and hex-decodes to 32 bytes.

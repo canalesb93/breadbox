@@ -12,6 +12,7 @@ All endpoints live under `/api/v1/` and require `X-API-Key` unless noted. Scope 
 | GET | `/health/live` | none | Alias of `/health` |
 | GET | `/health/ready` | none | DB + scheduler readiness |
 | GET | `/api/v1/version` | none | Build version + upgrade check |
+| GET | `/api/v1/headless/bootstrap` | R | Setup readiness report (consumed by `breadbox doctor`) |
 
 ## Accounts
 

@@ -137,6 +137,29 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VersionResponse" }
 
+  /api/v1/headless/bootstrap:
+    get:
+      tags: [Health]
+      summary: Setup readiness report
+      description: |
+        Returns a one-shot readiness/setup summary intended for the
+        `breadbox doctor` CLI command. Any API key (read or write) works.
+        Fields are best-effort — a per-row failure stays zero and the report
+        still ships. The endpoint returns 503 only when the database is
+        plainly unreachable.
+      responses:
+        "200":
+          description: Bootstrap report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HeadlessBootstrapResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: Database is not reachable; partial report in body.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
   # -- Accounts --
   /api/v1/accounts:
     get:
@@ -2068,6 +2091,83 @@ components:
         version: { type: string }
         latest: { type: string, nullable: true }
         update_available: { type: boolean }
+    HeadlessBootstrapResponse:
+      type: object
+      description: Readiness/setup summary consumed by `breadbox doctor`.
+      required:
+        [
+          version,
+          encryption_key_set,
+          database,
+          providers,
+          users_count,
+          login_accounts_count,
+          api_keys_count,
+          active_connections_count,
+          scheduler_running,
+          first_run,
+        ]
+      properties:
+        version: { type: string, description: Server build version. }
+        encryption_key_set:
+          { type: boolean, description: True when ENCRYPTION_KEY is set. }
+        database:
+          type: object
+          required: [connected, migrations_current, migration_version]
+          properties:
+            connected: { type: boolean }
+            migrations_current:
+              {
+                type: boolean,
+                description: True when the applied goose version meets or exceeds the highest embedded migration.,
+              }
+            migration_version:
+              {
+                type: integer,
+                format: int64,
+                description: Highest version_id applied in goose_db_version (0 if unread).,
+              }
+        providers:
+          type: array
+          description: Provider configuration status. Order is stable (plaid, teller).
+          items:
+            type: object
+            required: [name, configured]
+            properties:
+              name: { type: string, enum: [plaid, teller] }
+              configured: { type: boolean }
+              env:
+                {
+                  type: string,
+                  description: "Environment label (e.g. sandbox, production). Omitted when not configured.",
+                }
+        users_count:
+          { type: integer, format: int64, description: Household user count. }
+        login_accounts_count:
+          {
+            type: integer,
+            format: int64,
+            description: Admin / dashboard login account count.,
+          }
+        api_keys_count:
+          {
+            type: integer,
+            format: int64,
+            description: Active (un-revoked) API key count.,
+          }
+        active_connections_count:
+          {
+            type: integer,
+            format: int64,
+            description: Bank connections in 'active' status.,
+          }
+        scheduler_running:
+          { type: boolean, description: True when the sync scheduler has active cron entries. }
+        first_run:
+          {
+            type: boolean,
+            description: True when `login_accounts_count == 0` — the same signal used by the admin first-run redirect.,
+          }
     Account:
       type: object
       properties:
