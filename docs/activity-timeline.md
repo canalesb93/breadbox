@@ -173,6 +173,8 @@ Today's `Type` values:
 | `sync`     | `sync_started`, `sync_updated`   | `txdTimelineSystem`     |
 | `review`   | (legacy, retained for fallback)  | `txdTimelineSystem`     |
 
+The `transaction_deleted` and `transaction_restored` kinds are written by the REST API soft-delete / restore endpoints (`internal/service/transactions_lifecycle.go`) but are **not yet rendered** by `activityEntryFromAnnotation` — the renderer drops them as unknown. Surfacing them in the timeline is tracked as a follow-up to the headless-api bundle (see `docs/headless-api-plan.md` bundle 03). Until then they're visible to MCP via `list_annotations` (`Raw: true` or filtered by kind) and via the raw annotations table for audit.
+
 `syncEntryType` collapses both DB-level `sync_*` kinds onto a single `sync`
 type because they share an icon (`landmark`) and the differentiated verb
 already lives on the `Summary` string.

@@ -23,3 +23,6 @@ UPDATE agent_reports SET read_at = NULL WHERE id = $1;
 
 -- name: MarkAllAgentReportsRead :exec
 UPDATE agent_reports SET read_at = NOW() WHERE read_at IS NULL;
+
+-- name: DeleteAgentReport :exec
+DELETE FROM agent_reports WHERE id = $1;

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -521,43 +522,25 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Create the bank connection record.
-		bankConn, err := a.Queries.CreateBankConnection(r.Context(), db.CreateBankConnectionParams{
-			UserID:           userID,
-			Provider:         db.ProviderType(providerName),
-			InstitutionID:    pgconv.Text(req.InstitutionID),
-			InstitutionName:  pgconv.Text(req.InstitutionName),
-			ExternalID:           pgconv.Text(conn.ExternalID),
-			EncryptedCredentials: conn.EncryptedCredentials,
-			Status:           db.ConnectionStatusActive,
+		// Persist the connection + accounts via the shared service helper.
+		// REST (api.PlaidExchangeHandler) calls the same path so both
+		// surfaces stay byte-identical on what lands in the DB.
+		result, err := a.Service.RegisterNewConnection(r.Context(), service.RegisterNewConnectionParams{
+			UserID:          userID,
+			Provider:        providerName,
+			InstitutionID:   req.InstitutionID,
+			InstitutionName: req.InstitutionName,
+			Conn:            conn,
+			Accounts:        accounts,
 		})
 		if err != nil {
-			a.Logger.Error("create bank connection", "error", err)
+			a.Logger.Error("register new connection", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save connection"})
 			return
 		}
 
-		// Upsert accounts from the exchange response.
-		for _, acct := range accounts {
-			_, err := a.Queries.UpsertAccount(r.Context(), db.UpsertAccountParams{
-				ConnectionID:      bankConn.ID,
-				ExternalAccountID: acct.ExternalID,
-				Name:              acct.Name,
-				OfficialName:      pgconv.TextIfNotEmpty(acct.OfficialName),
-				Type:              acct.Type,
-				Subtype:           pgconv.TextIfNotEmpty(acct.Subtype),
-				Mask:              pgconv.TextIfNotEmpty(acct.Mask),
-				IsoCurrencyCode:   pgconv.TextIfNotEmpty(acct.ISOCurrencyCode),
-			})
-			if err != nil {
-				a.Logger.Error("upsert account", "error", err, "external_id", acct.ExternalID)
-			}
-		}
-
-		connID := pgconv.FormatUUID(bankConn.ID)
-
 		writeJSON(w, http.StatusCreated, exchangeTokenResponse{
-			ConnectionID:    connID,
+			ConnectionID:    pgconv.FormatUUID(result.ID),
 			InstitutionName: req.InstitutionName,
 			Status:          "active",
 		})
@@ -1051,7 +1034,11 @@ func ConnectionReauthCompleteHandler(a *app.App) http.HandlerFunc {
 }
 
 // DeleteConnectionHandler serves DELETE /admin/api/connections/{id}.
-func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+//
+// Best-effort calls the provider to revoke access, then delegates the
+// soft-delete (transactions + connection row) to service.DeleteConnection
+// so REST and admin share one code path.
+func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
@@ -1075,36 +1062,19 @@ func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 			}
 		}
 
-		// Soft-delete related transactions and the connection in a single transaction.
-		tx, err := a.DB.Begin(ctx)
-		if err != nil {
-			a.Logger.Error("begin delete connection tx", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
-			return
-		}
-		defer tx.Rollback(ctx)
-
-		txQueries := a.Queries.WithTx(tx)
-
-		deleted, err := txQueries.SoftDeleteTransactionsByConnectionID(ctx, connID)
-		if err != nil {
-			a.Logger.Error("soft delete transactions for connection", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
-			return
-		}
-		if deleted > 0 {
-			a.Logger.Info("soft-deleted transactions for connection", "connection_id", pgconv.FormatUUID(connID), "count", deleted)
-		}
-
-		err = txQueries.DeleteBankConnection(ctx, connID)
-		if err != nil {
-			a.Logger.Error("delete bank connection", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
-			return
-		}
-
-		if err := tx.Commit(ctx); err != nil {
-			a.Logger.Error("commit delete connection tx", "error", err)
+		// Delegate the soft-delete to the service layer (transactions
+		// soft-deleted + connection status flipped to disconnected, all
+		// in one DB transaction). Admin actor since this is an admin
+		// session.
+		if err := svc.DeleteConnection(ctx, pgconv.FormatUUID(connID), service.SystemActor()); err != nil {
+			// ErrNotFound means the connection was already disconnected
+			// or vanished — not actionable from the admin UI's POV;
+			// surface as 404 like other admin routes do.
+			if errors.Is(err, service.ErrNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Connection not found"})
+				return
+			}
+			a.Logger.Error("delete connection (service)", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
 			return
 		}

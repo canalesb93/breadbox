@@ -768,6 +768,65 @@ func TestListTransactionMatches_InvalidLinkID(t *testing.T) {
 	}
 }
 
+// --- ListTransactionMatchesPaginated ---
+
+func TestListTransactionMatchesPaginated_EnvelopeAndDefaults(t *testing.T) {
+	svc, queries, _ := newService(t)
+	user1 := testutil.MustCreateUser(t, queries, "User1")
+	conn1 := testutil.MustCreateConnection(t, queries, user1.ID, "item_1")
+	acct1 := testutil.MustCreateAccount(t, queries, conn1.ID, "ext_1", "Acct1")
+
+	user2 := testutil.MustCreateUser(t, queries, "User2")
+	conn2 := testutil.MustCreateConnection(t, queries, user2.ID, "item_2")
+	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
+
+	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
+	})
+	if err != nil {
+		t.Fatalf("CreateAccountLink: %v", err)
+	}
+
+	// Default limit should be 50 even with no rows.
+	res, err := svc.ListTransactionMatchesPaginated(context.Background(), link.ID, service.TransactionMatchListParams{})
+	if err != nil {
+		t.Fatalf("ListTransactionMatchesPaginated: %v", err)
+	}
+	if res.Limit != 50 {
+		t.Errorf("expected default limit 50, got %d", res.Limit)
+	}
+	if len(res.Matches) != 0 || res.HasMore || res.NextCursor != "" {
+		t.Errorf("expected empty result, got %+v", res)
+	}
+}
+
+func TestListTransactionMatchesPaginated_BadCursor(t *testing.T) {
+	svc, queries, _ := newService(t)
+	user1 := testutil.MustCreateUser(t, queries, "User1")
+	conn1 := testutil.MustCreateConnection(t, queries, user1.ID, "item_1")
+	acct1 := testutil.MustCreateAccount(t, queries, conn1.ID, "ext_1", "Acct1")
+
+	user2 := testutil.MustCreateUser(t, queries, "User2")
+	conn2 := testutil.MustCreateConnection(t, queries, user2.ID, "item_2")
+	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
+
+	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
+	})
+	if err != nil {
+		t.Fatalf("CreateAccountLink: %v", err)
+	}
+
+	_, err = svc.ListTransactionMatchesPaginated(context.Background(), link.ID, service.TransactionMatchListParams{
+		Cursor: "not-a-cursor",
+	})
+	if !errors.Is(err, service.ErrInvalidCursor) {
+		t.Errorf("expected ErrInvalidCursor, got: %v", err)
+	}
+}
+
 // --- DeleteAccountLink clears attribution ---
 
 func TestDeleteAccountLink_ClearsAttribution(t *testing.T) {

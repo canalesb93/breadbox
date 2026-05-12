@@ -42,6 +42,12 @@ type Config struct {
 	// Sync timeout (env vars only)
 	SyncTimeoutSeconds int // SYNC_TIMEOUT_SECONDS, default 300
 
+	// API rate limit (env vars only). Applies to /api/v1/* per API key (with
+	// IP fallback). Defaults match middleware.DefaultRateLimitRPM /
+	// middleware.DefaultRateLimitBurst (120 req/min, burst 60).
+	APIRateLimitRPM   int // API_RATE_LIMIT_RPM, default 120
+	APIRateLimitBurst int // API_RATE_LIMIT_BURST, default 60
+
 	// Runtime metadata (set at startup)
 	Version   string
 	StartTime time.Time

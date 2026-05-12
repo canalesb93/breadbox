@@ -1,5 +1,7 @@
 # API Quick Reference
 
+> **Canonical contract:** `openapi.yaml` at the repo root is the canonical machine-readable spec. This Markdown file is the prose companion and may lag the spec — when in doubt, the OpenAPI document wins. CI fails on drift between the two via `TestOpenAPIDrift` (`internal/api/openapi_drift_test.go`).
+
 Complete list of all REST API endpoints. All endpoints are prefixed with `/api/v1/` unless noted otherwise.
 
 ## Authentication
@@ -35,6 +37,42 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 |--------|----------|------|-------------|
 | GET | `/accounts` | Read | List all accounts |
 | GET | `/accounts/{id}` | Read | Get a single account |
+| GET | `/accounts/{id}/detail` | Read | Get account detail with last 25 transactions and per-currency balances |
+| PATCH | `/accounts/{id}` | Write | Partially update mutable fields on a single account |
+
+### `GET /accounts/{id}/detail`
+
+Returns the standard `AccountResponse` fields plus:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string \| null | User-supplied display label (overrides `name` in admin UI) |
+| `excluded` | bool | When true, the account is hidden from totals and skipped during sync |
+| `provider` | string | `plaid`, `teller`, or `csv` |
+| `connection_user_name` | string | Household member who owns the connection (display name) |
+| `connection_short_id` | string | Connection short_id (also surfaced as `connection_id` on the base shape) |
+| `balances` | array | One entry per currency (single-element today; future-proofs for multi-currency accounts). Each entry has `iso_currency_code`, `balance_current`, `balance_available`, `balance_limit`. |
+| `recent_transactions` | array | Up to 25 most recent transactions for this account, sorted date-DESC. Each entry uses the standard `TransactionResponse` shape. |
+
+### `PATCH /accounts/{id}`
+
+Body: every field is optional. Omit a key to leave the corresponding column unchanged. To clear `display_name` and fall back to the institution-supplied `name`, send an explicit empty string.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string | User-supplied label. Empty string clears the override. |
+| `is_excluded` | bool | Hide the account from totals and skip it during sync. |
+| `is_dependent_linked` | bool | Whether the account participates in dependent-link attribution. Normally driven by `account_links` lifecycle; exposed here for parity with the admin UI. |
+
+```json
+{
+  "display_name": "Joint Checking",
+  "is_excluded": false,
+  "is_dependent_linked": true
+}
+```
+
+Response: `200 OK` with the updated `AccountResponse`. Returns `404 NOT_FOUND` when the account doesn't exist.
 
 ## Transactions
 
@@ -45,10 +83,14 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | GET | `/transactions/summary` | Read | Aggregated totals by category, month, week, day |
 | GET | `/transactions/merchants` | Read | Merchant-level stats (count, total, avg) |
 | GET | `/transactions/{id}` | Read | Get a single transaction |
+| GET | `/transactions/{id}/annotations` | Read | List the activity-timeline rows for a transaction (comments, rule applications, tag/category changes). Mirror of MCP `list_annotations`. |
 | PATCH | `/transactions/{id}/category` | Write | Set transaction category (override) |
 | DELETE | `/transactions/{id}/category` | Write | Reset transaction category to provider default |
 | POST | `/transactions/batch-categorize` | Write | Batch categorize multiple transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | Write | Bulk recategorize by filter (server-side UPDATE) |
+| POST | `/transactions/update` | Write | Atomic multi-field batch (category + tags + comment per row, max 50 ops) |
+| DELETE | `/transactions/{id}` | Write | Soft-delete a transaction (sets `deleted_at`; hidden from all reads). |
+| POST | `/transactions/{id}/restore` | Write | Restore a soft-deleted transaction. |
 
 ### Transaction Query Parameters
 
@@ -71,7 +113,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | `sort_order` | string | `desc` (default), `asc` |
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
 | `cursor` | string | Pagination cursor (only with date sort) |
-| `limit` | int | Results per page (default 50, max 500) |
+| `limit` | int | Results per page (default 100, max 500) |
 
 ## Categories
 
@@ -91,19 +133,735 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/users` | Read | List all family members |
+| GET | `/users/{id}` | Read | Get a single household member |
+| POST | `/users` | Write | Create a household member |
+| PATCH | `/users/{id}` | Write | Update mutable fields (name, email) |
+| DELETE | `/users/{id}` | Write | Delete a household member (refused while bank connections still attach) |
+| POST | `/users/{id}/wipe-data` | Write | Destructive — remove all bank connections, accounts, and transactions belonging to this user |
+
+`{id}` accepts either the user's UUID or 8-char short_id.
+
+### POST `/users`
+
+Create a household member. Mirrors the admin "Add family member" form.
+
+```json
+{
+  "name": "Charlie",
+  "email": "charlie@example.com"
+}
+```
+
+- `name` (required) — trimmed; empty value returns `400 INVALID_PARAMETER`.
+- `email` (optional) — must parse as RFC 5322. A duplicate email returns `409 EMAIL_CONFLICT`.
+
+Responds `201` with the created `UserResponse`.
+
+### PATCH `/users/{id}`
+
+Partial update — every field is optional, omitted fields stay unchanged. Pass `email: ""` (a non-null empty string) to clear the stored email.
+
+```json
+{ "name": "Renamed", "email": "new@example.com" }
+```
+
+Responds `200` with the updated `UserResponse`. `404 NOT_FOUND` when the id cannot be resolved; `409 EMAIL_CONFLICT` when the new email is already taken.
+
+### DELETE `/users/{id}`
+
+Hard delete. Refuses with `409 USER_HAS_DEPENDENTS` whenever the user still owns one or more bank connections — call `POST /users/{id}/wipe-data` first if you really mean to remove them.
+
+Responds `204` on success, `404 NOT_FOUND` when the id is unknown.
+
+### POST `/users/{id}/wipe-data`
+
+Destructive: deletes every `bank_connections`, `accounts`, and `transactions` row attached to this user, in a single transaction. Useful as a prerequisite to `DELETE /users/{id}` and as a "reset" hook for development.
+
+```json
+{ "status": "ok", "deleted_transactions": 3 }
+```
+
+Responds `200` with the count of removed transactions, `404 NOT_FOUND` when the user does not exist.
+
+### Login accounts
+
+A "login account" is the auth identity that can sign in to the admin UI; each
+one is linked to exactly one household member (user). Headless deployments
+manage these via the endpoints below to provision admin access without an
+interactive setup session.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET    | `/users/{user_id}/login` | Write | List the login account(s) for a user |
+| POST   | `/users/{user_id}/login` | Write | Create a login account for a user; returns the one-time `setup_token` |
+| PATCH  | `/users/{user_id}/login/{login_id}` | Write | Update the role (`admin`, `editor`, or `viewer`) |
+| DELETE | `/users/{user_id}/login/{login_id}` | Write | Delete the login account (does not delete the user) |
+| POST   | `/users/{user_id}/login/{login_id}/regenerate-token` | Write | Regenerate the setup token; returns the new plaintext token |
+
+All login-account endpoints require **write scope** even for reads — the list
+of login identities is sensitive (it lets a leaked key enumerate who can sign
+in).
+
+`{user_id}` accepts either the user's UUID or 8-char `short_id`. `{login_id}`
+is the auth-account UUID (returned as `id` on every response).
+
+#### `POST /users/{user_id}/login`
+
+Request:
+
+```json
+{
+  "username": "alice@example.com",
+  "role": "admin"
+}
+```
+
+`username` is treated as an email address (validated) and must be unique
+across the entire deployment. `role` is one of `admin`, `editor`, or
+`viewer`.
+
+Success response (`201 Created`):
+
+```json
+{
+  "id": "0d6a8e02-...",
+  "user_id": "8c3f...",
+  "user_name": "Alice",
+  "user_email": null,
+  "username": "alice@example.com",
+  "role": "admin",
+  "has_password": false,
+  "setup_token": "f3a1c4...",
+  "setup_token_expires_at": "2026-05-16T12:34:56Z",
+  "created_at": "2026-05-09T12:34:56Z",
+  "updated_at": "2026-05-09T12:34:56Z"
+}
+```
+
+The `setup_token` is the one-time secret the user redeems to set their
+initial password. **It is exposed only on this `POST` response and on
+`POST .../regenerate-token`.** Subsequent `GET` and `PATCH` responses never
+include it; if it's lost, regenerate a fresh one.
+
+Error codes:
+
+- `400 INVALID_PARAMETER` — missing/invalid `username` (must be an email),
+  missing `role`, or unknown `role`.
+- `404 NOT_FOUND` — `user_id` does not exist.
+- `409 USERNAME_TAKEN` — another login already uses that username.
+- `409 LOGIN_EXISTS` — this user already has a login account.
+
+#### `PATCH /users/{user_id}/login/{login_id}`
+
+Request:
+
+```json
+{ "role": "viewer" }
+```
+
+Returns `200 OK` with the updated login account (no `setup_token`).
+
+#### `DELETE /users/{user_id}/login/{login_id}`
+
+Returns `204 No Content`. The linked household member is **not** deleted; only
+the auth identity is removed.
+
+#### `POST /users/{user_id}/login/{login_id}/regenerate-token`
+
+Returns `200 OK` with a fresh plaintext token:
+
+```json
+{ "setup_token": "9b2d4f..." }
+```
+
+Fails with `409 PASSWORD_ALREADY_SET` if the account already redeemed a token
+and chose a password — there's nothing to regenerate at that point.
 
 ## Connections
+
+### Provider registry (preferred)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/providers` | Read | List configured providers with capabilities + credential schema |
+| GET | `/providers/{name}` | Read | Single provider entry (same shape as one entry in the list) |
+| POST | `/providers/{name}/link-session` | Write | Start the hosted-UI session for `name`. Returns `{link_token, expiration}` for providers that need one; `204 No Content` for Teller/CSV. |
+| POST | `/connections` | Write | Create a connection. Body has a `provider` discriminator + `credentials` blob whose shape depends on `provider`. Also accepts `multipart/form-data` when `provider=csv`. |
+
+`POST /connections` body:
+
+```json
+{
+  "provider": "plaid",
+  "user_id": "<uuid-or-short-id>",
+  "credentials": { "public_token": "...", "institution_id": "...", "institution_name": "..." }
+}
+```
+
+`GET /providers` returns a bare JSON array with `name`, `configured`, `needs_link_session`, `capabilities`, and `credentials_schema`. Unconfigured providers still appear with `configured: false` so clients can render a "set me up" CTA without guessing. Discover supported providers and credential shapes programmatically rather than hardcoding the list.
+
+Errors on `POST /connections`:
+
+| Status | Code | When |
+|--------|------|------|
+| 400 | `INVALID_PARAMETER` | missing required credential per the provider schema |
+| 404 | `NOT_FOUND` | unknown provider name, unknown user |
+| 502 | `PROVIDER_ERROR` | exchange failed at the upstream provider |
+| 500 | `INTERNAL_ERROR` | unexpected server failure |
+
+### Other connection endpoints
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/connections` | Read | List all bank connections |
+| GET | `/connections/{id}` | Read | Get full connection detail (status, paused, sync interval, account count) |
 | GET | `/connections/{id}/status` | Read | Get connection status and last sync info |
+| POST | `/connections/{id}/sync` | Write | Trigger a sync for this single connection |
+| POST | `/connections/{id}/paused` | Write | Pause or resume scheduled syncs for a connection |
+| POST | `/connections/{id}/sync-interval` | Write | Set or clear a per-connection sync-interval override |
+| DELETE | `/connections/{id}` | Write | Soft-disconnect a connection (clears tokens, hides from list) |
+| POST | `/connections/{id}/reauth` | Write | Start the provider re-auth flow — returns a fresh link token |
+| POST | `/connections/{id}/reauth-complete` | Write | Mark connection active again after the user finishes the re-auth flow |
+| POST | `/connections/plaid/link-token` | Write | _Deprecated — use `POST /providers/plaid/link-session`._ |
+| POST | `/connections/plaid/exchange` | Write | _Deprecated — use `POST /connections` with `provider:"plaid"`._ |
+| POST | `/connections/teller` | Write | _Deprecated — use `POST /connections` with `provider:"teller"`._ |
+| POST | `/connections/csv/preview` | Write | Parse a CSV upload and return inferred columns + the first N rows. No persistence. |
+| POST | `/connections/csv/import` | Write | _Deprecated — use `POST /connections` with `provider:"csv"`._ |
+
+`{id}` accepts either the connection's UUID or 8-char short_id.
+
+### CSV import (`POST /connections/csv/preview`, `POST /connections/csv/import`)
+
+The CSV endpoints are the headless analog of the admin "Import CSV" wizard. They cover deployments without Plaid or Teller.
+
+Both endpoints accept **two transports** with identical configuration fields. Pick whichever your client makes easier:
+
+| Transport | How the file arrives | How config arrives |
+|-----------|----------------------|--------------------|
+| `multipart/form-data` | `file` form-file field | other fields as form values; `column_mapping` as a JSON string |
+| `application/json` | `csv_base64` (or `csv_data`) string with the file base64-encoded | sibling JSON fields |
+
+**Configuration fields**
+
+| Field | Type | Required for | Notes |
+|-------|------|--------------|-------|
+| `column_mapping` | object `{name: index}` | import | maps the canonical fields (`date`, `amount`, `description`, optional `category`, `merchant_name`, `debit`, `credit`) to 0-indexed CSV columns |
+| `date_format` | string | recommended | Go time-layout (e.g. `"2006-01-02"`); auto-detected when omitted |
+| `positive_is_debit` | bool | optional | bank convention defaults to `false` (positive = credit); set `true` when the source CSV already follows the Breadbox convention (positive = money out) |
+| `has_debit_credit` | bool | optional | set `true` for Capital-One-style two-column amount CSVs; pair with `debit` and `credit` keys in `column_mapping` |
+| `user_id` | string | new connection | UUID or short_id of the household member; falls back to the only user in single-user households |
+| `account_name` | string | new connection | display name; defaults to `"CSV Import"` |
+| `connection_id` | string | append-only | existing CSV connection's UUID or short_id; the new rows attach to its first account |
+| `limit` | int | preview only | max preview rows, default 10, capped at 100 |
+
+`POST /connections/csv/preview` returns `200 OK` with parsed headers, the first N rows, and inferred column mapping; nothing is persisted. `template_name`, `positive_is_debit`, `date_format`, and `has_debit_credit` are emitted only when a known bank template is auto-detected.
+
+`POST /connections/csv/import` returns `201 Created`:
+
+```json
+{
+  "connection_id": "ab12cd34",
+  "account_id": "ef56gh78",
+  "imported_transactions": 125,
+  "updated_transactions": 0,
+  "skipped_duplicates": 3,
+  "total_rows": 128
+}
+```
+
+Re-importing the same CSV is a safe no-op — every row hashes to the same `provider_transaction_id` and the upsert detects the dedup. **Manual category overrides (`category_override = true`) are preserved** across re-imports.
+
+Errors:
+
+| Status | Code | When |
+|--------|------|------|
+| 400 | `INVALID_PARAMETER` | missing/bad fields, malformed CSV, missing `column_mapping` |
+| 404 | `NOT_FOUND` | `connection_id` provided but doesn't exist (or isn't a CSV connection) |
+| 413 | `PAYLOAD_TOO_LARGE` | upload exceeds 50 MB |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` is neither multipart nor JSON |
+| 500 | `INTERNAL_ERROR` | unexpected server failure |
+
+See `docs/csv-import.md` for the full CSV format reference (supported delimiters, BOM handling, dedup hash, bank template list).
+
+### GET `/connections/{id}`
+
+Full per-connection detail. Returns `200` with the connection record:
+
+```json
+{
+  "id": "01J...",
+  "short_id": "abc12345",
+  "user_id": "u1abc234",
+  "user_name": "Alice",
+  "provider": "plaid",
+  "institution_id": "ins_3",
+  "institution_name": "Chase",
+  "status": "active",
+  "error_code": null,
+  "error_message": null,
+  "last_synced_at": "2026-05-09T15:00:00Z",
+  "created_at": "2026-04-01T12:00:00Z",
+  "updated_at": "2026-05-09T15:00:00Z",
+  "paused": false,
+  "sync_interval_override_minutes": null,
+  "consecutive_failures": 0,
+  "account_count": 3
+}
+```
+
+A non-existent id returns `404 NOT_FOUND`. Disconnected connections are still returned (with `status: "disconnected"`) — only the `/connections` list filters them out.
+
+### POST `/connections/{id}/sync`
+
+Per-connection variant of `POST /sync` (body-less). The handler returns `202 Accepted` and runs the sync in the background.
+
+```json
+{ "status": "sync_triggered" }
+```
+
+A non-existent or `disconnected` connection returns `404 NOT_FOUND` (the sync resolver hides disconnected rows).
+
+### POST `/connections/{id}/paused`
+
+Toggle the `paused` flag — paused connections are skipped by the cron scheduler but can still be synced manually via `POST /connections/{id}/sync`.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `paused` | bool | Required. `true` to pause, `false` to resume. |
+
+Returns `200` with the full connection detail (same shape as `GET /connections/{id}`). `404 NOT_FOUND` if the connection is missing.
+
+### POST `/connections/{id}/sync-interval`
+
+Set or clear the per-connection sync-interval override (minutes). When cleared, the connection falls back to the global default.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `interval_minutes` | int / null | Minutes between scheduled syncs. Pass `null` (or omit) to clear the override and revert to the global default. Values `<= 0` are treated as a clear. |
+
+Returns `200` with the full connection detail. `404 NOT_FOUND` if the connection is missing.
+
+### DELETE `/connections/{id}`
+
+Soft-disconnect: flips status to `disconnected`, wipes the encrypted access token, and soft-deletes related transactions in a single DB transaction. The row is preserved (FK policy is `SET NULL` for accounts and transactions, `CASCADE` for `sync_logs`) so historical data stays linked.
+
+Returns `204 No Content`. Calling on a missing or already-disconnected connection returns `404 NOT_FOUND` (idempotent at the API surface).
+
+Provider-side credential revocation (e.g. Plaid's `/item/remove`) is **not** performed by the REST endpoint — it is admin-handler-only because the public service layer doesn't carry the provider registry. The connection is unusable from Breadbox's side regardless.
+
+### POST `/connections/{id}/reauth`
+
+Starts a provider re-auth flow for a connection in `pending_reauth` (or any
+broken) state. Calls the provider for a short-lived link token; the client
+hands the token to the provider's UI (Plaid Link, Teller Connect, etc.) and
+calls `/reauth-complete` once the user finishes.
+
+Body: none.
+
+Returns `200`:
+
+```json
+{
+  "link_token": "link-sandbox-...",
+  "expiration": "2026-05-09T16:30:00Z"
+}
+```
+
+Errors:
+
+- `404 NOT_FOUND` — connection doesn't exist.
+- `400 INVALID_PARAMETER` — connection's provider isn't configured on this server.
+- `502 PROVIDER_ERROR` — upstream provider call failed.
+
+### POST `/connections/{id}/reauth-complete`
+
+Marks a previously broken connection active again and clears `error_code` /
+`error_message`. Call this after the user has completed the provider re-auth
+UI started by `/reauth`. Body is ignored — Plaid's OAuth redirect path
+exchanges the public token out-of-band, so no payload is required today.
+
+Returns `200`:
+
+```json
+{ "status": "active" }
+```
+
+Errors:
+
+- `404 NOT_FOUND` — connection doesn't exist.
+
+### Plaid Link flow (new connection)
+
+Connecting a new Plaid bank account is a three-step dance:
+
+1. Server: `POST /connections/plaid/link-token` → returns a `link_token`.
+2. Client / host: hand `link_token` to Plaid Link. The user authenticates with
+   their bank inside Plaid's UI; on success Plaid returns a `public_token`
+   plus institution and account metadata to the host's `onSuccess` callback.
+3. Server: `POST /connections/plaid/exchange` with the `public_token` →
+   Breadbox exchanges it for a long-lived access token, encrypts it,
+   creates the `BankConnection` row, and upserts the accounts Plaid
+   reports. Subsequent syncs run automatically on the global cron.
+
+These endpoints mirror the admin `POST /admin/api/link-token` and
+`POST /admin/api/exchange-token` handlers and persist data through the same
+service-layer write path.
+
+### POST `/connections/plaid/link-token`
+
+Starts a new Plaid Link session for a household member.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | string | Required. UUID **or** 8-char short_id of the user the new connection will be attached to. |
+
+Returns `200`:
+
+```json
+{
+  "link_token": "link-sandbox-abc123",
+  "expiration": "2026-05-09T16:30:00Z"
+}
+```
+
+Errors:
+
+- `400 INVALID_PARAMETER` — `user_id` missing or malformed; Plaid provider not configured on this server.
+- `404 NOT_FOUND` — `user_id` doesn't match any household member.
+- `502 PROVIDER_ERROR` — upstream Plaid call failed.
+
+### POST `/connections/plaid/exchange`
+
+Exchanges the `public_token` Plaid returned in Link's `onSuccess` for a
+stored `BankConnection` and the accounts Plaid authoritatively reports.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `public_token` | string | Required. The token Plaid handed back in `onSuccess`. |
+| `user_id` | string | Required. UUID or 8-char short_id of the owning user. |
+| `institution_id` | string | Required. Plaid institution identifier (e.g. `ins_109511`). |
+| `institution_name` | string | Required. Display name (e.g. `Chase`). |
+| `accounts` | array | Optional. The account metadata array Plaid Link's `onSuccess` returns (id / name / type / subtype / mask). **Informational only** — the rows persisted come from the provider's exchange response, not from this field. |
+
+Returns `201`:
+
+```json
+{
+  "connection_id": "abc12345",
+  "institution_name": "Chase",
+  "status": "active"
+}
+```
+
+`connection_id` is the new connection's 8-char short_id (use it in any
+downstream `/connections/{id}/...` call).
+
+Errors:
+
+- `400 INVALID_PARAMETER` — required field missing; Plaid provider not configured on this server.
+- `404 NOT_FOUND` — `user_id` doesn't match any household member.
+- `502 PROVIDER_ERROR` — upstream Plaid token exchange failed.
+- `500 INTERNAL_ERROR` — DB write failed (the provider call already succeeded; safe to retry).
+
+### Teller Connect flow (new connection)
+
+Teller's enrollment flow is materially different from Plaid's: Teller Connect
+runs entirely client-side without a server-issued init token, so there is **no
+link-token step**. Just one POST to register the connection:
+
+1. Client / host: load Teller Connect with the application's `TELLER_APP_ID`
+   (returned by `GET /settings/providers` so the host doesn't have to hard-code
+   it). The user authenticates with their bank inside Teller's UI; on success
+   Teller fires `onSuccess` with an `enrollment` payload containing
+   `access_token`, `enrollment.id`, the matched institution, and the accounts
+   it discovered.
+2. Server: `POST /connections/teller` with the enrollment payload →
+   Breadbox calls Teller's `GET /accounts` with the access token to confirm
+   the discovered accounts, encrypts the access token, creates the
+   `BankConnection` row, and upserts the accounts Teller authoritatively
+   reports. Subsequent syncs run automatically on the global cron.
+
+This endpoint mirrors the admin `POST /admin/api/exchange-token` handler with
+`provider: "teller"` and persists data through the same service-layer write
+path as `POST /connections/plaid/exchange`.
+
+### POST `/connections/teller`
+
+Registers a new Teller connection.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | string | Required. UUID or 8-char short_id of the owning user. |
+| `institution_id` | string | Optional. Teller institution identifier (e.g. `chase`). |
+| `institution_name` | string | Required. Display name (e.g. `Chase`). Forwarded to the Teller exchange so the persisted connection carries the right label. |
+| `access_token` | string | Required. The `access_token` Teller handed back in `onSuccess`. |
+| `enrollment_id` | string | Required. The `enrollment.id` Teller handed back in `onSuccess`. Becomes the connection's `external_id`. |
+| `accounts` | array | Optional. The account metadata array Teller's `onSuccess` returns (id / name / type / subtype / last_four). **Informational only** — the rows persisted come from Teller's `GET /accounts` response, not from this field. |
+
+Returns `201`:
+
+```json
+{
+  "connection_id": "abc12345",
+  "institution_name": "Chase",
+  "status": "active"
+}
+```
+
+`connection_id` is the new connection's 8-char short_id.
+
+Errors:
+
+- `400 INVALID_PARAMETER` — required field missing; Teller provider not configured on this server.
+- `404 NOT_FOUND` — `user_id` doesn't match any household member.
+- `502 PROVIDER_ERROR` — upstream Teller call failed.
+- `500 INTERNAL_ERROR` — DB write failed (the provider call already succeeded; safe to retry).
 
 ## Sync
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/sync` | Write | Trigger manual sync for all connections |
+| POST | `/sync` | Write | Trigger manual sync — all active connections, or one connection if `connection_id` is given |
+
+### Request body
+
+The body is optional. Omit it (or send an empty body) to enqueue **every active** connection for sync. Pass `connection_id` to scope the sync to a single connection.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connection_id` | string | Optional. Connection short_id or UUID. When provided, only that connection is synced. |
+
+```json
+{ "connection_id": "abc12345" }
+```
+
+The handler returns `202 Accepted` immediately and runs the sync asynchronously; observe progress through `/sync/logs` (when shipped) or by polling `/connections/{id}/status`. A non-existent `connection_id` returns `404 NOT_FOUND`. A connection whose status is `disconnected` is treated as not-found by the sync resolver and likewise returns `404 NOT_FOUND`.
+
+```json
+{ "status": "sync_triggered" }
+```
+
+### Sync visibility
+
+`POST /sync` is fire-and-forget — these GET endpoints close the loop. They wrap the same data the admin dashboard uses, so REST clients can poll progress, audit prior runs, and read provider health without scraping HTML. All read-scope. Pair them with the connection-management endpoints under `/connections/{id}` for per-connection drilldowns.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/sync/logs` | Read | Paginated history with filters |
+| GET | `/sync/logs/{id}` | Read | Single log + per-account rows |
+| GET | `/sync/health` | Read | Aggregate sync health (last 24h) |
+| GET | `/sync/health/providers` | Read | Per-provider health summary |
+| GET | `/sync/stats` | Read | Aggregate stats matching the same filter set as `/sync/logs` |
+
+#### `GET /sync/logs`
+
+| Query param | Type | Description |
+|-------------|------|-------------|
+| `connection_id` | string | UUID or short_id. Restrict to one connection. |
+| `status` | string | One of `in_progress`, `success`, `error`. |
+| `trigger` | string | One of `cron`, `webhook`, `manual`, `initial`. |
+| `from` | string (RFC3339) | Lower bound on `started_at` (inclusive). |
+| `to` | string (RFC3339) | Upper bound on `started_at` (exclusive). Must be after `from`. |
+| `limit` | int | Default 50, max 200. |
+| `cursor` | string | Opaque cursor returned by a prior page. Treat as a black box. |
+
+Response (`200 OK`):
+
+```json
+{
+  "sync_logs": [
+    {
+      "id": "01J...",
+      "connection_id": "01J...",
+      "institution_name": "Chase",
+      "trigger": "manual",
+      "status": "success",
+      "added_count": 12,
+      "modified_count": 1,
+      "removed_count": 0,
+      "unchanged_count": 47,
+      "started_at": "2026-04-26T12:00:00Z",
+      "completed_at": "2026-04-26T12:00:02Z",
+      "duration": "2.041s",
+      "duration_ms": 2041,
+      "accounts_affected": 3
+    }
+  ],
+  "next_cursor": "eyJwIjoyfQ",
+  "has_more": true,
+  "limit": 50,
+  "total": 173
+}
+```
+
+`error_message`, `friendly_error_message`, and `warning_message` are present only when populated. The list omits the per-rule breakdown — fetch a single log to see `rule_hits`. `400 INVALID_PARAMETER` is returned for malformed filter values; `400 INVALID_CURSOR` for a cursor that fails to decode.
+
+#### `GET /sync/logs/{id}`
+
+Path id must be the sync log UUID (sync logs do not expose a short_id alias on the REST surface). Response embeds the per-account breakdown plus the per-rule hit counts:
+
+```json
+{
+  "id": "01J...",
+  "connection_id": "01J...",
+  "institution_name": "Chase",
+  "provider": "plaid",
+  "trigger": "manual",
+  "status": "success",
+  "added_count": 12,
+  "modified_count": 1,
+  "removed_count": 0,
+  "unchanged_count": 47,
+  "started_at": "2026-04-26T12:00:00Z",
+  "completed_at": "2026-04-26T12:00:02Z",
+  "duration": "2.041s",
+  "accounts_affected": 3,
+  "rule_hits": [
+    { "rule_id": "01J...", "rule_name": "Coffee → Food & Drink", "count": 4 }
+  ],
+  "total_rule_hits": 4,
+  "accounts": [
+    {
+      "id": "01J...",
+      "sync_log_id": "01J...",
+      "account_id": "01J...",
+      "account_name": "Checking",
+      "added_count": 8,
+      "modified_count": 1,
+      "removed_count": 0,
+      "unchanged_count": 30
+    }
+  ]
+}
+```
+
+`404 NOT_FOUND` when the id doesn't resolve.
+
+#### `GET /sync/health`
+
+Aggregate over the last 24h, plus the most recent sync's status and the overall verdict (`healthy`, `degraded`, `unhealthy`). Useful as a single-shot dashboard probe.
+
+```json
+{
+  "overall_health": "healthy",
+  "last_sync_time": "5 minutes ago",
+  "last_sync_status": "success",
+  "recent_sync_count": 12,
+  "recent_success_rate": 100.0,
+  "recent_error_count": 0,
+  "connection_errors": 0,
+  "next_sync_time": ""
+}
+```
+
+`last_sync_time` is a human-readable relative timestamp ("5 minutes ago"), not RFC3339 — it mirrors what the admin dashboard renders. Pair with `/sync/logs?limit=1` if you need an absolute timestamp.
+
+#### `GET /sync/health/providers`
+
+Per-provider snapshot. Keyed by provider type (`plaid`, `teller`, `csv`):
+
+```json
+{
+  "providers": {
+    "plaid": {
+      "provider": "plaid",
+      "connection_count": 3,
+      "account_count": 7,
+      "last_sync_status": "success",
+      "last_sync_time": "5 minutes ago"
+    },
+    "teller": {
+      "provider": "teller",
+      "connection_count": 1,
+      "account_count": 2,
+      "last_sync_status": "error",
+      "last_sync_time": "1 hour ago",
+      "last_sync_error": "401 unauthorized"
+    }
+  }
+}
+```
+
+Disconnected connections are excluded from the connection / account counts (they don't sync).
+
+#### `GET /sync/stats`
+
+Same filter set as `/sync/logs` (`connection_id`, `status`, `trigger`, `from`, `to`). Returns aggregate counters for the matching slice — useful for "out of N runs matching this filter, X succeeded" UIs without paginating the full list.
+
+```json
+{
+  "total_syncs": 173,
+  "success_count": 168,
+  "error_count": 5,
+  "warning_count": 2,
+  "success_rate": 97.11,
+  "avg_duration_ms": 1842.5,
+  "total_added": 4203,
+  "total_modified": 87,
+  "total_removed": 12,
+  "total_unchanged": 18230
+}
+```
+
+### POST `/transactions/update`
+
+Atomic multi-field batch. Each operation can set a category (or clear an override), add/remove tags, and attach a comment — all atomic per transaction. REST sibling of the MCP `update_transactions` tool.
+
+**Body**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `operations` | array | Required. Up to 50 ops. |
+| `on_error` | string | `"continue"` (default — each op runs in its own DB tx, partial failures don't undo successful items) or `"abort"` (whole batch is one DB tx, rolls back on first error). |
+
+Each operation:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transaction_id` | string | Required. UUID or short_id. |
+| `category_slug` | string | Optional. Sets `category_override=true`. Mutually exclusive with `reset_category`. |
+| `reset_category` | bool | Optional. Clears the override and drops the transaction back to `uncategorized` so rules can re-categorize. |
+| `tags_to_add` | array | `[{"slug":"..."}]`. Auto-creates the tag if the slug is not yet registered. |
+| `tags_to_remove` | array | `[{"slug":"..."}]`. Unknown slugs are a no-op. |
+| `comment` | string | Optional annotation, attributed to your API key. Max 10000 chars. |
+
+**Response** `200 OK`
+
+```json
+{
+  "results": [
+    {"transaction_id": "k7Xm9pQ2", "status": "ok"},
+    {"transaction_id": "x4Lz1mNa", "status": "error", "error": {"code": "NOT_FOUND", "message": "..."}}
+  ],
+  "succeeded": 1,
+  "failed": 1
+}
+```
+
+Per-op errors are reported inside `results[]`; the top-level response is still `200`. The whole call returns `400 INVALID_PARAMETER` only on malformed input (empty `operations`, more than 50, bad `on_error`). In `abort` mode a partial-batch failure rolls back the DB transaction and the response includes `aborted: true` plus the partial per-op outcomes.
+
+### DELETE `/transactions/{id}` and POST `/transactions/{id}/restore`
+
+Soft-delete and undo. `DELETE /transactions/{id}` sets the row's `deleted_at` timestamp; every read endpoint (list, get, summary, merchants, count, …) filters on `deleted_at IS NULL`, so a deleted transaction immediately disappears from all responses. The DB row is preserved so `POST /transactions/{id}/restore` can clear `deleted_at` and bring it back.
+
+Both endpoints return `204 No Content` on success and write a `transaction_deleted` / `transaction_restored` annotation on the activity timeline attributed to the calling API key.
+
+Both are idempotent at the API surface — a no-op returns `404 NOT_FOUND`:
+
+- `DELETE` on a transaction that doesn't exist or is already soft-deleted → `404`.
+- `POST /restore` on a transaction that doesn't exist or isn't currently soft-deleted → `404`.
+
+Path id accepts either a UUID or short_id for live (non-deleted) rows. Restore on a soft-deleted row must use the UUID — the short_id resolver itself filters on `deleted_at IS NULL` and won't find a deleted row by its short id.
 
 ## Transaction Comments
 
@@ -114,6 +872,46 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | PUT | `/transactions/{id}/comments/{comment_id}` | Write | Update a comment |
 | DELETE | `/transactions/{id}/comments/{comment_id}` | Write | Delete a comment |
 
+## Transaction Annotations
+
+`GET /transactions/{id}/annotations` returns the activity-timeline rows for a single transaction — comments, rule applications, tag adds/removes, and category sets. Same payload as the MCP `list_annotations` tool, wrapped in a `{ "annotations": [...] }` envelope. The rendering contract (dedup, soft-delete tombstones, system-event kinds) is documented in `docs/activity-timeline.md`.
+
+Path id accepts either a UUID or short_id (the same resolver as the rest of the transaction endpoints).
+
+| Query param | Type | Description |
+|-------------|------|-------------|
+| `kind` | string (repeatable, comma-separated) | Filter by raw DB kind: `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`, `sync_started`, `sync_updated`. Both `?kind=comment&kind=rule_applied` and `?kind=comment,rule_applied` are accepted. |
+| `actor_type` | string (repeatable, comma-separated) | Filter by actor type: `user`, `agent`, `system`. Same repeatable / comma-separated handling as `kind`. |
+| `since` | string (RFC3339) | Return only rows created strictly after this timestamp. Pair with `limit` to bound a delta read. |
+| `limit` | int | Cap the returned rows to the most recent N (timeline tail), still ordered ASC. `0` (default) returns the full timeline; the server caps at `200`. Negative values are rejected. |
+| `raw` | bool | When `true`, bypass enrichment and dedup. Returns the unmodified DB view — rule-source duplicates and same-actor adjacent comment-vs-tag-note pairs survive, and the derived `summary` / `action` / `subject` fields are empty. |
+
+Example:
+
+```bash
+curl -H "X-API-Key: $BB_API_KEY" \
+  "https://breadbox.example.com/api/v1/transactions/abc12345/annotations?kind=comment&limit=5"
+```
+
+```json
+{
+  "annotations": [
+    {
+      "id": "01J...",
+      "short_id": "ann7zk2x",
+      "transaction_id": "01J...",
+      "kind": "comment",
+      "actor_type": "user",
+      "actor_name": "Alice",
+      "content": "needs receipt",
+      "created_at": "2026-04-26T12:00:00Z"
+    }
+  ]
+}
+```
+
+A 400 `INVALID_PARAMETER` is returned for malformed `since` timestamps or non-numeric / negative `limit` values; 404 `NOT_FOUND` is returned when the path id can't be resolved (the same MCP-shared limitation applies — a syntactically valid but unknown UUID returns an empty list rather than 404).
+
 ## Tags & Reviews
 
 The review queue is a tag. Transactions carrying the seeded `needs-review` tag (or any operator-defined trigger tag) are the backlog. A seeded `on_create` system rule auto-attaches `needs-review` to every newly-synced transaction; disable that rule to opt out. When removing a tag, passing a rationale `note` is optional — if provided, it's recorded on the `tag_removed` annotation.
@@ -121,10 +919,14 @@ The review queue is a tag. Transactions carrying the seeded `needs-review` tag (
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/tags` | Read | List all registered tags |
+| POST | `/tags` | Write | Create a tag. Body: `{"slug":"...","display_name":"...","description":"...","color":"#abc123","icon":"tag"}`. Slug must match `^[a-z0-9][a-z0-9\-:]*[a-z0-9]$`. Returns `409 SLUG_CONFLICT` if the slug is already registered. |
+| GET | `/tags/{slug}` | Read | Get a single tag by UUID, short_id, or slug |
+| PATCH | `/tags/{slug}` | Write | Partial update — every field optional: `{"display_name":"...","description":"...","color":"...","icon":"...","lifecycle":"persistent\|ephemeral"}`. Slug is immutable. |
+| DELETE | `/tags/{slug}` | Write | Delete a tag. Cascades to `transaction_tags`; annotations referencing the tag retain `tag_id=NULL`. Returns `204 No Content`. |
 | POST | `/transactions/{id}/tags` | Write | Attach a tag to a transaction (body: `{"slug":"...","note":"..."}`). Auto-creates the tag if the slug is not yet registered. Idempotent — returns `already_present: true` on repeat calls. |
 | DELETE | `/transactions/{id}/tags/{slug}` | Write | Detach a tag from a transaction. Optional `?note=...` or JSON body `{"note":"..."}` recorded on the `tag_removed` annotation. Idempotent — returns `already_absent: true` when the tag isn't attached. |
 
-Tag CRUD (create/update/delete tag records themselves) remains on the admin dashboard and MCP (`create_tag`, `update_tag`, `delete_tag`) for now; REST CRUD is tracked as a follow-up. For filtering, pass `tags=slug1,slug2` (AND) or `any_tag=slug1,slug2` (OR) to `/transactions` and `/transactions/count`.
+For filtering, pass `tags=slug1,slug2` (AND) or `any_tag=slug1,slug2` (OR) to `/transactions` and `/transactions/count`.
 
 Additional tag-touching operations exposed via MCP: `list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`. The admin dashboard covers the same ground at `/tags`, `/transactions/:id/edit`, and bulk actions on `/transactions`.
 
@@ -136,12 +938,30 @@ Rules auto-categorize transactions during sync by matching conditions on transac
 |--------|----------|------|-------------|
 | GET | `/rules` | Read | List all rules with filters |
 | GET | `/rules/{id}` | Read | Get a single rule |
+| GET | `/rules/{id}/sync-history` | Read | Last N sync runs that triggered this rule (default 10, max 100) |
 | POST | `/rules` | Write | Create a rule |
+| POST | `/rules/batch` | Write | Bulk-create rules (mirrors MCP `batch_create_rules`, max 50 per call) |
 | PUT | `/rules/{id}` | Write | Update a rule |
 | DELETE | `/rules/{id}` | Write | Delete a rule |
-| POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively |
-| POST | `/rules/apply-all` | Write | Apply all active rules retroactively |
+| POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively (skips `category_override=true` rows) |
+| POST | `/rules/apply-all` | Write | Apply all active rules retroactively (pipeline-stage order, skips overrides) |
 | POST | `/rules/preview` | Write | Dry-run a condition against existing transactions |
+
+`POST /rules/batch` and the apply endpoints both have integration coverage in `internal/api/rules_batch_integration_test.go` and `internal/api/rules_apply_integration_test.go`. The apply tests assert the `category_override=true` sacred-cow contract: a manually-overridden transaction is never recategorized by retroactive apply, even when its conditions match.
+
+`POST /rules/batch` request body mirrors the MCP `batch_create_rules` shape:
+
+```json
+{
+  "rules": [
+    { "name": "...", "category_slug": "...", "conditions": { ... } },
+    { "name": "...", "actions": [ ... ], "trigger": "always" }
+  ],
+  "on_error": "continue"
+}
+```
+
+`on_error` defaults to `continue` (per-op failures are isolated). With `on_error=abort`, the first failure rolls back any rules created earlier in the batch and returns a per-op `results[]` envelope with `aborted: true`. Top-level `400 INVALID_PARAMETER` is reserved for malformed input (empty rules array, > 50 entries, unknown `on_error`).
 
 ### Rule Condition Structure
 
@@ -184,7 +1004,7 @@ Account links connect dependent (authorized user) accounts to primary (cardholde
 |--------|----------|------|-------------|
 | GET | `/account-links` | Read | List all account links |
 | GET | `/account-links/{id}` | Read | Get a single link with match stats |
-| GET | `/account-links/{id}/matches` | Read | List matched transaction pairs |
+| GET | `/account-links/{id}/matches` | Read | List matched transaction pairs (cursor-paginated; see below) |
 | POST | `/account-links` | Write | Create a link (auto-runs initial reconciliation) |
 | PUT | `/account-links/{id}` | Write | Update a link |
 | DELETE | `/account-links/{id}` | Write | Delete a link |
@@ -192,6 +1012,26 @@ Account links connect dependent (authorized user) accounts to primary (cardholde
 | POST | `/transaction-matches/{id}/confirm` | Write | Confirm a matched pair |
 | POST | `/transaction-matches/{id}/reject` | Write | Reject a matched pair |
 | POST | `/transaction-matches/manual` | Write | Manually match two transactions |
+
+### `GET /account-links/{id}/matches` pagination
+
+Cursor-paginated. Query parameters:
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | int | `50` | Page size. Max `200`. |
+| `cursor` | string | — | Opaque cursor from a previous `next_cursor`. |
+
+Response envelope mirrors the transactions list:
+
+```json
+{
+  "matches": [{ "id": "...", "short_id": "...", "...": "..." }],
+  "next_cursor": "opaque-string-or-empty",
+  "has_more": false,
+  "limit": 50
+}
+```
 
 ## Agent Reports
 
@@ -201,8 +1041,12 @@ AI agents can submit summaries and flag transactions for human review.
 |--------|----------|------|-------------|
 | GET | `/reports` | Read | List all reports (bare array, bounded) |
 | GET | `/reports/unread-count` | Read | Count of unread reports |
+| GET | `/reports/{id}` | Read | Get a single report |
 | POST | `/reports` | Write | Submit a report |
 | PATCH | `/reports/{id}/read` | Write | Mark a report as read |
+| PATCH | `/reports/{id}/unread` | Write | Mark a report as unread (returns it to the unread queue) |
+| POST | `/reports/read-all` | Write | Mark every unread report as read |
+| DELETE | `/reports/{id}` | Write | Hard-delete a report |
 
 ### `POST /reports` body
 
@@ -224,6 +1068,157 @@ AI agents can submit summaries and flag transactions for human review.
 ```
 
 `rules_applied` is an object keyed by rule ID, mapping to the number of transactions updated by that rule in this retroactive pass. Order is not guaranteed. `total_affected` is the sum across all rules.
+
+## API Keys
+
+Manage the API keys that authenticate `X-API-Key` requests against this server. Useful for headless deployments that need to rotate credentials without a browser session.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api-keys` | Write | List all keys (hashed prefixes only — plaintext is never returned) |
+| POST | `/api-keys` | Write | Create a new key. Response includes `plaintext_key` **once** — store it. |
+| DELETE | `/api-keys/{id}` | Write | Soft-revoke (sets `revoked_at`); subsequent requests using the key get `401 REVOKED_API_KEY` |
+
+All three endpoints are gated by `Write` scope. Listing keys (even with hashes) reveals every credential's name, prefix, and last-used timestamp — enumeration that should not be available to read-only callers. The same scope applies to `POST` and `DELETE` for symmetry.
+
+### `POST /api-keys` body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Human label shown in the admin Access page. |
+| `scope` | string | No | `full_access` (default) or `read_only`. |
+
+### `POST /api-keys` response (201)
+
+```json
+{
+  "id": "...",
+  "name": "deploy-bot",
+  "key_prefix": "bb_aBcD1234",
+  "scope": "full_access",
+  "last_used_at": null,
+  "revoked_at": null,
+  "created_at": "2026-05-09T18:30:00Z",
+  "plaintext_key": "bb_aBcD1234...long..."
+}
+```
+
+The `plaintext_key` field is the **only** time the full key is returned. List and delete responses never include it; the server stores only the SHA-256 hash.
+
+## Provider settings
+
+Read and write the configuration for the bank-data providers (Plaid, Teller). These endpoints mirror the admin form handlers under `/settings/providers` so a headless install can bootstrap providers without an admin UI session.
+
+Persistence and hot-reload semantics match the admin flow:
+
+- Values are stored in the `app_config` DB table.
+- Sensitive fields (Plaid secret, Teller cert/key PEM) are AES-256-GCM encrypted at rest using `ENCRYPTION_KEY` — the server fails fast at startup if the key is missing when any provider is configured.
+- Sensitive fields are **redacted** on `GET` — only boolean `*_set` flags are returned. Raw secret/cert bodies are never exposed via REST.
+- Empty / omitted sensitive fields on `PUT` **preserve the existing stored value** — so a caller updating `webhook_url` doesn't need to retype the secret.
+- After a successful `PUT`, the live provider is re-initialized in-process so subsequent syncs use the new credentials immediately.
+
+If a provider is configured via environment variables (`PLAID_CLIENT_ID` / `TELLER_APP_ID`), `PUT` returns `409 PROVIDER_FROM_ENV` — env-driven config is the source of truth and cannot be overridden via the API.
+
+### `GET /settings/providers`
+
+Returns the current (redacted) view of both providers.
+
+**Scope:** read.
+
+**Response 200:**
+
+```json
+{
+  "plaid": {
+    "configured": true,
+    "from_env": false,
+    "client_id": "abc-123",
+    "environment": "sandbox",
+    "webhook_url": "https://example.com/wh",
+    "secret_set": true
+  },
+  "teller": {
+    "configured": false,
+    "from_env": false,
+    "environment": "sandbox",
+    "certificate_set": false,
+    "webhook_secret_set": false
+  }
+}
+```
+
+`configured` is `true` when all required fields for that provider are present (Plaid: `client_id` + secret; Teller: `application_id` + cert/key pair).
+
+### `PUT /settings/providers/plaid`
+
+Set or update Plaid credentials.
+
+**Scope:** write.
+
+**Request body:**
+
+```json
+{
+  "client_id": "abc-123",
+  "secret": "your-plaid-secret",
+  "environment": "sandbox",
+  "webhook_url": "https://example.com/wh"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `client_id` | yes | |
+| `secret` | conditionally | Required on first save. Omit (or send empty string) on subsequent saves to preserve the existing stored secret. |
+| `environment` | no | One of `sandbox`, `development`, `production`. Defaults to `sandbox`. |
+| `webhook_url` | no | Must use `https://` if provided. |
+
+**Response 200:** Same redacted shape as `GET /settings/providers`.
+
+**Errors:**
+
+- `400 INVALID_PARAMETER` — missing `client_id`, invalid `environment`, non-HTTPS `webhook_url`, or no secret available (no existing secret stored and none provided).
+- `409 PROVIDER_FROM_ENV` — `PLAID_CLIENT_ID` is set in the environment.
+- `500 PROVIDER_REINIT_FAILED` — config saved but the live provider failed to reinitialize.
+- `500 INTERNAL_ERROR` — DB write failure.
+
+### `PUT /settings/providers/teller`
+
+Set or update Teller credentials. The PEM cert and private key are accepted as JSON strings (suitable for `cat client.pem | jq -Rs .`).
+
+**Scope:** write.
+
+**Request body:**
+
+```json
+{
+  "application_id": "app_xxxxxxxx",
+  "environment": "sandbox",
+  "certificate": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
+  "private_key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n",
+  "webhook_secret": "optional-webhook-signing-secret"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `application_id` | yes | |
+| `environment` | no | One of `sandbox`, `development`, `production`. Defaults to `sandbox`. |
+| `certificate` | conditionally | PEM body. If both `certificate` and `private_key` are omitted (or empty), the existing encrypted cert is preserved. Must be supplied alongside `private_key`. |
+| `private_key` | conditionally | PEM body for the matching private key. Must be supplied alongside `certificate`. |
+| `webhook_secret` | no | Send an empty string or omit to leave the existing webhook secret unchanged. |
+
+The `certificate` + `private_key` pair is validated server-side via `crypto/tls.X509KeyPair` before being encrypted and stored.
+
+**Response 200:** Same redacted shape as `GET /settings/providers`.
+
+**Errors:**
+
+- `400 INVALID_PARAMETER` — missing `application_id`, invalid `environment`, only one of `certificate` / `private_key` supplied, or the cert/key pair fails X.509 validation.
+- `409 PROVIDER_FROM_ENV` — `TELLER_APP_ID` is set in the environment.
+- `500 ENCRYPTION_KEY_MISSING` — `ENCRYPTION_KEY` is not set on the server; cannot encrypt the cert.
+- `500 PROVIDER_REINIT_FAILED` — config saved but the live provider failed to reinitialize.
+- `500 INTERNAL_ERROR` — DB write failure or encryption error.
 
 ## OAuth / MCP Auth
 
@@ -249,7 +1244,7 @@ Two shapes, picked per-resource:
 - **Paginated resources** (transactions, rules) return a **resource-keyed envelope** with cursor pagination:
 
   ```json
-  { "transactions": [...], "next_cursor": "eyJ...", "has_more": true, "limit": 50 }
+  { "transactions": [...], "next_cursor": "eyJ...", "has_more": true, "limit": 100 }
   ```
 
   ```json
@@ -272,3 +1267,28 @@ All errors return a JSON envelope:
 ```
 
 Error codes use `UPPER_SNAKE_CASE`. Common codes: `VALIDATION_ERROR`, `NOT_FOUND`, `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMITED`, `INTERNAL_ERROR`.
+
+## Rate limiting
+
+All `/api/v1/*` endpoints are rate-limited per API key using a token bucket. `/health/*` and `/api/v1/version` are exempt (used by load balancers and monitoring).
+
+Defaults: **120 requests/minute, burst 60**. Override with the `API_RATE_LIMIT_RPM` and `API_RATE_LIMIT_BURST` environment variables at server startup. Unauthenticated requests (no valid `X-API-Key` or `Authorization: Bearer`) fall back to bucketing by client IP.
+
+Every response includes:
+
+| Header | Meaning |
+|--------|---------|
+| `X-RateLimit-Limit` | Bucket capacity (burst). |
+| `X-RateLimit-Remaining` | Tokens left after this request. |
+| `X-RateLimit-Reset` | Epoch seconds when the bucket fully refills. |
+
+Over-limit requests return `429 Too Many Requests` with `code: "RATE_LIMITED"` and a `Retry-After` header (seconds to wait before retrying):
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limit exceeded; retry after 1s"
+  }
+}
+```

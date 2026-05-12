@@ -3,7 +3,7 @@ module breadbox
 go 1.25.0
 
 require (
-	github.com/a-h/templ v0.3.1001
+	github.com/a-h/templ v0.3.1020
 	github.com/alexedwards/scs/pgxstore v0.0.0-20251002162104-209de6e426de
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/go-chi/chi/v5 v5.2.5
@@ -17,6 +17,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	golang.org/x/crypto v0.47.0
 	golang.org/x/image v0.24.0
+	golang.org/x/time v0.15.0
 )
 
 require (

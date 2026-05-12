@@ -16,11 +16,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"breadbox/internal/db"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	bsync "breadbox/internal/sync"
 	"breadbox/internal/testutil"
 
 	"github.com/go-chi/chi/v5"
@@ -45,7 +47,12 @@ type testEnv struct {
 func setupTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 	pool, queries := testutil.ServicePool(t)
-	svc := service.New(queries, pool, nil, slog.Default())
+	// Construct a real sync engine with no providers so that TriggerSyncHandler's
+	// background goroutine has a non-nil receiver. Without a registered provider
+	// the goroutine logs "unknown provider" and exits — exactly what we want for
+	// tests that only assert on the synchronous response.
+	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
+	svc := service.New(queries, pool, engine, slog.Default())
 
 	keyResult, err := svc.CreateAPIKey(t.Context(), "test-key", "full_access")
 	if err != nil {
@@ -69,7 +76,8 @@ func setupTestEnv(t *testing.T) *testEnv {
 func setupReadOnlyEnv(t *testing.T) *testEnv {
 	t.Helper()
 	pool, queries := testutil.ServicePool(t)
-	svc := service.New(queries, pool, nil, slog.Default())
+	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
+	svc := service.New(queries, pool, engine, slog.Default())
 
 	keyResult, err := svc.CreateAPIKey(t.Context(), "readonly-key", "read_only")
 	if err != nil {
@@ -98,43 +106,65 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		// Read endpoints
 		r.Get("/accounts", ListAccountsHandler(svc))
 		r.Get("/accounts/{id}", GetAccountHandler(svc))
+		r.Get("/accounts/{id}/detail", GetAccountDetailHandler(svc))
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
 		r.Get("/transactions/merchants", MerchantSummaryHandler(svc))
 		r.Get("/transactions/{id}", GetTransactionHandler(svc))
 		r.Get("/categories", ListCategoriesHandler(svc))
+		r.Get("/categories/export", ExportCategoriesTSVHandler(svc))
 		r.Get("/categories/{id}", GetCategoryHandler(svc))
 		r.Get("/users", ListUsersHandler(svc))
+		r.Get("/users/{id}", GetUserHandler(svc))
 		r.Get("/connections", ListConnectionsHandler(svc))
+		r.Get("/connections/{id}", GetConnectionHandler(svc))
+		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
+		r.Get("/sync/logs", ListSyncLogsHandler(svc))
+		r.Get("/sync/logs/{id}", GetSyncLogHandler(svc))
+		r.Get("/sync/health", SyncHealthHandler(svc))
+		r.Get("/sync/health/providers", SyncProviderHealthHandler(svc))
+		r.Get("/sync/stats", SyncStatsHandler(svc))
 		r.Get("/rules", ListRulesHandler(svc))
 		r.Get("/rules/{id}", GetRuleHandler(svc))
+		r.Get("/rules/{id}/sync-history", GetRuleSyncHistoryHandler(svc))
 		r.Get("/transactions/{transaction_id}/comments", ListCommentsHandler(svc))
+		r.Get("/transactions/{id}/annotations", ListAnnotationsHandler(svc))
 		r.Get("/account-links", ListAccountLinksHandler(svc))
 		r.Get("/account-links/{id}", GetAccountLinkHandler(svc))
 		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
 		r.Get("/reports", ListReportsHandler(svc))
 		r.Get("/reports/unread-count", UnreadReportCountHandler(svc))
+		r.Get("/reports/{id}", GetReportHandler(svc))
 		r.Get("/tags", ListTagsHandler(svc))
+		r.Get("/tags/{slug}", GetTagHandler(svc))
 
 		// Write endpoints — require full_access scope
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireWriteScope())
+			r.Patch("/accounts/{id}", UpdateAccountHandler(svc))
 			r.Patch("/transactions/{id}/category", SetTransactionCategoryHandler(svc))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryHandler(svc))
 			r.Post("/categories", CreateCategoryHandler(svc))
+			r.Post("/categories/import", ImportCategoriesTSVHandler(svc))
 			r.Put("/categories/{id}", UpdateCategoryHandler(svc))
 			r.Delete("/categories/{id}", DeleteCategoryHandler(svc))
 			r.Post("/categories/{id}/merge", MergeCategoriesHandler(svc))
 			r.Post("/rules", CreateRuleHandler(svc))
+			r.Post("/rules/batch", BatchCreateRulesHandler(svc))
 			r.Put("/rules/{id}", UpdateRuleHandler(svc))
 			r.Delete("/rules/{id}", DeleteRuleHandler(svc))
+			r.Post("/rules/{id}/apply", ApplyRuleHandler(svc))
+			r.Post("/rules/apply-all", ApplyAllRulesHandler(svc))
 			r.Post("/rules/preview", PreviewRuleHandler(svc))
 			r.Post("/transactions/{transaction_id}/comments", CreateCommentHandler(svc))
 			r.Put("/transactions/{transaction_id}/comments/{id}", UpdateCommentHandler(svc))
 			r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
 			r.Post("/transactions/batch-categorize", BatchCategorizeHandler(svc))
 			r.Post("/transactions/bulk-recategorize", BulkRecategorizeHandler(svc))
+			r.Post("/transactions/update", UpdateTransactionsHandler(svc))
+			r.Delete("/transactions/{id}", DeleteTransactionHandler(svc))
+			r.Post("/transactions/{id}/restore", RestoreTransactionHandler(svc))
 			r.Post("/account-links", CreateAccountLinkHandler(svc))
 			r.Put("/account-links/{id}", UpdateAccountLinkHandler(svc))
 			r.Delete("/account-links/{id}", DeleteAccountLinkHandler(svc))
@@ -144,8 +174,33 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/transaction-matches/manual", ManualMatchHandler(svc))
 			r.Post("/reports", CreateReportHandler(svc))
 			r.Patch("/reports/{id}/read", MarkReportReadHandler(svc))
+			r.Patch("/reports/{id}/unread", MarkReportUnreadHandler(svc))
+			r.Post("/reports/read-all", MarkAllReportsReadHandler(svc))
+			r.Delete("/reports/{id}", DeleteReportHandler(svc))
+			r.Get("/api-keys", ListAPIKeysHandler(svc))
+			r.Post("/api-keys", CreateAPIKeyHandler(svc))
+			r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
 			r.Post("/transactions/{id}/tags", AddTransactionTagHandler(svc))
 			r.Delete("/transactions/{id}/tags/{slug}", RemoveTransactionTagHandler(svc))
+			r.Post("/tags", CreateTagHandler(svc))
+			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
+			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
+			r.Post("/sync", TriggerSyncHandler(svc))
+			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
+			r.Post("/connections/csv/import", CSVImportHandler(svc))
+			r.Post("/connections/{id}/sync", SyncConnectionHandler(svc))
+			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
+			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))
+			r.Delete("/connections/{id}", DeleteConnectionHandler(svc))
+			r.Post("/users", CreateUserHandler(svc))
+			r.Patch("/users/{id}", UpdateUserHandler(svc))
+			r.Delete("/users/{id}", DeleteUserHandler(svc))
+			r.Post("/users/{id}/wipe-data", WipeUserDataHandler(svc))
+			r.Get("/users/{user_id}/login", ListUserLoginsHandler(svc))
+			r.Post("/users/{user_id}/login", CreateUserLoginHandler(svc))
+			r.Patch("/users/{user_id}/login/{login_id}", UpdateUserLoginHandler(svc))
+			r.Delete("/users/{user_id}/login/{login_id}", DeleteUserLoginHandler(svc))
+			r.Post("/users/{user_id}/login/{login_id}/regenerate-token", RegenerateLoginTokenHandler(svc))
 		})
 	})
 	return r
@@ -1816,4 +1871,143 @@ func TestAPI_ReadOnlyKeyAllowsMerchantSummaryRead(t *testing.T) {
 	resp := env.doGet(t, "/api/v1/transactions/merchants")
 	assertStatus(t, resp, http.StatusOK)
 	resp.Body.Close()
+}
+
+// ============================================================
+// TriggerSync Handler Tests (POST /sync)
+// ============================================================
+//
+// The handler returns 202 immediately and runs the sync in a background
+// goroutine. The Service in these tests is wired with a real *sync.Engine
+// that has no providers registered, so the goroutine logs an "unknown
+// provider" error and exits — letting us assert on the synchronous
+// request/response without needing real Plaid/Teller fixtures.
+
+// assertSyncTriggered reads the 202 envelope and confirms the canonical
+// {"status":"sync_triggered"} body.
+func assertSyncTriggered(t *testing.T, resp *http.Response) {
+	t.Helper()
+	assertStatus(t, resp, http.StatusAccepted)
+	var body map[string]string
+	parseJSON(t, resp, &body)
+	if body["status"] != "sync_triggered" {
+		t.Errorf("want status %q, got %q", "sync_triggered", body["status"])
+	}
+}
+
+// waitForSyncDrain registers a t.Cleanup that waits for the trigger
+// handler's background goroutines to finish writing to sync_logs. The
+// handler returns 202 immediately and runs Sync in a goroutine; without
+// this drain, the next test's TRUNCATE races with the goroutine's writes
+// and deadlocks. We wait for sync_logs to stay quiet across consecutive
+// polls, with a hard cap.
+func waitForSyncDrain(t *testing.T, env *testEnv) {
+	t.Helper()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		var prev int64 = -1
+		stable := 0
+		for {
+			var inProgress, total int64
+			err := env.Pool.QueryRow(ctx, `SELECT
+				COUNT(*) FILTER (WHERE status = 'in_progress'),
+				COUNT(*)
+			FROM sync_logs`).Scan(&inProgress, &total)
+			if err != nil {
+				t.Logf("waitForSyncDrain: query error: %v", err)
+				return
+			}
+			if inProgress == 0 && total == prev {
+				stable++
+				if stable >= 3 {
+					return
+				}
+			} else {
+				stable = 0
+			}
+			prev = total
+			select {
+			case <-ctx.Done():
+				t.Logf("waitForSyncDrain: timed out (in_progress=%d, total=%d)", inProgress, total)
+				return
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+	})
+}
+
+func TestTriggerSync_Success_AllConnections(t *testing.T) {
+	env := setupTestEnv(t)
+	waitForSyncDrain(t, env)
+	user := testutil.MustCreateUser(t, env.Queries, "Alice")
+	// Two active connections; SyncAll should enqueue both.
+	testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_active_1")
+	testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_active_2")
+
+	resp := env.doPost(t, "/api/v1/sync", nil)
+	assertSyncTriggered(t, resp)
+}
+
+func TestTriggerSync_Success_SingleConnection(t *testing.T) {
+	env := setupTestEnv(t)
+	waitForSyncDrain(t, env)
+	user := testutil.MustCreateUser(t, env.Queries, "Alice")
+	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_single")
+
+	// short_id form — exercises the resolver path.
+	resp := env.doPost(t, "/api/v1/sync", map[string]string{
+		"connection_id": conn.ShortID,
+	})
+	assertSyncTriggered(t, resp)
+}
+
+func TestTriggerSync_Success_SingleConnection_UUID(t *testing.T) {
+	env := setupTestEnv(t)
+	waitForSyncDrain(t, env)
+	user := testutil.MustCreateUser(t, env.Queries, "Alice")
+	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_single_uuid")
+
+	resp := env.doPost(t, "/api/v1/sync", map[string]string{
+		"connection_id": pgconv.FormatUUID(conn.ID),
+	})
+	assertSyncTriggered(t, resp)
+}
+
+func TestTriggerSync_Unknown_Connection(t *testing.T) {
+	env := setupTestEnv(t)
+
+	// Well-formed but non-existent UUID.
+	resp := env.doPost(t, "/api/v1/sync", map[string]string{
+		"connection_id": "00000000-0000-0000-0000-000000000000",
+	})
+	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestTriggerSync_Disconnected_Connection(t *testing.T) {
+	env := setupTestEnv(t)
+	user := testutil.MustCreateUser(t, env.Queries, "Alice")
+	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_disc")
+
+	// Flip the connection to disconnected; GetBankConnectionForSync filters
+	// these out and the service returns ErrNotFound, mapped to 404.
+	if err := env.Queries.UpdateBankConnectionStatus(t.Context(), db.UpdateBankConnectionStatusParams{
+		ID:     conn.ID,
+		Status: db.ConnectionStatusDisconnected,
+	}); err != nil {
+		t.Fatalf("set disconnected: %v", err)
+	}
+
+	resp := env.doPost(t, "/api/v1/sync", map[string]string{
+		"connection_id": conn.ShortID,
+	})
+	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestTriggerSync_RequiresWriteScope(t *testing.T) {
+	env := setupReadOnlyEnv(t)
+
+	resp := env.doPost(t, "/api/v1/sync", nil)
+	readErrorCode(t, resp, http.StatusForbidden, "INSUFFICIENT_SCOPE")
 }

@@ -42,3 +42,101 @@ func GetConnectionStatusHandler(svc *service.Service) http.HandlerFunc {
 		writeData(w, status)
 	}
 }
+
+// GetConnectionHandler serves GET /api/v1/connections/{id}.
+func GetConnectionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		conn, err := svc.GetConnection(r.Context(), id)
+		if err != nil {
+			writeServiceError(w, err, "Connection not found", "Failed to get connection")
+			return
+		}
+
+		writeData(w, conn)
+	}
+}
+
+// DeleteConnectionHandler serves DELETE /api/v1/connections/{id}.
+// Soft-disconnects the connection (status='disconnected', credentials wiped).
+// Returns 204 on success, 404 if the connection is missing or already
+// disconnected.
+func DeleteConnectionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		actor := service.ActorFromContext(r.Context())
+
+		if err := svc.DeleteConnection(r.Context(), id, actor); err != nil {
+			writeServiceError(w, err, "Connection not found", "Failed to delete connection")
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// SyncConnectionHandler serves POST /api/v1/connections/{id}/sync —
+// the per-connection variant of POST /sync.
+func SyncConnectionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		if err := svc.TriggerSync(r.Context(), &id); err != nil {
+			writeServiceError(w, err, "Connection not found", "Failed to trigger sync")
+			return
+		}
+
+		writeJSON(w, http.StatusAccepted, map[string]string{"status": "sync_triggered"})
+	}
+}
+
+// PauseConnectionHandler serves POST /api/v1/connections/{id}/paused —
+// body: {"paused": true|false}.
+func PauseConnectionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		var body struct {
+			Paused bool `json:"paused"`
+		}
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+
+		actor := service.ActorFromContext(r.Context())
+		conn, err := svc.UpdateConnectionPaused(r.Context(), id, body.Paused, actor)
+		if err != nil {
+			writeServiceError(w, err, "Connection not found", "Failed to update connection")
+			return
+		}
+
+		writeData(w, conn)
+	}
+}
+
+// UpdateConnectionSyncIntervalHandler serves POST
+// /api/v1/connections/{id}/sync-interval — body:
+// {"interval_minutes": 30} or {"interval_minutes": null} to clear the
+// per-connection override.
+func UpdateConnectionSyncIntervalHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		var body struct {
+			IntervalMinutes *int `json:"interval_minutes"`
+		}
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+
+		actor := service.ActorFromContext(r.Context())
+		conn, err := svc.UpdateConnectionSyncInterval(r.Context(), id, body.IntervalMinutes, actor)
+		if err != nil {
+			writeServiceError(w, err, "Connection not found", "Failed to update connection")
+			return
+		}
+
+		writeData(w, conn)
+	}
+}

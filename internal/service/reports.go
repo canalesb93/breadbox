@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // AgentReportResponse is the API response type for agent reports.
@@ -155,30 +158,81 @@ func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentRep
 	}
 	row, err := s.Queries.GetAgentReport(ctx, uid)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AgentReportResponse{}, ErrNotFound
+		}
 		return AgentReportResponse{}, fmt.Errorf("get agent report: %w", err)
 	}
 	return agentReportFromRow(row), nil
 }
 
-// MarkAgentReportRead marks a single report as read.
+// MarkAgentReportRead marks a single report as read. Returns ErrNotFound if no
+// report with the given ID exists. Returns nil (idempotent) if the report
+// exists but is already read.
 func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) error {
 	uid, err := pgconv.ParseUUID(reportID)
 	if err != nil {
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
-	return s.Queries.MarkAgentReportRead(ctx, uid)
+	// Use Pool.Exec directly to inspect rows affected — sqlc's :exec discards
+	// the CommandTag. The generated query has `AND read_at IS NULL`, so a
+	// row-affected count of zero is ambiguous (missing vs already read). To
+	// distinguish, fall back to a SELECT EXISTS check before declaring
+	// not-found.
+	tag, err := s.Pool.Exec(ctx,
+		"UPDATE agent_reports SET read_at = NOW() WHERE id = $1 AND read_at IS NULL", uid)
+	if err != nil {
+		return fmt.Errorf("mark agent report read: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		var exists bool
+		if err := s.Pool.QueryRow(ctx,
+			"SELECT EXISTS(SELECT 1 FROM agent_reports WHERE id = $1)", uid).Scan(&exists); err != nil {
+			return fmt.Errorf("mark agent report read: %w", err)
+		}
+		if !exists {
+			return ErrNotFound
+		}
+	}
+	return nil
 }
 
-// MarkAgentReportUnread clears read_at on a single report, returning it to the unread queue.
+// MarkAgentReportUnread clears read_at on a single report, returning it to the
+// unread queue. Returns ErrNotFound if no report with the given ID exists.
 func (s *Service) MarkAgentReportUnread(ctx context.Context, reportID string) error {
 	uid, err := pgconv.ParseUUID(reportID)
 	if err != nil {
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
-	return s.Queries.MarkAgentReportUnread(ctx, uid)
+	tag, err := s.Pool.Exec(ctx,
+		"UPDATE agent_reports SET read_at = NULL WHERE id = $1", uid)
+	if err != nil {
+		return fmt.Errorf("mark agent report unread: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // MarkAllAgentReportsRead marks all unread reports as read.
 func (s *Service) MarkAllAgentReportsRead(ctx context.Context) error {
 	return s.Queries.MarkAllAgentReportsRead(ctx)
+}
+
+// DeleteAgentReport hard-deletes a single report by ID. Returns ErrNotFound
+// if no report with the given ID exists.
+func (s *Service) DeleteAgentReport(ctx context.Context, reportID string) error {
+	uid, err := pgconv.ParseUUID(reportID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
+	}
+	tag, err := s.Pool.Exec(ctx, "DELETE FROM agent_reports WHERE id = $1", uid)
+	if err != nil {
+		return fmt.Errorf("delete agent report: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
