@@ -161,6 +161,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
 			r.Post("/connections/link", CreateHostedLinkHandler(svc))
+			r.Post("/connections/{id}/relink", CreateHostedLinkRelinkHandler(svc))
 			// Generic provider create + link-session — supersede the
 			// per-provider routes above. The old routes remain wired as
 			// deprecated shims (callers will see identical behavior).
@@ -192,6 +193,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/session", GetHostedLinkPageSessionHandler(svc))
 		r.Post("/providers/{name}/start", HostedLinkPageStartHandler(a))
 		r.Post("/connections", HostedLinkPageConnectionHandler(a))
+		r.Post("/reauth-complete", HostedLinkPageReauthCompleteHandler(svc))
 		r.Post("/complete", HostedLinkPageCompleteHandler(svc))
 		r.Post("/fail", HostedLinkPageFailHandler(svc))
 	})

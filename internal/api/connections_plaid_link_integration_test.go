@@ -35,8 +35,9 @@ import (
 )
 
 // fakePlaidProvider implements provider.Provider for the link-flow tests.
-// Only CreateLinkSession and ExchangeToken are functional; everything else
-// panics so any unexpected call is loud during testing.
+// CreateLinkSession, ExchangeToken, and CreateReauthSession are functional
+// (CreateReauthSession is needed by the hosted-link relink page tests).
+// Everything else panics so any unexpected call is loud during testing.
 type fakePlaidProvider struct {
 	linkSession        provider.LinkSession
 	linkErr            error
@@ -47,6 +48,10 @@ type fakePlaidProvider struct {
 	exchangeErr       error
 	exchangeCalls     int
 	lastExchangeToken string
+	reauthSession    provider.LinkSession
+	reauthErr        error
+	reauthCalls      int
+	lastReauthExtID  string
 }
 
 func (f *fakePlaidProvider) CreateLinkSession(_ context.Context, userID string) (provider.LinkSession, error) {
@@ -67,8 +72,13 @@ func (f *fakePlaidProvider) ExchangeToken(_ context.Context, publicToken string)
 	return f.exchangeConn, f.exchangeAccounts, nil
 }
 
-func (f *fakePlaidProvider) CreateReauthSession(context.Context, provider.Connection) (provider.LinkSession, error) {
-	panic("fakePlaidProvider.CreateReauthSession not implemented")
+func (f *fakePlaidProvider) CreateReauthSession(_ context.Context, conn provider.Connection) (provider.LinkSession, error) {
+	f.reauthCalls++
+	f.lastReauthExtID = conn.ExternalID
+	if f.reauthErr != nil {
+		return provider.LinkSession{}, f.reauthErr
+	}
+	return f.reauthSession, nil
 }
 func (f *fakePlaidProvider) SyncTransactions(context.Context, provider.Connection, string) (provider.SyncResult, error) {
 	panic("fakePlaidProvider.SyncTransactions not implemented")

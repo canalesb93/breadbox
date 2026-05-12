@@ -190,6 +190,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
 			r.Post("/connections/link", CreateHostedLinkHandler(svc))
+			r.Post("/connections/{id}/relink", CreateHostedLinkRelinkHandler(svc))
 			r.Post("/connections/{id}/sync", SyncConnectionHandler(svc))
 			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
 			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))

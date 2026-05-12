@@ -887,6 +887,39 @@ paths:
               schema: { $ref: "#/components/schemas/CreateHostedLinkResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/connections/{id}/relink:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Connections]
+      summary: Mint a re-auth hosted-link session for a connection
+      description: |
+        Creates a hosted-link session pinned to one existing bank connection
+        for re-authentication. The user_id, provider, action (`"relink"`),
+        connection_id, and `single_use=true` are all derived from the
+        connection row — the request body has no say.
+
+        The response shape mirrors `POST /connections/link`, including the
+        one-time-only bearer `token` and constructed `url`.
+
+        Returns 404 if the connection doesn't exist; 409 `CONNECTION_DISCONNECTED`
+        if the connection is in the `disconnected` state (soft-deleted bank
+        connections cannot be recovered via re-auth).
+
+        **Requires `full_access` scope.**
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateHostedLinkRelinkRequest" }
+      responses:
+        "201":
+          description: Hosted-link relink session created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateHostedLinkResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/connections/link/{id}:
     parameters: [{ $ref: "#/components/parameters/IDPath" }]
     get:
@@ -2292,6 +2325,27 @@ components:
           type: boolean
           default: false
           description: When true, the session burns after the first successful link.
+        redirect_url:
+          type: string
+          description: Optional URL the hosted page redirects to after completion.
+        label:
+          type: string
+          description: Optional human-readable label for the agent's audit timeline.
+        expires_in_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          description: |
+            TTL in seconds. `0` (or omitted) selects the default of 900 (15
+            minutes). Values above 3600 are rejected.
+    CreateHostedLinkRelinkRequest:
+      type: object
+      description: |
+        Body for `POST /connections/{id}/relink`. All fields are optional —
+        the connection identity (and therefore the user, provider, and
+        single_use flag) comes from the URL path. `user_id` and `provider`
+        are deliberately not accepted on this endpoint.
+      properties:
         redirect_url:
           type: string
           description: Optional URL the hosted page redirects to after completion.

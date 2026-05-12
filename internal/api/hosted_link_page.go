@@ -29,6 +29,7 @@ import (
 	"breadbox/internal/app"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/provider"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -92,6 +93,11 @@ func GetHostedLinkPageSessionHandler(svc *service.Service) http.HandlerFunc {
 // session's provider (if set) and using the session's user attribution.
 // The handler delegates to the existing provider registry — no provider
 // logic is duplicated.
+//
+// For sessions with action="relink" the handler swaps in the provider's
+// CreateReauthSession path so the page gets a re-auth link token (Plaid
+// "update mode") instead of a fresh new-connection token. The URL the JS
+// hits is the same — only the underlying provider call differs.
 func HostedLinkPageStartHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -117,8 +123,11 @@ func HostedLinkPageStartHandler(a *app.App) http.HandlerFunc {
 		}
 
 		// Providers without a server-issued init token (Teller, CSV) skip
-		// the provider call entirely. Mirrors LinkSessionHandler.
-		if !entry.needsLinkSession {
+		// the provider call entirely. Mirrors LinkSessionHandler. The
+		// relink branch below requires a token, so the early 204 here only
+		// applies to the link flow — Teller relink isn't wired yet anyway
+		// (Phase 2 PR2 handles it) and falls through to the 400 below.
+		if !entry.needsLinkSession && sess.Action == service.HostedLinkActionLink {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -127,6 +136,46 @@ func HostedLinkPageStartHandler(a *app.App) http.HandlerFunc {
 		if !ok {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
 				"Provider is not configured on this server")
+			return
+		}
+
+		// Relink path: re-auth on the session's pinned connection. The
+		// connection UUID comes from the session itself — the page has no
+		// say. CreateHostedLink already verified the connection exists at
+		// mint time, but it could have been deleted in the interim; surface
+		// that as 404.
+		if sess.Action == service.HostedLinkActionRelink {
+			if sess.ConnectionID == "" {
+				// Defensive — CreateHostedLink validates this at mint time.
+				mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Relink session missing connection_id")
+				return
+			}
+			cuid, err := a.Service.ResolveConnectionUUID(ctx, sess.ConnectionID)
+			if err != nil {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
+				return
+			}
+			conn, err := a.Queries.GetBankConnection(ctx, cuid)
+			if err != nil {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
+				return
+			}
+			provConn := provider.Connection{
+				ProviderName:         string(conn.Provider),
+				ExternalID:           conn.ExternalID.String,
+				EncryptedCredentials: conn.EncryptedCredentials,
+				UserID:               pgconv.FormatUUID(conn.UserID),
+			}
+			reauthSession, err := prov.CreateReauthSession(ctx, provConn)
+			if err != nil {
+				a.Logger.Error("hosted-link create reauth session", "provider", name, "error", err)
+				mw.WriteError(w, http.StatusBadGateway, "PROVIDER_ERROR", "Failed to create reauth link token")
+				return
+			}
+			writeJSON(w, http.StatusOK, linkSessionResponse{
+				LinkToken:  reauthSession.Token,
+				Expiration: reauthSession.Expiry.Format("2006-01-02T15:04:05Z"),
+			})
 			return
 		}
 
@@ -147,6 +196,66 @@ func HostedLinkPageStartHandler(a *app.App) http.HandlerFunc {
 			LinkToken:  linkSession.Token,
 			Expiration: linkSession.Expiry.Format("2006-01-02T15:04:05Z"),
 		})
+	}
+}
+
+// HostedLinkPageReauthCompleteHandler serves
+// POST /_link/{token}/reauth-complete.
+//
+// Marks the session's pinned connection active again after the user
+// finishes the provider's re-auth flow. Mirrors the public REST endpoint
+// POST /api/v1/connections/{id}/reauth-complete, but the connection ID
+// comes from the session (not the URL or body) and the actor is the agent
+// that minted the link.
+//
+// On success: flips connection.status to active, clears error fields, then
+// completes the hosted-link session (single-use is enforced at mint time
+// for relink). The bearer middleware will reject any follow-up call with
+// 410 CONSUMED. The handler also tolerates a request body for forward
+// compatibility, but currently ignores it (Plaid's update-mode flow
+// completes the OAuth exchange out-of-band, exactly like the public
+// /reauth-complete endpoint).
+func HostedLinkPageReauthCompleteHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := mw.HostedLinkToken(r)
+		if !ok {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Hosted-link session missing on context")
+			return
+		}
+		if sess.Action != service.HostedLinkActionRelink {
+			mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "Session action does not permit reauth-complete")
+			return
+		}
+		if sess.ConnectionID == "" {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Relink session missing connection_id")
+			return
+		}
+
+		actor := service.ActorFromContext(r.Context())
+		if err := svc.ReactivateConnection(r.Context(), sess.ConnectionID, actor); err != nil {
+			writeServiceError(w, err, "Connection not found", "Failed to reactivate connection")
+			return
+		}
+
+		// Record the (still-the-same) connection on the session and burn
+		// the token. Errors here are non-fatal for the user-visible flow —
+		// the reauth itself succeeded — but we log them so the audit
+		// timeline shows a session that didn't complete cleanly.
+		if err := svc.AppendHostedLinkResult(r.Context(), sess.ID, sess.ConnectionID); err != nil {
+			// Already-active sessions append fine; a stale state could
+			// surface as ErrInvalidState, in which case the user is fine
+			// but the audit row stays partial. Don't bubble this up.
+			_ = err
+		}
+		if err := svc.CompleteHostedLink(r.Context(), sess.ID); err != nil {
+			if errors.Is(err, service.ErrInvalidState) {
+				mw.WriteError(w, http.StatusConflict, "INVALID_STATE", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to complete hosted-link session")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

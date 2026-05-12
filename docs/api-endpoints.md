@@ -110,6 +110,7 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | POST | `/connections/{id}/reauth-complete` | W | Mark connection active again after the user finishes re-auth |
 | DELETE | `/connections/{id}` | W | Soft-disconnect (wipes encrypted tokens, transactions soft-deleted) |
 | POST | `/connections/link` | W | Mint a hosted-link URL — agent shares it, user opens in browser to run Plaid/Teller |
+| POST | `/connections/{id}/relink` | W | Mint a re-auth hosted-link URL for one connection (always single-use) |
 | GET | `/connections/link/{id}` | R | Poll a hosted-link session — status, result connection IDs |
 | POST | `/connections/csv/preview` | W | Preview a CSV (multipart or JSON+base64) — no persist |
 | POST | `/connections/csv/import` | W | Import a CSV — creates connection if absent, deduplicates by provider txn id |
@@ -118,6 +119,8 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | POST | `/connections/teller` | W | *Deprecated — use `POST /connections` with `provider: "teller"`.* Registers from the Teller enrollment payload |
 
 Prefer `POST /providers/{name}/link-session` + `POST /connections` for new integrations — the OpenAPI spec treats them as canonical and the per-provider routes above are kept only as shims.
+
+`POST /connections/{id}/relink` pins the new session to the connection in the path. The endpoint deliberately does not accept `user_id` or `provider` on the body — both are derived from the connection row, the session is always `action="relink"` and `single_use=true`, and re-auth against an already-disconnected connection returns `409 CONNECTION_DISCONNECTED`.
 
 ### Hosted-link page (token-scoped, page-internal)
 
@@ -129,6 +132,7 @@ These endpoints are called by the standalone `/link/{token}` page only. The toke
 | GET  | `/_link/{token}/session` | Redacted session view for the page (flips pending→active on first call) |
 | POST | `/_link/{token}/providers/{name}/start` | Page-scoped start of a provider link session |
 | POST | `/_link/{token}/connections` | Page-scoped connection create (attributes to session's user) |
+| POST | `/_link/{token}/reauth-complete` | Page-scoped re-auth completion (only valid for `action="relink"` sessions; reactivates the pinned connection and burns the token) |
 | POST | `/_link/{token}/complete` | User-initiated "I'm done"; consumes the token (idempotent — already-completed returns 204) |
 | POST | `/_link/{token}/fail` | Page reports a provider-side SDK failure |
 
