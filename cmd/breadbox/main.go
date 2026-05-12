@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -133,6 +134,18 @@ func runServe() error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+
+	// Parse serve-specific flags. Env (BREADBOX_NO_DASHBOARD) sets the default;
+	// the flag, if supplied, wins. Use ContinueOnError so unknown flags don't
+	// kill the process via flag.ExitOnError's os.Exit before we can format a
+	// useful error.
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	noDashboard := fs.Bool("no-dashboard", cfg.NoDashboard, "disable the admin dashboard, v2 SPA, and /web/v1 routes (REST + MCP + OAuth stay up)")
+	if err := fs.Parse(os.Args[2:]); err != nil {
+		return fmt.Errorf("parse serve flags: %w", err)
+	}
+	cfg.NoDashboard = *noDashboard
+
 	cfg.Version = version
 	cfg.StartTime = time.Now()
 
@@ -299,7 +312,11 @@ func runServe() error {
 	if cfg.EncryptionKey == nil {
 		logger.Warn("ENCRYPTION_KEY not set — encrypted provider credentials will not work")
 	}
-	if adminCount == 0 {
+	if cfg.NoDashboard {
+		logger.Info("dashboard disabled", "mode", "headless-runtime")
+	} else if adminCount == 0 {
+		// Only nag about the admin account when the dashboard is actually
+		// reachable; under --no-dashboard there's nothing to log in to.
 		logger.Warn("no admin account — create one at /setup or via 'breadbox create-admin'")
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

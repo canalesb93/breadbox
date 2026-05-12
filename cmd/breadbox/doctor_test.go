@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"breadbox/internal/config"
+	"breadbox/internal/db"
 )
 
 func TestCheckEncryptionKey(t *testing.T) {
@@ -173,9 +174,9 @@ func TestCheckPublicURL(t *testing.T) {
 }
 
 func TestLatestEmbeddedMigration(t *testing.T) {
-	v, err := latestEmbeddedMigration()
+	v, err := db.LatestEmbeddedMigration()
 	if err != nil {
-		t.Fatalf("latestEmbeddedMigration: %v", err)
+		t.Fatalf("LatestEmbeddedMigration: %v", err)
 	}
 	if v <= 0 {
 		t.Fatalf("expected a positive version, got %d", v)
