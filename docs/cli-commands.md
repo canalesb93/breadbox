@@ -162,8 +162,8 @@ A **connection** is a bank-side OAuth link (Plaid item, Teller enrollment, or CS
 |---------|-------|-------------|
 | `breadbox users list` | R | List household members |
 | `breadbox users get <id>` | R | Single user |
-| `breadbox users create [--name] [--email] [--role]` | W | Add a household member |
-| `breadbox users update <id> [...]` | W | Update member |
+| `breadbox users create --name [--email]` | W | Add a household member |
+| `breadbox users update <id> [--name] [--email]` | W | Update member |
 | `breadbox users delete <id>` | W | Remove member |
 
 ## Logins
@@ -171,10 +171,10 @@ A **connection** is a bank-side OAuth link (Plaid item, Teller enrollment, or CS
 | Command | Scope | Description |
 |---------|-------|-------------|
 | `breadbox logins list` | W | List admin login accounts |
-| `breadbox logins create [--email] [--user]` | W | Create a login account linked to a household user |
-| `breadbox logins update <id> [...]` | W | Update login |
+| `breadbox logins create --user --email [--role]` | W | Create a login account linked to a household user (full setup_token returned once) |
+| `breadbox logins update <id> --role` | W | Update login role (admin/editor/viewer) |
 | `breadbox logins delete <id>` | W | Delete login |
-| `breadbox logins reset-password <id>` | W | Generate a one-time reset token |
+| `breadbox logins reset-password <id>` | W | Generate a one-time reset token (full token returned once) |
 
 ## Reports
 

@@ -205,6 +205,9 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Patch("/users/{user_id}/login/{login_id}", UpdateUserLoginHandler(svc))
 			r.Delete("/users/{user_id}/login/{login_id}", DeleteUserLoginHandler(svc))
 			r.Post("/users/{user_id}/login/{login_id}/regenerate-token", RegenerateLoginTokenHandler(svc))
+			r.Get("/login-accounts", ListLoginAccountsHandler(svc))
+			r.Delete("/login-accounts/{id}", DeleteLoginAccountHandler(svc))
+			r.Post("/login-accounts/{id}/reset-password", ResetLoginAccountPasswordHandler(svc))
 		})
 	})
 	return r

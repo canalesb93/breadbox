@@ -233,6 +233,96 @@ func RegenerateLoginTokenHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// Top-level login-account endpoints. The nested `/users/{user_id}/login*`
+// routes above remain the canonical surface for the admin UI; the routes
+// below are flat conveniences for the CLI's `breadbox logins ...` subtree
+// (no parent user_id required). All carry the same write-scope gate.
+
+// ListLoginAccountsHandler handles GET /api/v1/login-accounts. Returns every
+// login account on the box, identity fields included. Sensitive — the route
+// is mounted inside the write-scope group on purpose.
+func ListLoginAccountsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		all, err := svc.ListLoginAccounts(r.Context())
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list login accounts")
+			return
+		}
+		// Strip setup_token from list responses — it only appears at
+		// create + reset.
+		for i := range all {
+			all[i].SetupToken = ""
+			all[i].SetupTokenExpiresAt = nil
+		}
+		writeData(w, all)
+	}
+}
+
+// DeleteLoginAccountHandler handles DELETE /api/v1/login-accounts/{id}.
+// Removes the login by its own UUID, without requiring the parent user_id.
+func DeleteLoginAccountHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		acct, err := findLoginByID(r.Context(), svc, id)
+		if err != nil {
+			writeServiceError(w, err, "Login account not found", "Failed to look up login account")
+			return
+		}
+		if err := svc.DeleteLoginAccount(r.Context(), acct.ID); err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete login account")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ResetLoginAccountPasswordHandler handles POST /api/v1/login-accounts/{id}/reset-password.
+// Issues a fresh setup token by login UUID — flat alias for the nested
+// regenerate-token endpoint. Same one-time-token semantics.
+func ResetLoginAccountPasswordHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		acct, err := findLoginByID(r.Context(), svc, id)
+		if err != nil {
+			writeServiceError(w, err, "Login account not found", "Failed to look up login account")
+			return
+		}
+		token, err := svc.RegenerateSetupToken(r.Context(), acct.ID)
+		if err != nil {
+			if strings.Contains(err.Error(), "already has a password") {
+				mw.WriteError(w, http.StatusConflict, "PASSWORD_ALREADY_SET", "This login already has a password set; cannot regenerate setup token")
+				return
+			}
+			if strings.Contains(err.Error(), "account not found") {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Login account not found")
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to regenerate setup token")
+			return
+		}
+		writeData(w, map[string]any{
+			"setup_token": token,
+		})
+	}
+}
+
+// findLoginByID looks up a login account by its own UUID, scanning the full
+// list. The list is bounded (households are small), so the cost is negligible
+// and we avoid adding a new sqlc query just for the CLI path.
+func findLoginByID(ctx context.Context, svc *service.Service, id string) (*service.LoginAccountResponse, error) {
+	all, err := svc.ListLoginAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, acct := range all {
+		if acct.ID == id {
+			out := acct
+			return &out, nil
+		}
+	}
+	return nil, service.ErrNotFound
+}
+
 // findLoginForUser returns the login account identified by loginID, but only
 // if it belongs to userID. Returns service.ErrNotFound when either side
 // doesn't match so callers can lean on the canonical 404 path.
