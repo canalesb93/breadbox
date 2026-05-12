@@ -119,6 +119,21 @@ See the Transactions table — comments are nested under `/transactions/{transac
 
 Prefer `POST /providers/{name}/link-session` + `POST /connections` for new integrations — the OpenAPI spec treats them as canonical and the per-provider routes above are kept only as shims.
 
+### Hosted-link page (token-scoped, page-internal)
+
+These endpoints are called by the standalone `/link/{token}` page only. The token in the path is the credential — no API key required, no admin session, no rate limiter. They are intentionally not modeled in `openapi.yaml` (the spec covers the agent-facing `/api/v1/*` surface only); the drift test scopes itself to `/api/v1/*` and ignores this section.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET  | `/link/{token}` | Standalone HTML page; user opens it to add a bank |
+| GET  | `/_link/{token}/session` | Redacted session view for the page (flips pending→active on first call) |
+| POST | `/_link/{token}/providers/{name}/start` | Page-scoped start of a provider link session |
+| POST | `/_link/{token}/connections` | Page-scoped connection create (attributes to session's user) |
+| POST | `/_link/{token}/complete` | User-initiated "I'm done"; consumes the token (idempotent — already-completed returns 204) |
+| POST | `/_link/{token}/fail` | Page reports a provider-side SDK failure |
+
+The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIRED` once past `expires_at`, `410 CONSUMED` after `/complete`, and `410 GONE` for any other terminal state. Scope-pinning lives in each handler: a session minted with `provider="plaid"` will `403 FORBIDDEN` any `/_link/.../providers/teller/start` or `/_link/.../connections` body that names a different provider.
+
 ## Sync
 
 | Method | Path | Scope | Description |
