@@ -27,9 +27,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func TestMain(m *testing.M) {
-	testutil.RunWithDB(m)
-}
+// TestMain lives in accounts_integration_test.go — one per `package cli_test`.
 
 // testServer is the shared test fixture: chi router + http server + a
 // configured client tied to a full_access key.
