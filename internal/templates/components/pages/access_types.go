@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // AccessProps mirrors the data map the old access.html read. The handler

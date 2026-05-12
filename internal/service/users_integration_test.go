@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration coverage for service.GetUser. The method is the user-shaped
 // mirror of GetAccount and is the resolver behind breadbox://user/{short_id}.

@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // AgentsSettingsProps drives the Agents tab inside the Settings shell —

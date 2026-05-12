@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for transaction query builder, filters, summary, and count.
 // Run with: make test-integration

@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for provider configuration REST endpoints.
 //

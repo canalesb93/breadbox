@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for DELETE /api/v1/transactions/{id} (soft-delete) and
 // POST /api/v1/transactions/{id}/restore (undo). Run with:

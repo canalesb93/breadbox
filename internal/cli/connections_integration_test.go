@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for `breadbox connections`. They drive the real REST
 // handlers via an in-process httptest.Server so the CLI client and

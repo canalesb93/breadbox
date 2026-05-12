@@ -1,3 +1,5 @@
+//go:build !lite
+
 // Package ruleapply provides shared helpers for writing rule-driven annotation
 // rows. Both the sync engine (internal/sync) and the retroactive apply paths
 // (internal/service) need to emit identical annotation shapes for

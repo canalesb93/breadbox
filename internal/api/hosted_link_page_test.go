@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the page-internal hosted-link surface:
 //

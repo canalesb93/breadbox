@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for POST /api/v1/rules/batch — REST sibling of the MCP
 // `batch_create_rules` tool. Run with:

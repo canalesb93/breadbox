@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for REST tag endpoints and the tags filter on
 // /api/v1/transactions. Run with:

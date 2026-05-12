@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the users / logins / keys noun groups in the CLI's
 // REST client. Mirrors internal/api/api_integration_test.go's infra: a chi

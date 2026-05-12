@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the tag CRUD endpoints (POST /tags, GET/PATCH/DELETE
 // /tags/{slug}). The {slug} URL param accepts UUID, short_id, or slug — see

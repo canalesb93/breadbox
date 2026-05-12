@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the providers / config / webhooks CLI commands.
 // They drive the real REST handlers through an in-process httptest.Server,

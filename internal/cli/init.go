@@ -1,3 +1,5 @@
+//go:build !lite
+
 // Package cli — `breadbox init`.
 //
 // `breadbox init` is a local-only command: it talks straight to the

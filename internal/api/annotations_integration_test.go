@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for GET /api/v1/transactions/{id}/annotations.
 // Run with:

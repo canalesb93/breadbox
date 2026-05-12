@@ -1,3 +1,5 @@
+//go:build !lite
+
 // Package testutil provides helpers for integration tests that need a real PostgreSQL database.
 //
 // Usage in tests (files must have //go:build integration):

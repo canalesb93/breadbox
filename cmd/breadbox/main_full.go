@@ -1,6 +1,12 @@
-// Package main is the breadbox binary entrypoint. The actual command tree
-// lives in internal/cli; this file is a 20-line shim so the binary stays a
-// single artifact across server, MCP, and CLI roles.
+//go:build !lite
+
+// Package main is the breadbox binary entrypoint (full build). The actual
+// command tree lives in internal/cli; this file is a thin shim so the
+// binary stays a single artifact across server, MCP, and CLI roles.
+//
+// The lite build (cmd/breadbox/main_lite.go) skips the goose/pgx stdlib
+// driver registration and ships the same shim under -tags=lite, producing
+// a smaller CLI-only binary (typically built as `breadbox-cli`).
 package main
 
 import (

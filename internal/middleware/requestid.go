@@ -1,3 +1,5 @@
+//go:build !lite
+
 package middleware
 
 // Request ID injection is handled by chi's built-in middleware.RequestID.

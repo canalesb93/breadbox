@@ -1,3 +1,5 @@
+//go:build !lite
+
 // Package cli — `breadbox backup`.
 //
 // Local-only commands: dump the database via pg_dump, list previous backups,

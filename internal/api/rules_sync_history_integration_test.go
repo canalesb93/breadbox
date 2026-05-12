@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for GET /api/v1/rules/{id}/sync-history. Run with:
 //

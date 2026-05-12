@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for POST /api/v1/transactions/update — the REST sibling
 // of the MCP `update_transactions` tool. Run with:
