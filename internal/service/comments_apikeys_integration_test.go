@@ -391,7 +391,7 @@ func TestCreateAPIKey_DefaultScope(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Test Key", "")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Test Key", "")
 	if err != nil {
 		t.Fatalf("CreateAPIKey failed: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestCreateAPIKey_ReadOnlyScope(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Read Only Key", "read_only")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Read Only Key", "read_only")
 	if err != nil {
 		t.Fatalf("CreateAPIKey failed: %v", err)
 	}
@@ -429,7 +429,7 @@ func TestCreateAPIKey_InvalidScope(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	_, err := svc.CreateAPIKey(ctx, "Bad Key", "admin")
+	_, err := svc.CreateAPIKeyLegacy(ctx, "Bad Key", "admin")
 	if err == nil {
 		t.Fatal("expected error for invalid scope, got nil")
 	}
@@ -439,7 +439,7 @@ func TestCreateAPIKey_PrefixLength(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Prefix Test", "full_access")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Prefix Test", "full_access")
 	if err != nil {
 		t.Fatalf("CreateAPIKey failed: %v", err)
 	}
@@ -469,11 +469,11 @@ func TestListAPIKeys_MultipleKeys(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	_, err := svc.CreateAPIKey(ctx, "Key One", "full_access")
+	_, err := svc.CreateAPIKeyLegacy(ctx, "Key One", "full_access")
 	if err != nil {
 		t.Fatalf("create key 1: %v", err)
 	}
-	_, err = svc.CreateAPIKey(ctx, "Key Two", "read_only")
+	_, err = svc.CreateAPIKeyLegacy(ctx, "Key Two", "read_only")
 	if err != nil {
 		t.Fatalf("create key 2: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestValidateAPIKey_Success(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Validate Test", "full_access")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Validate Test", "full_access")
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}
@@ -522,7 +522,7 @@ func TestValidateAPIKey_RevokedKey(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Revoke Test", "full_access")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Revoke Test", "full_access")
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}
@@ -544,7 +544,7 @@ func TestRevokeAPIKey_Success(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Revoke Me", "full_access")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Revoke Me", "full_access")
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}
@@ -581,7 +581,7 @@ func TestRevokeAPIKey_AlreadyRevoked(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	result, err := svc.CreateAPIKey(ctx, "Double Revoke", "full_access")
+	result, err := svc.CreateAPIKeyLegacy(ctx, "Double Revoke", "full_access")
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}
@@ -613,11 +613,11 @@ func TestCreateAPIKey_UniqueKeys(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two keys with the same name — should get different plaintext keys.
-	r1, err := svc.CreateAPIKey(ctx, "Same Name", "full_access")
+	r1, err := svc.CreateAPIKeyLegacy(ctx, "Same Name", "full_access")
 	if err != nil {
 		t.Fatalf("create key 1: %v", err)
 	}
-	r2, err := svc.CreateAPIKey(ctx, "Same Name", "full_access")
+	r2, err := svc.CreateAPIKeyLegacy(ctx, "Same Name", "full_access")
 	if err != nil {
 		t.Fatalf("create key 2: %v", err)
 	}

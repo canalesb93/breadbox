@@ -29,7 +29,7 @@ func TestHeadlessBootstrap(t *testing.T) {
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "headless-test", "read_only")
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "headless-test", "read_only")
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestHeadlessBootstrap_NoEncryptionKey(t *testing.T) {
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "headless-no-key", "read_only")
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "headless-no-key", "read_only")
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
 	}

@@ -12,16 +12,40 @@ import (
 	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-func (s *Service) CreateAPIKey(ctx context.Context, name string, scope string) (*CreateAPIKeyResult, error) {
+// CreateAPIKeyParams collects the inputs for minting a new API key. Actor
+// fields default to `agent` when omitted so existing callers keep their
+// behavior. CLI's `auth bootstrap` passes `user`, the stdio bootstrap passes
+// `system` (see ensureStdioSystemKey).
+type CreateAPIKeyParams struct {
+	Name      string
+	Scope     string
+	ActorType string // "user" | "agent" | "system"; defaults to "agent"
+	ActorName string // optional display name, falls back to Name
+}
+
+// CreateAPIKey mints a new API key and returns the full record plus the
+// one-time plaintext. The legacy (name, scope) signature is preserved via
+// CreateAPIKeyLegacy for in-tree callers (dashboard form, OAuth client mint)
+// that don't need to pick an actor type.
+func (s *Service) CreateAPIKey(ctx context.Context, p CreateAPIKeyParams) (*CreateAPIKeyResult, error) {
+	scope := p.Scope
 	if scope == "" {
 		scope = "full_access"
 	}
 	if scope != "full_access" && scope != "read_only" {
 		return nil, fmt.Errorf("invalid scope: %s", scope)
+	}
+	actorType := p.ActorType
+	if actorType == "" {
+		actorType = "agent"
+	}
+	if actorType != "user" && actorType != "agent" && actorType != "system" {
+		return nil, fmt.Errorf("invalid actor_type: %s", actorType)
 	}
 
 	// Generate 32 random bytes
@@ -50,11 +74,17 @@ func (s *Service) CreateAPIKey(ctx context.Context, name string, scope string) (
 	// Prefix: first 11 chars (bb_ + 8)
 	keyPrefix := plaintextKey[:11]
 
+	actorName := pgtype.Text{}
+	if p.ActorName != "" {
+		actorName = pgtype.Text{String: p.ActorName, Valid: true}
+	}
 	apiKey, err := s.Queries.CreateApiKey(ctx, db.CreateApiKeyParams{
-		Name:      name,
+		Name:      p.Name,
 		KeyHash:   keyHash,
 		KeyPrefix: keyPrefix,
 		Scope:     scope,
+		ActorType: actorType,
+		ActorName: actorName,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
@@ -64,6 +94,13 @@ func (s *Service) CreateAPIKey(ctx context.Context, name string, scope string) (
 		APIKeyResponse: apiKeyFromRow(apiKey),
 		PlaintextKey:   plaintextKey,
 	}, nil
+}
+
+// CreateAPIKeyLegacy is the pre-PR-03 entrypoint kept so call sites that
+// don't care about actor attribution stay short. New CLI code uses
+// CreateAPIKey + CreateAPIKeyParams directly.
+func (s *Service) CreateAPIKeyLegacy(ctx context.Context, name string, scope string) (*CreateAPIKeyResult, error) {
+	return s.CreateAPIKey(ctx, CreateAPIKeyParams{Name: name, Scope: scope})
 }
 
 func (s *Service) ListAPIKeys(ctx context.Context) ([]APIKeyResponse, error) {
@@ -123,13 +160,19 @@ func (s *Service) ValidateAPIKey(ctx context.Context, key string) (*db.ApiKey, e
 }
 
 func apiKeyFromRow(r db.ApiKey) APIKeyResponse {
-	return APIKeyResponse{
+	resp := APIKeyResponse{
 		ID:         formatUUID(r.ID),
 		Name:       r.Name,
 		KeyPrefix:  r.KeyPrefix,
 		Scope:      r.Scope,
+		ActorType:  r.ActorType,
 		LastUsedAt: timestampStr(r.LastUsedAt),
 		RevokedAt:  timestampStr(r.RevokedAt),
 		CreatedAt:  pgconv.TimestampStr(r.CreatedAt),
 	}
+	if r.ActorName.Valid {
+		s := r.ActorName.String
+		resp.ActorName = &s
+	}
+	return resp
 }

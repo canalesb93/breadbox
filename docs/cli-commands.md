@@ -22,11 +22,11 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 
 | Command | Scope | Description |
 |---------|-------|-------------|
-| `breadbox auth login [--host URL] [--token KEY]` | — | Add a host; interactive device-code by default |
-| `breadbox auth logout [--host NAME]` | — | Drop credentials for a host |
+| `breadbox auth login --host URL --token KEY` | — | Add a host; `--token` paste-mode lands in Stage 1, interactive device-code in Stage 2 |
+| `breadbox auth logout [name]` | — | Drop credentials for a host |
 | `breadbox auth status` | — | List configured hosts + which is default |
 | `breadbox auth use <name>` | — | Set the default host |
-| `breadbox auth bootstrap` | L | Local-only: mint a `full_access` key without prompting |
+| `breadbox auth bootstrap [--base-url URL]` | L | Local-only: mint a `full_access` `user`-actor key via the service layer and save as host `local` |
 | `breadbox auth whoami` | R | Print the API key's actor (type + name) and host |
 
 ## Server / process
@@ -38,10 +38,11 @@ These commands operate on the local box (filesystem, DB, embedded migrations) �
 | Command | Scope | Description |
 |---------|-------|-------------|
 | `breadbox serve [--no-dashboard]` | L | Start the HTTP server (REST + MCP-over-HTTP + dashboard) |
-| `breadbox mcp` | L | MCP server over stdio; Claude Desktop spawns this per session, blocks until stdin closes |
+| `breadbox mcp` | L | MCP server over stdio; Claude Desktop spawns this per session, blocks until stdin closes. Uses a singleton `actor_type='system'` api_keys row so the audit trail attributes every stdio call consistently |
+| `breadbox mcp-stdio` | L | *deprecated — use `breadbox mcp` instead*. Hidden alias kept so existing Claude Desktop configs keep working |
 | `breadbox init` | L | First-run setup: encryption key, first login account, first API key |
 | `breadbox migrate [--down] [--to N]` | L | Run goose migrations against `DATABASE_URL` (local-only — there is no remote migration endpoint by design) |
-| `breadbox doctor` | R | Health check; consumes `GET /api/v1/headless/bootstrap` + `/health/ready` |
+| `breadbox doctor [--skip-external]` | R/L | Remote mode (when a host is configured) consumes `GET /api/v1/headless/bootstrap`; local mode (no host) keeps the env/DB/provider preflight checks |
 | `breadbox version` | — | Print build version, commit, and upgrade check |
 | `breadbox completion [bash\|zsh\|fish]` | — | Print a shell-completion script (e.g. `breadbox completion zsh > _breadbox`) for tab-completion of nouns/verbs/flags — same pattern as `gh`, `kubectl` |
 

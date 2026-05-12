@@ -92,7 +92,7 @@ func setupProviderConfigEnv(t *testing.T, scope string) *providerConfigEnv {
 		Providers: map[string]provider.Provider{},
 	}
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "provider-config-key", scope)
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "provider-config-key", scope)
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}

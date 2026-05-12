@@ -189,7 +189,7 @@ func TestMergeCategories_RequiresWriteScope(t *testing.T) {
 	srcID := createCategoryViaAPI(t, env, "src_scope", "Source Scope")
 	tgtID := createCategoryViaAPI(t, env, "tgt_scope", "Target Scope")
 
-	readKey, err := env.Service.CreateAPIKey(t.Context(), "readonly", "read_only")
+	readKey, err := env.Service.CreateAPIKeyLegacy(t.Context(), "readonly", "read_only")
 	if err != nil {
 		t.Fatalf("create read-only key: %v", err)
 	}

@@ -91,6 +91,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/providers", ListProvidersHandler(a))
 		r.Get("/providers/{name}", GetProviderHandler(a))
 		r.Get("/headless/bootstrap", HeadlessBootstrapHandler(svc, a, version))
+		r.Get("/keys/me", WhoamiHandler())
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {

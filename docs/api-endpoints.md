@@ -205,8 +205,9 @@ The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIR
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
 | GET | `/api-keys` | W | List keys (hashed prefixes only — never plaintext) |
-| POST | `/api-keys` | W | Create. **Response includes plaintext `key` once.** |
+| POST | `/api-keys` | W | Create. **Response includes plaintext `key` once.** Accepts optional `actor_type` (`user`/`agent`/`system`, default `agent`) and `actor_name` |
 | DELETE | `/api-keys/{id}` | W | Soft-revoke a key |
+| GET | `/keys/me` | R | Whoami: return the calling key's id, prefix, scope, actor_type, actor_name |
 
 ## Provider settings
 

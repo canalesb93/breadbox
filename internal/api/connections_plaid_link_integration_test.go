@@ -109,7 +109,7 @@ func setupPlaidLinkEnv(t *testing.T, scope string, registerProvider bool) *plaid
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "plaid-link-test-key", scope)
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "plaid-link-test-key", scope)
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}

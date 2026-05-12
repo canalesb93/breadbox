@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"breadbox/internal/db"
-	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 )
 
@@ -40,14 +39,16 @@ func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 				}
 
 				// Create a synthetic API key record so existing scope checks work.
+				// OAuth bearer tokens represent a third-party app acting on the
+				// user's behalf — attribute them as `agent`.
 				syntheticKey := &db.ApiKey{
-					ID:    accessToken.ID,
-					Name:  clientName,
-					Scope: accessToken.Scope,
+					ID:        accessToken.ID,
+					Name:      clientName,
+					Scope:     accessToken.Scope,
+					ActorType: "agent",
 				}
 
-				keyID := pgconv.FormatUUID(accessToken.ID)
-				ctx := service.ContextWithAPIKey(r.Context(), keyID, syntheticKey.Name)
+				ctx := service.ContextWithAPIKey(r.Context(), syntheticKey)
 				ctx = SetAPIKey(ctx, syntheticKey)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -79,8 +80,7 @@ func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			keyID := pgconv.FormatUUID(apiKey.ID)
-			ctx := service.ContextWithAPIKey(r.Context(), keyID, apiKey.Name)
+			ctx := service.ContextWithAPIKey(r.Context(), apiKey)
 			ctx = SetAPIKey(ctx, apiKey)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
