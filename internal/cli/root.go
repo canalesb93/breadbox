@@ -173,6 +173,10 @@ func NewRootCmd(version string) *cobra.Command {
 	AddConfigCmd(root)
 	AddBackupCmd(root)
 	AddWebhooksCmd(root)
+	AddCategoriesCmd(root)
+	AddTagsCmd(root)
+	AddRulesCmd(root)
+	AddReportsCmd(root)
 	AddVersionCmd(root, version)
 
 	return root
