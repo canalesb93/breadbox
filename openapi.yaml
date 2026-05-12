@@ -674,6 +674,64 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Connection" }
+    post:
+      tags: [Connections]
+      summary: Create a connection
+      description: |
+        Generic, provider-discriminated create. Supersedes
+        `POST /connections/plaid/exchange`, `POST /connections/teller`, and
+        `POST /connections/csv/import`.
+
+        The `credentials` shape depends on `provider`:
+
+        - **plaid** — `{public_token, institution_id, institution_name, accounts?}`
+        - **teller** — `{access_token, enrollment_id, institution_id?, institution_name, accounts?}`
+        - **csv** — `{csv_base64, column_mapping, account_name?, date_format?, ...}`
+          (also accepts `multipart/form-data` with a `file` field plus the
+          same configuration fields as form values).
+
+        Returns the same `{connection_id, institution_name, status}` envelope
+        all three legacy routes produce. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider]
+              properties:
+                provider: { type: string, enum: [plaid, teller, csv] }
+                user_id: { type: string, description: "UUID or short_id" }
+                credentials:
+                  type: object
+                  additionalProperties: true
+          multipart/form-data:
+            schema:
+              type: object
+              required: [provider, file]
+              properties:
+                provider: { type: string, enum: [csv] }
+                user_id: { type: string }
+                file: { type: string, format: binary }
+                column_mapping: { type: string, description: "JSON object {column_name: column_index}" }
+                date_format: { type: string }
+                positive_is_debit: { type: string }
+                has_debit_credit: { type: string }
+                account_name: { type: string }
+                connection_id: { type: string }
+      responses:
+        "201":
+          description: Created connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502":
+          description: Provider exchange failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/v1/connections/{id}:
     parameters: [{ $ref: "#/components/parameters/IDPath" }]
     get:
@@ -796,11 +854,96 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Connection" }
+  /api/v1/providers:
+    get:
+      tags: [Connections]
+      summary: List configured providers
+      description: |
+        Returns the self-describing registry of bank-data providers this server
+        supports, including which are configured, their capabilities, and the
+        shape of credentials they accept on `POST /connections`.
+
+        Unconfigured providers still appear with `configured: false` so clients
+        can render a "set me up" CTA without guessing what providers exist.
+
+        Response is a bare JSON array (bounded resource — see API conventions).
+      responses:
+        "200":
+          description: Provider registry.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProviderInfo" }
+  /api/v1/providers/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string, enum: [plaid, teller, csv] }
+    get:
+      tags: [Connections]
+      summary: Get a single provider entry
+      description: Same shape as one entry in `GET /providers`.
+      responses:
+        "200":
+          description: Provider entry.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderInfo" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/providers/{name}/link-session:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string, enum: [plaid, teller, csv] }
+    post:
+      tags: [Connections]
+      summary: Start a provider link session
+      description: |
+        Generic link-token start. Replaces the deprecated provider-specific
+        link-token routes.
+
+        - Providers that need a server-issued init token (Plaid today;
+          MoneyKit / Salt Edge in the future) return `200 OK` with
+          `{link_token, expiration}`.
+        - Providers whose hosted UI runs entirely client-side (Teller, CSV)
+          return `204 No Content` — the client proceeds straight to
+          `POST /connections` with the credentials it collected.
+
+        **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: string, description: "UUID or short_id" }
+      responses:
+        "200":
+          description: Link token issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  link_token: { type: string }
+                  expiration: { type: string, format: date-time }
+        "204": { description: "No init token needed; proceed to POST /connections." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/connections/plaid/link-token:
     post:
       tags: [Connections]
+      deprecated: true
       summary: Issue a Plaid Link token
       description: |
+        **Deprecated** — use `POST /api/v1/providers/plaid/link-session` instead.
+        This route remains as a thin pass-through to the generic dispatch path.
+
         Returns a Plaid-issued `link_token` for initial connection (or update mode
         when `connection_id` is supplied). **Requires `full_access` scope.**
       requestBody:
@@ -823,8 +966,12 @@ paths:
   /api/v1/connections/plaid/exchange:
     post:
       tags: [Connections]
+      deprecated: true
       summary: Exchange a Plaid public_token
       description: |
+        **Deprecated** — use `POST /api/v1/connections` with `provider:"plaid"` instead.
+        This route remains as a thin pass-through to the generic dispatch path.
+
         Trades a one-time `public_token` for a long-lived access token, persists
         the connection, and triggers an initial sync. **Requires `full_access` scope.**
       requestBody:
@@ -849,8 +996,13 @@ paths:
   /api/v1/connections/teller:
     post:
       tags: [Connections]
+      deprecated: true
       summary: Create a Teller connection
-      description: Persists a Teller `enrollment_id` + access token after the Connect.js flow. **Requires `full_access` scope.**
+      description: |
+        **Deprecated** — use `POST /api/v1/connections` with `provider:"teller"` instead.
+        This route remains as a thin pass-through to the generic dispatch path.
+
+        Persists a Teller `enrollment_id` + access token after the Connect.js flow. **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -891,8 +1043,13 @@ paths:
   /api/v1/connections/csv/import:
     post:
       tags: [Connections]
+      deprecated: true
       summary: Import a CSV
-      description: Persists CSV rows as transactions under a CSV-type connection. **Requires `full_access` scope.**
+      description: |
+        **Deprecated** — use `POST /api/v1/connections` with `provider:"csv"` instead.
+        This route remains as a thin pass-through to the generic dispatch path.
+
+        Persists CSV rows as transactions under a CSV-type connection. **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -1967,6 +2124,29 @@ components:
         parent_id: { type: string, nullable: true }
         kind: { type: string }
         archived: { type: boolean }
+    ProviderInfo:
+      type: object
+      required: [name, configured, needs_link_session, capabilities, credentials_schema]
+      properties:
+        name: { type: string, description: "Provider identifier (plaid, teller, csv, ...)" }
+        configured: { type: boolean, description: "True when this provider's config is set on this server." }
+        needs_link_session: { type: boolean, description: "True when POST /providers/{name}/link-session returns a token; false when it returns 204." }
+        capabilities:
+          type: array
+          items: { type: string }
+          description: "Informational; e.g. transactions, balances."
+        credentials_schema:
+          type: object
+          description: "Per-field descriptor for the `credentials` payload on POST /connections."
+          additionalProperties:
+            type: object
+            properties:
+              type: { type: string }
+              required:
+                oneOf:
+                  - { type: boolean }
+                  - { type: string }
+              description: { type: string }
     Connection:
       type: object
       properties:

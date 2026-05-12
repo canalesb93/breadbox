@@ -87,6 +87,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/tags", ListTagsHandler(svc))
 		r.Get("/tags/{slug}", GetTagHandler(svc))
 		r.Get("/settings/providers", GetProviderConfigHandler(a))
+		r.Get("/providers", ListProvidersHandler(a))
+		r.Get("/providers/{name}", GetProviderHandler(a))
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -157,6 +159,11 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/users/{user_id}/login/{login_id}/regenerate-token", RegenerateLoginTokenHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
+			// Generic provider create + link-session — supersede the
+			// per-provider routes above. The old routes remain wired as
+			// deprecated shims (callers will see identical behavior).
+			r.Post("/providers/{name}/link-session", LinkSessionHandler(a))
+			r.Post("/connections", CreateConnectionHandler(a))
 		})
 	})
 
