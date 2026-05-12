@@ -157,6 +157,88 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, out any)
 	return nil
 }
 
+// rawGET fetches a path and returns the response body as a string. Used
+// for non-JSON endpoints like /categories/export (TSV).
+func (c *Client) rawGET(ctx context.Context, path string) (string, error) {
+	u, err := c.url(path)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	if c.host.Token != "" {
+		req.Header.Set("X-API-Key", c.host.Token)
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("call GET %s: %w", path, err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		var env errorEnvelope
+		_ = json.Unmarshal(body, &env)
+		apiErr := env.Error
+		apiErr.Status = resp.StatusCode
+		if apiErr.Message == "" && len(body) > 0 {
+			apiErr.Message = strings.TrimSpace(string(body))
+		}
+		return "", &apiErr
+	}
+	return string(body), nil
+}
+
+// doRaw is like Do but sends `body` verbatim with a caller-chosen
+// Content-Type (instead of JSON-encoding it). Used for endpoints whose
+// request body is a plain text payload (e.g., TSV import).
+func (c *Client) doRaw(ctx context.Context, method, path string, body []byte, contentType string, out any) error {
+	u, err := c.url(path)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	if c.host.Token != "" {
+		req.Header.Set("X-API-Key", c.host.Token)
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("call %s %s: %w", method, path, err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		var env errorEnvelope
+		_ = json.Unmarshal(raw, &env)
+		apiErr := env.Error
+		apiErr.Status = resp.StatusCode
+		if apiErr.Message == "" && len(raw) > 0 {
+			apiErr.Message = strings.TrimSpace(string(raw))
+		}
+		return &apiErr
+	}
+	if out == nil || resp.StatusCode == http.StatusNoContent || len(raw) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return fmt.Errorf("decode response: %w", err)
+	}
+	return nil
+}
+
 // url builds the absolute URL for an API path. `path` must start with
 // `/api/v1/...` (or another root-level path like `/health`).
 func (c *Client) url(path string) (string, error) {
