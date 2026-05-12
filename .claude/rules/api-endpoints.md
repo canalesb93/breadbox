@@ -45,7 +45,7 @@ Group rows by resource — match the existing section order:
 6. Rules
 7. Annotations (cross-reference)
 8. Comments (cross-reference)
-9. Connections (+ provider-specific link flows + CSV)
+9. Connections (+ providers dispatch + per-provider link flows + CSV)
 10. Sync
 11. Users (+ Login accounts subsection)
 12. Account links

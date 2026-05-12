@@ -99,17 +99,23 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | GET | `/connections` | R | List active connections |
 | GET | `/connections/{id}` | R | Connection detail (provider, status, paused, sync interval, account count) |
 | GET | `/connections/{id}/status` | R | Status + last sync info |
+| GET | `/providers` | R | List installed providers (`{name, configured, needs_link_session}`) |
+| GET | `/providers/{name}` | R | Single provider entry — capability flags for one provider |
+| POST | `/providers/{name}/link-session` | W | Start a link/auth session — returns a provider token when needed; `204` when no link step |
+| POST | `/connections` | W | Create from a provider payload (`provider` discriminator: `plaid`, `teller`) |
 | POST | `/connections/{id}/sync` | W | Trigger sync for one connection (202; runs async) |
 | POST | `/connections/{id}/paused` | W | Pause or resume scheduled syncs |
 | POST | `/connections/{id}/sync-interval` | W | Set or clear per-connection interval override |
 | POST | `/connections/{id}/reauth` | W | Start re-auth flow; returns a fresh link token |
 | POST | `/connections/{id}/reauth-complete` | W | Mark connection active again after the user finishes re-auth |
 | DELETE | `/connections/{id}` | W | Soft-disconnect (wipes encrypted tokens, transactions soft-deleted) |
-| POST | `/connections/plaid/link-token` | W | Plaid: get a fresh Link token to start a new connection |
-| POST | `/connections/plaid/exchange` | W | Plaid: exchange the public_token Plaid Link returned, persist connection + accounts |
-| POST | `/connections/teller` | W | Teller: register a connection from the enrollment payload (no link-token step) |
 | POST | `/connections/csv/preview` | W | Preview a CSV (multipart or JSON+base64) — no persist |
 | POST | `/connections/csv/import` | W | Import a CSV — creates connection if absent, deduplicates by provider txn id |
+| POST | `/connections/plaid/link-token` | W | *Deprecated — use `POST /providers/plaid/link-session`.* Returns a fresh Plaid Link token |
+| POST | `/connections/plaid/exchange` | W | *Deprecated — use `POST /connections` with `provider: "plaid"`.* Exchanges Plaid `public_token` |
+| POST | `/connections/teller` | W | *Deprecated — use `POST /connections` with `provider: "teller"`.* Registers from the Teller enrollment payload |
+
+Prefer `POST /providers/{name}/link-session` + `POST /connections` for new integrations — the OpenAPI spec treats them as canonical and the per-provider routes above are kept only as shims.
 
 ## Sync
 
