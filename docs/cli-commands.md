@@ -1,10 +1,10 @@
 # CLI commands
 
-A terse catalog of every command the `breadbox` CLI exposes. The CLI drives the same surface documented in [`docs/api-endpoints.md`](api-endpoints.md) — every data command is a thin shell over the REST API, plus a handful of server-only commands (`serve`, `migrate`, `init`, `mcp-stdio`) that talk to the service layer directly because there's no server to talk to. **Keep this file in sync with the cobra command tree** — see `.claude/rules/cli-commands.md` for the upkeep rule.
+A terse catalog of every command the `breadbox` CLI exposes. The CLI drives the same surface documented in [`docs/api-endpoints.md`](api-endpoints.md) — every data command is a thin shell over the REST API, plus a handful of server-only commands (`serve`, `mcp`, `init`, `migrate`, `backup`) that talk to the service layer directly because there's no server to talk to. **Keep this file in sync with the cobra command tree** — see `.claude/rules/cli-commands.md` for the upkeep rule.
 
 ## Architecture
 
-- **One binary, multiple roles.** `breadbox` is the same binary as the server. It can run as a server (`serve`), as an MCP stdio host (`mcp-stdio`), or as a CLI that drives a local or remote breadbox over HTTP. The dashboard and CLI share one process when needed; nothing is reimplemented.
+- **One binary, multiple roles.** `breadbox` is the same binary as the server. It can run as a server (`serve`), as an MCP stdio host (`mcp`), or as a CLI that drives a local or remote breadbox over HTTP. The dashboard and CLI share one process when needed; nothing is reimplemented.
 - **Local vs remote, same commands.** `breadbox transactions list` works against `http://localhost:8080` (default), a Unix socket, or `--host my-remote-server`. The CLI never reaches into the DB *except* when bootstrapping (`init`, `migrate`, `auth bootstrap` when no server is running) — in those cases there's no API to call.
 - **Build tags.**
   - Default build: full binary (server + CLI + dashboard).
@@ -33,20 +33,17 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 
 | Command | Scope | Description |
 |---------|-------|-------------|
-| `breadbox serve [--no-dashboard]` | L | Start the HTTP server (REST + MCP + dashboard) |
-| `breadbox mcp-stdio` | L | MCP server over stdio (for Claude Desktop and CLI agents) |
-| `breadbox init` | L | First-run setup: encryption key, first login account, first API key |
-| `breadbox migrate [--down] [--to N]` | L | Run goose migrations against `DATABASE_URL` |
-| `breadbox doctor` | R | Health check; consumes `GET /api/v1/headless/bootstrap` + `/health/ready` |
-| `breadbox version` | — | Print build version, commit, and upgrade check |
-| `breadbox completion [bash\|zsh\|fish]` | — | Shell completion script |
-
-## Health / meta
+These commands operate on the local box (filesystem, DB, embedded migrations) — they do not call the REST API. They're stripped from the `-tags=lite` build.
 
 | Command | Scope | Description |
 |---------|-------|-------------|
-| `breadbox version` | — | Local + server version diff |
-| `breadbox doctor` | R | Reports what's configured / missing (B22 bootstrap report) |
+| `breadbox serve [--no-dashboard]` | L | Start the HTTP server (REST + MCP-over-HTTP + dashboard) |
+| `breadbox mcp` | L | MCP server over stdio; Claude Desktop spawns this per session, blocks until stdin closes |
+| `breadbox init` | L | First-run setup: encryption key, first login account, first API key |
+| `breadbox migrate [--down] [--to N]` | L | Run goose migrations against `DATABASE_URL` (local-only — there is no remote migration endpoint by design) |
+| `breadbox doctor` | R | Health check; consumes `GET /api/v1/headless/bootstrap` + `/health/ready` |
+| `breadbox version` | — | Print build version, commit, and upgrade check |
+| `breadbox completion [bash\|zsh\|fish]` | — | Print a shell-completion script (e.g. `breadbox completion zsh > _breadbox`) for tab-completion of nouns/verbs/flags — same pattern as `gh`, `kubectl` |
 
 ## Accounts
 
@@ -55,7 +52,10 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 | `breadbox accounts list` | R | List household bank accounts |
 | `breadbox accounts get <id>` | R | Single account summary |
 | `breadbox accounts detail <id>` | R | Detail + last 25 transactions + per-currency balances |
-| `breadbox accounts update <id> [--name] [--excluded] [--dependent-linked]` | W | Patch display name and flags |
+| `breadbox accounts update <id> [--name] [--excluded] [--dependent-linked]` | W | Patch display name, `--excluded` (hide from views), `--dependent-linked` (exclude from household totals — e.g., a kid's account you fund but don't count toward your spending) |
+| `breadbox accounts links list <id>` | R | List user-links on an account (which household members own / share it) |
+| `breadbox accounts links add <id> --user <user-id>` | W | Link an account to a household user |
+| `breadbox accounts links remove <id> <link-id>` | W | Unlink a user from an account |
 
 ## Transactions
 
@@ -65,7 +65,6 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 | `breadbox transactions get <id>` | R | Single transaction |
 | `breadbox transactions count [filters]` | R | Count matching the same filters |
 | `breadbox transactions summary [--by=category\|month\|week\|day]` | R | Aggregates |
-| `breadbox transactions merchants [filters]` | R | Merchant stats (count, total, avg) |
 | `breadbox transactions update <id> [--category] [--note] [--tags]` | W | Atomic multi-field update |
 | `breadbox transactions batch <file>` | W | Batch update from JSON (max 50 rows) |
 | `breadbox transactions categorize <id> <category>` | W | Set category (override) |
@@ -117,24 +116,17 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 | `breadbox rules apply <id>` | W | Apply retroactively to existing transactions |
 | `breadbox rules batch <file>` | W | Create / update many rules atomically |
 
-## Reviews
-
-| Command | Scope | Description |
-|---------|-------|-------------|
-| `breadbox reviews list [--status]` | R | List pending reviews |
-| `breadbox reviews get <id>` | R | Single review |
-| `breadbox reviews approve <id> [--category]` | W | Approve a review |
-| `breadbox reviews reject <id>` | W | Reject a review |
-| `breadbox reviews skip <id>` | W | Skip a review |
-
 ## Connections
+
+A **connection** is a bank-side OAuth link (Plaid item, Teller enrollment, or CSV-import bucket). Different from account-links (which live under `breadbox accounts links` and map household users to bank accounts).
 
 | Command | Scope | Description |
 |---------|-------|-------------|
 | `breadbox connections list` | R | List bank connections (active + disconnected) |
 | `breadbox connections get <id>` | R | Single connection |
-| `breadbox connections create [--provider=plaid\|teller] [--wait]` | W | Mint hosted-link, print URL; `--wait` polls until completed |
-| `breadbox connections relink <id> [--wait]` | W | Mint a relink session for an existing connection |
+| `breadbox connections link [--provider=plaid\|teller] [--user] [--wait]` | W | Mint a hosted-link session (`POST /connections/link`), print the URL agents and users can open in a browser; `--wait` polls until completed |
+| `breadbox connections link get <session-id>` | R | Check a hosted-link session's status (`active` / `completed` / `failed` / `expired`) and the resulting connection IDs |
+| `breadbox connections relink <connection-id> [--wait]` | W | Mint a relink hosted-link session for an existing (broken or pending-reauth) connection |
 | `breadbox connections disconnect <id>` | W | Mark connection disconnected (preserves history) |
 | `breadbox connections delete <id>` | W | Hard delete (accounts/transactions FK-SET-NULL) |
 
@@ -182,14 +174,6 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 | `breadbox logins update <id> [...]` | W | Update login |
 | `breadbox logins delete <id>` | W | Delete login |
 | `breadbox logins reset-password <id>` | W | Generate a one-time reset token |
-
-## Account links
-
-| Command | Scope | Description |
-|---------|-------|-------------|
-| `breadbox links list` | R | List account ↔ user links |
-| `breadbox links create --account --user` | W | Link an account to a user |
-| `breadbox links delete <id>` | W | Remove an account-user link |
 
 ## Reports
 
