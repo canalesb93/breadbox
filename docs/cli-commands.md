@@ -22,7 +22,7 @@ Scope column: **R** = readable with any API key, **W** = requires `full_access` 
 
 | Command | Scope | Description |
 |---------|-------|-------------|
-| `breadbox auth login --host URL --token KEY` | — | Add a host; `--token` paste-mode lands in Stage 1, interactive device-code in Stage 2 |
+| `breadbox auth login --host URL [--token KEY]` | — | Add a host; with `--token`, paste-mode validates and saves; without it, runs the interactive device-code flow (operator approves in a browser) |
 | `breadbox auth logout [name]` | — | Drop credentials for a host |
 | `breadbox auth status` | — | List configured hosts + which is default |
 | `breadbox auth use <name>` | — | Set the default host |

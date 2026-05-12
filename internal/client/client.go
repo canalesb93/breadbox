@@ -227,3 +227,46 @@ func (c *Client) HeadlessBootstrap(ctx context.Context) (map[string]any, error) 
 	}
 	return out, nil
 }
+
+// DeviceCodeInitResponse mirrors POST /api/v1/auth/device-code. Interval
+// and ExpiresIn are in seconds.
+type DeviceCodeInitResponse struct {
+	DeviceCode      string `json:"device_code"`
+	UserCode        string `json:"user_code"`
+	VerificationURL string `json:"verification_url"`
+	ExpiresIn       int    `json:"expires_in"`
+	Interval        int    `json:"interval"`
+}
+
+// DeviceCodePollResponse mirrors the 200 body of POST
+// /api/v1/auth/device-code/poll. Non-2xx responses are surfaced via the
+// canonical *APIError envelope (EXPIRED / DENIED / INVALID_DEVICE_CODE).
+type DeviceCodePollResponse struct {
+	Status string `json:"status"`
+	Token  string `json:"token,omitempty"`
+}
+
+// InitiateDeviceCode calls POST /api/v1/auth/device-code without auth
+// and returns the freshly-minted device + user codes. The caller polls
+// PollDeviceCode on the cadence reported in Interval.
+func (c *Client) InitiateDeviceCode(ctx context.Context) (*DeviceCodeInitResponse, error) {
+	var out DeviceCodeInitResponse
+	if err := c.Do(ctx, http.MethodPost, "/api/v1/auth/device-code", struct{}{}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// PollDeviceCode calls POST /api/v1/auth/device-code/poll. Surfaces the
+// canonical error envelope via *APIError so callers can branch on
+// EXPIRED / DENIED / INVALID_DEVICE_CODE codes without parsing strings.
+func (c *Client) PollDeviceCode(ctx context.Context, deviceCode string) (*DeviceCodePollResponse, error) {
+	body := struct {
+		DeviceCode string `json:"device_code"`
+	}{DeviceCode: deviceCode}
+	var out DeviceCodePollResponse
+	if err := c.Do(ctx, http.MethodPost, "/api/v1/auth/device-code/poll", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

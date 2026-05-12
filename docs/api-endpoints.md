@@ -14,6 +14,15 @@ All endpoints live under `/api/v1/` and require `X-API-Key` unless noted. Scope 
 | GET | `/api/v1/version` | none | Build version + upgrade check |
 | GET | `/api/v1/headless/bootstrap` | R | Setup readiness report (consumed by `breadbox doctor`) |
 
+## Auth
+
+Unauthenticated device-code dance the CLI uses to mint API keys on a remote host without a paste-mode token. The `device_code` returned by the initiate call is the credential the polling endpoint accepts; the `user_code` is the short human-facing string the operator types on the browser approval page (`GET /auth/device`, session-gated, not on the public REST surface).
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| POST | `/auth/device-code` | none | Mint a pending device-code pair; returns `device_code`, `user_code`, `verification_url`, `expires_in`, `interval` |
+| POST | `/auth/device-code/poll` | none | Poll status; `200 {status: "authorization_pending"}` or `200 {status: "approved", token: "bb_..."}`, with `400 EXPIRED` / `400 DENIED` / `404 INVALID_DEVICE_CODE` envelopes for terminal states |
+
 ## Accounts
 
 | Method | Path | Scope | Description |

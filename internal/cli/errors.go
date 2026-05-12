@@ -54,6 +54,16 @@ func MapExitCode(err error) int {
 	if errors.Is(err, config.ErrNoHosts) || errors.Is(err, config.ErrHostNotFound) {
 		return ExitAuth
 	}
+	// Device-code terminal states. Denied is an auth failure (operator
+	// refused); expired is an upstream/timing problem.
+	var denied *deviceCodeDeniedError
+	if errors.As(err, &denied) {
+		return ExitAuth
+	}
+	var expired *deviceCodeExpiredError
+	if errors.As(err, &expired) {
+		return ExitUpstream
+	}
 	var apiErr *client.APIError
 	if errors.As(err, &apiErr) {
 		switch {

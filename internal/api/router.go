@@ -43,6 +43,16 @@ func NewRouter(a *app.App, version string) http.Handler {
 		RequestsPerMinute: a.Config.APIRateLimitRPM,
 		Burst:             a.Config.APIRateLimitBurst,
 	})
+
+	// Device-code auth — unauthenticated; the device_code is itself the
+	// credential the CLI carries while it waits for a browser approval.
+	// Mounted outside the /api/v1 Route block so APIKeyAuth doesn't
+	// intercept the unauthenticated polling loop. Surfaced in
+	// openapi.yaml; the drift test's healthVersionRoutes allowlist keeps
+	// it in sync.
+	r.Post("/api/v1/auth/device-code", CreateDeviceCodeHandler(svc))
+	r.Post("/api/v1/auth/device-code/poll", PollDeviceCodeHandler(svc))
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// Auth runs first so the rate limiter can identify by API key ID.
 		// /health/* and /api/v1/version are mounted outside this Route block
