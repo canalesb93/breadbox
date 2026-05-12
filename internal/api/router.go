@@ -68,6 +68,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}", GetConnectionHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
+		r.Get("/connections/link/{id}", GetHostedLinkSessionHandler(svc))
 		r.Get("/sync/logs", ListSyncLogsHandler(svc))
 		r.Get("/sync/logs/{id}", GetSyncLogHandler(svc))
 		r.Get("/sync/health", SyncHealthHandler(svc))
@@ -159,6 +160,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/users/{user_id}/login/{login_id}/regenerate-token", RegenerateLoginTokenHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
+			r.Post("/connections/link", CreateHostedLinkHandler(svc))
 			// Generic provider create + link-session — supersede the
 			// per-provider routes above. The old routes remain wired as
 			// deprecated shims (callers will see identical behavior).

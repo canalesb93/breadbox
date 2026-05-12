@@ -109,6 +109,8 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | POST | `/connections/{id}/reauth` | W | Start re-auth flow; returns a fresh link token |
 | POST | `/connections/{id}/reauth-complete` | W | Mark connection active again after the user finishes re-auth |
 | DELETE | `/connections/{id}` | W | Soft-disconnect (wipes encrypted tokens, transactions soft-deleted) |
+| POST | `/connections/link` | W | Mint a hosted-link URL — agent shares it, user opens in browser to run Plaid/Teller |
+| GET | `/connections/link/{id}` | R | Poll a hosted-link session — status, result connection IDs |
 | POST | `/connections/csv/preview` | W | Preview a CSV (multipart or JSON+base64) — no persist |
 | POST | `/connections/csv/import` | W | Import a CSV — creates connection if absent, deduplicates by provider txn id |
 | POST | `/connections/plaid/link-token` | W | *Deprecated — use `POST /providers/plaid/link-session`.* Returns a fresh Plaid Link token |
