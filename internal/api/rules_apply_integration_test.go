@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for POST /api/v1/rules/{id}/apply and POST
 // /api/v1/rules/apply-all — the previously-uncovered retroactive-apply

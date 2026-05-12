@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the categories noun group. Drives the real REST
 // handlers via an in-process httptest server.

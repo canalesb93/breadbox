@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 import "breadbox/internal/prompts"

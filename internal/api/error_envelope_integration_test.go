@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests covering the canonical error envelope returned by REST
 // handlers — specifically the sentinel-to-status mapping that flows through

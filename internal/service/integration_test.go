@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the service layer. Require a running PostgreSQL with breadbox_test database.
 // Run with: make test-integration

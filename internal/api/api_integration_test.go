@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for REST API handlers. Require a running PostgreSQL with breadbox_test database.
 // Run with: DATABASE_URL="postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable" go test -tags integration -count=1 -p 1 -v ./internal/api/...

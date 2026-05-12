@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 // Standalone hosted-link page (GET /link/{token}).

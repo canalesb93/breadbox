@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the user CRUD endpoints (GET /users/{id}, POST
 // /users, PATCH /users/{id}, DELETE /users/{id}, POST /users/{id}/wipe-data).

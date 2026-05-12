@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // LoginProps carries what the login form needs. Username is preserved on

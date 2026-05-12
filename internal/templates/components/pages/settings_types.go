@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // SettingsProps mirrors the field set the old settings.html read off the layout

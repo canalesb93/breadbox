@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // This test pins the api_keys actor_type / actor_name columns introduced
 // in PR-03 of the CLI/headless sprint. The columns + CHECK constraint

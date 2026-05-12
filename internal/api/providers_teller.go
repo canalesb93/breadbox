@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 // Teller entry in the generic provider dispatch table. Mirrors the legacy

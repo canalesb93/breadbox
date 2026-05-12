@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the Teller setup REST endpoint
 // (POST /api/v1/connections/teller).

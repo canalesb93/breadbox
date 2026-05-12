@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 // Package components hosts templ-generated admin UI components.
 //
 // Helpers here mirror the admin funcMap (internal/admin/templates.go) so a

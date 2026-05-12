@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 // Plaid entry in the generic provider dispatch table. The JSON-credentials

@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the TSV import/export endpoints:
 //   - GET  /api/v1/categories/export

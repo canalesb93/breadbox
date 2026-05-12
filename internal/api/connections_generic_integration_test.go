@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the generic POST /api/v1/connections endpoint plus
 // the backward-compat shims (POST /connections/plaid/exchange,

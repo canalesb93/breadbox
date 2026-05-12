@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the Plaid link-flow REST endpoints
 // (POST /api/v1/connections/plaid/link-token,

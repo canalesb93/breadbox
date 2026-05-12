@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Drift test: assert openapi.yaml and the live chi router agree on the
 // /api/v1/* surface. Run with:

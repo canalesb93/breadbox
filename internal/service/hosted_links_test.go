@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration coverage for service.HostedLink* methods. Locks the lifecycle
 // contract that PR2 (REST handlers) and PR3 (bearer middleware + page) will

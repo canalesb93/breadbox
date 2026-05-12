@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 // Page-internal endpoints behind the bearer middleware that powers the

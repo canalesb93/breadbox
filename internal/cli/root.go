@@ -155,14 +155,9 @@ func NewRootCmd(version string) *cobra.Command {
 	root.PersistentFlags().BoolVar(&flags.Quiet, "quiet", false, "suppress non-essential stderr output")
 	root.PersistentFlags().BoolVar(&flags.Debug, "debug", false, "verbose stderr logging")
 
+	// R/W-scope commands — all use the HTTP client. These are always
+	// registered, regardless of build tag.
 	AddAuthCmd(root)
-	AddServeCmd(root)
-	AddMigrateCmd(root)
-	AddSeedCmd(root)
-	AddMCPCmd(root)
-	AddCreateAdminCmd(root)
-	AddResetPasswordCmd(root)
-	AddInitCmd(root)
 	AddDoctorCmd(root)
 	AddAccountsCmd(root)
 	AddTransactionsCmd(root)
@@ -171,7 +166,6 @@ func NewRootCmd(version string) *cobra.Command {
 	AddKeysCmd(root)
 	AddProvidersCmd(root)
 	AddConfigCmd(root)
-	AddBackupCmd(root)
 	AddWebhooksCmd(root)
 	AddCategoriesCmd(root)
 	AddTagsCmd(root)
@@ -181,6 +175,12 @@ func NewRootCmd(version string) *cobra.Command {
 	AddSyncCmd(root)
 	AddCSVCmd(root)
 	AddVersionCmd(root, version)
+
+	// L-scope commands (serve, migrate, mcp-stdio, seed, create-admin,
+	// reset-password, init, backup) only register under non-lite builds —
+	// they need internal/db, internal/service, etc. which are stripped
+	// from CLI-only binaries.
+	registerServerCommands(root)
 
 	return root
 }

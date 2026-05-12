@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the generic provider registry endpoints
 // (GET /api/v1/providers, GET /api/v1/providers/{name},

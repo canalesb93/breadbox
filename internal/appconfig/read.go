@@ -1,3 +1,5 @@
+//go:build !lite
+
 // Package appconfig provides typed read helpers for the app_config DB table.
 //
 // The service, admin, sync, and command layers all need to read individual

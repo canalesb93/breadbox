@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // MyAccountProps mirrors the data map the old my_account.html read. The
