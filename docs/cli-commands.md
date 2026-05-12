@@ -54,9 +54,9 @@ These commands operate on the local box (filesystem, DB, embedded migrations) â€
 | `breadbox accounts get <id>` | R | Single account summary |
 | `breadbox accounts detail <id>` | R | Detail + last 25 transactions + per-currency balances |
 | `breadbox accounts update <id> [--name] [--excluded] [--dependent-linked]` | W | Patch display name, `--excluded` (hide from views), `--dependent-linked` (exclude from household totals â€” e.g., a kid's account you fund but don't count toward your spending) |
-| `breadbox accounts links list <id>` | R | List user-links on an account (which household members own / share it) |
-| `breadbox accounts links add <id> --user <user-id>` | W | Link an account to a household user |
-| `breadbox accounts links remove <id> <link-id>` | W | Unlink a user from an account |
+| `breadbox accounts links list <id>` | R | List account-link reconciliation rows where this account is primary or dependent |
+| `breadbox accounts links add <primary-id> --dependent <id>` | W | Link a dependent account to a primary for reconciliation (`--strategy`, `--tolerance-days`) |
+| `breadbox accounts links remove <link-id>` | W | Delete an account-link row |
 
 ## Transactions
 
@@ -70,7 +70,7 @@ These commands operate on the local box (filesystem, DB, embedded migrations) â€
 | `breadbox transactions batch <file>` | W | Batch update from JSON (max 50 rows) |
 | `breadbox transactions categorize <id> <category>` | W | Set category (override) |
 | `breadbox transactions uncategorize <id>` | W | Reset to provider default |
-| `breadbox transactions recategorize --filter --category` | W | Server-side recategorize by filter |
+| `breadbox transactions recategorize --target-category <slug> [filters]` | W | Server-side recategorize: every row matching the filters becomes `--target-category` |
 | `breadbox transactions delete <id>` | W | Soft-delete |
 | `breadbox transactions restore <id>` | W | Restore a soft-deleted transaction |
 | `breadbox transactions tag <id> <slug>` | W | Attach a tag |
