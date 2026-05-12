@@ -178,6 +178,24 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Handle("/mcp/*", mcpHandler)
 	})
 
+	// Hosted-link page surface — see internal/api/hosted_link_page.go.
+	//
+	// GET /link/{token}      → standalone HTML page (no auth)
+	// /_link/{token}/*       → page-internal JSON endpoints (bearer-gated)
+	//
+	// These are NOT under /api/v1 — they're a separate surface, intentionally
+	// not modeled in openapi.yaml. The drift test scopes itself to /api/v1/*
+	// and ignores everything mounted at the root (these, /webhooks, /mcp).
+	r.Get("/link/{token}", HostedLinkPageHandler())
+	r.Route("/_link/{token}", func(r chi.Router) {
+		r.Use(mw.HostedLinkBearer(svc))
+		r.Get("/session", GetHostedLinkPageSessionHandler(svc))
+		r.Post("/providers/{name}/start", HostedLinkPageStartHandler(a))
+		r.Post("/connections", HostedLinkPageConnectionHandler(a))
+		r.Post("/complete", HostedLinkPageCompleteHandler(svc))
+		r.Post("/fail", HostedLinkPageFailHandler(svc))
+	})
+
 	// Webhook handler — no auth (verified via JWT in provider).
 	r.Post("/webhooks/{provider}", webhook.NewHandler(a.Providers, a.SyncEngine, a.Queries, a.Logger))
 

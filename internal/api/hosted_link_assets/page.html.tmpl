@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect a bank — Breadbox</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f4f4f5;
+    color: #18181b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 10px 30px rgba(0,0,0,0.06);
+    padding: 32px;
+  }
+  .label { font-size: 12px; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  h1 { font-size: 20px; margin: 0 0 8px; font-weight: 600; }
+  p.lede { color: #52525b; font-size: 14px; line-height: 1.5; margin: 0 0 24px; }
+  .picker { display: flex; flex-direction: column; gap: 8px; }
+  button {
+    appearance: none;
+    border: 1px solid #e4e4e7;
+    background: #fff;
+    color: #18181b;
+    font: inherit;
+    font-weight: 500;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.1s, border-color 0.1s;
+  }
+  button:hover { background: #f4f4f5; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary {
+    background: #18181b;
+    border-color: #18181b;
+    color: #fff;
+  }
+  button.primary:hover { background: #27272a; }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid #e4e4e7;
+    border-top-color: #18181b;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .center { text-align: center; }
+  .error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+  }
+  .result-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+  }
+  .result-list li {
+    background: #f4f4f5;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .button-row { display: flex; flex-direction: column; gap: 8px; }
+  .small { font-size: 12px; color: #71717a; margin-top: 12px; text-align: center; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body data-hosted-link="page">
+<main class="card" id="card">
+  <!-- State: welcome -->
+  <section id="state-welcome" class="hidden">
+    <div class="label" id="welcome-label">Breadbox</div>
+    <h1>Connect your bank</h1>
+    <p class="lede" id="welcome-lede">Pick how you'd like to connect. You'll be handed off to your bank for authentication.</p>
+    <div class="picker" id="provider-picker"></div>
+  </section>
+
+  <!-- State: loading -->
+  <section id="state-loading" class="hidden center">
+    <div class="spinner"></div>
+    <p id="loading-text">Connecting…</p>
+  </section>
+
+  <!-- State: result -->
+  <section id="state-result" class="hidden">
+    <h1>Linked!</h1>
+    <p class="lede">Your bank is connected. We're syncing transactions now.</p>
+    <ul class="result-list" id="result-list"></ul>
+    <div class="button-row">
+      <button id="btn-another" class="hidden">Connect another bank</button>
+      <button id="btn-done" class="primary">I'm done</button>
+    </div>
+  </section>
+
+  <!-- State: error -->
+  <section id="state-error" class="hidden">
+    <div class="error" id="error-message">Something went wrong.</div>
+    <div class="button-row">
+      <button id="btn-retry" class="primary">Try again</button>
+    </div>
+  </section>
+
+  <!-- State: closed (post-complete with no redirect) -->
+  <section id="state-closed" class="hidden center">
+    <h1>All set</h1>
+    <p class="lede">You can close this window.</p>
+  </section>
+</main>
+
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+(function () {
+  // Token is in the URL path; pulling it server-side and rendering it into
+  // HTML would leak it into screenshots and browser history. The browser
+  // already has it — just read it back out.
+  var parts = window.location.pathname.split('/');
+  var token = parts[2] || '';
+  var base = '/_link/' + encodeURIComponent(token);
+
+  var states = ['welcome', 'loading', 'result', 'error', 'closed'];
+  function show(name) {
+    states.forEach(function (s) {
+      var el = document.getElementById('state-' + s);
+      if (el) el.classList.toggle('hidden', s !== name);
+    });
+  }
+
+  function showError(msg) {
+    document.getElementById('error-message').textContent = msg || 'Something went wrong.';
+    show('error');
+  }
+
+  function setLoading(text) {
+    document.getElementById('loading-text').textContent = text || 'Connecting…';
+    show('loading');
+  }
+
+  function api(method, path, body) {
+    var opts = { method: method, headers: {} };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(base + path, opts).then(function (resp) {
+      if (resp.status === 204) return null;
+      return resp.json().then(function (data) {
+        if (!resp.ok) {
+          var msg = (data && data.error && data.error.message) || 'Request failed';
+          var err = new Error(msg);
+          err.code = data && data.error && data.error.code;
+          err.status = resp.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  var sessionData = null;
+  var resultIds = [];
+
+  function renderWelcome() {
+    if (sessionData.label) {
+      document.getElementById('welcome-label').textContent = sessionData.label;
+    }
+    var picker = document.getElementById('provider-picker');
+    picker.innerHTML = '';
+    var pinned = sessionData.provider;
+    var options = pinned ? [pinned] : ['plaid', 'teller'];
+    options.forEach(function (name) {
+      var btn = document.createElement('button');
+      btn.className = 'primary';
+      if (name === 'plaid') {
+        btn.textContent = 'Connect with Plaid';
+        btn.addEventListener('click', startPlaid);
+      } else if (name === 'teller') {
+        btn.textContent = 'Connect with Teller';
+        btn.disabled = true;
+        btn.title = 'Teller hosted-link flow ships in Phase 2';
+        var note = document.createElement('p');
+        note.className = 'small';
+        note.textContent = 'Teller hosted-link flow ships in Phase 2 — please use the admin UI for now.';
+        picker.appendChild(btn);
+        picker.appendChild(note);
+        return;
+      }
+      picker.appendChild(btn);
+    });
+    show('welcome');
+  }
+
+  function startPlaid() {
+    setLoading('Opening Plaid…');
+    api('POST', '/providers/plaid/start', {}).then(function (data) {
+      if (!data || !data.link_token) {
+        showError('Plaid did not return a link token.');
+        return;
+      }
+      if (typeof Plaid === 'undefined' || !Plaid.create) {
+        showError('Plaid Link failed to load.');
+        return;
+      }
+      var handler = Plaid.create({
+        token: data.link_token,
+        onSuccess: function (public_token, metadata) {
+          setLoading('Saving your connection…');
+          api('POST', '/connections', {
+            provider: 'plaid',
+            credentials: {
+              public_token: public_token,
+              institution_id: (metadata && metadata.institution && metadata.institution.institution_id) || '',
+              institution_name: (metadata && metadata.institution && metadata.institution.name) || '',
+              accounts: (metadata && metadata.accounts) || []
+            }
+          }).then(function (conn) {
+            if (conn && conn.connection_id) {
+              resultIds.push(conn);
+            }
+            renderResult();
+          }).catch(function (err) {
+            showError(err.message || 'Failed to save your connection.');
+          });
+        },
+        onExit: function (err) {
+          if (err) {
+            api('POST', '/fail', {
+              code: err.error_code || 'PLAID_EXIT',
+              message: err.display_message || err.error_message || 'Plaid Link exited with an error.'
+            }).catch(function () {});
+            showError(err.display_message || err.error_message || 'Plaid Link exited.');
+          } else {
+            // Clean cancel — bounce back to welcome.
+            show('welcome');
+          }
+        }
+      });
+      handler.open();
+    }).catch(function (err) {
+      showError(err.message || 'Failed to start Plaid.');
+    });
+  }
+
+  function renderResult() {
+    var list = document.getElementById('result-list');
+    list.innerHTML = '';
+    resultIds.forEach(function (conn) {
+      var li = document.createElement('li');
+      li.textContent = (conn.institution_name || 'Connection') + ' — ' + conn.connection_id;
+      list.appendChild(li);
+    });
+    var another = document.getElementById('btn-another');
+    another.classList.toggle('hidden', !!sessionData.single_use);
+    show('result');
+  }
+
+  document.getElementById('btn-another').addEventListener('click', function () {
+    show('welcome');
+  });
+  document.getElementById('btn-done').addEventListener('click', function () {
+    setLoading('Wrapping up…');
+    api('POST', '/complete', {}).then(function () {
+      if (sessionData.redirect_url) {
+        window.location.href = sessionData.redirect_url;
+      } else {
+        show('closed');
+      }
+    }).catch(function (err) {
+      // Even on a complete failure, surface the closed state — the page
+      // is done from the user's POV. Log to console for debugging.
+      console.error('complete failed', err);
+      if (sessionData.redirect_url) {
+        window.location.href = sessionData.redirect_url;
+      } else {
+        show('closed');
+      }
+    });
+  });
+  document.getElementById('btn-retry').addEventListener('click', function () {
+    renderWelcome();
+  });
+
+  // Boot: load the session, then render welcome.
+  setLoading('Loading…');
+  api('GET', '/session').then(function (data) {
+    sessionData = data;
+    renderWelcome();
+  }).catch(function (err) {
+    if (err.code === 'CONSUMED') {
+      show('closed');
+    } else if (err.code === 'EXPIRED' || err.code === 'GONE') {
+      showError('This link is no longer valid.');
+    } else {
+      showError(err.message || 'Failed to load this link.');
+    }
+  });
+})();
+</script>
+</body>
+</html>
