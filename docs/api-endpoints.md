@@ -103,6 +103,8 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | GET | `/providers` | R | List installed providers (`{name, configured, needs_link_session}`) |
 | GET | `/providers/{name}` | R | Single provider entry — capability flags for one provider |
 | POST | `/providers/{name}/link-session` | W | Start a link/auth session — returns a provider token when needed; `204` when no link step |
+| POST | `/providers/{name}/test` | W | Round-trip a credentials check; returns `{ok, message}` |
+| DELETE | `/providers/{name}` | W | Disable a provider — clears credentials from `app_config`, drops the live provider entry |
 | POST | `/connections` | W | Create from a provider payload (`provider` discriminator: `plaid`, `teller`) |
 | POST | `/connections/{id}/sync` | W | Trigger sync for one connection (202; runs async) |
 | POST | `/connections/{id}/paused` | W | Pause or resume scheduled syncs |
@@ -221,6 +223,24 @@ The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIR
 | PUT | `/settings/providers/teller` | W | Set/update Teller `application_id`, cert + private key PEM |
 
 Empty sensitive fields on PUT preserve the stored value (so you can update `webhook_url` without retyping the secret). All sensitive fields are AES-256-GCM encrypted at rest.
+
+## App config
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/config` | W | List every app_config row with effective source (`env` / `db` / `default`); secret values are masked unless `?reveal=true` |
+| GET | `/config/{key}` | W | Get a single config value; same masking and `?reveal=true` semantics |
+| PUT | `/config/{key}` | W | Write a value into the app_config table (body: `{"value":"..."}`) |
+| DELETE | `/config/{key}` | W | Drop the row (effective value falls back to env or compile-in default) |
+
+Secret-flagged keys are masked on read. A denylist of keys (`ENCRYPTION_KEY`, `teller_cert_pem`, `teller_key_pem`) may never be revealed and refuse writes via this surface — manage them through env vars or the admin UI.
+
+## Webhook events
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/webhook-events` | W | Paginated list of recent webhook events; filters `provider`, `status`, `page`, `limit` |
+| POST | `/webhook-events/{id}/replay` | W | Re-trigger the manual sync the event would have caused; events without a connection are reported as `triggered: false` |
 
 ## Rate limiting
 
