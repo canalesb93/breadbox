@@ -279,6 +279,38 @@ and chose a password — there's nothing to regenerate at that point.
 
 ## Connections
 
+### Provider registry (preferred)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/providers` | Read | List configured providers with capabilities + credential schema |
+| GET | `/providers/{name}` | Read | Single provider entry (same shape as one entry in the list) |
+| POST | `/providers/{name}/link-session` | Write | Start the hosted-UI session for `name`. Returns `{link_token, expiration}` for providers that need one; `204 No Content` for Teller/CSV. |
+| POST | `/connections` | Write | Create a connection. Body has a `provider` discriminator + `credentials` blob whose shape depends on `provider`. Also accepts `multipart/form-data` when `provider=csv`. |
+
+`POST /connections` body:
+
+```json
+{
+  "provider": "plaid",
+  "user_id": "<uuid-or-short-id>",
+  "credentials": { "public_token": "...", "institution_id": "...", "institution_name": "..." }
+}
+```
+
+`GET /providers` returns a bare JSON array with `name`, `configured`, `needs_link_session`, `capabilities`, and `credentials_schema`. Unconfigured providers still appear with `configured: false` so clients can render a "set me up" CTA without guessing. Discover supported providers and credential shapes programmatically rather than hardcoding the list.
+
+Errors on `POST /connections`:
+
+| Status | Code | When |
+|--------|------|------|
+| 400 | `INVALID_PARAMETER` | missing required credential per the provider schema |
+| 404 | `NOT_FOUND` | unknown provider name, unknown user |
+| 502 | `PROVIDER_ERROR` | exchange failed at the upstream provider |
+| 500 | `INTERNAL_ERROR` | unexpected server failure |
+
+### Other connection endpoints
+
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/connections` | Read | List all bank connections |
@@ -290,11 +322,11 @@ and chose a password — there's nothing to regenerate at that point.
 | DELETE | `/connections/{id}` | Write | Soft-disconnect a connection (clears tokens, hides from list) |
 | POST | `/connections/{id}/reauth` | Write | Start the provider re-auth flow — returns a fresh link token |
 | POST | `/connections/{id}/reauth-complete` | Write | Mark connection active again after the user finishes the re-auth flow |
-| POST | `/connections/plaid/link-token` | Write | Start a new Plaid Link flow — returns a fresh link token |
-| POST | `/connections/plaid/exchange` | Write | Exchange the Plaid public token for a stored connection + accounts |
-| POST | `/connections/teller` | Write | Register a Teller connection from the enrollment payload Teller Connect returns |
+| POST | `/connections/plaid/link-token` | Write | _Deprecated — use `POST /providers/plaid/link-session`._ |
+| POST | `/connections/plaid/exchange` | Write | _Deprecated — use `POST /connections` with `provider:"plaid"`._ |
+| POST | `/connections/teller` | Write | _Deprecated — use `POST /connections` with `provider:"teller"`._ |
 | POST | `/connections/csv/preview` | Write | Parse a CSV upload and return inferred columns + the first N rows. No persistence. |
-| POST | `/connections/csv/import` | Write | Import a CSV. Creates a new connection if `connection_id` is omitted, otherwise appends to the existing one. |
+| POST | `/connections/csv/import` | Write | _Deprecated — use `POST /connections` with `provider:"csv"`._ |
 
 `{id}` accepts either the connection's UUID or 8-char short_id.
 
