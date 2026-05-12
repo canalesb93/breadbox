@@ -137,6 +137,73 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VersionResponse" }
 
+  /api/v1/auth/device-code:
+    post:
+      tags: [Auth]
+      summary: Initiate the device-code flow
+      description: |
+        Mint a pending device-code pair. Unauthenticated — the device_code
+        returned in the body is itself the credential the CLI uses to poll.
+        The user_code is the human-facing 8-char approval code (formatted
+        XXXX-XXXX) the operator enters on the verification page.
+      security: []
+      responses:
+        "201":
+          description: Pending device-code created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [device_code, user_code, verification_url, expires_in, interval]
+                properties:
+                  device_code: { type: string, description: Opaque polling credential carried by the CLI }
+                  user_code: { type: string, description: 8-char human-facing code formatted XXXX-XXXX }
+                  verification_url: { type: string, description: URL the operator opens to approve }
+                  expires_in: { type: integer, description: TTL in seconds (10 minutes by default) }
+                  interval: { type: integer, description: Suggested polling cadence in seconds }
+
+  /api/v1/auth/device-code/poll:
+    post:
+      tags: [Auth]
+      summary: Poll the status of a pending device code
+      description: |
+        Unauthenticated; the device_code is the credential. Returns one of:
+        - `200 {status: "authorization_pending"}` — keep polling
+        - `200 {status: "approved", token: "bb_..."}` — token returned exactly once
+        - `400 {error: {code: "EXPIRED"}}` — past the TTL
+        - `400 {error: {code: "DENIED"}}` — operator refused
+        - `404 {error: {code: "INVALID_DEVICE_CODE"}}` — unknown code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_code]
+              properties:
+                device_code: { type: string }
+      responses:
+        "200":
+          description: Polling outcome.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [authorization_pending, approved] }
+                  token: { type: string, description: Plaintext API key — returned exactly once on the first approved poll }
+        "400":
+          description: Terminal failure (EXPIRED or DENIED).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "404":
+          description: Unknown device_code.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
   /api/v1/headless/bootstrap:
     get:
       tags: [Health]

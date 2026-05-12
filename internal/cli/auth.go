@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"breadbox/internal/cli/config"
 	"breadbox/internal/cli/output"
@@ -114,22 +115,26 @@ func runAuthBootstrap(ctx context.Context, version, baseURL string) error {
 	return nil
 }
 
-// newAuthLoginCmd: paste-mode `--token` is fully supported in this PR;
-// interactive device-code is a Stage-2 deliverable and surfaces a friendly
-// error here so users know what to expect.
+// newAuthLoginCmd wires `breadbox auth login`. Two modes:
+//
+//   - `--token` paste flow (no browser round-trip; ideal for headless
+//     pipelines that already have a key handy).
+//   - Interactive device-code flow (default when --token is omitted) —
+//     the CLI calls /api/v1/auth/device-code and polls for approval
+//     while the operator visits the verification_url in a browser.
 func newAuthLoginCmd() *cobra.Command {
 	var token string
 	var hostURL string
 	var name string
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Add a host to hosts.toml; --token for paste mode (device-code: Stage 2)",
+		Short: "Add a host to hosts.toml; paste a token with --token or run the device-code flow interactively",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAuthLogin(cmd.Context(), Flags(cmd).Version, hostURL, token, name)
 		},
 	}
 	cmd.Flags().StringVar(&hostURL, "host", "", "base URL of the breadbox instance")
-	cmd.Flags().StringVar(&token, "token", "", "API key (bb_...) to paste; without it, device-code is planned for Stage 2")
+	cmd.Flags().StringVar(&token, "token", "", "API key (bb_...) to paste; without it, the device-code flow runs interactively")
 	cmd.Flags().StringVar(&name, "name", "", "name to store the host under (defaults to the URL hostname)")
 	return cmd
 }
@@ -138,14 +143,23 @@ func runAuthLogin(ctx context.Context, version, hostURL, token, name string) err
 	if hostURL == "" {
 		return UsageErrorf("--host is required")
 	}
-	if token == "" {
-		fmt.Fprintln(os.Stderr, "interactive device-code login lands in Stage 2; use `breadbox auth login --host=URL --token=KEY` for now")
-		return UsageErrorf("--token is required (device-code: Stage 2)")
-	}
 
 	if name == "" {
 		name = deriveHostName(hostURL)
 	}
+
+	if token == "" {
+		// Device-code flow — open a session against the host without a
+		// token, walk the polling loop, then drop the resulting bb_...
+		// into hosts.toml just like the paste mode would.
+		c := client.New(config.Host{BaseURL: hostURL}, version)
+		minted, err := runDeviceCodeFlow(ctx, c)
+		if err != nil {
+			return err
+		}
+		token = minted
+	}
+
 	host := config.Host{BaseURL: hostURL, Token: token}
 
 	// Validate the token before saving by hitting /version.
@@ -169,6 +183,84 @@ func runAuthLogin(ctx context.Context, version, hostURL, token, name string) err
 		fmt.Println("set as default host.")
 	}
 	return nil
+}
+
+// deviceCodePollIntervalOverride lets tests collapse the polling sleep
+// to a tiny value without having to fiddle with the server-reported
+// `interval`. Production code path never sets this — the CLI always
+// honors the server's advertised interval (with a 2s floor).
+var deviceCodePollIntervalOverride time.Duration
+
+// runDeviceCodeFlow drives the device-code dance against the configured
+// host. On a successful approval it returns the plaintext bb_... token;
+// on any other terminal status (expired, denied) it returns a typed
+// error the caller maps to the right exit code.
+func runDeviceCodeFlow(ctx context.Context, c *client.Client) (string, error) {
+	init, err := c.InitiateDeviceCode(ctx)
+	if err != nil {
+		return "", fmt.Errorf("initiate device-code: %w", err)
+	}
+
+	// Everything except the final token write happens on stderr so
+	// stdout stays free for a future `--json`-style mode and CI logs
+	// don't interleave the polling dots with the saved-host receipt.
+	fmt.Fprintf(os.Stderr, "Visit %s\n", init.VerificationURL)
+	fmt.Fprintf(os.Stderr, "Enter code: %s\n\n", init.UserCode)
+	fmt.Fprint(os.Stderr, "Waiting")
+
+	interval := time.Duration(init.Interval) * time.Second
+	if interval <= 0 {
+		interval = 2 * time.Second
+	}
+	if deviceCodePollIntervalOverride > 0 {
+		interval = deviceCodePollIntervalOverride
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Fprintln(os.Stderr)
+			return "", ctx.Err()
+		case <-time.After(interval):
+		}
+		res, err := c.PollDeviceCode(ctx, init.DeviceCode)
+		if err != nil {
+			fmt.Fprintln(os.Stderr)
+			var apiErr *client.APIError
+			if errors.As(err, &apiErr) {
+				switch apiErr.Code {
+				case "EXPIRED":
+					return "", &deviceCodeExpiredError{}
+				case "DENIED":
+					return "", &deviceCodeDeniedError{}
+				}
+			}
+			return "", fmt.Errorf("poll device-code: %w", err)
+		}
+		if res.Status == "approved" {
+			fmt.Fprintln(os.Stderr, " ok")
+			fmt.Fprintln(os.Stderr, "auth login: device approved on the server")
+			return res.Token, nil
+		}
+		// pending — pulse the dot and keep going.
+		fmt.Fprint(os.Stderr, ".")
+	}
+}
+
+// deviceCodeExpiredError maps to exit code 4 (upstream) so agents can
+// distinguish "user denied" from "user took too long".
+type deviceCodeExpiredError struct{}
+
+func (*deviceCodeExpiredError) Error() string {
+	return "device code expired before approval; re-run `breadbox auth login --host=...`"
+}
+
+// deviceCodeDeniedError maps to exit code 3 (auth) — the operator
+// actively refused this CLI invocation.
+type deviceCodeDeniedError struct{}
+
+func (*deviceCodeDeniedError) Error() string {
+	return "device code denied by the operator"
 }
 
 // deriveHostName turns a URL into a stable short name. Falls back to the
