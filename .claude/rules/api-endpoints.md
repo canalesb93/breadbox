@@ -1,3 +1,10 @@
+---
+paths:
+  - "internal/api/router.go"
+  - "docs/api-endpoints.md"
+  - "openapi.yaml"
+---
+
 # API endpoint catalog upkeep
 
 `docs/api-endpoints.md` is the terse human-readable index of every REST endpoint Breadbox exposes. It pairs with the canonical `openapi.yaml` (machine-readable, drift-tested) and `docs/api-reference.md` (long-form prose).
