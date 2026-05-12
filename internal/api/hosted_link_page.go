@@ -199,6 +199,50 @@ func HostedLinkPageStartHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
+// hostedLinkTellerConfigResponse is the redacted Teller config the page
+// needs to bootstrap the Teller Connect SDK. Cert/key material is
+// deliberately omitted — only the public-facing application id and
+// environment (sandbox / development / production) are surfaced. The
+// bearer token in the URL gates access.
+type hostedLinkTellerConfigResponse struct {
+	ApplicationID string `json:"application_id"`
+	Environment   string `json:"environment"`
+}
+
+// HostedLinkPageTellerConfigHandler serves
+// GET /_link/{token}/providers/teller/config.
+//
+// Returns just the public Teller Connect bootstrap values
+// (application_id + environment). Cert/key PEMs are never exposed on this
+// surface; they live server-side and the Teller exchange happens after the
+// page POSTs the enrollment access_token to /connections.
+//
+// Scope-pinned the same way HostedLinkPageStartHandler is: a session
+// pinned to a non-teller provider returns 403 FORBIDDEN.
+func HostedLinkPageTellerConfigHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := mw.HostedLinkToken(r)
+		if !ok {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Hosted-link session missing on context")
+			return
+		}
+		// Scope-pin: if the session declared a provider at mint time, only
+		// teller-pinned (or open-picker) sessions may read teller config.
+		if sess.Provider != "" && sess.Provider != "teller" {
+			mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "Provider does not match the hosted-link session")
+			return
+		}
+		if a.Config == nil || a.Config.TellerAppID == "" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "Teller is not configured on this server")
+			return
+		}
+		writeJSON(w, http.StatusOK, hostedLinkTellerConfigResponse{
+			ApplicationID: a.Config.TellerAppID,
+			Environment:   a.Config.TellerEnv,
+		})
+	}
+}
+
 // HostedLinkPageReauthCompleteHandler serves
 // POST /_link/{token}/reauth-complete.
 //

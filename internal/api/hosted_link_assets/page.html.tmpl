@@ -93,6 +93,7 @@
     <h1>Connect your bank</h1>
     <p class="lede" id="welcome-lede">Pick how you'd like to connect. You'll be handed off to your bank for authentication.</p>
     <div class="picker" id="provider-picker"></div>
+    <p class="small" id="welcome-tally"></p>
   </section>
 
   <!-- State: loading -->
@@ -128,6 +129,7 @@
 </main>
 
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script src="https://cdn.teller.io/connect/connect.js"></script>
 <script>
 (function () {
   // Token is in the URL path; pulling it server-side and rendering it into
@@ -178,6 +180,33 @@
 
   var sessionData = null;
   var resultIds = [];
+  // Running tally of institutions linked in this session. Survives the
+  // welcome → loading → result → welcome loop because we keep it in
+  // closure scope. Each entry: { name, when } where when is a Date.
+  var linkedInstitutions = [];
+
+  // Validate that a redirect_url is http:// or https:// before navigating.
+  // Defence in depth — the server already validates at mint time, but a
+  // malformed value shouldn't break the page or open a javascript: URL.
+  function safeRedirect(url) {
+    if (!url || typeof url !== 'string') return null;
+    try {
+      var u = new URL(url);
+      if (u.protocol === 'http:' || u.protocol === 'https:') return url;
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function leaveOrClose() {
+    var target = safeRedirect(sessionData && sessionData.redirect_url);
+    if (target) {
+      window.location.href = target;
+    } else {
+      show('closed');
+    }
+  }
 
   function isRelink() {
     return sessionData && sessionData.action === 'relink';
@@ -232,18 +261,25 @@
         btn.addEventListener('click', startPlaid);
       } else if (name === 'teller') {
         btn.textContent = 'Connect with Teller';
-        btn.disabled = true;
-        btn.title = 'Teller hosted-link flow ships in Phase 2';
-        var note = document.createElement('p');
-        note.className = 'small';
-        note.textContent = 'Teller hosted-link flow ships in Phase 2 — please use the admin UI for now.';
-        picker.appendChild(btn);
-        picker.appendChild(note);
-        return;
+        btn.addEventListener('click', startTeller);
       }
       picker.appendChild(btn);
     });
+    renderTally();
     show('welcome');
+  }
+
+  function renderTally() {
+    var tally = document.getElementById('welcome-tally');
+    if (!tally) return;
+    if (!linkedInstitutions.length) {
+      tally.textContent = '';
+      tally.classList.add('hidden');
+      return;
+    }
+    var names = linkedInstitutions.map(function (i) { return i.name; }).join(', ');
+    tally.textContent = 'Linked so far: ' + names;
+    tally.classList.remove('hidden');
   }
 
   function startPlaidRelink() {
@@ -302,7 +338,8 @@
     if (resultH1) resultH1.textContent = 'Reconnected.';
     if (resultLede) resultLede.textContent = 'Your bank is reconnected — sync will resume shortly.';
     document.getElementById('result-list').innerHTML = '';
-    // Single-use relink — never offer "Connect another".
+    // Single-use relink — never offer "Connect another". The "I'm done"
+    // CTA will honor redirect_url via leaveOrClose() if set.
     document.getElementById('btn-another').classList.add('hidden');
     show('result');
   }
@@ -358,12 +395,97 @@
     });
   }
 
+  function startTeller() {
+    setLoading('Opening Teller…');
+    // The server's /providers/teller/start is a no-op (Teller has no
+    // server-issued init token) but we still call it to confirm scope:
+    // a session pinned to plaid will 403 here before we ever boot the
+    // Teller SDK. Then we fetch the public application_id + environment
+    // from the bearer-protected config endpoint.
+    api('POST', '/providers/teller/start', {}).then(function () {
+      return api('GET', '/providers/teller/config');
+    }).then(function (cfg) {
+      if (!cfg || !cfg.application_id) {
+        showError('Teller is not configured on this server.');
+        return;
+      }
+      if (typeof TellerConnect === 'undefined' || !TellerConnect.setup) {
+        showError('Teller Connect failed to load.');
+        return;
+      }
+      var teller = TellerConnect.setup({
+        applicationId: cfg.application_id,
+        environment: cfg.environment || 'sandbox',
+        onInit: function () { /* no-op */ },
+        onSuccess: function (enrollment) {
+          setLoading('Saving your connection…');
+          // Teller's enrollment payload (per docs):
+          //   { accessToken, user: {id}, enrollment: {id, institution: {id, name}} }
+          var enr = (enrollment && enrollment.enrollment) || {};
+          var inst = (enr && enr.institution) || {};
+          api('POST', '/connections', {
+            provider: 'teller',
+            credentials: {
+              access_token: (enrollment && enrollment.accessToken) || '',
+              enrollment_id: enr.id || '',
+              institution_id: inst.id || '',
+              institution_name: inst.name || ''
+            }
+          }).then(function (conn) {
+            if (conn && conn.connection_id) {
+              resultIds.push(conn);
+            }
+            renderResult();
+          }).catch(function (err) {
+            showError(err.message || 'Failed to save your connection.');
+          });
+        },
+        onExit: function () {
+          // Teller's onExit fires on a plain cancel — no error payload.
+          // SDK-level failures come through onFailure (below).
+          show('welcome');
+        },
+        onFailure: function (failure) {
+          var code = (failure && failure.type) || 'TELLER_EXIT';
+          var msg = (failure && failure.message) || 'Teller Connect exited with an error.';
+          api('POST', '/fail', { code: code, message: msg }).catch(function () {});
+          showError(msg);
+        }
+      });
+      teller.open();
+    }).catch(function (err) {
+      showError(err.message || 'Failed to start Teller.');
+    });
+  }
+
   function renderResult() {
+    // Materialize the most recent connection into the running tally so
+    // that bouncing back through "Connect another bank" shows it on the
+    // welcome card. resultIds is the cumulative list; linkedInstitutions
+    // mirrors it but is the display-friendly view.
+    while (linkedInstitutions.length < resultIds.length) {
+      var conn = resultIds[linkedInstitutions.length];
+      linkedInstitutions.push({
+        name: (conn && conn.institution_name) || 'Connection',
+        when: new Date()
+      });
+    }
     var list = document.getElementById('result-list');
     list.innerHTML = '';
-    resultIds.forEach(function (conn) {
+    linkedInstitutions.forEach(function (entry) {
       var li = document.createElement('li');
-      li.textContent = (conn.institution_name || 'Connection') + ' — ' + conn.connection_id;
+      var name = document.createElement('div');
+      name.textContent = entry.name;
+      var stamp = document.createElement('div');
+      stamp.className = 'small';
+      stamp.style.marginTop = '2px';
+      try {
+        stamp.textContent = entry.when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      } catch (e) {
+        stamp.textContent = '';
+      }
+      li.appendChild(name);
+      li.appendChild(stamp);
       list.appendChild(li);
     });
     var another = document.getElementById('btn-another');
@@ -378,29 +500,17 @@
     // Relink sessions are already terminal — /reauth-complete burned the
     // token. Skip the /complete call so we don't 410 on ourselves.
     if (isRelink()) {
-      if (sessionData.redirect_url) {
-        window.location.href = sessionData.redirect_url;
-      } else {
-        show('closed');
-      }
+      leaveOrClose();
       return;
     }
     setLoading('Wrapping up…');
     api('POST', '/complete', {}).then(function () {
-      if (sessionData.redirect_url) {
-        window.location.href = sessionData.redirect_url;
-      } else {
-        show('closed');
-      }
+      leaveOrClose();
     }).catch(function (err) {
-      // Even on a complete failure, surface the closed state — the page
-      // is done from the user's POV. Log to console for debugging.
+      // Even on a complete failure, surface the closed/redirect state —
+      // the page is done from the user's POV. Log to console for debug.
       console.error('complete failed', err);
-      if (sessionData.redirect_url) {
-        window.location.href = sessionData.redirect_url;
-      } else {
-        show('closed');
-      }
+      leaveOrClose();
     });
   });
   document.getElementById('btn-retry').addEventListener('click', function () {

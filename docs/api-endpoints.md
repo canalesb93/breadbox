@@ -131,6 +131,7 @@ These endpoints are called by the standalone `/link/{token}` page only. The toke
 | GET  | `/link/{token}` | Standalone HTML page; user opens it to add a bank |
 | GET  | `/_link/{token}/session` | Redacted session view for the page (flips pending→active on first call) |
 | POST | `/_link/{token}/providers/{name}/start` | Page-scoped start of a provider link session |
+| GET  | `/_link/{token}/providers/teller/config` | Public Teller bootstrap (application_id + environment); cert/key never exposed |
 | POST | `/_link/{token}/connections` | Page-scoped connection create (attributes to session's user) |
 | POST | `/_link/{token}/reauth-complete` | Page-scoped re-auth completion (only valid for `action="relink"` sessions; reactivates the pinned connection and burns the token) |
 | POST | `/_link/{token}/complete` | User-initiated "I'm done"; consumes the token (idempotent — already-completed returns 204) |

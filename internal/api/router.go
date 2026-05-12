@@ -192,6 +192,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Use(mw.HostedLinkBearer(svc))
 		r.Get("/session", GetHostedLinkPageSessionHandler(svc))
 		r.Post("/providers/{name}/start", HostedLinkPageStartHandler(a))
+		r.Get("/providers/teller/config", HostedLinkPageTellerConfigHandler(a))
 		r.Post("/connections", HostedLinkPageConnectionHandler(a))
 		r.Post("/reauth-complete", HostedLinkPageReauthCompleteHandler(svc))
 		r.Post("/complete", HostedLinkPageCompleteHandler(svc))
