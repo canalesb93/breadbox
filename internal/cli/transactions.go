@@ -371,11 +371,15 @@ func newTxnRecategorizeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "recategorize",
 		Short: "Server-side bulk recategorize by filter",
+		Long: `Apply a new category to every transaction matching the filter set.
+
+The shared --category filter scopes which rows are touched; --target-category
+is the slug those rows get re-assigned to. Both are required.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, _ := ClientFromContext(cmd.Context())
 			flags := Flags(cmd)
 			if target == "" {
-				return UsageErrorf("--category is required (target category slug)")
+				return UsageErrorf("--target-category is required (slug to recategorize matching rows into)")
 			}
 			f := filtersFromCmd(cmd)
 			req := client.BulkRecategorizeRequest{
@@ -400,8 +404,10 @@ func newTxnRecategorizeCmd() *cobra.Command {
 			return output.PrintJSON(os.Stdout, res)
 		},
 	}
-	cmd.Flags().StringVar(&target, "category", "", "target category slug (required)")
+	// Filter flags first so --category claims its slot as the filter slug;
+	// the destination slug gets the unambiguous --target-category name.
 	txnFilterFlags(cmd)
+	cmd.Flags().StringVar(&target, "target-category", "", "target category slug to assign to matching rows (required)")
 	return cmd
 }
 

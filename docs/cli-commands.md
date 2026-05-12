@@ -70,7 +70,7 @@ These commands operate on the local box (filesystem, DB, embedded migrations) â€
 | `breadbox transactions batch <file>` | W | Batch update from JSON (max 50 rows) |
 | `breadbox transactions categorize <id> <category>` | W | Set category (override) |
 | `breadbox transactions uncategorize <id>` | W | Reset to provider default |
-| `breadbox transactions recategorize --filter --category` | W | Server-side recategorize by filter |
+| `breadbox transactions recategorize --target-category <slug> [filters]` | W | Server-side recategorize: every row matching the filters becomes `--target-category` |
 | `breadbox transactions delete <id>` | W | Soft-delete |
 | `breadbox transactions restore <id>` | W | Restore a soft-deleted transaction |
 | `breadbox transactions tag <id> <slug>` | W | Attach a tag |
