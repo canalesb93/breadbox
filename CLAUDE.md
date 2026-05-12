@@ -114,7 +114,8 @@ Canonical specs in `docs/`:
 
 - `data-model.md` — schema and enums (canonical)
 - `architecture.md` — provider interface and layer boundaries
-- `api-reference.md` — REST endpoints
+- `api-reference.md` — REST endpoints (long-form prose with examples)
+- `api-endpoints.md` — **terse index of every REST endpoint**; keep in sync per `.claude/rules/api-endpoints.md`
 - `mcp-tools-reference.md` — MCP tools
 - `rule-dsl.md` — **canonical transaction-rule DSL**: condition grammar, actions, triggers, pipeline-stage priority, sync-vs-retroactive, chaining
 - `design-system.md` — CSS framework, components, icons
@@ -129,6 +130,7 @@ Scoped rules in `.claude/rules/` load when you touch matching files:
 - `testing.md` — test patterns and fixtures
 - `service.md` — service-layer conventions
 - `api.md` — REST/admin handler conventions
+- `api-endpoints.md` — upkeep rule for `docs/api-endpoints.md` (the endpoint catalog)
 - `mcp.md` — MCP tool and permission patterns
 - `providers.md` — provider integrations
 - `sync.md` — sync engine patterns
