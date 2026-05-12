@@ -54,7 +54,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "test-key", "full_access")
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "test-key", "full_access")
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}
@@ -79,7 +79,7 @@ func setupReadOnlyEnv(t *testing.T) *testEnv {
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "readonly-key", "read_only")
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "readonly-key", "read_only")
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}
@@ -139,6 +139,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		r.Get("/reports/{id}", GetReportHandler(svc))
 		r.Get("/tags", ListTagsHandler(svc))
 		r.Get("/tags/{slug}", GetTagHandler(svc))
+		r.Get("/keys/me", WhoamiHandler())
 
 		// Write endpoints — require full_access scope
 		r.Group(func(r chi.Router) {
@@ -390,7 +391,7 @@ func TestAPI_RevokedAPIKey(t *testing.T) {
 	env := setupTestEnv(t)
 
 	// Create a second key, then revoke it
-	result2, err := env.Service.CreateAPIKey(t.Context(), "revocable", "full_access")
+	result2, err := env.Service.CreateAPIKeyLegacy(t.Context(), "revocable", "full_access")
 	if err != nil {
 		t.Fatal(err)
 	}

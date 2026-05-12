@@ -160,6 +160,34 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
 
+  /api/v1/keys/me:
+    get:
+      tags: [API Keys]
+      summary: Identify the calling API key (whoami)
+      description: |
+        Returns the API key record corresponding to the presented
+        credential — name, prefix, scope, actor type/name. The full
+        secret is never re-exposed. Used by `breadbox auth whoami` so
+        agents and humans can confirm which identity the CLI is acting
+        under. Any scope; the data only describes the caller's own key.
+      responses:
+        "200":
+          description: Identity record for the calling key.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, key_prefix, scope, actor_type, created_at]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  key_prefix: { type: string }
+                  scope: { type: string, enum: [read_only, full_access] }
+                  actor_type: { type: string, enum: [user, agent, system] }
+                  actor_name: { type: string, nullable: true }
+                  created_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   # -- Accounts --
   /api/v1/accounts:
     get:

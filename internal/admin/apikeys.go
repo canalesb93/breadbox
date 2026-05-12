@@ -33,7 +33,7 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 		if req.Scope == "" {
 			req.Scope = "full_access"
 		}
-		result, err := svc.CreateAPIKey(r.Context(), req.Name, req.Scope)
+		result, err := svc.CreateAPIKeyLegacy(r.Context(), req.Name, req.Scope)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create API key")
 			return
@@ -179,7 +179,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		if scope == "" {
 			scope = "full_access"
 		}
-		result, err := svc.CreateAPIKey(r.Context(), name, scope)
+		result, err := svc.CreateAPIKeyLegacy(r.Context(), name, scope)
 		if err != nil {
 			FlashRedirect(w, r, sm, "error", "Failed to create API key", "/settings/api-keys/new")
 			return

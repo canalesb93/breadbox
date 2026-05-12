@@ -51,7 +51,7 @@ func setupRelinkEnv(t *testing.T, scope string) *relinkEnv {
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "relink-test-key", scope)
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "relink-test-key", scope)
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}

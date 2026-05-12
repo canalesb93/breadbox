@@ -284,7 +284,7 @@ func TestGetTag_AllowsReadScope(t *testing.T) {
 	})
 
 	// Same DB, new env with read-only key.
-	roKey, err := env.Service.CreateAPIKey(t.Context(), "ro-read-tag", "read_only")
+	roKey, err := env.Service.CreateAPIKeyLegacy(t.Context(), "ro-read-tag", "read_only")
 	if err != nil {
 		t.Fatalf("create read-only API key: %v", err)
 	}

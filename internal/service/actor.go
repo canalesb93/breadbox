@@ -1,6 +1,11 @@
 package service
 
-import "context"
+import (
+	"context"
+
+	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
+)
 
 // Actor identifies who performed an action, used for audit logging and comments.
 type Actor struct {
@@ -17,25 +22,76 @@ func SystemActor() Actor {
 type contextKey int
 
 const (
-	ctxKeyAPIKeyID   contextKey = iota
-	ctxKeyAPIKeyName contextKey = iota
+	ctxKeyAPIKey contextKey = iota
 )
 
-// ContextWithAPIKey stores API key identity in the context.
-func ContextWithAPIKey(ctx context.Context, id, name string) context.Context {
-	ctx = context.WithValue(ctx, ctxKeyAPIKeyID, id)
-	ctx = context.WithValue(ctx, ctxKeyAPIKeyName, name)
-	return ctx
+// apiKeyCtxValue holds the slice of fields ActorFromContext needs out of an
+// API key. We carry the whole db.ApiKey so callers don't need to plumb the
+// fields independently — middleware and CLI bootstrap both already have the
+// row.
+type apiKeyCtxValue struct {
+	id        string
+	prefix    string
+	name      string
+	actorType string
+	actorName string
+}
+
+// ContextWithAPIKey stores an API-key-derived actor identity in the context.
+// Middleware and the stdio bootstrap both call this — there is one canonical
+// shape so ActorFromContext can read it consistently.
+//
+// Pre-PR-03 callers passed (id, name) only. That shape is kept on
+// ContextWithAPIKeyLegacy for the few in-tree paths that haven't been
+// migrated yet (synthetic OAuth bearer tokens, tests that mint a fake key
+// without DB access). Those callers attribute as `agent`.
+func ContextWithAPIKey(ctx context.Context, key *db.ApiKey) context.Context {
+	if key == nil {
+		return ctx
+	}
+	v := apiKeyCtxValue{
+		id:        pgconv.FormatUUID(key.ID),
+		prefix:    key.KeyPrefix,
+		name:      key.Name,
+		actorType: key.ActorType,
+	}
+	if key.ActorName.Valid {
+		v.actorName = key.ActorName.String
+	}
+	return context.WithValue(ctx, ctxKeyAPIKey, v)
+}
+
+// ContextWithAPIKeyLegacy is the pre-PR-03 shape — id + display name, no
+// explicit actor fields. Callers that produce a synthetic API key (OAuth
+// bearer tokens, in-memory test keys) use this and get attributed as
+// `agent` by default.
+func ContextWithAPIKeyLegacy(ctx context.Context, id, name string) context.Context {
+	return context.WithValue(ctx, ctxKeyAPIKey, apiKeyCtxValue{
+		id:        id,
+		name:      name,
+		actorType: "agent",
+	})
 }
 
 // ActorFromContext builds an Actor from the request context.
-// If API key info is present (set by APIKeyAuth middleware), returns an agent actor.
-// Otherwise returns a system actor.
+// The actor's Type reflects the API key's actor_type column ('user',
+// 'agent', or 'system'). Display name falls back to the API key's own
+// name (and then its prefix) when actor_name is empty.
 func ActorFromContext(ctx context.Context) Actor {
-	id, _ := ctx.Value(ctxKeyAPIKeyID).(string)
-	name, _ := ctx.Value(ctxKeyAPIKeyName).(string)
-	if id != "" {
-		return Actor{Type: "agent", ID: id, Name: name}
+	v, ok := ctx.Value(ctxKeyAPIKey).(apiKeyCtxValue)
+	if !ok || v.id == "" {
+		return SystemActor()
 	}
-	return SystemActor()
+	actorType := v.actorType
+	if actorType == "" {
+		actorType = "agent"
+	}
+	name := v.actorName
+	if name == "" {
+		name = v.name
+	}
+	if name == "" {
+		name = v.prefix
+	}
+	return Actor{Type: actorType, ID: v.id, Name: name}
 }
