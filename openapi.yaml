@@ -1669,6 +1669,50 @@ paths:
                 type: object
                 additionalProperties: true
 
+  /api/v1/login-accounts:
+    get:
+      tags: [Users]
+      summary: List every login account (flat — no parent user_id)
+      description: |
+        Top-level convenience for the headless CLI. Identical payload to the
+        nested per-user endpoint, but returns the full set across users.
+        **Requires `full_access` scope.** `setup_token` is never echoed here.
+      responses:
+        "200":
+          description: Login accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserLogin" }
+  /api/v1/login-accounts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Users]
+      summary: Delete a login account by its own id (no parent user_id required)
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/login-accounts/{id}/reset-password:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Users]
+      summary: Issue a fresh setup token for a login account
+      description: |
+        Flat alias for `/users/{user_id}/login/{login_id}/regenerate-token`.
+        Response includes the plaintext `setup_token` exactly once.
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Token payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   # -- Account links --
   /api/v1/account-links:
     get:

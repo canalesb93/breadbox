@@ -171,6 +171,9 @@ The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIR
 | PATCH | `/users/{user_id}/login/{login_id}` | W | Update role |
 | DELETE | `/users/{user_id}/login/{login_id}` | W | Remove a login |
 | POST | `/users/{user_id}/login/{login_id}/regenerate-token` | W | Issue a fresh setup token |
+| GET | `/login-accounts` | W | List every login account (flat — no parent user_id) |
+| DELETE | `/login-accounts/{id}` | W | Delete a login by its own id |
+| POST | `/login-accounts/{id}/reset-password` | W | Issue a fresh setup token (flat alias of `regenerate-token`) |
 
 ## Account links (dependent-account mirroring)
 

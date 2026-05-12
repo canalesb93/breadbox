@@ -163,6 +163,9 @@ func NewRootCmd(version string) *cobra.Command {
 	AddCreateAdminCmd(root)
 	AddResetPasswordCmd(root)
 	AddDoctorCmd(root)
+	AddUsersCmd(root)
+	AddLoginsCmd(root)
+	AddKeysCmd(root)
 	AddVersionCmd(root, version)
 
 	return root
