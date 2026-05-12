@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   pull_request:
-    branches: [main, "stack/**"]
+    branches: [main, "stack/**", "feat/**"]
   merge_group:
   push:
     branches: [main]
