@@ -8,3 +8,6 @@ SELECT key, value, updated_at FROM app_config ORDER BY key;
 INSERT INTO app_config (key, value, updated_at)
 VALUES ($1, $2, NOW())
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();
+
+-- name: DeleteAppConfig :exec
+DELETE FROM app_config WHERE key = $1;

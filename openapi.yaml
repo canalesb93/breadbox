@@ -1099,6 +1099,30 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderInfo" }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Connections]
+      summary: Disable a provider
+      description: |
+        Clears every `app_config` row tied to the named provider (Plaid:
+        client_id/secret/env; Teller: app_id/env/cert/key/webhook secret) and
+        re-runs the live provider init so the in-memory map drops the
+        provider. Existing connections stay in the DB and continue to surface
+        in listings, but sync attempts fail until credentials are restored.
+        CSV has no credentials and is a no-op.
+
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Provider disabled.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider: { type: string }
+                  ok: { type: boolean }
+                  message: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/providers/{name}/link-session:
     parameters:
       - name: name
@@ -1142,6 +1166,223 @@ paths:
         "204": { description: "No init token needed; proceed to POST /connections." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/providers/{name}/test:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string, enum: [plaid, teller, csv] }
+    post:
+      tags: [Connections]
+      summary: Round-trip a provider credentials check
+      description: |
+        Validates the server-side credentials for the named provider. CSV has
+        no credentials and always returns ok=true. Plaid hits
+        `/institutions/get` with a tiny payload; Teller validates the stored
+        cert/key pair (file path or in-memory PEM) against `crypto/tls`.
+
+        A reachable server with bad credentials still returns 200 with
+        `ok=false` and a human-readable message, so CLI agents can branch on
+        the JSON without parsing status codes.
+
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Credential-check result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider: { type: string }
+                  ok: { type: boolean }
+                  message: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/config:
+    get:
+      tags: [Settings]
+      summary: List app_config entries
+      description: |
+        Returns every row in the `app_config` table with the effective source
+        (`env` / `db` / `default`). Secret-flagged values are masked unless
+        `?reveal=true` is set. A denylist of keys (`ENCRYPTION_KEY` and the
+        Teller cert/key PEM rows) is always masked and never writable via
+        this surface — manage them through env vars or the admin UI.
+
+        **Requires `full_access` scope.**
+      parameters:
+        - name: reveal
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Config entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    value: { type: string, nullable: true }
+                    masked: { type: boolean }
+                    source: { type: string, enum: [env, db, default] }
+                    secret: { type: boolean }
+  /api/v1/config/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Settings]
+      summary: Get a single config entry
+      description: Same masking + `?reveal=true` semantics as the list endpoint.
+      parameters:
+        - name: reveal
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Config entry.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  value: { type: string, nullable: true }
+                  masked: { type: boolean }
+                  source: { type: string, enum: [env, db, default] }
+                  secret: { type: boolean }
+    put:
+      tags: [Settings]
+      summary: Set a config value
+      description: |
+        Writes the named value to the `app_config` table. The
+        always-denied key list (`ENCRYPTION_KEY`, `teller_cert_pem`,
+        `teller_key_pem`) returns `403 FORBIDDEN`.
+
+        **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+      responses:
+        "200":
+          description: Saved entry.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  value: { type: string, nullable: true }
+                  source: { type: string, enum: [env, db, default] }
+                  secret: { type: boolean }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [Settings]
+      summary: Remove a db-sourced config value
+      description: |
+        Drops the `app_config` row. The effective value falls back to env or
+        the compile-in default. The always-denied key list returns `403`.
+
+        **Requires `full_access` scope.**
+      responses:
+        "204": { description: "Key removed." }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/webhook-events:
+    get:
+      tags: [Webhooks]
+      summary: List recent webhook events
+      description: |
+        Paginated list of inbound provider webhooks (event_type, status,
+        connection_id, institution name, created_at). Filters: `provider`,
+        `status`, `page`, `limit` (max 200).
+
+        **Requires `full_access` scope.**
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema: { type: string, enum: [plaid, teller] }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [received, processed, error] }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: Page of webhook events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhook_events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        provider: { type: string }
+                        event_type: { type: string }
+                        connection_id: { type: string, nullable: true }
+                        institution_name: { type: string, nullable: true }
+                        raw_payload_hash: { type: string }
+                        status: { type: string }
+                        error_message: { type: string, nullable: true }
+                        created_at: { type: string, nullable: true }
+                  total: { type: integer }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total_pages: { type: integer }
+  /api/v1/webhook-events/{id}/replay:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Webhooks]
+      summary: Re-trigger the sync the webhook would have caused
+      description: |
+        The event row's raw payload is hashed-only, so the server can't
+        re-deliver it verbatim — instead, it kicks a manual `Sync` against
+        the connection the event was associated with. Events without a
+        connection return 200 with `triggered: false`.
+
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Replay result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhook_event_id: { type: string }
+                  connection_id: { type: string }
+                  triggered: { type: boolean }
+                  message: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
   /api/v1/connections/plaid/link-token:
     post:
       tags: [Connections]
