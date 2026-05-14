@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import type { ColumnDef } from "@tanstack/react-table";
 import { Receipt, Search } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { transactionColumns } from "@/features/transactions/columns";
 import { useTransactions } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
-import { formatAmount, formatDate } from "@/lib/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { Transaction } from "@/api/types";
 
@@ -21,74 +19,6 @@ export const transactionsSearchSchema = z.object({
 });
 
 type TransactionsSearch = z.infer<typeof transactionsSearchSchema>;
-
-const columns: ColumnDef<Transaction>[] = [
-  {
-    accessorKey: "date",
-    header: "Date",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground tabular-nums">
-        {formatDate(row.original.date)}
-      </span>
-    ),
-  },
-  {
-    id: "description",
-    header: "Description",
-    cell: ({ row }) => {
-      const t = row.original;
-      return (
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{t.provider_name}</span>
-          {t.pending && (
-            <Badge variant="outline" className="text-muted-foreground">
-              Pending
-            </Badge>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    id: "category",
-    header: "Category",
-    cell: ({ row }) => {
-      const cat = row.original.category;
-      if (!cat?.display_name) {
-        return <span className="text-muted-foreground">—</span>;
-      }
-      return <Badge variant="secondary">{cat.display_name}</Badge>;
-    },
-  },
-  {
-    accessorKey: "account_name",
-    header: "Account",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {row.original.account_name ?? "—"}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "amount",
-    header: () => <div className="text-right">Amount</div>,
-    cell: ({ row }) => {
-      const t = row.original;
-      const isInflow = t.amount < 0;
-      return (
-        <div
-          className={
-            isInflow
-              ? "text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-500"
-              : "text-right font-medium tabular-nums"
-          }
-        >
-          {formatAmount(t.amount, t.iso_currency_code)}
-        </div>
-      );
-    },
-  },
-];
 
 export function TransactionsPage() {
   const navigate = useNavigate();
@@ -142,7 +72,7 @@ export function TransactionsPage() {
       </div>
 
       <DataTable
-        columns={columns}
+        columns={transactionColumns}
         data={rows}
         isLoading={transactions.isLoading}
         isError={transactions.isError}
