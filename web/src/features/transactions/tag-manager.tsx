@@ -1,21 +1,13 @@
-import { useState } from "react";
-import { Check, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { TagChip } from "@/components/tag-chip";
-import { DynamicIcon } from "@/lib/icon";
+import { TagCommandList } from "@/components/tag-command";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useTags } from "@/api/queries/tags";
 import { useUpdateTransactions } from "@/api/queries/transactions";
@@ -28,14 +20,14 @@ interface TagManagerProps {
 
 // TagManager is the single-transaction tag editor on the detail page. Current
 // tags render as removable chips; the "Add tag" popover toggles attachment
-// against the full tag catalog. Each toggle is one batch operation — add or
-// remove a single slug — and the cache invalidation refetches the row.
+// against the shared tag command list. Each toggle is one batch operation —
+// add or remove a single slug — and the cache invalidation refetches the row.
 export function TagManager({ transactionId, tags }: TagManagerProps) {
   const [open, setOpen] = useState(false);
-  const { data: catalog, isLoading } = useTags();
+  const { data: catalog } = useTags();
   const update = useUpdateTransactions();
 
-  const attached = new Set(tags);
+  const attached = useMemo(() => new Set(tags), [tags]);
   const bySlug = new Map((catalog ?? []).map((t) => [t.slug, t]));
 
   const toggle = async (slug: string) => {
@@ -87,33 +79,7 @@ export function TagManager({ transactionId, tags }: TagManagerProps) {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-56 p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search tags…" />
-            <CommandList>
-              <CommandEmpty>
-                {isLoading ? "Loading…" : "No tags found."}
-              </CommandEmpty>
-              <CommandGroup>
-                {(catalog ?? []).map((tag) => (
-                  <CommandItem
-                    key={tag.slug}
-                    value={tag.display_name}
-                    onSelect={() => toggle(tag.slug)}
-                  >
-                    <DynamicIcon
-                      name={tag.icon}
-                      className="size-4"
-                      style={tag.color ? { color: tag.color } : undefined}
-                    />
-                    <span>{tag.display_name}</span>
-                    {attached.has(tag.slug) && (
-                      <Check className="ml-auto size-4" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
+          <TagCommandList attachedSlugs={attached} onPick={toggle} />
         </PopoverContent>
       </Popover>
     </div>

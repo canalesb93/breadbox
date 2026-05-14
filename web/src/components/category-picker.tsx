@@ -48,7 +48,7 @@ export function CategoryPicker({
           disabled={isPending}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "hover:bg-accent focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50",
+            "hover:bg-accent focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
             className,
           )}
         >
