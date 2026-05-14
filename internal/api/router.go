@@ -15,6 +15,7 @@ import (
 	"breadbox/static"
 	webui "breadbox/web"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -55,12 +56,26 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Post("/api/v1/auth/device-code", CreateDeviceCodeHandler(svc))
 	r.Post("/api/v1/auth/device-code/poll", PollDeviceCodeHandler(svc))
 
+	// Session manager — created once, shared by /api/v1 (the cookie-auth
+	// fallback) and the dashboard mount below. nil under --no-dashboard
+	// (and -tags=headless): there are no cookie clients, so /api/v1 then
+	// behaves exactly as before — API-key / Bearer only.
+	var sm *scs.SessionManager
+	if !a.Config.NoDashboard {
+		isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
+		sm = admin.NewSessionManager(a.DB, isSecure)
+	}
+
 	r.Route("/api/v1", func(r chi.Router) {
-		// Auth runs first so the rate limiter can identify by API key ID.
+		// Auth runs first so the rate limiter can identify by API key ID
+		// (a session is translated into a synthetic key keyed by the user).
 		// /health/* and /api/v1/version are mounted outside this Route block
 		// and are intentionally not rate-limited (cheap, used by load
 		// balancers / monitoring).
-		r.Use(mw.APIKeyAuth(svc))
+		if sm != nil {
+			r.Use(sm.LoadAndSave)
+		}
+		r.Use(sessionOrAPIKeyAuth(svc, sm))
 		r.Use(apiLimiter.Middleware())
 
 		// Read endpoints — all API keys.
@@ -242,8 +257,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 	// strips the assets entirely is `-tags=headless` (see
 	// .claude/rules/build-tags.md).
 	if !a.Config.NoDashboard {
-		isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
-		sm := admin.NewSessionManager(a.DB, isSecure)
+		// sm was created above (shared with the /api/v1 cookie-auth path).
 
 		// v2 SPA — internal frontend API and embedded static bundle.
 		// /web/v1/* is session-only, never accepts API keys, and carries zero
