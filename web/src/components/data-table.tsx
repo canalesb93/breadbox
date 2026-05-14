@@ -4,6 +4,7 @@ import {
   useReactTable,
   type ColumnDef,
   type OnChangeFn,
+  type RowSelectionState,
   type SortingState,
 } from "@tanstack/react-table";
 import {
@@ -36,6 +37,17 @@ export interface DataTableProps<TData, TValue> {
   onSortingChange?: OnChangeFn<SortingState>;
   /** Optional row click handler — e.g. navigate to a detail page. */
   onRowClick?: (row: TData) => void;
+  /**
+   * Controlled row selection. Like sorting, the state lives in the calling
+   * route; DataTable just renders it. `getRowId` should return a stable id
+   * (not the array index) so a selection survives pagination/refetch.
+   */
+  enableRowSelection?: boolean;
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  getRowId?: (row: TData) => string;
+  /** Passed through to the table instance — e.g. shift-range-select hooks. */
+  meta?: object;
 }
 
 // Shared table wrapper over @tanstack/react-table + the shadcn Table
@@ -53,14 +65,26 @@ export function DataTable<TData, TValue>({
   sorting,
   onSortingChange,
   onRowClick,
+  enableRowSelection,
+  rowSelection,
+  onRowSelectionChange,
+  getRowId,
+  meta,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     manualSorting: true,
-    state: sorting ? { sorting } : undefined,
+    state: {
+      ...(sorting ? { sorting } : {}),
+      ...(rowSelection ? { rowSelection } : {}),
+    },
     onSortingChange,
+    enableRowSelection,
+    onRowSelectionChange,
+    getRowId,
+    meta,
   });
 
   const colCount = columns.length;
@@ -119,6 +143,7 @@ export function DataTable<TData, TValue>({
             table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
+                data-state={row.getIsSelected() ? "selected" : undefined}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 className={cn(onRowClick && "cursor-pointer")}
               >

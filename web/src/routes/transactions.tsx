@@ -1,14 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { Receipt, Search } from "lucide-react";
+import type { RowSelectionState } from "@tanstack/react-table";
+import { CheckSquare, Receipt, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { transactionColumns } from "@/features/transactions/columns";
+import {
+  buildTransactionColumns,
+  type TransactionTableMeta,
+} from "@/features/transactions/columns";
 import { FilterBar } from "@/features/transactions/filter-bar";
+import { SelectionActionBar } from "@/features/transactions/selection-action-bar";
 import { useTransactions } from "@/api/queries/transactions";
 import type { TransactionFilters } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
@@ -96,6 +107,52 @@ export function TransactionsPage() {
     [transactions.data?.pages],
   );
 
+  // --- Select mode ---
+  const [selectMode, setSelectMode] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const lastIndexRef = useRef<number | null>(null);
+
+  const columns = useMemo(
+    () => buildTransactionColumns({ selection: selectMode }),
+    [selectMode],
+  );
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setRowSelection({});
+    lastIndexRef.current = null;
+  }, []);
+
+  // getRowId returns the transaction id, so rowSelection keys ARE ids.
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection],
+  );
+
+  // Shift-click range select: every row between the last-toggled row and the
+  // shift-clicked one becomes selected.
+  const tableMeta: TransactionTableMeta = useMemo(
+    () => ({
+      setLastIndex: (index) => {
+        lastIndexRef.current = index;
+      },
+      onRangeSelect: (toIndex) => {
+        const from = lastIndexRef.current;
+        if (from == null) return;
+        const [lo, hi] = from < toIndex ? [from, toIndex] : [toIndex, from];
+        setRowSelection((prev) => {
+          const next = { ...prev };
+          for (let i = lo; i <= hi; i++) {
+            const id = rows[i]?.id;
+            if (id) next[id] = true;
+          }
+          return next;
+        });
+      },
+    }),
+    [rows],
+  );
+
   const hasActiveFilters =
     !!search.q ||
     !!search.account ||
@@ -111,6 +168,23 @@ export function TransactionsPage() {
       <PageHeader
         title="Transactions"
         description="Every transaction synced across your connected accounts."
+        actions={
+          selectMode ? (
+            <Button variant="secondary" size="sm" onClick={exitSelectMode}>
+              <X className="size-4" />
+              Done
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectMode(true)}
+            >
+              <CheckSquare className="size-4" />
+              Select
+            </Button>
+          )
+        }
       />
 
       <div className="mb-4 space-y-3">
@@ -127,12 +201,23 @@ export function TransactionsPage() {
       </div>
 
       <DataTable
-        columns={transactionColumns}
+        columns={columns}
         data={rows}
         isLoading={transactions.isLoading}
         isError={transactions.isError}
-        onRowClick={(t) =>
-          navigate({ to: "/transactions/$id", params: { id: t.short_id } })
+        getRowId={(t) => t.id}
+        enableRowSelection={selectMode}
+        rowSelection={selectMode ? rowSelection : undefined}
+        onRowSelectionChange={setRowSelection}
+        meta={tableMeta}
+        onRowClick={
+          selectMode
+            ? undefined
+            : (t) =>
+                navigate({
+                  to: "/transactions/$id",
+                  params: { id: t.short_id },
+                })
         }
         emptyState={
           <EmptyState
@@ -161,6 +246,13 @@ export function TransactionsPage() {
             {transactions.isFetchingNextPage ? "Loading…" : "Load more"}
           </Button>
         </div>
+      )}
+
+      {selectMode && selectedIds.length > 0 && (
+        <SelectionActionBar
+          selectedIds={selectedIds}
+          onClear={exitSelectMode}
+        />
       )}
     </div>
   );

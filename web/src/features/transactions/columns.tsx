@@ -1,5 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { TagList } from "@/components/tag-chip";
@@ -7,11 +8,49 @@ import { formatAmount, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
 
-// transactionColumns is the single column definition for the v2 transactions
-// table — kept out of the route so the row rendering is reusable and the
-// route file stays focused on data + URL state. Sorting, selection, and other
-// per-context columns are layered on by later PRs in this stack.
-export const transactionColumns: ColumnDef<Transaction>[] = [
+// TransactionTableMeta is the shape passed through DataTable's `meta` prop so
+// the selection column can do shift-click range select without the column
+// definitions owning any state.
+export interface TransactionTableMeta {
+  onRangeSelect?: (toIndex: number) => void;
+  setLastIndex?: (index: number) => void;
+}
+
+const selectionColumn: ColumnDef<Transaction> = {
+  id: "select",
+  header: ({ table }) => (
+    <Checkbox
+      checked={
+        table.getIsAllPageRowsSelected() ||
+        (table.getIsSomePageRowsSelected() && "indeterminate")
+      }
+      onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+      aria-label="Select all"
+    />
+  ),
+  cell: ({ row, table }) => {
+    const meta = table.options.meta as TransactionTableMeta | undefined;
+    return (
+      <Checkbox
+        checked={row.getIsSelected()}
+        // Shift-click extends the selection from the last-toggled row. The
+        // normal onCheckedChange still fires and lands the current row in the
+        // same (selected) state the range sets, so no preventDefault needed.
+        onClick={(e) => {
+          if (e.shiftKey) meta?.onRangeSelect?.(row.index);
+        }}
+        onCheckedChange={(value) => {
+          row.toggleSelected(!!value);
+          meta?.setLastIndex?.(row.index);
+        }}
+        aria-label="Select row"
+      />
+    );
+  },
+  enableSorting: false,
+};
+
+const baseColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "date",
     header: "Date",
@@ -102,3 +141,12 @@ export const transactionColumns: ColumnDef<Transaction>[] = [
     },
   },
 ];
+
+// buildTransactionColumns is the single column definition for the v2
+// transactions table. Kept out of the route so row rendering is reusable; the
+// `selection` option prepends a checkbox column for select mode.
+export function buildTransactionColumns(opts?: {
+  selection?: boolean;
+}): ColumnDef<Transaction>[] {
+  return opts?.selection ? [selectionColumn, ...baseColumns] : baseColumns;
+}
