@@ -1216,6 +1216,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 	// directly (matching ListTransactions). Avoids per-FK round-trips.
 	const q = `
 		SELECT t.id, t.short_id, a.short_id AS account_short_id,
+			COALESCE(a.display_name, a.name) AS account_name,
 			au.short_id AS attributed_user_short_id, au.name AS attributed_user_name,
 			COALESCE(au.short_id, u.short_id) AS effective_user_short_id,
 			COALESCE(au.name, u.name) AS user_name,
@@ -1236,6 +1237,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		txID                  pgtype.UUID
 		shortID               string
 		accountShortID        pgtype.Text
+		accountName           pgtype.Text
 		attributedUserShortID pgtype.Text
 		attributedUserName    pgtype.Text
 		effectiveUserShortID  pgtype.Text
@@ -1260,7 +1262,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 	)
 
 	if err := s.Pool.QueryRow(ctx, q, uid).Scan(
-		&txID, &shortID, &accountShortID,
+		&txID, &shortID, &accountShortID, &accountName,
 		&attributedUserShortID, &attributedUserName,
 		&effectiveUserShortID, &userName,
 		&amount, &isoCurrencyCode, &date, &authorizedDate,
@@ -1289,6 +1291,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		ID:                         formatUUID(txID),
 		ShortID:                    shortID,
 		AccountID:                  textPtr(accountShortID),
+		AccountName:                textPtr(accountName),
 		UserName:                   textPtr(userName),
 		AttributedUserID:           textPtr(attributedUserShortID),
 		AttributedUserName:         textPtr(attributedUserName),
@@ -1332,6 +1335,14 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 			resp.Category = catInfo
 		}
 	}
+
+	// Populate Tags via the shared batched helper (one-element slice) so the
+	// detail endpoint returns the same enriched shape as list rows.
+	batch := []TransactionResponse{*resp}
+	if err := s.attachTagsToTransactions(ctx, batch); err != nil {
+		return nil, fmt.Errorf("get transaction tags: %w", err)
+	}
+	resp.Tags = batch[0].Tags
 
 	return resp, nil
 }

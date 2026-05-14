@@ -31,3 +31,41 @@ export function formatDate(date: string): string {
   const d = new Date(`${date}T00:00:00`);
   return Number.isNaN(d.getTime()) ? date : monthDayFormatter.format(d);
 }
+
+const longDateFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+});
+
+// formatLongDate renders a YYYY-MM-DD date as e.g. "Jan 2, 2026".
+export function formatLongDate(date: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? date : longDateFormatter.format(d);
+}
+
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("en-US", {
+  numeric: "auto",
+});
+
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["year", 31_536_000],
+  ["month", 2_592_000],
+  ["week", 604_800],
+  ["day", 86_400],
+  ["hour", 3_600],
+  ["minute", 60],
+];
+
+// formatRelativeTime renders an RFC3339 timestamp as e.g. "3 hours ago" or
+// "in 2 days"; returns the input unchanged if it isn't a parseable date.
+export function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const diffSec = (then - Date.now()) / 1000;
+  const absSec = Math.abs(diffSec);
+  for (const [unit, secs] of RELATIVE_UNITS) {
+    if (absSec >= secs) {
+      return relativeTimeFormatter.format(Math.round(diffSec / secs), unit);
+    }
+  }
+  return relativeTimeFormatter.format(Math.round(diffSec), "second");
+}

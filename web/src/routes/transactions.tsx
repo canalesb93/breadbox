@@ -76,6 +76,9 @@ export function TransactionsPage() {
         data={rows}
         isLoading={transactions.isLoading}
         isError={transactions.isError}
+        onRowClick={(t) =>
+          navigate({ to: "/transactions/$id", params: { id: t.short_id } })
+        }
         emptyState={
           <EmptyState
             icon={Receipt}

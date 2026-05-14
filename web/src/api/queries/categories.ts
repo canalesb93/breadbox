@@ -3,14 +3,12 @@ import { api } from "@/api/client";
 import type { Category } from "@/api/types";
 
 // useCategories loads the full category tree (parents with nested children).
-// Bounded reference data — fetched once, held with a long staleTime.
+// Bounded reference data — fetched once, held with a long staleTime. The
+// endpoint returns a bare array (no envelope).
 export function useCategories() {
   return useQuery({
     queryKey: ["categories"],
-    queryFn: async () => {
-      const res = await api<{ categories: Category[] }>("/api/v1/categories");
-      return res.categories;
-    },
+    queryFn: () => api<Category[]>("/api/v1/categories"),
     staleTime: 5 * 60_000,
   });
 }
