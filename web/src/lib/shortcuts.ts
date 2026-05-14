@@ -57,6 +57,12 @@ export interface UseShortcutOptions {
   label: string;
   group?: string;
   enabled?: boolean;
+  /**
+   * Fire even when focus is inside an input or an open dialog/popover. Only
+   * for genuinely global, modifier-guarded shortcuts (e.g. ⌘K) that must
+   * toggle from anywhere — never for bare-letter shortcuts.
+   */
+  global?: boolean;
 }
 
 export function useShortcut(
@@ -64,7 +70,7 @@ export function useShortcut(
   handler: (event: KeyboardEvent) => void,
   options: UseShortcutOptions,
 ): void {
-  const { label, group, enabled = true } = options;
+  const { label, group, enabled = true, global = false } = options;
   const id = `${group ?? "global"}:${label}`;
   // Both `keys` (inline array literal) and `handler` (inline arrow) are
   // referentially unstable across renders. Without this, the effect tears
@@ -81,16 +87,25 @@ export function useShortcut(
     const unregister = registerShortcut({ id, keys: parsedKeys, label, group });
     const match = parseKeys(parsedKeys);
     const onKey = (event: KeyboardEvent) => {
+      // Holding a key down repeats keydown — let single-press shortcuts
+      // (j/k navigation especially) fire once per press, not per frame.
+      if (event.repeat) return;
       if (event.key.toLowerCase() !== match.key) return;
       if (!!match.meta !== (event.metaKey || event.ctrlKey)) return;
       if (!!match.shift !== event.shiftKey) return;
       if (!!match.alt !== event.altKey) return;
       const target = event.target as HTMLElement | null;
       if (
+        !global &&
         target &&
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+          target.isContentEditable ||
+          // Focus inside an open dialog or popover (command palette, filter
+          // pills, pickers) — the page's list shortcuts must not leak under it.
+          target.closest(
+            '[role="dialog"],[data-radix-popper-content-wrapper]',
+          ))
       ) {
         return;
       }
@@ -101,5 +116,5 @@ export function useShortcut(
       window.removeEventListener("keydown", onKey);
       unregister();
     };
-  }, [enabled, id, keysKey, label, group]);
+  }, [enabled, id, keysKey, label, group, global]);
 }

@@ -175,7 +175,7 @@ export function DataTable<TData, TValue>({
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 className={cn(
                   onRowClick && "cursor-pointer",
-                  focused && "ring-primary ring-1 ring-inset",
+                  focused && "ring-primary ring-2 ring-inset outline-none",
                 )}
               >
                 {row.getVisibleCells().map((cell) => (

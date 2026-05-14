@@ -129,6 +129,13 @@ export function TransactionsPage() {
     setSelectMode(false);
     setRowSelection({});
     lastIndexRef.current = null;
+    setFocusedIndex(null);
+  }, []);
+
+  // In select mode a click anywhere on the row toggles its selection — the
+  // checkbox cell stops propagation so it doesn't double-toggle.
+  const toggleRowSelection = useCallback((t: Transaction) => {
+    setRowSelection((prev) => ({ ...prev, [t.id]: !prev[t.id] }));
   }, []);
 
   const toggleSelectMode = useCallback(() => {
@@ -209,10 +216,11 @@ export function TransactionsPage() {
   useShortcut(
     ["x"],
     () => {
-      // No focused row → just enter select mode (matches the toolbar button,
-      // which advertises `x` as its shortcut).
+      // No focused row → enter select mode and land the focus ring on the
+      // first row, so the next `x` has something to select.
       if (focusedIndex == null) {
         setSelectMode(true);
+        setFocusedIndex(0);
         return;
       }
       const id = rows[focusedIndex]?.id;
@@ -263,12 +271,17 @@ export function TransactionsPage() {
       </div>
 
       {showCountLine && rows.length > 0 && (
-        <div className="text-muted-foreground mb-2 text-sm">
-          {count != null && count > rows.length
-            ? `Showing ${rows.length} of ${count.toLocaleString()} transactions`
-            : `${(count ?? rows.length).toLocaleString()} ${
-                (count ?? rows.length) === 1 ? "transaction" : "transactions"
-              }`}
+        <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm">
+          <span>
+            {count != null && count > rows.length
+              ? `Showing ${rows.length} of ${count.toLocaleString()} transactions`
+              : `${(count ?? rows.length).toLocaleString()} ${
+                  (count ?? rows.length) === 1 ? "transaction" : "transactions"
+                }`}
+          </span>
+          {focusedIndex == null && (
+            <span className="text-xs">· Press J / K to navigate</span>
+          )}
         </div>
       )}
 
@@ -284,7 +297,7 @@ export function TransactionsPage() {
         onRowSelectionChange={setRowSelection}
         meta={tableMeta}
         focusedRowId={focusedRowId}
-        onRowClick={selectMode ? undefined : openTransaction}
+        onRowClick={selectMode ? toggleRowSelection : openTransaction}
         emptyState={
           <EmptyState
             icon={Receipt}
@@ -326,7 +339,11 @@ export function TransactionsPage() {
       )}
 
       {selectMode && selectedIds.length > 0 && (
-        <SelectionActionBar selectedIds={selectedIds} onClear={exitSelectMode} />
+        <SelectionActionBar
+          selectedIds={selectedIds}
+          totalCount={count}
+          onClear={exitSelectMode}
+        />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { displayKey } from "@/lib/kbd-display";
 
 export interface KbdTooltipProps {
   label: string;
@@ -12,21 +13,6 @@ export interface KbdTooltipProps {
   side?: React.ComponentProps<typeof TooltipContent>["side"];
   align?: React.ComponentProps<typeof TooltipContent>["align"];
   children: React.ReactElement;
-}
-
-const DISPLAY: Record<string, string> = {
-  mod: "⌘",
-  cmd: "⌘",
-  ctrl: "Ctrl",
-  shift: "⇧",
-  alt: "⌥",
-  option: "⌥",
-};
-
-function display(k: string): string {
-  const lower = k.toLowerCase();
-  if (lower in DISPLAY) return DISPLAY[lower];
-  return k.length === 1 ? k.toUpperCase() : k;
 }
 
 export function KbdTooltip({
@@ -44,7 +30,7 @@ export function KbdTooltip({
         {keys && keys.length > 0 && (
           <KbdGroup>
             {keys.map((k) => (
-              <Kbd key={k}>{display(k)}</Kbd>
+              <Kbd key={k}>{displayKey(k)}</Kbd>
             ))}
           </KbdGroup>
         )}
