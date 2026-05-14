@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { SETTINGS_SECTIONS, type SettingsSection } from "@/lib/settings-sections";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { closeModalSearch, openModalSearch, useActiveModal } from "@/lib/modals";
+import { AccountSection } from "@/features/settings/account-section";
 
 const SETTINGS_MODAL_KEY = "settings";
 
@@ -137,8 +138,20 @@ function SectionContent({
   section: SettingsSection;
   mobile?: boolean;
 }) {
+  const wrapper = mobile
+    ? "border-border border-t pt-4 first:border-t-0 first:pt-0"
+    : "";
+
+  if (section.slug === "account") {
+    return (
+      <div className={wrapper}>
+        <AccountSection />
+      </div>
+    );
+  }
+
   return (
-    <div className={cn(mobile ? "border-border space-y-2 border-t pt-4 first:border-t-0 first:pt-0" : "space-y-1")}>
+    <div className={cn(wrapper, mobile ? "space-y-2" : "space-y-1")}>
       <h2 className="text-lg font-medium">{section.title}</h2>
       <p className="text-muted-foreground text-sm">{section.description}</p>
       <p className="text-muted-foreground mt-4 text-sm">Coming soon.</p>

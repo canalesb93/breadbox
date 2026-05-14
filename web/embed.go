@@ -21,6 +21,7 @@ import (
 	"breadbox/internal/pgconv"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -216,6 +217,73 @@ func LogoutHandler(sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := sm.Destroy(r.Context()); err != nil {
 			mw.WriteError(w, http.StatusInternalServerError, "SESSION_ERROR", "Failed to destroy session")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ChangePasswordRequest is the POST body for /web/v1/account/password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
+
+// ChangePasswordHandler updates the current session's password. Mirrors
+// admin.changePasswordForAccount validation rules: current password must
+// verify, new must be 8+ chars and match confirm.
+func ChangePasswordHandler(sm *scs.SessionManager, queries *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		accountIDStr := admin.SessionAccountID(sm, r)
+		if accountIDStr == "" {
+			mw.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Session required")
+			return
+		}
+		var accountID pgtype.UUID
+		if err := accountID.Scan(accountIDStr); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_SESSION", "Invalid session")
+			return
+		}
+
+		var req ChangePasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Request body must be valid JSON")
+			return
+		}
+
+		account, err := queries.GetAuthAccountByID(r.Context(), accountID)
+		if err != nil {
+			mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account not found")
+			return
+		}
+		if account.HashedPassword == nil {
+			mw.WriteError(w, http.StatusUnprocessableEntity, "ACCOUNT_NOT_SETUP", "No password set. Contact your administrator.")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword(account.HashedPassword, []byte(req.CurrentPassword)); err != nil {
+			mw.WriteError(w, http.StatusUnauthorized, "INVALID_CURRENT_PASSWORD", "Current password is incorrect")
+			return
+		}
+		if len(req.NewPassword) < 8 {
+			mw.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "New password must be at least 8 characters")
+			return
+		}
+		if req.NewPassword != req.ConfirmPassword {
+			mw.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "New passwords do not match")
+			return
+		}
+
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash password")
+			return
+		}
+		if err := queries.UpdateAuthAccountPassword(r.Context(), db.UpdateAuthAccountPasswordParams{
+			ID:             accountID,
+			HashedPassword: hashed,
+		}); err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "UPDATE_FAILED", "Failed to update password")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

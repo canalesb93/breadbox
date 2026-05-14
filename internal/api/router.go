@@ -261,6 +261,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 					r.Use(webui.RequireSessionJSON(sm))
 					r.Get("/me", webui.MeHandler(sm))
 					r.Post("/logout", webui.LogoutHandler(sm))
+					r.Post("/account/password", webui.ChangePasswordHandler(sm, a.Queries))
 				})
 			})
 			// /v2/* — embedded SPA static bundle. The session middleware lets
