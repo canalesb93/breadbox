@@ -7,6 +7,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Toaster } from "@/components/ui/sonner";
 import { NAV_LEAVES, isNavMatch } from "@/lib/nav";
 import { useMe } from "@/api/queries/me";
 import { ApiError } from "@/api/client";
@@ -47,6 +48,7 @@ export function RootLayout() {
           <Outlet />
         </main>
       </SidebarInset>
+      <Toaster />
     </SidebarProvider>
   );
 }
