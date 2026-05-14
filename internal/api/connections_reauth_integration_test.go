@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the reauth REST endpoints.
 //
@@ -84,7 +84,7 @@ func setupReauthEnv(t *testing.T, scope string) *reauthEnv {
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "reauth-test-key", scope)
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "reauth-test-key", scope)
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}

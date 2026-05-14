@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // BackupsProps mirrors the data map that the old backups.html read off the

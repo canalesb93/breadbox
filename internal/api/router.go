@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 import (
@@ -43,6 +45,16 @@ func NewRouter(a *app.App, version string) http.Handler {
 		RequestsPerMinute: a.Config.APIRateLimitRPM,
 		Burst:             a.Config.APIRateLimitBurst,
 	})
+
+	// Device-code auth — unauthenticated; the device_code is itself the
+	// credential the CLI carries while it waits for a browser approval.
+	// Mounted outside the /api/v1 Route block so APIKeyAuth doesn't
+	// intercept the unauthenticated polling loop. Surfaced in
+	// openapi.yaml; the drift test's healthVersionRoutes allowlist keeps
+	// it in sync.
+	r.Post("/api/v1/auth/device-code", CreateDeviceCodeHandler(svc))
+	r.Post("/api/v1/auth/device-code/poll", PollDeviceCodeHandler(svc))
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// Auth runs first so the rate limiter can identify by API key ID.
 		// /health/* and /api/v1/version are mounted outside this Route block
@@ -90,6 +102,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/settings/providers", GetProviderConfigHandler(a))
 		r.Get("/providers", ListProvidersHandler(a))
 		r.Get("/providers/{name}", GetProviderHandler(a))
+		r.Get("/headless/bootstrap", HeadlessBootstrapHandler(svc, a, version))
+		r.Get("/keys/me", WhoamiHandler())
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -149,6 +163,14 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 			r.Put("/settings/providers/plaid", UpdatePlaidConfigHandler(a))
 			r.Put("/settings/providers/teller", UpdateTellerConfigHandler(a))
+			r.Post("/providers/{name}/test", TestProviderHandler(a))
+			r.Delete("/providers/{name}", DisableProviderHandler(a))
+			r.Get("/config", ListConfigHandler(a))
+			r.Get("/config/{key}", GetConfigHandler(a))
+			r.Put("/config/{key}", SetConfigHandler(a))
+			r.Delete("/config/{key}", DeleteConfigHandler(a))
+			r.Get("/webhook-events", ListWebhookEventsHandler(svc))
+			r.Post("/webhook-events/{id}/replay", ReplayWebhookEventHandler(svc, a.SyncEngine))
 			r.Post("/users", CreateUserHandler(svc))
 			r.Patch("/users/{id}", UpdateUserHandler(svc))
 			r.Delete("/users/{id}", DeleteUserHandler(svc))
@@ -158,6 +180,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Patch("/users/{user_id}/login/{login_id}", UpdateUserLoginHandler(svc))
 			r.Delete("/users/{user_id}/login/{login_id}", DeleteUserLoginHandler(svc))
 			r.Post("/users/{user_id}/login/{login_id}/regenerate-token", RegenerateLoginTokenHandler(svc))
+			r.Get("/login-accounts", ListLoginAccountsHandler(svc))
+			r.Delete("/login-accounts/{id}", DeleteLoginAccountHandler(svc))
+			r.Post("/login-accounts/{id}/reset-password", ResetLoginAccountPasswordHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
 			r.Post("/connections/link", CreateHostedLinkHandler(svc))
@@ -210,34 +235,41 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Post("/oauth/token", admin.OAuthTokenHandler(svc))
 	r.Post("/oauth/register", admin.OAuthRegisterHandler(svc))
 
-	// Admin dashboard: session manager + template renderer + admin router.
-	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
-	sm := admin.NewSessionManager(a.DB, isSecure)
+	// Admin dashboard, v2 SPA, and /web/v1 — all gated by the runtime
+	// --no-dashboard flag. When disabled, REST + MCP + OAuth + webhooks stay
+	// reachable; the dashboard surface is silently absent (no admin router
+	// mounted on "/" — bare GET / returns 404). The build-tag side that
+	// strips the assets entirely is `-tags=headless` (see
+	// .claude/rules/build-tags.md).
+	if !a.Config.NoDashboard {
+		isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
+		sm := admin.NewSessionManager(a.DB, isSecure)
 
-	// v2 SPA — internal frontend API and embedded static bundle.
-	// /web/v1/* is session-only, never accepts API keys, and carries zero
-	// stability promise (it is exclusively consumed by the v2 SPA).
-	r.Group(func(r chi.Router) {
-		r.Use(sm.LoadAndSave)
-		r.Route("/web/v1", func(r chi.Router) {
-			r.Use(webui.RequireSessionJSON(sm))
-			r.Get("/me", webui.MeHandler(sm))
+		// v2 SPA — internal frontend API and embedded static bundle.
+		// /web/v1/* is session-only, never accepts API keys, and carries zero
+		// stability promise (it is exclusively consumed by the v2 SPA).
+		r.Group(func(r chi.Router) {
+			r.Use(sm.LoadAndSave)
+			r.Route("/web/v1", func(r chi.Router) {
+				r.Use(webui.RequireSessionJSON(sm))
+				r.Get("/me", webui.MeHandler(sm))
+			})
+			// /v2/* — embedded SPA static bundle. The session middleware lets
+			// the SPA shell load on /login, but the SPA's own queries
+			// (/web/v1/me) gate the authenticated content.
+			r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
+			r.Handle("/v2/*", webui.Handler())
 		})
-		// /v2/* — embedded SPA static bundle. The session middleware lets
-		// the SPA shell load on /login, but the SPA's own queries
-		// (/web/v1/me) gate the authenticated content.
-		r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
-		r.Handle("/v2/*", webui.Handler())
-	})
 
-	tr, err := admin.NewTemplateRenderer(sm)
-	if err != nil {
-		a.Logger.Error("failed to initialize template renderer", "error", err)
-	} else {
-		tr.SetVersion(a.Config.Version)
-		tr.SetVersionChecker(a.VersionChecker)
-		adminRouter := admin.NewAdminRouter(a, sm, tr, svc, mcpServer)
-		r.Mount("/", adminRouter)
+		tr, err := admin.NewTemplateRenderer(sm)
+		if err != nil {
+			a.Logger.Error("failed to initialize template renderer", "error", err)
+		} else {
+			tr.SetVersion(a.Config.Version)
+			tr.SetVersionChecker(a.VersionChecker)
+			adminRouter := admin.NewAdminRouter(a, sm, tr, svc, mcpServer)
+			r.Mount("/", adminRouter)
+		}
 	}
 
 	return r

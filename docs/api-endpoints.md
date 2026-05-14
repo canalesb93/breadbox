@@ -12,6 +12,16 @@ All endpoints live under `/api/v1/` and require `X-API-Key` unless noted. Scope 
 | GET | `/health/live` | none | Alias of `/health` |
 | GET | `/health/ready` | none | DB + scheduler readiness |
 | GET | `/api/v1/version` | none | Build version + upgrade check |
+| GET | `/api/v1/headless/bootstrap` | R | Setup readiness report (consumed by `breadbox doctor`) |
+
+## Auth
+
+Unauthenticated device-code dance the CLI uses to mint API keys on a remote host without a paste-mode token. The `device_code` returned by the initiate call is the credential the polling endpoint accepts; the `user_code` is the short human-facing string the operator types on the browser approval page (`GET /auth/device`, session-gated, not on the public REST surface).
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| POST | `/auth/device-code` | none | Mint a pending device-code pair; returns `device_code`, `user_code`, `verification_url`, `expires_in`, `interval` |
+| POST | `/auth/device-code/poll` | none | Poll status; `200 {status: "authorization_pending"}` or `200 {status: "approved", token: "bb_..."}`, with `400 EXPIRED` / `400 DENIED` / `404 INVALID_DEVICE_CODE` envelopes for terminal states |
 
 ## Accounts
 
@@ -102,6 +112,8 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | GET | `/providers` | R | List installed providers (`{name, configured, needs_link_session}`) |
 | GET | `/providers/{name}` | R | Single provider entry — capability flags for one provider |
 | POST | `/providers/{name}/link-session` | W | Start a link/auth session — returns a provider token when needed; `204` when no link step |
+| POST | `/providers/{name}/test` | W | Round-trip a credentials check; returns `{ok, message}` |
+| DELETE | `/providers/{name}` | W | Disable a provider — clears credentials from `app_config`, drops the live provider entry |
 | POST | `/connections` | W | Create from a provider payload (`provider` discriminator: `plaid`, `teller`) |
 | POST | `/connections/{id}/sync` | W | Trigger sync for one connection (202; runs async) |
 | POST | `/connections/{id}/paused` | W | Pause or resume scheduled syncs |
@@ -170,6 +182,9 @@ The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIR
 | PATCH | `/users/{user_id}/login/{login_id}` | W | Update role |
 | DELETE | `/users/{user_id}/login/{login_id}` | W | Remove a login |
 | POST | `/users/{user_id}/login/{login_id}/regenerate-token` | W | Issue a fresh setup token |
+| GET | `/login-accounts` | W | List every login account (flat — no parent user_id) |
+| DELETE | `/login-accounts/{id}` | W | Delete a login by its own id |
+| POST | `/login-accounts/{id}/reset-password` | W | Issue a fresh setup token (flat alias of `regenerate-token`) |
 
 ## Account links (dependent-account mirroring)
 
@@ -204,8 +219,9 @@ The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIR
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
 | GET | `/api-keys` | W | List keys (hashed prefixes only — never plaintext) |
-| POST | `/api-keys` | W | Create. **Response includes plaintext `key` once.** |
+| POST | `/api-keys` | W | Create. **Response includes plaintext `key` once.** Accepts optional `actor_type` (`user`/`agent`/`system`, default `agent`) and `actor_name` |
 | DELETE | `/api-keys/{id}` | W | Soft-revoke a key |
+| GET | `/keys/me` | R | Whoami: return the calling key's id, prefix, scope, actor_type, actor_name |
 
 ## Provider settings
 
@@ -216,6 +232,24 @@ The bearer middleware returns `401 INVALID_TOKEN` for unknown tokens, `410 EXPIR
 | PUT | `/settings/providers/teller` | W | Set/update Teller `application_id`, cert + private key PEM |
 
 Empty sensitive fields on PUT preserve the stored value (so you can update `webhook_url` without retyping the secret). All sensitive fields are AES-256-GCM encrypted at rest.
+
+## App config
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/config` | W | List every app_config row with effective source (`env` / `db` / `default`); secret values are masked unless `?reveal=true` |
+| GET | `/config/{key}` | W | Get a single config value; same masking and `?reveal=true` semantics |
+| PUT | `/config/{key}` | W | Write a value into the app_config table (body: `{"value":"..."}`) |
+| DELETE | `/config/{key}` | W | Drop the row (effective value falls back to env or compile-in default) |
+
+Secret-flagged keys are masked on read. A denylist of keys (`ENCRYPTION_KEY`, `teller_cert_pem`, `teller_key_pem`) may never be revealed and refuse writes via this surface — manage them through env vars or the admin UI.
+
+## Webhook events
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/webhook-events` | W | Paginated list of recent webhook events; filters `provider`, `status`, `page`, `limit` |
+| POST | `/webhook-events/{id}/replay` | W | Re-trigger the manual sync the event would have caused; events without a connection are reported as `triggered: false` |
 
 ## Rate limiting
 

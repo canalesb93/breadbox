@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 // Package webui embeds the v2 SPA build (web/dist) and serves it under /v2/*.
 //
 // When the bundle hasn't been built (only web/dist/.gitkeep present),

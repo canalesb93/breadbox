@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // ConnectionsProps mirrors the data map the old connections.html read off

@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 // Generic provider registry + dispatch for the public REST API.

@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate
 
 PORT ?= 8080
 
@@ -32,8 +32,18 @@ templ-install:
 # templ generates *_templ.go for every *.templ file. Always runs — templ is
 # fast enough (a few hundred ms) that the cost beats the complexity of
 # timestamp-based skip logic, and missing generated files break the build.
+#
+# templ does not currently emit `//go:build` constraints, so we prepend
+# `//go:build !headless && !lite` to every generated `*_templ.go` file
+# under internal/templates/components — those files belong to the
+# dashboard surface and must be excluded from headless and lite builds.
 templ: templ-install
 	templ generate
+	@find internal/templates/components -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do \
+		if ! head -1 "$$f" | grep -q '^//go:build'; then \
+			printf '//go:build !headless && !lite\n\n' | cat - "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
+		fi; \
+	done
 
 # templ-check fails if generated files are stale. Used in CI so a PR cannot
 # land with hand-edited .templ files that nobody regenerated.
@@ -102,6 +112,18 @@ dev-stop:
 build: generate web
 	go build -o breadbox ./cmd/breadbox
 
+# build-headless: server + REST + MCP + OAuth + webhooks, NO dashboard assets.
+# Strips internal/admin, internal/templates, and the v2 SPA from the binary
+# via -tags=headless. See .claude/rules/build-tags.md.
+build-headless: generate
+	go build -tags=headless -o breadbox ./cmd/breadbox
+
+# build-lite: CLI-only binary (named `breadbox-cli`). No server packages,
+# no DB drivers, no provider SDKs — for remote agents that only need to
+# drive a Breadbox over HTTP.
+build-lite:
+	go build -tags=lite -o breadbox-cli ./cmd/breadbox
+
 # web-install: install bun dependencies for the v2 SPA. Idempotent — bun
 # install short-circuits when the lockfile is unchanged.
 web-install:
@@ -134,6 +156,15 @@ test-integration: generate
 lint: generate
 	go vet ./...
 
+# lint-headless and lint-lite mirror the CI matrix locally. Run them before
+# pushing a build-tag-touching change so you catch the per-tag breakage
+# before the PR opens.
+lint-headless: generate
+	go vet -tags=headless ./...
+
+lint-lite: generate
+	go vet -tags=lite ./...
+
 # openapi-validate lints the hand-authored openapi.yaml at the repo root.
 # Real CI enforcement is the TestOpenAPIDrift integration test in
 # internal/api — this target exists for local dev convenience and uses
@@ -164,6 +195,18 @@ sqlc-install:
 sqlc: sqlc-install
 	@rm -f internal/db/*.sql.go internal/db/models.go internal/db/db.go
 	sqlc generate
+	@$(MAKE) sqlc-tag
+
+# sqlc-tag prepends `//go:build !lite` to every sqlc-generated file in
+# internal/db. sqlc 1.23 (pinned in sqlc-install) does not yet support the
+# `emit_build_tag` option (added in 1.27+), so we patch the artifacts in a
+# follow-up step. CI runs the same target.
+sqlc-tag:
+	@for f in internal/db/db.go internal/db/models.go internal/db/*.sql.go; do \
+		if [ -f "$$f" ] && ! head -1 "$$f" | grep -q '^//go:build'; then \
+			printf '//go:build !lite\n\n' | cat - "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
+		fi; \
+	done
 
 seed:
 	go run ./cmd/breadbox seed

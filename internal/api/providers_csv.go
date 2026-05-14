@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 // CSV entry in the generic provider dispatch table.

@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // stdioConfigJSON is the static stdio MCP-server snippet shown in the

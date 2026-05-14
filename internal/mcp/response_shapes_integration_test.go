@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 package mcp
 
@@ -63,7 +63,7 @@ func seedFixtures(t *testing.T) *fixtures {
 		t.Fatal("BuildServer returned nil")
 	}
 
-	ctx := service.ContextWithAPIKey(context.Background(), "test-api-key", "TestKey")
+	ctx := service.ContextWithAPIKeyLegacy(context.Background(), "test-api-key", "TestKey")
 
 	user := testutil.MustCreateUser(t, q, "Alice")
 	conn := testutil.MustCreateConnection(t, q, user.ID, "item_primary")

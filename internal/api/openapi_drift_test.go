@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Drift test: assert openapi.yaml and the live chi router agree on the
 // /api/v1/* surface. Run with:
@@ -35,11 +35,18 @@ var liveRouteRegex = regexp.MustCompile(
 // healthVersionRoutes are the auth-free routes mounted outside /api/v1 that
 // the spec still documents. The drift check stitches them into the live set
 // so spec parity covers them too.
+//
+// `/api/v1/auth/device-code*` lives here because device-code endpoints must
+// run without APIKeyAuth — there is no API key yet — so they are mounted
+// at the top-level router rather than inside the `r.Route("/api/v1", ...)`
+// block the regex scans.
 var healthVersionRoutes = map[string]struct{}{
-	"GET /health":         {},
-	"GET /health/live":    {},
-	"GET /health/ready":   {},
-	"GET /api/v1/version": {},
+	"GET /health":                            {},
+	"GET /health/live":                       {},
+	"GET /health/ready":                      {},
+	"GET /api/v1/version":                    {},
+	"POST /api/v1/auth/device-code":          {},
+	"POST /api/v1/auth/device-code/poll":     {},
 }
 
 // liveRoutesFromSource greps router.go for chi route declarations under

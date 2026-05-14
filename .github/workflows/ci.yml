@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   pull_request:
-    branches: [main, "stack/**"]
+    branches: [main, "stack/**", "feat/**"]
   merge_group:
   push:
     branches: [main]
@@ -45,11 +45,25 @@ jobs:
         run: |
           curl -sL https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin sqlc
           sqlc generate
+          # Prepend //go:build !lite to every generated file so they're
+          # excluded from -tags=lite builds. Mirrors `make sqlc-tag`.
+          for f in internal/db/db.go internal/db/models.go internal/db/*.sql.go; do
+            if [ -f "$f" ] && ! head -1 "$f" | grep -q '^//go:build'; then
+              printf '//go:build !lite\n\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            fi
+          done
 
       - name: Install templ and generate
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
           templ generate
+          # Prepend //go:build !headless && !lite to every generated templ
+          # file in internal/templates/components. Mirrors `make templ`.
+          find internal/templates/components -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do
+            if ! head -1 "$f" | grep -q '^//go:build'; then
+              printf '//go:build !headless && !lite\n\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            fi
+          done
           # Fail fast if the committed *.templ files don't regenerate to the
           # *_templ.go already in the tree (they shouldn't exist in git, but
           # if someone lands a manual edit this surfaces it).
@@ -98,9 +112,87 @@ jobs:
           DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
         run: go test -tags integration -count=1 -p 1 ./...
 
+  test-headless:
+    name: Test (headless)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install sqlc and generate
+        run: |
+          curl -sL https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin sqlc
+          sqlc generate
+          for f in internal/db/db.go internal/db/models.go internal/db/*.sql.go; do
+            if [ -f "$f" ] && ! head -1 "$f" | grep -q '^//go:build'; then
+              printf '//go:build !lite\n\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            fi
+          done
+
+      - name: Install templ and generate
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          templ generate
+          find internal/templates/components -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do
+            if ! head -1 "$f" | grep -q '^//go:build'; then
+              printf '//go:build !headless && !lite\n\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            fi
+          done
+
+      - name: Build CSS
+        # The static package (internal/mcp/server.go imports it for the
+        # favicon) still needs static/css/styles.css to exist for the
+        # `//go:embed all:css` directive to resolve. Headless builds don't
+        # serve the CSS at runtime — but the file has to be present to
+        # compile.
+        run: make css
+
+      - name: go build -tags=headless
+        run: go build -tags=headless ./...
+
+      - name: go vet -tags=headless
+        run: go vet -tags=headless ./...
+
+      - name: go test -tags=headless
+        run: go test -tags=headless ./...
+
+  test-lite:
+    name: Test (lite, CLI-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      # No sqlc/templ generation needed: -tags=lite excludes internal/db and
+      # internal/templates entirely, so the generated artifacts wouldn't even
+      # be part of the build graph. We still create empty stubs for the
+      # *_templ.go references so v1 doesn't drift if the build picks them up
+      # via some untagged-pkg edge case (it currently doesn't).
+
+      - name: go build -tags=lite
+        run: go build -tags=lite ./...
+
+      - name: go vet -tags=lite
+        run: go vet -tags=lite ./...
+
+      - name: go test -tags=lite
+        run: go test -tags=lite ./...
+
+      - name: go build -tags=lite -o breadbox-cli ./cmd/breadbox
+        run: |
+          go build -tags=lite -o breadbox-cli ./cmd/breadbox
+          ls -lh breadbox-cli
+          ./breadbox-cli --help | head -20
+
   build:
     name: Build & Push
-    needs: test
+    needs: [test, test-headless, test-lite]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -154,7 +246,7 @@ jobs:
 
   release:
     name: Release Binaries
-    needs: test
+    needs: [test, test-headless, test-lite]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:

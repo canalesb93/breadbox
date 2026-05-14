@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // SessionDetailProps mirrors the data the old session_detail.html

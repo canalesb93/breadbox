@@ -1,3 +1,5 @@
+//go:build !lite
+
 package service
 
 import "errors"
@@ -15,4 +17,8 @@ var (
 	// session). Distinct from ErrInvalidParameter (bad input) and ErrNotFound
 	// (no such row).
 	ErrInvalidState = errors.New("invalid state")
+	// ErrExpired indicates a time-bounded resource (device code, token,
+	// hosted-link session) has passed its expiration. Distinct from
+	// ErrNotFound because the row still exists, just unusable.
+	ErrExpired = errors.New("expired")
 )

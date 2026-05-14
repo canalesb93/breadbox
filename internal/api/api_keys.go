@@ -1,3 +1,5 @@
+//go:build !lite
+
 package api
 
 import (
@@ -35,8 +37,10 @@ func ListAPIKeysHandler(svc *service.Service) http.HandlerFunc {
 func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Name  string `json:"name"`
-			Scope string `json:"scope"`
+			Name      string `json:"name"`
+			Scope     string `json:"scope"`
+			ActorType string `json:"actor_type"`
+			ActorName string `json:"actor_name"`
 		}
 		if !decodeJSON(w, r, &req) {
 			return
@@ -53,12 +57,66 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "scope must be full_access or read_only")
 			return
 		}
-		result, err := svc.CreateAPIKey(r.Context(), req.Name, req.Scope)
+		if req.ActorType == "" {
+			req.ActorType = "agent"
+		}
+		if req.ActorType != "user" && req.ActorType != "agent" && req.ActorType != "system" {
+			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "actor_type must be user, agent, or system")
+			return
+		}
+		result, err := svc.CreateAPIKey(r.Context(), service.CreateAPIKeyParams{
+			Name:      req.Name,
+			Scope:     req.Scope,
+			ActorType: req.ActorType,
+			ActorName: strings.TrimSpace(req.ActorName),
+		})
 		if err != nil {
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create API key")
 			return
 		}
 		writeJSON(w, http.StatusCreated, result)
+	}
+}
+
+// WhoamiResponse is the shape returned by GET /api/v1/keys/me — small
+// purpose-built endpoint the CLI uses for `breadbox auth whoami`. Mirrors
+// APIKeyResponse but omits sensitive fields and never returns plaintext.
+type WhoamiResponse struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	KeyPrefix string  `json:"key_prefix"`
+	Scope     string  `json:"scope"`
+	ActorType string  `json:"actor_type"`
+	ActorName *string `json:"actor_name,omitempty"`
+	CreatedAt string  `json:"created_at"`
+}
+
+// WhoamiHandler returns the API key record corresponding to the caller's
+// credential — the row middleware already loaded. Mounted at
+// GET /api/v1/keys/me; readable with any scope (it only reveals data the
+// caller already presented).
+func WhoamiHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key := mw.GetAPIKey(r.Context())
+		if key == nil {
+			mw.WriteError(w, http.StatusUnauthorized, "MISSING_CREDENTIALS", "API key context missing")
+			return
+		}
+		resp := WhoamiResponse{
+			ID:        key.ID.String(),
+			Name:      key.Name,
+			KeyPrefix: key.KeyPrefix,
+			Scope:     key.Scope,
+			ActorType: key.ActorType,
+		}
+		if key.ActorName.Valid {
+			s := key.ActorName.String
+			resp.ActorName = &s
+		}
+		if key.CreatedAt.Valid {
+			resp.CreatedAt = key.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z")
+		}
+		writeData(w, resp)
 	}
 }
 

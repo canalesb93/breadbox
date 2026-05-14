@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"breadbox/internal/crypto"
 
@@ -105,7 +106,19 @@ func Load() (*Config, error) {
 	cfg.APIRateLimitRPM = getEnvInt("API_RATE_LIMIT_RPM", 120)
 	cfg.APIRateLimitBurst = getEnvInt("API_RATE_LIMIT_BURST", 60)
 
+	// Dashboard gate. Truthy values: "1", "true", "yes", "on" (case-insensitive).
+	cfg.NoDashboard = parseBool(os.Getenv("BREADBOX_NO_DASHBOARD"))
+
 	return cfg, nil
+}
+
+// parseBool returns true for "1", "true", "yes", "on" (case-insensitive); false otherwise.
+func parseBool(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // LoadWithDB merges app_config table values into the config. Environment

@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && !lite
 
 // Integration tests for the generic provider registry endpoints
 // (GET /api/v1/providers, GET /api/v1/providers/{name},
@@ -48,7 +48,7 @@ func setupProvidersEnv(t *testing.T, scope string, registerPlaid, registerTeller
 	engine := bsync.NewEngine(queries, pool, nil, slog.Default())
 	svc := service.New(queries, pool, engine, slog.Default())
 
-	keyResult, err := svc.CreateAPIKey(t.Context(), "providers-test-key", scope)
+	keyResult, err := svc.CreateAPIKeyLegacy(t.Context(), "providers-test-key", scope)
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}

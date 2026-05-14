@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package pages
 
 // GettingStartedProps mirrors the data map the old getting_started.html

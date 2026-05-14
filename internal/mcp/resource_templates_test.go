@@ -1,3 +1,5 @@
+//go:build !lite
+
 package mcp
 
 // Unit tests for the template URI parser. No DB needed — these stay outside

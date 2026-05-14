@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package admin
 
 import (
@@ -206,6 +208,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/users/{id}/create-login", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/settings/household/"+chi.URLParam(r, "id")+"/create-login", http.StatusMovedPermanently)
 		})
+
+		// Device-code approval page — admin-only because approving mints a
+		// new API key. GET shows the form, POST handles approve/deny.
+		r.Get("/auth/device", DeviceCodeApprovalHandler(svc, sm))
+		r.Post("/auth/device", DeviceCodeApprovalHandler(svc, sm))
 
 		// API key and OAuth client revoke — admin only.
 		r.Post("/settings/api-keys/{id}/revoke", APIKeyRevokePageHandler(svc, sm))

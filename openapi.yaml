@@ -137,6 +137,124 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VersionResponse" }
 
+  /api/v1/auth/device-code:
+    post:
+      tags: [Auth]
+      summary: Initiate the device-code flow
+      description: |
+        Mint a pending device-code pair. Unauthenticated — the device_code
+        returned in the body is itself the credential the CLI uses to poll.
+        The user_code is the human-facing 8-char approval code (formatted
+        XXXX-XXXX) the operator enters on the verification page.
+      security: []
+      responses:
+        "201":
+          description: Pending device-code created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [device_code, user_code, verification_url, expires_in, interval]
+                properties:
+                  device_code: { type: string, description: Opaque polling credential carried by the CLI }
+                  user_code: { type: string, description: 8-char human-facing code formatted XXXX-XXXX }
+                  verification_url: { type: string, description: URL the operator opens to approve }
+                  expires_in: { type: integer, description: TTL in seconds (10 minutes by default) }
+                  interval: { type: integer, description: Suggested polling cadence in seconds }
+
+  /api/v1/auth/device-code/poll:
+    post:
+      tags: [Auth]
+      summary: Poll the status of a pending device code
+      description: |
+        Unauthenticated; the device_code is the credential. Returns one of:
+        - `200 {status: "authorization_pending"}` — keep polling
+        - `200 {status: "approved", token: "bb_..."}` — token returned exactly once
+        - `400 {error: {code: "EXPIRED"}}` — past the TTL
+        - `400 {error: {code: "DENIED"}}` — operator refused
+        - `404 {error: {code: "INVALID_DEVICE_CODE"}}` — unknown code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_code]
+              properties:
+                device_code: { type: string }
+      responses:
+        "200":
+          description: Polling outcome.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [authorization_pending, approved] }
+                  token: { type: string, description: Plaintext API key — returned exactly once on the first approved poll }
+        "400":
+          description: Terminal failure (EXPIRED or DENIED).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "404":
+          description: Unknown device_code.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/headless/bootstrap:
+    get:
+      tags: [Health]
+      summary: Setup readiness report
+      description: |
+        Returns a one-shot readiness/setup summary intended for the
+        `breadbox doctor` CLI command. Any API key (read or write) works.
+        Fields are best-effort — a per-row failure stays zero and the report
+        still ships. The endpoint returns 503 only when the database is
+        plainly unreachable.
+      responses:
+        "200":
+          description: Bootstrap report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HeadlessBootstrapResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: Database is not reachable; partial report in body.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/keys/me:
+    get:
+      tags: [API Keys]
+      summary: Identify the calling API key (whoami)
+      description: |
+        Returns the API key record corresponding to the presented
+        credential — name, prefix, scope, actor type/name. The full
+        secret is never re-exposed. Used by `breadbox auth whoami` so
+        agents and humans can confirm which identity the CLI is acting
+        under. Any scope; the data only describes the caller's own key.
+      responses:
+        "200":
+          description: Identity record for the calling key.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, key_prefix, scope, actor_type, created_at]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  key_prefix: { type: string }
+                  scope: { type: string, enum: [read_only, full_access] }
+                  actor_type: { type: string, enum: [user, agent, system] }
+                  actor_name: { type: string, nullable: true }
+                  created_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   # -- Accounts --
   /api/v1/accounts:
     get:
@@ -981,6 +1099,30 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderInfo" }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Connections]
+      summary: Disable a provider
+      description: |
+        Clears every `app_config` row tied to the named provider (Plaid:
+        client_id/secret/env; Teller: app_id/env/cert/key/webhook secret) and
+        re-runs the live provider init so the in-memory map drops the
+        provider. Existing connections stay in the DB and continue to surface
+        in listings, but sync attempts fail until credentials are restored.
+        CSV has no credentials and is a no-op.
+
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Provider disabled.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider: { type: string }
+                  ok: { type: boolean }
+                  message: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/providers/{name}/link-session:
     parameters:
       - name: name
@@ -1024,6 +1166,223 @@ paths:
         "204": { description: "No init token needed; proceed to POST /connections." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/providers/{name}/test:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string, enum: [plaid, teller, csv] }
+    post:
+      tags: [Connections]
+      summary: Round-trip a provider credentials check
+      description: |
+        Validates the server-side credentials for the named provider. CSV has
+        no credentials and always returns ok=true. Plaid hits
+        `/institutions/get` with a tiny payload; Teller validates the stored
+        cert/key pair (file path or in-memory PEM) against `crypto/tls`.
+
+        A reachable server with bad credentials still returns 200 with
+        `ok=false` and a human-readable message, so CLI agents can branch on
+        the JSON without parsing status codes.
+
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Credential-check result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider: { type: string }
+                  ok: { type: boolean }
+                  message: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/config:
+    get:
+      tags: [Settings]
+      summary: List app_config entries
+      description: |
+        Returns every row in the `app_config` table with the effective source
+        (`env` / `db` / `default`). Secret-flagged values are masked unless
+        `?reveal=true` is set. A denylist of keys (`ENCRYPTION_KEY` and the
+        Teller cert/key PEM rows) is always masked and never writable via
+        this surface — manage them through env vars or the admin UI.
+
+        **Requires `full_access` scope.**
+      parameters:
+        - name: reveal
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Config entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    value: { type: string, nullable: true }
+                    masked: { type: boolean }
+                    source: { type: string, enum: [env, db, default] }
+                    secret: { type: boolean }
+  /api/v1/config/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Settings]
+      summary: Get a single config entry
+      description: Same masking + `?reveal=true` semantics as the list endpoint.
+      parameters:
+        - name: reveal
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Config entry.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  value: { type: string, nullable: true }
+                  masked: { type: boolean }
+                  source: { type: string, enum: [env, db, default] }
+                  secret: { type: boolean }
+    put:
+      tags: [Settings]
+      summary: Set a config value
+      description: |
+        Writes the named value to the `app_config` table. The
+        always-denied key list (`ENCRYPTION_KEY`, `teller_cert_pem`,
+        `teller_key_pem`) returns `403 FORBIDDEN`.
+
+        **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+      responses:
+        "200":
+          description: Saved entry.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  value: { type: string, nullable: true }
+                  source: { type: string, enum: [env, db, default] }
+                  secret: { type: boolean }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [Settings]
+      summary: Remove a db-sourced config value
+      description: |
+        Drops the `app_config` row. The effective value falls back to env or
+        the compile-in default. The always-denied key list returns `403`.
+
+        **Requires `full_access` scope.**
+      responses:
+        "204": { description: "Key removed." }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/webhook-events:
+    get:
+      tags: [Webhooks]
+      summary: List recent webhook events
+      description: |
+        Paginated list of inbound provider webhooks (event_type, status,
+        connection_id, institution name, created_at). Filters: `provider`,
+        `status`, `page`, `limit` (max 200).
+
+        **Requires `full_access` scope.**
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema: { type: string, enum: [plaid, teller] }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [received, processed, error] }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: Page of webhook events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhook_events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        provider: { type: string }
+                        event_type: { type: string }
+                        connection_id: { type: string, nullable: true }
+                        institution_name: { type: string, nullable: true }
+                        raw_payload_hash: { type: string }
+                        status: { type: string }
+                        error_message: { type: string, nullable: true }
+                        created_at: { type: string, nullable: true }
+                  total: { type: integer }
+                  page: { type: integer }
+                  page_size: { type: integer }
+                  total_pages: { type: integer }
+  /api/v1/webhook-events/{id}/replay:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [Webhooks]
+      summary: Re-trigger the sync the webhook would have caused
+      description: |
+        The event row's raw payload is hashed-only, so the server can't
+        re-deliver it verbatim — instead, it kicks a manual `Sync` against
+        the connection the event was associated with. Events without a
+        connection return 200 with `triggered: false`.
+
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Replay result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhook_event_id: { type: string }
+                  connection_id: { type: string }
+                  triggered: { type: boolean }
+                  message: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/BadGateway" }
   /api/v1/connections/plaid/link-token:
     post:
       tags: [Connections]
@@ -1618,6 +1977,50 @@ paths:
                 type: object
                 additionalProperties: true
 
+  /api/v1/login-accounts:
+    get:
+      tags: [Users]
+      summary: List every login account (flat — no parent user_id)
+      description: |
+        Top-level convenience for the headless CLI. Identical payload to the
+        nested per-user endpoint, but returns the full set across users.
+        **Requires `full_access` scope.** `setup_token` is never echoed here.
+      responses:
+        "200":
+          description: Login accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UserLogin" }
+  /api/v1/login-accounts/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Users]
+      summary: Delete a login account by its own id (no parent user_id required)
+      description: "**Requires `full_access` scope.**"
+      responses:
+        "204": { description: Deleted. }
+  /api/v1/login-accounts/{id}/reset-password:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Users]
+      summary: Issue a fresh setup token for a login account
+      description: |
+        Flat alias for `/users/{user_id}/login/{login_id}/regenerate-token`.
+        Response includes the plaintext `setup_token` exactly once.
+        **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Token payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   # -- Account links --
   /api/v1/account-links:
     get:
@@ -2068,6 +2471,83 @@ components:
         version: { type: string }
         latest: { type: string, nullable: true }
         update_available: { type: boolean }
+    HeadlessBootstrapResponse:
+      type: object
+      description: Readiness/setup summary consumed by `breadbox doctor`.
+      required:
+        [
+          version,
+          encryption_key_set,
+          database,
+          providers,
+          users_count,
+          login_accounts_count,
+          api_keys_count,
+          active_connections_count,
+          scheduler_running,
+          first_run,
+        ]
+      properties:
+        version: { type: string, description: Server build version. }
+        encryption_key_set:
+          { type: boolean, description: True when ENCRYPTION_KEY is set. }
+        database:
+          type: object
+          required: [connected, migrations_current, migration_version]
+          properties:
+            connected: { type: boolean }
+            migrations_current:
+              {
+                type: boolean,
+                description: True when the applied goose version meets or exceeds the highest embedded migration.,
+              }
+            migration_version:
+              {
+                type: integer,
+                format: int64,
+                description: Highest version_id applied in goose_db_version (0 if unread).,
+              }
+        providers:
+          type: array
+          description: Provider configuration status. Order is stable (plaid, teller).
+          items:
+            type: object
+            required: [name, configured]
+            properties:
+              name: { type: string, enum: [plaid, teller] }
+              configured: { type: boolean }
+              env:
+                {
+                  type: string,
+                  description: "Environment label (e.g. sandbox, production). Omitted when not configured.",
+                }
+        users_count:
+          { type: integer, format: int64, description: Household user count. }
+        login_accounts_count:
+          {
+            type: integer,
+            format: int64,
+            description: Admin / dashboard login account count.,
+          }
+        api_keys_count:
+          {
+            type: integer,
+            format: int64,
+            description: Active (un-revoked) API key count.,
+          }
+        active_connections_count:
+          {
+            type: integer,
+            format: int64,
+            description: Bank connections in 'active' status.,
+          }
+        scheduler_running:
+          { type: boolean, description: True when the sync scheduler has active cron entries. }
+        first_run:
+          {
+            type: boolean,
+            description: True when `login_accounts_count == 0` — the same signal used by the admin first-run redirect.,
+          }
     Account:
       type: object
       properties:
