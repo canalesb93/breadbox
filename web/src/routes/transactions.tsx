@@ -280,7 +280,9 @@ export function TransactionsPage() {
                 }`}
           </span>
           {focusedIndex == null && (
-            <span className="text-xs">· Press J / K to navigate</span>
+            <span className="hidden text-xs sm:inline">
+              · Press J / K to navigate
+            </span>
           )}
         </div>
       )}

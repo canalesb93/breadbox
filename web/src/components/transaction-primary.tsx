@@ -17,7 +17,7 @@ export function TransactionPrimary({
   className,
 }: TransactionPrimaryProps) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <CategoryIconTile
         icon={t.category?.icon}
         color={t.category?.color}

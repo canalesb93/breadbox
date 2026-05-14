@@ -63,7 +63,9 @@ const baseColumns: ColumnDef<Transaction>[] = [
   {
     id: "category",
     header: "Category",
-    meta: { className: "w-px" },
+    // Hidden on mobile — the description column takes the freed space; the
+    // category is still editable from the detail page.
+    meta: { className: "w-px hidden sm:table-cell" },
     cell: ({ row }) => (
       <CategoryPicker
         transactionId={row.original.id}

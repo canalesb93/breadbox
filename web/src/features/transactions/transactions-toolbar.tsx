@@ -140,6 +140,9 @@ export function TransactionsToolbar({
           />
         </div>
 
+        {/* Filter pills — grouped so they wrap as a unit, independent of
+            the sort/select controls. */}
+        <div className="flex flex-wrap items-center gap-2">
         {/* Account */}
         <FilterPill icon={Banknote} label="Account" active={!!account}>
           <Command>
@@ -307,6 +310,7 @@ export function TransactionsToolbar({
             </CommandList>
           </Command>
         </FilterPill>
+        </div>
 
         <div className="grow" />
 

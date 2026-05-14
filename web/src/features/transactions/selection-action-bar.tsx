@@ -65,7 +65,7 @@ export function SelectionActionBar({
 
   return (
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-      <div className="bg-popover text-popover-foreground flex items-center gap-1 rounded-full border p-1 pl-3 shadow-lg">
+      <div className="bg-popover text-popover-foreground flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 pl-3 shadow-lg">
         <span className="text-sm font-medium">
           {totalCount != null && totalCount > selectedIds.length
             ? `${selectedIds.length} of ${totalCount.toLocaleString()} selected`
@@ -121,7 +121,7 @@ function CategorizeAction({
           disabled={disabled}
         >
           <Shapes className="size-4" />
-          Categorize
+          <span className="hidden sm:inline">Categorize</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="center" side="top">
@@ -155,7 +155,7 @@ function TagAction({
           disabled={disabled}
         >
           <Tag className="size-4" />
-          Tag
+          <span className="hidden sm:inline">Tag</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-0" align="center" side="top">
