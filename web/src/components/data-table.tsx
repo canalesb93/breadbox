@@ -5,6 +5,7 @@ import {
   useReactTable,
   type ColumnDef,
   type OnChangeFn,
+  type RowData,
   type RowSelectionState,
   type SortingState,
 } from "@tanstack/react-table";
@@ -18,6 +19,15 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+// Per-column className, applied to both the header cell and every body cell.
+// Lets a column opt into width behaviour (e.g. `w-px` to shrink to content).
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    className?: string;
+  }
+}
 
 export interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -102,13 +112,19 @@ export function DataTable<TData, TValue>({
   const colCount = columns.length;
 
   return (
+    // The shadcn Table primitive already wraps the <table> in its own
+    // overflow-x-auto container, so narrow viewports scroll horizontally
+    // without a second scroll container here.
     <div className="rounded-md border">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+                <TableHead
+                  key={header.id}
+                  className={header.column.columnDef.meta?.className}
+                >
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -155,22 +171,30 @@ export function DataTable<TData, TValue>({
             table.getRowModel().rows.map((row) => {
               const focused = row.id === focusedRowId;
               return (
-              <TableRow
-                key={row.id}
-                ref={focused ? focusedRowRef : undefined}
-                data-state={row.getIsSelected() ? "selected" : undefined}
-                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={cn(
-                  onRowClick && "cursor-pointer",
-                  focused && "ring-primary ring-1 ring-inset",
-                )}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
+                <TableRow
+                  key={row.id}
+                  ref={focused ? focusedRowRef : undefined}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
+                  onClick={
+                    onRowClick ? () => onRowClick(row.original) : undefined
+                  }
+                  className={cn(
+                    onRowClick && "cursor-pointer",
+                    focused && "ring-primary ring-2 ring-inset outline-none",
+                  )}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cell.column.columnDef.meta?.className}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
               );
             })
           )}

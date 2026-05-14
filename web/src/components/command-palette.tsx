@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { ArrowUpDown, CircleDot, type LucideIcon } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -13,6 +14,42 @@ import { NAV, navKey } from "@/lib/nav";
 import { openModal } from "@/lib/modals";
 import { useShortcut } from "@/lib/shortcuts";
 import { useLogout } from "@/api/queries/auth";
+import type { TransactionsSearch } from "@/routes/transactions";
+
+// Quick "jump to this transactions view" actions. Each merges its params
+// into the current transactions search. `value` carries extra search terms
+// so cmdk surfaces them on partial matches ("pend", "larg").
+const TX_QUICK_ACTIONS: {
+  title: string;
+  value: string;
+  icon: LucideIcon;
+  search: Partial<TransactionsSearch>;
+}[] = [
+  {
+    title: "Filter: Pending",
+    value: "transactions filter pending unreviewed",
+    icon: CircleDot,
+    search: { pending: "true" },
+  },
+  {
+    title: "Filter: Posted",
+    value: "transactions filter posted cleared",
+    icon: CircleDot,
+    search: { pending: "false" },
+  },
+  {
+    title: "Sort: Largest amount",
+    value: "transactions sort amount largest highest",
+    icon: ArrowUpDown,
+    search: { sort: "amount", dir: "desc" },
+  },
+  {
+    title: "Sort: Newest first",
+    value: "transactions sort date newest recent",
+    icon: ArrowUpDown,
+    search: { sort: "date", dir: "desc" },
+  },
+];
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
@@ -22,6 +59,9 @@ export function CommandPalette() {
   useShortcut(["mod", "k"], () => setOpen((v) => !v), {
     label: "Open command palette",
     group: "Global",
+    // ⌘K must toggle from anywhere — including from inside the palette
+    // itself (its own search input / dialog) to close it.
+    global: true,
   });
 
   const go = (to: string) => {
@@ -32,6 +72,17 @@ export function CommandPalette() {
   const runOpenModal = (modalKey: string) => {
     setOpen(false);
     navigate({ to: ".", search: openModal(modalKey) });
+  };
+
+  const runQuickFilter = (patch: Partial<TransactionsSearch>) => {
+    setOpen(false);
+    // Merge onto the current search rather than replacing it — "Sort:
+    // Largest" shouldn't wipe an active filter. Unknown keys carried in from
+    // another route's params are stripped by the transactions search schema.
+    navigate({
+      to: "/transactions",
+      search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }),
+    });
   };
 
   const runLogout = async () => {
@@ -66,6 +117,22 @@ export function CommandPalette() {
             })}
           </CommandGroup>
         ))}
+        <CommandSeparator />
+        <CommandGroup heading="Transactions">
+          {TX_QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            return (
+              <CommandItem
+                key={action.title}
+                value={action.value}
+                onSelect={() => runQuickFilter(action.search)}
+              >
+                <Icon className="size-4" />
+                <span>{action.title}</span>
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Account">
           <CommandItem value="logout sign out" onSelect={runLogout}>

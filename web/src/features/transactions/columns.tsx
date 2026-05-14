@@ -1,11 +1,8 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CategoryBadge } from "@/components/category-badge";
-import { CategoryIconTile } from "@/components/category-icon-tile";
-import { TagList } from "@/components/tag-chip";
-import { formatAmount, formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { CategoryPicker } from "@/components/category-picker";
+import { TransactionPrimary } from "@/components/transaction-primary";
+import { TransactionAmount } from "@/components/transaction-amount";
 import type { Transaction } from "@/api/types";
 
 // TransactionTableMeta is the shape passed through DataTable's `meta` prop so
@@ -18,6 +15,7 @@ export interface TransactionTableMeta {
 
 const selectionColumn: ColumnDef<Transaction> = {
   id: "select",
+  meta: { className: "w-px" },
   header: ({ table }) => (
     <Checkbox
       checked={
@@ -36,7 +34,10 @@ const selectionColumn: ColumnDef<Transaction> = {
         // Shift-click extends the selection from the last-toggled row. The
         // normal onCheckedChange still fires and lands the current row in the
         // same (selected) state the range sets, so no preventDefault needed.
+        // stopPropagation keeps the row-body select-mode click from also
+        // toggling — otherwise a checkbox click would toggle twice.
         onClick={(e) => {
+          e.stopPropagation();
           if (e.shiftKey) meta?.onRangeSelect?.(row.index);
         }}
         onCheckedChange={(value) => {
@@ -50,95 +51,34 @@ const selectionColumn: ColumnDef<Transaction> = {
   enableSorting: false,
 };
 
+// Description is the greedy column (no width class); category and amount
+// shrink to their content via `w-px` so the description gets the slack and
+// its title can truncate.
 const baseColumns: ColumnDef<Transaction>[] = [
-  {
-    accessorKey: "date",
-    header: "Date",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground tabular-nums whitespace-nowrap">
-        {formatDate(row.original.date)}
-      </span>
-    ),
-  },
   {
     id: "description",
     header: "Description",
-    cell: ({ row }) => {
-      const t = row.original;
-      // provider_name is the raw bank description (the primary label, per the
-      // #1072 decision). provider_merchant_name is the cleaned merchant — show
-      // it as a subtitle only when it adds information.
-      const subtitle =
-        t.provider_merchant_name &&
-        t.provider_merchant_name !== t.provider_name
-          ? t.provider_merchant_name
-          : null;
-      return (
-        <div className="flex items-center gap-3">
-          <CategoryIconTile
-            icon={t.category?.icon}
-            color={t.category?.color}
-            size="sm"
-          />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate font-medium">{t.provider_name}</span>
-              {t.pending && (
-                <Badge
-                  variant="outline"
-                  className="text-muted-foreground shrink-0"
-                >
-                  Pending
-                </Badge>
-              )}
-            </div>
-            {subtitle && (
-              <div className="text-muted-foreground truncate text-xs">
-                {subtitle}
-              </div>
-            )}
-            <TagList slugs={t.tags} max={3} className="mt-1" />
-          </div>
-        </div>
-      );
-    },
+    cell: ({ row }) => <TransactionPrimary transaction={row.original} />,
   },
   {
     id: "category",
     header: "Category",
+    // Hidden on mobile — the description column takes the freed space; the
+    // category is still editable from the detail page.
+    meta: { className: "w-px hidden sm:table-cell" },
     cell: ({ row }) => (
-      <CategoryBadge
+      <CategoryPicker
+        transactionId={row.original.id}
         category={row.original.category}
         overridden={row.original.category_override}
       />
     ),
   },
   {
-    accessorKey: "account_name",
-    header: "Account",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground whitespace-nowrap">
-        {row.original.account_name ?? "—"}
-      </span>
-    ),
-  },
-  {
     accessorKey: "amount",
     header: () => <div className="text-right">Amount</div>,
-    cell: ({ row }) => {
-      const t = row.original;
-      const isInflow = t.amount < 0;
-      return (
-        <div
-          className={cn(
-            "text-right font-medium tabular-nums whitespace-nowrap",
-            isInflow && "text-emerald-600 dark:text-emerald-500",
-          )}
-        >
-          {formatAmount(t.amount, t.iso_currency_code)}
-        </div>
-      );
-    },
+    meta: { className: "w-px" },
+    cell: ({ row }) => <TransactionAmount transaction={row.original} />,
   },
 ];
 

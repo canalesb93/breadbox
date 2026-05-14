@@ -5,20 +5,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { DynamicIcon } from "@/lib/icon";
+import { CategoryCommandList } from "@/components/category-command";
+import { TagCommandList } from "@/components/tag-command";
+import { KbdTooltip } from "@/components/kbd-tooltip";
 import { withMutationToast } from "@/lib/mutation-toast";
-import { useCategories, flattenCategories } from "@/api/queries/categories";
-import { useTags } from "@/api/queries/tags";
 import { useUpdateTransactions } from "@/api/queries/transactions";
 import type { UpdateTransactionsOp } from "@/api/types";
 
@@ -36,6 +28,9 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 interface SelectionActionBarProps {
   selectedIds: string[];
+  /** Total transactions matching the current filters — gives the count
+   *  context (header select-all only covers the loaded page). */
+  totalCount?: number;
   onClear: () => void;
 }
 
@@ -45,6 +40,7 @@ interface SelectionActionBarProps {
 // chunked to the endpoint's 50-op limit.
 export function SelectionActionBar({
   selectedIds,
+  totalCount,
   onClear,
 }: SelectionActionBarProps) {
   const update = useUpdateTransactions();
@@ -69,9 +65,11 @@ export function SelectionActionBar({
 
   return (
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-      <div className="bg-popover text-popover-foreground flex items-center gap-1 rounded-full border p-1 pl-3 shadow-lg">
+      <div className="bg-popover text-popover-foreground flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 pl-3 shadow-lg">
         <span className="text-sm font-medium">
-          {selectedIds.length} selected
+          {totalCount != null && totalCount > selectedIds.length
+            ? `${selectedIds.length} of ${totalCount.toLocaleString()} selected`
+            : `${selectedIds.length} selected`}
         </span>
         <Separator orientation="vertical" className="mx-1 h-5" />
 
@@ -89,15 +87,17 @@ export function SelectionActionBar({
         />
 
         <Separator orientation="vertical" className="mx-1 h-5" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 rounded-full"
-          onClick={onClear}
-          aria-label="Clear selection"
-        >
-          <X className="size-4" />
-        </Button>
+        <KbdTooltip label="Clear selection / exit" keys={["Esc"]} side="top">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 rounded-full"
+            onClick={onClear}
+            aria-label="Clear selection"
+          >
+            <X className="size-4" />
+          </Button>
+        </KbdTooltip>
       </div>
     </div>
   );
@@ -111,8 +111,6 @@ function CategorizeAction({
   onPick: (slug: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { data: tree } = useCategories();
-  const categories = flattenCategories(tree);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -123,39 +121,17 @@ function CategorizeAction({
           disabled={disabled}
         >
           <Shapes className="size-4" />
-          Categorize
+          <span className="hidden sm:inline">Categorize</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="center" side="top">
-        <Command>
-          <CommandInput placeholder="Search categories…" />
-          <CommandList>
-            <CommandEmpty>No categories found.</CommandEmpty>
-            <CommandGroup>
-              {categories.map((c) => (
-                <CommandItem
-                  key={c.slug}
-                  value={`${c.display_name} ${c.parent_display_name ?? ""}`}
-                  onSelect={() => {
-                    setOpen(false);
-                    onPick(c.slug);
-                  }}
-                >
-                  <DynamicIcon
-                    name={c.icon}
-                    className="size-4"
-                    style={c.color ? { color: c.color } : undefined}
-                  />
-                  <span>
-                    {c.parent_display_name
-                      ? `${c.parent_display_name} › ${c.display_name}`
-                      : c.display_name}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <CategoryCommandList
+          onPick={({ category_slug }) => {
+            if (!category_slug) return;
+            setOpen(false);
+            onPick(category_slug);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -169,7 +145,6 @@ function TagAction({
   onPick: (slug: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { data: tags } = useTags();
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -180,35 +155,16 @@ function TagAction({
           disabled={disabled}
         >
           <Tag className="size-4" />
-          Tag
+          <span className="hidden sm:inline">Tag</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-0" align="center" side="top">
-        <Command>
-          <CommandInput placeholder="Search tags…" />
-          <CommandList>
-            <CommandEmpty>No tags found.</CommandEmpty>
-            <CommandGroup>
-              {(tags ?? []).map((tag) => (
-                <CommandItem
-                  key={tag.slug}
-                  value={tag.display_name}
-                  onSelect={() => {
-                    setOpen(false);
-                    onPick(tag.slug);
-                  }}
-                >
-                  <DynamicIcon
-                    name={tag.icon}
-                    className="size-4"
-                    style={tag.color ? { color: tag.color } : undefined}
-                  />
-                  <span>{tag.display_name}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <TagCommandList
+          onPick={(slug) => {
+            setOpen(false);
+            onPick(slug);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );
