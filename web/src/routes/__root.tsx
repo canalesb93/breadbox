@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
+import { SettingsShell } from "@/components/settings-shell";
 import { ShortcutSheet } from "@/components/shortcut-sheet";
 import {
   SidebarInset,
@@ -33,9 +34,9 @@ export function RootLayout() {
 
 function AuthenticatedShell({ pathname }: { pathname: string }) {
   const navigate = useNavigate();
-  const match = NAV_LEAVES.find((leaf) => isNavMatch(leaf, pathname));
+  const match = NAV_LEAVES.find(({ leaf }) => isNavMatch(leaf, pathname));
   const group = match?.group ?? "";
-  const title = match?.title ?? "Breadbox";
+  const title = match && match.leaf.kind === "link" ? match.leaf.title : "Breadbox";
 
   // Redirect to /v2/login when the session is missing. The api client
   // surfaces 401 as an ApiError; this is the single place that knows what
@@ -70,6 +71,7 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
       </SidebarInset>
       <CommandPalette />
       <ShortcutSheet />
+      <SettingsShell />
       <Toaster />
     </SidebarProvider>
   );
