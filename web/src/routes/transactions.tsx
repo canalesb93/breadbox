@@ -24,6 +24,7 @@ import { useTransactions } from "@/api/queries/transactions";
 import type { TransactionFilters } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useShortcut } from "@/lib/shortcuts";
 import type { Transaction } from "@/api/types";
 
 // Merges with the root route's baseSearchSchema (m/ms modal params). Every
@@ -76,6 +77,7 @@ export function TransactionsPage() {
   // fight the reverse sync below.
   const [query, setQuery] = useState(search.q ?? "");
   const debounced = useDebouncedValue(query, 300);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const q = debounced.trim() || undefined;
@@ -111,6 +113,8 @@ export function TransactionsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const lastIndexRef = useRef<number | null>(null);
+  // Keyboard-navigated row focus (j/k). Index into `rows`; null = no focus.
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   const columns = useMemo(
     () => buildTransactionColumns({ selection: selectMode }),
@@ -153,6 +157,68 @@ export function TransactionsPage() {
     [rows],
   );
 
+  const focusedRowId =
+    focusedIndex != null ? rows[focusedIndex]?.id : undefined;
+
+  const openTransaction = useCallback(
+    (t: Transaction) =>
+      navigate({ to: "/transactions/$id", params: { id: t.short_id } }),
+    [navigate],
+  );
+
+  // --- Keyboard shortcuts (registered while this page is mounted) ---
+  useShortcut(
+    ["/"],
+    (e) => {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    },
+    { label: "Focus search", group: "Transactions" },
+  );
+  useShortcut(
+    ["j"],
+    () =>
+      setFocusedIndex((i) =>
+        i == null ? 0 : Math.min(i + 1, rows.length - 1),
+      ),
+    { label: "Move focus down", group: "Transactions" },
+  );
+  useShortcut(
+    ["k"],
+    () => setFocusedIndex((i) => (i == null ? 0 : Math.max(i - 1, 0))),
+    { label: "Move focus up", group: "Transactions" },
+  );
+  useShortcut(
+    ["enter"],
+    () => {
+      if (focusedIndex == null) return;
+      const t = rows[focusedIndex];
+      if (t) openTransaction(t);
+    },
+    { label: "Open focused transaction", group: "Transactions" },
+  );
+  useShortcut(
+    ["x"],
+    () => {
+      if (focusedIndex == null) return;
+      const id = rows[focusedIndex]?.id;
+      if (!id) return;
+      setSelectMode(true);
+      setRowSelection((prev) => ({ ...prev, [id]: !prev[id] }));
+      lastIndexRef.current = focusedIndex;
+    },
+    { label: "Select focused transaction", group: "Transactions" },
+  );
+  useShortcut(
+    ["escape"],
+    () => {
+      if (selectedIds.length > 0) setRowSelection({});
+      else if (selectMode) exitSelectMode();
+      else setFocusedIndex(null);
+    },
+    { label: "Clear selection / focus", group: "Transactions" },
+  );
+
   const hasActiveFilters =
     !!search.q ||
     !!search.account ||
@@ -191,6 +257,7 @@ export function TransactionsPage() {
         <div className="relative w-full max-w-xs">
           <Search className="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
           <Input
+            ref={searchInputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search merchant or description…"
@@ -210,15 +277,8 @@ export function TransactionsPage() {
         rowSelection={selectMode ? rowSelection : undefined}
         onRowSelectionChange={setRowSelection}
         meta={tableMeta}
-        onRowClick={
-          selectMode
-            ? undefined
-            : (t) =>
-                navigate({
-                  to: "/transactions/$id",
-                  params: { id: t.short_id },
-                })
-        }
+        focusedRowId={focusedRowId}
+        onRowClick={selectMode ? undefined : openTransaction}
         emptyState={
           <EmptyState
             icon={Receipt}
