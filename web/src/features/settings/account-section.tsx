@@ -1,7 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -14,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useMe } from "@/api/queries/me";
 import { useChangePassword } from "@/api/queries/account";
-import { ApiError } from "@/api/client";
+import { withMutationToast } from "@/lib/mutation-toast";
 
 const schema = z
   .object({
@@ -39,15 +38,11 @@ export function AccountSection() {
   });
 
   const onSubmit = async (values: Values) => {
-    try {
-      await changePassword.mutateAsync(values);
-      toast.success("Password updated.");
-      form.reset();
-    } catch (err) {
-      const msg =
-        err instanceof ApiError ? err.message : "Something went wrong. Try again.";
-      toast.error(msg);
-    }
+    const ok = await withMutationToast(
+      () => changePassword.mutateAsync(values),
+      { success: "Password updated." },
+    );
+    if (ok) form.reset();
   };
 
   return (

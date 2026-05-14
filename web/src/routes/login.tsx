@@ -47,8 +47,10 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login.mutateAsync(values);
+      // `redirect` is an arbitrary pathname captured by the auth gate, not a
+      // statically-known route — cast past the typed-router `to` constraint.
       const target = search.redirect && search.redirect.startsWith("/") ? search.redirect : "/";
-      navigate({ to: target });
+      navigate({ to: target as string });
     } catch (err) {
       const msg =
         err instanceof ApiError ? err.message : "Something went wrong. Try again.";
