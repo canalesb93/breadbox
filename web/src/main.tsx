@@ -15,6 +15,7 @@ import { HomePage } from "@/routes/home";
 import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
+import { TransactionDetailPage } from "@/routes/transaction-detail";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -60,6 +61,15 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   },
 };
 
+// Detail routes aren't nav leaves, so they're registered explicitly rather
+// than derived from NAV_LEAVES. isNavMatch's prefix match keeps the
+// Transactions sidebar item active on /transactions/$id.
+const transactionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/transactions/$id",
+  component: TransactionDetailPage,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -78,6 +88,7 @@ const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  transactionDetailRoute,
   ...pageRoutes,
 ]);
 
