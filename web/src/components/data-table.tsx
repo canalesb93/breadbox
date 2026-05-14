@@ -112,6 +112,9 @@ export function DataTable<TData, TValue>({
   const colCount = columns.length;
 
   return (
+    // The shadcn Table primitive already wraps the <table> in its own
+    // overflow-x-auto container, so narrow viewports scroll horizontally
+    // without a second scroll container here.
     <div className="rounded-md border">
       <Table>
         <TableHeader>

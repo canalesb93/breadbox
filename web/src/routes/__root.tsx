@@ -92,7 +92,10 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      {/* min-w-0: the inset is a flex child — without it, a wide page (e.g. a
+          horizontally-scrolling table) grows the inset past the viewport
+          instead of letting the page's own overflow container scroll. */}
+      <SidebarInset className="min-w-0">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -106,7 +109,7 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             <span className="text-sm font-medium">{title}</span>
           </div>
         </header>
-        <main className="flex-1 p-6">
+        <main className="min-w-0 flex-1 p-6">
           <Outlet />
         </main>
       </SidebarInset>
