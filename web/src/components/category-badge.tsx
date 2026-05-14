@@ -12,7 +12,8 @@ interface CategoryBadgeProps {
 
 // CategoryBadge is the single rendering of a transaction category across v2 —
 // list rows, the detail page, pickers. Icon + display name, tinted by the
-// category's own color. Renders an em-dash when there's no category.
+// category's own color. Rounded-rectangle shaped — the pill shape is reserved
+// for tags. Renders an em-dash when there's no category.
 export function CategoryBadge({
   category,
   overridden,
@@ -27,7 +28,7 @@ export function CategoryBadge({
     <Badge
       variant="secondary"
       className={cn(
-        "gap-1",
+        "gap-1 rounded-md",
         overridden && "ring-1 ring-primary/40",
         className,
       )}

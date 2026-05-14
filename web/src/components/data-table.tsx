@@ -5,6 +5,7 @@ import {
   useReactTable,
   type ColumnDef,
   type OnChangeFn,
+  type RowData,
   type RowSelectionState,
   type SortingState,
 } from "@tanstack/react-table";
@@ -18,6 +19,15 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+// Per-column className, applied to both the header cell and every body cell.
+// Lets a column opt into width behaviour (e.g. `w-px` to shrink to content).
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    className?: string;
+  }
+}
 
 export interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -108,7 +118,10 @@ export function DataTable<TData, TValue>({
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+                <TableHead
+                  key={header.id}
+                  className={header.column.columnDef.meta?.className}
+                >
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -166,7 +179,10 @@ export function DataTable<TData, TValue>({
                 )}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell
+                    key={cell.id}
+                    className={cell.column.columnDef.meta?.className}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
