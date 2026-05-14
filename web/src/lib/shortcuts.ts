@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export interface Shortcut {
   id: string;
@@ -66,11 +66,20 @@ export function useShortcut(
 ): void {
   const { label, group, enabled = true } = options;
   const id = `${group ?? "global"}:${label}`;
+  // Both `keys` (inline array literal) and `handler` (inline arrow) are
+  // referentially unstable across renders. Without this, the effect tears
+  // down and re-adds the global keydown listener — and churns the registry —
+  // on every render of the calling component. Depend on a stable string for
+  // keys, and read the handler through a ref.
+  const keysKey = keys.join("+");
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
 
   useEffect(() => {
     if (!enabled) return;
-    const unregister = registerShortcut({ id, keys, label, group });
-    const match = parseKeys(keys);
+    const parsedKeys = keysKey.split("+");
+    const unregister = registerShortcut({ id, keys: parsedKeys, label, group });
+    const match = parseKeys(parsedKeys);
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== match.key) return;
       if (!!match.meta !== (event.metaKey || event.ctrlKey)) return;
@@ -85,12 +94,12 @@ export function useShortcut(
       ) {
         return;
       }
-      handler(event);
+      handlerRef.current(event);
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       unregister();
     };
-  }, [enabled, handler, id, keys, label, group]);
+  }, [enabled, id, keysKey, label, group]);
 }

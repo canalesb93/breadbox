@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -13,10 +14,16 @@ import { HomePage } from "@/routes/home";
 import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
 import { NAV_LEAVES } from "@/lib/nav";
+import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
 import "@/globals.css";
 
-const rootRoute = createRootRoute({ component: RootLayout });
+// baseSearchSchema on the root route makes the modal params (`m`/`ms`) valid
+// search params everywhere; page-level schemas merge with it.
+const rootRoute = createRootRoute({
+  component: RootLayout,
+  validateSearch: baseSearchSchema,
+});
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -33,13 +40,24 @@ const loginRoute = createRoute({
   validateSearch: loginSearchSchema,
 });
 
-const placeholderRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
+// PAGE_COMPONENTS overrides the default Placeholder for a given path. To ship
+// a real page, add one entry here — e.g. `"/transactions": TransactionsPage`.
+// The page route is still derived from NAV_LEAVES (single source of truth for
+// paths), but the override *replaces* the placeholder rather than adding a
+// second route alongside it, so there's no way to silently shadow a real page.
+const PAGE_COMPONENTS: Record<string, () => ReactNode> = {
+  // "/transactions": TransactionsPage,
+};
+
+const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
+  const override = PAGE_COMPONENTS[leaf.to];
+  const component = override ?? (() => <Placeholder title={leaf.title} />);
   return [
     createRoute({
       getParentRoute: () => rootRoute,
       path: leaf.to,
-      component: () => <Placeholder title={leaf.title} />,
+      component,
     }),
   ];
 });
@@ -47,7 +65,7 @@ const placeholderRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  ...placeholderRoutes,
+  ...pageRoutes,
 ]);
 
 const router = createRouter({
