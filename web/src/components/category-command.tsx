@@ -10,10 +10,10 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { DynamicIcon } from "@/lib/icon";
-import { cn } from "@/lib/utils";
 import { withMutationToast } from "@/lib/mutation-toast";
-import { useCategories, flattenCategories } from "@/api/queries/categories";
+import { useCategories } from "@/api/queries/categories";
 import { useUpdateTransactions } from "@/api/queries/transactions";
+import type { Category } from "@/api/types";
 
 // A single category change — set a slug, or reset to the provider default.
 export interface CategoryPick {
@@ -29,16 +29,47 @@ interface CategoryCommandListProps {
   onPick: (pick: CategoryPick) => void;
 }
 
+// One selectable category row. `value` carries the parent name too, so a
+// search for the parent ("food") still surfaces every child.
+function CategoryItem({
+  category,
+  currentSlug,
+  onPick,
+}: {
+  category: Category;
+  currentSlug?: string | null;
+  onPick: (pick: CategoryPick) => void;
+}) {
+  return (
+    <CommandItem
+      // Slug is in the value so it disambiguates duplicate child names
+      // ("Savings" under two parents) and lets power users search by slug.
+      value={`${category.slug} ${category.display_name} ${category.parent_display_name ?? ""}`}
+      onSelect={() => onPick({ category_slug: category.slug })}
+    >
+      <DynamicIcon
+        name={category.icon}
+        className="size-4"
+        style={category.color ? { color: category.color } : undefined}
+      />
+      <span>{category.display_name}</span>
+      {currentSlug === category.slug && <Check className="ml-auto size-4" />}
+    </CommandItem>
+  );
+}
+
 // CategoryCommandList is the shared searchable category list behind every
-// category-mutation surface — the detail-page editor and the inline row
-// picker. Pure presentation: the caller owns the mutation.
+// category-mutation surface — the detail-page editor, the inline row picker,
+// and bulk categorize. Categories are grouped by their parent so the list
+// reads as sections rather than one flat wall. Pure presentation: the caller
+// owns the mutation.
 export function CategoryCommandList({
   currentSlug,
   showReset,
   onPick,
 }: CategoryCommandListProps) {
   const { data: tree, isLoading } = useCategories();
-  const categories = flattenCategories(tree);
+  const parents = (tree ?? []).filter((c) => !c.hidden);
 
   return (
     <Command>
@@ -61,27 +92,38 @@ export function CategoryCommandList({
             <CommandSeparator />
           </>
         )}
-        <CommandGroup>
-          {categories.map((c) => (
-            <CommandItem
-              key={c.slug}
-              value={`${c.display_name} ${c.parent_display_name ?? ""}`}
-              onSelect={() => onPick({ category_slug: c.slug })}
-            >
-              <DynamicIcon
-                name={c.icon}
-                className="size-4"
-                style={c.color ? { color: c.color } : undefined}
+        {parents.map((parent) => {
+          const children = (parent.children ?? []).filter((c) => !c.hidden);
+          // A childless top-level category renders as a lone item — no point
+          // wrapping it in a one-row group with a redundant heading.
+          if (children.length === 0) {
+            return (
+              <CategoryItem
+                key={parent.slug}
+                category={parent}
+                currentSlug={currentSlug}
+                onPick={onPick}
               />
-              <span className={cn(c.parent_id && "text-muted-foreground")}>
-                {c.parent_display_name
-                  ? `${c.parent_display_name} › ${c.display_name}`
-                  : c.display_name}
-              </span>
-              {currentSlug === c.slug && <Check className="ml-auto size-4" />}
-            </CommandItem>
-          ))}
-        </CommandGroup>
+            );
+          }
+          return (
+            <CommandGroup key={parent.slug} heading={parent.display_name}>
+              <CategoryItem
+                category={parent}
+                currentSlug={currentSlug}
+                onPick={onPick}
+              />
+              {children.map((child) => (
+                <CategoryItem
+                  key={child.slug}
+                  category={child}
+                  currentSlug={currentSlug}
+                  onPick={onPick}
+                />
+              ))}
+            </CommandGroup>
+          );
+        })}
       </CommandList>
     </Command>
   );

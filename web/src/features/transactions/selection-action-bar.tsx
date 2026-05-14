@@ -5,20 +5,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { DynamicIcon } from "@/lib/icon";
+import { CategoryCommandList } from "@/components/category-command";
+import { TagCommandList } from "@/components/tag-command";
 import { withMutationToast } from "@/lib/mutation-toast";
-import { useCategories, flattenCategories } from "@/api/queries/categories";
-import { useTags } from "@/api/queries/tags";
 import { useUpdateTransactions } from "@/api/queries/transactions";
 import type { UpdateTransactionsOp } from "@/api/types";
 
@@ -111,8 +102,6 @@ function CategorizeAction({
   onPick: (slug: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { data: tree } = useCategories();
-  const categories = flattenCategories(tree);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -127,35 +116,13 @@ function CategorizeAction({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="center" side="top">
-        <Command>
-          <CommandInput placeholder="Search categories…" />
-          <CommandList>
-            <CommandEmpty>No categories found.</CommandEmpty>
-            <CommandGroup>
-              {categories.map((c) => (
-                <CommandItem
-                  key={c.slug}
-                  value={`${c.display_name} ${c.parent_display_name ?? ""}`}
-                  onSelect={() => {
-                    setOpen(false);
-                    onPick(c.slug);
-                  }}
-                >
-                  <DynamicIcon
-                    name={c.icon}
-                    className="size-4"
-                    style={c.color ? { color: c.color } : undefined}
-                  />
-                  <span>
-                    {c.parent_display_name
-                      ? `${c.parent_display_name} › ${c.display_name}`
-                      : c.display_name}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <CategoryCommandList
+          onPick={({ category_slug }) => {
+            if (!category_slug) return;
+            setOpen(false);
+            onPick(category_slug);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -169,7 +136,6 @@ function TagAction({
   onPick: (slug: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { data: tags } = useTags();
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -184,31 +150,12 @@ function TagAction({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-0" align="center" side="top">
-        <Command>
-          <CommandInput placeholder="Search tags…" />
-          <CommandList>
-            <CommandEmpty>No tags found.</CommandEmpty>
-            <CommandGroup>
-              {(tags ?? []).map((tag) => (
-                <CommandItem
-                  key={tag.slug}
-                  value={tag.display_name}
-                  onSelect={() => {
-                    setOpen(false);
-                    onPick(tag.slug);
-                  }}
-                >
-                  <DynamicIcon
-                    name={tag.icon}
-                    className="size-4"
-                    style={tag.color ? { color: tag.color } : undefined}
-                  />
-                  <span>{tag.display_name}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <TagCommandList
+          onPick={(slug) => {
+            setOpen(false);
+            onPick(slug);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );
