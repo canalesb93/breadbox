@@ -90,10 +90,10 @@ Conventions on layout:
 
 ### Auth and `/web/v1/*` backend
 
-- Endpoints under `/web/v1/*` MUST be session-only — gated by `webui.RequireSessionJSON` in `web/embed.go`.
+- Endpoints under `/web/v1/*` MUST be session-only — gated by `webui.RequireSessionJSON` in `web/embed.go`. Pre-auth endpoints (login, password reset) live under the same prefix but skip `RequireSessionJSON`; they still pass through `RequireSameOrigin`.
 - They MUST return JSON envelopes (`mw.WriteError` / `mw.WriteJSON`). Never hand-roll `json.NewEncoder(...).Encode(...)` or string-literal JSON in handlers.
 - `/web/v1/*` carries **zero stability promise.** Don't document it in `docs/api-reference.md` or `docs/mcp-tools-reference.md`. Free to break it.
-- Any new write endpoint needs a CSRF strategy decided first (see open decisions in `Breadbox/planned-features/v2-frontend-plan.md`). Until then, `/web/v1/*` is read-only.
+- **CSRF strategy for writes: SameSite=Lax cookie + `Origin`/`Referer` host check.** Every `/web/v1/*` mutating request (POST/PUT/PATCH/DELETE) passes through `webui.RequireSameOrigin`, which rejects any request whose `Origin` (or `Referer` fallback) host doesn't match `r.Host`. Same-origin SPA + Lax cookies make this sufficient — no double-submit token, no synchronizer token. Non-browser callers without an `Origin` header will 403 by design; they should use `/api/v1/*` + an API key.
 
 ### Routing
 

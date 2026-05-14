@@ -251,8 +251,17 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(sm.LoadAndSave)
 			r.Route("/web/v1", func(r chi.Router) {
-				r.Use(webui.RequireSessionJSON(sm))
-				r.Get("/me", webui.MeHandler(sm))
+				// SameSite=Lax cookie + Origin check is the CSRF strategy
+				// for /web/v1/* writes. See .claude/rules/v2-frontend.md.
+				r.Use(webui.RequireSameOrigin())
+				// Pre-auth (login + first-run signup-style routes): no session required.
+				r.Post("/login", webui.LoginHandler(sm, a.Queries))
+				// Post-auth routes.
+				r.Group(func(r chi.Router) {
+					r.Use(webui.RequireSessionJSON(sm))
+					r.Get("/me", webui.MeHandler(sm))
+					r.Post("/logout", webui.LogoutHandler(sm))
+				})
 			})
 			// /v2/* — embedded SPA static bundle. The session middleware lets
 			// the SPA shell load on /login, but the SPA's own queries
