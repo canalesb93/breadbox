@@ -10,7 +10,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { NAV, navKey } from "@/lib/nav";
-import { openModalSearch } from "@/lib/modals";
+import { openModal } from "@/lib/modals";
 import { useShortcut } from "@/lib/shortcuts";
 import { useLogout } from "@/api/queries/auth";
 
@@ -29,12 +29,9 @@ export function CommandPalette() {
     navigate({ to });
   };
 
-  const openModal = (modalKey: string) => {
+  const runOpenModal = (modalKey: string) => {
     setOpen(false);
-    navigate({
-      to: ".",
-      search: (prev: Record<string, unknown>) => openModalSearch(prev, modalKey),
-    });
+    navigate({ to: ".", search: openModal(modalKey) });
   };
 
   const runLogout = async () => {
@@ -57,7 +54,9 @@ export function CommandPalette() {
                   key={navKey(item)}
                   value={`${group.label} ${item.title}`}
                   onSelect={() =>
-                    item.kind === "link" ? go(item.to) : openModal(item.modalKey)
+                    item.kind === "link"
+                      ? go(item.to)
+                      : runOpenModal(item.modalKey)
                   }
                 >
                   <Icon className="size-4" />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTransactions } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
+import { formatAmount, formatDate } from "@/lib/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { Transaction } from "@/api/types";
 
@@ -20,22 +21,6 @@ export const transactionsSearchSchema = z.object({
 });
 
 type TransactionsSearch = z.infer<typeof transactionsSearchSchema>;
-
-function formatDate(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  return Number.isNaN(d.getTime())
-    ? date
-    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function formatAmount(amount: number, currency: string | null): string {
-  const formatted = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency ?? "USD",
-  }).format(Math.abs(amount));
-  // Sign convention: positive = money out, negative = money in.
-  return amount < 0 ? `+${formatted}` : formatted;
-}
 
 const columns: ColumnDef<Transaction>[] = [
   {
@@ -48,15 +33,13 @@ const columns: ColumnDef<Transaction>[] = [
     ),
   },
   {
-    id: "merchant",
-    header: "Merchant",
+    id: "description",
+    header: "Description",
     cell: ({ row }) => {
       const t = row.original;
       return (
         <div className="flex items-center gap-2">
-          <span className="font-medium">
-            {t.provider_merchant_name ?? t.provider_name}
-          </span>
+          <span className="font-medium">{t.provider_name}</span>
           {t.pending && (
             <Badge variant="outline" className="text-muted-foreground">
               Pending
@@ -111,22 +94,33 @@ export function TransactionsPage() {
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as TransactionsSearch;
 
-  // Local input state → debounced → URL search param. The query is keyed on
-  // the URL value, so search is bookmarkable and survives reload.
+  // `query` is local input state for responsive typing. It's debounced, then
+  // pushed to the URL (the bookmarkable source of truth). The forward effect
+  // is keyed only on `debounced` — never on `search.q` — so an external URL
+  // change (back/forward, command palette) doesn't re-trigger a push and
+  // fight the reverse sync below.
   const [query, setQuery] = useState(search.q ?? "");
   const debounced = useDebouncedValue(query, 300);
 
   useEffect(() => {
-    const next = debounced.trim() || undefined;
-    if (next === (search.q ?? undefined)) return;
+    const q = debounced.trim() || undefined;
     navigate({
       to: ".",
-      search: (prev: Record<string, unknown>) => ({ ...prev, q: next }),
+      search: (prev: Record<string, unknown>) => ({ ...prev, q }),
     });
-  }, [debounced, navigate, search.q]);
+  }, [debounced, navigate]);
+
+  // Adopt the URL value when it changes from outside this component.
+  // setQuery to an equal value is a no-op, so our own pushes don't loop.
+  useEffect(() => {
+    setQuery(search.q ?? "");
+  }, [search.q]);
 
   const transactions = useTransactions({ search: search.q });
-  const rows = flattenPages<Transaction>(transactions.data?.pages, "transactions");
+  const rows = useMemo(
+    () => flattenPages<Transaction>(transactions.data?.pages, "transactions"),
+    [transactions.data?.pages],
+  );
 
   return (
     <div>

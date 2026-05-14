@@ -4,7 +4,6 @@ package api
 
 import (
 	"net/http"
-	"net/url"
 
 	"breadbox/internal/admin"
 	"breadbox/internal/db"
@@ -43,7 +42,7 @@ func sessionOrAPIKeyAuth(
 					// guard it with the same SameSite=Lax + Origin check the
 					// /web/v1/* routes use. Pure API-key clients send no cookie
 					// and never reach this branch.
-					if isUnsafeMethod(r.Method) && !sameOrigin(r) {
+					if mw.IsUnsafeMethod(r.Method) && !mw.SameOrigin(r) {
 						mw.WriteError(
 							w,
 							http.StatusForbidden,
@@ -97,31 +96,4 @@ func roleToScope(role string) string {
 		return "full_access"
 	}
 	return "read_only"
-}
-
-func isUnsafeMethod(m string) bool {
-	switch m {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return false
-	default:
-		return true
-	}
-}
-
-// sameOrigin mirrors webui.RequireSameOrigin's check — the Origin (or Referer
-// fallback) host must match the request host. Duplicated rather than imported
-// because webui is a !headless package and this file compiles under headless.
-func sameOrigin(r *http.Request) bool {
-	got := r.Header.Get("Origin")
-	if got == "" {
-		got = r.Header.Get("Referer")
-	}
-	if got == "" {
-		return false
-	}
-	u, err := url.Parse(got)
-	if err != nil {
-		return false
-	}
-	return u.Host == r.Host
 }

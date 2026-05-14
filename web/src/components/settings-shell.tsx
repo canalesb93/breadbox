@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SETTINGS_SECTIONS, type SettingsSection } from "@/lib/settings-sections";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { closeModalSearch, openModalSearch, useActiveModal } from "@/lib/modals";
+import { closeModal, openModal, useActiveModal } from "@/lib/modals";
 import { AccountSection } from "@/features/settings/account-section";
 
 const SETTINGS_MODAL_KEY = "settings";
@@ -35,18 +35,11 @@ export function SettingsShell() {
 
   const onOpenChange = (next: boolean) => {
     if (next) return;
-    navigate({
-      to: ".",
-      search: (prev: Record<string, unknown>) => closeModalSearch(prev),
-    });
+    navigate({ to: ".", search: closeModal() });
   };
 
   const onSelect = (slug: string) => {
-    navigate({
-      to: ".",
-      search: (prev: Record<string, unknown>) =>
-        openModalSearch(prev, SETTINGS_MODAL_KEY, slug),
-    });
+    navigate({ to: ".", search: openModal(SETTINGS_MODAL_KEY, slug) });
   };
 
   const body = (

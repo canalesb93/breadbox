@@ -7,7 +7,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { isNavMatch, navKey, type NavGroup, type NavLeaf } from "@/lib/nav";
-import { openModalSearch, useActiveModal } from "@/lib/modals";
+import { openModal, useActiveModal } from "@/lib/modals";
 
 export function NavMain({ group }: { group: NavGroup }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -25,11 +25,7 @@ export function NavMain({ group }: { group: NavGroup }) {
             pathname={pathname}
             activeModal={activeModal}
             onOpenModal={(modalKey) =>
-              navigate({
-                to: ".",
-                search: (prev: Record<string, unknown>) =>
-                  openModalSearch(prev, modalKey),
-              })
+              navigate({ to: ".", search: openModal(modalKey) })
             }
           />
         ))}
