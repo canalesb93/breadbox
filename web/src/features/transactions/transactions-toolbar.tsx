@@ -1,11 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type RefObject } from "react";
 import {
   ArrowUpDown,
   Banknote,
   CalendarRange,
   Check,
+  CheckSquare,
   CircleDot,
   DollarSign,
+  Search,
   Shapes,
   X,
 } from "lucide-react";
@@ -26,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KbdTooltip } from "@/components/kbd-tooltip";
 import { DynamicIcon } from "@/lib/icon";
 import { formatLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -33,10 +36,17 @@ import { useAccounts } from "@/api/queries/accounts";
 import { useCategories, flattenCategories } from "@/api/queries/categories";
 import type { TransactionsSearch } from "@/routes/transactions";
 
-interface FilterBarProps {
+interface TransactionsToolbarProps {
   search: TransactionsSearch;
   /** Merge a patch into the URL search params. Pass undefined to clear a key. */
   onChange: (patch: Partial<TransactionsSearch>) => void;
+  /** Free-text search box — debounced into the URL by the route. */
+  query: string;
+  onQueryChange: (value: string) => void;
+  searchRef: RefObject<HTMLInputElement | null>;
+  /** Select-mode toggle, owned by the route. */
+  selectMode: boolean;
+  onToggleSelect: () => void;
 }
 
 const SORT_OPTIONS: {
@@ -50,32 +60,46 @@ const SORT_OPTIONS: {
   { label: "Smallest amount", sort: "amount", dir: "asc" },
 ];
 
-// FilterBar is the transactions filter strip: a row of popover-backed filter
-// pills plus a removable chip for every active filter. It's a controlled
-// component — all state lives in the URL, owned by the route.
-export function FilterBar({ search, onChange }: FilterBarProps) {
+// TransactionsToolbar is the transactions page's single control band: a search
+// box, a row of popover-backed filter pills, a sort control and the select-mode
+// toggle — plus a removable chip for every active filter. It's controlled — all
+// state lives in the URL (filters) or the route (search text, select mode).
+export function TransactionsToolbar({
+  search,
+  onChange,
+  query,
+  onQueryChange,
+  searchRef,
+  selectMode,
+  onToggleSelect,
+}: TransactionsToolbarProps) {
   const { data: accounts } = useAccounts();
   const { data: categoryTree } = useCategories();
   const categories = flattenCategories(categoryTree);
 
   const account = accounts?.find((a) => a.short_id === search.account);
   const category = categories.find((c) => c.slug === search.category);
-  const activeSort =
-    SORT_OPTIONS.find((o) => o.sort === search.sort && o.dir === search.dir) ??
-    SORT_OPTIONS[0];
+  // Only treat sort as "custom" when the params actually resolve to a known
+  // option — a partial/garbage param shouldn't light the pill with the wrong
+  // label.
+  const foundSort = SORT_OPTIONS.find(
+    (o) => o.sort === search.sort && o.dir === search.dir,
+  );
+  const activeSort = foundSort ?? SORT_OPTIONS[0];
+  const sortIsCustom = !!foundSort;
 
-  const chips: { key: keyof TransactionsSearch; label: string }[] = [];
+  const chips: { key: string; label: string }[] = [];
   if (account) chips.push({ key: "account", label: account.name });
   if (category) chips.push({ key: "category", label: category.display_name });
   if (search.start || search.end) {
     const from = search.start ? formatLongDate(search.start) : "Any";
     const to = search.end ? formatLongDate(search.end) : "Any";
-    chips.push({ key: "start", label: `${from} – ${to}` });
+    chips.push({ key: "dateRange", label: `${from} – ${to}` });
   }
   if (search.min != null || search.max != null) {
     const lo = search.min != null ? `$${search.min}` : "Any";
     const hi = search.max != null ? `$${search.max}` : "Any";
-    chips.push({ key: "min", label: `${lo} – ${hi}` });
+    chips.push({ key: "amountRange", label: `${lo} – ${hi}` });
   }
   if (search.pending) {
     chips.push({
@@ -84,9 +108,9 @@ export function FilterBar({ search, onChange }: FilterBarProps) {
     });
   }
 
-  const clearChip = (key: keyof TransactionsSearch) => {
-    if (key === "start") onChange({ start: undefined, end: undefined });
-    else if (key === "min") onChange({ min: undefined, max: undefined });
+  const clearChip = (key: string) => {
+    if (key === "dateRange") onChange({ start: undefined, end: undefined });
+    else if (key === "amountRange") onChange({ min: undefined, max: undefined });
     else onChange({ [key]: undefined } as Partial<TransactionsSearch>);
   };
 
@@ -104,6 +128,18 @@ export function FilterBar({ search, onChange }: FilterBarProps) {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative w-full min-w-48 sm:w-64">
+          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="Search merchant or description…"
+            className="pl-8"
+          />
+        </div>
+
         {/* Account */}
         <FilterPill icon={Banknote} label="Account" active={!!account}>
           <Command>
@@ -274,29 +310,49 @@ export function FilterBar({ search, onChange }: FilterBarProps) {
 
         <div className="grow" />
 
-        {/* Sort */}
-        <FilterPill icon={ArrowUpDown} label={activeSort.label} active>
-          <Command>
-            <CommandList>
-              <CommandGroup>
-                {SORT_OPTIONS.map((opt) => (
-                  <CommandItem
-                    key={opt.label}
-                    value={opt.label}
-                    onSelect={() =>
-                      onChange({ sort: opt.sort, dir: opt.dir })
-                    }
-                  >
-                    {opt.label}
-                    {activeSort.label === opt.label && (
-                      <Check className="ml-auto size-4" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </FilterPill>
+        {/* Sort + select mode — grouped so they stay together when the row wraps */}
+        <div className="flex items-center gap-2">
+          <FilterPill
+            icon={ArrowUpDown}
+            label={activeSort.label}
+            active={sortIsCustom}
+          >
+            <Command>
+              <CommandList>
+                <CommandGroup>
+                  {SORT_OPTIONS.map((opt) => (
+                    <CommandItem
+                      key={opt.label}
+                      value={opt.label}
+                      onSelect={() => onChange({ sort: opt.sort, dir: opt.dir })}
+                    >
+                      {opt.label}
+                      {activeSort.label === opt.label && (
+                        <Check className="ml-auto size-4" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </FilterPill>
+
+          {selectMode ? (
+            <KbdTooltip label="Exit select mode" keys={["Esc"]}>
+              <Button variant="secondary" size="sm" onClick={onToggleSelect}>
+                <X className="size-4" />
+                Done
+              </Button>
+            </KbdTooltip>
+          ) : (
+            <KbdTooltip label="Select transactions" keys={["x"]}>
+              <Button variant="outline" size="sm" onClick={onToggleSelect}>
+                <CheckSquare className="size-4" />
+                Select
+              </Button>
+            </KbdTooltip>
+          )}
+        </div>
       </div>
 
       {chips.length > 0 && (
@@ -356,10 +412,7 @@ function FilterPill({
           {label}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className={cn("w-56 p-0", className)}
-      >
+      <PopoverContent align="start" className={cn("w-56 p-0", className)}>
         {children}
       </PopoverContent>
     </Popover>

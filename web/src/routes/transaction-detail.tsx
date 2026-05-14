@@ -84,7 +84,7 @@ function DetailBody({ transaction: t }: { transaction: Transaction }) {
         <div
           className={cn(
             "text-xl font-semibold tabular-nums whitespace-nowrap",
-            isInflow && "text-emerald-600 dark:text-emerald-500",
+            isInflow && "text-success",
           )}
         >
           {formatAmount(t.amount, t.iso_currency_code)}
