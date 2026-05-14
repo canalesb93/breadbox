@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DynamicIcon } from "@/lib/icon";
@@ -51,9 +52,14 @@ interface TagListProps {
 // falls back to the slug) so a freshly-created tag never silently vanishes.
 export function TagList({ slugs, max, className }: TagListProps) {
   const { data: tags } = useTags();
+  // Memoized above the early return (Rules of Hooks) — TagList renders in
+  // every table row, so rebuilding this Map per row per render is wasteful.
+  const bySlug = useMemo(
+    () => new Map((tags ?? []).map((t) => [t.slug, t])),
+    [tags],
+  );
   if (!slugs?.length) return null;
 
-  const bySlug = new Map((tags ?? []).map((t) => [t.slug, t]));
   const resolved: TagLike[] = slugs.map(
     (slug) =>
       bySlug.get(slug) ?? { slug, display_name: slug, color: null, icon: null },

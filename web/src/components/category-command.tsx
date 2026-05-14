@@ -42,9 +42,11 @@ function CategoryItem({
 }) {
   return (
     <CommandItem
-      // Slug is in the value so it disambiguates duplicate child names
-      // ("Savings" under two parents) and lets power users search by slug.
-      value={`${category.slug} ${category.display_name} ${category.parent_display_name ?? ""}`}
+      // Parent name is in the value to disambiguate duplicate child names
+      // ("Savings" under two parents). The slug is deliberately NOT included:
+      // slugs repeat words ("income_tax_refund" → two "refund"s) which let
+      // fuzzy search false-match unrelated queries and bury the real result.
+      value={`${category.display_name} ${category.parent_display_name ?? ""}`}
       onSelect={() => onPick({ category_slug: category.slug })}
     >
       <DynamicIcon

@@ -28,7 +28,10 @@ export function TagManager({ transactionId, tags }: TagManagerProps) {
   const update = useUpdateTransactions();
 
   const attached = useMemo(() => new Set(tags), [tags]);
-  const bySlug = new Map((catalog ?? []).map((t) => [t.slug, t]));
+  const bySlug = useMemo(
+    () => new Map((catalog ?? []).map((t) => [t.slug, t])),
+    [catalog],
+  );
 
   const toggle = async (slug: string) => {
     const isAttached = attached.has(slug);

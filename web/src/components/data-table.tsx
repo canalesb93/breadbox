@@ -171,25 +171,30 @@ export function DataTable<TData, TValue>({
             table.getRowModel().rows.map((row) => {
               const focused = row.id === focusedRowId;
               return (
-              <TableRow
-                key={row.id}
-                ref={focused ? focusedRowRef : undefined}
-                data-state={row.getIsSelected() ? "selected" : undefined}
-                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={cn(
-                  onRowClick && "cursor-pointer",
-                  focused && "ring-primary ring-2 ring-inset outline-none",
-                )}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    key={cell.id}
-                    className={cell.column.columnDef.meta?.className}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
+                <TableRow
+                  key={row.id}
+                  ref={focused ? focusedRowRef : undefined}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
+                  onClick={
+                    onRowClick ? () => onRowClick(row.original) : undefined
+                  }
+                  className={cn(
+                    onRowClick && "cursor-pointer",
+                    focused && "ring-primary ring-2 ring-inset outline-none",
+                  )}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cell.column.columnDef.meta?.className}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
               );
             })
           )}
