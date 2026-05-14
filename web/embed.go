@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"path"
 	"strings"
 
@@ -116,47 +115,20 @@ func RequireSessionJSON(sm *scs.SessionManager) func(http.Handler) http.Handler 
 	}
 }
 
-// RequireSameOrigin is the CSRF strategy for /web/v1/* writes. On any
-// unsafe-method request (POST/PUT/PATCH/DELETE), the Origin (or Referer
-// fallback) host must match the request host. SameSite=Lax cookies +
-// same-origin SPA make this sufficient — no double-submit token needed.
-//
-// Browsers send Origin on every cross-origin and same-origin POST, so the
-// only legitimate case where Origin is absent is older clients or non-CORS
-// fetches; we accept Referer as a fallback there.
+// RequireSameOrigin is the CSRF strategy for /web/v1/* writes: an
+// unsafe-method request must pass the shared SameSite=Lax + Origin check
+// (mw.SameOrigin). Same-origin SPA + Lax cookies make this sufficient — no
+// double-submit token needed.
 func RequireSameOrigin() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-			case http.MethodGet, http.MethodHead, http.MethodOptions:
-				next.ServeHTTP(w, r)
-				return
-			}
-			if !sameOrigin(r) {
+			if mw.IsUnsafeMethod(r.Method) && !mw.SameOrigin(r) {
 				mw.WriteError(w, http.StatusForbidden, "ORIGIN_MISMATCH", "Cross-origin request rejected")
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func sameOrigin(r *http.Request) bool {
-	got := r.Header.Get("Origin")
-	if got == "" {
-		got = r.Header.Get("Referer")
-	}
-	if got == "" {
-		// No Origin and no Referer — refuse rather than guess. Modern browsers
-		// always send one on a POST; missing both indicates a non-browser
-		// caller that should use the public /api/v1 + API key surface instead.
-		return false
-	}
-	u, err := url.Parse(got)
-	if err != nil {
-		return false
-	}
-	return u.Host == r.Host
 }
 
 // LoginRequest is the POST body for /web/v1/login.

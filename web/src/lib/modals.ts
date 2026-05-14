@@ -30,7 +30,7 @@ export function useActiveModal(): { key: string | null; section: string | null }
   return { key, section };
 }
 
-export function openModalSearch<S extends Record<string, unknown>>(
+function openModalSearch<S extends Record<string, unknown>>(
   prev: S,
   key: string,
   section?: string,
@@ -41,9 +41,20 @@ export function openModalSearch<S extends Record<string, unknown>>(
   return next as S;
 }
 
-export function closeModalSearch<S extends Record<string, unknown>>(prev: S): S {
+function closeModalSearch<S extends Record<string, unknown>>(prev: S): S {
   const next = { ...prev } as Record<string, unknown>;
   delete next[MODAL_KEY];
   delete next[MODAL_SECTION_KEY];
   return next as S;
+}
+
+// Search-param updater functions for `navigate({ search })`. Use these
+// directly — `navigate({ search: openModal(key) })` — instead of repeating
+// the `(prev) => ...` wrapper at every call site.
+export function openModal(key: string, section?: string) {
+  return (prev: Record<string, unknown>) => openModalSearch(prev, key, section);
+}
+
+export function closeModal() {
+  return (prev: Record<string, unknown>) => closeModalSearch(prev);
 }
