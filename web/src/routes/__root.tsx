@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandPalette } from "@/components/command-palette";
+import { ShortcutSheet } from "@/components/shortcut-sheet";
 import {
   SidebarInset,
   SidebarProvider,
@@ -66,6 +68,8 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
           <Outlet />
         </main>
       </SidebarInset>
+      <CommandPalette />
+      <ShortcutSheet />
       <Toaster />
     </SidebarProvider>
   );
