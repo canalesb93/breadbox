@@ -37,15 +37,15 @@ export function SettingsShell() {
     if (next) return;
     navigate({
       to: ".",
-      search: (prev) => closeModalSearch(prev as Record<string, unknown>),
+      search: (prev: Record<string, unknown>) => closeModalSearch(prev),
     });
   };
 
   const onSelect = (slug: string) => {
     navigate({
       to: ".",
-      search: (prev) =>
-        openModalSearch(prev as Record<string, unknown>, SETTINGS_MODAL_KEY, slug),
+      search: (prev: Record<string, unknown>) =>
+        openModalSearch(prev, SETTINGS_MODAL_KEY, slug),
     });
   };
 

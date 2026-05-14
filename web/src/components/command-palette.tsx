@@ -33,7 +33,7 @@ export function CommandPalette() {
     setOpen(false);
     navigate({
       to: ".",
-      search: (prev) => openModalSearch(prev as Record<string, unknown>, modalKey),
+      search: (prev: Record<string, unknown>) => openModalSearch(prev, modalKey),
     });
   };
 

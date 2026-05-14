@@ -27,7 +27,8 @@ export function NavMain({ group }: { group: NavGroup }) {
             onOpenModal={(modalKey) =>
               navigate({
                 to: ".",
-                search: (prev) => openModalSearch(prev as Record<string, unknown>, modalKey),
+                search: (prev: Record<string, unknown>) =>
+                  openModalSearch(prev, modalKey),
               })
             }
           />

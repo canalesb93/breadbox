@@ -9,10 +9,12 @@ import {
   createRoute,
 } from "@tanstack/react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import type { AnyRoute } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { HomePage } from "@/routes/home";
 import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
+import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -40,27 +42,38 @@ const loginRoute = createRoute({
   validateSearch: loginSearchSchema,
 });
 
-// PAGE_COMPONENTS overrides the default Placeholder for a given path. To ship
-// a real page, add one entry here — e.g. `"/transactions": TransactionsPage`.
-// The page route is still derived from NAV_LEAVES (single source of truth for
-// paths), but the override *replaces* the placeholder rather than adding a
-// second route alongside it, so there's no way to silently shadow a real page.
-const PAGE_COMPONENTS: Record<string, () => ReactNode> = {
-  // "/transactions": TransactionsPage,
+// PAGE_OVERRIDES swaps the default Placeholder for a real page on a given
+// path. To ship a page, add one entry — `component`, plus an optional
+// `validateSearch` zod schema for typed URL filters/pagination. The route is
+// still derived from NAV_LEAVES (single source of truth for paths), but the
+// override *replaces* the placeholder rather than adding a second route, so
+// there's no way to silently shadow a real page.
+interface PageOverride {
+  component: () => ReactNode;
+  validateSearch?: Parameters<typeof createRoute>[0]["validateSearch"];
+}
+
+const PAGE_OVERRIDES: Record<string, PageOverride> = {
+  "/transactions": {
+    component: TransactionsPage,
+    validateSearch: transactionsSearchSchema,
+  },
 };
 
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
-  const override = PAGE_COMPONENTS[leaf.to];
-  const component = override ?? (() => <Placeholder title={leaf.title} />);
+  const override = PAGE_OVERRIDES[leaf.to];
+  const component =
+    override?.component ?? (() => <Placeholder title={leaf.title} />);
   return [
     createRoute({
       getParentRoute: () => rootRoute,
       path: leaf.to,
       component,
+      validateSearch: override?.validateSearch,
     }),
   ];
-});
+}) as AnyRoute[];
 
 const routeTree = rootRoute.addChildren([
   indexRoute,

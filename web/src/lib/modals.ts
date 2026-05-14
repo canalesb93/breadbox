@@ -18,7 +18,7 @@ export const baseSearchSchema = z.object({
 });
 
 export function useActiveModal(): { key: string | null; section: string | null } {
-  const search = useRouterState({ select: (s) => s.location.search }) as Record<
+  const search = useRouterState({ select: (s) => s.location.search }) as unknown as Record<
     string,
     unknown
   >;
