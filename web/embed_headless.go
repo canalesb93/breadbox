@@ -12,6 +12,8 @@ package webui
 import (
 	"net/http"
 
+	"breadbox/internal/db"
+
 	"github.com/alexedwards/scs/v2"
 )
 
@@ -36,5 +38,26 @@ func RequireSessionJSON(_ *scs.SessionManager) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
 		})
+	}
+}
+
+// RequireSameOrigin is the CSRF middleware for /web/v1/* writes. Stub is a
+// no-op pass-through (the routes it would guard are themselves stubbed to
+// 410 elsewhere, so this never lets a real request through).
+func RequireSameOrigin() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler { return next }
+}
+
+// LoginHandler authenticates the v2 SPA's session. Stub returns 410.
+func LoginHandler(_ *scs.SessionManager, _ *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
+	}
+}
+
+// LogoutHandler destroys the v2 SPA's session. Stub returns 410.
+func LogoutHandler(_ *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
 	}
 }

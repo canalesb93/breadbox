@@ -8,15 +8,20 @@ package webui
 
 import (
 	"embed"
+	"encoding/json"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 
 	"breadbox/internal/admin"
+	"breadbox/internal/db"
 	mw "breadbox/internal/middleware"
+	"breadbox/internal/pgconv"
 
 	"github.com/alexedwards/scs/v2"
+	"golang.org/x/crypto/bcrypt"
 )
 
 //go:embed all:dist
@@ -109,3 +114,115 @@ func RequireSessionJSON(sm *scs.SessionManager) func(http.Handler) http.Handler 
 		})
 	}
 }
+
+// RequireSameOrigin is the CSRF strategy for /web/v1/* writes. On any
+// unsafe-method request (POST/PUT/PATCH/DELETE), the Origin (or Referer
+// fallback) host must match the request host. SameSite=Lax cookies +
+// same-origin SPA make this sufficient — no double-submit token needed.
+//
+// Browsers send Origin on every cross-origin and same-origin POST, so the
+// only legitimate case where Origin is absent is older clients or non-CORS
+// fetches; we accept Referer as a fallback there.
+func RequireSameOrigin() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet, http.MethodHead, http.MethodOptions:
+				next.ServeHTTP(w, r)
+				return
+			}
+			if !sameOrigin(r) {
+				mw.WriteError(w, http.StatusForbidden, "ORIGIN_MISMATCH", "Cross-origin request rejected")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func sameOrigin(r *http.Request) bool {
+	got := r.Header.Get("Origin")
+	if got == "" {
+		got = r.Header.Get("Referer")
+	}
+	if got == "" {
+		// No Origin and no Referer — refuse rather than guess. Modern browsers
+		// always send one on a POST; missing both indicates a non-browser
+		// caller that should use the public /api/v1 + API key surface instead.
+		return false
+	}
+	u, err := url.Parse(got)
+	if err != nil {
+		return false
+	}
+	return u.Host == r.Host
+}
+
+// LoginRequest is the POST body for /web/v1/login.
+type LoginRequest struct {
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	RememberMe bool   `json:"remember_me"`
+}
+
+// LoginHandler authenticates against auth_accounts and sets the session
+// keys the rest of the dashboard expects. JSON twin of admin.LoginHandler.
+func LoginHandler(sm *scs.SessionManager, queries *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Request body must be valid JSON")
+			return
+		}
+		if req.Username == "" || req.Password == "" {
+			bcrypt.CompareHashAndPassword(loginDummyHash, []byte(req.Password))
+			mw.WriteError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
+			return
+		}
+
+		account, err := queries.GetAuthAccountByUsername(r.Context(), req.Username)
+		if err != nil {
+			bcrypt.CompareHashAndPassword(loginDummyHash, []byte(req.Password))
+			mw.WriteError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
+			return
+		}
+		if account.HashedPassword == nil {
+			bcrypt.CompareHashAndPassword(loginDummyHash, []byte(req.Password))
+			mw.WriteError(w, http.StatusUnauthorized, "ACCOUNT_NOT_SETUP", "Your account hasn't been set up yet. Ask your administrator for a setup link.")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword(account.HashedPassword, []byte(req.Password)); err != nil {
+			mw.WriteError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
+			return
+		}
+
+		if err := sm.RenewToken(r.Context()); err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "SESSION_ERROR", "Failed to renew session")
+			return
+		}
+		sm.RememberMe(r.Context(), req.RememberMe)
+		admin.SetLoginSessionKeys(r.Context(), sm, account, queries)
+
+		mw.WriteJSON(w, http.StatusOK, MeResponse{
+			AccountID: pgconv.FormatUUID(account.ID),
+			Username:  account.Username,
+			Role:      account.Role,
+		})
+	}
+}
+
+// LogoutHandler destroys the current session.
+func LogoutHandler(sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := sm.Destroy(r.Context()); err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "SESSION_ERROR", "Failed to destroy session")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// loginDummyHash mirrors admin.dummyHash — used for constant-time login
+// responses against unknown usernames so timing can't be used for
+// enumeration.
+var loginDummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), 12)

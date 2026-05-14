@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useRouterState } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -12,20 +12,38 @@ import { NAV_LEAVES, isNavMatch } from "@/lib/nav";
 import { useMe } from "@/api/queries/me";
 import { ApiError } from "@/api/client";
 
+const UNAUTHENTICATED_PATHS = new Set(["/login"]);
+
 export function RootLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  if (UNAUTHENTICATED_PATHS.has(pathname)) {
+    return (
+      <>
+        <Outlet />
+        <Toaster />
+      </>
+    );
+  }
+
+  return <AuthenticatedShell pathname={pathname} />;
+}
+
+function AuthenticatedShell({ pathname }: { pathname: string }) {
+  const navigate = useNavigate();
   const match = NAV_LEAVES.find((leaf) => isNavMatch(leaf, pathname));
   const group = match?.group ?? "";
   const title = match?.title ?? "Breadbox";
 
-  // Redirect to /login when the session is missing. The api client surfaces
-  // 401 as an ApiError; this is the single place that knows what to do.
+  // Redirect to /v2/login when the session is missing. The api client
+  // surfaces 401 as an ApiError; this is the single place that knows what
+  // to do.
   const { error } = useMe();
   useEffect(() => {
     if (error instanceof ApiError && error.status === 401) {
-      window.location.href = "/login";
+      navigate({ to: "/login", search: { redirect: pathname } });
     }
-  }, [error]);
+  }, [error, navigate, pathname]);
 
   return (
     <SidebarProvider>

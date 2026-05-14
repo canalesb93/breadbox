@@ -3,6 +3,7 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -120,25 +121,32 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 
 		sm.RememberMe(r.Context(), r.FormValue("remember_me") != "")
 
-		sm.Put(r.Context(), sessionKeyAccountID, pgconv.FormatUUID(account.ID))
-		sm.Put(r.Context(), sessionKeyAccountUsername, account.Username)
-		sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
-		if account.UserID.Valid {
-			sm.Put(r.Context(), sessionKeyUserID, pgconv.FormatUUID(account.UserID))
-			// Cache the linked household-member display name so the
-			// sidebar footer can show "Ricardo" instead of falling back
-			// to the auth_accounts.username (often an email). Updated
-			// on profile edits via /settings/account/profile.
-			if u, err := queries.GetUser(r.Context(), account.UserID); err == nil {
-				sm.Put(r.Context(), sessionKeyUserName, u.Name)
-			} else {
-				sm.Remove(r.Context(), sessionKeyUserName)
-			}
-		} else {
-			sm.Remove(r.Context(), sessionKeyUserID)
-			sm.Remove(r.Context(), sessionKeyUserName)
-		}
+		SetLoginSessionKeys(r.Context(), sm, account, queries)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
+// SetLoginSessionKeys writes the session keys for a freshly authenticated
+// account. Called by both admin.LoginHandler (HTML form) and
+// webui.LoginHandler (JSON) so the two surfaces stay in lock-step.
+func SetLoginSessionKeys(ctx context.Context, sm *scs.SessionManager, account db.AuthAccount, queries *db.Queries) {
+	sm.Put(ctx, sessionKeyAccountID, pgconv.FormatUUID(account.ID))
+	sm.Put(ctx, sessionKeyAccountUsername, account.Username)
+	sm.Put(ctx, sessionKeyAccountRole, account.Role)
+	if account.UserID.Valid {
+		sm.Put(ctx, sessionKeyUserID, pgconv.FormatUUID(account.UserID))
+		// Cache the linked household-member display name so the
+		// sidebar footer can show "Ricardo" instead of falling back
+		// to the auth_accounts.username (often an email). Updated
+		// on profile edits via /settings/account/profile.
+		if u, err := queries.GetUser(ctx, account.UserID); err == nil {
+			sm.Put(ctx, sessionKeyUserName, u.Name)
+		} else {
+			sm.Remove(ctx, sessionKeyUserName)
+		}
+	} else {
+		sm.Remove(ctx, sessionKeyUserID)
+		sm.Remove(ctx, sessionKeyUserName)
 	}
 }
 

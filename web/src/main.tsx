@@ -10,8 +10,10 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { RootLayout } from "@/routes/__root";
 import { HomePage } from "@/routes/home";
+import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
 import { NAV_LEAVES } from "@/lib/nav";
+import { z } from "zod";
 import "@/globals.css";
 
 const rootRoute = createRootRoute({ component: RootLayout });
@@ -22,6 +24,15 @@ const indexRoute = createRoute({
   component: HomePage,
 });
 
+const loginSearchSchema = z.object({ redirect: z.string().optional() });
+
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/login",
+  component: LoginPage,
+  validateSearch: loginSearchSchema,
+});
+
 const placeholderRoutes = NAV_LEAVES.filter((leaf) => leaf.to !== "/").map((leaf) =>
   createRoute({
     getParentRoute: () => rootRoute,
@@ -30,7 +41,7 @@ const placeholderRoutes = NAV_LEAVES.filter((leaf) => leaf.to !== "/").map((leaf
   }),
 );
 
-const routeTree = rootRoute.addChildren([indexRoute, ...placeholderRoutes]);
+const routeTree = rootRoute.addChildren([indexRoute, loginRoute, ...placeholderRoutes]);
 
 const router = createRouter({
   routeTree,
