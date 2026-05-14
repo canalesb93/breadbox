@@ -1,7 +1,17 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { nextCursor } from "@/lib/pagination";
-import type { TransactionsPage } from "@/api/types";
+import type {
+  TransactionDetail,
+  TransactionsPage,
+  UpdateTransactionsRequest,
+  UpdateTransactionsResult,
+} from "@/api/types";
 
 export interface TransactionFilters {
   /** Free-text search; the API requires a minimum of 2 chars. */
@@ -30,5 +40,36 @@ export function useTransactions(filters: TransactionFilters) {
     },
     initialPageParam: "",
     getNextPageParam: (last) => nextCursor(last),
+  });
+}
+
+// useTransaction loads a single transaction by id or short_id. Disabled until
+// an id is supplied.
+export function useTransaction(id: string | undefined) {
+  return useQuery({
+    queryKey: ["transaction", id],
+    queryFn: () => api<TransactionDetail>(`/api/v1/transactions/${id}`),
+    enabled: !!id,
+  });
+}
+
+// useUpdateTransactions is the one batch-mutation path for transaction edits —
+// category set/reset, tag add/remove, comment append — used by both the detail
+// page (single-op batch) and select mode (many ops). On success it invalidates
+// every transaction-derived cache so list rows, the detail page, and timelines
+// re-fetch.
+export function useUpdateTransactions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: UpdateTransactionsRequest) =>
+      api<UpdateTransactionsResult>("/api/v1/transactions/update", {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["transaction"] });
+      qc.invalidateQueries({ queryKey: ["annotations"] });
+    },
   });
 }
