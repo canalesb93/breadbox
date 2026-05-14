@@ -1,4 +1,6 @@
 import { ChevronsUpDown, ExternalLink, LogOut } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -15,6 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { Me } from "@/api/types";
+import { useLogout } from "@/api/queries/auth";
 
 function initials(name: string) {
   const local = name.split("@")[0];
@@ -24,6 +27,19 @@ function initials(name: string) {
 
 export function NavUser({ me }: { me: Me | null }) {
   const { isMobile } = useSidebar();
+  const navigate = useNavigate();
+  const logout = useLogout();
+
+  const onLogout = async () => {
+    try {
+      await logout.mutateAsync();
+    } catch {
+      // Even on error we still send the user to /login — the cookie may be
+      // gone client-side; surface a toast but don't block navigation.
+      toast.error("Couldn't reach the server — signing out anyway.");
+    }
+    navigate({ to: "/login" });
+  };
 
   if (!me) {
     return (
@@ -76,11 +92,15 @@ export function NavUser({ me }: { me: Me | null }) {
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a href="/logout">
-                <LogOut />
-                Log out
-              </a>
+            <DropdownMenuItem
+              disabled={logout.isPending}
+              onSelect={(e) => {
+                e.preventDefault();
+                void onLogout();
+              }}
+            >
+              <LogOut />
+              {logout.isPending ? "Signing out…" : "Sign out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
