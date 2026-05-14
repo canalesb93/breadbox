@@ -29,6 +29,15 @@ All error responses use:
 - `scope` column: `full_access` or `read_only`. `middleware.RequireWriteScope()` blocks read-only keys from write endpoints.
 - Full key record exposed to handlers via `middleware.SetAPIKey()` / `GetAPIKey()` for actor attribution.
 
+### Session cookie on `/api/v1/*` (the v2 SPA)
+
+`/api/v1/*` also accepts the v2 dashboard **session cookie** — that's how the v2 SPA reads public resources without holding an API key. `internal/api/auth_session.go` (`sessionOrAPIKeyAuth`) wraps the API-key/Bearer middleware:
+
+- A valid session is translated into a **synthetic `db.ApiKey`** (`ActorType: "user"`), so every downstream `RequireWriteScope` / actor-attribution path works unchanged — there is no second auth code path.
+- **Scope is role-derived:** `auth_accounts.role` of `admin` or `editor` → `full_access`; `viewer` (or unknown) → `read_only`. Mirrors `admin.IsEditor`.
+- **CSRF:** a session-authed *unsafe* method (POST/PUT/PATCH/DELETE) must pass a SameSite=Lax + `Origin`/`Referer` host check — the same guard `/web/v1/*` uses. Pure API-key clients send no cookie and skip this entirely.
+- Falls through to the existing API-key / Bearer path when no session is present. Disabled (nil session manager) under `--no-dashboard` and `-tags=headless`.
+
 ### Admin sessions (`/` and `/-/*`)
 
 - `alexedwards/scs` session manager with `pgxstore`.

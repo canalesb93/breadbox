@@ -12,8 +12,8 @@ The v2 admin SPA at `/v2/`, served by Go via `embed.FS`. Lives at top-level `web
 - **One binary in production.** `bun run build` → `web/dist/` → `//go:embed all:dist` → served at `/v2/*` with SPA fallback.
 - **Old admin UI is untouched.** Never modify `internal/admin/*`, `internal/templates/*`, `static/css/`, `static/js/admin/`, `input.css` to make v2 work. The two UIs coexist; choices for one shouldn't bleed into the other. v2 is an entirely new front-end approach.
 - **API split:**
-  - `/api/v1/*` — public REST API. API key OR session. Stable. Used by SPA, MCP, external consumers.
-  - `/web/v1/*` — SPA-only internal API. **Session cookie required**, never accepts API key. **Zero stability promise.** Returns JSON 401 (not HTML redirect). Auth gate: `webui.RequireSessionJSON`.
+  - `/api/v1/*` — public REST API. API key, OAuth Bearer, **or the v2 session cookie**. Stable. Used by SPA, MCP, external consumers. The session is translated into a synthetic role-scoped API key by `sessionOrAPIKeyAuth` (`internal/api/auth_session.go`) — so the SPA reads public resources (transactions, categories, connections…) with just its cookie. Session-authed *writes* pass a same-origin CSRF check. Details in `.claude/rules/api.md`.
+  - `/web/v1/*` — SPA-only internal API. **Session cookie required**, never accepts API key. **Zero stability promise.** Returns JSON 401 (not HTML redirect). Auth gate: `webui.RequireSessionJSON`. For composite UI bundles and session-only operations only — if the public API already serves a resource well, the SPA hits `/api/v1/*` instead.
 - **Service layer is shared.** Both `/api/v1/*` and `/web/v1/*` handlers call `internal/service/`. No duplicated logic — shape differences (composite UI bundles vs normalized resources) are at the handler boundary only.
 
 ## File organization

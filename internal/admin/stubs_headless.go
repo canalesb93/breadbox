@@ -87,3 +87,25 @@ func OAuthRegisterHandler(_ *service.Service) http.HandlerFunc {
 func gone(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, "dashboard surface disabled in this build", http.StatusGone)
 }
+
+// Role constants — mirrored from auth.go so api/auth_session.go compiles
+// under -tags=headless. The session helpers below always return "" on
+// headless builds (there is no dashboard session manager), so these are
+// only ever compared against an empty string.
+const (
+	RoleAdmin  = "admin"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
+)
+
+// SessionAccountID is a no-op on headless builds — there is no session.
+func SessionAccountID(_ *scs.SessionManager, _ *http.Request) string { return "" }
+
+// SessionRole is a no-op on headless builds.
+func SessionRole(_ *scs.SessionManager, _ *http.Request) string { return "" }
+
+// SessionUsername is a no-op on headless builds.
+func SessionUsername(_ *scs.SessionManager, _ *http.Request) string { return "" }
+
+// SessionUserID is a no-op on headless builds.
+func SessionUserID(_ *scs.SessionManager, _ *http.Request) string { return "" }
