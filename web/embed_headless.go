@@ -61,3 +61,10 @@ func LogoutHandler(_ *scs.SessionManager) http.HandlerFunc {
 		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
 	}
 }
+
+// ChangePasswordHandler updates the session account password. Stub returns 410.
+func ChangePasswordHandler(_ *scs.SessionManager, _ *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
+	}
+}
