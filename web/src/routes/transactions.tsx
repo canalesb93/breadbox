@@ -8,19 +8,21 @@ import {
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { CheckSquare, Receipt, Search, X } from "lucide-react";
+import { Loader2, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   buildTransactionColumns,
   type TransactionTableMeta,
 } from "@/features/transactions/columns";
-import { FilterBar } from "@/features/transactions/filter-bar";
+import { TransactionsToolbar } from "@/features/transactions/transactions-toolbar";
 import { SelectionActionBar } from "@/features/transactions/selection-action-bar";
-import { useTransactions } from "@/api/queries/transactions";
+import {
+  useTransactions,
+  useTransactionCount,
+} from "@/api/queries/transactions";
 import type { TransactionFilters } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -103,7 +105,9 @@ export function TransactionsPage() {
     [navigate],
   );
 
-  const transactions = useTransactions(searchToFilters(search));
+  const filters = searchToFilters(search);
+  const transactions = useTransactions(filters);
+  const totalCount = useTransactionCount(filters);
   const rows = useMemo(
     () => flattenPages<Transaction>(transactions.data?.pages, "transactions"),
     [transactions.data?.pages],
@@ -126,6 +130,11 @@ export function TransactionsPage() {
     setRowSelection({});
     lastIndexRef.current = null;
   }, []);
+
+  const toggleSelectMode = useCallback(() => {
+    if (selectMode) exitSelectMode();
+    else setSelectMode(true);
+  }, [selectMode, exitSelectMode]);
 
   // getRowId returns the transaction id, so rowSelection keys ARE ids.
   const selectedIds = useMemo(
@@ -200,7 +209,12 @@ export function TransactionsPage() {
   useShortcut(
     ["x"],
     () => {
-      if (focusedIndex == null) return;
+      // No focused row → just enter select mode (matches the toolbar button,
+      // which advertises `x` as its shortcut).
+      if (focusedIndex == null) {
+        setSelectMode(true);
+        return;
+      }
       const id = rows[focusedIndex]?.id;
       if (!id) return;
       setSelectMode(true);
@@ -229,49 +243,41 @@ export function TransactionsPage() {
     search.max != null ||
     !!search.pending;
 
+  const count = totalCount.data?.count;
+  const showCountLine = !transactions.isLoading && !transactions.isError;
+
   return (
     <div>
-      <PageHeader
-        title="Transactions"
-        description="Every transaction synced across your connected accounts."
-        actions={
-          selectMode ? (
-            <Button variant="secondary" size="sm" onClick={exitSelectMode}>
-              <X className="size-4" />
-              Done
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectMode(true)}
-            >
-              <CheckSquare className="size-4" />
-              Select
-            </Button>
-          )
-        }
-      />
+      <PageHeader title="Transactions" />
 
-      <div className="mb-4 space-y-3">
-        <div className="relative w-full max-w-xs">
-          <Search className="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
-          <Input
-            ref={searchInputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search merchant or description…"
-            className="pl-8"
-          />
-        </div>
-        <FilterBar search={search} onChange={setFilter} />
+      <div className="mb-4">
+        <TransactionsToolbar
+          search={search}
+          onChange={setFilter}
+          query={query}
+          onQueryChange={setQuery}
+          searchRef={searchInputRef}
+          selectMode={selectMode}
+          onToggleSelect={toggleSelectMode}
+        />
       </div>
+
+      {showCountLine && rows.length > 0 && (
+        <div className="text-muted-foreground mb-2 text-sm">
+          {count != null && count > rows.length
+            ? `Showing ${rows.length} of ${count.toLocaleString()} transactions`
+            : `${(count ?? rows.length).toLocaleString()} ${
+                (count ?? rows.length) === 1 ? "transaction" : "transactions"
+              }`}
+        </div>
+      )}
 
       <DataTable
         columns={columns}
         data={rows}
         isLoading={transactions.isLoading}
         isError={transactions.isError}
+        loadingRows={6}
         getRowId={(t) => t.id}
         enableRowSelection={selectMode}
         rowSelection={selectMode ? rowSelection : undefined}
@@ -296,23 +302,31 @@ export function TransactionsPage() {
         }
       />
 
-      {transactions.hasNextPage && (
-        <div className="mt-4 flex justify-center">
-          <Button
-            variant="outline"
-            onClick={() => transactions.fetchNextPage()}
-            disabled={transactions.isFetchingNextPage}
-          >
-            {transactions.isFetchingNextPage ? "Loading…" : "Load more"}
-          </Button>
+      {rows.length > 0 && (
+        <div className="text-muted-foreground mt-4 flex justify-center text-sm">
+          {transactions.hasNextPage ? (
+            <Button
+              variant="outline"
+              onClick={() => transactions.fetchNextPage()}
+              disabled={transactions.isFetchingNextPage}
+            >
+              {transactions.isFetchingNextPage && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+              {transactions.isFetchingNextPage ? "Loading…" : "Load more"}
+            </Button>
+          ) : (
+            <span>
+              {count != null
+                ? `All ${count.toLocaleString()} transactions loaded`
+                : "All transactions loaded"}
+            </span>
+          )}
         </div>
       )}
 
       {selectMode && selectedIds.length > 0 && (
-        <SelectionActionBar
-          selectedIds={selectedIds}
-          onClear={exitSelectMode}
-        />
+        <SelectionActionBar selectedIds={selectedIds} onClear={exitSelectMode} />
       )}
     </div>
   );

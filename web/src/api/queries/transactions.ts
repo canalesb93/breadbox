@@ -84,6 +84,50 @@ export function useTransactions(filters: TransactionFilters) {
   });
 }
 
+// useTransactionCount returns the total number of transactions matching the
+// same filters as useTransactions — the list endpoint is cursor-paginated and
+// carries no total, so the count comes from a dedicated endpoint. Used for the
+// "Showing N of M" footer.
+export function useTransactionCount(filters: TransactionFilters) {
+  const search =
+    filters.search && filters.search.trim().length >= 2
+      ? filters.search.trim()
+      : undefined;
+
+  const key = {
+    search,
+    account: filters.account,
+    category: filters.category,
+    start: filters.start,
+    end: filters.end,
+    minAmount: filters.minAmount,
+    maxAmount: filters.maxAmount,
+    pending: filters.pending,
+  };
+
+  return useQuery({
+    queryKey: ["transactions", "count", key],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (filters.account) params.set("account_id", filters.account);
+      if (filters.category) params.set("category_slug", filters.category);
+      if (filters.start) params.set("start_date", filters.start);
+      if (filters.end) params.set("end_date", filters.end);
+      if (filters.minAmount != null)
+        params.set("min_amount", String(filters.minAmount));
+      if (filters.maxAmount != null)
+        params.set("max_amount", String(filters.maxAmount));
+      if (filters.pending != null)
+        params.set("pending", String(filters.pending));
+      const qs = params.toString();
+      return api<{ count: number }>(
+        `/api/v1/transactions/count${qs ? `?${qs}` : ""}`,
+      );
+    },
+  });
+}
+
 // useTransaction loads a single transaction by id or short_id. Disabled until
 // an id is supplied.
 export function useTransaction(id: string | undefined) {
