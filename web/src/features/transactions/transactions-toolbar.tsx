@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type RefObject } from "react";
+import { useMemo, useState, type ReactNode, type RefObject } from "react";
 import {
   ArrowUpDown,
   Banknote,
@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KbdTooltip } from "@/components/kbd-tooltip";
-import { DynamicIcon } from "@/lib/icon";
+import { CategoryCommandList } from "@/components/category-command";
 import { formatLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAccounts } from "@/api/queries/accounts";
@@ -60,6 +60,10 @@ const SORT_OPTIONS: {
   { label: "Smallest amount", sort: "amount", dir: "asc" },
 ];
 
+// A removable filter chip's key — either a real search param, or a sentinel
+// for the two range filters that clear a pair of params at once.
+type ChipKey = keyof TransactionsSearch | "dateRange" | "amountRange";
+
 // TransactionsToolbar is the transactions page's single control band: a search
 // box, a row of popover-backed filter pills, a sort control and the select-mode
 // toggle — plus a removable chip for every active filter. It's controlled — all
@@ -75,7 +79,12 @@ export function TransactionsToolbar({
 }: TransactionsToolbarProps) {
   const { data: accounts } = useAccounts();
   const { data: categoryTree } = useCategories();
-  const categories = flattenCategories(categoryTree);
+  // Flattened only to resolve the active category's label for its chip — the
+  // Category pill itself uses the shared CategoryCommandList.
+  const categories = useMemo(
+    () => flattenCategories(categoryTree),
+    [categoryTree],
+  );
 
   const account = accounts?.find((a) => a.short_id === search.account);
   const category = categories.find((c) => c.slug === search.category);
@@ -88,7 +97,7 @@ export function TransactionsToolbar({
   const activeSort = foundSort ?? SORT_OPTIONS[0];
   const sortIsCustom = !!foundSort;
 
-  const chips: { key: string; label: string }[] = [];
+  const chips: { key: ChipKey; label: string }[] = [];
   if (account) chips.push({ key: "account", label: account.name });
   if (category) chips.push({ key: "category", label: category.display_name });
   if (search.start || search.end) {
@@ -108,10 +117,10 @@ export function TransactionsToolbar({
     });
   }
 
-  const clearChip = (key: string) => {
+  const clearChip = (key: ChipKey) => {
     if (key === "dateRange") onChange({ start: undefined, end: undefined });
     else if (key === "amountRange") onChange({ min: undefined, max: undefined });
-    else onChange({ [key]: undefined } as Partial<TransactionsSearch>);
+    else onChange({ [key]: undefined });
   };
 
   const clearAll = () =>
@@ -128,7 +137,6 @@ export function TransactionsToolbar({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        {/* Search */}
         <div className="relative w-full min-w-48 sm:w-64">
           <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
           <Input
@@ -143,173 +151,158 @@ export function TransactionsToolbar({
         {/* Filter pills — grouped so they wrap as a unit, independent of
             the sort/select controls. */}
         <div className="flex flex-wrap items-center gap-2">
-        {/* Account */}
-        <FilterPill icon={Banknote} label="Account" active={!!account}>
-          <Command>
-            <CommandInput placeholder="Search accounts…" />
-            <CommandList>
-              <CommandEmpty>No accounts found.</CommandEmpty>
-              <CommandGroup>
-                {(accounts ?? []).map((a) => (
-                  <CommandItem
-                    key={a.short_id}
-                    value={`${a.name} ${a.institution_name}`}
-                    onSelect={() =>
-                      onChange({
-                        account:
-                          search.account === a.short_id
-                            ? undefined
-                            : a.short_id,
-                      })
-                    }
-                  >
-                    <span className="truncate">{a.name}</span>
-                    <span className="text-muted-foreground ml-1 truncate text-xs">
-                      {a.institution_name}
-                    </span>
-                    {search.account === a.short_id && (
-                      <Check className="ml-auto size-4" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </FilterPill>
+          <FilterPill icon={Banknote} label="Account" active={!!account}>
+            <Command>
+              <CommandInput placeholder="Search accounts…" />
+              <CommandList>
+                <CommandEmpty>No accounts found.</CommandEmpty>
+                <CommandGroup>
+                  {(accounts ?? []).map((a) => (
+                    <CommandItem
+                      key={a.short_id}
+                      value={`${a.name} ${a.institution_name}`}
+                      onSelect={() =>
+                        onChange({
+                          account:
+                            search.account === a.short_id
+                              ? undefined
+                              : a.short_id,
+                        })
+                      }
+                    >
+                      <span className="truncate">{a.name}</span>
+                      <span className="text-muted-foreground ml-1 truncate text-xs">
+                        {a.institution_name}
+                      </span>
+                      {search.account === a.short_id && (
+                        <Check className="ml-auto size-4" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </FilterPill>
 
-        {/* Category */}
-        <FilterPill icon={Shapes} label="Category" active={!!category}>
-          <Command>
-            <CommandInput placeholder="Search categories…" />
-            <CommandList>
-              <CommandEmpty>No categories found.</CommandEmpty>
-              <CommandGroup>
-                {categories.map((c) => (
-                  <CommandItem
-                    key={c.slug}
-                    value={`${c.display_name} ${c.parent_display_name ?? ""}`}
-                    onSelect={() =>
-                      onChange({
-                        category:
-                          search.category === c.slug ? undefined : c.slug,
-                      })
-                    }
-                  >
-                    <DynamicIcon
-                      name={c.icon}
-                      className="size-4"
-                      style={c.color ? { color: c.color } : undefined}
-                    />
-                    <span className={cn(c.parent_id && "text-muted-foreground")}>
-                      {c.parent_display_name
-                        ? `${c.parent_display_name} › ${c.display_name}`
-                        : c.display_name}
-                    </span>
-                    {search.category === c.slug && (
-                      <Check className="ml-auto size-4" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </FilterPill>
+          <FilterPill icon={Shapes} label="Category" active={!!category}>
+            <CategoryCommandList
+              currentSlug={search.category ?? null}
+              onPick={({ category_slug }) =>
+                onChange({
+                  category:
+                    category_slug && search.category === category_slug
+                      ? undefined
+                      : category_slug,
+                })
+              }
+            />
+          </FilterPill>
 
-        {/* Date range */}
-        <FilterPill
-          icon={CalendarRange}
-          label="Date"
-          active={!!(search.start || search.end)}
-          className="w-64 p-3"
-        >
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">From</Label>
-              <Input
-                type="date"
-                value={search.start ?? ""}
-                onChange={(e) =>
-                  onChange({ start: e.target.value || undefined })
-                }
-              />
+          <FilterPill
+            icon={CalendarRange}
+            label="Date"
+            active={!!(search.start || search.end)}
+            className="w-64 p-3"
+          >
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">From</Label>
+                <Input
+                  type="date"
+                  value={search.start ?? ""}
+                  onChange={(e) =>
+                    onChange({ start: e.target.value || undefined })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">To</Label>
+                <Input
+                  type="date"
+                  value={search.end ?? ""}
+                  onChange={(e) =>
+                    onChange({ end: e.target.value || undefined })
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">To</Label>
-              <Input
-                type="date"
-                value={search.end ?? ""}
-                onChange={(e) => onChange({ end: e.target.value || undefined })}
-              />
-            </div>
-          </div>
-        </FilterPill>
+          </FilterPill>
 
-        {/* Amount range */}
-        <FilterPill
-          icon={DollarSign}
-          label="Amount"
-          active={search.min != null || search.max != null}
-          className="w-56 p-3"
-        >
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Min</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={search.min ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    min: e.target.value ? Number(e.target.value) : undefined,
-                  })
-                }
-              />
+          <FilterPill
+            icon={DollarSign}
+            label="Amount"
+            active={search.min != null || search.max != null}
+            className="w-56 p-3"
+          >
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Min</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={search.min ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      min: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Max</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={search.max ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      max: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    })
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Max</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={search.max ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    max: e.target.value ? Number(e.target.value) : undefined,
-                  })
-                }
-              />
-            </div>
-          </div>
-        </FilterPill>
+          </FilterPill>
 
-        {/* Pending */}
-        <FilterPill icon={CircleDot} label="Status" active={!!search.pending}>
-          <Command>
-            <CommandList>
-              <CommandGroup>
-                {(
-                  [
-                    { label: "Any status", value: undefined },
-                    { label: "Pending only", value: "true" as const },
-                    { label: "Posted only", value: "false" as const },
-                  ] satisfies { label: string; value: "true" | "false" | undefined }[]
-                ).map((opt) => (
-                  <CommandItem
-                    key={opt.label}
-                    value={opt.label}
-                    onSelect={() => onChange({ pending: opt.value })}
-                  >
-                    {opt.label}
-                    {search.pending === opt.value && (
-                      <Check className="ml-auto size-4" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </FilterPill>
+          <FilterPill
+            icon={CircleDot}
+            label="Status"
+            active={!!search.pending}
+          >
+            <Command>
+              <CommandList>
+                <CommandGroup>
+                  {(
+                    [
+                      { label: "Any status", value: undefined },
+                      { label: "Pending only", value: "true" as const },
+                      { label: "Posted only", value: "false" as const },
+                    ] satisfies {
+                      label: string;
+                      value: "true" | "false" | undefined;
+                    }[]
+                  ).map((opt) => (
+                    <CommandItem
+                      key={opt.label}
+                      value={opt.label}
+                      onSelect={() => onChange({ pending: opt.value })}
+                    >
+                      {opt.label}
+                      {search.pending === opt.value && (
+                        <Check className="ml-auto size-4" />
+                      )}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </FilterPill>
         </div>
 
         <div className="grow" />

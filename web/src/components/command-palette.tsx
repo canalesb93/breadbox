@@ -14,15 +14,16 @@ import { NAV, navKey } from "@/lib/nav";
 import { openModal } from "@/lib/modals";
 import { useShortcut } from "@/lib/shortcuts";
 import { useLogout } from "@/api/queries/auth";
+import type { TransactionsSearch } from "@/routes/transactions";
 
-// Quick "jump to this transactions view" actions. Each navigates to
-// /transactions with a fresh set of search params. `value` carries extra
-// search terms so cmdk surfaces them on partial matches ("pend", "larg").
+// Quick "jump to this transactions view" actions. Each merges its params
+// into the current transactions search. `value` carries extra search terms
+// so cmdk surfaces them on partial matches ("pend", "larg").
 const TX_QUICK_ACTIONS: {
   title: string;
   value: string;
   icon: LucideIcon;
-  search: Record<string, string>;
+  search: Partial<TransactionsSearch>;
 }[] = [
   {
     title: "Filter: Pending",
@@ -73,7 +74,7 @@ export function CommandPalette() {
     navigate({ to: ".", search: openModal(modalKey) });
   };
 
-  const runQuickFilter = (patch: Record<string, string>) => {
+  const runQuickFilter = (patch: Partial<TransactionsSearch>) => {
     setOpen(false);
     // Merge onto the current search rather than replacing it — "Sort:
     // Largest" shouldn't wipe an active filter. Unknown keys carried in from
