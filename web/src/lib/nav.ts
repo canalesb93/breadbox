@@ -16,62 +16,79 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export interface NavLeaf {
+interface NavLeafBase {
   title: string;
-  to: string;
   icon: LucideIcon;
 }
+
+export interface NavLeafLink extends NavLeafBase {
+  kind: "link";
+  to: string;
+}
+
+export interface NavLeafModal extends NavLeafBase {
+  kind: "modal";
+  modalKey: string;
+}
+
+export type NavLeaf = NavLeafLink | NavLeafModal;
 
 export interface NavGroup {
   label: string;
   items: NavLeaf[];
 }
 
-export interface NavLeafWithGroup extends NavLeaf {
+export interface NavLeafWithGroup {
+  leaf: NavLeaf;
   group: string;
 }
 
 export function isNavMatch(item: NavLeaf, pathname: string): boolean {
+  if (item.kind !== "link") return false;
   return item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+}
+
+export function navKey(item: NavLeaf): string {
+  return item.kind === "link" ? `link:${item.to}` : `modal:${item.modalKey}`;
 }
 
 export const NAV: NavGroup[] = [
   {
     label: "Money",
     items: [
-      { title: "Home", to: "/", icon: BadgeDollarSign },
-      { title: "Transactions", to: "/transactions", icon: ArrowLeftRight },
-      { title: "Reviews", to: "/reviews", icon: ClipboardCheck },
-      { title: "Insights", to: "/insights", icon: LineChart },
-      { title: "Reports", to: "/reports", icon: FileText },
+      { kind: "link", title: "Home", to: "/", icon: BadgeDollarSign },
+      { kind: "link", title: "Transactions", to: "/transactions", icon: ArrowLeftRight },
+      { kind: "link", title: "Reviews", to: "/reviews", icon: ClipboardCheck },
+      { kind: "link", title: "Insights", to: "/insights", icon: LineChart },
+      { kind: "link", title: "Reports", to: "/reports", icon: FileText },
     ],
   },
   {
     label: "Setup",
     items: [
-      { title: "Accounts", to: "/accounts", icon: Banknote },
-      { title: "Connections", to: "/connections", icon: Plug },
-      { title: "Account links", to: "/account-links", icon: Link2 },
+      { kind: "link", title: "Accounts", to: "/accounts", icon: Banknote },
+      { kind: "link", title: "Connections", to: "/connections", icon: Plug },
+      { kind: "link", title: "Account links", to: "/account-links", icon: Link2 },
     ],
   },
   {
     label: "Automation",
     items: [
-      { title: "Rules", to: "/rules", icon: Wand2 },
-      { title: "Agents", to: "/agents", icon: Bot },
+      { kind: "link", title: "Rules", to: "/rules", icon: Wand2 },
+      { kind: "link", title: "Agents", to: "/agents", icon: Bot },
     ],
   },
   {
     label: "Admin",
     items: [
-      { title: "Categories", to: "/categories", icon: Shapes },
-      { title: "Tags", to: "/tags", icon: Tags },
-      { title: "API keys", to: "/api-keys", icon: Key },
-      { title: "Settings", to: "/settings", icon: Settings },
+      { kind: "link", title: "Categories", to: "/categories", icon: Shapes },
+      { kind: "link", title: "Tags", to: "/tags", icon: Tags },
+      { kind: "link", title: "API keys", to: "/api-keys", icon: Key },
+      { kind: "modal", title: "Settings", modalKey: "settings", icon: Settings },
     ],
   },
 ];
 
 export const NAV_LEAVES: NavLeafWithGroup[] = NAV.flatMap((g) =>
-  g.items.map((item) => ({ ...item, group: g.label })),
+  g.items.map((leaf) => ({ leaf, group: g.label })),
 );

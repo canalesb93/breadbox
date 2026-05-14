@@ -33,15 +33,22 @@ const loginRoute = createRoute({
   validateSearch: loginSearchSchema,
 });
 
-const placeholderRoutes = NAV_LEAVES.filter((leaf) => leaf.to !== "/").map((leaf) =>
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: leaf.to,
-    component: () => <Placeholder title={leaf.title} />,
-  }),
-);
+const placeholderRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
+  if (leaf.kind !== "link" || leaf.to === "/") return [];
+  return [
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: leaf.to,
+      component: () => <Placeholder title={leaf.title} />,
+    }),
+  ];
+});
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, ...placeholderRoutes]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  loginRoute,
+  ...placeholderRoutes,
+]);
 
 const router = createRouter({
   routeTree,
