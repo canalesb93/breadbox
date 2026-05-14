@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -48,6 +49,11 @@ export interface DataTableProps<TData, TValue> {
   getRowId?: (row: TData) => string;
   /** Passed through to the table instance — e.g. shift-range-select hooks. */
   meta?: object;
+  /**
+   * Row id (matching getRowId) to render with a keyboard-focus ring and keep
+   * scrolled into view — drives j/k list navigation.
+   */
+  focusedRowId?: string;
 }
 
 // Shared table wrapper over @tanstack/react-table + the shadcn Table
@@ -70,7 +76,13 @@ export function DataTable<TData, TValue>({
   onRowSelectionChange,
   getRowId,
   meta,
+  focusedRowId,
 }: DataTableProps<TData, TValue>) {
+  const focusedRowRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    focusedRowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [focusedRowId]);
+
   const table = useReactTable({
     data,
     columns,
@@ -140,12 +152,18 @@ export function DataTable<TData, TValue>({
               </TableCell>
             </TableRow>
           ) : (
-            table.getRowModel().rows.map((row) => (
+            table.getRowModel().rows.map((row) => {
+              const focused = row.id === focusedRowId;
+              return (
               <TableRow
                 key={row.id}
+                ref={focused ? focusedRowRef : undefined}
                 data-state={row.getIsSelected() ? "selected" : undefined}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={cn(onRowClick && "cursor-pointer")}
+                className={cn(
+                  onRowClick && "cursor-pointer",
+                  focused && "ring-primary ring-1 ring-inset",
+                )}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
@@ -153,7 +171,8 @@ export function DataTable<TData, TValue>({
                   </TableCell>
                 ))}
               </TableRow>
-            ))
+              );
+            })
           )}
         </TableBody>
       </Table>
