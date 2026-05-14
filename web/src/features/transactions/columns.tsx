@@ -34,7 +34,10 @@ const selectionColumn: ColumnDef<Transaction> = {
         // Shift-click extends the selection from the last-toggled row. The
         // normal onCheckedChange still fires and lands the current row in the
         // same (selected) state the range sets, so no preventDefault needed.
+        // stopPropagation keeps the row-body select-mode click from also
+        // toggling — otherwise a checkbox click would toggle twice.
         onClick={(e) => {
+          e.stopPropagation();
           if (e.shiftKey) meta?.onRangeSelect?.(row.index);
         }}
         onCheckedChange={(value) => {

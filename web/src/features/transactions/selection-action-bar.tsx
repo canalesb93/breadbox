@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CategoryCommandList } from "@/components/category-command";
 import { TagCommandList } from "@/components/tag-command";
+import { KbdTooltip } from "@/components/kbd-tooltip";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useUpdateTransactions } from "@/api/queries/transactions";
 import type { UpdateTransactionsOp } from "@/api/types";
@@ -27,6 +28,9 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 interface SelectionActionBarProps {
   selectedIds: string[];
+  /** Total transactions matching the current filters — gives the count
+   *  context (header select-all only covers the loaded page). */
+  totalCount?: number;
   onClear: () => void;
 }
 
@@ -36,6 +40,7 @@ interface SelectionActionBarProps {
 // chunked to the endpoint's 50-op limit.
 export function SelectionActionBar({
   selectedIds,
+  totalCount,
   onClear,
 }: SelectionActionBarProps) {
   const update = useUpdateTransactions();
@@ -62,7 +67,9 @@ export function SelectionActionBar({
     <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
       <div className="bg-popover text-popover-foreground flex items-center gap-1 rounded-full border p-1 pl-3 shadow-lg">
         <span className="text-sm font-medium">
-          {selectedIds.length} selected
+          {totalCount != null && totalCount > selectedIds.length
+            ? `${selectedIds.length} of ${totalCount.toLocaleString()} selected`
+            : `${selectedIds.length} selected`}
         </span>
         <Separator orientation="vertical" className="mx-1 h-5" />
 
@@ -80,15 +87,17 @@ export function SelectionActionBar({
         />
 
         <Separator orientation="vertical" className="mx-1 h-5" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 rounded-full"
-          onClick={onClear}
-          aria-label="Clear selection"
-        >
-          <X className="size-4" />
-        </Button>
+        <KbdTooltip label="Clear selection / exit" keys={["Esc"]} side="top">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 rounded-full"
+            onClick={onClear}
+            aria-label="Clear selection"
+          >
+            <X className="size-4" />
+          </Button>
+        </KbdTooltip>
       </div>
     </div>
   );

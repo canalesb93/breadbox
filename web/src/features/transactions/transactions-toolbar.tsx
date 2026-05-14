@@ -338,7 +338,7 @@ export function TransactionsToolbar({
           </FilterPill>
 
           {selectMode ? (
-            <KbdTooltip label="Exit select mode" keys={["Esc"]}>
+            <KbdTooltip label="Clear selection / exit" keys={["Esc"]}>
               <Button variant="secondary" size="sm" onClick={onToggleSelect}>
                 <X className="size-4" />
                 Done

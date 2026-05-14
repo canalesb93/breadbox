@@ -22,6 +22,9 @@ export function CommandPalette() {
   useShortcut(["mod", "k"], () => setOpen((v) => !v), {
     label: "Open command palette",
     group: "Global",
+    // ⌘K must toggle from anywhere — including from inside the palette
+    // itself (its own search input / dialog) to close it.
+    global: true,
   });
 
   const go = (to: string) => {

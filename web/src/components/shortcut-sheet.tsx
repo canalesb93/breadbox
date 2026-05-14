@@ -7,27 +7,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { displayKey } from "@/lib/kbd-display";
 import {
   listShortcuts,
   subscribeShortcuts,
   useShortcut,
   type Shortcut,
 } from "@/lib/shortcuts";
-
-const DISPLAY: Record<string, string> = {
-  mod: "⌘",
-  cmd: "⌘",
-  ctrl: "Ctrl",
-  shift: "⇧",
-  alt: "⌥",
-  option: "⌥",
-};
-
-function display(k: string): string {
-  const lower = k.toLowerCase();
-  if (lower in DISPLAY) return DISPLAY[lower];
-  return k.length === 1 ? k.toUpperCase() : k;
-}
 
 function useShortcutList(): Shortcut[] {
   const [list, setList] = React.useState<Shortcut[]>(() => listShortcuts());
@@ -52,7 +38,14 @@ export function ShortcutSheet() {
       arr.push(s);
       out.set(key, arr);
     }
-    return Array.from(out.entries());
+    // "Global" first, then the rest alphabetically — stable regardless of
+    // which page registered its shortcuts in what order.
+    return Array.from(out.entries()).sort(([a], [b]) => {
+      if (a === b) return 0;
+      if (a === "Global") return -1;
+      if (b === "Global") return 1;
+      return a.localeCompare(b);
+    });
   }, [list]);
 
   return (
@@ -79,7 +72,7 @@ export function ShortcutSheet() {
                     <span className="text-sm">{s.label}</span>
                     <KbdGroup>
                       {s.keys.map((k) => (
-                        <Kbd key={k}>{display(k)}</Kbd>
+                        <Kbd key={k}>{displayKey(k)}</Kbd>
                       ))}
                     </KbdGroup>
                   </li>
