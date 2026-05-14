@@ -63,6 +63,19 @@ export interface TransactionsPage {
   limit: number;
 }
 
+// --- Accounts (public /api/v1/accounts) ---
+// A trimmed view — the transactions filter only needs identity + labels.
+export interface Account {
+  id: string;
+  short_id: string;
+  name: string;
+  institution_name: string;
+  type: string;
+  subtype: string | null;
+  mask: string | null;
+  iso_currency_code: string | null;
+}
+
 // --- Tags (public /api/v1/tags) ---
 // Mirrors internal/client/tags.go Tag.
 export interface Tag {

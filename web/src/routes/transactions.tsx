@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { Receipt, Search } from "lucide-react";
@@ -8,17 +8,51 @@ import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { transactionColumns } from "@/features/transactions/columns";
+import { FilterBar } from "@/features/transactions/filter-bar";
 import { useTransactions } from "@/api/queries/transactions";
+import type { TransactionFilters } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { Transaction } from "@/api/types";
 
-// Merges with the root route's baseSearchSchema (m/ms modal params).
+// Merges with the root route's baseSearchSchema (m/ms modal params). Every
+// filter is a URL search param so the view is bookmarkable and shareable.
 export const transactionsSearchSchema = z.object({
   q: z.string().optional(),
+  account: z.string().optional(),
+  category: z.string().optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
+  min: z.coerce.number().optional(),
+  max: z.coerce.number().optional(),
+  pending: z.enum(["true", "false"]).optional(),
+  sort: z.enum(["date", "amount"]).optional(),
+  dir: z.enum(["asc", "desc"]).optional(),
 });
 
-type TransactionsSearch = z.infer<typeof transactionsSearchSchema>;
+export type TransactionsSearch = z.infer<typeof transactionsSearchSchema>;
+
+// searchToFilters maps the URL search params onto the query hook's filter
+// shape — the one place the param names and the API param names meet.
+function searchToFilters(search: TransactionsSearch): TransactionFilters {
+  return {
+    search: search.q,
+    account: search.account,
+    category: search.category,
+    start: search.start,
+    end: search.end,
+    minAmount: search.min,
+    maxAmount: search.max,
+    pending:
+      search.pending === "true"
+        ? true
+        : search.pending === "false"
+          ? false
+          : undefined,
+    sortBy: search.sort,
+    sortOrder: search.dir,
+  };
+}
 
 export function TransactionsPage() {
   const navigate = useNavigate();
@@ -46,11 +80,31 @@ export function TransactionsPage() {
     setQuery(search.q ?? "");
   }, [search.q]);
 
-  const transactions = useTransactions({ search: search.q });
+  const setFilter = useCallback(
+    (patch: Partial<TransactionsSearch>) => {
+      navigate({
+        to: ".",
+        search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }),
+      });
+    },
+    [navigate],
+  );
+
+  const transactions = useTransactions(searchToFilters(search));
   const rows = useMemo(
     () => flattenPages<Transaction>(transactions.data?.pages, "transactions"),
     [transactions.data?.pages],
   );
+
+  const hasActiveFilters =
+    !!search.q ||
+    !!search.account ||
+    !!search.category ||
+    !!search.start ||
+    !!search.end ||
+    search.min != null ||
+    search.max != null ||
+    !!search.pending;
 
   return (
     <div>
@@ -59,7 +113,7 @@ export function TransactionsPage() {
         description="Every transaction synced across your connected accounts."
       />
 
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 space-y-3">
         <div className="relative w-full max-w-xs">
           <Search className="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
           <Input
@@ -69,6 +123,7 @@ export function TransactionsPage() {
             className="pl-8"
           />
         </div>
+        <FilterBar search={search} onChange={setFilter} />
       </div>
 
       <DataTable
@@ -82,10 +137,14 @@ export function TransactionsPage() {
         emptyState={
           <EmptyState
             icon={Receipt}
-            title={search.q ? "No matching transactions" : "No transactions yet"}
+            title={
+              hasActiveFilters
+                ? "No matching transactions"
+                : "No transactions yet"
+            }
             description={
-              search.q
-                ? "Try a different search term."
+              hasActiveFilters
+                ? "Try adjusting or clearing your filters."
                 : "Transactions appear here once an account finishes syncing."
             }
           />

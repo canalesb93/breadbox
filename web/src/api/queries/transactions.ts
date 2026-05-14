@@ -16,13 +16,27 @@ import type {
 export interface TransactionFilters {
   /** Free-text search; the API requires a minimum of 2 chars. */
   search?: string;
+  /** Account short_id. */
+  account?: string;
+  /** Category slug. */
+  category?: string;
+  /** Inclusive start / exclusive end date, YYYY-MM-DD. */
+  start?: string;
+  end?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  /** true = pending only, false = posted only, undefined = both. */
+  pending?: boolean;
+  sortBy?: "date" | "amount";
+  sortOrder?: "asc" | "desc";
 }
 
 const PAGE_LIMIT = 50;
 
 // useTransactions paginates GET /api/v1/transactions with cursor pagination.
 // The SPA reaches the public endpoint directly — session auth on /api/v1/*
-// (see internal/api/auth_session.go) makes the cookie sufficient.
+// (see internal/api/auth_session.go) makes the cookie sufficient. Every
+// filter maps 1:1 to a documented query param.
 export function useTransactions(filters: TransactionFilters) {
   // The API rejects a 1-char search; treat <2 chars as "no search".
   const search =
@@ -30,12 +44,39 @@ export function useTransactions(filters: TransactionFilters) {
       ? filters.search.trim()
       : undefined;
 
+  // Normalised key — only the fields that actually narrow the query, so two
+  // filter objects that mean the same thing share a cache entry.
+  const key = {
+    search,
+    account: filters.account,
+    category: filters.category,
+    start: filters.start,
+    end: filters.end,
+    minAmount: filters.minAmount,
+    maxAmount: filters.maxAmount,
+    pending: filters.pending,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+  };
+
   return useInfiniteQuery({
-    queryKey: ["transactions", { search }],
+    queryKey: ["transactions", key],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ limit: String(PAGE_LIMIT) });
       if (pageParam) params.set("cursor", pageParam);
       if (search) params.set("search", search);
+      if (filters.account) params.set("account_id", filters.account);
+      if (filters.category) params.set("category_slug", filters.category);
+      if (filters.start) params.set("start_date", filters.start);
+      if (filters.end) params.set("end_date", filters.end);
+      if (filters.minAmount != null)
+        params.set("min_amount", String(filters.minAmount));
+      if (filters.maxAmount != null)
+        params.set("max_amount", String(filters.maxAmount));
+      if (filters.pending != null)
+        params.set("pending", String(filters.pending));
+      if (filters.sortBy) params.set("sort_by", filters.sortBy);
+      if (filters.sortOrder) params.set("sort_order", filters.sortOrder);
       return api<TransactionsPage>(`/api/v1/transactions?${params.toString()}`);
     },
     initialPageParam: "",
