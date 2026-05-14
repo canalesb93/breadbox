@@ -24,6 +24,7 @@ Breadbox syncs your bank data into a PostgreSQL database you control, then expos
 - **Agent reports** for AI agents to submit summaries and flag transactions
 - **API key auth** with scoped access (full/read-only)
 - **AES-256-GCM encryption** for provider credentials at rest
+- **CLI** -- `gh`-style `breadbox <noun> <verb>` driving a local or remote instance; same binary, plus a 10 MB `breadbox-cli` lite build for remote agents
 - **Single binary** -- one Go binary serves everything (API, MCP, dashboard, webhooks, cron)
 
 ## Installation
@@ -152,6 +153,14 @@ make dev
 # Visit http://localhost:8080
 ```
 
+Alternate build targets:
+
+```bash
+make build           # default — server + CLI + dashboard (~50 MB)
+make build-headless  # server + CLI, no dashboard assets (~46 MB)
+make build-lite      # CLI-only, no server packages — ships as breadbox-cli (~10 MB)
+```
+
 For production deployment details (domain setup, Caddy, daemon registration, backups), see the [`deploy/README.md`](deploy/README.md).
 
 ## MCP Integration
@@ -160,7 +169,7 @@ Breadbox exposes financial data to AI agents via the [Model Context Protocol](ht
 
 **Streamable HTTP** (remote): The MCP endpoint is at `/mcp`, authenticated with an API key.
 
-**Stdio** (local): Run `breadbox mcp-stdio` for direct stdin/stdout MCP transport.
+**Stdio** (local): Run `breadbox mcp` for direct stdin/stdout MCP transport. (The older `breadbox mcp-stdio` still works as a deprecated alias for back-compat with existing Claude Desktop configs.)
 
 ### Claude Desktop / Claude Code
 
@@ -169,7 +178,7 @@ Breadbox exposes financial data to AI agents via the [Model Context Protocol](ht
   "mcpServers": {
     "breadbox": {
       "command": "/path/to/breadbox",
-      "args": ["mcp-stdio"],
+      "args": ["mcp"],
       "env": {
         "DATABASE_URL": "postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"
       }
@@ -186,6 +195,35 @@ Point your agent's MCP client at your Breadbox instance:
 URL: https://your-host/mcp
 Header: X-API-Key: bb_your_api_key
 ```
+
+## CLI
+
+The `breadbox` binary doubles as a `gh`-style CLI driving any breadbox over its REST API. Same binary, same auth, plus a 10 MB `breadbox-cli` lite build (`-tags=lite`) for remote agents that don't need the server packages.
+
+Per-host credentials live in `~/.config/breadbox/hosts.toml`. Switch hosts with `--host <name>` or `BREADBOX_HOST=<name>`. Full command catalog: [`docs/cli-commands.md`](docs/cli-commands.md); upkeep rule: [`.claude/rules/cli-commands.md`](.claude/rules/cli-commands.md).
+
+### Local (same machine as `breadbox serve`)
+
+```bash
+breadbox auth bootstrap           # mints a full_access key, saves to hosts.toml
+breadbox doctor                   # readiness report
+breadbox transactions list --limit 10
+breadbox connections link --provider=plaid --user=<short_id> --wait
+```
+
+### Remote (device-code login)
+
+```bash
+breadbox auth login --host=https://breadbox.example.com
+# prints a verification URL + short code; approve on the server's /auth/device page
+breadbox accounts list
+```
+
+Or paste a pre-issued key directly: `breadbox auth login --host=URL --token=bb_xxxxx`.
+
+### Output
+
+Default is a human table on TTY and JSON when piped (`breadbox transactions list | jq ...` just works). Exit codes are a contract: `0` success, `1` runtime, `2` usage, `3` auth, `4` upstream, `5` validation.
 
 ## REST API
 
