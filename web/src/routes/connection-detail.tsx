@@ -54,15 +54,20 @@ import type { Account, ConnectionDetail } from "@/api/types";
 import type { SyncLog } from "@/api/queries/sync-logs";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
 import { ComingSoonSheet } from "@/features/connections/coming-soon-sheet";
+import { ConnectBankSheet } from "@/features/connections/connect-bank-sheet";
 import { ConnectionAccountsList } from "@/features/connections/connection-accounts-list";
 import { SyncActivityBars } from "@/features/connections/sync-activity-bars";
 import { SyncHistoryList } from "@/features/connections/sync-history-list";
 import { providerLabel, relativeTime } from "@/features/connections/connection-utils";
+import { Upload } from "lucide-react";
 
 // Search-param schema for the detail page. Mirrors the list schema's `reauth`
-// so the same coming-soon Sheet can open from either surface.
+// so the same coming-soon Sheet can open from either surface. `import_csv`
+// opens the CSV upload Sheet inline, pre-targeted to append rows to this
+// connection.
 export const connectionDetailSearchSchema = z.object({
   reauth: z.string().optional(),
+  import_csv: z.string().optional(),
 });
 
 type ConnectionDetailSearch = z.infer<typeof connectionDetailSearchSchema>;
@@ -138,6 +143,32 @@ export function ConnectionDetailPage() {
     });
   }
 
+  function openImportCsv() {
+    if (!connQuery.data) return;
+    navigate({
+      to: "/connections/$id",
+      params: { id: connQuery.data.short_id },
+      search: (prev: ConnectionDetailSearch) => ({
+        ...prev,
+        import_csv: connQuery.data!.short_id,
+      }),
+      replace: false,
+    });
+  }
+
+  function closeImportCsv() {
+    if (!connQuery.data) return;
+    navigate({
+      to: "/connections/$id",
+      params: { id: connQuery.data.short_id },
+      search: (prev: ConnectionDetailSearch) => ({
+        ...prev,
+        import_csv: undefined,
+      }),
+      replace: true,
+    });
+  }
+
   return (
     <div className="mx-auto max-w-5xl">
       <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
@@ -168,6 +199,7 @@ export function ConnectionDetailPage() {
           allLogsForActivity={syncLogsQuery.data?.sync_logs ?? []}
           syncLogsLoading={syncLogsQuery.isLoading}
           onReauth={openReauth}
+          onImportCsv={openImportCsv}
         />
       )}
 
@@ -179,6 +211,15 @@ export function ConnectionDetailPage() {
         title="Re-authenticate"
         description="Reconnect to the bank to resume syncing this connection."
       />
+      {connQuery.data?.provider === "csv" && (
+        <ConnectBankSheet
+          open={!!search.import_csv}
+          onOpenChange={(open) => {
+            if (!open) closeImportCsv();
+          }}
+          appendToConnectionId={connQuery.data.short_id}
+        />
+      )}
     </div>
   );
 }
@@ -190,6 +231,7 @@ interface DetailBodyProps {
   allLogsForActivity: SyncLog[];
   syncLogsLoading: boolean;
   onReauth: () => void;
+  onImportCsv: () => void;
 }
 
 function DetailBody({
@@ -199,6 +241,7 @@ function DetailBody({
   allLogsForActivity,
   syncLogsLoading,
   onReauth,
+  onImportCsv,
 }: DetailBodyProps) {
   const sync = useSyncConnection();
   const pause = usePauseConnection();
@@ -317,6 +360,12 @@ function DetailBody({
                 <RefreshCw className="size-4" />
               )}
               Sync now
+            </Button>
+          )}
+          {conn.provider === "csv" && conn.status !== "disconnected" && (
+            <Button variant="outline" size="sm" onClick={onImportCsv}>
+              <Upload className="size-4" />
+              Import more
             </Button>
           )}
           <DropdownMenu>
