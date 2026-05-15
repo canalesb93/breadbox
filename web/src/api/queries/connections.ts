@@ -4,6 +4,8 @@ import type {
   Connection,
   ConnectionDetail,
   CreateConnectionResult,
+  CsvImportResult,
+  CsvPreviewResult,
   LinkSession,
   PlaidExchangeCredentials,
   ProviderInfo,
@@ -171,6 +173,73 @@ export function useCreateConnection() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["connections"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+}
+
+// useCsvPreview parses a CSV upload server-side and returns the headers +
+// preview rows + auto-detected column mapping. Multipart-only — the backend
+// also accepts JSON+base64 but using FormData on the client side keeps the
+// upload streamable and avoids a 33%-base64 inflation. The endpoint never
+// persists, so we don't invalidate any caches.
+export function useCsvPreview() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return api<CsvPreviewResult>("/api/v1/connections/csv/preview", {
+        method: "POST",
+        body: fd,
+      });
+    },
+  });
+}
+
+// useCsvImport commits a parsed CSV. Either creates a brand-new CSV
+// connection (no `connectionId`) or appends rows to an existing one. On
+// success we invalidate the connections + accounts + transactions caches so
+// every list reflects the new rows immediately.
+export interface CsvImportInput {
+  file: File;
+  columnMapping: Partial<Record<string, number>>;
+  positiveIsDebit: boolean;
+  hasDebitCredit: boolean;
+  dateFormat?: string;
+  // For new connections — the household member that owns the import.
+  // Ignored when `connectionId` is set (the existing connection's user wins).
+  userId?: string;
+  accountName?: string;
+  // Set to append to an existing CSV connection. Accepts the connection's
+  // short_id (the public-facing 8-char ID) or its full UUID.
+  connectionId?: string;
+}
+
+export function useCsvImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CsvImportInput) => {
+      const fd = new FormData();
+      fd.append("file", input.file);
+      fd.append("column_mapping", JSON.stringify(input.columnMapping));
+      fd.append("positive_is_debit", String(input.positiveIsDebit));
+      fd.append("has_debit_credit", String(input.hasDebitCredit));
+      if (input.dateFormat) fd.append("date_format", input.dateFormat);
+      if (input.connectionId) {
+        fd.append("connection_id", input.connectionId);
+      } else {
+        if (input.userId) fd.append("user_id", input.userId);
+        if (input.accountName) fd.append("account_name", input.accountName);
+      }
+      return api<CsvImportResult>("/api/v1/connections/csv/import", {
+        method: "POST",
+        body: fd,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connections"] });
+      qc.invalidateQueries({ queryKey: ["connection"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
     },
   });
 }

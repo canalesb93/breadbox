@@ -177,6 +177,45 @@ export interface TellerExchangeCredentials {
   accounts?: { id: string; name?: string; type?: string; subtype?: string; last_four?: string }[];
 }
 
+// --- Connect: CSV preview / import (POST /connections/csv/{preview,import}) ---
+// Mirrors the JSON shapes returned by internal/api/csv_import.go. The CSV
+// branch in the Connect-bank Sheet posts the file as multipart/form-data; the
+// preview returns parsed headers + the first N rows + an inferred column
+// mapping (with optional auto-detected template hints), and the import
+// commits the file with the user-chosen mapping.
+export interface CsvPreviewResult {
+  headers: string[];
+  preview_rows: string[][];
+  total_rows: number;
+  delimiter: string; // "," | ";" | "|" | "tab"
+  inferred_mapping: Partial<Record<CsvColumnKey, number>>;
+  template_name?: string;
+  positive_is_debit?: boolean;
+  date_format?: string;
+  has_debit_credit?: boolean;
+}
+
+// CsvColumnKey is the union of every field the backend importer recognises.
+// `date` + `description` are always required; `amount` is required unless
+// `has_debit_credit` is true (then `debit` + `credit` carry the value).
+export type CsvColumnKey =
+  | "date"
+  | "description"
+  | "amount"
+  | "debit"
+  | "credit"
+  | "category"
+  | "merchant_name";
+
+export interface CsvImportResult {
+  connection_id: string;
+  account_id: string;
+  imported_transactions: number;
+  updated_transactions: number;
+  skipped_duplicates: number;
+  total_rows: number;
+}
+
 // --- Tags (public /api/v1/tags) ---
 // Mirrors internal/client/tags.go Tag.
 export interface Tag {

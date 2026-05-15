@@ -5,11 +5,20 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // Default Content-Type is JSON, but skip it when the body is a FormData
+  // (multipart) — the browser MUST set Content-Type itself so it can include
+  // the auto-generated multipart boundary. Forcing application/json here
+  // would leave the server unable to parse the body.
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+  const baseHeaders: Record<string, string> = isFormData
+    ? {}
+    : { "Content-Type": "application/json" };
   const res = await fetch(path, {
     credentials: "include",
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...baseHeaders,
       ...(init.headers ?? {}),
     },
   });

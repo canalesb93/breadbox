@@ -31,10 +31,16 @@ import { useUsers } from "@/api/queries/users";
 import { ProviderPicker, PROVIDER_META } from "./provider-picker";
 import { PlaidLinkButton } from "./plaid-link-button";
 import { TellerConnectButton } from "./teller-connect-button";
+import { CsvImportForm } from "./csv-import-form";
 
 interface ConnectBankSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // When set, the Sheet skips step 1 and renders the CSV form directly,
+  // pre-targeted to append to this connection. Used by the connection-
+  // detail page's "Import more" button so admins can append rows to an
+  // existing CSV connection without re-picking a provider.
+  appendToConnectionId?: string;
 }
 
 // Stage drives the inner switch between provider-pick (step 1) and the
@@ -45,7 +51,8 @@ interface ConnectBankSheetProps {
 type Stage =
   | { kind: "pick" }
   | { kind: "plaid"; userId: string; linkToken: string }
-  | { kind: "teller"; userId: string; applicationId: string };
+  | { kind: "teller"; userId: string; applicationId: string }
+  | { kind: "csv"; userId: string };
 
 // ConnectBankSheet is the real Connect-bank flow that replaces the v1
 // /connections/new wizard for the v2 SPA. Two steps inside one Sheet:
@@ -61,6 +68,7 @@ type Stage =
 export function ConnectBankSheet({
   open,
   onOpenChange,
+  appendToConnectionId,
 }: ConnectBankSheetProps) {
   const navigate = useNavigate();
   const providersQuery = useProviders();
@@ -70,16 +78,20 @@ export function ConnectBankSheet({
 
   const [provider, setProvider] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>("");
-  const [stage, setStage] = useState<Stage>({ kind: "pick" });
+  const [stage, setStage] = useState<Stage>(
+    appendToConnectionId ? { kind: "csv", userId: "" } : { kind: "pick" },
+  );
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const enabledProviders = useMemo(
-    () =>
-      (providersQuery.data ?? [])
-        .filter((p) => p.configured && p.name !== "csv")
-        .map((p) => p.name),
-    [providersQuery.data],
-  );
+  // CSV is always available (the importer is in-binary, not a provider
+  // requiring credentials). Plaid + Teller cards are gated on the
+  // /api/v1/providers `configured` flag.
+  const enabledProviders = useMemo(() => {
+    const fromApi = (providersQuery.data ?? [])
+      .filter((p) => p.configured && p.name !== "csv")
+      .map((p) => p.name);
+    return [...fromApi, "csv"];
+  }, [providersQuery.data]);
 
   // Default the family member to the only household member when there's just
   // one, so the picker doesn't render a single-option dropdown the user has
@@ -91,7 +103,11 @@ export function ConnectBankSheet({
   function reset() {
     setProvider(null);
     setUserId("");
-    setStage({ kind: "pick" });
+    // When the Sheet is bound to an existing CSV connection (append mode)
+    // it stays on the CSV stage across re-opens; the picker is irrelevant.
+    setStage(
+      appendToConnectionId ? { kind: "csv", userId: "" } : { kind: "pick" },
+    );
     setCreateError(null);
     linkSession.reset();
     createConnection.reset();
@@ -105,6 +121,12 @@ export function ConnectBankSheet({
   async function onContinue() {
     if (!provider || !effectiveUserId) return;
     setCreateError(null);
+    // CSV doesn't need a server-issued link session — skip straight to the
+    // upload form. The form itself owns the file → preview → import flow.
+    if (provider === "csv") {
+      setStage({ kind: "csv", userId: effectiveUserId });
+      return;
+    }
     try {
       const session = await linkSession.mutateAsync({
         provider,
@@ -293,7 +315,7 @@ export function ConnectBankSheet({
           </div>
         )}
 
-        {stage.kind !== "pick" && (
+        {(stage.kind === "plaid" || stage.kind === "teller") && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <Loader2 className="text-muted-foreground size-6 animate-spin" />
             <div className="text-sm font-medium">
@@ -311,6 +333,34 @@ export function ConnectBankSheet({
               Cancel
             </Button>
           </div>
+        )}
+
+        {stage.kind === "csv" && (
+          <CsvImportForm
+            appendToConnectionId={appendToConnectionId}
+            userId={stage.userId || undefined}
+            onSuccess={(result) => {
+              toast.success(
+                result.appended
+                  ? `Imported ${result.imported} more transactions.`
+                  : `Imported ${result.imported} transactions.`,
+              );
+              handleSheetChange(false);
+              if (!result.appended) {
+                navigate({
+                  to: "/connections/$short_id",
+                  params: { short_id: result.connection_id },
+                });
+              }
+            }}
+            onCancel={() => {
+              if (appendToConnectionId) {
+                handleSheetChange(false);
+              } else {
+                setStage({ kind: "pick" });
+              }
+            }}
+          />
         )}
 
         {stage.kind === "plaid" && (

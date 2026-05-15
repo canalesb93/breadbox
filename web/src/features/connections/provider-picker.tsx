@@ -30,8 +30,7 @@ export interface ProviderPickerProps {
    *  list still renders, but is disabled with a "not configured" hint so the
    *  user knows this server hasn't been wired up for it. */
   enabledProviders: string[];
-  /** Subset of providers to show. Defaults to plaid + teller; the future
-   *  CSV PR (PR-04) will pass `["plaid", "teller", "csv"]`. */
+  /** Subset of providers to show. Defaults to plaid + teller + csv. */
   providers?: string[];
   value: string | null;
   onChange: (provider: string) => void;
@@ -45,7 +44,7 @@ export interface ProviderPickerProps {
 // a connection without an admin login.
 export function ProviderPicker({
   enabledProviders,
-  providers = ["plaid", "teller"],
+  providers = ["plaid", "teller", "csv"],
   value,
   onChange,
   className,
