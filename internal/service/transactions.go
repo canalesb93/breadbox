@@ -94,6 +94,115 @@ func FormatCurrency(abs float64) string {
 	return fmt.Sprintf("$%s.%02d", s, cents)
 }
 
+// appendAccountFilter writes the account-filter SQL clause for transactions
+// queries, preferring the multi-value AccountIDs over the singular AccountID
+// when both are populated. Errors out on any unknown id — a bad id is almost
+// always a client bug (vs. a stale category slug, which we tolerate silently
+// in appendCategoryFilter below).
+func (s *Service) appendAccountFilter(
+	ctx context.Context,
+	buf *strings.Builder,
+	args []any,
+	argN int,
+	ids []string,
+	single *string,
+) ([]any, int, error) {
+	if len(ids) > 0 {
+		uuids := make([]pgtype.UUID, 0, len(ids))
+		for _, id := range ids {
+			u, err := s.resolveAccountID(ctx, id)
+			if err != nil {
+				return args, argN, fmt.Errorf("invalid account id %q: %w", id, err)
+			}
+			uuids = append(uuids, u)
+		}
+		buf.WriteString(" AND t.account_id = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("::uuid[])")
+		args = append(args, uuids)
+		argN++
+		return args, argN, nil
+	}
+	if single != nil {
+		u, err := s.resolveAccountID(ctx, *single)
+		if err != nil {
+			return args, argN, fmt.Errorf("invalid account id: %w", err)
+		}
+		buf.WriteString(" AND t.account_id = $")
+		buf.WriteString(strconv.Itoa(argN))
+		args = append(args, u)
+		argN++
+	}
+	return args, argN, nil
+}
+
+// appendCategoryFilter writes the category-filter SQL clause. Supports both
+// the singular CategorySlug and the multi-value CategorySlugs. When a
+// selected slug names a top-level (parent) category its child categories
+// are automatically included. Returns `matched=false` only when every
+// requested slug failed to resolve — caller should short-circuit to zero
+// results in that case.
+func (s *Service) appendCategoryFilter(
+	ctx context.Context,
+	buf *strings.Builder,
+	args []any,
+	argN int,
+	slugs []string,
+	single *string,
+) (newArgs []any, newArgN int, matched bool, err error) {
+	if len(slugs) > 0 {
+		var selfIDs, parentIDs []pgtype.UUID
+		for _, slug := range slugs {
+			row, e := s.Queries.GetCategoryBySlug(ctx, slug)
+			if e != nil {
+				continue
+			}
+			selfIDs = append(selfIDs, row.ID)
+			if !row.ParentID.Valid {
+				parentIDs = append(parentIDs, row.ID)
+			}
+		}
+		if len(selfIDs) == 0 {
+			return args, argN, false, nil
+		}
+		buf.WriteString(" AND (c.id = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("::uuid[])")
+		args = append(args, selfIDs)
+		argN++
+		if len(parentIDs) > 0 {
+			buf.WriteString(" OR c.parent_id = ANY($")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteString("::uuid[])")
+			args = append(args, parentIDs)
+			argN++
+		}
+		buf.WriteByte(')')
+		return args, argN, true, nil
+	}
+	if single != nil {
+		row, e := s.Queries.GetCategoryBySlug(ctx, *single)
+		if e != nil {
+			return args, argN, false, nil
+		}
+		n := strconv.Itoa(argN)
+		if !row.ParentID.Valid {
+			buf.WriteString(" AND (c.id = $")
+			buf.WriteString(n)
+			buf.WriteString(" OR c.parent_id = $")
+			buf.WriteString(n)
+			buf.WriteByte(')')
+		} else {
+			buf.WriteString(" AND t.category_id = $")
+			buf.WriteString(n)
+		}
+		args = append(args, row.ID)
+		argN++
+		return args, argN, true, nil
+	}
+	return args, argN, true, nil
+}
+
 func (s *Service) ListTransactions(ctx context.Context, params TransactionListParams) (*TransactionListResult, error) {
 	// Build dynamic SQL query using strings.Builder to reduce allocations.
 	var buf strings.Builder
@@ -110,7 +219,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"a.short_id AS account_short_id, " +
 		"COALESCE(au.name, u.name) AS user_name, " +
 		"t.category_id, t.category_override, " +
-		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
+		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
 		"au.short_id AS attributed_user_short_id, au.name AS attributed_user_name, " +
 		"COALESCE(au.short_id, u.short_id) AS effective_user_short_id " +
@@ -149,15 +258,12 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN++
 	}
 
-	if params.AccountID != nil {
-		aid, err := s.resolveAccountID(ctx, *params.AccountID)
+	{
+		var err error
+		args, argN, err = s.appendAccountFilter(ctx, &buf, args, argN, params.AccountIDs, params.AccountID)
 		if err != nil {
-			return nil, fmt.Errorf("invalid account id: %w", err)
+			return nil, err
 		}
-		buf.WriteString(" AND t.account_id = $")
-		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, aid)
-		argN++
 	}
 
 	if params.StartDate != nil {
@@ -174,28 +280,18 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN++
 	}
 
-	if params.CategorySlug != nil {
-		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+	{
+		var (
+			err     error
+			matched bool
+		)
+		args, argN, matched, err = s.appendCategoryFilter(ctx, &buf, args, argN, params.CategorySlugs, params.CategorySlug)
 		if err != nil {
-			// Unknown slug — no results
-			return &TransactionListResult{Transactions: []TransactionResponse{}, Limit: limit}, nil
+			return nil, err
 		}
-		n := strconv.Itoa(argN)
-		if !catRow.ParentID.Valid {
-			// Parent category — include self and all children
-			buf.WriteString(" AND (c.id = $")
-			buf.WriteString(n)
-			buf.WriteString(" OR c.parent_id = $")
-			buf.WriteString(n)
-			buf.WriteByte(')')
-			args = append(args, catRow.ID)
-			argN++
-		} else {
-			// Child category — exact match
-			buf.WriteString(" AND t.category_id = $")
-			buf.WriteString(n)
-			args = append(args, catRow.ID)
-			argN++
+		if !matched {
+			// Every requested slug failed to resolve — empty result.
+			return &TransactionListResult{Transactions: []TransactionResponse{}, Limit: limit}, nil
 		}
 	}
 
@@ -542,15 +638,12 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		argN++
 	}
 
-	if params.AccountID != nil {
-		aid, err := s.resolveAccountID(ctx, *params.AccountID)
+	{
+		var err error
+		args, argN, err = s.appendAccountFilter(ctx, &buf, args, argN, params.AccountIDs, params.AccountID)
 		if err != nil {
-			return 0, fmt.Errorf("invalid account id: %w", err)
+			return 0, err
 		}
-		buf.WriteString(" AND t.account_id = $")
-		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, aid)
-		argN++
 	}
 
 	if params.StartDate != nil {
@@ -567,28 +660,17 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		argN++
 	}
 
-	if params.CategorySlug != nil {
-		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+	{
+		var (
+			err     error
+			matched bool
+		)
+		args, argN, matched, err = s.appendCategoryFilter(ctx, &buf, args, argN, params.CategorySlugs, params.CategorySlug)
 		if err != nil {
-			// Unknown slug — 0 count
-			return 0, nil
+			return 0, err
 		}
-		n := strconv.Itoa(argN)
-		if !catRow.ParentID.Valid {
-			// Parent category — include self and all children
-			buf.WriteString(" AND (c.id = $")
-			buf.WriteString(n)
-			buf.WriteString(" OR c.parent_id = $")
-			buf.WriteString(n)
-			buf.WriteByte(')')
-			args = append(args, catRow.ID)
-			argN++
-		} else {
-			// Child category — exact match
-			buf.WriteString(" AND t.category_id = $")
-			buf.WriteString(n)
-			args = append(args, catRow.ID)
-			argN++
+		if !matched {
+			return 0, nil
 		}
 	}
 

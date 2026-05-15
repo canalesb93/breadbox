@@ -24,6 +24,12 @@ export interface CategoryPick {
 interface CategoryCommandListProps {
   /** Slug of the currently-applied category — rendered with a check mark. */
   currentSlug?: string | null;
+  /**
+   * Set of currently-selected slugs for multi-select callers (the
+   * transactions toolbar). Each match renders a check mark. Takes
+   * precedence over `currentSlug` when provided.
+   */
+  selectedSlugs?: Set<string>;
   /** Show a "reset to provider default" entry — for manually-overridden rows. */
   showReset?: boolean;
   onPick: (pick: CategoryPick) => void;
@@ -33,11 +39,11 @@ interface CategoryCommandListProps {
 // search for the parent ("food") still surfaces every child.
 function CategoryItem({
   category,
-  currentSlug,
+  isSelected,
   onPick,
 }: {
   category: Category;
-  currentSlug?: string | null;
+  isSelected: boolean;
   onPick: (pick: CategoryPick) => void;
 }) {
   return (
@@ -55,7 +61,7 @@ function CategoryItem({
         style={category.color ? { color: category.color } : undefined}
       />
       <span>{category.display_name}</span>
-      {currentSlug === category.slug && <Check className="ml-auto size-4" />}
+      {isSelected && <Check className="ml-auto size-4" />}
     </CommandItem>
   );
 }
@@ -67,11 +73,17 @@ function CategoryItem({
 // owns the mutation.
 export function CategoryCommandList({
   currentSlug,
+  selectedSlugs,
   showReset,
   onPick,
 }: CategoryCommandListProps) {
   const { data: tree, isLoading } = useCategories();
   const parents = (tree ?? []).filter((c) => !c.hidden);
+
+  const isSelected = (slug: string) => {
+    if (selectedSlugs) return selectedSlugs.has(slug);
+    return currentSlug === slug;
+  };
 
   return (
     <Command>
@@ -103,7 +115,7 @@ export function CategoryCommandList({
               <CategoryItem
                 key={parent.slug}
                 category={parent}
-                currentSlug={currentSlug}
+                isSelected={isSelected(parent.slug)}
                 onPick={onPick}
               />
             );
@@ -112,14 +124,14 @@ export function CategoryCommandList({
             <CommandGroup key={parent.slug} heading={parent.display_name}>
               <CategoryItem
                 category={parent}
-                currentSlug={currentSlug}
+                isSelected={isSelected(parent.slug)}
                 onPick={onPick}
               />
               {children.map((child) => (
                 <CategoryItem
                   key={child.slug}
                   category={child}
-                  currentSlug={currentSlug}
+                  isSelected={isSelected(child.slug)}
                   onPick={onPick}
                 />
               ))}

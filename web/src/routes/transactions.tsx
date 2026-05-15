@@ -13,15 +13,22 @@ import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { CommandDialog } from "@/components/ui/command";
+import {
+  CategoryCommandList,
+  type CategoryPick,
+} from "@/components/category-command";
 import {
   buildTransactionColumns,
   type TransactionTableMeta,
 } from "@/features/transactions/columns";
 import { TransactionsToolbar } from "@/features/transactions/transactions-toolbar";
 import { SelectionActionBar } from "@/features/transactions/selection-action-bar";
+import { applyBulkTransactionOp } from "@/features/transactions/bulk-update";
 import {
   useTransactions,
   useTransactionCount,
+  useUpdateTransactions,
 } from "@/api/queries/transactions";
 import type { TransactionFilters } from "@/api/queries/transactions";
 import { flattenPages } from "@/lib/pagination";
@@ -241,6 +248,50 @@ export function TransactionsPage() {
     { label: "Clear selection / focus", group: "Transactions" },
   );
 
+  // --- Categorize shortcut ---
+  // `c` opens a centered command dialog targeting either the bulk selection
+  // (when select mode has selected rows) or the j/k-focused row.
+  const updateTransactions = useUpdateTransactions();
+  const [categorizeOpen, setCategorizeOpen] = useState(false);
+  const categorizeTargets = useMemo(() => {
+    if (selectedIds.length > 0) return selectedIds;
+    if (focusedIndex != null) {
+      const id = rows[focusedIndex]?.id;
+      return id ? [id] : [];
+    }
+    return [];
+  }, [selectedIds, focusedIndex, rows]);
+
+  useShortcut(
+    ["c"],
+    (e) => {
+      if (categorizeTargets.length === 0) return;
+      // Otherwise the same keypress that triggers us also lands inside the
+      // dialog's auto-focused command input as a literal "c".
+      e.preventDefault();
+      setCategorizeOpen(true);
+    },
+    {
+      label: "Categorize focused / selected",
+      group: "Transactions",
+      enabled: categorizeTargets.length > 0,
+    },
+  );
+
+  const handleCategorizePick = useCallback(
+    (pick: CategoryPick) => {
+      if (!categorizeTargets.length) return;
+      setCategorizeOpen(false);
+      const n = categorizeTargets.length;
+      const plural = n === 1 ? "" : "s";
+      const message = pick.reset_category
+        ? `Category reset on ${n} transaction${plural}.`
+        : `Category applied to ${n} transaction${plural}.`;
+      applyBulkTransactionOp(updateTransactions, categorizeTargets, pick, message);
+    },
+    [categorizeTargets, updateTransactions],
+  );
+
   const hasActiveFilters =
     !!search.q ||
     !!search.account ||
@@ -347,6 +398,19 @@ export function TransactionsPage() {
           onClear={exitSelectMode}
         />
       )}
+
+      <CommandDialog
+        open={categorizeOpen}
+        onOpenChange={setCategorizeOpen}
+        title="Categorize"
+        description={
+          categorizeTargets.length === 1
+            ? "Apply a category to the focused transaction."
+            : `Apply a category to ${categorizeTargets.length} selected transactions.`
+        }
+      >
+        <CategoryCommandList onPick={handleCategorizePick} />
+      </CommandDialog>
     </div>
   );
 }

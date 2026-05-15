@@ -14,67 +14,87 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// parseTransactionFilters extracts the common filter parameters shared by
-// ListTransactions and CountTransactions. It writes an error response and
-// returns false when any parameter is invalid.
-func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
-	startDate, endDate *time.Time,
-	accountID, userID, categorySlug *string,
-	minAmount, maxAmount *float64,
-	pending *bool,
-	search, searchMode, excludeSearch *string,
-	tags, anyTag []string,
-	ok bool,
-) {
+// transactionFilters bundles the filter values shared by ListTransactions and
+// CountTransactions. Returning it via a struct keeps the parse function and
+// its call sites readable as the v2 SPA adds new multi-select filters.
+type transactionFilters struct {
+	StartDate     *time.Time
+	EndDate       *time.Time
+	AccountID     *string
+	UserID        *string
+	CategorySlug  *string
+	AccountIDs    []string
+	CategorySlugs []string
+	MinAmount     *float64
+	MaxAmount     *float64
+	Pending       *bool
+	Search        *string
+	SearchMode    *string
+	ExcludeSearch *string
+	Tags          []string
+	AnyTag        []string
+}
+
+func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (f transactionFilters, ok bool) {
 	q := r.URL.Query()
 
 	var err error
 
-	startDate, err = parseDateParam(q, "start_date")
+	f.StartDate, err = parseDateParam(q, "start_date")
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
-	endDate, err = parseDateParam(q, "end_date")
+	f.EndDate, err = parseDateParam(q, "end_date")
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
-	if startDate != nil && endDate != nil && !startDate.Before(*endDate) {
+	if f.StartDate != nil && f.EndDate != nil && !f.StartDate.Before(*f.EndDate) {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
 		return
 	}
 
-	accountID = parseOptionalStringParam(q, "account_id")
-	userID = parseOptionalStringParam(q, "user_id")
-	categorySlug = parseOptionalStringParam(q, "category_slug")
+	// account_id and category_slug accept either a single value or a
+	// comma-separated list; the service layer prefers the slice when present.
+	if list := parseCSVParam(q, "account_id"); len(list) > 1 {
+		f.AccountIDs = list
+	} else {
+		f.AccountID = parseOptionalStringParam(q, "account_id")
+	}
+	f.UserID = parseOptionalStringParam(q, "user_id")
+	if list := parseCSVParam(q, "category_slug"); len(list) > 1 {
+		f.CategorySlugs = list
+	} else {
+		f.CategorySlug = parseOptionalStringParam(q, "category_slug")
+	}
 
-	minAmount, err = parseFloatParam(q, "min_amount")
+	f.MinAmount, err = parseFloatParam(q, "min_amount")
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
-	maxAmount, err = parseFloatParam(q, "max_amount")
+	f.MaxAmount, err = parseFloatParam(q, "max_amount")
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
-	if minAmount != nil && maxAmount != nil && *minAmount > *maxAmount {
+	if f.MinAmount != nil && f.MaxAmount != nil && *f.MinAmount > *f.MaxAmount {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be less than or equal to max_amount")
 		return
 	}
 
-	pending, err = parseBoolParam(q, "pending")
+	f.Pending, err = parseBoolParam(q, "pending")
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
-	search, err = parseMinLengthStringParam(q, "search", 2)
+	f.Search, err = parseMinLengthStringParam(q, "search", 2)
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
@@ -85,17 +105,17 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
 			return
 		}
-		searchMode = &v
+		f.SearchMode = &v
 	}
 
-	excludeSearch, err = parseMinLengthStringParam(q, "exclude_search", 2)
+	f.ExcludeSearch, err = parseMinLengthStringParam(q, "exclude_search", 2)
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
-	tags = parseCSVParam(q, "tags")
-	anyTag = parseCSVParam(q, "any_tag")
+	f.Tags = parseCSVParam(q, "tags")
+	f.AnyTag = parseCSVParam(q, "any_tag")
 
 	ok = true
 	return
@@ -112,19 +132,17 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, tags, anyTag, ok := parseTransactionFilters(w, r)
+		f, ok := parseTransactionFilters(w, r)
 		if !ok {
 			return
 		}
 
-		// Parse sort_by.
 		sortBy, err := parseEnumParam(q, "sort_by", []string{"date", "amount", "provider_name"})
 		if err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
-		// Parse sort_order.
 		var sortOrder *string
 		if v := q.Get("sort_order"); v != "" {
 			switch v {
@@ -139,21 +157,23 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		params := service.TransactionListParams{
 			Cursor:        q.Get("cursor"),
 			Limit:         limit,
-			StartDate:     startDate,
-			EndDate:       endDate,
-			AccountID:     accountID,
-			UserID:        userID,
-			CategorySlug:  categorySlug,
-			MinAmount:     minAmount,
-			MaxAmount:     maxAmount,
-			Pending:       pending,
-			Search:        search,
-			SearchMode:    searchMode,
-			ExcludeSearch: excludeSearch,
+			StartDate:     f.StartDate,
+			EndDate:       f.EndDate,
+			AccountID:     f.AccountID,
+			UserID:        f.UserID,
+			CategorySlug:  f.CategorySlug,
+			AccountIDs:    f.AccountIDs,
+			CategorySlugs: f.CategorySlugs,
+			MinAmount:     f.MinAmount,
+			MaxAmount:     f.MaxAmount,
+			Pending:       f.Pending,
+			Search:        f.Search,
+			SearchMode:    f.SearchMode,
+			ExcludeSearch: f.ExcludeSearch,
 			SortBy:        sortBy,
 			SortOrder:     sortOrder,
-			Tags:          tags,
-			AnyTag:        anyTag,
+			Tags:          f.Tags,
+			AnyTag:        f.AnyTag,
 		}
 
 		// Parse fields for field selection.
@@ -194,25 +214,27 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 // CountTransactionsHandler returns the number of transactions matching optional filters.
 func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, tags, anyTag, ok := parseTransactionFilters(w, r)
+		f, ok := parseTransactionFilters(w, r)
 		if !ok {
 			return
 		}
 
 		params := service.TransactionCountParams{
-			StartDate:     startDate,
-			EndDate:       endDate,
-			AccountID:     accountID,
-			UserID:        userID,
-			CategorySlug:  categorySlug,
-			MinAmount:     minAmount,
-			MaxAmount:     maxAmount,
-			Pending:       pending,
-			Search:        search,
-			SearchMode:    searchMode,
-			ExcludeSearch: excludeSearch,
-			Tags:          tags,
-			AnyTag:        anyTag,
+			StartDate:     f.StartDate,
+			EndDate:       f.EndDate,
+			AccountID:     f.AccountID,
+			UserID:        f.UserID,
+			CategorySlug:  f.CategorySlug,
+			AccountIDs:    f.AccountIDs,
+			CategorySlugs: f.CategorySlugs,
+			MinAmount:     f.MinAmount,
+			MaxAmount:     f.MaxAmount,
+			Pending:       f.Pending,
+			Search:        f.Search,
+			SearchMode:    f.SearchMode,
+			ExcludeSearch: f.ExcludeSearch,
+			Tags:          f.Tags,
+			AnyTag:        f.AnyTag,
 		}
 
 		count, err := svc.CountTransactionsFiltered(r.Context(), params)
