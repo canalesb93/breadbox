@@ -17,6 +17,10 @@ import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
 import { TransactionDetailPage } from "@/routes/transaction-detail";
+import {
+  ConnectionsPage,
+  connectionsSearchSchema,
+} from "@/routes/connections";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -59,6 +63,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/transactions": {
     component: TransactionsPage,
     validateSearch: transactionsSearchSchema,
+  },
+  "/connections": {
+    component: ConnectionsPage,
+    validateSearch: connectionsSearchSchema,
   },
 };
 
