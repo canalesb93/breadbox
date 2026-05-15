@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldAlert } from "lucide-react";
 import {
   Sheet,
@@ -63,15 +63,24 @@ export function ReauthSheet({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Reset internal state every time the Sheet closes so a re-open lands on
-  // the confirmation step rather than mid-flow leftovers.
+  // the confirmation step rather than mid-flow leftovers. The mutation
+  // objects from useMutation are rebuilt every render, so adding them to the
+  // dep array would re-fire the effect (and call reset()) on every render —
+  // the source of the "Maximum update depth" warning when the Sheet sits
+  // mounted-but-closed on the connections page. Their `reset` methods are
+  // referentially stable per TanStack Query design, so a [open]-only dep is
+  // safe; we read them through refs to keep the dep array honest.
+  const reauthStartRef = useRef(reauthStart);
+  reauthStartRef.current = reauthStart;
+  const reauthCompleteRef = useRef(reauthComplete);
+  reauthCompleteRef.current = reauthComplete;
   useEffect(() => {
-    if (!open) {
-      setStage({ kind: "confirm" });
-      setErrorMessage(null);
-      reauthStart.reset();
-      reauthComplete.reset();
-    }
-  }, [open, reauthStart, reauthComplete]);
+    if (open) return;
+    setStage({ kind: "confirm" });
+    setErrorMessage(null);
+    reauthStartRef.current.reset();
+    reauthCompleteRef.current.reset();
+  }, [open]);
 
   const conn = connQuery.data;
   const institutionName = conn?.institution_name ?? "Untitled connection";

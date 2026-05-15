@@ -29,8 +29,8 @@ export interface PlaidLinkButtonProps {
 // PlaidLinkButton encapsulates Plaid's official `usePlaidLink` hook. It
 // renders nothing visible — Plaid Link itself is a popup the SDK manages —
 // but exposes its `open()` via auto-launch so the parent Sheet can drive the
-// flow declaratively. Reused for new connections (PR-03) and re-auth in
-// update mode (PR-05) by passing different link tokens.
+// flow declaratively. Reused for new connections and re-auth in update mode
+// by passing different link tokens.
 export function PlaidLinkButton({
   linkToken,
   onSuccess,

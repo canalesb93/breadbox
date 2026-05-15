@@ -36,12 +36,19 @@ export interface UseSyncLogsParams {
   // Connection UUID (short_id is not accepted by /api/v1/sync/logs).
   connectionId?: string;
   limit?: number;
+  // Defaults true — pass false to defer the fetch until the parent has the
+  // info it needs (e.g. resolving a short_id → UUID first).
+  enabled?: boolean;
 }
 
 // useSyncLogs fetches the most-recent sync history. Pass a connection UUID
 // (not the short_id) — the backend filter only resolves UUIDs. Omitting
 // `connectionId` returns the global feed.
-export function useSyncLogs({ connectionId, limit = 30 }: UseSyncLogsParams) {
+export function useSyncLogs({
+  connectionId,
+  limit = 30,
+  enabled = true,
+}: UseSyncLogsParams) {
   return useQuery({
     queryKey: ["sync-logs", connectionId ?? null, limit],
     queryFn: () => {
@@ -50,7 +57,7 @@ export function useSyncLogs({ connectionId, limit = 30 }: UseSyncLogsParams) {
       qs.set("limit", String(limit));
       return api<SyncLogsPage>(`/api/v1/sync/logs?${qs.toString()}`);
     },
-    enabled: connectionId == null || !!connectionId,
+    enabled,
     staleTime: 30_000,
   });
 }
