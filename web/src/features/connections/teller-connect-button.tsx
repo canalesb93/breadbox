@@ -25,6 +25,10 @@ export interface TellerConnectButtonProps {
   /** "sandbox" | "development" | "production". Sandbox is the default since
    *  it works without provisioning real Teller credentials. */
   environment?: string;
+  /** Pass the existing connection's enrollment ID to switch Teller Connect
+   *  into reconnection mode (re-auth). Used by the Re-auth Sheet (PR-05);
+   *  omit it for new-connection flows. */
+  enrollmentId?: string;
   onSuccess: (result: TellerEnrollmentResult) => void;
   onExit?: () => void;
   onFailure?: (failure: { message?: string }) => void;
@@ -39,6 +43,7 @@ declare global {
       setup: (options: {
         applicationId: string;
         environment?: string;
+        enrollmentId?: string;
         products?: string[];
         onSuccess: (enrollment: TellerEnrollment) => void;
         onExit?: () => void;
@@ -79,6 +84,7 @@ function loadTellerSDK(): Promise<void> {
 export function TellerConnectButton({
   applicationId,
   environment = "sandbox",
+  enrollmentId,
   onSuccess,
   onExit,
   onFailure,
@@ -96,6 +102,7 @@ export function TellerConnectButton({
         const tc = window.TellerConnect.setup({
           applicationId,
           environment,
+          ...(enrollmentId ? { enrollmentId } : {}),
           products: ["transactions", "balance"],
           onSuccess: (enrollment) => {
             onSuccess({
@@ -118,7 +125,15 @@ export function TellerConnectButton({
     return () => {
       cancelled = true;
     };
-  }, [autoOpen, applicationId, environment, onSuccess, onExit, onFailure]);
+  }, [
+    autoOpen,
+    applicationId,
+    environment,
+    enrollmentId,
+    onSuccess,
+    onExit,
+    onFailure,
+  ]);
 
   return null;
 }

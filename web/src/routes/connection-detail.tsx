@@ -53,8 +53,8 @@ import { useSyncLogs } from "@/api/queries/sync-logs";
 import type { Account, ConnectionDetail } from "@/api/types";
 import type { SyncLog } from "@/api/queries/sync-logs";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
-import { ComingSoonSheet } from "@/features/connections/coming-soon-sheet";
 import { ConnectBankSheet } from "@/features/connections/connect-bank-sheet";
+import { ReauthSheet } from "@/features/connections/reauth-sheet";
 import { ConnectionAccountsList } from "@/features/connections/connection-accounts-list";
 import { SyncActivityBars } from "@/features/connections/sync-activity-bars";
 import { SyncHistoryList } from "@/features/connections/sync-history-list";
@@ -203,13 +203,12 @@ export function ConnectionDetailPage() {
         />
       )}
 
-      <ComingSoonSheet
+      <ReauthSheet
         open={!!search.reauth}
         onOpenChange={(open) => {
           if (!open) closeReauth();
         }}
-        title="Re-authenticate"
-        description="Reconnect to the bank to resume syncing this connection."
+        connectionShortId={search.reauth}
       />
       {connQuery.data?.provider === "csv" && (
         <ConnectBankSheet
