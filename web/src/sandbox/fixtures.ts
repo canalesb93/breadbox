@@ -253,27 +253,37 @@ export const sampleTransactions: Transaction[] = [
   }),
 ];
 
-// --- Accounts (trimmed view useAccounts returns) ---
+// --- Accounts (full view useAccounts returns) ---
 
 export const sampleAccounts: Account[] = [
   {
     id: "acct-checking",
     short_id: "checking",
+    connection_id: "demo-conn",
+    user_id: "demo-user",
     name: "My Checking",
     institution_name: "Mega Bank",
     type: "depository",
     subtype: "checking",
     mask: "4821",
+    balance_current: 4280.5,
+    balance_available: 4280.5,
     iso_currency_code: "USD",
+    is_dependent_linked: false,
   },
   {
     id: "acct-platinum",
     short_id: "platinum",
+    connection_id: "demo-conn",
+    user_id: "demo-user",
     name: "Platinum Card",
     institution_name: "Card Co",
     type: "credit",
     subtype: "credit card",
     mask: "0093",
+    balance_current: -842.16,
+    balance_available: null,
     iso_currency_code: "USD",
+    is_dependent_linked: false,
   },
 ];

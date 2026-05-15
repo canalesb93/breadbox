@@ -64,16 +64,63 @@ export interface TransactionsPage {
 }
 
 // --- Accounts (public /api/v1/accounts) ---
-// A trimmed view — the transactions filter only needs identity + labels.
+// Mirrors internal/service.AccountResponse. The transactions filter only
+// touches identity + labels; the connections list rolls up balances per
+// connection by joining client-side, so connection_id and balance_current are
+// load-bearing there.
 export interface Account {
   id: string;
   short_id: string;
+  connection_id: string | null;
+  user_id: string | null;
   name: string;
   institution_name: string;
   type: string;
   subtype: string | null;
   mask: string | null;
+  balance_current: number | null;
+  balance_available: number | null;
   iso_currency_code: string | null;
+  is_dependent_linked: boolean;
+}
+
+// --- Users (public /api/v1/users) ---
+// Mirrors internal/service.UserResponse — household members. Used by the
+// connections page to filter by family member.
+export interface User {
+  id: string;
+  short_id: string;
+  name: string;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Connections (public /api/v1/connections) ---
+// Mirrors internal/service.ConnectionResponse. The list endpoint returns this
+// shape; ConnectionDetail extends it with paused/account_count/sync interval
+// override (used on the detail page).
+export interface Connection {
+  id: string;
+  short_id: string;
+  user_id: string | null;
+  user_name: string | null;
+  provider: string; // plaid | teller | csv
+  institution_id: string | null;
+  institution_name: string | null;
+  status: string; // active | error | pending_reauth | disconnected
+  error_code: string | null;
+  error_message: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConnectionDetail extends Connection {
+  paused: boolean;
+  sync_interval_override_minutes: number | null;
+  consecutive_failures: number;
+  account_count: number;
 }
 
 // --- Tags (public /api/v1/tags) ---
