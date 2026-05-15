@@ -64,6 +64,14 @@ Conventions on layout:
 4. **Toasts** via `useToast()` (sonner). No `alert()`. No inline error spans.
 5. **Dialogs / sheets / popovers** use shadcn primitives. Don't roll your own.
 
+### Design-system sandbox — keep it current
+
+There's a living component gallery at `/v2/sandbox` (`web/src/sandbox/`, route in `routes/sandbox.tsx`). It's the demo surface for the reusable layer, organized into sections under `web/src/sandbox/sections/*.tsx`: **foundations** (tokens, type, icons), **primitives** (shadcn `ui/*`), **components** (composed `components/*`), **amounts** (money display), **patterns** (toasts, shortcuts, hooks, date formatters).
+
+- **Adding or meaningfully changing a reusable component, primitive, shared hook, or `lib/` helper → add or update its specimen in the matching sandbox section in the same PR.** A component nobody can find isn't reusable. This applies to anything in `components/`, `components/ui/`, `hooks/`, and reusable `lib/` utilities — **not** to `features/<page>/*` (feature-only, not library) or `routes/*`.
+- The sandbox runs on **static fixtures** (`web/src/sandbox/fixtures.ts`) and a seeded query cache — extend the fixtures rather than fetching live data, and wire `onPick`/mutation props to `toast` instead of real writes.
+- New top-level area? Add a section file + register it in the `SECTIONS` array in `routes/sandbox.tsx`.
+
 ### Styling
 
 - **Tailwind classes only.** No inline `style={}` except dynamic values that can't be expressed in Tailwind (computed colors, animations).

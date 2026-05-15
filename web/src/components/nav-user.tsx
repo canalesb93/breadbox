@@ -1,5 +1,5 @@
-import { ChevronsUpDown, ExternalLink, LogOut } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
+import { ChevronsUpDown, ExternalLink, LogOut, Palette } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -90,6 +90,12 @@ export function NavUser({ me }: { me: Me | null }) {
                 <ExternalLink />
                 Back to classic UI
               </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/sandbox">
+                <Palette />
+                Design system
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
