@@ -100,7 +100,8 @@ export function ConnectionRow({
     <div className="bg-card overflow-hidden rounded-lg border">
       <div className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
         <Link
-          to="/connections"
+          to="/connections/$id"
+          params={{ id: connection.short_id }}
           className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4"
           aria-label={`Open ${connection.institution_name ?? "connection"} detail`}
         >
