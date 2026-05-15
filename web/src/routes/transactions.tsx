@@ -8,11 +8,10 @@ import {
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Loader2, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
-import { Button } from "@/components/ui/button";
 import { CommandDialog } from "@/components/ui/command";
 import {
   CategoryCommandList,
@@ -25,13 +24,18 @@ import {
 import { TransactionsToolbar } from "@/features/transactions/transactions-toolbar";
 import { SelectionActionBar } from "@/features/transactions/selection-action-bar";
 import { applyBulkTransactionOp } from "@/features/transactions/bulk-update";
+import { TransactionsPagination } from "@/features/transactions/transactions-pagination";
+import { TransactionRowSkeleton } from "@/features/transactions/transaction-row-skeleton";
+import { TagCommandList } from "@/components/tag-command";
 import {
-  useTransactions,
+  PAGE_LIMIT,
+  fetchAllMatchingTransactionIds,
+  useTransactionsPage,
   useTransactionCount,
   useUpdateTransactions,
 } from "@/api/queries/transactions";
 import type { TransactionFilters } from "@/api/queries/transactions";
-import { flattenPages } from "@/lib/pagination";
+import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useShortcut } from "@/lib/shortcuts";
 import type { Transaction } from "@/api/types";
@@ -49,6 +53,8 @@ export const transactionsSearchSchema = z.object({
   pending: z.enum(["true", "false"]).optional(),
   sort: z.enum(["date", "amount"]).optional(),
   dir: z.enum(["asc", "desc"]).optional(),
+  /** 1-indexed page number for the offset-paginated list view. */
+  p: z.coerce.number().int().min(1).optional(),
 });
 
 export type TransactionsSearch = z.infer<typeof transactionsSearchSchema>;
@@ -92,7 +98,7 @@ export function TransactionsPage() {
     const q = debounced.trim() || undefined;
     navigate({
       to: ".",
-      search: (prev: Record<string, unknown>) => ({ ...prev, q }),
+      search: (prev: Record<string, unknown>) => ({ ...prev, q, p: undefined }),
     });
   }, [debounced, navigate]);
 
@@ -106,18 +112,39 @@ export function TransactionsPage() {
     (patch: Partial<TransactionsSearch>) => {
       navigate({
         to: ".",
-        search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }),
+        // Any filter change collapses back to page 1 — staying on page 11
+        // when the filtered result has only 2 pages would land on an empty
+        // view. The pagination control itself patches `p` directly and
+        // doesn't go through setFilter.
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          ...patch,
+          p: undefined,
+        }),
       });
     },
     [navigate],
   );
 
   const filters = searchToFilters(search);
-  const transactions = useTransactions(filters);
+  const page = search.p ?? 1;
+  const transactions = useTransactionsPage(filters, page, PAGE_LIMIT);
   const totalCount = useTransactionCount(filters);
-  const rows = useMemo(
-    () => flattenPages<Transaction>(transactions.data?.pages, "transactions"),
-    [transactions.data?.pages],
+  const rows = useMemo<Transaction[]>(
+    () => transactions.data?.transactions ?? [],
+    [transactions.data?.transactions],
+  );
+  const goToPage = useCallback(
+    (next: number) => {
+      navigate({
+        to: ".",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          p: next > 1 ? next : undefined,
+        }),
+      });
+    },
+    [navigate],
   );
 
   // --- Select mode ---
@@ -248,12 +275,12 @@ export function TransactionsPage() {
     { label: "Clear selection / focus", group: "Transactions" },
   );
 
-  // --- Categorize shortcut ---
-  // `c` opens a centered command dialog targeting either the bulk selection
-  // (when select mode has selected rows) or the j/k-focused row.
+  // `c` and `t` open centered command dialogs targeting either the bulk
+  // selection (when select mode has selected rows) or the j/k-focused row.
   const updateTransactions = useUpdateTransactions();
   const [categorizeOpen, setCategorizeOpen] = useState(false);
-  const categorizeTargets = useMemo(() => {
+  const [tagOpen, setTagOpen] = useState(false);
+  const bulkTargets = useMemo(() => {
     if (selectedIds.length > 0) return selectedIds;
     if (focusedIndex != null) {
       const id = rows[focusedIndex]?.id;
@@ -265,7 +292,7 @@ export function TransactionsPage() {
   useShortcut(
     ["c"],
     (e) => {
-      if (categorizeTargets.length === 0) return;
+      if (bulkTargets.length === 0) return;
       // Otherwise the same keypress that triggers us also lands inside the
       // dialog's auto-focused command input as a literal "c".
       e.preventDefault();
@@ -274,22 +301,51 @@ export function TransactionsPage() {
     {
       label: "Categorize focused / selected",
       group: "Transactions",
-      enabled: categorizeTargets.length > 0,
+      enabled: bulkTargets.length > 0,
+    },
+  );
+  useShortcut(
+    ["t"],
+    (e) => {
+      if (bulkTargets.length === 0) return;
+      e.preventDefault();
+      setTagOpen(true);
+    },
+    {
+      label: "Tag focused / selected",
+      group: "Transactions",
+      enabled: bulkTargets.length > 0,
     },
   );
 
   const handleCategorizePick = useCallback(
     (pick: CategoryPick) => {
-      if (!categorizeTargets.length) return;
+      if (!bulkTargets.length) return;
       setCategorizeOpen(false);
-      const n = categorizeTargets.length;
+      const n = bulkTargets.length;
       const plural = n === 1 ? "" : "s";
       const message = pick.reset_category
         ? `Category reset on ${n} transaction${plural}.`
         : `Category applied to ${n} transaction${plural}.`;
-      applyBulkTransactionOp(updateTransactions, categorizeTargets, pick, message);
+      applyBulkTransactionOp(updateTransactions, bulkTargets, pick, message);
     },
-    [categorizeTargets, updateTransactions],
+    [bulkTargets, updateTransactions],
+  );
+
+  const handleTagPick = useCallback(
+    (slug: string) => {
+      if (!bulkTargets.length) return;
+      setTagOpen(false);
+      const n = bulkTargets.length;
+      const plural = n === 1 ? "" : "s";
+      applyBulkTransactionOp(
+        updateTransactions,
+        bulkTargets,
+        { tags_to_add: [{ slug }] },
+        `Tag applied to ${n} transaction${plural}.`,
+      );
+    },
+    [bulkTargets, updateTransactions],
   );
 
   const hasActiveFilters =
@@ -344,6 +400,9 @@ export function TransactionsPage() {
         isLoading={transactions.isLoading}
         isError={transactions.isError}
         loadingRows={6}
+        renderSkeletonRow={() => (
+          <TransactionRowSkeleton showSelect={selectMode} />
+        )}
         getRowId={(t) => t.id}
         enableRowSelection={selectMode}
         rowSelection={selectMode ? rowSelection : undefined}
@@ -368,27 +427,14 @@ export function TransactionsPage() {
         }
       />
 
-      {rows.length > 0 && (
-        <div className="text-muted-foreground mt-4 flex justify-center text-sm">
-          {transactions.hasNextPage ? (
-            <Button
-              variant="outline"
-              onClick={() => transactions.fetchNextPage()}
-              disabled={transactions.isFetchingNextPage}
-            >
-              {transactions.isFetchingNextPage && (
-                <Loader2 className="size-4 animate-spin" />
-              )}
-              {transactions.isFetchingNextPage ? "Loading…" : "Load more"}
-            </Button>
-          ) : (
-            <span>
-              {count != null
-                ? `All ${count.toLocaleString()} transactions loaded`
-                : "All transactions loaded"}
-            </span>
-          )}
-        </div>
+      {count != null && count > PAGE_LIMIT && (
+        <TransactionsPagination
+          page={page}
+          pageSize={PAGE_LIMIT}
+          total={count}
+          onPageChange={goToPage}
+          isFetching={transactions.isFetching}
+        />
       )}
 
       {selectMode && selectedIds.length > 0 && (
@@ -396,6 +442,21 @@ export function TransactionsPage() {
           selectedIds={selectedIds}
           totalCount={count}
           onClear={exitSelectMode}
+          onSelectAllMatching={async () => {
+            try {
+              const ids = await fetchAllMatchingTransactionIds(filters);
+              setRowSelection(
+                Object.fromEntries(ids.map((id) => [id, true])),
+              );
+              if (count != null && ids.length < count) {
+                toast.info(
+                  `Selected the first ${ids.length.toLocaleString()} of ${count.toLocaleString()} matches.`,
+                );
+              }
+            } catch {
+              toast.error("Couldn't select all matching transactions.");
+            }
+          }}
         />
       )}
 
@@ -404,12 +465,25 @@ export function TransactionsPage() {
         onOpenChange={setCategorizeOpen}
         title="Categorize"
         description={
-          categorizeTargets.length === 1
+          bulkTargets.length === 1
             ? "Apply a category to the focused transaction."
-            : `Apply a category to ${categorizeTargets.length} selected transactions.`
+            : `Apply a category to ${bulkTargets.length} selected transactions.`
         }
       >
         <CategoryCommandList onPick={handleCategorizePick} />
+      </CommandDialog>
+
+      <CommandDialog
+        open={tagOpen}
+        onOpenChange={setTagOpen}
+        title="Tag"
+        description={
+          bulkTargets.length === 1
+            ? "Add a tag to the focused transaction."
+            : `Add a tag to ${bulkTargets.length} selected transactions.`
+        }
+      >
+        <TagCommandList onPick={handleTagPick} />
       </CommandDialog>
     </div>
   );

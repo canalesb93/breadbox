@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Shapes, Tag, X } from "lucide-react";
+import { Check, Loader2, Shapes, Tag, X } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { CategoryCommandList } from "@/components/category-command";
 import { TagCommandList } from "@/components/tag-command";
@@ -13,6 +14,7 @@ import { KbdTooltip } from "@/components/kbd-tooltip";
 import { useUpdateTransactions } from "@/api/queries/transactions";
 import type { UpdateTransactionsOp } from "@/api/types";
 import { applyBulkTransactionOp } from "@/features/transactions/bulk-update";
+import { cn } from "@/lib/utils";
 
 interface SelectionActionBarProps {
   selectedIds: string[];
@@ -20,18 +22,22 @@ interface SelectionActionBarProps {
    *  context (header select-all only covers the loaded page). */
   totalCount?: number;
   onClear: () => void;
+  /**
+   * Expand the selection to cover every transaction matching the current
+   * filters. Returns a promise so the bar can render a pending state until
+   * the IDs are fetched. Omit to hide the "Select all N" affordance.
+   */
+  onSelectAllMatching?: () => Promise<void> | void;
 }
 
-// SelectionActionBar is the floating bar that appears in select mode once at
-// least one row is selected — a count, bulk categorize / tag actions, and a
-// clear button. Each action fans the selection out into batch-update ops,
-// chunked to the endpoint's 50-op limit.
 export function SelectionActionBar({
   selectedIds,
   totalCount,
   onClear,
+  onSelectAllMatching,
 }: SelectionActionBarProps) {
   const update = useUpdateTransactions();
+  const [isExpanding, setIsExpanding] = useState(false);
 
   const applyToAll = async (
     op: Omit<UpdateTransactionsOp, "transaction_id">,
@@ -46,41 +52,99 @@ export function SelectionActionBar({
     if (ok) onClear();
   };
 
+  const canExpand =
+    !!onSelectAllMatching &&
+    totalCount != null &&
+    totalCount > selectedIds.length;
+
   return (
-    <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-      <div className="bg-popover text-popover-foreground flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 pl-3 shadow-lg">
-        <span className="text-sm font-medium">
-          {totalCount != null && totalCount > selectedIds.length
-            ? `${selectedIds.length} of ${totalCount.toLocaleString()} selected`
-            : `${selectedIds.length} selected`}
-        </span>
-        <Separator orientation="vertical" className="mx-1 h-5" />
+    // pointer-events-none on the outer wrapper so the empty space around the
+    // pill stays click-through, while the pill itself re-enables events.
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 sm:bottom-6">
+      <div
+        data-state="open"
+        className={cn(
+          "pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border bg-popover/95 p-1 pl-3 text-popover-foreground shadow-xl backdrop-blur-sm",
+          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4 data-[state=open]:duration-200",
+        )}
+      >
+        {update.isPending ? (
+          <div className="flex items-center gap-2 px-2 py-1 text-sm">
+            <Loader2 className="size-4 animate-spin" />
+            <span className="font-medium">
+              Applying to {selectedIds.length.toLocaleString()}…
+            </span>
+          </div>
+        ) : (
+          <>
+            <span className="text-sm font-medium whitespace-nowrap">
+              {selectedIds.length.toLocaleString()}
+              {totalCount != null && totalCount > selectedIds.length && (
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  / {totalCount.toLocaleString()}
+                </span>
+              )}
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                selected
+              </span>
+            </span>
 
-        <CategorizeAction
-          disabled={update.isPending}
-          onPick={(slug) =>
-            applyToAll({ category_slug: slug }, "Category applied.")
-          }
-        />
-        <TagAction
-          disabled={update.isPending}
-          onPick={(slug) =>
-            applyToAll({ tags_to_add: [{ slug }] }, "Tag applied.")
-          }
-        />
+            {canExpand && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-full px-2 text-xs"
+                disabled={isExpanding}
+                onClick={async () => {
+                  if (!onSelectAllMatching) return;
+                  setIsExpanding(true);
+                  try {
+                    await onSelectAllMatching();
+                  } finally {
+                    setIsExpanding(false);
+                  }
+                }}
+              >
+                {isExpanding ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Check className="size-3" />
+                )}
+                Select all
+              </Button>
+            )}
 
-        <Separator orientation="vertical" className="mx-1 h-5" />
-        <KbdTooltip label="Clear selection / exit" keys={["Esc"]} side="top">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 rounded-full"
-            onClick={onClear}
-            aria-label="Clear selection"
-          >
-            <X className="size-4" />
-          </Button>
-        </KbdTooltip>
+            <Separator orientation="vertical" className="mx-1 h-5" />
+
+            <CategorizeAction
+              disabled={update.isPending}
+              onPick={(slug) =>
+                applyToAll({ category_slug: slug }, "Category applied.")
+              }
+            />
+            <TagAction
+              disabled={update.isPending}
+              onPick={(slug) =>
+                applyToAll({ tags_to_add: [{ slug }] }, "Tag applied.")
+              }
+            />
+
+            <Separator orientation="vertical" className="mx-1 h-5" />
+            <KbdTooltip label="Clear selection / exit" keys={["Esc"]} side="top">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-full"
+                onClick={onClear}
+                aria-label="Clear selection"
+              >
+                <X className="size-4" />
+              </Button>
+            </KbdTooltip>
+          </>
+        )}
       </div>
     </div>
   );
@@ -98,13 +162,16 @@ function CategorizeAction({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
+          variant="default"
           size="sm"
           className="h-8 gap-1.5 rounded-full"
           disabled={disabled}
         >
           <Shapes className="size-4" />
           <span className="hidden sm:inline">Categorize</span>
+          <Kbd className="ml-1 hidden bg-primary-foreground/10 text-primary-foreground/80 sm:inline-flex">
+            C
+          </Kbd>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="center" side="top">
@@ -139,6 +206,7 @@ function TagAction({
         >
           <Tag className="size-4" />
           <span className="hidden sm:inline">Tag</span>
+          <Kbd className="ml-1 hidden sm:inline-flex">T</Kbd>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-0" align="center" side="top">

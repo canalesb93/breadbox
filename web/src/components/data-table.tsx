@@ -41,6 +41,12 @@ export interface DataTableProps<TData, TValue> {
   /** Number of skeleton rows to show while loading. */
   loadingRows?: number;
   /**
+   * Optional row-shaped skeleton renderer. When provided it replaces the
+   * generic full-width bars with placeholders shaped like the real row, so
+   * loading state mirrors the data layout without a layout shift on arrival.
+   */
+  renderSkeletonRow?: () => React.ReactNode;
+  /**
    * Controlled sorting. Owned by the route (typically synced to URL search
    * params), so DataTable stays presentational. Omit for an unsorted table.
    */
@@ -78,6 +84,7 @@ export function DataTable<TData, TValue>({
   emptyState,
   errorState,
   loadingRows = 8,
+  renderSkeletonRow,
   sorting,
   onSortingChange,
   onRowClick,
@@ -140,11 +147,13 @@ export function DataTable<TData, TValue>({
           {isLoading ? (
             Array.from({ length: loadingRows }).map((_, r) => (
               <TableRow key={`skeleton-${r}`}>
-                {Array.from({ length: colCount }).map((__, c) => (
-                  <TableCell key={c}>
-                    <Skeleton className="h-4 w-full" />
-                  </TableCell>
-                ))}
+                {renderSkeletonRow
+                  ? renderSkeletonRow()
+                  : Array.from({ length: colCount }).map((__, c) => (
+                      <TableCell key={c}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
               </TableRow>
             ))
           ) : isError ? (

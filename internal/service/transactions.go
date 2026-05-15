@@ -355,7 +355,9 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN++
 	}
 
-	if params.Cursor != "" {
+	// Offset takes precedence over cursor — random-access pagination for the
+	// v2 SPA. External REST clients keep using the stable cursor path.
+	if params.Offset == 0 && params.Cursor != "" {
 		cursorDate, cursorID, err := DecodeCursor(params.Cursor)
 		if err != nil {
 			return nil, err
@@ -401,6 +403,14 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	buf.WriteString(" LIMIT $")
 	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, limit+1)
+	argN++
+
+	if params.Offset > 0 {
+		buf.WriteString(" OFFSET $")
+		buf.WriteString(strconv.Itoa(argN))
+		args = append(args, params.Offset)
+		argN++
+	}
 
 	query := buf.String()
 	rows, err := s.Pool.Query(ctx, query, args...)

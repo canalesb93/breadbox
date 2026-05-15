@@ -154,8 +154,15 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			}
 		}
 
+		offset, err := parseIntParam(q, "offset", 0, 0, 1_000_000)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+
 		params := service.TransactionListParams{
 			Cursor:        q.Get("cursor"),
+			Offset:        offset,
 			Limit:         limit,
 			StartDate:     f.StartDate,
 			EndDate:       f.EndDate,

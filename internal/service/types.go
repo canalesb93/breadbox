@@ -77,6 +77,11 @@ type TransactionListResult struct {
 
 type TransactionListParams struct {
 	Cursor           string
+	// Offset enables random-access pagination (LIMIT/OFFSET) — used by the
+	// v2 SPA's page-numbered Pagination component. Cursor pagination
+	// remains the default for external REST clients; when Offset > 0 the
+	// service ignores Cursor.
+	Offset           int
 	Limit            int
 	StartDate        *time.Time
 	EndDate          *time.Time
