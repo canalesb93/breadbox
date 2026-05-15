@@ -8,7 +8,6 @@ import { withMutationToast } from "@/lib/mutation-toast";
 import { useShortcut } from "@/lib/shortcuts";
 import { displayKey } from "@/lib/kbd-display";
 import {
-  formatAmount,
   formatDate,
   formatLongDate,
   formatRelativeTime,
@@ -18,17 +17,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 
+// Amount formatting has its own section; this covers the date/time formatters.
 const FORMATTERS: { code: string; input: string; output: string }[] = [
-  {
-    code: "formatAmount(6.75, 'USD')",
-    input: "6.75",
-    output: formatAmount(6.75, "USD"),
-  },
-  {
-    code: "formatAmount(-3200, 'USD')",
-    input: "-3200 (inflow)",
-    output: formatAmount(-3200, "USD"),
-  },
   {
     code: "formatDate('2026-05-13')",
     input: "2026-05-13",
@@ -141,9 +131,9 @@ export function PatternsSection() {
       </Specimen>
 
       <Specimen
-        label="Formatters"
+        label="Date formatters"
         code="lib/format"
-        description="Cached Intl instances — amounts (inflows get a + sign), short/long dates, relative time."
+        description="Cached Intl instances — short and long dates, relative time. Amount formatting lives in the Amounts section."
         className="block"
       >
         <div className="grid gap-2 sm:grid-cols-2">

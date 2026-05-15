@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { FoundationsSection } from "@/sandbox/sections/foundations";
 import { PrimitivesSection } from "@/sandbox/sections/primitives";
 import { ComponentsSection } from "@/sandbox/sections/components";
+import { AmountsSection } from "@/sandbox/sections/amounts";
 import { PatternsSection } from "@/sandbox/sections/patterns";
 import { sampleCategories, sampleTags } from "@/sandbox/fixtures";
 
@@ -13,6 +14,7 @@ const SECTIONS = [
   { id: "foundations", label: "Foundations", Component: FoundationsSection },
   { id: "primitives", label: "Primitives", Component: PrimitivesSection },
   { id: "components", label: "Components", Component: ComponentsSection },
+  { id: "amounts", label: "Amounts", Component: AmountsSection },
   { id: "patterns", label: "Patterns", Component: PatternsSection },
 ] as const;
 
