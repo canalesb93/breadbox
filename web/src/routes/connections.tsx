@@ -1,12 +1,14 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { Loader2, Plug, Plus, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { withMutationToast } from "@/lib/mutation-toast";
+import { useShortcut } from "@/lib/shortcuts";
 import { useConnections, useSyncAll } from "@/api/queries/connections";
 import { useAccounts } from "@/api/queries/accounts";
 import { useUsers } from "@/api/queries/users";
@@ -15,6 +17,7 @@ import { ConnectionsSummary } from "@/features/connections/connections-summary";
 import { FamilyTabs } from "@/features/connections/family-tabs";
 import { ConnectBankSheet } from "@/features/connections/connect-bank-sheet";
 import { ReauthSheet } from "@/features/connections/reauth-sheet";
+import { SelectionActionBar } from "@/features/connections/selection-action-bar";
 import {
   indexAccountsByConnection,
   needsAttention,
@@ -90,7 +93,59 @@ export function ConnectionsPage() {
     [connectionsQuery.data],
   );
 
+  // Multi-select state — Set of UUIDs (Connection.id, not short_id). Lifted
+  // here so the action bar reads the union and the rows pass selection back
+  // up. Ephemeral by design: not stored in URL search, cleared after a
+  // successful bulk mutation or on family-tab switch.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Selected connections that are still visible after filtering — used by the
+  // action bar. Filtering also drops any stale ids that may have been removed
+  // from the underlying data (e.g. after a bulk disconnect refetch).
+  const selectedConnections = useMemo(
+    () => visible.filter((c) => selectedIds.has(c.id)),
+    [visible, selectedIds],
+  );
+
+  const allVisibleSelected =
+    visible.length > 0 && selectedConnections.length === visible.length;
+  const someVisibleSelected =
+    selectedConnections.length > 0 && !allVisibleSelected;
+
+  const toggleRowSelection = useCallback((id: string, next: boolean) => {
+    setSelectedIds((prev) => {
+      const out = new Set(prev);
+      if (next) out.add(id);
+      else out.delete(id);
+      return out;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size > 0) return new Set();
+      return new Set(visible.map((c) => c.id));
+    });
+  }, [visible]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Esc clears selection. Mirrors the transactions page convention so the
+  // same muscle memory works here. Always-registered (cheap) — the handler
+  // gates on having something to clear, which avoids the registry churn from
+  // toggling `enabled` on every selection change.
+  useShortcut(
+    ["escape"],
+    () => {
+      if (selectedIds.size > 0) clearSelection();
+    },
+    { label: "Clear selection", group: "Connections" },
+  );
+
   function setUserFilter(next: string) {
+    // Selection is per-visible-set; switching tabs would otherwise carry
+    // hidden rows along silently.
+    setSelectedIds(new Set());
     navigate({
       to: "/connections",
       search: (prev: ConnectionsSearch) => ({
@@ -235,6 +290,30 @@ export function ConnectionsPage() {
         />
       ) : (
         <div className="flex flex-col gap-3">
+          <div className="text-muted-foreground flex items-center gap-3 px-1 text-xs">
+            <Checkbox
+              checked={
+                allVisibleSelected
+                  ? true
+                  : someVisibleSelected
+                    ? "indeterminate"
+                    : false
+              }
+              onCheckedChange={() => toggleSelectAll()}
+              aria-label={
+                selectedIds.size > 0 ? "Clear selection" : "Select all visible"
+              }
+            />
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="hover:text-foreground transition-colors"
+            >
+              {selectedIds.size > 0
+                ? `${selectedConnections.length} selected`
+                : `Select all (${visible.length})`}
+            </button>
+          </div>
           {visible.map((c) => (
             <ConnectionRow
               key={c.id}
@@ -243,9 +322,18 @@ export function ConnectionsPage() {
               // short_id (the consistent compact-ID convention), not its UUID.
               stats={accountStats.get(c.short_id)}
               onReauth={openReauthSheet}
+              selected={selectedIds.has(c.id)}
+              onSelectChange={(next) => toggleRowSelection(c.id, next)}
             />
           ))}
         </div>
+      )}
+
+      {selectedConnections.length > 0 && (
+        <SelectionActionBar
+          selected={selectedConnections}
+          onClear={clearSelection}
+        />
       )}
 
       <ConnectBankSheet

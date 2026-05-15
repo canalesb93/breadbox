@@ -13,6 +13,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,11 @@ interface ConnectionRowProps {
   // Account-level pause flag. Set to true on the connection row briefly while
   // the optimistic mutation is in flight to avoid double-clicks.
   paused?: boolean;
+  // Multi-select state, lifted to the page so the bulk action bar can read
+  // the union of selected ids. Optional — pages that don't render a bulk bar
+  // can omit and the checkbox UI stays hidden.
+  selected?: boolean;
+  onSelectChange?: (next: boolean) => void;
 }
 
 const PROVIDER_ICON: Record<string, typeof Building2> = {
@@ -58,6 +64,8 @@ export function ConnectionRow({
   connection,
   stats,
   onReauth,
+  selected,
+  onSelectChange,
 }: ConnectionRowProps) {
   const sync = useSyncConnection();
   const pause = usePauseConnection();
@@ -97,8 +105,27 @@ export function ConnectionRow({
   }
 
   return (
-    <div className="bg-card overflow-hidden rounded-lg border">
+    <div
+      className={`bg-card overflow-hidden rounded-lg border transition-colors ${
+        selected ? "border-primary/60 ring-primary/20 ring-2" : ""
+      }`}
+    >
       <div className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
+        {onSelectChange && (
+          // Wrapper stops the click from bubbling to the surrounding Link, so
+          // toggling selection never navigates to the detail page. The label
+          // is generous (full size) so it's an easy mobile tap target.
+          <label
+            className="flex shrink-0 cursor-pointer items-center justify-center p-1"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${connection.institution_name ?? "connection"}`}
+          >
+            <Checkbox
+              checked={!!selected}
+              onCheckedChange={(value) => onSelectChange(!!value)}
+            />
+          </label>
+        )}
         <Link
           to="/connections/$id"
           params={{ id: connection.short_id }}
