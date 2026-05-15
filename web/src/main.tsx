@@ -21,6 +21,10 @@ import {
   ConnectionsPage,
   connectionsSearchSchema,
 } from "@/routes/connections";
+import {
+  ConnectionDetailPage,
+  connectionDetailSearchSchema,
+} from "@/routes/connection-detail";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -87,6 +91,13 @@ const sandboxRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/sandbox"), "SandboxPage"),
 });
 
+const connectionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/connections/$id",
+  component: ConnectionDetailPage,
+  validateSearch: connectionDetailSearchSchema,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -107,6 +118,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   transactionDetailRoute,
   sandboxRoute,
+  connectionDetailRoute,
   ...pageRoutes,
 ]);
 

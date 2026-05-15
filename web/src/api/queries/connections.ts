@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import type { Connection } from "@/api/types";
+import type { Connection, ConnectionDetail } from "@/api/types";
 
 // useConnections lists every household connection. The endpoint returns a
 // bare array (no envelope). Read with the v2 session cookie via the synthetic
@@ -10,6 +10,35 @@ export function useConnections() {
     queryKey: ["connections"],
     queryFn: () => api<Connection[]>("/api/v1/connections"),
     staleTime: 30_000,
+  });
+}
+
+// useConnection fetches a single connection by short_id (or UUID). Returns the
+// detail payload — same fields as the list shape plus paused, sync interval
+// override, consecutive_failures, and account_count.
+export function useConnection(id: string | undefined) {
+  return useQuery({
+    queryKey: ["connection", id],
+    queryFn: () => api<ConnectionDetail>(`/api/v1/connections/${id}`),
+    enabled: !!id,
+    staleTime: 30_000,
+  });
+}
+
+// useSetSyncInterval writes the per-connection sync-interval override. Pass
+// `minutes: null` to clear the override and fall back to the global default.
+export function useSetSyncInterval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, minutes }: { id: string; minutes: number | null }) =>
+      api<ConnectionDetail>(`/api/v1/connections/${id}/sync-interval`, {
+        method: "POST",
+        body: JSON.stringify({ interval_minutes: minutes }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connection"] });
+      qc.invalidateQueries({ queryKey: ["connections"] });
+    },
   });
 }
 
@@ -42,6 +71,8 @@ export function useSyncConnection() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["connections"] });
+      qc.invalidateQueries({ queryKey: ["connection"] });
+      qc.invalidateQueries({ queryKey: ["sync-logs"] });
     },
   });
 }
