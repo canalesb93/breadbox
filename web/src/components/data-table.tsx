@@ -180,7 +180,12 @@ export function DataTable<TData, TValue>({
                   }
                   className={cn(
                     onRowClick && "cursor-pointer",
-                    focused && "ring-primary ring-2 ring-inset outline-none",
+                    // Keyboard-focus indicator: a 3px primary accent bar on
+                    // the left edge plus a faint primary tint, layered via
+                    // inset box-shadow so it doesn't shift the row geometry
+                    // or compete with the row's selected/hover background.
+                    focused &&
+                      "bg-primary/[0.04] shadow-[inset_3px_0_0_0_var(--primary)] outline-none",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (

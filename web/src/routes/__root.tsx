@@ -109,7 +109,7 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             <span className="text-sm font-medium">{title}</span>
           </div>
         </header>
-        <main className="min-w-0 flex-1 p-6">
+        <main className="min-w-0 flex-1 p-3 sm:p-6">
           <Outlet />
         </main>
       </SidebarInset>

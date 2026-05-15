@@ -64,6 +64,33 @@ const SORT_OPTIONS: {
 // for the two range filters that clear a pair of params at once.
 type ChipKey = keyof TransactionsSearch | "dateRange" | "amountRange";
 
+function csvSet(raw: string | undefined): Set<string> {
+  if (!raw) return new Set();
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+function setToCsv(set: Set<string>): string | undefined {
+  if (set.size === 0) return undefined;
+  return Array.from(set).join(",");
+}
+
+function toggleInSet(set: Set<string>, value: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
+
+function multiSelectChip(
+  key: ChipKey,
+  selected: { label: string }[],
+  pluralNoun: string,
+): { key: ChipKey; label: string } | null {
+  if (selected.length === 0) return null;
+  if (selected.length === 1) return { key, label: selected[0].label };
+  return { key, label: `${selected.length} ${pluralNoun}` };
+}
+
 // TransactionsToolbar is the transactions page's single control band: a search
 // box, a row of popover-backed filter pills, a sort control and the select-mode
 // toggle — plus a removable chip for every active filter. It's controlled — all
@@ -79,15 +106,37 @@ export function TransactionsToolbar({
 }: TransactionsToolbarProps) {
   const { data: accounts } = useAccounts();
   const { data: categoryTree } = useCategories();
-  // Flattened only to resolve the active category's label for its chip — the
-  // Category pill itself uses the shared CategoryCommandList.
+  // Flattened only to resolve the active categories' labels for their chip —
+  // the Category pill itself uses the shared CategoryCommandList.
   const categories = useMemo(
     () => flattenCategories(categoryTree),
     [categoryTree],
   );
 
-  const account = accounts?.find((a) => a.short_id === search.account);
-  const category = categories.find((c) => c.slug === search.category);
+  // `account` and `category` are comma-separated lists; splitting to Sets up
+  // here lets the rest of the toolbar treat selection as set membership.
+  const accountSlugs = useMemo(
+    () => csvSet(search.account),
+    [search.account],
+  );
+  const categorySlugs = useMemo(
+    () => csvSet(search.category),
+    [search.category],
+  );
+
+  const selectedAccounts = useMemo(
+    () => (accounts ?? []).filter((a) => accountSlugs.has(a.short_id)),
+    [accounts, accountSlugs],
+  );
+  const selectedCategories = useMemo(
+    () => categories.filter((c) => categorySlugs.has(c.slug)),
+    [categories, categorySlugs],
+  );
+
+  const toggleAccount = (shortId: string) =>
+    onChange({ account: setToCsv(toggleInSet(accountSlugs, shortId)) });
+  const toggleCategory = (slug: string) =>
+    onChange({ category: setToCsv(toggleInSet(categorySlugs, slug)) });
   // Only treat sort as "custom" when the params actually resolve to a known
   // option — a partial/garbage param shouldn't light the pill with the wrong
   // label.
@@ -98,8 +147,18 @@ export function TransactionsToolbar({
   const sortIsCustom = !!foundSort;
 
   const chips: { key: ChipKey; label: string }[] = [];
-  if (account) chips.push({ key: "account", label: account.name });
-  if (category) chips.push({ key: "category", label: category.display_name });
+  const accountChip = multiSelectChip(
+    "account",
+    selectedAccounts.map((a) => ({ label: a.name })),
+    "accounts",
+  );
+  if (accountChip) chips.push(accountChip);
+  const categoryChip = multiSelectChip(
+    "category",
+    selectedCategories.map((c) => ({ label: c.display_name })),
+    "categories",
+  );
+  if (categoryChip) chips.push(categoryChip);
   if (search.start || search.end) {
     const from = search.start ? formatLongDate(search.start) : "Any";
     const to = search.end ? formatLongDate(search.end) : "Any";
@@ -143,6 +202,12 @@ export function TransactionsToolbar({
             ref={searchRef}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            // Esc inside the search box blurs back to the page so the global
+            // shortcuts (j/k/c/Esc-to-clear-selection) regain control without
+            // a manual click-away.
+            onKeyDown={(e) => {
+              if (e.key === "Escape") e.currentTarget.blur();
+            }}
             placeholder="Search merchant or description…"
             className="pl-8"
           />
@@ -151,7 +216,12 @@ export function TransactionsToolbar({
         {/* Filter pills — grouped so they wrap as a unit, independent of
             the sort/select controls. */}
         <div className="flex flex-wrap items-center gap-2">
-          <FilterPill icon={Banknote} label="Account" active={!!account}>
+          <FilterPill
+            icon={Banknote}
+            label="Account"
+            count={selectedAccounts.length}
+            active={selectedAccounts.length > 0}
+          >
             <Command>
               <CommandInput placeholder="Search accounts…" />
               <CommandList>
@@ -161,20 +231,13 @@ export function TransactionsToolbar({
                     <CommandItem
                       key={a.short_id}
                       value={`${a.name} ${a.institution_name}`}
-                      onSelect={() =>
-                        onChange({
-                          account:
-                            search.account === a.short_id
-                              ? undefined
-                              : a.short_id,
-                        })
-                      }
+                      onSelect={() => toggleAccount(a.short_id)}
                     >
                       <span className="truncate">{a.name}</span>
                       <span className="text-muted-foreground ml-1 truncate text-xs">
                         {a.institution_name}
                       </span>
-                      {search.account === a.short_id && (
+                      {accountSlugs.has(a.short_id) && (
                         <Check className="ml-auto size-4" />
                       )}
                     </CommandItem>
@@ -184,17 +247,18 @@ export function TransactionsToolbar({
             </Command>
           </FilterPill>
 
-          <FilterPill icon={Shapes} label="Category" active={!!category}>
+          <FilterPill
+            icon={Shapes}
+            label="Category"
+            count={selectedCategories.length}
+            active={selectedCategories.length > 0}
+          >
             <CategoryCommandList
-              currentSlug={search.category ?? null}
-              onPick={({ category_slug }) =>
-                onChange({
-                  category:
-                    category_slug && search.category === category_slug
-                      ? undefined
-                      : category_slug,
-                })
-              }
+              selectedSlugs={categorySlugs}
+              onPick={({ category_slug }) => {
+                if (!category_slug) return;
+                toggleCategory(category_slug);
+              }}
             />
           </FilterPill>
 
@@ -385,6 +449,8 @@ interface FilterPillProps {
   icon: typeof Banknote;
   label: string;
   active?: boolean;
+  /** When > 1, rendered as a numeric badge after the label — multi-select hint. */
+  count?: number;
   className?: string;
   children: ReactNode;
 }
@@ -393,6 +459,7 @@ function FilterPill({
   icon: Icon,
   label,
   active,
+  count,
   className,
   children,
 }: FilterPillProps) {
@@ -407,6 +474,11 @@ function FilterPill({
         >
           <Icon className="size-3.5" />
           {label}
+          {count != null && count > 1 && (
+            <Badge variant="secondary" className="ml-0.5 px-1.5 py-0">
+              {count}
+            </Badge>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className={cn("w-56 p-0", className)}>

@@ -10,21 +10,9 @@ import { Separator } from "@/components/ui/separator";
 import { CategoryCommandList } from "@/components/category-command";
 import { TagCommandList } from "@/components/tag-command";
 import { KbdTooltip } from "@/components/kbd-tooltip";
-import { withMutationToast } from "@/lib/mutation-toast";
 import { useUpdateTransactions } from "@/api/queries/transactions";
 import type { UpdateTransactionsOp } from "@/api/types";
-
-// The batch endpoint caps each call at 50 operations; larger selections are
-// split into sequential chunks.
-const BATCH_LIMIT = 50;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size));
-  }
-  return out;
-}
+import { applyBulkTransactionOp } from "@/features/transactions/bulk-update";
 
 interface SelectionActionBarProps {
   selectedIds: string[];
@@ -49,16 +37,11 @@ export function SelectionActionBar({
     op: Omit<UpdateTransactionsOp, "transaction_id">,
     successMessage: string,
   ) => {
-    const ok = await withMutationToast(
-      () =>
-        Promise.all(
-          chunk(selectedIds, BATCH_LIMIT).map((ids) =>
-            update.mutateAsync({
-              operations: ids.map((id) => ({ transaction_id: id, ...op })),
-            }),
-          ),
-        ),
-      { success: successMessage },
+    const ok = await applyBulkTransactionOp(
+      update,
+      selectedIds,
+      op,
+      successMessage,
     );
     if (ok) onClear();
   };

@@ -83,6 +83,12 @@ type TransactionListParams struct {
 	AccountID        *string
 	UserID           *string
 	CategorySlug     *string
+	// Multi-select variants. When non-empty they take precedence over the
+	// singular `AccountID` / `CategorySlug` fields above and produce an OR
+	// match across every value in the list (parent categories still include
+	// their children).
+	AccountIDs       []string
+	CategorySlugs    []string
 	MinAmount        *float64
 	MaxAmount        *float64
 	Pending          *bool
@@ -104,6 +110,9 @@ type TransactionCountParams struct {
 	AccountID        *string
 	UserID           *string
 	CategorySlug     *string
+	// Multi-select variants — see TransactionListParams.
+	AccountIDs       []string
+	CategorySlugs    []string
 	MinAmount        *float64
 	MaxAmount        *float64
 	Pending          *bool

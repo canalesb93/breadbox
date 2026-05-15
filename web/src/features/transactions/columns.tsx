@@ -58,14 +58,21 @@ const baseColumns: ColumnDef<Transaction>[] = [
   {
     id: "description",
     header: "Description",
+    // `max-w-0 w-full` is the classic auto-table truncation trick: the cell
+    // fills available width but its max-width is 0, so descendants with
+    // `truncate` actually clamp. Without this, a long merchant name expands
+    // the column and pushes the amount off-screen on narrow viewports.
+    meta: { className: "max-w-0 w-full" },
     cell: ({ row }) => <TransactionPrimary transaction={row.original} />,
   },
   {
     id: "category",
-    header: "Category",
+    header: () => <div className="text-right">Category</div>,
     // Hidden on mobile — the description column takes the freed space; the
-    // category is still editable from the detail page.
-    meta: { className: "w-px hidden sm:table-cell" },
+    // category is still editable from the detail page. `text-right` keeps the
+    // badge flush against the amount column so the gap is consistent
+    // regardless of category name length.
+    meta: { className: "w-px hidden sm:table-cell text-right" },
     cell: ({ row }) => (
       <CategoryPicker
         transactionId={row.original.id}
@@ -77,7 +84,10 @@ const baseColumns: ColumnDef<Transaction>[] = [
   {
     accessorKey: "amount",
     header: () => <div className="text-right">Amount</div>,
-    meta: { className: "w-px" },
+    // `w-px` shrinks to content on mobile (where space is tight); `sm:min-w-28`
+    // pins a comfortable floor on desktop so the right edge of the column
+    // stays steady across rows of varying amount length.
+    meta: { className: "w-px sm:min-w-28" },
     cell: ({ row }) => <TransactionAmount transaction={row.original} />,
   },
 ];
