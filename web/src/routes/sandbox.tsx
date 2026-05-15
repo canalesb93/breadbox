@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ export function SandboxPage() {
   const qc = useQueryClient();
   // Prime the cache once, before the section components mount, so the
   // category/tag pickers render from fixtures instead of hitting the API.
+  // A useState initializer runs synchronously pre-render (unlike useEffect);
+  // StrictMode double-invokes it in dev, which is harmless here — the
+  // fixtures are module constants, so setQueryData is idempotent.
   useState(() => {
     qc.setQueryData(["categories"], sampleCategories);
     qc.setQueryData(["tags"], sampleTags);
@@ -33,9 +36,19 @@ export function SandboxPage() {
   });
 
   const [active, setActive] = useState<SectionId>("foundations");
-  const [dark, setDark] = useState(() =>
+  // The theme toggle is a scoped preview: it flips the global `.dark` class
+  // so the whole gallery re-themes, but restores the original mode on
+  // unmount so it never leaks out to the rest of the app.
+  const [origDark] = useState(() =>
     document.documentElement.classList.contains("dark"),
   );
+  const [dark, setDark] = useState(origDark);
+
+  useEffect(() => {
+    return () => {
+      document.documentElement.classList.toggle("dark", origDark);
+    };
+  }, [origDark]);
 
   const toggleDark = () => {
     const next = !dark;
