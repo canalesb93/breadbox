@@ -7,6 +7,7 @@ import {
   createRouter,
   createRootRoute,
   createRoute,
+  lazyRouteComponent,
 } from "@tanstack/react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { AnyRoute } from "@tanstack/react-router";
@@ -70,6 +71,14 @@ const transactionDetailRoute = createRoute({
   component: TransactionDetailPage,
 });
 
+// The design-system sandbox — a dev/reference gallery, not a nav leaf.
+// Lazy-loaded so its fixtures + section code stay out of the main bundle.
+const sandboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sandbox",
+  component: lazyRouteComponent(() => import("@/routes/sandbox"), "SandboxPage"),
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -89,6 +98,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   transactionDetailRoute,
+  sandboxRoute,
   ...pageRoutes,
 ]);
 
