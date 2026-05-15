@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
@@ -128,6 +129,13 @@ export function PrimitivesSection() {
         <div className="mt-3 grid max-w-xs gap-1.5">
           <Label htmlFor="sb-input-disabled">Disabled</Label>
           <Input id="sb-input-disabled" placeholder="Disabled" disabled />
+        </div>
+      </Specimen>
+
+      <Specimen label="Textarea" className="block">
+        <div className="grid max-w-md gap-1.5">
+          <Label htmlFor="sb-textarea">Note</Label>
+          <Textarea id="sb-textarea" placeholder="Add a note…" rows={3} />
         </div>
       </Specimen>
 
