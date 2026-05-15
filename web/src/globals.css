@@ -76,6 +76,124 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Theme presets — accent overrides composed with light/dark mode.
+ *
+ * Each preset retunes the "primary" family (button fills, focus rings,
+ * active sidebar item) while leaving neutrals (background, card, muted,
+ * border) alone. The default neutral theme lives in `:root` / `.dark` above
+ * — applying a preset is done by setting `data-theme="<id>"` on `<html>`.
+ *
+ * Selectors target any element with `data-theme` (not just the root), so a
+ * swatch in the preset picker can preview its color by setting the attribute
+ * on itself. Dark-mode variants compose via descendant + self selectors so
+ * both `<html class="dark" data-theme="x">` and `<.dark>...<[data-theme="x"]>`
+ * (a swatch inside the dark page) work. Chart vars are also retuned. */
+
+[data-theme="neutral"] {
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.708 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+:is(.dark[data-theme="neutral"], .dark [data-theme="neutral"]) {
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --ring: oklch(0.556 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+[data-theme="blue"] {
+  --primary: oklch(0.546 0.215 262.881);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.546 0.215 262.881);
+  --sidebar-primary: oklch(0.546 0.215 262.881);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.546 0.215 262.881);
+  --chart-1: oklch(0.546 0.215 262.881);
+  --chart-2: oklch(0.7 0.15 230);
+  --chart-3: oklch(0.6 0.18 200);
+  --chart-4: oklch(0.65 0.2 285);
+  --chart-5: oklch(0.75 0.12 260);
+}
+:is(.dark[data-theme="blue"], .dark [data-theme="blue"]) {
+  --primary: oklch(0.7 0.18 262);
+  --primary-foreground: oklch(0.18 0.04 262);
+  --ring: oklch(0.7 0.18 262);
+  --sidebar-primary: oklch(0.7 0.18 262);
+  --sidebar-primary-foreground: oklch(0.18 0.04 262);
+  --sidebar-ring: oklch(0.7 0.18 262);
+}
+
+[data-theme="green"] {
+  --primary: oklch(0.55 0.165 152);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.55 0.165 152);
+  --sidebar-primary: oklch(0.55 0.165 152);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.55 0.165 152);
+  --chart-1: oklch(0.55 0.165 152);
+  --chart-2: oklch(0.65 0.14 170);
+  --chart-3: oklch(0.7 0.12 130);
+  --chart-4: oklch(0.6 0.18 185);
+  --chart-5: oklch(0.75 0.13 145);
+}
+:is(.dark[data-theme="green"], .dark [data-theme="green"]) {
+  --primary: oklch(0.7 0.16 152);
+  --primary-foreground: oklch(0.18 0.04 152);
+  --ring: oklch(0.7 0.16 152);
+  --sidebar-primary: oklch(0.7 0.16 152);
+  --sidebar-primary-foreground: oklch(0.18 0.04 152);
+  --sidebar-ring: oklch(0.7 0.16 152);
+}
+
+[data-theme="rose"] {
+  --primary: oklch(0.585 0.22 17);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.585 0.22 17);
+  --sidebar-primary: oklch(0.585 0.22 17);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-ring: oklch(0.585 0.22 17);
+  --chart-1: oklch(0.585 0.22 17);
+  --chart-2: oklch(0.7 0.18 350);
+  --chart-3: oklch(0.65 0.2 0);
+  --chart-4: oklch(0.6 0.22 30);
+  --chart-5: oklch(0.75 0.15 10);
+}
+:is(.dark[data-theme="rose"], .dark [data-theme="rose"]) {
+  --primary: oklch(0.72 0.19 17);
+  --primary-foreground: oklch(0.18 0.05 17);
+  --ring: oklch(0.72 0.19 17);
+  --sidebar-primary: oklch(0.72 0.19 17);
+  --sidebar-primary-foreground: oklch(0.18 0.05 17);
+  --sidebar-ring: oklch(0.72 0.19 17);
+}
+
+[data-theme="orange"] {
+  --primary: oklch(0.68 0.18 50);
+  --primary-foreground: oklch(0.18 0.04 50);
+  --ring: oklch(0.68 0.18 50);
+  --sidebar-primary: oklch(0.68 0.18 50);
+  --sidebar-primary-foreground: oklch(0.18 0.04 50);
+  --sidebar-ring: oklch(0.68 0.18 50);
+  --chart-1: oklch(0.68 0.18 50);
+  --chart-2: oklch(0.75 0.16 70);
+  --chart-3: oklch(0.7 0.2 30);
+  --chart-4: oklch(0.65 0.18 80);
+  --chart-5: oklch(0.78 0.14 55);
+}
+:is(.dark[data-theme="orange"], .dark [data-theme="orange"]) {
+  --primary: oklch(0.78 0.17 50);
+  --primary-foreground: oklch(0.18 0.05 50);
+  --ring: oklch(0.78 0.17 50);
+  --sidebar-primary: oklch(0.78 0.17 50);
+  --sidebar-primary-foreground: oklch(0.18 0.05 50);
+  --sidebar-ring: oklch(0.78 0.17 50);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

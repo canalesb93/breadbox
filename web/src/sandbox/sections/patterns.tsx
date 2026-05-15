@@ -15,6 +15,7 @@ import {
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { THEME_PRESETS } from "@/lib/theme";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 
 // Amount formatting has its own section; this covers the date/time formatters.
@@ -185,6 +186,34 @@ export function PatternsSection() {
           </span>
         </div>
       </Specimen>
+
+      <Specimen
+        label="Theme presets"
+        code="useTheme · THEME_PRESETS"
+        description="Settings → Appearance picks the mode + preset. Swatches show each preset's --primary against the current mode."
+        className="block"
+      >
+        <ThemeSwatches />
+      </Specimen>
     </SandboxSection>
+  );
+}
+
+function ThemeSwatches() {
+  return (
+    <div className="flex flex-wrap gap-3">
+      {THEME_PRESETS.map((p) => (
+        <div
+          key={p.id}
+          className="border-border flex items-center gap-2 rounded-md border p-2 text-sm"
+        >
+          <span
+            data-theme={p.id}
+            className="bg-primary size-6 shrink-0 rounded-md"
+          />
+          <span className="font-mono text-xs">{p.id}</span>
+        </div>
+      ))}
+    </div>
   );
 }

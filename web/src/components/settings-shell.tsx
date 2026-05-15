@@ -18,6 +18,7 @@ import { SETTINGS_SECTIONS, type SettingsSection } from "@/lib/settings-sections
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { closeModal, openModal, useActiveModal } from "@/lib/modals";
 import { AccountSection } from "@/features/settings/account-section";
+import { AppearanceSection } from "@/features/settings/appearance-section";
 
 const SETTINGS_MODAL_KEY = "settings";
 
@@ -139,6 +140,14 @@ function SectionContent({
     return (
       <div className={wrapper}>
         <AccountSection />
+      </div>
+    );
+  }
+
+  if (section.slug === "appearance") {
+    return (
+      <div className={wrapper}>
+        <AppearanceSection />
       </div>
     );
   }

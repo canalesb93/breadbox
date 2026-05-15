@@ -74,12 +74,24 @@ There's a living component gallery at `/v2/sandbox` (`web/src/sandbox/`, route i
 
 ### Styling
 
-- **Tailwind classes only.** No inline `style={}` except dynamic values that can't be expressed in Tailwind (computed colors, animations).
-- Use shadcn theme variables (`bg-primary`, `text-muted-foreground`, `border-border`). Never raw colors (`bg-blue-500`).
+- **Tailwind classes only.** No inline `style={}` except dynamic values that can't be expressed in Tailwind (computed colors that come from the backend — user-chosen tag/category colors).
+- Use shadcn theme variables (`bg-primary`, `text-muted-foreground`, `border-border`, `bg-card`, `text-destructive-foreground`, etc.). Never raw colors (`bg-blue-500`, `text-slate-700`, `dark:bg-zinc-900`, `#0f172a`).
 - Spacing: Tailwind defaults (`gap-2`, `p-4`).
 - **No CSS modules, no styled-components, no `@apply` outside `globals.css`.**
 - **Never import `static/css/styles.css`** or any v1 stylesheet. The v2 design system is shadcn theme tokens + Tailwind utilities. v1 grew unboundedly — we're not paying that cost again.
 - **Do not commit changes to `web/src/components/ui/*` styling.** If a primitive looks wrong, theme tokens in `globals.css` are the lever.
+
+#### Theme presets — don't drift past shadcn
+
+The app supports runtime theme presets (Settings → Appearance). Presets work by flipping a `data-theme` attribute on `<html>` and a `.dark` class for mode; each combination is a block of CSS-variable overrides in `globals.css`. **Any color that doesn't flow through these variables will not follow the user's chosen preset.**
+
+To keep presets working:
+
+- **No hardcoded color literals anywhere in `web/`.** That includes Tailwind color classes (`bg-blue-500`, `text-red-600`, `border-gray-200`, plus every named hue), `dark:*` variants of those classes (double trouble — they short-circuit the theme system), hex/`rgb()`/`hsl()` strings in `className`, inline `style={{ color: '#...' }}`, and CSS files outside the theme-variable definitions in `globals.css`.
+- **Destructive / success state uses semantic tokens, not white.** Use `text-destructive-foreground` on destructive buttons/badges, not `text-white`. White looks right against the default red but breaks the moment a preset shifts the destructive hue.
+- **Charts go through `--chart-1`…`--chart-5`,** never raw hex. The preset config tunes the chart palette to match the rest of the theme.
+- **Dynamic backend colors are the one exception.** User-chosen tag/category colors come from the API as hex and ARE rendered via `style={{ color }}` / `style={{ backgroundColor }}`. These are user data, not theme — leave them alone.
+- **Adding a new color need?** First grep the existing variables in `globals.css`. If nothing fits, add a new semantic variable (`--warning`, `--info`, …) to both `:root`, `.dark`, every preset block, and `@theme inline`. Don't shortcut with a raw color class for "just this one place."
 
 ### State
 

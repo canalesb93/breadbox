@@ -5,13 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Breadbox v2</title>
     <script>
+      // Apply theme synchronously before React mounts to avoid a flash of
+      // the wrong theme. Storage shape must match web/src/lib/theme.ts.
       (function () {
-        var mql = window.matchMedia("(prefers-color-scheme: dark)");
-        function apply(e) {
-          document.documentElement.classList.toggle("dark", e.matches);
+        var root = document.documentElement;
+        var mode = "system";
+        var preset = "neutral";
+        try {
+          var raw = localStorage.getItem("breadbox-v2-theme");
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              if (
+                parsed.mode === "light" ||
+                parsed.mode === "dark" ||
+                parsed.mode === "system"
+              )
+                mode = parsed.mode;
+              if (
+                parsed.preset === "neutral" ||
+                parsed.preset === "blue" ||
+                parsed.preset === "green" ||
+                parsed.preset === "rose" ||
+                parsed.preset === "orange"
+              )
+                preset = parsed.preset;
+            }
+          }
+        } catch (_) {
+          /* ignore — fall back to defaults */
         }
-        apply(mql);
-        mql.addEventListener("change", apply);
+        var mql = window.matchMedia("(prefers-color-scheme: dark)");
+        function applyMode() {
+          var dark = mode === "dark" || (mode === "system" && mql.matches);
+          root.classList.toggle("dark", dark);
+        }
+        if (preset === "neutral") root.removeAttribute("data-theme");
+        else root.setAttribute("data-theme", preset);
+        applyMode();
+        mql.addEventListener("change", applyMode);
       })();
     </script>
   </head>

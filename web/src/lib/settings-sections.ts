@@ -24,7 +24,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     slug: "appearance",
     title: "Appearance",
-    description: "Theme follows your system preference.",
+    description: "Mode and accent color.",
     icon: Brush,
   },
   {
