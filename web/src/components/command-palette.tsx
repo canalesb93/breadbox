@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowUpDown, CircleDot, type LucideIcon } from "lucide-react";
+import { ArrowUpDown, CircleDot, Palette, type LucideIcon } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -132,6 +132,16 @@ export function CommandPalette() {
               </CommandItem>
             );
           })}
+        </CommandGroup>
+        <CommandSeparator />
+        <CommandGroup heading="Developer">
+          <CommandItem
+            value="design system sandbox components primitives"
+            onSelect={() => go("/sandbox")}
+          >
+            <Palette className="size-4" />
+            <span>Design system</span>
+          </CommandItem>
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Account">
