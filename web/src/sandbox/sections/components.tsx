@@ -19,6 +19,7 @@ import { TagCommandList } from "@/components/tag-command";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
+import { ProviderPicker } from "@/features/connections/provider-picker";
 import type { Transaction } from "@/api/types";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 import {
@@ -60,6 +61,7 @@ export function ComponentsSection() {
   const [tableState, setTableState] = useState<
     "data" | "loading" | "empty"
   >("data");
+  const [pickedProvider, setPickedProvider] = useState<string | null>("plaid");
 
   return (
     <SandboxSection
@@ -226,6 +228,22 @@ export function ComponentsSection() {
         <KbdTooltip label="Command palette" keys={["mod", "k"]}>
           <Button variant="outline">Search</Button>
         </KbdTooltip>
+      </Specimen>
+
+      <Specimen
+        label="ProviderPicker"
+        code="features/connections/provider-picker"
+        description="Stacked provider cards used in the Connect-bank Sheet (and the future hosted-link page). `enabledProviders` gates which cards are clickable; everything else renders as 'Not configured'."
+        className="block"
+      >
+        <div className="max-w-sm">
+          <ProviderPicker
+            enabledProviders={["plaid"]}
+            providers={["plaid", "teller", "csv"]}
+            value={pickedProvider}
+            onChange={setPickedProvider}
+          />
+        </div>
       </Specimen>
 
       <Specimen

@@ -14,6 +14,7 @@ import { ConnectionRow } from "@/features/connections/connection-row";
 import { ConnectionsSummary } from "@/features/connections/connections-summary";
 import { FamilyTabs } from "@/features/connections/family-tabs";
 import { ComingSoonSheet } from "@/features/connections/coming-soon-sheet";
+import { ConnectBankSheet } from "@/features/connections/connect-bank-sheet";
 import {
   indexAccountsByConnection,
   needsAttention,
@@ -247,13 +248,11 @@ export function ConnectionsPage() {
         </div>
       )}
 
-      <ComingSoonSheet
+      <ConnectBankSheet
         open={search.action === "connect"}
         onOpenChange={(open) => {
           if (!open) closeSheets();
         }}
-        title="Connect a bank"
-        description="Pick a provider and the family member this connection belongs to."
       />
       <ComingSoonSheet
         open={!!search.reauth}

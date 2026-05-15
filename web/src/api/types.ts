@@ -123,6 +123,60 @@ export interface ConnectionDetail extends Connection {
   account_count: number;
 }
 
+// --- Providers (public /api/v1/providers) ---
+// Mirrors internal/api.providerInfo. Used by the Connect-bank Sheet to filter
+// which provider cards are clickable on this server.
+export interface ProviderCredentialField {
+  type: string;
+  required: boolean | string;
+  description?: string;
+}
+
+export interface ProviderInfo {
+  name: string; // plaid | teller | csv
+  configured: boolean;
+  needs_link_session: boolean;
+  capabilities: string[];
+  credentials_schema: Record<string, ProviderCredentialField>;
+}
+
+// --- Connect: link-session response (POST /providers/{name}/link-session) ---
+// Returned by providers that need a server-issued init token (Plaid today).
+// Providers without one (Teller, CSV) get a 204 — surfaced here as a null
+// result.
+export interface LinkSession {
+  link_token: string;
+  expiration: string;
+}
+
+// --- Connect: connection-create envelope (POST /connections) ---
+// Mirrors internal/api.connectionEnvelope. The detail page consumes
+// connection_id (which is the new connection's short_id).
+export interface CreateConnectionResult {
+  connection_id: string;
+  institution_name: string;
+  status: string;
+}
+
+// --- Connect: per-provider credentials shapes (POST /connections body) ---
+// What goes in the `credentials` field for each provider — the shape the
+// generic dispatch endpoint hands to the provider extractor in
+// internal/api/providers.go.
+export interface PlaidExchangeCredentials {
+  public_token: string;
+  institution_id: string;
+  institution_name: string;
+  accounts: { id: string; name?: string; mask?: string; type?: string; subtype?: string }[];
+}
+
+export interface TellerExchangeCredentials {
+  access_token: string;
+  enrollment_id: string;
+  institution_id?: string;
+  institution_name: string;
+  accounts?: { id: string; name?: string; type?: string; subtype?: string; last_four?: string }[];
+}
+
 // --- Tags (public /api/v1/tags) ---
 // Mirrors internal/client/tags.go Tag.
 export interface Tag {
