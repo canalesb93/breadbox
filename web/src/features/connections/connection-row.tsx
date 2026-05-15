@@ -7,7 +7,6 @@ import {
   Loader2,
   MoreHorizontal,
   Pause,
-  Play,
   Plug,
   RefreshCw,
   Unplug,
@@ -40,13 +39,9 @@ import {
 interface ConnectionRowProps {
   connection: Connection;
   stats: ConnectionAccountStats | undefined;
-  // Optional callbacks the list passes in to open the (placeholder, in PR-01)
-  // re-auth flow. Lifted here so the same trigger can fire from the row banner
-  // and the ⋯ menu.
+  // Lifted to the page so the same trigger fires from the inline banner and
+  // the row's ⋯ menu.
   onReauth: (connection: Connection) => void;
-  // Account-level pause flag. Set to true on the connection row briefly while
-  // the optimistic mutation is in flight to avoid double-clicks.
-  paused?: boolean;
   // Multi-select state, lifted to the page so the bulk action bar can read
   // the union of selected ids. Optional — pages that don't render a bulk bar
   // can omit and the checkbox UI stays hidden.
@@ -87,9 +82,9 @@ export function ConnectionRow({
   }
 
   async function onTogglePause() {
-    // Server is the source of truth — we just toggle the inverse of whatever
-    // the most recent mutation thinks. The actual paused state lives in the
-    // detail response; the list can't tell, so this is best-effort UX.
+    // The list endpoint doesn't return the paused flag, so this row can only
+    // pause (not toggle). Resume lives on the detail page where paused is
+    // visible, and on the bulk action bar.
     await withMutationToast(
       () => pause.mutateAsync({ id: connection.id, paused: true }),
       { success: "Connection paused." },
@@ -218,16 +213,6 @@ export function ConnectionRow({
                   disabled={pause.isPending}
                 >
                   <Pause className="size-4" /> Pause syncing
-                </DropdownMenuItem>
-              )}
-              {connection.status !== "active" && connection.status !== "disconnected" && (
-                <DropdownMenuItem
-                  onClick={() =>
-                    pause.mutate({ id: connection.id, paused: false })
-                  }
-                  disabled={pause.isPending}
-                >
-                  <Play className="size-4" /> Resume syncing
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

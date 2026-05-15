@@ -28,8 +28,6 @@ import type { Connection } from "@/api/types";
 //   user   → "all" or a user short_id  (family-member filter)
 //   action → "connect"                 (opens the Connect-bank sheet)
 //   reauth → connection short_id        (opens the Re-auth sheet for that row)
-// PR-03 / PR-05 wire `action` and `reauth` into real flows. PR-01 only owns
-// the URL contract + the placeholder sheet.
 export const connectionsSearchSchema = z.object({
   user: z.string().optional(),
   action: z.literal("connect").optional(),

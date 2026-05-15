@@ -6,6 +6,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowLeft,
   Building2,
   ExternalLink,
@@ -18,7 +19,7 @@ import {
   Plug,
   RefreshCw,
   Unplug,
-  AlertTriangle,
+  Upload,
 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -59,12 +60,10 @@ import { ConnectionAccountsList } from "@/features/connections/connection-accoun
 import { SyncActivityBars } from "@/features/connections/sync-activity-bars";
 import { SyncHistoryList } from "@/features/connections/sync-history-list";
 import { providerLabel, relativeTime } from "@/features/connections/connection-utils";
-import { Upload } from "lucide-react";
 
 // Search-param schema for the detail page. Mirrors the list schema's `reauth`
-// so the same coming-soon Sheet can open from either surface. `import_csv`
-// opens the CSV upload Sheet inline, pre-targeted to append rows to this
-// connection.
+// so the same Re-auth Sheet can open from either surface. `import_csv` opens
+// the CSV upload Sheet inline, pre-targeted to append rows to this connection.
 export const connectionDetailSearchSchema = z.object({
   reauth: z.string().optional(),
   import_csv: z.string().optional(),
@@ -98,10 +97,11 @@ export function ConnectionDetailPage() {
 
   const connQuery = useConnection(id);
   const accountsQuery = useAccounts();
-  // The /sync/logs endpoint accepts UUIDs only — we pass the connection's
-  // UUID once it's loaded.
+  // The /sync/logs endpoint accepts UUIDs only — wait for the connection so
+  // we don't fire a global-feed fetch we'll immediately discard.
   const syncLogsQuery = useSyncLogs({
     connectionId: connQuery.data?.id,
+    enabled: !!connQuery.data?.id,
     limit: 30,
   });
 

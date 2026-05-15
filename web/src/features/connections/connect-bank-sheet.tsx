@@ -64,7 +64,7 @@ type Stage =
 //      TellerConnectButton) which auto-opens its hosted UI. On success the
 //      launcher hands back the public_token / enrollment payload, we POST
 //      to the generic /api/v1/connections endpoint, toast success, and
-//      navigate to the new connection's detail page (PR-02).
+//      navigate to the new connection's detail page.
 export function ConnectBankSheet({
   open,
   onOpenChange,
@@ -224,8 +224,8 @@ export function ConnectBankSheet({
       toast.success(`Connected ${result.institution_name}.`);
       handleSheetChange(false);
       navigate({
-        to: "/connections/$short_id",
-        params: { short_id: result.connection_id },
+        to: "/connections/$id",
+        params: { id: result.connection_id },
       });
     } catch (err) {
       const msg =
@@ -271,8 +271,8 @@ export function ConnectBankSheet({
               <Alert variant="default">
                 <AlertTitle>No bank providers configured</AlertTitle>
                 <AlertDescription>
-                  Set up Plaid or Teller credentials on this server, or use a
-                  CSV import (coming soon).
+                  Set up Plaid or Teller credentials on this server, or import
+                  a CSV statement.
                 </AlertDescription>
               </Alert>
             ) : (
@@ -348,8 +348,8 @@ export function ConnectBankSheet({
               handleSheetChange(false);
               if (!result.appended) {
                 navigate({
-                  to: "/connections/$short_id",
-                  params: { short_id: result.connection_id },
+                  to: "/connections/$id",
+                  params: { id: result.connection_id },
                 });
               }
             }}

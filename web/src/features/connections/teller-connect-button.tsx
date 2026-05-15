@@ -26,8 +26,7 @@ export interface TellerConnectButtonProps {
    *  it works without provisioning real Teller credentials. */
   environment?: string;
   /** Pass the existing connection's enrollment ID to switch Teller Connect
-   *  into reconnection mode (re-auth). Used by the Re-auth Sheet (PR-05);
-   *  omit it for new-connection flows. */
+   *  into reconnection mode (re-auth). Omit for new-connection flows. */
   enrollmentId?: string;
   onSuccess: (result: TellerEnrollmentResult) => void;
   onExit?: () => void;
