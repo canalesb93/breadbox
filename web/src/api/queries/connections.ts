@@ -244,6 +244,45 @@ export function useCsvImport() {
   });
 }
 
+// useReauthStart mints an update-mode link token for an existing connection.
+// POST /api/v1/connections/{id}/reauth.
+//   - Plaid replies with {link_token, expiration} — pass link_token straight
+//     to PlaidLinkButton, which runs Plaid Link in update mode when given an
+//     update-mode token.
+//   - Teller replies with {link_token: <enrollment_id>} — the v1 reauth flow
+//     reuses the enrollment_id as the "token". TellerConnectButton accepts it
+//     as `enrollmentId` to launch Connect in reconnection mode.
+//   - CSV has no concept of re-auth — the dispatcher returns an error there.
+export function useReauthStart() {
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<LinkSession>(`/api/v1/connections/${id}/reauth`, {
+        method: "POST",
+      }),
+  });
+}
+
+// useReauthComplete marks a connection active again after the user finished
+// the provider's update-mode flow. POST /api/v1/connections/{id}/reauth-complete.
+// The body is intentionally empty — Plaid completes the token exchange
+// out-of-band; Teller doesn't need a payload either. We invalidate the
+// connection caches so the banner clears immediately.
+export function useReauthComplete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ status: string }>(
+        `/api/v1/connections/${id}/reauth-complete`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connections"] });
+      qc.invalidateQueries({ queryKey: ["connection"] });
+      qc.invalidateQueries({ queryKey: ["sync-logs"] });
+    },
+  });
+}
+
 // useDisconnectConnection soft-disconnects: encrypted tokens are wiped, the
 // connection row's status flips to 'disconnected', and its transactions are
 // soft-deleted. Irreversible from the UI — the user has to reconnect from

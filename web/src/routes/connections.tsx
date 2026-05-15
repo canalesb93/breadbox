@@ -13,8 +13,8 @@ import { useUsers } from "@/api/queries/users";
 import { ConnectionRow } from "@/features/connections/connection-row";
 import { ConnectionsSummary } from "@/features/connections/connections-summary";
 import { FamilyTabs } from "@/features/connections/family-tabs";
-import { ComingSoonSheet } from "@/features/connections/coming-soon-sheet";
 import { ConnectBankSheet } from "@/features/connections/connect-bank-sheet";
+import { ReauthSheet } from "@/features/connections/reauth-sheet";
 import {
   indexAccountsByConnection,
   needsAttention,
@@ -254,13 +254,12 @@ export function ConnectionsPage() {
           if (!open) closeSheets();
         }}
       />
-      <ComingSoonSheet
+      <ReauthSheet
         open={!!search.reauth}
         onOpenChange={(open) => {
           if (!open) closeSheets();
         }}
-        title="Re-authenticate"
-        description="Reconnect to the bank to resume syncing this connection."
+        connectionShortId={search.reauth}
       />
     </>
   );
