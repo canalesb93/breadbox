@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import type { Connection, ConnectionDetail } from "@/api/types";
+import type {
+  Connection,
+  ConnectionDetail,
+  CreateConnectionResult,
+  LinkSession,
+  PlaidExchangeCredentials,
+  ProviderInfo,
+  TellerExchangeCredentials,
+} from "@/api/types";
 
 // useConnections lists every household connection. The endpoint returns a
 // bare array (no envelope). Read with the v2 session cookie via the synthetic
@@ -90,6 +98,79 @@ export function usePauseConnection() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["connections"] });
       qc.invalidateQueries({ queryKey: ["connection"] });
+    },
+  });
+}
+
+// useProviders lists available bank-data providers along with their
+// `configured` flag and credential schema. Used by the Connect-bank Sheet to
+// gate the Plaid / Teller cards on whichever providers this server has
+// credentials for. Bounded reference data — long staleTime is fine.
+export function useProviders() {
+  return useQuery({
+    queryKey: ["providers"],
+    queryFn: () => api<ProviderInfo[]>("/api/v1/providers"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+// useProviderLinkSession requests a fresh link token for a provider that
+// needs one (Plaid today). Mutation-shaped because each token is one-shot
+// and short-lived — caching would either yield stale tokens or guarantee a
+// re-fetch. Returns null for providers without an init flow (Teller, CSV)
+// where the server replies 204; the caller should fall through to the
+// provider's client-side launcher in that case.
+export function useProviderLinkSession() {
+  return useMutation({
+    mutationFn: async ({
+      provider,
+      userId,
+    }: {
+      provider: string;
+      userId: string;
+    }): Promise<LinkSession | null> => {
+      const res = await api<LinkSession | undefined>(
+        `/api/v1/providers/${provider}/link-session`,
+        {
+          method: "POST",
+          body: JSON.stringify({ user_id: userId }),
+        },
+      );
+      return res ?? null;
+    },
+  });
+}
+
+// useCreateConnection persists a new connection via the generic dispatch
+// endpoint (POST /api/v1/connections). The caller picks the discriminated
+// `credentials` shape per provider — Plaid returns the public_token from
+// Plaid Link's onSuccess; Teller returns the enrollment payload from
+// Teller Connect. On success we invalidate the connections + accounts
+// caches so the connections list and the new detail page both see the
+// row immediately.
+export type CreateConnectionPlaid = {
+  provider: "plaid";
+  user_id: string;
+  credentials: PlaidExchangeCredentials;
+};
+export type CreateConnectionTeller = {
+  provider: "teller";
+  user_id: string;
+  credentials: TellerExchangeCredentials;
+};
+export type CreateConnectionInput = CreateConnectionPlaid | CreateConnectionTeller;
+
+export function useCreateConnection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateConnectionInput) =>
+      api<CreateConnectionResult>("/api/v1/connections", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connections"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
     },
   });
 }
