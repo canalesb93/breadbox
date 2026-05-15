@@ -31,7 +31,7 @@ export interface TransactionFilters {
   sortOrder?: "asc" | "desc";
 }
 
-const PAGE_LIMIT = 50;
+export const PAGE_LIMIT = 50;
 
 // The API rejects a 1-char search; treat <2 chars as "no search".
 function normalizeSearch(raw: string | undefined): string | undefined {
@@ -94,6 +94,79 @@ export function useTransactions(filters: TransactionFilters) {
     },
     initialPageParam: "",
     getNextPageParam: (last) => nextCursor(last),
+  });
+}
+
+// fetchAllMatchingTransactionIds fetches every transaction id matching the
+// given filters by walking the cursor-paginated list endpoint. Used by the
+// selection action bar's "Select all N" affordance. Capped at MAX_BULK_SELECT
+// to keep one runaway click from triggering hundreds of requests; the caller
+// should surface a truncation hint when the real match count is higher.
+const MAX_BULK_SELECT = 5_000;
+
+export async function fetchAllMatchingTransactionIds(
+  filters: TransactionFilters,
+): Promise<string[]> {
+  const search = normalizeSearch(filters.search);
+  const ids: string[] = [];
+  let cursor = "";
+  while (ids.length < MAX_BULK_SELECT) {
+    const params = buildFilterParams(filters, search);
+    params.set("limit", "500");
+    params.set("fields", "id");
+    if (cursor) params.set("cursor", cursor);
+    if (filters.sortBy) params.set("sort_by", filters.sortBy);
+    if (filters.sortOrder) params.set("sort_order", filters.sortOrder);
+    const page = await api<{
+      transactions: { id: string }[];
+      next_cursor?: string | null;
+      has_more?: boolean;
+    }>(`/api/v1/transactions?${params.toString()}`);
+    for (const t of page.transactions) ids.push(t.id);
+    if (!page.has_more || !page.next_cursor) break;
+    cursor = page.next_cursor;
+  }
+  return ids;
+}
+
+// useTransactionsPage fetches a single page worth of transactions by offset —
+// the path used by the v2 list view's numbered pagination. The cursor path
+// (useTransactions above) is preserved for any future infinite-scroll surface
+// and remains the only path external REST clients can rely on.
+export function useTransactionsPage(
+  filters: TransactionFilters,
+  page: number,
+  pageSize: number = PAGE_LIMIT,
+) {
+  const search = normalizeSearch(filters.search);
+
+  const key = {
+    search,
+    account: filters.account,
+    category: filters.category,
+    start: filters.start,
+    end: filters.end,
+    minAmount: filters.minAmount,
+    maxAmount: filters.maxAmount,
+    pending: filters.pending,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
+    page,
+    pageSize,
+  };
+
+  return useQuery({
+    queryKey: ["transactions", "page", key],
+    queryFn: () => {
+      const params = buildFilterParams(filters, search);
+      params.set("limit", String(pageSize));
+      const offset = Math.max(0, page - 1) * pageSize;
+      if (offset > 0) params.set("offset", String(offset));
+      if (filters.sortBy) params.set("sort_by", filters.sortBy);
+      if (filters.sortOrder) params.set("sort_order", filters.sortOrder);
+      return api<TransactionsPage>(`/api/v1/transactions?${params.toString()}`);
+    },
+    placeholderData: (prev) => prev,
   });
 }
 
