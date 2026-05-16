@@ -71,15 +71,15 @@ next target, then updates this file at the end of the run.
   pills, not raw `<code>` — promote into a shared `IdPill` once a
   third surface (rules? agents?) needs it.
 - **IdPill** — extracted to `web/src/components/id-pill.tsx` in
-  iter 6 (#1119). Five surfaces now share it (iter 11 added
-  Connection-detail): Tags slug column, TX-detail Reference row,
+  iter 6 (#1119). Six surfaces now share it (iter 13 added the
+  API keys family): Tags slug column, TX-detail Reference row,
   Account-detail Reference row, Categories list (parent + child
-  rows, iter 7), and Connection-detail (Provider Institution row
-  + Reference ID row). Use `<IdPill value={shortId} />` for any
-  short_id / slug / machine identifier. The api-key-created page
-  still uses its own `<code className="bg-muted ...">` markup —
-  migrate when that page gets a design pass (different `bg-muted`
-  token, intentional).
+  rows, iter 7), Connection-detail (Provider Institution row +
+  Reference ID row), and API-keys list (prefix column) +
+  api-key-created (X-API-Key / /api/v1/* literals in the helper
+  copy). Use `<IdPill value={shortId} />` for any short_id /
+  slug / machine identifier. The iter-6 drift note on the
+  api-key-created page is now resolved.
 - **ListCard primitive** (iter 8, expanded iter 9, iter 12): the
   canonical bordered-card-with-divide-y-rows container lives at
   `web/src/components/list-card.tsx`. Eight surfaces now share it
@@ -156,7 +156,7 @@ Pages:
 - [x] Connections list (`connections.tsx`) — iter 8
 - [x] Connection detail (`connection-detail.tsx`) — #1124
 - [ ] Providers settings (`providers.tsx`)
-- [ ] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`)
+- [x] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`) — #1126
 - [ ] Login (`login.tsx`)
 - [ ] Setup account (`setup-account.tsx`)
 - [ ] Placeholder (`placeholder.tsx`)
@@ -175,11 +175,15 @@ Cross-cutting components:
   applied both flags to the Tags list — abstraction is validated on
   a second surface, no per-page divergence. Sort header affordances
   still TODO when we wire interactive sorting.
-- [ ] `SoftBackButton` primitive — three detail pages now share the
-  "real link to list + history.back on plain left-click" pattern
-  (TX-detail, Account-detail, Connection-detail iter 11). Extract
-  to `web/src/components/soft-back-button.tsx` next time we touch
-  a fourth detail page (Tag detail would qualify).
+- [x] `SoftBackButton` primitive (iter 13, #1126) — extracted to
+  `web/src/components/soft-back-button.tsx`. Five surfaces now
+  share it: TX-detail, Account-detail, Connection-detail,
+  Category-detail, and api-key-new. Visual contract: `<Button
+  variant="ghost" size="sm" className="-ml-2 mb-3 h-7 px-2
+  text-xs">` with `text-muted-foreground` / hover→`text-foreground`
+  + leading `ArrowLeft`. Use `<SoftBackButton to="/foo">Back to
+  foo</SoftBackButton>` on any new detail or form page that hangs
+  off a list. Don't fork the look.
 - [ ] `empty-state.tsx` — visual language
 - [ ] `command-palette.tsx` — sections, kbd hints, recents
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
@@ -484,6 +488,56 @@ Cross-cutting components:
     `<ColorRailCard>` in the same PR. Both are pixel-equivalent;
     the rewrite is purely structural so future hero tweaks
     propagate from one file.
+
+- **Iter 13 — API keys family + SoftBackButton primitive** ([#1126](https://github.com/canalesb93/breadbox/pull/1126))
+  - Promoted `<SoftBackButton>` to
+    `web/src/components/soft-back-button.tsx`. The "real link to
+    the list + `router.history.back()` on plain left-click"
+    pattern was open-coded across TX-detail (iter 5),
+    Account-detail (iter 6), Connection-detail (iter 11), and
+    Category-detail (iter 10); iter 11's drift note explicitly
+    queued the extraction once a fourth surface adopted it.
+    api-key-new is that fifth surface, so the primitive landed
+    in the same PR that consumed it. Five surfaces now share it.
+    Visual contract `-ml-2 mb-3 h-7 px-2 text-xs` ghost button
+    with `text-muted-foreground`/hover→`text-foreground` and a
+    leading `ArrowLeft size-3.5`. Don't fork.
+  - api-keys list adopts the canonical list-page vocabulary that
+    Tags / Transactions / Connections / Categories / Accounts
+    share: PageHeader eyebrow ("N active keys" / "Showing N of M"
+    / "No matches" / "Loading" / "Error"), expanded description,
+    `size="sm"` New key CTA, `flex flex-col gap-3` toolbar block
+    above the table (tabs + search in a `justify-between` row).
+    `APIKeysTable` opts into iter-3 `DataTable` `stickyHeader` +
+    `refinedHeader` props — column band stays pinned on scroll
+    and reads as small uppercase tracked labels. Prefix column
+    renders the `bb_xxx…` identifier as an `IdPill` instead of
+    a raw `<code>` — fourth table surface for the primitive.
+  - api-key-new gets the canonical form-page shell: SoftBackButton
+    + PageHeader with "New credential" eyebrow + "Mint an API key"
+    title, then the form wrapped in a `<SectionCard>` (icon +
+    "Key details" title). The form's action row becomes a flush
+    bordered footer at the bottom of the card
+    (`-mx-5 -mb-5 mt-2 border-t bg-muted/20 px-5 py-3`) with
+    Cancel on the left and Create key on the right — same
+    pattern as the ColorRailCard footer slot. Establishes the
+    canonical "form inside a card with a sticky-feeling action
+    strip" pattern. If category-form (queued) or tag-form picks
+    this up, promote to a `FormFooter` prop on `SectionCard`.
+  - api-key-created drops its bespoke `<Card>`/`<CardHeader>`/
+    `<CardContent>` shell for a `<SectionCard>` matching the
+    api-key-new vocabulary. The pending key's name moves into
+    PageHeader as the page title (with "Key created" eyebrow);
+    the inline `<code className="bg-muted">` markup that wrapped
+    `X-API-Key` and `/api/v1/*` migrates to `<IdPill>` — sixth
+    surface for the primitive, retiring the iter-6 drift note
+    on this exact page.
+  - Migrated the four existing detail pages (TX-detail,
+    Account-detail, Connection-detail, Category-detail) off
+    their inline `BackButton` copies onto `<SoftBackButton>` in
+    the same PR. Pixel-equivalent — the rewrite is structural
+    so future tweaks (radius, hover tint, size) propagate from
+    one file.
 
 ## Open observations / questions
 
