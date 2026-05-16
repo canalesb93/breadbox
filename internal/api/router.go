@@ -270,6 +270,11 @@ func NewRouter(a *app.App, version string) http.Handler {
 				r.Use(webui.RequireSameOrigin())
 				// Pre-auth (login + first-run signup-style routes): no session required.
 				r.Post("/login", webui.LoginHandler(sm, a.Queries))
+				// Setup-account: token-gated password set for new members.
+				// Pre-auth — the one-time token is the credential. POST also
+				// starts a session so the SPA can route straight into /v2/.
+				r.Get("/setup-account/{token}", webui.SetupAccountInfoHandler(a.Queries))
+				r.Post("/setup-account/{token}", webui.SetupAccountHandler(sm, a.Queries))
 				// Post-auth routes.
 				r.Group(func(r chi.Router) {
 					r.Use(webui.RequireSessionJSON(sm))

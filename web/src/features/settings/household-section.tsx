@@ -80,9 +80,11 @@ export function HouseholdSection() {
   const { data: users, isLoading } = useUsers();
   const [addOpen, setAddOpen] = useState(false);
 
+  const hasMembers = !!users && users.length > 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="space-y-3">
         <div className="space-y-1">
           <h2 className="text-lg font-medium">Household</h2>
           <p className="text-muted-foreground text-sm">
@@ -92,9 +94,9 @@ export function HouseholdSection() {
         </div>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">
+            <Button size="sm" variant={hasMembers ? "outline" : "default"}>
               <UserPlus className="size-4" />
-              Add member
+              {hasMembers ? "Add member" : "Add your first member"}
             </Button>
           </DialogTrigger>
           <AddMemberDialog onDone={() => setAddOpen(false)} />
@@ -103,8 +105,8 @@ export function HouseholdSection() {
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading members…</p>
-      ) : !users || users.length === 0 ? (
-        <EmptyState onAdd={() => setAddOpen(true)} />
+      ) : !hasMembers ? (
+        <EmptyState />
       ) : (
         <ul className="space-y-3">
           {users.map((u) => (
@@ -116,7 +118,7 @@ export function HouseholdSection() {
   );
 }
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+function EmptyState() {
   return (
     <div className="border-border rounded-lg border border-dashed p-8 text-center">
       <div className="bg-muted mx-auto mb-3 flex size-12 items-center justify-center rounded-xl">
@@ -124,12 +126,9 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <h3 className="text-sm font-medium">No family members yet</h3>
       <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
-        Add members to connect their banks and attribute transactions by person.
+        Add members to connect their banks and attribute transactions by
+        person.
       </p>
-      <Button onClick={onAdd} size="sm" className="mt-4">
-        <UserPlus className="size-4" />
-        Add your first member
-      </Button>
     </div>
   );
 }

@@ -145,7 +145,8 @@ export function useDeleteUserLogin(userId: string) {
 }
 
 // setupAccountURL builds the link a new member uses to set their password.
-// Mirrors the v1 admin flow (`/setup-account/<token>`).
+// Points at the v2 SPA route; the legacy `/setup-account/<token>` admin form
+// is still mounted so previously-issued tokens keep working.
 export function setupAccountURL(token: string): string {
-  return `${window.location.origin}/setup-account/${token}`;
+  return `${window.location.origin}/v2/setup-account/${token}`;
 }

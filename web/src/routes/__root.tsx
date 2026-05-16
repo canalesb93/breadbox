@@ -17,11 +17,19 @@ import { useMe } from "@/api/queries/me";
 import { ApiError } from "@/api/client";
 
 const UNAUTHENTICATED_PATHS = new Set(["/login"]);
+// Setup-account is parameterized (`/setup-account/$token`), so the prefix
+// check covers every token variant without listing them.
+const UNAUTHENTICATED_PREFIXES = ["/setup-account/"];
+
+function isUnauthenticatedPath(pathname: string): boolean {
+  if (UNAUTHENTICATED_PATHS.has(pathname)) return true;
+  return UNAUTHENTICATED_PREFIXES.some((p) => pathname.startsWith(p));
+}
 
 export function RootLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  if (UNAUTHENTICATED_PATHS.has(pathname)) {
+  if (isUnauthenticatedPath(pathname)) {
     return (
       <>
         <Outlet />

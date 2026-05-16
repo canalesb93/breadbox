@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"breadbox/internal/admin"
 	"breadbox/internal/db"
@@ -20,6 +21,7 @@ import (
 	"breadbox/internal/pgconv"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -266,3 +268,123 @@ func ChangePasswordHandler(sm *scs.SessionManager, queries *db.Queries) http.Han
 // responses against unknown usernames so timing can't be used for
 // enumeration.
 var loginDummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), 12)
+
+// SetupAccountInfoResponse is the GET shape for /web/v1/setup-account/{token}:
+// just enough for the SPA to greet the new member with their email.
+type SetupAccountInfoResponse struct {
+	Username string `json:"username"`
+}
+
+// SetupAccountInfoHandler validates a setup token and returns the username
+// the SPA should display. Pre-auth (no session required) — the token *is*
+// the credential. Returns 404 for unknown/expired tokens; 410 GONE when the
+// password has already been set so the SPA can route the visitor to /login.
+func SetupAccountInfoHandler(queries *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := chi.URLParam(r, "token")
+		account, ok := lookupSetupToken(w, r, queries, token)
+		if !ok {
+			return
+		}
+		mw.WriteJSON(w, http.StatusOK, SetupAccountInfoResponse{Username: account.Username})
+	}
+}
+
+// SetupAccountRequest is the POST body for /web/v1/setup-account/{token}.
+type SetupAccountRequest struct {
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
+
+// SetupAccountHandler consumes a setup token, hashes + stores the password,
+// clears the token, and opens a session so the SPA can route the visitor
+// straight into /v2/ without a second login round-trip. Pre-auth.
+func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := chi.URLParam(r, "token")
+		account, ok := lookupSetupToken(w, r, queries, token)
+		if !ok {
+			return
+		}
+
+		var req SetupAccountRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Request body must be valid JSON")
+			return
+		}
+		if len(req.Password) < 8 {
+			mw.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Password must be at least 8 characters")
+			return
+		}
+		if req.Password != req.ConfirmPassword {
+			mw.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Passwords do not match")
+			return
+		}
+
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash password")
+			return
+		}
+		if err := queries.UpdateAuthAccountPassword(r.Context(), db.UpdateAuthAccountPasswordParams{
+			ID:             account.ID,
+			HashedPassword: hashed,
+		}); err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "UPDATE_FAILED", "Failed to set password")
+			return
+		}
+		_ = queries.ClearAuthAccountSetupToken(r.Context(), account.ID)
+
+		// Re-read so the session keys reflect the freshly-set password and the
+		// row has no stale token state. Mirrors the LoginHandler path.
+		fresh, err := queries.GetAuthAccountByID(r.Context(), account.ID)
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Account refresh failed")
+			return
+		}
+		if err := sm.RenewToken(r.Context()); err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "SESSION_ERROR", "Failed to start session")
+			return
+		}
+		admin.SetLoginSessionKeys(r.Context(), sm, fresh, queries)
+
+		mw.WriteJSON(w, http.StatusOK, MeResponse{
+			AccountID: pgconv.FormatUUID(fresh.ID),
+			Username:  fresh.Username,
+			Role:      fresh.Role,
+		})
+	}
+}
+
+// lookupSetupToken resolves the URL `token` parameter to an `auth_accounts`
+// row, writing the canonical error envelope (and HTTP status) if anything is
+// off so callers can early-return.
+//
+// Returns ok=false in three cases the SPA should distinguish:
+//   - 400 BAD_REQUEST: empty token (almost always a SPA bug).
+//   - 410 GONE / ALREADY_SETUP: token row exists but password is already
+//     stored — the SPA reads this and bounces to /login instead of showing
+//     the form a second time.
+//   - 404 NOT_FOUND / SETUP_TOKEN_INVALID: unknown token, or expired. We
+//     collapse these to one code on purpose so a malicious caller can't tell
+//     "expired" from "never existed".
+func lookupSetupToken(w http.ResponseWriter, r *http.Request, queries *db.Queries, token string) (db.AuthAccount, bool) {
+	if token == "" {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "Missing setup token")
+		return db.AuthAccount{}, false
+	}
+	account, err := queries.GetAuthAccountBySetupToken(r.Context(), pgconv.Text(token))
+	if err != nil {
+		mw.WriteError(w, http.StatusNotFound, "SETUP_TOKEN_INVALID", "This setup link is invalid or has expired.")
+		return db.AuthAccount{}, false
+	}
+	if account.SetupTokenExpiresAt.Valid && account.SetupTokenExpiresAt.Time.Before(time.Now()) {
+		mw.WriteError(w, http.StatusNotFound, "SETUP_TOKEN_INVALID", "This setup link is invalid or has expired.")
+		return db.AuthAccount{}, false
+	}
+	if account.HashedPassword != nil {
+		mw.WriteError(w, http.StatusGone, "ALREADY_SETUP", "This account is already set up. Please sign in.")
+		return db.AuthAccount{}, false
+	}
+	return account, true
+}

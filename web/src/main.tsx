@@ -14,6 +14,7 @@ import type { AnyRoute } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { HomePage } from "@/routes/home";
 import { LoginPage } from "@/routes/login";
+import { SetupAccountPage } from "@/routes/setup-account";
 import { Placeholder } from "@/routes/placeholder";
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
 import { TransactionDetailPage } from "@/routes/transaction-detail";
@@ -68,6 +69,12 @@ const loginRoute = createRoute({
   path: "/login",
   component: LoginPage,
   validateSearch: loginSearchSchema,
+});
+
+const setupAccountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/setup-account/$token",
+  component: SetupAccountPage,
 });
 
 // PAGE_OVERRIDES swaps the default Placeholder for a real page on a given
@@ -222,6 +229,7 @@ const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  setupAccountRoute,
   transactionDetailRoute,
   categoryNewRoute,
   categoryDetailRoute,
