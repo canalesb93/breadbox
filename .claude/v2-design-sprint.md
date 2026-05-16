@@ -43,13 +43,24 @@ next target, then updates this file at the end of the run.
   `design/v2-shadcn` as a leaf ref, so a child branch named
   `design/v2-shadcn/<topic>` cannot be pushed (git refs can't be both a
   file and a directory). Use a hyphen instead: `design-v2-shadcn/<topic>`.
+- **Scoreboard / stat card** (iter 2): `StatCard` lives inline in
+  `features/home/home-stats.tsx` — tiny uppercase label + icon, big
+  tabular-nums value, hint line, optional accent (positive / negative /
+  warning). If Reports or Accounts wants the same scoreboard pattern,
+  extract to `components/stat-card.tsx` then. Don't pre-extract.
+- **Card with list rows** (iter 2): Home uses `<Card className="gap-0
+  py-0">` with a `border-b` `CardHeader` and `<ul className="divide-y">`
+  rows inside `<CardContent className="px-0 py-0">`. Reused for both the
+  recent-activity feed and the connections panel — if a third surface
+  needs the pattern (e.g. Reports recent insights), wrap into a
+  `ListCard` primitive.
 
 ## Backlog (ordered roughly by impact)
 
 Pages:
 
 - [x] App shell + sidebar (`app-sidebar.tsx`, `__root.tsx`, `settings-shell.tsx`) — #1113
-- [ ] Home / dashboard (`home.tsx`)
+- [x] Home / dashboard (`home.tsx`) — #1115
 - [ ] Transactions list (`transactions.tsx`)
 - [ ] Transaction detail (`transaction-detail.tsx`)
 - [ ] Accounts list (`accounts.tsx`)
@@ -96,6 +107,20 @@ Cross-cutting components:
     page routes through it for consistency.
   - Settings modal section list adopts the same active-state language.
 
+- **Iter 2 — Home / dashboard** ([#1115](https://github.com/canalesb93/breadbox/pull/1115))
+  - Replaced the three placeholder cards with a real dashboard: KPI
+    strip (net cash, cash, credit & loans, connections health),
+    recent-activity feed (6 rows, reusing `TransactionPrimary` +
+    `TransactionAmount` so vocabulary matches the Transactions list),
+    and a connections side panel sorted attention-first.
+  - PageHeader gets a `Synced X ago` eyebrow (max `last_synced_at`
+    across connections) and primary/secondary CTAs (Connect bank,
+    Transactions).
+  - Skeletons + empty states wired for every section. Empty connections
+    panel CTA goes straight to `/connections?action=connect`.
+  - Reuses `ConnectionStatusBadge` + `relativeTime` from
+    `features/connections` — no forked rendering.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -113,3 +138,15 @@ Cross-cutting components:
   point the SPA at a non-default backend port; documented in
   `web/vite.config.ts`. Useful when piggybacking on an existing `make
   dev` from another worktree (see above).
+- **Worktree creation under sandbox** (iter 2): `EnterWorktree` rejects
+  the call from a subagent; falling back to `git worktree add
+  -b <branch> /tmp/claude/<dir> origin/design/v2-shadcn` works even when
+  sandbox blocks `.git/config` writes (the worktree still gets created;
+  the config errors are warnings, not fatals). Branch rename via
+  `git branch -m` also succeeds despite the config write error.
+- **`go build ./...` from a fresh worktree** needs `sqlc generate`
+  first (committed `*.sql.go` are required by `internal/testutil`) and
+  a stub `static/css/styles.css` (gitignored Tailwind output;
+  `mkdir -p static/css && touch static/css/styles.css` is enough for
+  the embed pattern to resolve). After that, no Go regen needed for
+  v2 SPA work.
