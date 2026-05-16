@@ -7,7 +7,7 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Form,
@@ -33,9 +33,9 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { FormFooter } from "@/components/form-footer";
 import { IconPicker } from "@/components/icon-picker";
 import { ColorPicker } from "@/components/color-picker";
-import { CategoryIconTile } from "@/components/category-icon-tile";
 import { DynamicIcon } from "@/lib/icon";
 import {
   useCategories,
@@ -81,9 +81,9 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
     },
   });
 
-  const [icon, color, displayName, parentId] = useWatch({
+  const [color] = useWatch({
     control: form.control,
-    name: ["icon", "color", "display_name", "parent_id"],
+    name: ["color"],
   });
 
   const onSubmit: SubmitHandler<CategoryFormValues> = async (values) => {
@@ -125,24 +125,6 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* In create mode the form is the only thing on the page so it
-            needs its own live preview. In edit mode the hero card above
-            already carries the identity preview live (icon + colour are
-            sourced from the same Category), so skip the redundant tile. */}
-        {mode === "create" && (
-          <div className="bg-muted/30 flex items-center gap-3 rounded-md border p-3">
-            <CategoryIconTile icon={icon} color={color} size="lg" />
-            <div className="min-w-0">
-              <div className="truncate font-medium">
-                {displayName || "Untitled category"}
-              </div>
-              <div className="text-muted-foreground text-xs">
-                {parentId ? "Sub-category" : "Top-level category"}
-              </div>
-            </div>
-          </div>
-        )}
-
         <FormField
           control={form.control}
           name="display_name"
@@ -279,18 +261,25 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
           />
         )}
 
-        <div className="flex gap-2 border-t pt-6">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Saving…" : submitLabel}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => navigate({ to: "/categories" })}
-          >
-            Cancel
-          </Button>
-        </div>
+        <FormFooter
+          secondary={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ to: "/categories" })}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+          }
+          primary={
+            <Button type="submit" size="sm" disabled={isPending}>
+              {isPending && <Loader2 className="size-4 animate-spin" />}
+              {isPending ? "Saving…" : submitLabel}
+            </Button>
+          }
+        />
       </form>
     </Form>
   );

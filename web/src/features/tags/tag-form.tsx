@@ -7,6 +7,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -19,9 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { FormFooter } from "@/components/form-footer";
 import { IconPicker } from "@/components/icon-picker";
 import { ColorPicker } from "@/components/color-picker";
-import { TagChip } from "@/components/tag-chip";
 import { useCreateTag, useUpdateTag } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
 import type { Tag } from "@/api/types";
@@ -66,9 +67,9 @@ export function TagForm({ mode, tag }: TagFormProps) {
     },
   });
 
-  const [slug, displayName, icon, color] = useWatch({
+  const [color] = useWatch({
     control: form.control,
-    name: ["slug", "display_name", "icon", "color"],
+    name: ["color"],
   });
 
   const onSubmit: SubmitHandler<TagFormValues> = async (values) => {
@@ -106,21 +107,9 @@ export function TagForm({ mode, tag }: TagFormProps) {
   const isPending = create.isPending || update.isPending;
   const submitLabel = mode === "create" ? "Create tag" : "Save changes";
 
-  const previewTag = {
-    slug: slug || "tag",
-    display_name: displayName || "Untitled tag",
-    icon,
-    color,
-  };
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="bg-muted/30 flex items-center gap-3 rounded-md border p-3">
-          <TagChip tag={previewTag} />
-          <span className="text-muted-foreground text-xs">Live preview</span>
-        </div>
-
         {mode === "create" ? (
           <FormField
             control={form.control}
@@ -229,18 +218,25 @@ export function TagForm({ mode, tag }: TagFormProps) {
           />
         </div>
 
-        <div className="flex gap-2 border-t pt-6">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Saving…" : submitLabel}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => navigate({ to: "/tags" })}
-          >
-            Cancel
-          </Button>
-        </div>
+        <FormFooter
+          secondary={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ to: "/tags" })}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+          }
+          primary={
+            <Button type="submit" size="sm" disabled={isPending}>
+              {isPending && <Loader2 className="size-4 animate-spin" />}
+              {isPending ? "Saving…" : submitLabel}
+            </Button>
+          }
+        />
       </form>
     </Form>
   );

@@ -1,23 +1,24 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Tags as TagsIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { TagForm } from "@/features/tags/tag-form";
 
 export function TagNewPage() {
   return (
     <div className="mx-auto max-w-2xl">
-      <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
-        <Link to="/tags">
-          <ArrowLeft className="size-4" />
-          Tags
-        </Link>
-      </Button>
+      <SoftBackButton to="/tags">Back to tags</SoftBackButton>
       <PageHeader
-        title="New tag"
-        description="Tags are reusable labels. Pick a stable slug — rules and exports reference it."
+        eyebrow="New tag"
+        title="Create a tag"
+        description="Tags are reusable labels you attach to any transaction. Pick a stable slug — rules, exports, and the URL reference it."
       />
-      <TagForm mode="create" />
+      <SectionCard
+        icon={<TagsIcon className="text-muted-foreground size-4" />}
+        title="Tag details"
+      >
+        <TagForm mode="create" />
+      </SectionCard>
     </div>
   );
 }
