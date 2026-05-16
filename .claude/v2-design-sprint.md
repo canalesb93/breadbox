@@ -1712,6 +1712,36 @@ Cross-cutting components:
     New form primitives should follow the same vocabulary or
     they'll regress dark mode.
 
+- **Iter 47 — Dark-mode Toggle/Tabs sweep + sandbox specimens** ([#1161](https://github.com/canalesb93/breadbox/pull/1161))
+  - Extends iter 45/46 to the remaining selection-state primitives.
+    Same root cause: stock `dark:bg-input/30` is ~4.5% white over the
+    `bg-muted` Tabs container (oklch 0.269), and `data-[state=on]:bg-accent`
+    is `--accent` (oklch 0.269) over `bg-card` (0.205) — both collapse
+    in dark, so the active/pressed signal disappears.
+  - **Tabs**: active trigger bumped from
+    `dark:data-[state=active]:bg-input/30` →
+    `dark:data-[state=active]:bg-white/[0.08]`, with
+    `dark:data-[state=active]:border-transparent` (the brighter fill
+    alone carries selection).
+  - **Toggle**: on-state bumped from `bg-accent` →
+    `dark:data-[state=on]:bg-white/[0.08]` +
+    `dark:data-[state=on]:text-foreground`; hover gets
+    `dark:hover:bg-white/[0.04]`. Outline variant picks up the iter-46
+    `dark:border-white/20` recipe for parity with Input / Textarea /
+    Select. ToggleGroup inherits via `toggleVariants`.
+  - **Sandbox**: added Tabs, Toggle (default + outline + pressed),
+    ToggleGroup (single + outline) specimens to the primitives section.
+    First specimens for any of the three — next dark sweep catches
+    them automatically.
+  - Pattern now consistent across all 7 selection-state primitives
+    (Input, Textarea, Select, Checkbox, RadioGroup, Tabs, Toggle):
+    bump idle border to `dark:border-white/20-30`, bump on/active fill
+    to `dark:bg-white/[0.04–0.08]`. New selection primitives should
+    follow this vocabulary or they'll regress dark mode.
+  - Live consumers benefiting: ToggleGroup on /accounts (institution
+    vs type grouping), Tabs on /accounts + /connections (FamilyTabs)
+    and /api-keys (active/revoked filter).
+
 ## Open observations / questions
 
 (Populated by iterations.)
