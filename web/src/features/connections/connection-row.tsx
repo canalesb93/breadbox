@@ -8,7 +8,6 @@ import {
   MoreHorizontal,
   Pause,
   Plug,
-  RefreshCw,
   Unplug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useDisconnectConnection,
   usePauseConnection,
-  useSyncConnection,
 } from "@/api/queries/connections";
 import type { Connection } from "@/api/types";
 import { ConnectionStatusBadge } from "./connection-status-badge";
@@ -62,7 +60,6 @@ export function ConnectionRow({
   selected,
   onSelectChange,
 }: ConnectionRowProps) {
-  const sync = useSyncConnection();
   const pause = usePauseConnection();
   const disconnect = useDisconnectConnection();
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
@@ -70,16 +67,8 @@ export function ConnectionRow({
   const Icon = PROVIDER_ICON[connection.provider] ?? Plug;
   const balance = primaryBalance(stats);
   const accountCount = stats?.count ?? 0;
-  const canSync =
-    connection.provider !== "csv" && connection.status === "active";
   const showReauthBanner =
     connection.status === "pending_reauth" || connection.status === "error";
-
-  async function onSync() {
-    await withMutationToast(() => sync.mutateAsync(connection.id), {
-      success: `Sync queued for ${connection.institution_name ?? "connection"}.`,
-    });
-  }
 
   async function onTogglePause() {
     // The list endpoint doesn't return the paused flag, so this row can only
@@ -156,24 +145,6 @@ export function ConnectionRow({
         </Link>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {canSync && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-full"
-              onClick={onSync}
-              disabled={sync.isPending}
-              aria-label={`Sync ${connection.institution_name ?? "connection"} now`}
-              title="Sync now"
-            >
-              {sync.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-            </Button>
-          )}
-
           <div className="text-right">
             {balance ? (
               <div className="text-sm font-semibold tabular-nums sm:text-base">
@@ -197,11 +168,6 @@ export function ConnectionRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {canSync && (
-                <DropdownMenuItem onClick={onSync} disabled={sync.isPending}>
-                  <RefreshCw className="size-4" /> Sync now
-                </DropdownMenuItem>
-              )}
               {showReauthBanner && (
                 <DropdownMenuItem onClick={() => onReauth(connection)}>
                   <Plug className="size-4" /> Re-authenticate
