@@ -20,6 +20,14 @@ export function formatAmount(amount: number, currency: string | null): string {
   return amount < 0 ? `+${formatted}` : formatted;
 }
 
+// parseIsoDate parses a YYYY-MM-DD string as a local-midnight Date so day-of
+// boundaries don't drift by a day when the user's timezone is west of UTC.
+// (`new Date("2026-01-02")` parses as UTC midnight, then renders as the prior
+// day in negative-offset zones.)
+export function parseIsoDate(iso: string): Date {
+  return new Date(`${iso}T00:00:00`);
+}
+
 const monthDayFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -28,7 +36,7 @@ const monthDayFormatter = new Intl.DateTimeFormat("en-US", {
 // formatDate renders a YYYY-MM-DD date as e.g. "Jan 2"; returns the input
 // unchanged if it isn't a parseable date.
 export function formatDate(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
+  const d = parseIsoDate(date);
   return Number.isNaN(d.getTime()) ? date : monthDayFormatter.format(d);
 }
 
@@ -38,7 +46,7 @@ const longDateFormatter = new Intl.DateTimeFormat("en-US", {
 
 // formatLongDate renders a YYYY-MM-DD date as e.g. "Jan 2, 2026".
 export function formatLongDate(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
+  const d = parseIsoDate(date);
   return Number.isNaN(d.getTime()) ? date : longDateFormatter.format(d);
 }
 

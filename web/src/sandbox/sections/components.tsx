@@ -14,6 +14,8 @@ import { DataTable } from "@/components/data-table";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { CategoryCommandList } from "@/components/category-command";
+import { DateRangeFilter } from "@/components/date-range-filter";
+import type { DateRangeValue } from "@/components/date-range-filter";
 import { TagChip, TagList } from "@/components/tag-chip";
 import { TagCommandList } from "@/components/tag-command";
 import { TransactionPrimary } from "@/components/transaction-primary";
@@ -62,6 +64,7 @@ export function ComponentsSection() {
     "data" | "loading" | "empty"
   >("data");
   const [pickedProvider, setPickedProvider] = useState<string | null>("plaid");
+  const [dateRange, setDateRange] = useState<DateRangeValue>({});
 
   return (
     <SandboxSection
@@ -244,6 +247,19 @@ export function ComponentsSection() {
             onChange={setPickedProvider}
           />
         </div>
+      </Specimen>
+
+      <Specimen
+        label="DateRangeFilter"
+        code="components/date-range-filter"
+        description="Date-range filter pill — preset chips beside a 2-month calendar (single month on mobile). Click to open."
+      >
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <span className="text-muted-foreground text-xs">
+          {dateRange.start || dateRange.end
+            ? `${dateRange.start ?? "any"} → ${dateRange.end ?? "any"}`
+            : "no range selected"}
+        </span>
       </Specimen>
 
       <Specimen
