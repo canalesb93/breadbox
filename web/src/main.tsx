@@ -31,6 +31,7 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { ProvidersPage } from "@/routes/providers";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -83,6 +84,9 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/connections": {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
+  },
+  "/providers": {
+    component: ProvidersPage,
   },
 };
 

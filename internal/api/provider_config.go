@@ -39,8 +39,9 @@ import (
 
 // providerConfigResponse is the wire shape of GET /settings/providers.
 type providerConfigResponse struct {
-	Plaid  plaidConfigView  `json:"plaid"`
-	Teller tellerConfigView `json:"teller"`
+	Plaid             plaidConfigView  `json:"plaid"`
+	Teller            tellerConfigView `json:"teller"`
+	HasEncryptionKey  bool             `json:"has_encryption_key"`
 }
 
 type plaidConfigView struct {
@@ -358,6 +359,7 @@ func buildProviderConfigResponse(a *app.App) providerConfigResponse {
 			CertificateSet:   tellerCertPresent,
 			WebhookSecretSet: a.Config.TellerWebhookSecret != "",
 		},
+		HasEncryptionKey: len(a.Config.EncryptionKey) > 0,
 	}
 }
 

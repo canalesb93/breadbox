@@ -11,6 +11,7 @@ import {
   Settings,
   Shapes,
   Tags,
+  ToyBrick,
   Wand2,
   type LucideIcon,
 } from "lucide-react";
@@ -67,6 +68,7 @@ export const NAV: NavGroup[] = [
       { kind: "link", title: "Accounts", to: "/accounts", icon: Banknote },
       { kind: "link", title: "Connections", to: "/connections", icon: Plug },
       { kind: "link", title: "Account links", to: "/account-links", icon: Link2 },
+      { kind: "link", title: "Providers", to: "/providers", icon: ToyBrick },
     ],
   },
   {
