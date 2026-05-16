@@ -190,6 +190,7 @@ export function ConnectionsPage() {
   async function onSyncAll() {
     await withMutationToast(() => syncAll.mutateAsync(), {
       success: "Sync queued for every active connection.",
+      successDescription: "New transactions land within a minute.",
     });
   }
 

@@ -86,7 +86,8 @@ export function RuleDetailPage() {
     const ok = await withMutationToast(
       () => applyRule.mutateAsync(rule.short_id),
       {
-        success: "Rule applied retroactively. Transactions are being updated.",
+        success: "Rule applied retroactively.",
+        successDescription: "Transactions are being updated.",
       },
     );
     if (ok) {

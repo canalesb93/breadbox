@@ -92,7 +92,7 @@ export function PatternsSection() {
       <Specimen
         label="Toasts"
         code="sonner · withMutationToast"
-        description="One toast surface for the whole app. Each tone gets a coloured left rail + tinted icon tile — same vocabulary as <StatusPanel>. withMutationToast wraps a mutation: success toast on resolve, the ApiError message on reject."
+        description="One toast surface for the whole app. Each tone gets a coloured left rail + tinted icon tile — same vocabulary as <StatusPanel>. withMutationToast wraps a mutation: success toast on resolve, the ApiError message on reject. Use the successDescription slot for any two-thought outcome (what happened + what to expect / do next) instead of cramming both into the title."
         className="block"
       >
         <div className="flex flex-wrap gap-2">

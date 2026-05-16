@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ApiError } from "@/api/client";
 import {
   ArrowRight,
   Link2,
@@ -171,15 +173,22 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
   const otherUser = isPrimary ? link.dependent_user_name : link.primary_user_name;
 
   async function onReconcile() {
-    await withMutationToast(
-      async () => {
-        const r = await reconcile.mutateAsync(link.id);
-        return r;
-      },
-      {
-        success: `Reconciled — ${reconcile.data?.new_matches ?? 0} new matches.`,
-      },
-    );
+    try {
+      const r = await reconcile.mutateAsync(link.id);
+      const count = r?.new_matches ?? 0;
+      toast.success("Reconciled.", {
+        description:
+          count === 0
+            ? "No new matches this pass."
+            : `${count} new match${count === 1 ? "" : "es"} found.`,
+      });
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : "Couldn't reconcile this link. Try again.";
+      toast.error(msg);
+    }
   }
 
   async function onDelete() {

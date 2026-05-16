@@ -232,7 +232,8 @@ function BackupActions({ disabled }: { disabled: boolean }) {
     if (!pendingUpload) return;
     const file = pendingUpload;
     const ok = await withMutationToast(() => upload.mutateAsync(file), {
-      success: "Restored from uploaded backup. Restart the server to be safe.",
+      success: "Restored from uploaded backup.",
+      successDescription: "Restart the server to be safe.",
     });
     if (ok) {
       setPendingUpload(null);
@@ -480,7 +481,8 @@ function BackupRowItem({
 
   const runRestore = async () => {
     const ok = await withMutationToast(() => restore.mutateAsync(row.filename), {
-      success: `Restored from ${row.filename}. Restart the server to be safe.`,
+      success: `Restored from ${row.filename}.`,
+      successDescription: "Restart the server to be safe.",
     });
     if (ok) setConfirm(null);
   };
