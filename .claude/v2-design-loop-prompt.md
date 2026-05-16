@@ -10,6 +10,29 @@ You are running one autonomous iteration of the **v2 SPA design sprint** for the
 
 ## Iteration steps
 
+### Worktree, not main repo (hard rule)
+
+**NEVER work in the main repo at `/Users/canales/dev/breadbox`.** Always
+isolate iteration work in a git worktree. Iter #33 worked directly in
+the main repo, switched branches there, and disturbed Ricardo's working
+tree. Don't repeat that. The robust pattern:
+
+```bash
+git fetch origin design/v2-shadcn
+git worktree add ~/dev/breadbox-iter<N> -b design-v2-shadcn/<topic> origin/design/v2-shadcn
+cd ~/dev/breadbox-iter<N>
+```
+
+Or use `EnterWorktree({ name: "design-v2-shadcn-<topic>" })` first.
+
+At the end of the iteration: `git worktree remove --force ~/dev/breadbox-iter<N>`.
+
+If you ever find yourself running `git checkout` in `/Users/canales/dev/breadbox`,
+**stop and back out** — that's the main repo and changes there will surface in
+Ricardo's working tree.
+
+---
+
 ### Step ordering rule (read before reordering anything below)
 
 Four iterations (#18, #22, #25, #29) stopped mid-screenshot or
