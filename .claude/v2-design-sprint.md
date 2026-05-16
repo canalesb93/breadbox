@@ -150,14 +150,18 @@ next target, then updates this file at the end of the run.
   `settings-shell.tsx`. When password-reset lands, it goes
   here. If `topRight` ever gets a real consumer (e.g. "switch
   account"), the slot is already wired. Don't fork.
-- **StatusPanel (inline)** (iter 14): setup-account's success +
-  error states use a small inline panel with a 3px tone-tinted
-  left rail (success or destructive) + tinted icon tile + heading
-  + body. Same colour-encodes-meaning principle as ColorRailCard
-  but inline-only and smaller. Lives **inline** in
-  `routes/setup-account.tsx` for now — only one consumer. Promote
-  to `web/src/components/status-panel.tsx` once a second surface
-  (form-level error? settings warning?) needs it. Don't pre-extract.
+- **StatusPanel primitive** — extracted to
+  `web/src/components/status-panel.tsx` in iter 16 (#1129).
+  Tones: `success`, `destructive`, `warning`, `info`. 3px
+  tone-tinted left rail + tinted icon tile (size-8) + heading
+  + body, optional trailing slot. Same colour-encodes-meaning
+  principle as ColorRailCard but inline-only and smaller. Three
+  surfaces share it today: setup-account (success "already set
+  up" + destructive "invalid link" states, iter 14), the
+  `EnvLockedNotice` wrapper used by Plaid + Teller cards (iter
+  16), and the Teller card's `ENCRYPTION_KEY is not set` warning
+  (iter 16, retiring an open-coded amber `<Alert>`). Don't fork
+  — change this primitive.
 - **FormFooter primitive** — extracted to
   `web/src/components/form-footer.tsx` in iter 15 (#1128). The
   flush bordered action strip
@@ -204,7 +208,7 @@ Pages:
 - [x] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`) — #1128
 - [x] Connections list (`connections.tsx`) — iter 8
 - [x] Connection detail (`connection-detail.tsx`) — #1124
-- [ ] Providers settings (`providers.tsx`)
+- [x] Providers settings (`providers.tsx`) — #1129
 - [x] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`) — #1126
 - [x] Login (`login.tsx`) — #1127
 - [x] Setup account (`setup-account.tsx`) — #1127
@@ -688,6 +692,50 @@ Cross-cutting components:
     primary-left previously; the iter-13 vocabulary is
     primary-right so the eye lands on the destructive-less
     confirm. Carries over to all four form surfaces.
+
+- **Iter 16 — Providers settings + StatusPanel primitive** ([#1129](https://github.com/canalesb93/breadbox/pull/1129))
+  - Promoted `<StatusPanel>` to
+    `web/src/components/status-panel.tsx` (tones: `success`,
+    `destructive`, `warning`, `info`). The iter-14 drift note
+    explicitly queued promotion once a second surface needed it;
+    iter 16 brings two new surfaces (`EnvLockedNotice` for both
+    Plaid + Teller env-locked configs, plus the Teller card's
+    `ENCRYPTION_KEY is not set` warning that previously open-coded
+    its own amber `<Alert>`), so the primitive landed in the same
+    PR that consumed it. Three surfaces share it today: setup-account
+    (success / destructive states), EnvLockedNotice wrapper, and
+    Teller missing-encryption-key. The `warning` tone uses
+    `var(--warning, oklch(0.78 0.16 75))` with the same fallback
+    pattern as the iter-11 connection-detail rail; `info` uses a
+    neutral muted-foreground rail for "this surface is locked by
+    server-side config".
+  - Each provider on `/providers` now adopts the v2 detail-page
+    vocabulary: hero rebuilt around `<ColorRailCard>` with a 4px
+    rail tinted by sync status (success after a healthy sync,
+    destructive on sync error, warning when configured-but-never
+    -synced, muted when not configured at all — same 4-way state
+    as connection-detail). Hero identity column carries an
+    uppercase "Provider" eyebrow + name + status badge +
+    description; the right column is a new
+    `ProviderScoreboard` (tone-tinted status pill +
+    Connections / Accounts scoreboard cells) that mirrors the
+    account-detail / connection-detail metric column shape.
+  - Below each hero, the form + diagnostics split onto
+    `<SectionCard>`s: "Credentials" (form or env-locked KV) and
+    optional "Diagnostics" (Test connection button in the action
+    slot + webhook setup body). Save / Disable strip migrates to
+    `<FormFooter>` — fourth surface for the iter-15 primitive.
+  - PageHeader gains a status eyebrow ("N healthy · M of 3
+    configured") matching the list-page vocabulary (Tags /
+    Transactions / Connections / Categories / Accounts / API
+    keys). Webhook URLs render as `<IdPill>` instead of bespoke
+    `<code>` blocks — seventh surface for the primitive (Plaid
+    webhook endpoint + Teller webhook URL).
+  - The CSV card drops its duplicate "Always available" badge
+    (the scoreboard pill already says it), and its body collapses
+    into a single SectionCard with the "Import CSV" CTA in the
+    header action slot — symmetric with the Plaid/Teller
+    Diagnostics card structure.
 
 ## Open observations / questions
 
