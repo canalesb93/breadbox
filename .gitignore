@@ -2,6 +2,7 @@
 /breadbox
 /breadbox-server
 breadbox.exe
+/bin/
 
 # Tailwind CSS standalone binary and generated CSS
 tailwindcss-extra
