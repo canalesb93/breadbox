@@ -1,17 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  ChevronDown,
-  ChevronRight,
-  EyeOff,
-  Lock,
-  MoreHorizontal,
-  Pencil,
-} from "lucide-react";
+import { ChevronRight, EyeOff, Lock, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CategoryIconTile } from "@/components/category-icon-tile";
+import { IdPill } from "@/components/id-pill";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/api/types";
 
@@ -23,6 +17,13 @@ interface CategoryListProps {
   emptyState?: React.ReactNode;
 }
 
+// CategoryList renders the full parent → child tree as one bordered card with
+// `divide-y` rows — matching the Home / Tags / TX-detail "Card gap-0 py-0 +
+// CardHeader border-b + ul divide-y" vocabulary. Each parent row toggles its
+// children inline; the expanded children sit in a tinted band with a 2px
+// left rail tinted by the parent's color, so the nesting is both visible
+// and meaningful (the rail encodes which parent owns the group, not just
+// "these are indented").
 export function CategoryList({ tree, query, emptyState }: CategoryListProps) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -44,15 +45,17 @@ export function CategoryList({ tree, query, emptyState }: CategoryListProps) {
   if (filtered.length === 0) return emptyState ?? null;
 
   return (
-    <div className="space-y-3">
-      {filtered.map((parent) => (
-        <CategoryCard key={parent.id} category={parent} forceOpen={!!query} />
-      ))}
-    </div>
+    <Card className="gap-0 py-0">
+      <ul className="divide-y">
+        {filtered.map((parent) => (
+          <CategoryRow key={parent.id} category={parent} forceOpen={!!query} />
+        ))}
+      </ul>
+    </Card>
   );
 }
 
-function CategoryCard({
+function CategoryRow({
   category,
   forceOpen,
 }: {
@@ -62,101 +65,143 @@ function CategoryCard({
   const [open, setOpen] = useState(false);
   const isOpen = forceOpen || open;
   const children = category.children ?? [];
+  const hasChildren = children.length > 0;
+  const accent = category.color ?? undefined;
 
   return (
-    <Card className="overflow-hidden gap-0 py-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="hover:bg-muted/30 flex w-full items-center gap-3 px-4 py-3 text-left transition"
+    <li>
+      <div
+        className={cn(
+          "group hover:bg-muted/40 flex items-center gap-3 px-4 py-2.5 transition-colors",
+          isOpen && hasChildren && "bg-muted/20",
+        )}
       >
+        <button
+          type="button"
+          onClick={hasChildren ? () => setOpen((v) => !v) : undefined}
+          aria-expanded={hasChildren ? isOpen : undefined}
+          aria-label={
+            hasChildren
+              ? `${isOpen ? "Collapse" : "Expand"} ${category.display_name}`
+              : undefined
+          }
+          disabled={!hasChildren}
+          className={cn(
+            "text-muted-foreground -ml-1 flex size-6 shrink-0 items-center justify-center rounded-md transition-all",
+            hasChildren
+              ? "hover:bg-muted hover:text-foreground cursor-pointer"
+              : "cursor-default opacity-0",
+            isOpen && "text-foreground rotate-90",
+          )}
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
+
         <CategoryIconTile
           icon={category.icon}
           color={category.color}
           size="md"
         />
-        <div className="min-w-0 flex-1">
+
+        <Link
+          to="/categories/$id"
+          params={{ id: category.short_id }}
+          className="min-w-0 flex-1 outline-none"
+        >
           <div className="flex items-center gap-2">
-            <span className="font-medium">{category.display_name}</span>
+            <span className="truncate text-sm font-medium">
+              {category.display_name}
+            </span>
             {category.is_system && (
-              <Badge variant="outline" className="gap-1 text-xs">
-                <Lock className="size-3" /> System
+              <Badge
+                variant="outline"
+                className="text-muted-foreground gap-1 px-1.5 py-0 text-[10px] font-normal"
+              >
+                <Lock className="size-2.5" /> System
               </Badge>
             )}
             {category.hidden && (
-              <Badge variant="outline" className="gap-1 text-xs">
-                <EyeOff className="size-3" /> Hidden
+              <Badge
+                variant="outline"
+                className="text-muted-foreground gap-1 px-1.5 py-0 text-[10px] font-normal"
+              >
+                <EyeOff className="size-2.5" /> Hidden
               </Badge>
             )}
           </div>
-          <div className="text-muted-foreground text-xs">
-            {children.length === 0
-              ? "No sub-categories"
-              : `${children.length} sub-categor${children.length === 1 ? "y" : "ies"}`}
+          <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+            <IdPill value={category.slug} />
+            {hasChildren && (
+              <span className="text-muted-foreground/80">
+                {children.length}{" "}
+                {children.length === 1 ? "sub-category" : "sub-categories"}
+              </span>
+            )}
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            asChild
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Link
-              to="/categories/$id"
-              params={{ id: category.short_id }}
-              aria-label={`Edit ${category.display_name}`}
-            >
-              <Pencil className="size-4" />
-            </Link>
-          </Button>
-          {children.length > 0 ? (
-            isOpen ? (
-              <ChevronDown className="text-muted-foreground size-4" />
-            ) : (
-              <ChevronRight className="text-muted-foreground size-4" />
-            )
-          ) : (
-            <span className="size-4" aria-hidden />
-          )}
-        </div>
-      </button>
+        </Link>
 
-      {isOpen && children.length > 0 && (
-        <div className="border-t">
+        <Button
+          variant="ghost"
+          size="icon"
+          asChild
+          className="text-muted-foreground hover:text-foreground size-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <Link
+            to="/categories/$id"
+            params={{ id: category.short_id }}
+            aria-label={`Edit ${category.display_name}`}
+          >
+            <Pencil className="size-3.5" />
+          </Link>
+        </Button>
+      </div>
+
+      {isOpen && hasChildren && (
+        <ul
+          className="bg-muted/15 divide-y border-t"
+          style={
+            accent ? { boxShadow: `inset 2px 0 0 0 ${accent}40` } : undefined
+          }
+        >
           {children.map((child) => (
-            <Link
-              key={child.id}
-              to="/categories/$id"
-              params={{ id: child.short_id }}
-              className={cn(
-                "hover:bg-muted/30 flex items-center gap-3 px-4 py-2.5 pl-8 transition",
-                child.hidden && "text-muted-foreground",
-              )}
-            >
-              <CategoryIconTile
-                icon={child.icon}
-                color={child.color}
-                size="sm"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm">{child.display_name}</span>
-                  {child.hidden && (
-                    <Badge variant="outline" className="gap-1 text-xs">
-                      <EyeOff className="size-3" /> Hidden
-                    </Badge>
-                  )}
+            <li key={child.id}>
+              <Link
+                to="/categories/$id"
+                params={{ id: child.short_id }}
+                className={cn(
+                  "hover:bg-muted/40 flex items-center gap-3 py-2 pr-4 pl-12 transition-colors",
+                  child.hidden && "text-muted-foreground",
+                )}
+              >
+                <CategoryIconTile
+                  icon={child.icon}
+                  color={child.color ?? category.color}
+                  size="sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm">
+                      {child.display_name}
+                    </span>
+                    {child.hidden && (
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground gap-1 px-1.5 py-0 text-[10px] font-normal"
+                      >
+                        <EyeOff className="size-2.5" /> Hidden
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-0.5">
+                    <IdPill value={child.slug} />
+                  </div>
                 </div>
-                <code className="text-muted-foreground text-xs">
-                  {child.slug}
-                </code>
-              </div>
-              <MoreHorizontal className="text-muted-foreground/50 size-4" />
-            </Link>
+                <ChevronRight className="text-muted-foreground/60 size-3.5" />
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </Card>
+    </li>
   );
 }
