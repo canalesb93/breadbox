@@ -1475,6 +1475,26 @@ Cross-cutting components:
     ListRowSkeleton / IdPill / PageHeader / PaginationBar /
     DangerZone / FormFooter / SoftBackButton).
 
+- **Iter 38 — Sandbox showcase catches up on iter 36/37 primitives** ([#1152](https://github.com/canalesb93/breadbox/pull/1152))
+  - Adds `<Eyebrow>` and `<ListRowSkeleton>` specimens to
+    `web/src/sandbox/sections/components.tsx` so both primitives
+    have a discoverable home in the gallery at `/v2/sandbox`.
+  - Eyebrow specimen shows both `default` and `hero` variants
+    side-by-side in their typical hosts (card header vs. detail-page
+    hero column under a display title), with the consolidation
+    rationale baked into the description.
+  - ListRowSkeleton specimen demonstrates three of the most-used
+    token combinations: `regular · sm-square · value-stack` (Home
+    recent activity), `comfortable · lg-square · value-stack`
+    (Accounts / Connections), `compact · md-square · badge`
+    (Categories). The description points consumers at the
+    extend-don't-fork rule.
+  - First open item from iter 23 (`grow`-spacer sweep) verified
+    already clean — `grep -rEn '\bgrow\b' web/src` returns zero
+    matches (the iter-24 mobile sweep cleared everything; the only
+    remaining hit is a `// tag pages tend to grow long` comment
+    inside `tags-table.tsx`). Observation closed.
+
 ## Open observations / questions
 
 (Populated by iterations.)
