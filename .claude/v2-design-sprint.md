@@ -320,6 +320,21 @@ next target, then updates this file at the end of the run.
   intentionally outside this vocabulary — they're surface-specific
   framing (login chrome, brand lockup, command-palette grouping),
   not detail-page eyebrows.
+- **DetailList primitive** — extracted to
+  `web/src/components/detail-list.tsx` in iter 54 (#1168). Four
+  surfaces now share the canonical label / value KV block: TX-detail
+  Details sidebar, account-detail Details sidebar, connection-detail
+  Details sidebar, category-detail Details sidebar. Visual contract:
+  `<div className="space-y-2.5">` + optional `<Eyebrow as="h3">` +
+  `<dl className="space-y-2">` with rows of `<dt>` (muted xs,
+  shrink-0, label) + `<dd>` (right-aligned xs, `break-words` so long
+  values wrap inside the column at 375px instead of getting clipped
+  by `truncate`). `compactDetailRows` is the canonical nullable-row
+  filter so callsites stay declarative (`cond ? row : null`
+  inline). Mono rows route through `<IdPill>`. Stack two or three
+  inside a `<SectionCard bodyClassName="space-y-5 px-5 py-5
+  text-sm">` host — same rhythm every detail page now shares. Don't
+  fork the look — extend the primitive.
 - **DetailSheetHeader primitive** — extracted to
   `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
   Two surfaces now share the canonical icon-tile sheet header lockup:
@@ -2046,6 +2061,54 @@ Cross-cutting components:
     but you can still submit". `<Alert>` stays the right
     primitive for content advice / informational notices that
     aren't tied to a field error.
+
+- **Iter 54 — DetailList primitive + SectionCard header band fix** ([#1168](https://github.com/canalesb93/breadbox/pull/1168))
+  - Promoted `<DetailList>` to `web/src/components/detail-list.tsx`.
+    The label / value KV block was open-coded as a local
+    `DetailGroup` on every v2 detail page (transaction, account,
+    connection, category) — four copies of the same `<div>
+    <Eyebrow><dl><dt><dd></dd></dt></dl></div>` markup plus four
+    copies of the `compactRows` nullable filter. Same playbook as
+    iter 6 SectionCard / iter 8 ListCard / iter 13 SoftBackButton:
+    when the same block lands on 3+ pages, promote. 15th shared
+    primitive of the sprint.
+  - Mobile (375px) readability fix baked in: the previous
+    open-coded version used `truncate` on `<dd>` which clipped
+    long values inside the Details sidebar (full datetimes,
+    multi-word provider categories like "Transfer In Other
+    Transfer In"). DetailList replaces it with `break-words` +
+    row-level `min-w-0` so values wrap inside the column instead.
+  - SectionCard header empty band fix (affects every detail page,
+    every viewport — most visible on TX-detail Activity card on
+    mobile): the shadcn Card primitive injects `[.border-b]:pb-6`
+    on `CardHeader` to give bordered headers extra breathing
+    room; combined with SectionCard's intentional `py-4` this
+    produced `pt-4 pb-6` plus an `auto-rows` grid gap where a
+    non-existent description row would have sat. Override with
+    `!pb-4` so the rhythm matches the design. Source-annotated.
+  - Drive-by TX-detail Details sidebar polish: "Account → Name"
+    inside the Account group (eyebrow + first row no longer
+    repeat the word); drop `Channel: other` low-signal rows
+    (the literal "other" reads as "Plaid didn't give us a
+    channel" noise, not data); "Provider category" → "Category"
+    (the group is already labelled "Provider"). Account-detail
+    "Last update" drops the wall-clock seconds
+    (`5/15/2026, 10:35:13 PM` → `5/15/2026`) so the row doesn't
+    overflow at 375px — connection detail is the right host for
+    sync-precision timestamps.
+  - Sandbox specimen shipped under Components: shows the
+    canonical "stack of three DetailLists inside a SectionCard
+    body" layout with the same fixture vocabulary the TX-detail
+    Details sidebar uses (Account / Provider / Reference). Three
+    `IdPill` imports in account-detail / connection-detail /
+    category-detail are now scoped to the primitive — those
+    routes no longer import IdPill directly.
+  - Audit method for the next time: `grep -rn "function DetailGroup\b"
+    web/src/routes/` returned the four duplicates that triggered
+    extraction. Combined with the (already-applied) `function
+    compactRows\b` grep, that's the canonical drift-detection
+    pattern for "this open-coded helper landed on too many pages
+    and earned a primitive promotion".
 
 ## Open observations / questions
 
