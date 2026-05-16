@@ -154,6 +154,25 @@ export interface User {
   updated_at: string;
 }
 
+// --- Login accounts (public /api/v1/users/{id}/login) ---
+// Mirrors internal/service.LoginAccountResponse. setup_token is only
+// populated on create + regenerate; list/update strip it.
+export type LoginAccountRole = "admin" | "editor" | "viewer";
+
+export interface LoginAccount {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string | null;
+  username: string;
+  role: LoginAccountRole;
+  has_password: boolean;
+  setup_token?: string;
+  setup_token_expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // --- Connections (public /api/v1/connections) ---
 // Mirrors internal/service.ConnectionResponse. The list endpoint returns this
 // shape; ConnectionDetail extends it with paused/account_count/sync interval
