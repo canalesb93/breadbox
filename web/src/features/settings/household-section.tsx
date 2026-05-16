@@ -68,6 +68,7 @@ import { withMutationToast } from "@/lib/mutation-toast";
 import type { LoginAccount, User } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 export function HouseholdSection() {
   const { data: users, isLoading } = useUsers();
@@ -77,24 +78,21 @@ export function HouseholdSection() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-lg font-medium">Household</h2>
-          <p className="text-muted-foreground text-sm">
-            Add family members to track everyone's accounts in one place. Each
-            member can be invited to sign in with their own login.
-          </p>
-        </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant={hasMembers ? "outline" : "default"}>
-              <UserPlus className="size-4" />
-              {hasMembers ? "Add member" : "Add your first member"}
-            </Button>
-          </DialogTrigger>
-          <AddMemberDialog onDone={() => setAddOpen(false)} />
-        </Dialog>
-      </div>
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <SettingsSectionHeader
+          title="Household"
+          description="Add family members to track everyone's accounts in one place. Each member can be invited to sign in with their own login."
+          action={
+            <DialogTrigger asChild>
+              <Button size="sm" variant={hasMembers ? "outline" : "default"}>
+                <UserPlus className="size-4" />
+                {hasMembers ? "Add member" : "Add your first member"}
+              </Button>
+            </DialogTrigger>
+          }
+        />
+        <AddMemberDialog onDone={() => setAddOpen(false)} />
+      </Dialog>
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading members…</p>

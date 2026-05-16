@@ -20,6 +20,7 @@ import { closeModal, openModal, useActiveModal } from "@/lib/modals";
 import { AccountSection } from "@/features/settings/account-section";
 import { BackupsSection } from "@/features/settings/backups-section";
 import { HouseholdSection } from "@/features/settings/household-section";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 const SETTINGS_MODAL_KEY = "settings";
 
@@ -191,10 +192,12 @@ function SectionContent({ section }: { section: SettingsSection }) {
   }
 
   return (
-    <div className="space-y-1">
-      <h2 className="text-lg font-medium">{section.title}</h2>
-      <p className="text-muted-foreground text-sm">{section.description}</p>
-      <p className="text-muted-foreground mt-4 text-sm">Coming soon.</p>
+    <div className="space-y-4">
+      <SettingsSectionHeader
+        title={section.title}
+        description={section.description}
+      />
+      <p className="text-muted-foreground text-sm">Coming soon.</p>
     </div>
   );
 }
