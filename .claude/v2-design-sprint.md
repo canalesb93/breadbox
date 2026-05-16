@@ -158,6 +158,34 @@ next target, then updates this file at the end of the run.
   `routes/setup-account.tsx` for now — only one consumer. Promote
   to `web/src/components/status-panel.tsx` once a second surface
   (form-level error? settings warning?) needs it. Don't pre-extract.
+- **FormFooter primitive** — extracted to
+  `web/src/components/form-footer.tsx` in iter 15 (#1128). The
+  flush bordered action strip
+  (`bg-muted/20 -mx-5 -mb-5 mt-2 ... border-t px-5 py-3`) that
+  sits at the bottom of a `<SectionCard>` body. Cancel left,
+  primary right (`<Button size="sm">` with leading
+  `<Loader2 className="animate-spin">` while pending). Three
+  surfaces share it today: tag-form, category-form, and the
+  surfaces that consume those forms (tag-new, tag-detail,
+  category-new, category-detail). api-key-form (iter 13) still
+  hand-rolls the same strip inline; sweep onto `<FormFooter>`
+  next time we touch it. Don't fork the look — extend the
+  primitive. The optional `hint` slot is wired but no consumer
+  uses it yet — useful for validation messages that should sit
+  next to the actions instead of above them.
+- **Canonical form-page shell** (iter 15): for any new/edit
+  page that hangs off a list, the vocabulary is now
+  `<SoftBackButton>` + `<PageHeader eyebrow="New X" title="…">`
+  + `<SectionCard icon={…} title="X details">` wrapping the
+  form, with `<FormFooter>` at the bottom. tag-new, tag-detail,
+  category-new, category-detail, and api-key-new all share it.
+  The previous bespoke shell on tag/category-new (`max-w-2xl`
+  ghost-back-button + naked PageHeader + form on the page with
+  inline "Live preview" tile) is gone. Inline preview tiles
+  inside the form bodies are removed — the icon + colour
+  pickers' triggers already show the live selection, and
+  tag-detail's PageHeader.actions slot now hosts a `<TagChip>`
+  preview of the live tag. Don't re-introduce the inline tile.
 
 ## Backlog (ordered roughly by impact)
 
@@ -171,9 +199,9 @@ Pages:
 - [x] Account detail (`account-detail.tsx`) — #1119
 - [x] Categories list (`categories.tsx`) — #1120
 - [x] Category detail (`category-detail.tsx`) — #1123
-- [ ] Category new (`category-new.tsx`)
+- [x] Category new (`category-new.tsx`) — #1128
 - [x] Tags list (`tags.tsx`) — #1117
-- [ ] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`)
+- [x] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`) — #1128
 - [x] Connections list (`connections.tsx`) — iter 8
 - [x] Connection detail (`connection-detail.tsx`) — #1124
 - [ ] Providers settings (`providers.tsx`)
@@ -209,7 +237,15 @@ Cross-cutting components:
 - [ ] `command-palette.tsx` — sections, kbd hints, recents
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
 - [ ] `transaction-amount.tsx` — currency rendering
-- [ ] Form patterns (used across new/edit pages) — labels, validation, footers
+- [x] Form patterns (used across new/edit pages) — `FormFooter` primitive
+  promoted in iter 15 (#1128). Canonical form-page shell is now:
+  `<SoftBackButton>` + `<PageHeader eyebrow=…>` + `<SectionCard>` with the
+  form, `<FormFooter>` at the bottom (flush bordered strip, Cancel left,
+  primary right with `<Loader2 className="animate-spin">`). Live across
+  tag-new, tag-detail, category-new, category-detail. api-key-new (iter 13)
+  still hand-rolls the same strip inline — sweep onto `<FormFooter>` next
+  time we touch api-key-form. Labels / validation / FormItem patterns
+  already canonical via shadcn `Form` primitive.
 - [ ] Toast (`sonner.tsx`) — variants, action affordances
 - [ ] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency
 - [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
@@ -600,6 +636,59 @@ Cross-cutting components:
     documented in iters 3/5 (port 9214 served stale after
     edit, port 9215 with `--force` served fresh).
 
+- **Iter 15 — Tag/Category form pages + FormFooter primitive** ([#1128](https://github.com/canalesb93/breadbox/pull/1128))
+  - Promoted `<FormFooter>` to
+    `web/src/components/form-footer.tsx`. The flush bordered
+    action strip (`bg-muted/20 -mx-5 -mb-5 mt-2 border-t px-5 py-3`,
+    Cancel left + primary right with `Loader2` spinner) was
+    open-coded inline in api-key-form (iter 13). The iter-13
+    drift note explicitly queued promotion once a second/third
+    form picked it up; iter 15 brings tag-form and category-form
+    onto the pattern, so the primitive landed in the same PR
+    that consumed it. Three surfaces share it today (tag-new,
+    tag-detail, category-new, category-detail all reach for it
+    via the shared form components). The optional `hint` slot
+    is wired but unused — useful for validation messages that
+    should sit next to the actions instead of above them.
+  - tag-new and category-new adopt the canonical form-page
+    shell that api-key-new established: `<SoftBackButton>` +
+    `<PageHeader eyebrow="New tag/category">` +
+    `<SectionCard icon={…} title="X details">` wrapping the
+    form, with `<FormFooter>` as the strip at the bottom of
+    the card body. The bespoke `<Button variant="ghost"
+    asChild>` back link gets replaced by the shared
+    `<SoftBackButton to="/tags">Back to tags</SoftBackButton>`
+    (sixth surface for the iter-13 primitive). PageHeader
+    titles tighten ("New tag" → "Create a tag"; "New category"
+    → "Create a category") so the eyebrow + title don't repeat.
+  - tag-detail picks up a real identity layer for the first
+    time: PageHeader eyebrow ("Tag"), title (display name),
+    description, and a `<TagChip>` preview pinned to the
+    actions slot. Form wraps in a `<SectionCard>` ("Tag
+    details") matching category-detail's "Appearance & metadata"
+    SectionCard. DangerZone stays untouched (already lives in
+    its own bordered card). Five-line skeleton replaces the
+    single `h-96` skeleton block so the loading shape matches
+    the post-load layout. Now reads as a sibling of
+    category-detail / api-key-new instead of "a form with a
+    back button".
+  - The inline "Live preview" tile inside `TagForm` and
+    `CategoryForm` is gone — the `IconPicker` and `ColorPicker`
+    triggers already show their current selection live (icon
+    glyph + colour swatch in the trigger), and tag-detail's
+    PageHeader.actions slot now hosts the `TagChip` for the
+    full live render. Forms lose ~20 lines of preview-tile
+    markup + the `CategoryIconTile` / `TagChip` imports;
+    `useWatch` collapses from 4 fields to just `color` (still
+    needed for the `IconPicker tint` prop).
+  - Cancel/primary order flips to match the iter-13
+    convention: Cancel left (`variant="ghost" size="sm"`),
+    primary right (`size="sm"` with leading
+    `<Loader2 className="animate-spin">` while pending). Was
+    primary-left previously; the iter-13 vocabulary is
+    primary-right so the eye lands on the destructive-less
+    confirm. Carries over to all four form surfaces.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -671,5 +760,6 @@ Cross-cutting components:
   or rely on the harness's per-task output file in
   `/private/tmp/claude-501/.../tasks/<id>.output` (readable but not
   redirectable to from a `>` operator).
+
 
 
