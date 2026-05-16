@@ -1742,6 +1742,58 @@ Cross-cutting components:
     vs type grouping), Tabs on /accounts + /connections (FamilyTabs)
     and /api-keys (active/revoked filter).
 
+- **Iter 48 — CSV import form polish** ([#1162](https://github.com/canalesb93/breadbox/pull/1162))
+  - Pivot away from the iter 45–47 dark-mode run. CSV import
+    (`features/connections/csv-import-form.tsx`) was the largest
+    unaudited surface left in `web/` — pre-v2 patterns inside an
+    otherwise polished Connect-bank Sheet.
+  - **Drop stage**: tile-on-tile icon affordance (size-11
+    rounded-xl tile holding the Upload icon, matching the
+    StatusPanel / EmptyState / category-tile vocabulary). Softer
+    rest tone (`bg-muted/20`), refined drag-over treatment
+    (`border-primary/70 bg-primary/[0.06] ring-4 ring-primary/15`)
+    so the affordance reads as a real surface rather than a
+    pencil-line. Swapped the `FileSpreadsheet` hint icon for
+    `Wand2` — the line is about auto-detection, not file format.
+  - **Map stage**: retired the misused `<Alert>` header for a
+    file pill (filename + KB + rows · cols · template metadata
+    in one strip with the amber CSV icon tile). Promoted the
+    hand-rolled `text-xs uppercase tracking-wide` labels to
+    `<Eyebrow as="p">`. Replaced the native `<input
+    type="checkbox">` and `<input type="radio">` with shadcn
+    `<Checkbox>` and `<RadioGroup>` + `<RadioGroupItem>` so the
+    iter 45–47 dark-mode sweep actually applies here (these were
+    the last native form controls in the v2 SPA — the iter-46
+    grep had missed them because they're inside a feature file,
+    not under `components/ui/`). Hand-rolled `<table>` lifted
+    onto the shadcn `Table` primitive family — same density
+    (`h-8 px-2.5`) but inherits the hover / border / dark-mode
+    contract. Required-field affordance is now a muted
+    destructive asterisk next to the label instead of `*` shoved
+    into the label string.
+  - **Validation `<Alert>`** now uses `variant="destructive"`
+    (was `default` — easy to miss against the rest of the
+    panel).
+  - **`ArrowLeft`** replaces the `X` icon on the "Different
+    file" action. X means dismiss; the action is "back to step
+    1".
+  - **`CsvFooterStrip`** (local to the file): mirrors the
+    `<FormFooter>` vocabulary (`bg-muted/20` + `border-t` +
+    flush to the parent edges) but bound to the Connect-bank
+    Sheet body (`-mx-6 -mb-6 px-6 py-3`) rather than a
+    SectionCard body (`-mx-5 -mb-5 px-5 py-3`). Carries an
+    optional hint slot — used to show "Ready to import N rows"
+    on the left while the primary CTA sits right. Don't promote
+    yet; promote when a second non-SectionCard form needs the
+    same flush strip.
+  - Live drift retired: the iter-46 dark-mode sweep notes that
+    the checkbox/radio fixes only cover the shadcn primitives.
+    Any feature using native `<input type="checkbox|radio">`
+    bypassed the fix. The CSV form was the only remaining
+    consumer in the SPA — `grep -rn 'type="checkbox"\\|type="radio"' web/src` now returns nothing under `features/`. New
+    feature code that reaches for the native input will regress
+    dark mode; treat the shadcn primitives as canonical.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1848,6 +1900,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
