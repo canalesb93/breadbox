@@ -2,17 +2,27 @@ import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle2,
   Inbox,
+  Info,
+  KeyRound,
   MessageSquare,
   Plus,
   RefreshCw,
   RotateCcw,
+  Save,
   Shapes,
+  ShieldAlert,
   Tag,
+  Trash2,
   Users,
   Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -34,6 +44,14 @@ import { ColorPicker } from "@/components/color-picker";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
+import { ListCard } from "@/components/list-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { SectionCard } from "@/components/section-card";
+import { IdPill } from "@/components/id-pill";
+import { SoftBackButton } from "@/components/soft-back-button";
+import { StatusPanel } from "@/components/status-panel";
+import { FormFooter } from "@/components/form-footer";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import type { Transaction } from "@/api/types";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
@@ -80,6 +98,8 @@ export function ComponentsSection() {
   const [colorValue, setColorValue] = useState<string | null>("#f97316");
   const [pickedProvider, setPickedProvider] = useState<string | null>("plaid");
   const [dateRange, setDateRange] = useState<DateRangeValue>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmPending, setConfirmPending] = useState(false);
 
   return (
     <SandboxSection
@@ -96,6 +116,267 @@ export function ComponentsSection() {
           description="Every transaction synced across your connected accounts."
           actions={<Button size="sm">Action</Button>}
         />
+      </Specimen>
+
+      <Specimen
+        label="SoftBackButton"
+        code="components/soft-back-button"
+        description="The tiny ghost link that hangs at the top of every detail / form page. Prefers in-app history on a plain click (so you land on the exact list state you came from), falls through to the canonical `to` URL otherwise. Don't fork the look."
+        className="block"
+      >
+        <SoftBackButton to="/v2/transactions">
+          Back to transactions
+        </SoftBackButton>
+      </Specimen>
+
+      <Specimen
+        label="SectionCard"
+        code="components/section-card"
+        description="The bordered 'section in a card' primitive: header rail names the section, optional action slot on the right, body holds prose / forms / KV blocks. Use `flushBody` when the body is a `<ul className='divide-y'>` (or reach for `ListCard`, which bakes that in)."
+        className="block"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <SectionCard
+            title="Details"
+            action={
+              <Button size="sm" variant="outline">
+                Edit
+              </Button>
+            }
+          >
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Reference</dt>
+              <dd className="font-mono text-xs">tx_aB12cD34</dd>
+              <dt className="text-muted-foreground">Created</dt>
+              <dd>May 14, 2026</dd>
+              <dt className="text-muted-foreground">Source</dt>
+              <dd>Plaid · Chase ····2890</dd>
+            </dl>
+          </SectionCard>
+          <SectionCard
+            title="Notes"
+            footer={
+              <Button size="sm" variant="ghost">
+                View all
+              </Button>
+            }
+          >
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Reach for `SectionCard` for any non-list section. The footer slot
+              renders a flush bordered strip — typically a "See all" link.
+            </p>
+          </SectionCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ListCard"
+        code="components/list-card"
+        description="`SectionCard`'s sibling for divide-y lists. Pass `rows` + `renderRow` and each row is wrapped in an `<li>` automatically — the rail of dividers stays consistent across surfaces (Home recent activity, Account-detail recent transactions, Connections list, …)."
+        className="block"
+      >
+        <div className="max-w-md">
+          <ListCard
+            title="Recent transactions"
+            action={
+              <Button size="sm" variant="ghost">
+                View all
+              </Button>
+            }
+            rows={sampleTransactions.slice(0, 3)}
+            getRowKey={(t) => t.id}
+            renderRow={(t) => (
+              <div className="flex items-center justify-between gap-4 px-5 py-3">
+                <TransactionPrimary transaction={t} />
+                <TransactionAmount transaction={t} />
+              </div>
+            )}
+            empty={
+              <EmptyState
+                variant="inline"
+                icon={Inbox}
+                title="Nothing yet"
+                description="New transactions will appear here."
+              />
+            }
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ColorRailCard"
+        code="components/color-rail-card"
+        description="The canonical 'detail-page hero': bordered card with a 4px coloured left rail that encodes meaning (category colour, accounting role, connection status). Optional `footer` slot hosts an inline action strip. Pair the rail with a small uppercase eyebrow so colour never carries the signal alone."
+        className="block"
+      >
+        <div className="max-w-xl">
+          <ColorRailCard
+            accent="#f97316"
+            footer={
+              <>
+                <Button size="sm" variant="outline">
+                  Recategorise
+                </Button>
+                <Button size="sm">
+                  Open
+                  <ArrowUpRight />
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-2 px-6 py-5 sm:px-7">
+              <span className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                Transaction · Food & Drink
+              </span>
+              <div className="flex items-baseline justify-between gap-4">
+                <h3 className="text-foreground text-xl font-semibold tracking-tight">
+                  Blue Bottle Coffee
+                </h3>
+                <span className="text-foreground text-xl font-semibold tabular-nums">
+                  −$6.25
+                </span>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Posted May 14, 2026 · Chase ····2890
+              </p>
+            </div>
+          </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="StatusPanel"
+        code="components/status-panel"
+        description="Inline tone-tinted status block — 3px left rail + tinted icon tile + heading + body. Same 'colour encodes meaning' principle as `ColorRailCard`, sized for in-page notices (env-locked panels, already-set-up confirmation, sync warnings). Four tones: success / destructive / warning / info."
+        className="block"
+      >
+        <div className="grid w-full gap-3 md:grid-cols-2">
+          <StatusPanel
+            tone="success"
+            icon={CheckCircle2}
+            heading="Encryption key configured"
+            body="Tokens for new connections will be encrypted at rest."
+          />
+          <StatusPanel
+            tone="warning"
+            icon={AlertTriangle}
+            heading="Plaid sync took longer than usual"
+            body="Two accounts returned partial data — check the connection details."
+          />
+          <StatusPanel
+            tone="destructive"
+            icon={ShieldAlert}
+            heading="Setup token is invalid"
+            body="Generate a fresh one from the CLI and try again."
+          />
+          <StatusPanel
+            tone="info"
+            icon={Info}
+            heading="Provider locked by environment"
+            body="The PLAID_ENV variable is set — override it in the env to unlock."
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="IdPill"
+        code="components/id-pill"
+        description="Machine identifier (short_id, slug, URL fragment) rendered as a muted monospace pill — reads as 'this is a stable reference, not display copy'. Six surfaces share it; don't fork the look."
+      >
+        <IdPill value="tx_aB12cD34" />
+        <IdPill value="acct_3rR9pq01" />
+        <IdPill value="food_and_drink_coffee" />
+        <IdPill value="/api/v1/transactions" />
+      </Specimen>
+
+      <Specimen
+        label="FormFooter"
+        code="components/form-footer"
+        description="The flush bordered action strip at the bottom of a `<SectionCard>` that wraps a form. Sticks Cancel left, primary right; optional `hint` slot for an inline validation note. Drop inside a `SectionCard` with default body padding — negative margins line the strip up with the card's outer border."
+        className="block"
+      >
+        <div className="max-w-md">
+          <SectionCard title="Edit tag">
+            <div className="grid gap-1.5">
+              <Label htmlFor="sb-form-name">Display name</Label>
+              <Input id="sb-form-name" defaultValue="Reimbursable" />
+            </div>
+            <FormFooter
+              hint="Slug is generated automatically from the name."
+              secondary={
+                <Button variant="outline" size="sm">
+                  Cancel
+                </Button>
+              }
+              primary={
+                <Button size="sm">
+                  <Save /> Save changes
+                </Button>
+              }
+            />
+          </SectionCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ConfirmDialog"
+        code="components/confirm-dialog"
+        description="Canonical confirmation surface for any destructive / irreversible action. Tone-tinted icon tile, built-in `pending` state (spinner + locked Cancel) so the dialog stays open on slow mutations. Tones: `destructive` (default) and `default`."
+      >
+        <Button
+          variant="destructive"
+          onClick={() => {
+            setConfirmPending(false);
+            setConfirmOpen(true);
+          }}
+        >
+          <Trash2 /> Open confirm
+        </Button>
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          tone="destructive"
+          icon={Trash2}
+          title="Delete this tag?"
+          description="The tag will be removed from every transaction it's attached to. This can't be undone."
+          confirmLabel="Delete tag"
+          pendingLabel="Deleting…"
+          pending={confirmPending}
+          onConfirm={() => {
+            setConfirmPending(true);
+            window.setTimeout(() => {
+              setConfirmPending(false);
+              setConfirmOpen(false);
+              toast.success("Tag deleted.");
+            }, 900);
+          }}
+        />
+      </Specimen>
+
+      <Specimen
+        label="AuthShell"
+        code="components/auth-shell"
+        description="Two-pane brand + form shell used by Login and Setup. It's a whole-screen primitive — view it live on the unauthenticated routes rather than scaled into this gallery."
+      >
+        <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+          <KeyRound className="size-4" />
+          <span>
+            See it in context at{" "}
+            <a
+              href="/v2/login"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
+              /v2/login
+            </a>{" "}
+            ·{" "}
+            <a
+              href="/v2/setup-account"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
+              /v2/setup-account
+            </a>
+          </span>
+        </div>
       </Specimen>
 
       <Specimen
