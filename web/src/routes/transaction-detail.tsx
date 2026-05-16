@@ -102,77 +102,64 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
       accent={accent}
       cardClassName={cn(t.pending && "border-dashed")}
     >
-      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
-        {/* Identity column */}
-        <div className="min-w-0 space-y-5">
-          <div className="flex items-start gap-4">
-            <CategoryIconTile
-              icon={t.category?.icon}
-              color={t.category?.color}
-              size="lg"
-            />
-            <div className="min-w-0 space-y-1">
-              <Eyebrow as="p" variant="hero">
-                Transaction
-              </Eyebrow>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-xl font-semibold tracking-tight">
-                  {t.provider_name}
-                </h1>
-                {t.pending && (
-                  <Badge
-                    variant="outline"
-                    className="text-muted-foreground border-dashed text-[10px] font-medium tracking-wide uppercase"
-                  >
-                    Pending
-                  </Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                <span>{formatLongDate(t.date)}</span>
-                {(subtitle || t.account_name) && (
-                  <span aria-hidden className="opacity-50">
-                    ·
-                  </span>
-                )}
-                {subtitle && <span className="truncate">{subtitle}</span>}
-                {subtitle && t.account_name && (
-                  <span aria-hidden className="opacity-50">
-                    ·
-                  </span>
-                )}
-                {t.account_name && (
-                  <span className="truncate">{t.account_name}</span>
-                )}
-              </p>
+      {/* Hero grid: on mobile the rows flow identity → amount → classify so
+          the amount sits in the priority slot right under the title. On lg
+          the identity + classify stack on the left and the amount column
+          docks to the right (identity stays anchored at the top via
+          `lg:row-span-2`). */}
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-10 lg:gap-y-5">
+        {/* Identity row (full width on mobile, left column on lg) */}
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4 lg:row-start-1">
+          <CategoryIconTile
+            icon={t.category?.icon}
+            color={t.category?.color}
+            size="lg"
+          />
+          <div className="min-w-0 space-y-1">
+            <Eyebrow as="p" variant="hero">
+              Transaction
+            </Eyebrow>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {t.provider_name}
+              </h1>
+              {t.pending && (
+                <Badge
+                  variant="outline"
+                  className="text-muted-foreground border-dashed text-[10px] font-medium tracking-wide uppercase"
+                >
+                  Pending
+                </Badge>
+              )}
             </div>
-          </div>
-
-          <Separator />
-
-          {/* Inline classify strip — keeps the identity, category, and tags
-              within one glance instead of three stacked cards. */}
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
-            <ClassifyField label="Category">
-              <CategoryEditor
-                transactionId={t.id}
-                category={t.category}
-                overridden={t.category_override}
-              />
-            </ClassifyField>
-            <ClassifyField label="Tags">
-              <div className="min-h-9 flex items-center">
-                <TagManager transactionId={t.id} tags={t.tags ?? []} />
-              </div>
-            </ClassifyField>
+            <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+              <span>{formatLongDate(t.date)}</span>
+              {(subtitle || t.account_name) && (
+                <span aria-hidden className="opacity-50">
+                  ·
+                </span>
+              )}
+              {subtitle && <span className="truncate">{subtitle}</span>}
+              {subtitle && t.account_name && (
+                <span aria-hidden className="opacity-50">
+                  ·
+                </span>
+              )}
+              {t.account_name && (
+                <span className="truncate">{t.account_name}</span>
+              )}
+            </p>
           </div>
         </div>
 
-        {/* Amount column */}
+        {/* Amount row (sits below identity on mobile so the headline number is
+            visible without a scroll past tags + category; docks to the right
+            column on lg). `lg:row-span-2` keeps it aligned with the identity
+            row instead of straddling the classify strip beneath. */}
         <div
           className={cn(
             "flex flex-col items-start gap-1.5",
-            "lg:items-end lg:text-right",
+            "lg:row-start-1 lg:row-span-2 lg:items-end lg:text-right",
           )}
         >
           <div
@@ -201,6 +188,27 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
               Amount may change once posted.
             </p>
           )}
+        </div>
+
+        {/* Classify strip — last on mobile so the priority order reads
+            identity → amount → tags/category. Spans the full left column on
+            lg via `lg:row-start-2`. */}
+        <div className="space-y-5 lg:row-start-2">
+          <Separator />
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+            <ClassifyField label="Category">
+              <CategoryEditor
+                transactionId={t.id}
+                category={t.category}
+                overridden={t.category_override}
+              />
+            </ClassifyField>
+            <ClassifyField label="Tags">
+              <div className="min-h-9 flex items-center">
+                <TagManager transactionId={t.id} tags={t.tags ?? []} />
+              </div>
+            </ClassifyField>
+          </div>
         </div>
       </div>
     </ColorRailCard>
@@ -387,16 +395,20 @@ function DetailSkeleton() {
     <div className="space-y-6">
       <div className="bg-card relative overflow-hidden rounded-xl border">
         <div className="bg-muted absolute inset-y-0 left-0 w-1" />
-        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="space-y-5">
-            <div className="flex items-start gap-4">
-              <Skeleton className="size-12 rounded-md" />
-              <div className="space-y-2 py-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-32" />
-              </div>
+        <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-x-10 lg:gap-y-5">
+          <div className="flex items-start gap-3 sm:gap-4 lg:row-start-1">
+            <Skeleton className="size-12 rounded-md" />
+            <div className="space-y-2 py-1">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-32" />
             </div>
+          </div>
+          <div className="space-y-2 lg:row-start-1 lg:row-span-2 lg:items-end">
+            <Skeleton className="h-5 w-20" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+          <div className="space-y-5 lg:row-start-2">
             <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -408,10 +420,6 @@ function DetailSkeleton() {
                 <Skeleton className="h-9 w-24 rounded-md" />
               </div>
             </div>
-          </div>
-          <div className="space-y-2 lg:items-end">
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-9 w-32" />
           </div>
         </div>
       </div>
