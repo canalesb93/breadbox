@@ -2171,6 +2171,43 @@ Cross-cutting components:
     axis lands (e.g. variant-aware leading icon swap for both
     "addition" and "replacement" patterns in the same primitive).
 
+- **Iter 58 — Empty state copy audit (20 callsites)** ([#1171](https://github.com/canalesb93/breadbox/pull/1171))
+  - Swept every `<EmptyState>` in the v2 SPA for voice, verb choice,
+    and helpful specificity. Three convention families established:
+    (1) "Not found" detail pages (transaction / account / connection /
+    category / tag) collapse onto one template — "This X may have
+    been {deleted|disconnected}, or the link is out of date. Head
+    back to the X list to pick another." — instead of five subtly
+    different lines that all said "the link is wrong." (2) Search /
+    filter empties end on the canonical phrase already used by
+    categories — "Try a different search term, or clear the filter
+    to see every X." — so tags, api-keys, rules, transactions,
+    connections, accounts all read the same. (3) "Yet-to-have-data"
+    empties name the actual trigger (manual / scheduled / webhook
+    for sync history; rules / reports / cross-cutting for the
+    library pages) and the time horizon ("within a minute") so the
+    user knows what to expect rather than reading the bare "they
+    appear after the first sync" line.
+  - Pages touched: `transactions.tsx`, `accounts.tsx`,
+    `connections.tsx`, `categories.tsx`, `tags.tsx`, `api-keys.tsx`,
+    `rules.tsx`, `tag-detail.tsx`, `account-detail.tsx`,
+    `connection-detail.tsx`, `category-detail.tsx`,
+    `transaction-detail.tsx`, plus features
+    `home-recent-transactions.tsx`, `home-connections-panel.tsx`,
+    `connection-accounts-list.tsx`, `sync-history-list.tsx`,
+    `activity-timeline.tsx`, `account-recent-transactions.tsx`,
+    `household-section.tsx`, `backups-section.tsx`.
+  - No new primitives. `EmptyState`'s contract is unchanged — this
+    was purely a copy sweep. Drift retired: the five "not found"
+    pages no longer drift independently because they all consume
+    the same canonical template; future detail pages should follow
+    the same shape.
+  - Sweep technique (worth recording): `grep -rn "EmptyState"
+    --include='*.tsx' web/src` enumerates every callsite in one
+    pass; the audit takes one read per file. If a future iteration
+    needs to re-audit, the same `grep` is the canonical
+    drift-detection pattern.
+
 ## Open observations / questions
 
 (Populated by iterations.)
