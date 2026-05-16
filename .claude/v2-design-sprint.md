@@ -1267,6 +1267,23 @@ Cross-cutting components:
     for free (the audit in iter 31 noted dozens of `isPending` /
     `submitting` call sites). No call-site changes.
 
+- **Iter 33 — Primitive header + footer padding tightening** ([#1147](https://github.com/canalesb93/breadbox/pull/1147))
+  - User-directed: Ricardo flagged SectionCard, ListCard, FormFooter
+    headers as having "weird padding" he couldn't quite describe.
+  - Tightened header padding across the card-style primitives so they
+    read with the same vertical weight when stacked on the same page;
+    aligned FormFooter flush with SectionCard's bottom border (removed
+    sliver gap); unified eyebrow tracking and spacing.
+  - Touched files: `section-card.tsx`, `list-card.tsx`,
+    `color-rail-card.tsx`, `form-footer.tsx`, `api-key-form.tsx`,
+    `account-detail.tsx`.
+  - Process note: iter #33 hit an API 500 mid-run (after the work was
+    pushed + PR opened). The PR was merged from the main session. The
+    agent also did the unusual thing of working in the main repo
+    instead of a worktree — future iterations: stick to `git worktree
+    add ~/dev/breadbox-iter<N>` so the main repo working tree stays
+    untouched.
+
 ## Open observations / questions
 
 (Populated by iterations.)
