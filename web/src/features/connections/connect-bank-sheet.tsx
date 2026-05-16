@@ -143,16 +143,10 @@ export function ConnectBankSheet({
           linkToken: session.link_token,
         });
       } else if (provider === "teller") {
-        // Teller's link-session endpoint replies 204 — nothing in the body.
-        // The application id Teller Connect needs comes from the env, not
-        // the API. Until the backend exposes it, fall through with the
-        // env-supplied value (set on a global by the Vite shell). We toast
-        // on missing config so the user gets actionable feedback rather
-        // than a silent open-then-close.
-        const applicationId =
-          (typeof window !== "undefined" &&
-            (window as Window & { __TELLER_APP_ID__?: string }).__TELLER_APP_ID__) ||
-          "";
+        // Teller's link-session endpoint returns the server-configured
+        // application_id as link_token; Teller Connect is initialized with
+        // it client-side. An empty token means the server has no app_id set.
+        const applicationId = session?.link_token ?? "";
         if (!applicationId) {
           toast.error(
             "Teller application ID is not configured on this server.",
