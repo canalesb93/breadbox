@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useFieldArray, useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Plus, Save, Wand2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Plus, Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { StatusPanel } from "@/components/status-panel";
 import {
   Collapsible,
   CollapsibleContent,
@@ -633,18 +634,20 @@ export function RuleForm({
             )}
 
             {comboWarnings.length > 0 && (
-              <Alert className="border-amber-500/30 bg-amber-500/5">
-                <AlertTitle className="text-amber-700 dark:text-amber-400 text-sm">
-                  Heads up
-                </AlertTitle>
-                <AlertDescription className="space-y-1">
-                  {comboWarnings.map((w, i) => (
-                    <p key={i} className="text-xs">
-                      {w}
-                    </p>
-                  ))}
-                </AlertDescription>
-              </Alert>
+              <StatusPanel
+                tone="warning"
+                icon={AlertTriangle}
+                heading="Heads up"
+                body={
+                  <span className="space-y-1">
+                    {comboWarnings.map((w, i) => (
+                      <span key={i} className="block">
+                        {w}
+                      </span>
+                    ))}
+                  </span>
+                }
+              />
             )}
           </div>
 
@@ -780,6 +783,9 @@ function getRowErrors(
 function RowError({ errors }: { errors: string[] }) {
   if (errors.length === 0) return null;
   return (
-    <p className="text-destructive ml-12 text-xs">{errors.join(" · ")}</p>
+    <p className="text-destructive ml-12 flex items-start gap-1.5 text-xs">
+      <AlertCircle aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+      <span className="min-w-0">{errors.join(" · ")}</span>
+    </p>
   );
 }
