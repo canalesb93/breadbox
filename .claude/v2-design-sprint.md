@@ -1649,6 +1649,32 @@ Cross-cutting components:
     `gap-5 sm:gap-6` consistently across all four heros; if a
     fifth detail hero ships, copy the same tokens.
 
+- **Iter 45 — Dark-mode checkbox visibility** ([#1159](https://github.com/canalesb93/breadbox/pull/1159))
+  - Stock shadcn's `border-input` + `dark:bg-input/30` makes
+    unchecked checkboxes nearly invisible in v2's dark palette:
+    `--input` is `oklch(1 0 0 / 15%)`, so 30% of that fill
+    renders at ~4.5% white — indistinguishable from `bg-card`
+    at oklch 0.205. The border at 15% is similarly weak.
+  - Override `dark:` unchecked-state with `border-white/25` +
+    `bg-white/[0.04]` (hover `bg-white/[0.07]`) inside
+    `ui/checkbox.tsx`. Light mode untouched. Checked state keeps
+    the stock `bg-primary` accent — selection vocabulary
+    unchanged across the connections list, accounts list, TX
+    table multi-select, and the `Exclude from sync` form
+    checkbox on account-detail.
+  - First iteration of the dark-mode spot-check on shared
+    primitives. Dark spot-check also verified clean (this pass):
+    Eyebrow, ListRowSkeleton, ColorRailCard (when carrying a
+    meaningful color), SectionCard, ListCard, StatusPanel,
+    FormFooter, DetailSheetHeader, Home ColorRailCard hero,
+    sandbox. No regressions surfaced outside the checkbox case.
+  - Open follow-up (not pursued — single consumer):
+    `ColorRailCard` collapses to `var(--muted)` when no accent is
+    provided (TX-detail uncategorised hero). At dark
+    `--muted = oklch(0.269)` the rail is technically visible but
+    barely. If a fourth surface ships an uncategorised hero, bump
+    the muted-rail rendering — for now, single consumer.
+
 ## Open observations / questions
 
 (Populated by iterations.)
