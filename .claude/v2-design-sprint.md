@@ -418,7 +418,18 @@ Cross-cutting components:
   `features/rules/rule-display.tsx`. The shared SIZE recipe lives
   inline in both files — adjust as a pair if the density vocabulary
   shifts.
-- [ ] `transaction-amount.tsx` — currency rendering
+- [x] `transaction-amount.tsx` — currency rendering — iter 59 (#1172)
+  consolidated all money formatters into `lib/format.ts`. Two new
+  siblings to `formatAmount` (`formatBalance`, `formatCompactAmount`)
+  replaced the three forks (`home-stats.formatCompact`,
+  `connection-utils.formatCurrency`, `account-utils.formatCurrency`)
+  that each rebuilt `Intl.NumberFormat` per call. Five consumers
+  swept onto the shared helpers; `grep -rn "new Intl.NumberFormat"
+  web/src` now returns one hit (the helper itself). Sandbox
+  `AmountsSection` documents all three formatters in one place.
+  `TransactionAmount` component itself was already on `formatAmount`
+  — the work was in the surrounding currency-rendering ecosystem,
+  not the component file.
 - [x] Form patterns (used across new/edit pages) — `FormFooter` primitive
   promoted in iter 15 (#1128); api-key-form swept onto it in iter 43
   (#1157), closing the iter-13 carve-out. Iter 49 (#1163) added the
@@ -2207,6 +2218,42 @@ Cross-cutting components:
     pass; the audit takes one read per file. If a future iteration
     needs to re-audit, the same `grep` is the canonical
     drift-detection pattern.
+
+- **Iter 59 — Currency formatters consolidated in `lib/format`** ([#1172](https://github.com/canalesb93/breadbox/pull/1172))
+  - Three private currency formatters had forked across the SPA:
+    `home-stats.formatCompact` (en-US, no minor units),
+    `connection-utils.formatCurrency` (Intl default locale, sign
+    preserved), and `account-utils.formatCurrency` (Intl default
+    locale + USD fallback for null currency). All three constructed a
+    fresh `Intl.NumberFormat` per call, side-stepping the cached
+    pattern that `formatAmount` had been using since iter 3.
+  - Promoted two siblings to `lib/format.ts` alongside `formatAmount`:
+    `formatBalance(amount, currency | null)` — same cache, sign
+    rendered literally (no leading `+`) — for account balances,
+    totals, scoreboard cells. And `formatCompactAmount(amount,
+    currency | null)` — strips minor units (`$1,234` not
+    `$1,234.56`) — for hero KPIs. Both use the same per-currency
+    cache pattern and null-currency fallback as `formatAmount`.
+  - Five consumers swept (home-stats, accounts-summary, account-row,
+    accounts list, account-detail, connection-row,
+    connection-accounts-list). The two leftover utility files
+    (`account-utils.ts`, `connection-utils.ts`) lose their inline
+    helpers and shrink to their actual domain logic (grouping,
+    primary-balance picking). Visual output across every money
+    surface is byte-for-byte identical — same locale, same
+    minor-units behaviour, same null fallback — but now one cached
+    formatter instance per currency for the whole SPA.
+  - Sandbox `AmountsSection` gains two new specimens documenting
+    `formatBalance` and `formatCompactAmount` (sign preservation,
+    EUR/JPY locale, null fallback, compact thousands). All three
+    `lib/format` money formatters are now visible in one place; the
+    design system tour covers the full vocabulary.
+  - Audit method (worth recording for the next consolidation): `grep
+    -rn "new Intl.NumberFormat\|formatCurrency\|formatCompact" web/src
+    --include='*.tsx' --include='*.ts'` enumerates every money
+    formatter callsite in one pass. After this iteration, the only
+    `new Intl.NumberFormat` in `web/src` is the helper itself —
+    canonical drift-detection state.
 
 ## Open observations / questions
 
