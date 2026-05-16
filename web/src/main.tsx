@@ -31,6 +31,11 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
+import {
+  AccountDetailPage,
+  accountDetailSearchSchema,
+} from "@/routes/account-detail";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -84,6 +89,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
   },
+  "/accounts": {
+    component: AccountsPage,
+    validateSearch: accountsSearchSchema,
+  },
 };
 
 // Detail routes aren't nav leaves, so they're registered explicitly rather
@@ -134,6 +143,13 @@ const connectionDetailRoute = createRoute({
   validateSearch: connectionDetailSearchSchema,
 });
 
+const accountDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/accounts/$id",
+  component: AccountDetailPage,
+  validateSearch: accountDetailSearchSchema,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -159,6 +175,7 @@ const routeTree = rootRoute.addChildren([
   tagDetailRoute,
   sandboxRoute,
   connectionDetailRoute,
+  accountDetailRoute,
   ...pageRoutes,
 ]);
 
