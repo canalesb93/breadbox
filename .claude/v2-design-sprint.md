@@ -2377,6 +2377,43 @@ Cross-cutting components:
     queued in the iter-26 / iter-56 notes) reach for the same
     vocabulary.
 
+- **Iter 63 — `SettingsSectionHeader` primitive consolidates settings headings** ([#1176](https://github.com/canalesb93/breadbox/pull/1176))
+  - Promotes `<SettingsSectionHeader>` to
+    `web/src/components/settings-section-header.tsx`. 16th shared
+    primitive in the v2 vocabulary. The three settings panes
+    (Account, Household, Backups) each hand-rolled the section-title
+    vocabulary as `<h2 className="text-lg font-medium">` +
+    `<p className="text-muted-foreground text-sm">` blocks with
+    slightly different rhythms (Household stacked the Add-member
+    CTA below the description; Backups had three sub-section
+    headers — Actions / Automatic schedule / Stored backups — each
+    using `<h3 className="font-medium">` + muted paragraph; Account
+    had its own Change password sub-section in the same shape).
+  - Two tokens encode visual weight: `section` (h2, text-lg,
+    tracking-tight, baseline-aligned action) for top-of-pane
+    titles, and `sub` (h3, text-sm, baseline-aligned action) for
+    inline groupings. Both share the same `action` slot that
+    sm:right-aligns on `sm+` viewports and stacks below on mobile,
+    so the Household pane's Add-member CTA now baseline-aligns with
+    the "Household" title instead of stacking below the description
+    (saves ~24px of vertical real estate; reads as a real toolbar
+    on desktop).
+  - Five surfaces migrate onto the primitive in this PR:
+    `AccountSection` (Account title + Change password sub),
+    `HouseholdSection` (Household title + Add-member action),
+    `BackupsSection` (Backups title + Actions / Automatic schedule
+    / Stored backups subs), and `settings-shell.tsx`'s
+    Coming-soon placeholder pane. The new sandbox specimen
+    demonstrates both `section` (with action) and `sub`
+    (description-only) weights side-by-side.
+  - Drift retired: every `<h2 className="text-lg font-medium">`
+    + adjacent muted-paragraph pattern inside the settings shell
+    is gone. New settings panes (Security, anything else) should
+    reach for `<SettingsSectionHeader>` — don't fork. If a fourth
+    weight is needed (e.g. a "field group" rhythm tighter than
+    `sub`), add it as a new token on the primitive rather than
+    open-coding another `<h4>` block in a feature file.
+
 (Populated by iterations.)
 
 - **TimelineRail cross-group continuity** (iter 56 follow-up): the
