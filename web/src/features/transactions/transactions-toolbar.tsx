@@ -350,10 +350,12 @@ export function TransactionsToolbar({
           </FilterPill>
         </div>
 
-        <div className="grow" />
-
-        {/* Sort + select mode — grouped so they stay together when the row wraps */}
-        <div className="flex items-center gap-2">
+        {/* Sort + select mode — grouped so they stay together when the row wraps.
+            On sm+, `ml-auto` pushes them to the right edge alongside the filter
+            pills. On mobile we deliberately omit the spacer so they sit inline
+            with the filter pills instead of getting flung to the right of an
+            empty row. */}
+        <div className="flex items-center gap-2 sm:ml-auto">
           <FilterPill
             icon={ArrowUpDown}
             label={activeSort.label}

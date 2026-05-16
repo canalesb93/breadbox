@@ -25,7 +25,11 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end",
+        // No outer margin — every caller wraps PageHeader in a flex column
+        // with its own `gap-*`, so an `mb-*` here stacks with that gap and
+        // produces a ~44px void on mobile (visible because the action chip
+        // wraps below the description). Let the parent layout own spacing.
+        "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end sm:gap-4",
         className,
       )}
     >
