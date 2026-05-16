@@ -52,6 +52,8 @@ import { ListCard } from "@/components/list-card";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
+import { Eyebrow } from "@/components/eyebrow";
+import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
@@ -293,6 +295,122 @@ export function ComponentsSection() {
         <IdPill value="acct_3rR9pq01" />
         <IdPill value="food_and_drink_coffee" />
         <IdPill value="/api/v1/transactions" />
+      </Specimen>
+
+      <Specimen
+        label="Eyebrow"
+        code="components/eyebrow"
+        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, and timeline-rail day headings. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them. Two variants — `default` (text-[10px] tracking-[0.1em]) is the everyday eyebrow; `hero` (tracking-[0.12em]) gets extra letter air for spots where it sits directly under a large display title. Don't reach for raw `text-[10px] font-medium tracking-* uppercase` markup — extend this primitive."
+        className="block"
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border p-4">
+            <Eyebrow>Default · in a card header</Eyebrow>
+            <p className="text-foreground mt-1 text-sm">
+              "Showing 24 of 879" / "Synced 4 minutes ago" / "Reference"
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border p-4">
+            <Eyebrow variant="hero" as="p">
+              Liability
+            </Eyebrow>
+            <h4 className="text-foreground mt-1 text-xl font-semibold tracking-tight">
+              Chase Sapphire ····2890
+            </h4>
+            <p className="text-muted-foreground mt-1 text-xs">
+              hero variant — sits under a display title with extra letter air
+            </p>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ListRowSkeleton"
+        code="components/list-row-skeleton"
+        description="The canonical loading-row shape used by every v2 list — Home recent activity, Home connections, Connections, Accounts, Categories. Tokens encode the real row's rhythm: `density` (compact / regular / comfortable), `leading` (sm/md/lg-square matching CategoryIconTile sizes), `trailing` (none / badge / value-stack). Pick the tokens that match the real row so the skeleton doesn't shift on data arrival. Don't fork — extend the primitive with new tokens if no combination fits."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              regular · sm-square · value-stack
+            </div>
+            <div className="divide-y">
+              <ListRowSkeleton
+                density="regular"
+                leading="sm-square"
+                trailing="value-stack"
+                titleClassName="w-36"
+                subtitleClassName="w-24"
+              />
+              <ListRowSkeleton
+                density="regular"
+                leading="sm-square"
+                trailing="value-stack"
+                titleClassName="w-40"
+                subtitleClassName="w-20"
+              />
+              <ListRowSkeleton
+                density="regular"
+                leading="sm-square"
+                trailing="value-stack"
+                titleClassName="w-32"
+                subtitleClassName="w-28"
+              />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              comfortable · lg-square · value-stack
+            </div>
+            <div className="divide-y">
+              <ListRowSkeleton
+                density="comfortable"
+                leading="lg-square"
+                trailing="value-stack"
+                titleClassName="w-44"
+                subtitleClassName="w-24"
+              />
+              <ListRowSkeleton
+                density="comfortable"
+                leading="lg-square"
+                trailing="value-stack"
+                titleClassName="w-36"
+                subtitleClassName="w-20"
+              />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              compact · md-square · badge
+            </div>
+            <div className="divide-y">
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                trailing="badge"
+                titleClassName="w-32"
+                subtitleClassName="w-20"
+                trailingTopClassName="w-14"
+              />
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                trailing="badge"
+                titleClassName="w-40"
+                subtitleClassName="w-24"
+                trailingTopClassName="w-12"
+              />
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                trailing="none"
+                titleClassName="w-28"
+                lines={1}
+              />
+            </div>
+          </div>
+        </div>
       </Specimen>
 
       <Specimen
