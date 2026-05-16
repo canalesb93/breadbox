@@ -113,7 +113,7 @@ export function RuleDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-4">
-          <section className="bg-card rounded-2xl border p-5">
+          <section className="bg-card rounded-xl border p-5">
             <h2 className="text-sm font-medium">What this rule does</h2>
             <div className="mt-4 space-y-4">
               <div>
@@ -156,7 +156,7 @@ export function RuleDetailPage() {
         </div>
 
         <aside className="space-y-3">
-          <section className="bg-card space-y-3 rounded-2xl border p-4">
+          <section className="bg-card space-y-3 rounded-xl border p-4">
             <div>
               <h3 className="text-sm font-medium">Apply retroactively</h3>
               <p className="text-muted-foreground mt-1 text-xs">
@@ -181,7 +181,7 @@ export function RuleDetailPage() {
           </section>
 
           {!isSystem && (
-            <section className="bg-card space-y-3 rounded-2xl border p-4">
+            <section className="bg-card space-y-3 rounded-xl border p-4">
               <div>
                 <h3 className="text-sm font-medium">Delete rule</h3>
                 <p className="text-muted-foreground mt-1 text-xs">

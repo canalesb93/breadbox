@@ -289,7 +289,7 @@ export function RuleForm({
       <Form {...form}>
         <form
           onSubmit={submitHandler}
-          className="bg-card overflow-hidden rounded-2xl border"
+          className="bg-card overflow-hidden rounded-xl border"
         >
           <div className="space-y-4 p-5 sm:p-6">
             <div className="flex items-center gap-3">
