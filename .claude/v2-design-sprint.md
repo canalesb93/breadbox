@@ -80,12 +80,13 @@ next target, then updates this file at the end of the run.
   still uses its own `<code className="bg-muted ...">` markup —
   migrate when that page gets a design pass (different `bg-muted`
   token, intentional).
-- **ListCard primitive** (iter 8, expanded iter 9): the canonical
-  bordered-card-with-divide-y-rows container lives at
-  `web/src/components/list-card.tsx`. Seven surfaces now share it
-  (iter 9 added two): Home recent-activity, Home connections panel,
-  Connections list + Connections skeleton (iter 8), Account-detail
-  Recent transactions, Categories list, Categories skeleton (iter 9).
+- **ListCard primitive** (iter 8, expanded iter 9, iter 12): the
+  canonical bordered-card-with-divide-y-rows container lives at
+  `web/src/components/list-card.tsx`. Eight surfaces now share it
+  (iter 12 added one — Accounts list groups): Home recent-activity,
+  Home connections panel, Connections list + Connections skeleton
+  (iter 8), Account-detail Recent transactions, Categories list,
+  Categories skeleton (iter 9), Accounts list per-group (iter 12).
   CategoryRow nests a secondary `<ul>` band for children with a
   color-tinted inset left rail — that pattern stays inside the row
   renderer (ListCard handles the outer card + first-level rail).
@@ -145,7 +146,7 @@ Pages:
 - [x] Home / dashboard (`home.tsx`) — #1115
 - [x] Transactions list (`transactions.tsx`) — #1116
 - [x] Transaction detail (`transaction-detail.tsx`) — #1118
-- [ ] Accounts list (`accounts.tsx`)
+- [x] Accounts list (`accounts.tsx`) — #1125
 - [x] Account detail (`account-detail.tsx`) — #1119
 - [x] Categories list (`categories.tsx`) — #1120
 - [x] Category detail (`category-detail.tsx`) — #1123
@@ -374,6 +375,43 @@ Cross-cutting components:
     Activity intentionally stays on `SectionCard` — its body is the
     comment composer + timeline, not a list.
 
+- **Iter 12 — Accounts list (ListCard per group)** ([#1125](https://github.com/canalesb93/breadbox/pull/1125))
+  - Migrates the Accounts list from a 2-col bare-bordered-AccountCard
+    grid to one `<ListCard>` per institution / type group, unifying
+    the page with the established v2 vocabulary used by Connections,
+    Categories, Tags, and Home. Eighth production surface for the
+    primitive — no fork needed.
+  - Each group header now carries the institution / type label, a
+    pill count, and a **signed net subtotal** in the dominant
+    currency (liabilities flipped, so it reads as
+    contribution-to-net-worth — same sign convention as the
+    page-level `AccountsSummary`). The page now reads as a
+    scoreboard-of-groups instead of a soup of equal cards.
+  - New `<AccountRow>` ships in `features/accounts/`; rows lose
+    their self-border and adopt the shared
+    `px-5 py-3.5 hover:bg-muted/40` row vocabulary (matches
+    ConnectionRow and AccountRecentTransactions density). The
+    old `account-card.tsx` is removed — `connection-detail` has
+    its own local `AccountCard` defined inline in
+    `features/connections/connection-accounts-list.tsx`, which
+    is intentionally separate (two-column bordered grid, not a
+    divide-y list).
+  - PageHeader gains the standard `eyebrow` ("N accounts" /
+    "Showing N of M") to match every other v2 list page; the
+    inline mb-4 negative-margin hack around `AccountsSummary` is
+    gone, replaced by the page-level `gap-5` rhythm. Toggle group
+    (Institution / Type) parked to its own right-aligned row so
+    FamilyTabs sit alone and don't compete.
+  - Skeleton state migrates to `<ListCard>` for consistency with
+    Connections loading skeleton — same 4-row layout, same icon
+    tile + two-line text + right-aligned amount column.
+  - New `groupNetTotal` helper in `account-utils.ts` picks the
+    dominant currency in the group and signs liabilities the same
+    way `totalsByCurrency` does. Returns `{currency, total,
+    excluded}`; excluded count is unused for now (no UI hint) —
+    rare-enough edge that the subtotal in the dominant currency
+    is fine on its own.
+
 - **Iter 11 — Connection detail + ColorRailCard fourth surface** ([#1124](https://github.com/canalesb93/breadbox/pull/1124))
   - Connection detail adopts the v2 detail-page vocabulary: hero
     rebuilt around `<ColorRailCard>` with a 4px rail tinted by
@@ -518,4 +556,5 @@ Cross-cutting components:
   or rely on the harness's per-task output file in
   `/private/tmp/claude-501/.../tasks/<id>.output` (readable but not
   redirectable to from a `>` operator).
+
 
