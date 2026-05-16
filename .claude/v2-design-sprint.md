@@ -71,12 +71,24 @@ next target, then updates this file at the end of the run.
   pills, not raw `<code>` — promote into a shared `IdPill` once a
   third surface (rules? agents?) needs it.
 - **IdPill** — extracted to `web/src/components/id-pill.tsx` in
-  iter 6 (#1119). Three surfaces (Tags slug column, TX-detail
-  Reference row, Account-detail Reference row) now share it. Use
+  iter 6 (#1119). Four surfaces now share it: Tags slug column,
+  TX-detail Reference row, Account-detail Reference row, and the
+  Categories list (parent + child rows, iter 7). Use
   `<IdPill value={shortId} />` for any short_id / slug / machine
   identifier. The api-key-created page still uses its own
   `<code className="bg-muted ...">` markup — migrate when that page
   gets a design pass (different `bg-muted` token, intentional).
+- **ListCard pattern watching for promotion** (iter 7): a single
+  bordered `<Card className="gap-0 py-0">` with a
+  `<ul className="divide-y">` body is now on **five** surfaces —
+  Home recent-activity, Home connections, TX-detail Activity,
+  Account-detail Recent transactions, Categories (iter 7). The
+  Categories variant also nests a secondary `<ul>` band for
+  child rows with a color-tinted inset left rail. Once a sixth
+  flat-list surface adopts it (Connections list is the obvious
+  next candidate), promote to `<ListCard>` — effectively a
+  sibling of `<SectionCard>` pre-tuned for list bodies
+  (`flushBody` + `<ul divide-y>` baked in).
 - **Color-rail "hero" pattern** (iter 5 + iter 6): Now used on two
   detail pages — TX-detail (category color, neutral when
   uncategorised) and Account-detail (success for assets, destructive
@@ -88,6 +100,17 @@ next target, then updates this file at the end of the run.
   into `<ColorRailCard>` once a 3rd detail page adopts it**
   (Category detail with category-color rail is the obvious next
   candidate).
+- **Color-rail "nested band" variant** (iter 7, new mechanic):
+  Categories' expanded children sit in a `bg-muted/15` band with
+  a 2px inset left rail tinted by the parent category's color
+  (`boxShadow: inset 2px 0 0 0 ${color}40`). Same encoding
+  principle as the hero rail — colour means "owned by this
+  parent," not decoration. Different mechanic (boxShadow inset
+  inside a `<ul>` rather than a left border on a card) because
+  the band must sit flush inside the list card; share the
+  principle, not the implementation. If a second "nested rows
+  under a parent" surface needs it (rule conditions? account
+  sub-accounts?), the inset-boxShadow trick is the one to lift.
 - **Bordered timeline rail** (iter 5, new): activity-timeline now
   uses `<ol class="border-l">` with each row's icon disc set to
   `bg-card border-border/60 -ml-[calc(0.875rem+1px)]` so the discs
@@ -106,7 +129,7 @@ Pages:
 - [x] Transaction detail (`transaction-detail.tsx`) — #1118
 - [ ] Accounts list (`accounts.tsx`)
 - [x] Account detail (`account-detail.tsx`) — #1119
-- [ ] Categories list (`categories.tsx`)
+- [x] Categories list (`categories.tsx`) — #1120
 - [ ] Category detail (`category-detail.tsx`)
 - [ ] Category new (`category-new.tsx`)
 - [x] Tags list (`tags.tsx`) — #1117
@@ -148,9 +171,10 @@ Cross-cutting components:
   should reach for this instead of hand-rolling
   `<Card gap-0 py-0>` + `<CardHeader className="border-b">`.
 - [x] `IdPill` primitive (iter 6, #1119) — mono short_id pill at
-  `web/src/components/id-pill.tsx`. Three surfaces now share it:
-  Tags slug column, TX-detail Reference row, Account-detail
-  Reference row. Don't re-derive the same span.
+  `web/src/components/id-pill.tsx`. Four surfaces now share it
+  (iter 7 added Categories): Tags slug column, TX-detail
+  Reference row, Account-detail Reference row, Categories list
+  parent + child slug pills. Don't re-derive the same span.
 
 ## Completed
 
@@ -258,6 +282,32 @@ Cross-cutting components:
     detail has more first-class affordances (rename, exclude, link,
     reauth) than TX detail, so Settings earned its own sidebar slot.
 
+- **Iter 7 — Categories list** ([#1120](https://github.com/canalesb93/breadbox/pull/1120))
+  - PageHeader adopts the iter-3/4 list eyebrow vocabulary
+    ("123 categories" / "Showing N of M" / "No matches" /
+    "Loading" / "Error"), expanded description, `size="sm"`
+    "New category" CTA, and the `flex flex-col gap-3` toolbar
+    block. Counts include children so the eyebrow reflects what
+    actually scrolls.
+  - 17 floating Cards collapse into **one bordered list card**
+    (`<Card gap-0 py-0>` + `<ul divide-y>`) — matches Home /
+    TX-detail / Account-detail vocabulary. Row height drops from
+    ~64px to ~44px; the parent → child grouping reads as one
+    continuous list, not a card soup.
+  - Each parent row gets a left chevron toggle that rotates 90°
+    when open. Expanded children sit in a tinted band
+    (`bg-muted/15`) with a 2px inset left rail tinted by the
+    parent's own color — new variant of the iter-5/6 color-rail
+    pattern, encoding "owned by this parent" rather than
+    decoration. Children's slug pills use `IdPill` instead of
+    raw `<code>`, fourth surface for the primitive.
+  - System / Hidden badges shrink to a `text-[10px]
+    text-muted-foreground` variant so the category name reads
+    first. The misleading `MoreHorizontal` glyph on child rows
+    (it didn't open a menu) is replaced with a calm chevron
+    pointing to the detail page. Parent-row edit pencils fade
+    in on hover instead of being permanently loud.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -329,3 +379,4 @@ Cross-cutting components:
   or rely on the harness's per-task output file in
   `/private/tmp/claude-501/.../tasks/<id>.output` (readable but not
   redirectable to from a `>` operator).
+
