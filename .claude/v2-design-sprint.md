@@ -1895,6 +1895,53 @@ Cross-cutting components:
     but it's grep-able so the third surface that grows a size
     variant has an obvious template to copy.
 
+- **Iter 51 — a11y focus rings on bare custom buttons** ([#1165](https://github.com/canalesb93/breadbox/pull/1165))
+  - Sweeps the v2 SPA for hand-rolled `<button>` elements that
+    bypass the shadcn `Button` primitive and therefore had no
+    `focus-visible` ring at all. Continues the iter-50 TagChip
+    remove-button thread: keyboard users couldn't see which target
+    was selected before pressing Enter.
+  - **9 sites updated across 7 files**:
+    - `web/src/components/color-picker.tsx` — preset color swatches
+      (with `ring-offset-2` so the ring doesn't hug the fill).
+    - `web/src/components/icon-picker.tsx` — `IconTile` grid + the
+      "Clear icon" footer button.
+    - `web/src/components/settings-shell.tsx` — desktop side-nav
+      section buttons + mobile pill strip section buttons.
+    - `web/src/components/date-range-filter.tsx` — preset list
+      buttons (Last 30 days / This month / etc.).
+    - `web/src/features/transactions/transactions-toolbar.tsx` —
+      chip-clear `×` inside the filter chip row.
+    - `web/src/features/categories/category-list.tsx` — parent-row
+      expand/collapse chevron toggle.
+    - `web/src/features/rules/rule-form.tsx` — pipeline-stage
+      CollapsibleTrigger, STAGE_PRESETS pill row, AND/OR pill
+      row, "Edit as JSON" toggle. Gained a `cn()` import to
+      centralize the pill-toggle merge.
+  - **Shared recipe**: `focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none`
+    — matches the shadcn `Button` / `Sidebar*` / `Badge` /
+    `Input` ring vocabulary already in use. Single source of
+    truth via tokens (`ring-ring/50`) so a future ring-color
+    swap propagates automatically.
+  - **No new primitive**: the recipe is too small to extract
+    (3 utility classes). If a fourth surface needs the
+    `ring-offset-2` variant, consider a `focusRingClass`
+    tokenset in `lib/utils.ts` — but two consumers (color
+    swatch + maybe a future avatar picker) is below the
+    promote-to-helper threshold.
+  - **Pattern for the next time this comes up**: any hand-rolled
+    `<button>` that bypasses the shadcn `Button` must carry the
+    focus-visible recipe. The shadcn primitives have it baked in
+    (`button.tsx` line 14, `sidebar.tsx` line 475, `badge.tsx`
+    line 8) — reach for them first. If a feature needs a fully
+    custom look (toggle pills inside a `bg-muted` track, icon
+    tiles in a grid, etc.), copy the 3-class recipe verbatim.
+  - **Audit method**: `grep -rn "<button" web/src --include="*.tsx" | grep -v "focus-visible" | grep -v "asChild"`
+    returns the canonical list of bare buttons that need
+    auditing. Post-iter-51 this returns 8 entries — all 8 now
+    carry the recipe. New bare buttons that fail the grep are
+    the only regression vector.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -2001,6 +2048,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
