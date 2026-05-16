@@ -7,18 +7,12 @@ import {
   Check,
   FileKey2,
   Landmark,
+  Loader2,
   Trash2,
   Upload,
   Webhook,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -37,11 +31,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -52,6 +41,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { SectionCard } from "@/components/section-card";
+import { FormFooter } from "@/components/form-footer";
+import { IdPill } from "@/components/id-pill";
+import { StatusPanel } from "@/components/status-panel";
 import { toast } from "sonner";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
@@ -63,7 +57,12 @@ import type {
   TellerConfigView,
 } from "@/api/types";
 import { EnvLockedNotice } from "./env-locked-notice";
-import { ProviderStats, ProviderStatusBadge } from "./provider-status";
+import {
+  ProviderScoreboard,
+  ProviderStatusBadge,
+  providerToneAccent,
+  resolveProviderTone,
+} from "./provider-status";
 import { TestConnectionButton } from "./test-connection-button";
 
 const ENVS = ["sandbox", "development", "production"] as const;
@@ -144,28 +143,41 @@ export function TellerCard({ config, health, hasEncryptionKey }: TellerCardProps
     });
   }
 
+  const tone = resolveProviderTone(health, config.configured);
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b">
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex size-10 items-center justify-center rounded-lg">
-            <Landmark className="size-5" />
+    <div className="space-y-4">
+      <ColorRailCard accent={providerToneAccent(tone)}>
+        <div className="flex flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex size-11 shrink-0 items-center justify-center rounded-lg">
+              <Landmark className="size-5" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <div className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
+                Provider
+              </div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-foreground text-lg font-semibold tracking-tight">
+                  Teller
+                </h2>
+                <ProviderStatusBadge health={health} configured={config.configured} />
+              </div>
+              <p className="text-muted-foreground max-w-md text-sm">
+                US bank coverage via mutual-TLS authentication.
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base">Teller</CardTitle>
-            <CardDescription className="text-xs">
-              US bank coverage via mutual-TLS authentication.
-            </CardDescription>
-          </div>
-          <ProviderStatusBadge health={health} configured={config.configured} />
+          <ProviderScoreboard health={health} tone={tone} />
         </div>
-      </CardHeader>
+      </ColorRailCard>
 
-      <CardContent className="space-y-6 pt-2">
-        <ProviderStats health={health} />
-
+      <SectionCard
+        title="Credentials"
+        icon={<Landmark className="text-muted-foreground size-4" />}
+      >
         {config.from_env ? (
-          <>
+          <div className="space-y-4">
             <EnvLockedNotice provider="Teller" />
             <dl className="grid grid-cols-1 gap-y-3 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-6">
               <Row label="Application ID" value={config.application_id ?? "—"} mono />
@@ -176,10 +188,10 @@ export function TellerCard({ config, health, hasEncryptionKey }: TellerCardProps
                 value={config.webhook_secret_set ? "Configured" : "Not configured"}
               />
             </dl>
-          </>
+          </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -221,19 +233,23 @@ export function TellerCard({ config, health, hasEncryptionKey }: TellerCardProps
               </div>
 
               {!hasEncryptionKey && (
-                <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
-                  <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
-                  <AlertTitle className="text-amber-700 dark:text-amber-400">
-                    ENCRYPTION_KEY is not set
-                  </AlertTitle>
-                  <AlertDescription>
-                    Teller certificates are encrypted at rest. Set the <code className="font-mono text-xs">ENCRYPTION_KEY</code>{" "}
-                    environment variable before uploading a certificate.
-                  </AlertDescription>
-                </Alert>
+                <StatusPanel
+                  tone="warning"
+                  icon={AlertTriangle}
+                  heading="ENCRYPTION_KEY is not set"
+                  body={
+                    <>
+                      Teller certificates are encrypted at rest. Set the{" "}
+                      <code className="bg-muted/60 rounded px-1 py-0.5 font-mono text-[11px]">
+                        ENCRYPTION_KEY
+                      </code>{" "}
+                      environment variable before uploading a certificate.
+                    </>
+                  }
+                />
               )}
 
-              <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+              <div className="bg-muted/20 space-y-3 rounded-lg border p-4">
                 <div className="flex items-center gap-2">
                   <FileKey2 className="text-muted-foreground size-4" />
                   <span className="text-sm font-medium">mTLS certificate</span>
@@ -292,77 +308,81 @@ export function TellerCard({ config, health, hasEncryptionKey }: TellerCardProps
                 )}
               />
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <Button type="submit" disabled={update.isPending}>
-                  {update.isPending ? "Saving…" : "Save Teller settings"}
-                </Button>
-                {config.configured && (
-                  <AlertDialog open={confirmingDisable} onOpenChange={setConfirmingDisable}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                        Disable Teller
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Disable Teller?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Stored credentials (application ID, webhook secret, and encrypted certificate) will be
-                          deleted from the database. Existing Teller connections stay in your household but syncs
-                          will fail until you re-enter credentials.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={onDisable}
-                          className="bg-destructive text-white hover:bg-destructive/90"
+              <FormFooter
+                secondary={
+                  config.configured ? (
+                    <AlertDialog
+                      open={confirmingDisable}
+                      onOpenChange={setConfirmingDisable}
+                    >
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
                         >
+                          <Trash2 className="size-3.5" />
                           Disable
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Disable Teller?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Stored credentials (application ID, webhook secret, and encrypted
+                            certificate) will be deleted from the database. Existing Teller
+                            connections stay in your household but syncs will fail until you
+                            re-enter credentials.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={onDisable}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                          >
+                            Disable
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null
+                }
+                primary={
+                  <Button type="submit" size="sm" disabled={update.isPending}>
+                    {update.isPending && <Loader2 className="size-4 animate-spin" />}
+                    {update.isPending ? "Saving…" : "Save settings"}
+                  </Button>
+                }
+              />
             </form>
           </Form>
         )}
+      </SectionCard>
 
-        {config.configured && (
-          <div className="border-t pt-4">
-            <TestConnectionButton provider="teller" />
+      {config.configured && (
+        <SectionCard
+          title="Diagnostics"
+          icon={<Webhook className="text-muted-foreground size-4" />}
+          action={<TestConnectionButton provider="teller" />}
+        >
+          <div className="text-muted-foreground space-y-3 text-xs">
+            <p className="text-foreground text-sm font-medium">Webhook setup</p>
+            <ol className="ml-4 list-decimal space-y-2">
+              <li>Open the Teller dashboard and navigate to your application settings.</li>
+              <li>
+                Set the webhook URL to{" "}
+                <span className="inline-block align-middle">
+                  <IdPill value="https://<your-domain>/webhooks/teller" />
+                </span>
+              </li>
+              <li>Copy the webhook signing secret from Teller and paste it above.</li>
+            </ol>
           </div>
-        )}
-
-        {config.configured && (
-          <details className="group rounded-md border bg-muted/30 px-3 py-2 text-sm">
-            <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 text-xs font-medium">
-              <Webhook className="size-3.5" />
-              Webhook setup
-            </summary>
-            <div className="text-muted-foreground mt-3 space-y-2 text-xs">
-              <ol className="ml-4 list-decimal space-y-1">
-                <li>Open the Teller dashboard and navigate to your application settings.</li>
-                <li>Set the webhook URL to:</li>
-              </ol>
-              <code className="bg-background block break-all rounded border px-2 py-1.5 font-mono text-xs select-all">
-                https://&lt;your-domain&gt;/webhooks/teller
-              </code>
-              <ol className="ml-4 list-decimal space-y-1" start={3}>
-                <li>Copy the webhook signing secret from Teller and paste it above.</li>
-              </ol>
-            </div>
-          </details>
-        )}
-      </CardContent>
-    </Card>
+        </SectionCard>
+      )}
+    </div>
   );
 }
 
@@ -382,7 +402,7 @@ function PemFileInput({ id, label, accept, file, onChange }: PemFileInputProps) 
       </label>
       <label
         htmlFor={id}
-        className="border-input hover:bg-muted/60 flex cursor-pointer items-center gap-2 rounded-md border border-dashed bg-background px-3 py-2 text-xs transition-colors"
+        className="border-input bg-background hover:bg-muted/60 flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs transition-colors"
       >
         <Upload className="text-muted-foreground size-3.5" />
         <span className={file ? "text-foreground truncate" : "text-muted-foreground"}>

@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AuthShell } from "@/components/auth-shell";
+import { StatusPanel } from "@/components/status-panel";
 import { toast } from "sonner";
 import { useSetupAccount, useSetupAccountInfo } from "@/api/queries/auth";
 import { ApiError } from "@/api/client";
@@ -212,48 +213,3 @@ export function SetupAccountPage() {
   );
 }
 
-function StatusPanel({
-  tone,
-  icon: Icon,
-  heading,
-  body,
-}: {
-  tone: "success" | "destructive";
-  icon: React.ComponentType<{ className?: string }>;
-  heading: string;
-  body: string;
-}) {
-  // Inline panel used by setup-account's success / error states. Color is
-  // load-bearing here: success-tinted rail for "already set up" reads as
-  // resolution; destructive rail for "invalid link" reads as friction. Same
-  // colour-encodes-meaning principle as ColorRailCard, but inline-only.
-  const palette =
-    tone === "success"
-      ? {
-          rail: "before:bg-success",
-          iconBg: "bg-success/12 text-success",
-        }
-      : {
-          rail: "before:bg-destructive",
-          iconBg: "bg-destructive/10 text-destructive",
-        };
-  return (
-    <div
-      className={`bg-muted/30 relative overflow-hidden rounded-md border p-4 pl-5 before:absolute before:top-0 before:bottom-0 before:left-0 before:w-[3px] ${palette.rail}`}
-    >
-      <div className="flex items-start gap-3">
-        <span
-          className={`flex size-8 shrink-0 items-center justify-center rounded-md ${palette.iconBg}`}
-        >
-          <Icon className="size-4" />
-        </span>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-foreground text-sm font-medium">{heading}</span>
-          <span className="text-muted-foreground text-xs leading-relaxed">
-            {body}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
