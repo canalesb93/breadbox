@@ -2114,6 +2114,18 @@ Cross-cutting components:
 
 (Populated by iterations.)
 
+- **TimelineRail rail-tail issue** (iter 55 audit, no PR shipped): on
+  TX-detail Activity timeline, the `<ol border-l>` rail visibly extends
+  below the last row's icon disc because the disc is inset with
+  `-ml-[calc(0.875rem+1px)]` so the parent `<ol>`'s left border keeps
+  going past the centered icon. Worse: each `<TimelineRail.Group>` is
+  its own `<ol>`, so the visual continuity the primitive promises is
+  broken between day-group boundaries — each group has its own rail
+  tail. Most prominent at mobile but visible at all viewports. Fix:
+  either render one continuous `<ol>` across groups (day headings as
+  list items) or use a CSS background-image rail that stops at the
+  last disc. Pick one in the next iteration.
+
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
   Settings shell retired in iter 27 ([#1139](https://github.com/canalesb93/breadbox/pull/1139))
