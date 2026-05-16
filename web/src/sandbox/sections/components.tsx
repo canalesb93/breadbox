@@ -458,29 +458,67 @@ export function ComponentsSection() {
       <Specimen
         label="FormFooter"
         code="components/form-footer"
-        description="The flush bordered action strip at the bottom of a `<SectionCard>` that wraps a form. Sticks Cancel left, primary right; optional `hint` slot for an inline validation note. Drop inside a `SectionCard` with default body padding — negative margins line the strip up with the card's outer border."
+        description="The flush bordered action strip at the bottom of a form container. Cancel sits left, primary right; optional `hint` slot for an inline validation note. Two insets — `card` (default) flushes to a `<SectionCard>` body (px-5 py-5), `sheet` flushes to a `<Sheet>` body (p-6) and uses `mt-auto` so it sticks to the Sheet bottom. Iter 49 folded the CSV form's bespoke footer onto the `sheet` variant."
         className="block"
       >
-        <div className="max-w-md">
-          <SectionCard title="Edit tag">
-            <div className="grid gap-1.5">
-              <Label htmlFor="sb-form-name">Display name</Label>
-              <Input id="sb-form-name" defaultValue="Reimbursable" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <div className="text-muted-foreground mb-2 text-[11px] tracking-wide uppercase">
+              inset · card (inside SectionCard)
             </div>
-            <FormFooter
-              hint="Slug is generated automatically from the name."
-              secondary={
-                <Button variant="outline" size="sm">
-                  Cancel
-                </Button>
-              }
-              primary={
-                <Button size="sm">
-                  <Save /> Save changes
-                </Button>
-              }
-            />
-          </SectionCard>
+            <SectionCard title="Edit tag">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sb-form-name">Display name</Label>
+                <Input id="sb-form-name" defaultValue="Reimbursable" />
+              </div>
+              <FormFooter
+                hint="Slug is generated automatically from the name."
+                secondary={
+                  <Button variant="outline" size="sm">
+                    Cancel
+                  </Button>
+                }
+                primary={
+                  <Button size="sm">
+                    <Save /> Save changes
+                  </Button>
+                }
+              />
+            </SectionCard>
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-2 text-[11px] tracking-wide uppercase">
+              inset · sheet (inside a Sheet body)
+            </div>
+            <div className="bg-card flex min-h-[200px] flex-col rounded-lg border p-6">
+              <p className="text-muted-foreground text-sm">
+                Mock Sheet body — the footer below flushes to the surrounding{" "}
+                <code className="bg-muted/60 rounded px-1 font-mono text-[11px]">
+                  p-6
+                </code>{" "}
+                edges and uses <code className="bg-muted/60 rounded px-1 font-mono text-[11px]">mt-auto</code>{" "}
+                so it sticks to the bottom of the Sheet.
+              </p>
+              <FormFooter
+                inset="sheet"
+                hint={
+                  <span className="text-muted-foreground text-xs">
+                    Ready to import{" "}
+                    <span className="text-foreground tabular-nums font-medium">
+                      241
+                    </span>{" "}
+                    rows.
+                  </span>
+                }
+                secondary={
+                  <Button variant="ghost" size="sm">
+                    Different file
+                  </Button>
+                }
+                primary={<Button size="sm">Import 241 rows</Button>}
+              />
+            </div>
+          </div>
         </div>
       </Specimen>
 

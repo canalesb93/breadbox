@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Eyebrow } from "@/components/eyebrow";
+import { FormFooter } from "@/components/form-footer";
 import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 import {
@@ -231,16 +232,19 @@ function CsvDropStage({
         </span>
       </div>
 
-      <CsvFooterStrip>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCancel}
-          disabled={loading}
-        >
-          Cancel
-        </Button>
-      </CsvFooterStrip>
+      <FormFooter
+        inset="sheet"
+        secondary={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -577,7 +581,8 @@ function CsvMapStage({
         </Alert>
       )}
 
-      <CsvFooterStrip
+      <FormFooter
+        inset="sheet"
         hint={
           validation ? null : (
             <span className="text-muted-foreground text-xs">
@@ -589,52 +594,28 @@ function CsvMapStage({
             </span>
           )
         }
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onBack}
-          disabled={importing}
-        >
-          <ArrowLeft className="size-3.5" />
-          Different file
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => onImport(buildImportInput())}
-          disabled={!!validation || importing}
-        >
-          {importing ? <Loader2 className="size-3.5 animate-spin" /> : null}
-          Import {preview.total_rows} rows
-        </Button>
-      </CsvFooterStrip>
-    </div>
-  );
-}
-
-// CsvFooterStrip is the bottom action strip for the CSV form. The form
-// lives inside the Connect-bank Sheet body (`p-6`) rather than a
-// SectionCard, so we can't reuse `<FormFooter>` directly — its negative
-// margins assume the SectionCard `px-5 py-5` contract. Instead we mirror
-// the same visual vocabulary (`bg-muted/20` strip, top border, flush to
-// the parent container edges via `-mx-6 -mb-6 px-6 py-3`) so the action
-// row reads as a footer of the Sheet, not floating content.
-function CsvFooterStrip({
-  children,
-  hint,
-}: {
-  children: React.ReactNode;
-  hint?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "bg-muted/20 -mx-6 -mb-6 mt-auto flex flex-wrap items-center gap-2 border-t px-6 py-3",
-        hint ? "justify-between" : "justify-end",
-      )}
-    >
-      {hint && <div className="min-w-0">{hint}</div>}
-      <div className="ml-auto flex items-center gap-2">{children}</div>
+        secondary={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            disabled={importing}
+          >
+            <ArrowLeft className="size-3.5" />
+            Different file
+          </Button>
+        }
+        primary={
+          <Button
+            size="sm"
+            onClick={() => onImport(buildImportInput())}
+            disabled={!!validation || importing}
+          >
+            {importing ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Import {preview.total_rows} rows
+          </Button>
+        }
+      />
     </div>
   );
 }
