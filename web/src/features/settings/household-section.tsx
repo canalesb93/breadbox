@@ -24,16 +24,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -735,30 +726,17 @@ function DeleteMemberDialog({
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Remove {user.name}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This deletes the household member and their login (if any). Bank
-            connections attached to them must be disconnected first. This can't
-            be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(e) => {
-              e.preventDefault();
-              onConfirm();
-            }}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Remove member
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      icon={Trash2}
+      title={`Remove ${user.name}?`}
+      description="This deletes the household member and their login (if any). Bank connections attached to them must be disconnected first. This can't be undone."
+      confirmLabel="Remove member"
+      pendingLabel="Removing…"
+      pending={deleteUser.isPending}
+      onConfirm={onConfirm}
+    />
   );
 }
 

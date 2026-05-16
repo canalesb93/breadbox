@@ -2,16 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Loader2, Pause, Pencil, Play, PlayCircle, Shield, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -92,23 +83,27 @@ export function RuleDetailPage() {
     );
 
   const onApplyConfirm = async () => {
-    setConfirmApply(false);
     const ok = await withMutationToast(
       () => applyRule.mutateAsync(rule.short_id),
       {
         success: "Rule applied retroactively. Transactions are being updated.",
       },
     );
-    if (ok) ruleQuery.refetch();
+    if (ok) {
+      setConfirmApply(false);
+      ruleQuery.refetch();
+    }
   };
 
   const onDeleteConfirm = async () => {
-    setConfirmDelete(false);
     const ok = await withMutationToast(
       () => deleteRule.mutateAsync(rule.short_id),
       { success: `Deleted rule "${rule.name}".` },
     );
-    if (ok) navigate({ to: "/rules" });
+    if (ok) {
+      setConfirmDelete(false);
+      navigate({ to: "/rules" });
+    }
   };
 
   return (
@@ -207,42 +202,30 @@ export function RuleDetailPage() {
         </aside>
       </div>
 
-      <AlertDialog open={confirmApply} onOpenChange={setConfirmApply}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apply "{rule.name}" retroactively?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This evaluates the rule's conditions against every existing
-              transaction in your household. Category changes respect the
-              per-transaction override lock; tags and comments accumulate.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onApplyConfirm}>
-              Apply now
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmApply}
+        onOpenChange={setConfirmApply}
+        tone="default"
+        icon={PlayCircle}
+        title={`Apply "${rule.name}" retroactively?`}
+        description="This evaluates the rule's conditions against every existing transaction in your household. Category changes respect the per-transaction override lock; tags and comments accumulate."
+        confirmLabel="Apply now"
+        pendingLabel="Applying…"
+        pending={applyRule.isPending}
+        onConfirm={onApplyConfirm}
+      />
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{rule.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The rule stops firing on future syncs. Past actions it applied
-              stay on transactions.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onDeleteConfirm}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        icon={Trash2}
+        title={`Delete "${rule.name}"?`}
+        description="The rule stops firing on future syncs. Past actions it applied stay on transactions."
+        confirmLabel="Delete rule"
+        pendingLabel="Deleting…"
+        pending={deleteRule.isPending}
+        onConfirm={onDeleteConfirm}
+      />
     </>
   );
 
