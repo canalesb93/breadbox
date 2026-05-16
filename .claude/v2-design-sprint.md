@@ -358,6 +358,24 @@ next target, then updates this file at the end of the run.
   to provide the Dialog.Root context without rendering a portaled
   SheetContent. The same recipe unlocks specimens for any future
   primitive that wraps radix Dialog/Popover/Sheet internals.
+- **Hover vocabulary** (iter 64, #1177) — three canonical
+  `transition-colors hover:bg-*` patterns documented in the
+  Foundations sandbox. Pattern selection is by *host surface*,
+  not visual weight. (1) Divide-y list row → `hover:bg-muted/40`
+  (matches `<TableRow>`); used by Home recent activity, Account
+  recent transactions, Categories, Shortcut sheet, Category-detail
+  children, Connection-row, Account-row. (2) Bordered card grid
+  pick → `hover:bg-accent/40 hover:border-primary/40`; used by
+  provider-picker, connection-accounts-list cards. (3)
+  Tinted-idle card grid → `bg-muted/20 hover:bg-muted/40
+  hover:border-ring/40`; used by not-found quick jumps. Don't
+  drift between the three — they encode different meanings (row
+  in a list vs selectable card vs interactive tile). The
+  rule-row `hover:bg-muted/30` is justified by its heavier idle
+  weight (bordered card with `bg-card`); when a second
+  bordered-list-card pattern lands, consider promoting that as a
+  fourth token. Future surfaces: never invent a hover tint
+  without checking the three canonical patterns first.
 
 ## Backlog (ordered roughly by impact)
 
@@ -2413,6 +2431,37 @@ Cross-cutting components:
     weight is needed (e.g. a "field group" rhythm tighter than
     `sub`), add it as a new token on the primitive rather than
     open-coding another `<h4>` block in a feature file.
+
+- **Iter 64 — List-row hover vocabulary unified on muted/40** ([#1177](https://github.com/canalesb93/breadbox/pull/1177))
+  - Three list-row surfaces had drifted to non-canonical hover tints
+    (Home recent activity `/50`, Account recent transactions
+    `accent/40`, rule-form pipeline-stage trigger `/50`). All three
+    swept onto `transition-colors hover:bg-muted/40` — same token
+    `<TableRow>` uses, so every row in the v2 vocabulary now shares
+    one hover signal.
+  - Adds a "Hover & transition vocabulary" specimen to Foundations
+    that documents the three canonical patterns side-by-side. The
+    point isn't visual weight — it's *which host surface you're on*:
+    (1) divide-y list row → `hover:bg-muted/40` (matches TableRow);
+    (2) bordered card grid pick → `hover:bg-accent/40
+    hover:border-primary/40` (provider-picker,
+    connection-accounts-list); (3) tinted-idle card grid →
+    `bg-muted/20 hover:bg-muted/40 hover:border-ring/40` (not-found
+    quick jumps). Drift between these three reads as inconsistency;
+    never invent a fourth.
+  - rule-row stays at `hover:bg-muted/30` because it's a bordered
+    card with `bg-card` already (different shape from divide-y list
+    rows) — the lower tint matches the heavier idle weight.
+    `transition` (no scope) usages in provider-picker /
+    csv-import-form / icon-picker stay because they animate the
+    border alongside background — `transition-colors` would drop
+    the border morph.
+  - Audit method (worth recording for future sweeps): `grep -rn
+    "hover:bg" web/src --include='*.tsx' --include='*.ts'`
+    enumerates every callsite. The three drift patterns to look for
+    are `hover:bg-muted/50`, `hover:bg-accent/40` on a divide-y
+    list row, and any `hover:` without a paired `transition-colors`
+    (snap-changes feel cheap).
 
 (Populated by iterations.)
 
