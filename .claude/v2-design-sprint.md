@@ -71,13 +71,15 @@ next target, then updates this file at the end of the run.
   pills, not raw `<code>` — promote into a shared `IdPill` once a
   third surface (rules? agents?) needs it.
 - **IdPill** — extracted to `web/src/components/id-pill.tsx` in
-  iter 6 (#1119). Four surfaces now share it: Tags slug column,
-  TX-detail Reference row, Account-detail Reference row, and the
-  Categories list (parent + child rows, iter 7). Use
-  `<IdPill value={shortId} />` for any short_id / slug / machine
-  identifier. The api-key-created page still uses its own
-  `<code className="bg-muted ...">` markup — migrate when that page
-  gets a design pass (different `bg-muted` token, intentional).
+  iter 6 (#1119). Five surfaces now share it (iter 11 added
+  Connection-detail): Tags slug column, TX-detail Reference row,
+  Account-detail Reference row, Categories list (parent + child
+  rows, iter 7), and Connection-detail (Provider Institution row
+  + Reference ID row). Use `<IdPill value={shortId} />` for any
+  short_id / slug / machine identifier. The api-key-created page
+  still uses its own `<code className="bg-muted ...">` markup —
+  migrate when that page gets a design pass (different `bg-muted`
+  token, intentional).
 - **ListCard primitive** (iter 8, expanded iter 9): the canonical
   bordered-card-with-divide-y-rows container lives at
   `web/src/components/list-card.tsx`. Seven surfaces now share it
@@ -97,10 +99,13 @@ next target, then updates this file at the end of the run.
   bordered card wrapper) — don't force those onto ListCard.
 - **ColorRailCard primitive** — extracted to
   `web/src/components/color-rail-card.tsx` in iter 10 (#1123).
-  Three surfaces now share it: TX-detail hero (category color,
-  neutral when uncategorised), Account-detail hero (success for
-  assets, destructive for liabilities, muted when excluded),
-  Category-detail hero (category's own color, neutral if unset).
+  Four surfaces now share it (iter 11 added Connection detail):
+  TX-detail hero (category color, neutral when uncategorised),
+  Account-detail hero (success for assets, destructive for
+  liabilities, muted when excluded), Category-detail hero
+  (category's own color, neutral if unset), Connection-detail
+  hero (success for active, amber for pending_reauth, destructive
+  for error, muted for disconnected or paused).
   The rail's colour encodes *meaning* (classification, accounting
   role, palette token) rather than decoration. All three heroes
   share a small uppercase eyebrow ("Transaction" / "Asset" /
@@ -148,7 +153,7 @@ Pages:
 - [x] Tags list (`tags.tsx`) — #1117
 - [ ] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`)
 - [x] Connections list (`connections.tsx`) — iter 8
-- [ ] Connection detail (`connection-detail.tsx`)
+- [x] Connection detail (`connection-detail.tsx`) — #1124
 - [ ] Providers settings (`providers.tsx`)
 - [ ] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`)
 - [ ] Login (`login.tsx`)
@@ -169,6 +174,11 @@ Cross-cutting components:
   applied both flags to the Tags list — abstraction is validated on
   a second surface, no per-page divergence. Sort header affordances
   still TODO when we wire interactive sorting.
+- [ ] `SoftBackButton` primitive — three detail pages now share the
+  "real link to list + history.back on plain left-click" pattern
+  (TX-detail, Account-detail, Connection-detail iter 11). Extract
+  to `web/src/components/soft-back-button.tsx` next time we touch
+  a fourth detail page (Tag detail would qualify).
 - [ ] `empty-state.tsx` — visual language
 - [ ] `command-palette.tsx` — sections, kbd hints, recents
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
@@ -188,14 +198,15 @@ Cross-cutting components:
   (iter 7 added Categories): Tags slug column, TX-detail
   Reference row, Account-detail Reference row, Categories list
   parent + child slug pills. Don't re-derive the same span.
-- [x] `ColorRailCard` primitive (iter 10, #1123) — bordered hero
-  card with a 4px coloured left rail that encodes meaning, at
-  `web/src/components/color-rail-card.tsx`. Three surfaces share
-  it: TX-detail hero, Account-detail hero (with the `footer` slot
-  hosting the inline Link/View action strip), Category-detail
-  hero. Sibling of `<SectionCard>` and `<ListCard>` — third
-  primitive in the v2 vocabulary. Reach for it for any new
-  detail-page hero.
+- [x] `ColorRailCard` primitive (iter 10, #1123; iter 11 #1124) —
+  bordered hero card with a 4px coloured left rail that encodes
+  meaning, at `web/src/components/color-rail-card.tsx`. Four
+  surfaces share it: TX-detail hero, Account-detail hero (with
+  the `footer` slot hosting the inline Link/View action strip),
+  Category-detail hero, Connection-detail hero (with the footer
+  slot hosting Sync now / Re-authenticate / Import more). Sibling
+  of `<SectionCard>` and `<ListCard>` — third primitive in the v2
+  vocabulary. Reach for it for any new detail-page hero.
 
 ## Completed
 
@@ -362,6 +373,45 @@ Cross-cutting components:
     ListCard (the iter-8 primitive landed wired up to them). TX-detail
     Activity intentionally stays on `SectionCard` — its body is the
     comment composer + timeline, not a list.
+
+- **Iter 11 — Connection detail + ColorRailCard fourth surface** ([#1124](https://github.com/canalesb93/breadbox/pull/1124))
+  - Connection detail adopts the v2 detail-page vocabulary: hero
+    rebuilt around `<ColorRailCard>` with a 4px rail tinted by
+    status — success for `active`, amber for `pending_reauth`,
+    destructive for `error`, muted for `disconnected` or paused.
+    Fourth production surface for the primitive after TX /
+    Account / Category. Same "rail colour encodes meaning, never
+    decoration" principle: a paused-but-active connection drops
+    to muted so the card reads "shelved" instead of "demanding
+    attention".
+  - Hero composition mirrors Account-detail: icon tile + uppercase
+    "Connection" eyebrow + institution name + status badge + paused
+    chip in the identity column; status-tinted "Last synced" pill +
+    `relativeTime` headline + success-rate anchor in the metric
+    column. Footer slot hosts Sync now / Re-authenticate / Import
+    more as an inline action strip — same pattern as the
+    Account-detail Link/View strip. Disconnect lives in the kebab
+    menu in the footer.
+  - Two-column body splits primary content (Sync activity / Accounts
+    / Sync history as `SectionCard`s) from secondary affordances
+    (Settings + Details sidebar). Three loose cards from the
+    previous design (Health stat grid, Settings, Sync activity)
+    collapse onto the new vocabulary: Health stat grid folds into
+    the Details sidebar as a "Health" group, Settings moves to the
+    sidebar, Sync activity becomes a SectionCard in the primary
+    column. IdPill picks up two new surfaces (Institution row +
+    Reference ID row) — five total now share the primitive.
+  - BackButton mirrors the TX/Account detail soft-back pattern
+    (real link + `history.back()` on plain left-click). Third
+    surface for the pattern — worth promoting to a shared
+    `<SoftBackButton to="..." />` next time we touch a detail
+    page; queued as cross-cutting follow-up.
+  - Adds a new colour mapping: `var(--warning, oklch(0.78 0.16 75))`
+    for `pending_reauth`. Same fallback pattern as the existing
+    `--success` literal — uses the token if defined, falls back
+    to an oklch literal otherwise. If a second surface wants the
+    warning token (rules with errors? agents off?), promote it to
+    a real token in `globals.css` then.
 
 - **Iter 10 — Category detail + ColorRailCard primitive** ([#1123](https://github.com/canalesb93/breadbox/pull/1123))
   - Promoted `<ColorRailCard>` to
