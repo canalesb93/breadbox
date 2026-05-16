@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useTags } from "@/api/queries/tags";
+import { cn } from "@/lib/utils";
 import type { Condition, TransactionRule } from "@/api/types";
 import { ConditionRowFields } from "./condition-row";
 import { ActionRowFields } from "./action-row";
@@ -353,7 +354,7 @@ export function RuleForm({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="hover:bg-muted/50 group -mx-2 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition-colors"
+                  className="hover:bg-muted/50 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none group -mx-2 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition-colors"
                 >
                   <span className="text-muted-foreground inline-flex items-center gap-2">
                     Pipeline stage
@@ -380,11 +381,12 @@ export function RuleForm({
                               type="button"
                               onClick={() => field.onChange(preset.value)}
                               title={preset.hint}
-                              className={
+                              className={cn(
+                                "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none flex-1 rounded-lg px-2 py-1 text-xs font-medium",
                                 field.value === preset.value
-                                  ? "bg-background text-foreground flex-1 rounded-lg px-2 py-1 text-xs font-medium shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground flex-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
-                              }
+                                  ? "bg-background text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground transition-colors",
+                              )}
                             >
                               {preset.label}
                             </button>
@@ -437,22 +439,24 @@ export function RuleForm({
                     <button
                       type="button"
                       onClick={() => form.setValue("logic", "and")}
-                      className={
+                      className={cn(
+                        "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none rounded-md px-2.5 py-0.5 text-xs font-medium",
                         watchedLogic === "and"
-                          ? "bg-background text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium shadow-sm"
-                          : "text-muted-foreground hover:text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors"
-                      }
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground transition-colors",
+                      )}
                     >
                       AND
                     </button>
                     <button
                       type="button"
                       onClick={() => form.setValue("logic", "or")}
-                      className={
+                      className={cn(
+                        "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none rounded-md px-2.5 py-0.5 text-xs font-medium",
                         watchedLogic === "or"
-                          ? "bg-background text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium shadow-sm"
-                          : "text-muted-foreground hover:text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors"
-                      }
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground transition-colors",
+                      )}
                     >
                       OR
                     </button>
@@ -545,7 +549,7 @@ export function RuleForm({
                       }
                       field.onChange(!field.value);
                     }}
-                    className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
+                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none flex items-center gap-1 rounded-sm text-xs"
                   >
                     <Code2 className="size-3" />
                     {field.value ? "Hide JSON" : "Edit as JSON"}
