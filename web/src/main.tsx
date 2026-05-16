@@ -31,6 +31,7 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { ProvidersPage } from "@/routes/providers";
 import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
 import {
   AccountDetailPage,
@@ -88,6 +89,9 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/connections": {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
+  },
+  "/providers": {
+    component: ProvidersPage,
   },
   "/accounts": {
     component: AccountsPage,
