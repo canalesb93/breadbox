@@ -355,7 +355,7 @@ export function RuleForm({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="hover:bg-muted/50 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none group -mx-2 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition-colors"
+                  className="hover:bg-muted/40 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none group -mx-2 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition-colors"
                 >
                   <span className="text-muted-foreground inline-flex items-center gap-2">
                     Pipeline stage
