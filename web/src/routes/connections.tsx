@@ -4,8 +4,10 @@ import { z } from "zod";
 import { Loader2, Plug, Plus, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useShortcut } from "@/lib/shortcuts";
@@ -195,11 +197,25 @@ export function ConnectionsPage() {
   const isError = connectionsQuery.isError;
   const connections = connectionsQuery.data ?? [];
 
+  // Eyebrow tracks the same vocabulary as the other v2 list pages (Transactions,
+  // Tags, Categories): N entities, then Showing N of M when a filter narrows
+  // the view. Empty / loading / error get their own short string.
+  const eyebrow = isLoading
+    ? "Loading"
+    : isError
+      ? "Error loading"
+      : connections.length === 0
+        ? "No connections yet"
+        : visible.length === connections.length
+          ? `${connections.length} ${connections.length === 1 ? "connection" : "connections"}`
+          : `Showing ${visible.length} of ${connections.length}`;
+
   return (
-    <>
+    <div className="flex flex-col gap-5">
       <PageHeader
+        eyebrow={eyebrow}
         title="Connections"
-        description="Banks and CSV imports that feed transactions into Breadbox."
+        description="Banks and CSV imports that feed transactions into Breadbox. Re-authenticate broken ones and sync on demand."
         actions={
           connections.length > 0 ? (
             <>
@@ -226,13 +242,11 @@ export function ConnectionsPage() {
       />
 
       {connections.length > 0 && (
-        <div className="-mt-4 mb-4">
-          <ConnectionsSummary connections={connections} />
-        </div>
+        <ConnectionsSummary connections={connections} />
       )}
 
       {attentionCount > 0 && (
-        <Alert variant="default" className="mb-4 border-amber-500/30 bg-amber-500/5">
+        <Alert variant="default" className="border-amber-500/30 bg-amber-500/5">
           <AlertTitle className="text-amber-700 dark:text-amber-400">
             {attentionCount === 1
               ? "1 connection needs attention"
@@ -245,21 +259,33 @@ export function ConnectionsPage() {
       )}
 
       {(usersQuery.data?.length ?? 0) > 1 && (
-        <div className="mb-4">
-          <FamilyTabs
-            users={usersQuery.data ?? []}
-            value={userFilter}
-            onChange={setUserFilter}
-            counts={countsByUserShortId}
-            totalCount={connections.length}
-          />
-        </div>
+        <FamilyTabs
+          users={usersQuery.data ?? []}
+          value={userFilter}
+          onChange={setUserFilter}
+          counts={countsByUserShortId}
+          totalCount={connections.length}
+        />
       )}
 
       {isLoading ? (
-        <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
-          <Loader2 className="size-4 animate-spin" /> Loading connections…
-        </div>
+        <ListCard
+          rows={[0, 1, 2]}
+          getRowKey={(i) => i}
+          renderRow={(i) => (
+            <div className="flex items-center gap-4 px-5 py-3.5" key={i}>
+              <Skeleton className="size-9 rounded-md" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <div className="space-y-1.5 text-right">
+                <Skeleton className="ml-auto h-3.5 w-20" />
+                <Skeleton className="ml-auto h-3 w-12" />
+              </div>
+            </div>
+          )}
+        />
       ) : isError ? (
         <Alert variant="destructive">
           <AlertTitle>Couldn't load connections</AlertTitle>
@@ -281,40 +307,12 @@ export function ConnectionsPage() {
             </Button>
           }
         />
-      ) : visible.length === 0 ? (
-        <EmptyState
-          title="No connections for this filter"
-          description="Switch family member or clear the filter to see other connections."
-        />
       ) : (
-        <div className="flex flex-col gap-3">
-          <div className="text-muted-foreground flex items-center gap-3 px-1 text-xs">
-            <Checkbox
-              checked={
-                allVisibleSelected
-                  ? true
-                  : someVisibleSelected
-                    ? "indeterminate"
-                    : false
-              }
-              onCheckedChange={() => toggleSelectAll()}
-              aria-label={
-                selectedIds.size > 0 ? "Clear selection" : "Select all visible"
-              }
-            />
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="hover:text-foreground transition-colors"
-            >
-              {selectedIds.size > 0
-                ? `${selectedConnections.length} selected`
-                : `Select all (${visible.length})`}
-            </button>
-          </div>
-          {visible.map((c) => (
+        <ListCard
+          rows={visible}
+          getRowKey={(c) => c.id}
+          renderRow={(c) => (
             <ConnectionRow
-              key={c.id}
               connection={c}
               // /api/v1/accounts exposes connection_id as the parent's
               // short_id (the consistent compact-ID convention), not its UUID.
@@ -323,8 +321,45 @@ export function ConnectionsPage() {
               selected={selectedIds.has(c.id)}
               onSelectChange={(next) => toggleRowSelection(c.id, next)}
             />
-          ))}
-        </div>
+          )}
+          toolbar={
+            visible.length === 0 ? undefined : (
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={
+                  allVisibleSelected
+                    ? true
+                    : someVisibleSelected
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={() => toggleSelectAll()}
+                aria-label={
+                  selectedIds.size > 0
+                    ? "Clear selection"
+                    : "Select all visible"
+                }
+              />
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="hover:text-foreground transition-colors"
+              >
+                {selectedIds.size > 0
+                  ? `${selectedConnections.length} selected`
+                  : `Select all visible (${visible.length})`}
+              </button>
+            </div>
+            )
+          }
+          empty={
+            <EmptyState
+              title="No connections for this filter"
+              description="Switch family member or clear the filter to see other connections."
+              className="py-10"
+            />
+          }
+        />
       )}
 
       {selectedConnections.length > 0 && (
@@ -347,6 +382,6 @@ export function ConnectionsPage() {
         }}
         connectionShortId={search.reauth}
       />
-    </>
+    </div>
   );
 }
