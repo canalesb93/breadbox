@@ -1,4 +1,4 @@
-import { Lock, User, type LucideIcon } from "lucide-react";
+import { DatabaseBackup, Lock, User, type LucideIcon } from "lucide-react";
 
 export interface SettingsSection {
   slug: string;
@@ -19,5 +19,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "Security",
     description: "Sessions and API keys.",
     icon: Lock,
+  },
+  {
+    slug: "backups",
+    title: "Backups",
+    description: "Snapshot the database, restore, and schedule automatic backups.",
+    icon: DatabaseBackup,
   },
 ];
