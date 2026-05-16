@@ -1,23 +1,24 @@
-import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Shapes } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
 
 export function CategoryNewPage() {
   return (
     <div className="mx-auto max-w-2xl">
-      <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
-        <Link to="/categories">
-          <ArrowLeft className="size-4" />
-          Categories
-        </Link>
-      </Button>
+      <SoftBackButton to="/categories">Back to categories</SoftBackButton>
       <PageHeader
-        title="New category"
-        description="Top-level categories form the spine of your spending breakdown. Sub-categories let you slice further."
+        eyebrow="New category"
+        title="Create a category"
+        description="Top-level categories form the spine of your spending breakdown. Sub-categories let you slice further. Pick a parent to nest, or leave empty for a fresh group."
       />
-      <CategoryForm mode="create" />
+      <SectionCard
+        icon={<Shapes className="text-muted-foreground size-4" />}
+        title="Category details"
+      >
+        <CategoryForm mode="create" />
+      </SectionCard>
     </div>
   );
 }
