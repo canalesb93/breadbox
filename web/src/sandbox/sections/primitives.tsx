@@ -104,9 +104,31 @@ export function PrimitivesSection() {
         <Button size="icon" aria-label="Add">
           <Plus />
         </Button>
-        <Button disabled>Disabled</Button>
         <Button>
           <Bell /> With icon
+        </Button>
+      </Specimen>
+
+      <Specimen
+        label="Button — disabled across variants"
+        code="disabled"
+        description="Filled variants (default + destructive) swap to bg-muted text-muted-foreground instead of opacity-50 so dark mode doesn't render the near-white primary token as a bright tile. Outline/ghost/secondary/link keep the inherited opacity dim."
+      >
+        <Button disabled>Default</Button>
+        <Button variant="destructive" disabled>
+          Destructive
+        </Button>
+        <Button variant="secondary" disabled>
+          Secondary
+        </Button>
+        <Button variant="outline" disabled>
+          Outline
+        </Button>
+        <Button variant="ghost" disabled>
+          Ghost
+        </Button>
+        <Button variant="link" disabled>
+          Link
         </Button>
       </Specimen>
 
