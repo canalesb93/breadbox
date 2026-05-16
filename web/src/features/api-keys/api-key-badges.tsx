@@ -47,7 +47,7 @@ const ACTOR_LABEL: Record<APIKeyActorType, string> = {
 // muted text — useful when a household has several agent integrations and
 // the type alone isn't enough to tell them apart.
 export function ActorBadge({ type, name }: ActorBadgeProps) {
-  const Icon = ACTOR_ICON[type] ?? Bot;
+  const Icon = ACTOR_ICON[type];
   return (
     <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
       <Icon className="size-3.5" />

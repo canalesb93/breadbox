@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useMemo } from "react";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Key, Plus, Search } from "lucide-react";
 import { z } from "zod";
 import { PageHeader } from "@/components/page-header";
@@ -18,6 +18,9 @@ export const apiKeysSearchSchema = z.object({
   q: z.string().optional(),
 });
 
+type APIKeysSearch = z.infer<typeof apiKeysSearchSchema>;
+type Tab = "active" | "revoked";
+
 function filterKeys(keys: APIKey[], query: string): APIKey[] {
   const q = query.trim().toLowerCase();
   if (!q) return keys;
@@ -31,8 +34,10 @@ function filterKeys(keys: APIKey[], query: string): APIKey[] {
 
 export function APIKeysPage() {
   const { data: keys, isLoading, isError } = useAPIKeys();
-  const [tab, setTab] = useState<"active" | "revoked">("active");
-  const [query, setQuery] = useState("");
+  const search = useSearch({ strict: false }) as APIKeysSearch;
+  const navigate = useNavigate();
+  const tab: Tab = search.status ?? "active";
+  const query = search.q ?? "";
 
   const { active, revoked } = useMemo(() => {
     const all = keys ?? [];
@@ -42,7 +47,32 @@ export function APIKeysPage() {
     };
   }, [keys]);
 
-  const rows = filterKeys(tab === "active" ? active : revoked, query);
+  const rows = useMemo(
+    () => filterKeys(tab === "active" ? active : revoked, query),
+    [tab, active, revoked, query],
+  );
+
+  function setTab(next: Tab) {
+    navigate({
+      to: "/api-keys",
+      search: (prev: APIKeysSearch) => ({
+        ...prev,
+        status: next === "active" ? undefined : next,
+      }),
+      replace: true,
+    });
+  }
+
+  function setQuery(next: string) {
+    navigate({
+      to: "/api-keys",
+      search: (prev: APIKeysSearch) => ({
+        ...prev,
+        q: next || undefined,
+      }),
+      replace: true,
+    });
+  }
 
   const newKeyButton = (
     <Button asChild>
@@ -53,29 +83,7 @@ export function APIKeysPage() {
     </Button>
   );
 
-  const emptyState =
-    tab === "active" ? (
-      query ? (
-        <EmptyState
-          icon={Key}
-          title="No matching keys"
-          description="Try a different search."
-        />
-      ) : (
-        <EmptyState
-          icon={Key}
-          title="No API keys yet"
-          description="Mint a key to let agents, scripts, or the CLI talk to Breadbox."
-          action={newKeyButton}
-        />
-      )
-    ) : (
-      <EmptyState
-        icon={Key}
-        title="No revoked keys"
-        description="Revoked keys show up here so you can audit the trail."
-      />
-    );
+  const emptyState = renderEmptyState({ tab, query, newKeyButton });
 
   return (
     <div>
@@ -86,10 +94,7 @@ export function APIKeysPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Tabs
-          value={tab}
-          onValueChange={(v) => setTab(v as "active" | "revoked")}
-        >
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList>
             <TabsTrigger value="active">
               Active
@@ -125,5 +130,40 @@ export function APIKeysPage() {
         emptyState={emptyState}
       />
     </div>
+  );
+}
+
+interface EmptyStateArgs {
+  tab: Tab;
+  query: string;
+  newKeyButton: React.ReactNode;
+}
+
+function renderEmptyState({ tab, query, newKeyButton }: EmptyStateArgs) {
+  if (tab === "revoked") {
+    return (
+      <EmptyState
+        icon={Key}
+        title="No revoked keys"
+        description="Revoked keys show up here so you can audit the trail."
+      />
+    );
+  }
+  if (query) {
+    return (
+      <EmptyState
+        icon={Key}
+        title="No matching keys"
+        description="Try a different search."
+      />
+    );
+  }
+  return (
+    <EmptyState
+      icon={Key}
+      title="No API keys yet"
+      description="Mint a key to let agents, scripts, or the CLI talk to Breadbox."
+      action={newKeyButton}
+    />
   );
 }

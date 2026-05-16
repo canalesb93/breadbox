@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { Check, Copy, KeyRound, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import {
   clearPendingPlaintextKey,
   readPendingPlaintextKey,
@@ -30,12 +31,18 @@ export function APIKeyCreatedPage() {
   );
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
 
   // Clear from storage on unmount — the value should not survive a fresh
   // visit to /api-keys/created. The component-local `pending` keeps the
   // page rendered for as long as the user stays.
   useEffect(() => {
-    return () => clearPendingPlaintextKey();
+    return () => {
+      clearPendingPlaintextKey();
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+    };
   }, []);
 
   if (!pending) {
@@ -47,7 +54,13 @@ export function APIKeyCreatedPage() {
       await navigator.clipboard.writeText(pending.plaintext);
       setCopied(true);
       toast.success("API key copied to clipboard.");
-      window.setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 2000);
     } catch {
       toast.error(
         "Couldn't access the clipboard. Select the value and copy manually.",
@@ -91,12 +104,12 @@ export function APIKeyCreatedPage() {
               API key
             </label>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <input
+              <Input
                 id="api-key-plaintext"
                 readOnly
                 value={pending.plaintext}
                 onFocus={(e) => e.currentTarget.select()}
-                className="bg-muted/40 text-foreground border-input focus-visible:border-ring focus-visible:ring-ring/40 min-w-0 flex-1 truncate rounded-md border px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:ring-[3px]"
+                className="bg-muted/40 min-w-0 flex-1 truncate font-mono text-xs"
               />
               <Button
                 type="button"

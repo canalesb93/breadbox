@@ -2,7 +2,16 @@ import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "@tanstack/react-router";
-import { Bot, Loader2, ShieldCheck, ShieldOff, User } from "lucide-react";
+import {
+  Bot,
+  Loader2,
+  ShieldCheck,
+  ShieldOff,
+  User,
+  type LucideIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { ApiError } from "@/api/client";
 import {
   Form,
   FormControl,
@@ -17,9 +26,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { useCreateAPIKey } from "@/api/queries/api-keys";
-import { withMutationToast } from "@/lib/mutation-toast";
 import { storePendingPlaintextKey } from "@/features/api-keys/plaintext-store";
-import type { CreateAPIKeyResult } from "@/api/types";
 
 const formSchema = z.object({
   name: z
@@ -41,7 +48,7 @@ interface ScopeOption {
   value: APIKeyFormValues["scope"];
   label: string;
   description: string;
-  Icon: typeof ShieldCheck;
+  Icon: LucideIcon;
 }
 
 const SCOPE_OPTIONS: ScopeOption[] = [
@@ -63,7 +70,7 @@ interface ActorOption {
   value: APIKeyFormValues["actor_type"];
   label: string;
   description: string;
-  Icon: typeof Bot;
+  Icon: LucideIcon;
 }
 
 const ACTOR_OPTIONS: ActorOption[] = [
@@ -102,27 +109,24 @@ export function APIKeyForm() {
   });
 
   const onSubmit: SubmitHandler<APIKeyFormValues> = async (values) => {
-    let created: CreateAPIKeyResult | null = null;
-    const ok = await withMutationToast(
-      async () => {
-        created = await create.mutateAsync({
-          name: values.name,
-          scope: values.scope,
-          actor_type: values.actor_type,
-          actor_name: values.actor_name || undefined,
-        });
-      },
-      { success: `Created "${values.name}".` },
-    );
-    if (ok && created) {
-      // Stash plaintext in sessionStorage so the /created page can render it
-      // exactly once and the user can refresh without losing it mid-copy.
-      storePendingPlaintextKey({
-        id: (created as CreateAPIKeyResult).id,
-        name: (created as CreateAPIKeyResult).name,
-        plaintext: (created as CreateAPIKeyResult).plaintext_key,
+    try {
+      const created = await create.mutateAsync({
+        name: values.name,
+        scope: values.scope,
+        actor_type: values.actor_type,
+        actor_name: values.actor_name || undefined,
       });
+      storePendingPlaintextKey({
+        id: created.id,
+        name: created.name,
+        plaintext: created.plaintext_key,
+      });
+      toast.success(`Created "${values.name}".`);
       navigate({ to: "/api-keys/created" });
+    } catch (err) {
+      const msg =
+        err instanceof ApiError ? err.message : "Couldn't create the key.";
+      toast.error(msg);
     }
   };
 
@@ -265,7 +269,7 @@ interface OptionCardProps {
   selected: boolean;
   label: string;
   description: string;
-  Icon: typeof Bot;
+  Icon: LucideIcon;
 }
 
 // OptionCard is a wrapped RadioGroupItem styled as a tappable tile —
