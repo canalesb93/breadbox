@@ -290,7 +290,7 @@ next target, then updates this file at the end of the run.
 Pages:
 
 - [x] App shell + sidebar (`app-sidebar.tsx`, `__root.tsx`, `settings-shell.tsx`) — #1113
-- [x] Home / dashboard (`home.tsx`) — #1115
+- [x] Home / dashboard (`home.tsx`) — #1115; rebuilt iter 34 onto v2 primitives ([#1148](https://github.com/canalesb93/breadbox/pull/1148))
 - [x] Transactions list (`transactions.tsx`) — #1116
 - [x] Transaction detail (`transaction-detail.tsx`) — #1118
 - [x] Accounts list (`accounts.tsx`) — #1125
@@ -1283,6 +1283,31 @@ Cross-cutting components:
     instead of a worktree — future iterations: stick to `git worktree
     add ~/dev/breadbox-iter<N>` so the main repo working tree stays
     untouched.
+
+- **Iter 34 — Home dashboard rebuild** ([#1148](https://github.com/canalesb93/breadbox/pull/1148))
+  - Home was iter 2, shipped before the v2 primitives (`ColorRailCard`,
+    `StatusPanel`, `ListCard`) existed. The 4-up hand-rolled scoreboard
+    read flatter than the polished detail pages.
+  - Replaced the scoreboard with a single `ColorRailCard` hero — Net
+    cash on the left (3xl tabular-nums, success/destructive rail
+    encodes solvency) and Cash + Credit & loans as supporting cells
+    separated by the card border. `sm:grid-cols-[1.4fr_1fr_1fr]` gives
+    the dominant value ~40% of the row width on tablet+.
+  - Connection-health summary moved into the Connections panel header
+    (`3 healthy`, or `2 need action · 1 healthy`) — the same number
+    isn't duplicated as a fourth stat tile anymore.
+  - New `HomeAttentionPanel`: a tone-rail `StatusPanel` (warning)
+    above the hero only when one or more connections need re-auth or
+    have a sync error — silent on a healthy household, no orphaned
+    "all good!" empty-state to mute. Reuses the established
+    setup-account / providers vocabulary.
+  - Touched files: `features/home/home-stats.tsx` (full rewrite —
+    `StatCard` retired, hero is now `ColorRailCard` + `HeroCell`/
+    `SecondaryCell`), `features/home/home-connections-panel.tsx`
+    (title now carries health subtitle), `features/home/home-attention-panel.tsx`
+    (new), `routes/home.tsx` (mounts the attention panel).
+  - Process note: ran from a worktree at `/tmp/claude/breadbox-iter34`
+    — clean, didn't disturb the main repo (corrects the iter 33 lapse).
 
 ## Open observations / questions
 
