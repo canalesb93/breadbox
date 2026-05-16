@@ -1,6 +1,7 @@
 import * as React from "react";
 import { type LucideIcon } from "lucide-react";
 import { Eyebrow } from "@/components/eyebrow";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 // TimelineRail is the v2 vocabulary for a vertical activity feed: a thin
@@ -173,15 +174,66 @@ function TimelineRailRow({
   );
 }
 
+interface TimelineRailRowSkeletonProps
+  extends Omit<React.HTMLAttributes<HTMLLIElement>, "children"> {
+  // Whether the row carries a body block under the headline (e.g. a comment
+  // bubble). Defaults to false so the skeleton matches the dominant row shape
+  // (single-line summary + timestamp).
+  body?: boolean;
+  className?: string;
+}
+
+// RowSkeleton mirrors the real <TimelineRail.Row> geometry — same disc + rail
+// + content column — so loading-to-loaded transitions don't jump. Reach for
+// this inside a <TimelineRail.Group> with the same `label` you'll render for
+// the real rows (or no label for a flat feed). Added in iter 65; previously
+// the activity timeline hand-rolled a `gap-3` skeleton with a `size-7
+// rounded-full` chip that didn't carry the rail line, so the loading state
+// shifted layout when annotations arrived.
+function TimelineRailRowSkeleton({
+  body = false,
+  className,
+  ...rest
+}: TimelineRailRowSkeletonProps) {
+  return (
+    <li
+      className={cn(
+        // Geometry mirrors TimelineRailRow exactly so the disc lands on the
+        // rail x-axis and the rail pseudo-element clips identically — see the
+        // long-form comment on TimelineRailRow for the math.
+        "relative flex gap-3 pl-3.5",
+        "before:content-[''] before:absolute before:left-0 before:w-px before:bg-border/60",
+        "before:-top-3 before:-bottom-3",
+        "[&:first-of-type]:before:top-[14px]",
+        "[&:last-of-type]:before:bottom-[calc(100%-14px)]",
+        className,
+      )}
+      {...rest}
+    >
+      <Skeleton
+        aria-hidden
+        className="bg-card border-border/60 relative z-10 -ml-3.5 size-7 shrink-0 rounded-full border"
+      />
+      <div className="min-w-0 flex-1 space-y-1.5 py-1">
+        <Skeleton className="h-3 w-3/4" />
+        {body && <Skeleton className="h-8 w-full rounded-md" />}
+        <Skeleton className="h-3 w-1/4" />
+      </div>
+    </li>
+  );
+}
+
 // Compound export — `TimelineRail.Group` / `TimelineRail.Row` matches the
 // shadcn-style composition used by Card, Table, Sidebar, etc.
 export const TimelineRail = Object.assign(TimelineRailRoot, {
   Group: TimelineRailGroup,
   Row: TimelineRailRow,
+  RowSkeleton: TimelineRailRowSkeleton,
 });
 
 export type {
   TimelineRailProps,
   TimelineRailGroupProps,
   TimelineRailRowProps,
+  TimelineRailRowSkeletonProps,
 };

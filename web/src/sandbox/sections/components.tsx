@@ -718,11 +718,15 @@ export function ComponentsSection() {
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
-        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
         className="block"
       >
-        <div className="max-w-md">
-          <TimelineRail>
+        <div className="grid gap-6 max-w-3xl sm:grid-cols-2">
+          <div>
+            <div className="text-muted-foreground mb-3 text-[11px] uppercase tracking-[0.08em]">
+              Loaded
+            </div>
+            <TimelineRail>
             <TimelineRail.Group label="Today">
               <TimelineRail.Row icon={MessageSquare}>
                 <p className="text-sm leading-snug">
@@ -771,6 +775,20 @@ export function ComponentsSection() {
               </TimelineRail.Row>
             </TimelineRail.Group>
           </TimelineRail>
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-3 text-[11px] uppercase tracking-[0.08em]">
+              Loading
+            </div>
+            <TimelineRail>
+              <TimelineRail.Group>
+                <TimelineRail.RowSkeleton />
+                <TimelineRail.RowSkeleton body />
+                <TimelineRail.RowSkeleton />
+                <TimelineRail.RowSkeleton />
+              </TimelineRail.Group>
+            </TimelineRail>
+          </div>
         </div>
       </Specimen>
 
