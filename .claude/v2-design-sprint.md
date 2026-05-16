@@ -1229,10 +1229,10 @@ Cross-cutting components:
     regressions). One observation queued: the disabled primary
     Button in dark (e.g. "Post note" idle state on TX detail) is
     bright via `--primary: oklch(0.922)` × default `disabled:opacity-50`
-    — reads as a mid-gray block. Acceptable per shadcn defaults,
-    but if dark-mode polish wants more restraint, consider tuning
-    the disabled treatment to `bg-muted text-muted-foreground` in
-    a follow-up.
+    — reads as a mid-gray block. Retired in iter 32
+    ([#1145](https://github.com/canalesb93/breadbox/pull/1145)) by
+    swapping the filled-variant disabled treatment to
+    `bg-muted text-muted-foreground` (opacity-100).
   - Process note: iter agent first opened a redundant PR (#1143)
     re-implementing iter-30's work after misreading the prompt's
     "iter 30 added a theme switcher" claim as not-yet-shipped. Closed
@@ -1240,6 +1240,32 @@ Cross-cutting components:
     the bootstrap fix. Lesson: when the prompt says a recent iter
     "is now wired," verify against `git log origin/design/v2-shadcn`
     before redoing the work.
+
+- **Iter 32 — Calmer disabled treatment for filled buttons** ([#1145](https://github.com/canalesb93/breadbox/pull/1145))
+  - Retires the iter-31 dark-mode observation. `default` and
+    `destructive` button variants now override the base
+    `disabled:opacity-50` with `disabled:bg-muted
+    disabled:text-muted-foreground disabled:opacity-100
+    disabled:shadow-none`. In dark mode `--primary` resolves to
+    `oklch(0.922 0 0)` (near-white); paired with `opacity-50` the
+    disabled "Post note" / "Save" buttons read as a bright gray *tile*
+    rather than a dimmed control. The new treatment swaps the fill
+    entirely so the disabled state reads as "this surface is locked"
+    in both light and dark — same `bg-muted text-muted-foreground`
+    vocabulary as Input's disabled state, no special-casing per
+    theme.
+  - Outline / ghost / secondary / link variants keep the inherited
+    `opacity-50`; they have no strong fill so 50% reads fine. The
+    base class string in `buttonVariants` is unchanged for them.
+  - Sandbox gains a `Button — disabled across variants` specimen
+    immediately below the existing Button specimen, with one
+    disabled `<Button>` per variant side-by-side so future iterations
+    can inspect the contract without grepping for `disabled=`. The
+    standalone `<Button disabled>Disabled</Button>` row in the
+    original Button specimen is gone (subsumed).
+  - Scoped fix — every disabled `<Button>` in the SPA picks it up
+    for free (the audit in iter 31 noted dozens of `isPending` /
+    `submitting` call sites). No call-site changes.
 
 ## Open observations / questions
 
