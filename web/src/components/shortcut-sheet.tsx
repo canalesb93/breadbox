@@ -30,6 +30,16 @@ export function ShortcutSheet() {
     group: "Global",
   });
 
+  // Command palette (and any other surface) can ask us to open without
+  // owning a ref — keeps `open` state local but lets external callers
+  // surface the sheet on demand.
+  React.useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("breadbox:shortcut-sheet:open", onOpen);
+    return () =>
+      window.removeEventListener("breadbox:shortcut-sheet:open", onOpen);
+  }, []);
+
   const grouped = React.useMemo(() => {
     const out = new Map<string, Shortcut[]>();
     for (const s of list) {
