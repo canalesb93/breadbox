@@ -3,15 +3,8 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckCircle2, ShieldAlert } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ArrowRight, CheckCircle2, Loader2, ShieldAlert, UserPlus } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
   FormControl,
@@ -22,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { AuthShell } from "@/components/auth-shell";
 import { toast } from "sonner";
 import { useSetupAccount, useSetupAccountInfo } from "@/api/queries/auth";
 import { ApiError } from "@/api/client";
@@ -66,115 +60,200 @@ export function SetupAccountPage() {
     }
   };
 
+  if (info.isLoading) {
+    return (
+      <AuthShell
+        eyebrow={
+          <>
+            <Loader2 className="size-3 animate-spin" />
+            Verifying invitation
+          </>
+        }
+        title="Checking your link…"
+        description="One moment while we validate this setup token."
+      >
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-9 w-full rounded-md" />
+          <Skeleton className="h-9 w-full rounded-md" />
+          <Skeleton className="h-9 w-full rounded-md" />
+        </div>
+      </AuthShell>
+    );
+  }
+
+  if (info.error instanceof ApiError && info.error.code === "ALREADY_SETUP") {
+    return (
+      <AuthShell
+        eyebrow="Already set up"
+        title="This account is already set up"
+        description="You've already chosen a password for this Breadbox account. Sign in below to continue."
+      >
+        <StatusPanel
+          tone="success"
+          icon={CheckCircle2}
+          heading="Setup complete"
+          body="Your password is already on file. The setup link won't be valid a second time."
+        />
+        <Button
+          onClick={() => navigate({ to: "/login" })}
+          className="mt-5 w-full"
+        >
+          Go to sign in
+          <ArrowRight className="size-4" />
+        </Button>
+      </AuthShell>
+    );
+  }
+
+  if (info.error) {
+    return (
+      <AuthShell
+        eyebrow="Invalid link"
+        title="This setup link won't work"
+        description={
+          info.error instanceof ApiError
+            ? info.error.message
+            : "The link is invalid or has expired."
+        }
+      >
+        <StatusPanel
+          tone="destructive"
+          icon={ShieldAlert}
+          heading="Setup link expired or invalid"
+          body="Ask the person who invited you to send a fresh link from their household admin dashboard. Existing links can be regenerated from Settings → Accounts."
+        />
+      </AuthShell>
+    );
+  }
+
   return (
-    <div className="bg-muted/30 flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        {info.isLoading ? (
-          <>
-            <CardHeader>
-              <CardTitle>Checking your link…</CardTitle>
-              <CardDescription>One moment.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted h-9 animate-pulse rounded-md" />
-            </CardContent>
-          </>
-        ) : info.error instanceof ApiError &&
-          info.error.code === "ALREADY_SETUP" ? (
-          <>
-            <CardHeader>
-              <div className="bg-emerald-500/10 mb-2 flex size-10 items-center justify-center rounded-xl">
-                <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <CardTitle>This account is already set up</CardTitle>
-              <CardDescription>
-                You've already chosen a password. Sign in below.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter>
-              <Button onClick={() => navigate({ to: "/login" })} className="w-full">
-                Go to sign in
-              </Button>
-            </CardFooter>
-          </>
-        ) : info.error ? (
-          <>
-            <CardHeader>
-              <div className="bg-destructive/10 mb-2 flex size-10 items-center justify-center rounded-xl">
-                <ShieldAlert className="text-destructive size-5" />
-              </div>
-              <CardTitle>This setup link is invalid</CardTitle>
-              <CardDescription>
-                {info.error instanceof ApiError
-                  ? info.error.message
-                  : "The link is invalid or has expired."}
-                {" "}
-                Ask the person who invited you to send a fresh link.
-              </CardDescription>
-            </CardHeader>
-          </>
-        ) : (
-          <>
-            <CardHeader>
-              <CardTitle>Set your password</CardTitle>
-              <CardDescription>
-                Welcome,{" "}
-                <span className="text-foreground font-medium">
-                  {info.data?.username}
-                </span>
-                . Choose a password to finish setting up your Breadbox account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            autoComplete="new-password"
-                            autoFocus
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+    <AuthShell
+      eyebrow={
+        <>
+          <UserPlus className="size-3" />
+          Finish setup
+        </>
+      }
+      title="Set your password"
+      description={
+        <>
+          Welcome,{" "}
+          <span className="text-foreground font-medium">
+            {info.data?.username}
+          </span>
+          . Choose a password to finish setting up your Breadbox account.
+        </>
+      }
+      footer={
+        <span>
+          Passwords are hashed with bcrypt and never leave your server.
+        </span>
+      }
+    >
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex flex-col gap-5"
+          noValidate
+        >
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input
+                    type="password"
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                    autoFocus
+                    {...field}
                   />
-                  <FormField
-                    control={form.control}
-                    name="confirm_password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirm password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            autoComplete="new-password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="confirm_password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm password</FormLabel>
+                <FormControl>
+                  <Input
+                    type="password"
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    {...field}
                   />
-                  <Button type="submit" className="w-full" disabled={submitting}>
-                    {submitting ? "Setting password…" : "Set password & sign in"}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </>
-        )}
-      </Card>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Setting password…
+              </>
+            ) : (
+              <>
+                Set password & sign in
+                <ArrowRight className="size-4" />
+              </>
+            )}
+          </Button>
+        </form>
+      </Form>
+    </AuthShell>
+  );
+}
+
+function StatusPanel({
+  tone,
+  icon: Icon,
+  heading,
+  body,
+}: {
+  tone: "success" | "destructive";
+  icon: React.ComponentType<{ className?: string }>;
+  heading: string;
+  body: string;
+}) {
+  // Inline panel used by setup-account's success / error states. Color is
+  // load-bearing here: success-tinted rail for "already set up" reads as
+  // resolution; destructive rail for "invalid link" reads as friction. Same
+  // colour-encodes-meaning principle as ColorRailCard, but inline-only.
+  const palette =
+    tone === "success"
+      ? {
+          rail: "before:bg-success",
+          iconBg: "bg-success/12 text-success",
+        }
+      : {
+          rail: "before:bg-destructive",
+          iconBg: "bg-destructive/10 text-destructive",
+        };
+  return (
+    <div
+      className={`bg-muted/30 relative overflow-hidden rounded-md border p-4 pl-5 before:absolute before:top-0 before:bottom-0 before:left-0 before:w-[3px] ${palette.rail}`}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`flex size-8 shrink-0 items-center justify-center rounded-md ${palette.iconBg}`}
+        >
+          <Icon className="size-4" />
+        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-foreground text-sm font-medium">{heading}</span>
+          <span className="text-muted-foreground text-xs leading-relaxed">
+            {body}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
