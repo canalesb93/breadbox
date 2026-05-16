@@ -265,6 +265,25 @@ next target, then updates this file at the end of the run.
   reserved for "real page loaded fine but has no data
   right now" (different semantics → different shell). Don't
   fork either.
+- **Theme switcher** (iter 30) — `<ThemeProvider>`
+  (`web/src/components/theme-provider.tsx`) wraps `next-themes`
+  with `attribute="class"`, `defaultTheme="system"`,
+  `disableTransitionOnChange`, `storageKey="breadbox:theme"`.
+  Mounted at the React root in `main.tsx`. `useTheme()` is the
+  only correct way to read or set the current mode — `ui/sonner.tsx`
+  already keys its `theme` prop off the same hook so toasts pick
+  up the chosen mode for free. The `.dark` variant in
+  `globals.css` does the rest; pages don't need to opt in.
+  Don't add a parallel theme state, don't manually toggle a
+  `data-theme` attribute — go through `useTheme()`.
+- **Primary-tinted pill triad** (iter 30, new): three surfaces
+  now reach for `bg-primary/15 text-primary` (BrandHeader's "V2"
+  chip, NavUser's admin role pill, settings active-state inline
+  rail). When a fourth surface adopts the combo, promote to a
+  `<PrimaryPill>` (or `<AccentPill tone="primary">`) primitive
+  so the radius / padding / font-weight stays in one place.
+  Until then, copy is fine — the pattern is small enough that
+  the abstraction would weigh more than the duplication.
 
 ## Backlog (ordered roughly by impact)
 
@@ -1139,6 +1158,51 @@ Cross-cutting components:
     shipped. Future iterations: end with `result:` only AFTER the PR
     is merged. Don't pause for "one more screenshot" — the PR is the
     deliverable.
+
+- **Iter 30 — NavUser footer + theme switcher** ([#1142](https://github.com/canalesb93/breadbox/pull/1142))
+  - Wires `next-themes` at the React root via a new
+    `<ThemeProvider>` (`web/src/components/theme-provider.tsx`) so
+    the SPA finally has a real light/dark/system switch. `globals.css`
+    already shipped the `.dark` variant and `ui/sonner.tsx` already
+    read `useTheme()` — both surfaces now resolve correctly.
+    `storageKey="breadbox:theme"` and `disableTransitionOnChange` so
+    the OKLCH tokens don't flicker on toggle.
+  - Rebuilt `NavUser` (bottom-of-sidebar account row + dropdown)
+    around the v2 vocabulary. The trigger row drops the
+    generic-shadcn-template feel: 8x8 ring-bordered avatar with a
+    primary-tinted tile, username splits into display + muted
+    domain (admin@example.com → "admin" + "@example.com"), and a
+    new `<RoleBadge>` renders the role as a tinted pill using the
+    same `bg-primary/15 text-primary` combo as the BrandHeader's
+    V2 chip (admin) / muted neutral for editor/viewer. Chevron
+    fades to foreground on hover.
+  - Dropdown header gets an enlarged identity tile mirroring the
+    trigger — opens by re-anchoring "who you are". New menu items:
+    **Theme** submenu (system / light / dark, check affordance on
+    the active row, key off `theme` not `resolvedTheme` so "System"
+    stays selected when the OS resolves dark), **Keyboard
+    shortcuts** with a `?` kbd hint (opens existing ShortcutSheet
+    via the iter-17 `breadbox:shortcut-sheet:open` event bus),
+    **Send feedback** → GitHub issues, **Classic admin UI**
+    promoted to its own row with an `ExternalLink` trail icon.
+    Sign out drops to a destructive-tinted row at the bottom (was
+    a neutral item indistinguishable from the rest).
+  - Loading state uses `SidebarMenuSkeleton` (the shadcn sidebar
+    primitive) instead of the "Loading…" placeholder text. Reads
+    as "loading", not "broken".
+  - Sandbox specimens added: live ThemeToggle (segmented pill
+    group backed by the same `useTheme` hook) + NavUser footer
+    visual demo with a note pointing readers at the live sidebar
+    for the actual dropdown. NavUser depends on `SidebarProvider`
+    so the full dropdown can't render inside a specimen card;
+    the demo is faithful to the trigger shape (avatar + name +
+    role pill + chevron).
+  - Process note: followed the iter-29 hard rule — committed +
+    pushed + opened PR BEFORE taking the AFTER screenshot. Vite
+    HMR still got stale (port 9301 served old code after edits
+    landed); fresh port 9302 with `--force` served correctly. Same
+    dance documented since iter 4 — chronic but trivially worked
+    around.
 
 ## Open observations / questions
 
