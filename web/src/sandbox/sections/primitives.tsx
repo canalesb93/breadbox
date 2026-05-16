@@ -7,6 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -189,6 +196,38 @@ export function PrimitivesSection() {
             <RadioGroupItem value="disabled" disabled /> Disabled
           </Label>
         </RadioGroup>
+      </Specimen>
+
+      <Specimen label="Select" className="block">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select defaultValue="full">
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Pick a scope" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full">Full access</SelectItem>
+              <SelectItem value="read">Read only</SelectItem>
+              <SelectItem value="none">None</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Placeholder" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a">Option A</SelectItem>
+              <SelectItem value="b">Option B</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select disabled>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Disabled" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="x">Unused</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </Specimen>
 
       <Specimen label="Card" className="block">
