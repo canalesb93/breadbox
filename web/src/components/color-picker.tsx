@@ -82,6 +82,11 @@ export function ColorPicker({
                 aria-label={`Pick ${color}`}
                 className={cn(
                   "relative size-7 rounded-md border transition hover:scale-110 hover:shadow-sm",
+                  // Shared focus vocabulary: matches the shadcn Button ring
+                  // recipe (ring-ring/50 + ring-[3px]) so keyboard users can
+                  // see which swatch is focused. Offset keeps the ring from
+                  // hugging the swatch fill.
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:ring-offset-2 focus-visible:outline-none",
                   selected && "ring-ring ring-2 ring-offset-2",
                 )}
                 style={{ backgroundColor: color }}

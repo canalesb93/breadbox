@@ -166,7 +166,7 @@ export function IconPicker({
               onChange(null);
               setOpen(false);
             }}
-            className="text-muted-foreground hover:bg-accent flex w-full items-center justify-center gap-1.5 border-t px-2 py-2 text-xs"
+            className="text-muted-foreground hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none flex w-full items-center justify-center gap-1.5 border-t px-2 py-2 text-xs"
           >
             <X className="size-3.5" /> Clear icon
           </button>
@@ -194,6 +194,9 @@ function IconTile({
       title={name}
       className={cn(
         "hover:bg-accent flex size-8 items-center justify-center rounded-md transition",
+        // Shared focus-visible recipe (matches Button primitive) so keyboard
+        // users can see which tile is focused as they tab/arrow through.
+        "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
         selected && "bg-accent ring-ring ring-2",
       )}
     >

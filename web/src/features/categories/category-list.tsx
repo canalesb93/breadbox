@@ -87,6 +87,10 @@ function CategoryRow({
           disabled={!hasChildren}
           className={cn(
             "text-muted-foreground -ml-1 flex size-6 shrink-0 items-center justify-center rounded-md transition-all",
+            // Shared focus-visible recipe so keyboard users tabbing through
+            // the category list can see which expand/collapse toggle is
+            // focused. Disabled (no-children) state stays invisible.
+            "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
             hasChildren
               ? "hover:bg-muted hover:text-foreground cursor-pointer"
               : "cursor-default opacity-0",

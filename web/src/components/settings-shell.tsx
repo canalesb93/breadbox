@@ -107,6 +107,10 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                     className={cn(
                       "group relative flex w-full items-center gap-2 rounded-md py-2 pr-3 pl-3.5 text-left text-sm transition-colors",
                       "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r-full before:bg-transparent before:transition-all",
+                      // Shared focus-visible vocabulary (matches Button +
+                      // SidebarMenuButton) so keyboard users can see which
+                      // section is focused before pressing Enter.
+                      "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
                       "[&>svg]:size-4 [&>svg]:text-muted-foreground",
                       isActive
                         ? "bg-accent text-accent-foreground before:bg-primary before:inset-y-1 [&>svg]:text-primary"
@@ -148,6 +152,10 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                   data-active={isActive ? "true" : undefined}
                   className={cn(
                     "group flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                    // Shared focus-visible vocabulary so keyboard users
+                    // tabbing through the mobile pill strip can see which
+                    // section is selected.
+                    "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
                     "[&>svg]:size-3.5",
                     isActive
                       ? "border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary"
