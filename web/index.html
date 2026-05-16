@@ -3,8 +3,51 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Breadbox v2</title>
+
+    <title>Breadbox — Self-hosted finance for households</title>
+    <meta
+      name="description"
+      content="Aggregate Plaid, Teller, and CSV bank data into one Postgres database you control. AI-ready via MCP, deploys as a single Go binary."
+    />
+
+    <!-- Branding / browser chrome.
+
+         The favicon and theme-color match the v2 primary token in
+         `web/src/globals.css` (oklch(0.205 0 0) ≈ #1a1a1a) and the
+         `BrandHeader` lockup so the tab icon reads as a smaller copy
+         of the in-app brand mark. -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- Open Graph — Slack / Discord / iMessage / Linear link previews. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Breadbox" />
+    <meta property="og:title" content="Breadbox — Self-hosted finance for households" />
+    <meta
+      property="og:description"
+      content="Aggregate Plaid, Teller, and CSV bank data into one Postgres database you control. AI-ready via MCP, deploys as a single Go binary."
+    />
+    <meta property="og:image" content="./og-image.svg" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Breadbox — self-hosted finance for households. Encrypted at rest, MCP-native, single binary." />
+
+    <!-- Twitter / X card. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Breadbox — Self-hosted finance for households" />
+    <meta
+      name="twitter:description"
+      content="Aggregate Plaid, Teller, and CSV bank data into one Postgres database you control."
+    />
+    <meta name="twitter:image" content="./og-image.svg" />
+
     <script>
+      // Light/dark theme follows the OS — same contract as `BrandHeader`
+      // and the rest of the v2 SPA. Inline + synchronous so the first
+      // paint never flashes the wrong theme.
       (function () {
         var mql = window.matchMedia("(prefers-color-scheme: dark)");
         function apply(e) {
