@@ -45,16 +45,34 @@
     <meta name="twitter:image" content="./og-image.svg" />
 
     <script>
-      // Light/dark theme follows the OS — same contract as `BrandHeader`
-      // and the rest of the v2 SPA. Inline + synchronous so the first
-      // paint never flashes the wrong theme.
+      // No-flash theme bootstrap. Inline + synchronous so the first
+      // paint never flashes the wrong theme. Reads the same storage
+      // key (`breadbox-theme`) that `ThemeProvider` writes from
+      // `next-themes` so a user's saved choice survives reloads.
+      // Falls back to the OS preference when nothing is saved or
+      // when the saved value is "system".
       (function () {
-        var mql = window.matchMedia("(prefers-color-scheme: dark)");
-        function apply(e) {
-          document.documentElement.classList.toggle("dark", e.matches);
+        try {
+          var stored = window.localStorage.getItem("breadbox-theme");
+          var mql = window.matchMedia("(prefers-color-scheme: dark)");
+          function resolve() {
+            if (stored === "dark") return true;
+            if (stored === "light") return false;
+            return mql.matches;
+          }
+          function apply() {
+            document.documentElement.classList.toggle("dark", resolve());
+          }
+          apply();
+          // Keep tracking OS changes only while the user is on
+          // "system" (or has not chosen) — `next-themes` handles the
+          // explicit case once the React tree mounts.
+          mql.addEventListener("change", function () {
+            if (!stored || stored === "system") apply();
+          });
+        } catch (_) {
+          /* localStorage blocked — fall through, default light */
         }
-        apply(mql);
-        mql.addEventListener("change", apply);
       })();
     </script>
   </head>

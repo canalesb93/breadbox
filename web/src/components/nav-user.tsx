@@ -1,5 +1,16 @@
-import { ChevronsUpDown, ExternalLink, LogOut, Palette } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  ExternalLink,
+  LogOut,
+  Monitor,
+  Moon,
+  Palette,
+  Sun,
+  SunMoon,
+} from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -7,7 +18,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -25,10 +40,17 @@ function initials(name: string) {
   return (parts[0]?.[0] ?? "?").concat(parts[1]?.[0] ?? "").toUpperCase();
 }
 
+const THEME_OPTIONS = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+] as const;
+
 export function NavUser({ me }: { me: Me | null }) {
   const { isMobile } = useSidebar();
   const navigate = useNavigate();
   const logout = useLogout();
+  const { theme, setTheme } = useTheme();
 
   const onLogout = async () => {
     try {
@@ -97,6 +119,37 @@ export function NavUser({ me }: { me: Me | null }) {
                 Design system
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2">
+                <SunMoon className="size-4" />
+                <span>Theme</span>
+                <span className="text-muted-foreground ml-auto text-xs capitalize">
+                  {theme ?? "system"}
+                </span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent className="min-w-36">
+                  {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+                    const active = (theme ?? "system") === value;
+                    return (
+                      <DropdownMenuItem
+                        key={value}
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setTheme(value);
+                        }}
+                      >
+                        <Icon className="size-4" />
+                        <span>{label}</span>
+                        {active && (
+                          <Check className="text-muted-foreground ml-auto size-3.5" />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               disabled={logout.isPending}
