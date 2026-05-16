@@ -1,4 +1,12 @@
-import { Bell, Check, ChevronsUpDown, Plus } from "lucide-react";
+import {
+  Bell,
+  Bold,
+  Check,
+  ChevronsUpDown,
+  Italic,
+  Plus,
+  Underline,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -91,6 +99,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Toggle } from "@/components/ui/toggle";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 
 export function PrimitivesSection() {
@@ -442,6 +461,66 @@ export function PrimitivesSection() {
             Collapsible content — the sidebar nav groups use this.
           </CollapsibleContent>
         </Collapsible>
+      </Specimen>
+
+      <Specimen
+        label="Tabs"
+        code="default · active state"
+        className="block"
+        description="Active fill carries the selection signal. Iter 47 bumped the dark active to bg-white/[0.08] so it reads as pressed over the bg-muted container (stock dark:bg-input/30 was invisible)."
+      >
+        <Tabs defaultValue="overview" className="max-w-md">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+          <TabsContent
+            value="overview"
+            className="text-muted-foreground text-sm"
+          >
+            Overview panel content.
+          </TabsContent>
+          <TabsContent
+            value="activity"
+            className="text-muted-foreground text-sm"
+          >
+            Activity panel content.
+          </TabsContent>
+          <TabsContent
+            value="settings"
+            className="text-muted-foreground text-sm"
+          >
+            Settings panel content.
+          </TabsContent>
+        </Tabs>
+      </Specimen>
+
+      <Specimen
+        label="Toggle"
+        code="default · outline · pressed"
+        description="Single pressable toggle. Iter 47 bumped the dark on-state to bg-white/[0.08] so the pressed state reads against bg-card; outline picks up the same dark:border-white/20 vocabulary as inputs."
+      >
+        <Toggle aria-label="Toggle bold">
+          <Bold />
+        </Toggle>
+        <Toggle aria-label="Toggle italic" defaultPressed>
+          <Italic />
+        </Toggle>
+        <Toggle aria-label="Toggle underline" variant="outline">
+          <Underline />
+        </Toggle>
+      </Specimen>
+
+      <Specimen
+        label="ToggleGroup"
+        code="single · outline"
+        description="Multi-button cluster (grouping dimension on /accounts). Single-select; outline variant glues borders together so the cluster reads as one control."
+      >
+        <ToggleGroup type="single" variant="outline" defaultValue="institution">
+          <ToggleGroupItem value="institution">Institution</ToggleGroupItem>
+          <ToggleGroupItem value="type">Type</ToggleGroupItem>
+        </ToggleGroup>
       </Specimen>
     </SandboxSection>
   );
