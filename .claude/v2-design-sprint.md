@@ -2110,21 +2110,52 @@ Cross-cutting components:
     pattern for "this open-coded helper landed on too many pages
     and earned a primitive promotion".
 
+- **Iter 56 — TimelineRail rail-tail clipped to disc centres** ([#1169](https://github.com/canalesb93/breadbox/pull/1169))
+  - Picked up the iter 55 audit observation. The old TimelineRail
+    drew its rail as `border-l` on the surrounding `<ol>`, but each
+    row's icon disc was inset with a negative margin
+    (`-ml-[calc(0.875rem+1px)]`) so it visually sat centred on that
+    border. The `<ol>`'s border ran from row 1's top to the last
+    row's bottom — i.e. past the centred icon — leaving a stray
+    rail-tail under every group.
+  - Fix: drop the `<ol border-l>` and draw the rail per-row via a
+    `::before` pseudo on each `<li>`. Default the line to span
+    `-top-3` → `-bottom-3` so it bridges the `space-y-3` gap
+    between rows; override `top: 14px` on `:first-of-type` and
+    `bottom: calc(100% - 14px)` on `:last-of-type` so the line
+    starts exactly on the first disc centre and ends on the last
+    one. Disc gains `relative z-10` + `bg-card` so it punches
+    through the rail line behind it (same "punch-through" identity
+    the primitive promised).
+  - Consumer API unchanged. `<TimelineRail>` /
+    `<TimelineRail.Group label="...">` / `<TimelineRail.Row icon=
+    {Icon}>` work exactly as before. The single consumer (TX-detail
+    Activity feed via `features/transactions/activity-timeline.tsx`)
+    + the sandbox specimen both render through the new pipeline
+    untouched.
+  - Cross-group continuity (one rail across day groups) is
+    deliberately deferred — see the updated open observation. That
+    fix needs a bigger refactor (Group becomes a Fragment, headings
+    become `<li role="presentation">` siblings of rows) and there's
+    still only one consumer, so the API churn doesn't pay off yet.
+
 ## Open observations / questions
 
 (Populated by iterations.)
 
-- **TimelineRail rail-tail issue** (iter 55 audit, no PR shipped): on
-  TX-detail Activity timeline, the `<ol border-l>` rail visibly extends
-  below the last row's icon disc because the disc is inset with
-  `-ml-[calc(0.875rem+1px)]` so the parent `<ol>`'s left border keeps
-  going past the centered icon. Worse: each `<TimelineRail.Group>` is
-  its own `<ol>`, so the visual continuity the primitive promises is
-  broken between day-group boundaries — each group has its own rail
-  tail. Most prominent at mobile but visible at all viewports. Fix:
-  either render one continuous `<ol>` across groups (day headings as
-  list items) or use a CSS background-image rail that stops at the
-  last disc. Pick one in the next iteration.
+- **TimelineRail cross-group continuity** (iter 56 follow-up): the
+  rail-tail clipping bug from iter 55 is fixed (#1169) — each group's
+  rail now starts and ends exactly on the first/last disc centre via
+  per-row `::before` lines clipped with `:first-of-type` /
+  `:last-of-type`. The remaining piece is visual continuity *across*
+  groups: each `<TimelineRail.Group>` is still its own `<ol>`, so the
+  rail breaks between day-group boundaries. That fix requires merging
+  groups into a single `<ol>` with day headings as `<li
+  role="presentation">` siblings, which is a real consumer-API
+  refactor (Group becomes a Fragment that dissolves into the parent
+  `<ol>`) — defer until a second consumer (rule run history,
+  per-connection sync log) needs the same look, so we don't ship a
+  refactor for one consumer.
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
@@ -2228,6 +2259,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
