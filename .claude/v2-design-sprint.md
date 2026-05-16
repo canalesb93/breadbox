@@ -242,6 +242,23 @@ next target, then updates this file at the end of the run.
   surface, so muted reads as "this surface is locked by config"
   instead of "look at me". Live with the divergence; revisit if
   a third surface picks up a tonal info.
+- **"Coming soon" page pattern** (iter 21) — the new
+  `routes/placeholder.tsx` shell is the canonical pattern
+  for any unbuilt nav leaf: `<PageHeader>` (eyebrow from nav
+  group + scoped description + Jump-to-⌘K + Back-to-Home
+  actions) → `<StatusPanel tone="info">` with a "Coming
+  soon" pill in the trailing slot → optional `<SectionCard
+  title="What's coming">` with a 3-column grid of numbered
+  planned-feature tiles + footer strip of related-page
+  links. Per-route copy lives in a `CONTENT` map keyed by
+  pathname inside the file. When a new nav leaf lands
+  without a real implementation, add a `CONTENT[path]` entry
+  with `description` + `features[]` + `related[]` —
+  everything else (eyebrow, icon, layout, command-palette
+  hookup) is derived. The `<EmptyState>` primitive stays
+  reserved for "real page loaded fine but has no data
+  right now" (different semantics → different shell). Don't
+  fork either.
 
 ## Backlog (ordered roughly by impact)
 
@@ -264,7 +281,7 @@ Pages:
 - [x] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`) — #1126
 - [x] Login (`login.tsx`) — #1127
 - [x] Setup account (`setup-account.tsx`) — #1127
-- [ ] Placeholder (`placeholder.tsx`)
+- [x] Placeholder (`placeholder.tsx`) — #1134
 
 Cross-cutting components:
 
@@ -916,6 +933,48 @@ Cross-cutting components:
     browser. Same dance documented in iter 4/5 still applies:
     stale browser content → start a fresh port with `--force`
     rather than fighting the cache.
+
+- **Iter 21 — Placeholder "coming soon" page** ([#1134](https://github.com/canalesb93/breadbox/pull/1134))
+  - Retires the generic "page is empty" plate (centered icon
+    + one-liner) used for `/reports` and `/agents`. Replaced
+    with a real v2-vocabulary page: `<PageHeader>` (eyebrow
+    derived from the nav group via `NAV_LEAVES` lookup +
+    scoped description + action cluster), `<StatusPanel
+    tone="info">` notice with an inline "Coming soon" pill
+    in the trailing slot, then a `<SectionCard>` body with
+    "What's coming" — a three-up grid of numbered planned-
+    feature tiles. Footer slot hosts a small "Available
+    today:" strip with outline-button links to related pages
+    that ARE live + a "Request a feature" link to GitHub
+    issues on the right.
+  - Per-route copy lives in a `CONTENT` map keyed by
+    pathname. Reports gets Cashflow / Category breakdown /
+    Saved views & exports planned features + links to
+    Transactions / Categories / Accounts. Agents gets
+    Connected agents / Activity timeline / Scope controls +
+    links to API keys / Connections. New nav leaves without
+    a CONTENT entry fall back to just the StatusPanel notice
+    (no "What's coming" section). Adding a new entry is one
+    object literal.
+  - Pathname-driven lookup means callers continue to pass
+    only `title` — no API change at the `<Placeholder
+    title={leaf.title} />` callsite in `main.tsx`. Eyebrow
+    + leaf icon come from `NAV_LEAVES.find(({ leaf }) =>
+    leaf.to === pathname)`, so each tile in the grid carries
+    a small ghosted version of the page's nav icon for visual
+    continuity.
+  - `Jump to… ⌘K` button in the header actions slot reuses
+    the iter-17 `breadbox:command-palette:open` event bus to
+    open the command palette inline — no prop-drilling, no
+    new state lifted. Pairs with a primary `Back to Home`
+    button for a no-brainer escape.
+  - File header comment now spells out the distinction
+    between `<Placeholder>` (page hasn't been built yet) and
+    `<EmptyState>` (page loaded fine but has no data right
+    now). Different semantics, different visual language.
+    The last unchecked Pages backlog item is now ticked —
+    every nav leaf has either a real page or a polished
+    coming-soon shell.
 
 ## Open observations / questions
 
