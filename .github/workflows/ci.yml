@@ -18,8 +18,27 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    # Integration tests are sharded across parallel jobs so the two
+    # heavy packages (api, service) don't run end-to-end on one
+    # runner. api+service alone are ~76% of integration time.
+    name: Test (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - name: api
+            packages: ./internal/api/...
+            run_unit: false
+          - name: service
+            packages: ./internal/service/...
+            run_unit: false
+          - name: rest
+            # Everything except api + service. Also carries go vet and
+            # the untagged unit-test suite for the whole repo, since
+            # those don't shard cleanly and are cheap (~20s combined).
+            packages: $(go list ./... | grep -v -E '^breadbox/internal/(api|service)(/|$)' | tr '\n' ' ')
+            run_unit: true
     services:
       postgres:
         image: postgres:16-alpine
@@ -41,9 +60,32 @@ jobs:
         with:
           go-version: "1.25"
 
-      - name: Install sqlc and generate
+      - name: Cache generator binaries (sqlc, templ, goose)
+        id: gen-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/bin/sqlc
+            ~/go/bin/templ
+            ~/go/bin/goose
+          # Version-keyed so a bump (sqlc release, templ tag, goose
+          # release) invalidates cleanly.
+          key: ${{ runner.os }}-gentools-sqlc1.30.0-templ-latest-goose-latest-v1
+
+      - name: Install sqlc
+        if: steps.gen-cache.outputs.cache-hit != 'true'
+        run: curl -sL https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin sqlc
+
+      - name: Install templ
+        if: steps.gen-cache.outputs.cache-hit != 'true'
+        run: go install github.com/a-h/templ/cmd/templ@latest
+
+      - name: Install goose
+        if: steps.gen-cache.outputs.cache-hit != 'true'
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+      - name: Generate sqlc
         run: |
-          curl -sL https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin sqlc
           sqlc generate
           # Prepend //go:build !lite to every generated file so they're
           # excluded from -tags=lite builds. Mirrors `make sqlc-tag`.
@@ -53,9 +95,8 @@ jobs:
             fi
           done
 
-      - name: Install templ and generate
+      - name: Generate templ
         run: |
-          go install github.com/a-h/templ/cmd/templ@latest
           templ generate
           # Prepend //go:build !headless && !lite to every generated templ
           # file in internal/templates/components. Mirrors `make templ`.
@@ -75,18 +116,13 @@ jobs:
       - name: Build CSS
         run: make css
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Build v2 SPA
-        run: |
-          cd web
-          bun install --frozen-lockfile
-          bun run build
+      # The v2 SPA bundle is intentionally NOT built here: //go:embed
+      # all:dist is satisfied by the committed web/dist/.gitkeep, and
+      # no test exercises the bundle's content. Bundle build lives in
+      # the release/docker-build jobs that actually ship the binary.
 
       - name: Check for duplicate migration versions
+        if: matrix.shard.run_unit
         run: |
           dupes=$(ls internal/db/migrations/*.sql | sed 's/.*\///' | sed 's/_.*//' | sort | uniq -d)
           if [ -n "$dupes" ]; then
@@ -95,22 +131,22 @@ jobs:
           fi
 
       - name: Run go vet
+        if: matrix.shard.run_unit
         run: go vet ./...
 
       - name: Run migrations
         env:
           DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
-        run: |
-          go install github.com/pressly/goose/v3/cmd/goose@latest
-          goose -dir internal/db/migrations postgres "$DATABASE_URL" up
+        run: goose -dir internal/db/migrations postgres "$DATABASE_URL" up
 
       - name: Run unit tests
+        if: matrix.shard.run_unit
         run: go test ./...
 
       - name: Run integration tests
         env:
           DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
-        run: go test -tags integration -count=1 -p 1 ./...
+        run: go test -tags integration -count=1 -p 1 ${{ matrix.shard.packages }}
 
   test-headless:
     name: Test (headless)
