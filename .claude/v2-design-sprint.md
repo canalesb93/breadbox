@@ -133,21 +133,22 @@ next target, then updates this file at the end of the run.
 - **TimelineRail primitive** — extracted to
   `web/src/components/timeline-rail.tsx` in iter 26 (#1138).
   Compound API: `<TimelineRail>` / `<TimelineRail.Group label="…">`
-  / `<TimelineRail.Row icon={Icon} muted>`. Bordered `<ol>` rail +
+  / `<TimelineRail.Row icon={Icon} muted>` / `<TimelineRail.RowSkeleton body>`
+  (added iter 65, #1178). Bordered per-row rail (`::before` on
+  each `<li>`, clipped on first/last to the disc centre) +
   punched-through `bg-card` icon discs + day-headings as anchors
   outside the rail. One consumer today (transaction-detail
   Activity); queued for rule run history and per-connection sync
   log. `muted` prop centralises the soft-delete opacity vocabulary
-  so consumers don't fork the class string. Don't fork the look —
+  so consumers don't fork the class string. `RowSkeleton` mirrors
+  the row geometry exactly (same disc + rail) so the loading state
+  doesn't shift layout when annotations land — opt-in `body` prop
+  adds a `Skeleton h-8` block between the headline and timestamp
+  lines for comment-bubble-bearing rows. Don't fork the look —
   extend the primitive. The iter-5 drift note ("Generic enough to
   ship as a `<TimelineRail>` primitive if a second timeline lands")
   is now resolved (shipped pre-emptively before the second
-  consumer to avoid forking later). Iter 62 reworked the
-  `<TimelineRail.Group>` `label` rendering to read as a temporal
-  divider (dot anchored on the rail x-axis + uppercase eyebrow +
-  hairline rule extending right) instead of a plain `<Eyebrow>`
-  that drifted into the section-header vocabulary — same Eyebrow
-  primitive inside, distinct visual role outside.
+  consumer to avoid forking later).
 - **AuthShell primitive** (iter 14, #1127) — two-pane shell for
   unauthenticated pages at `web/src/components/auth-shell.tsx`.
   Left pane reuses the in-app sidebar surface (`bg-sidebar` +
@@ -182,18 +183,12 @@ next target, then updates this file at the end of the run.
   `<Loader2 className="animate-spin">` while pending). Three
   surfaces share it today: tag-form, category-form, and the
   surfaces that consume those forms (tag-new, tag-detail,
-  category-new, category-detail, api-key-new). api-key-form
-  (iter 43, #1157) was the last hand-rolled copy of the strip —
-  swept onto `<FormFooter>` and the iter-13 / iter-15 drift TODO
-  is resolved. Don't fork the look — extend the primitive. The
-  optional `hint` slot is wired but no consumer uses it yet —
-  useful for validation messages that should sit next to the
-  actions instead of above them. Rule-form keeps its bespoke
-  bottom strip because the form lives inside a wide two-column
-  layout (form + live-preview rail) rather than a SectionCard
-  body, so the FormFooter contract (negative margins to flush
-  out to the card edges) doesn't apply — promote when a second
-  surface adopts that wider layout.
+  category-new, category-detail). api-key-form (iter 13) still
+  hand-rolls the same strip inline; sweep onto `<FormFooter>`
+  next time we touch it. Don't fork the look — extend the
+  primitive. The optional `hint` slot is wired but no consumer
+  uses it yet — useful for validation messages that should sit
+  next to the actions instead of above them.
 - **Canonical form-page shell** (iter 15): for any new/edit
   page that hangs off a list, the vocabulary is now
   `<SoftBackButton>` + `<PageHeader eyebrow="New X" title="…">`
@@ -325,21 +320,6 @@ next target, then updates this file at the end of the run.
   intentionally outside this vocabulary — they're surface-specific
   framing (login chrome, brand lockup, command-palette grouping),
   not detail-page eyebrows.
-- **DetailList primitive** — extracted to
-  `web/src/components/detail-list.tsx` in iter 54 (#1168). Four
-  surfaces now share the canonical label / value KV block: TX-detail
-  Details sidebar, account-detail Details sidebar, connection-detail
-  Details sidebar, category-detail Details sidebar. Visual contract:
-  `<div className="space-y-2.5">` + optional `<Eyebrow as="h3">` +
-  `<dl className="space-y-2">` with rows of `<dt>` (muted xs,
-  shrink-0, label) + `<dd>` (right-aligned xs, `break-words` so long
-  values wrap inside the column at 375px instead of getting clipped
-  by `truncate`). `compactDetailRows` is the canonical nullable-row
-  filter so callsites stay declarative (`cond ? row : null`
-  inline). Mono rows route through `<IdPill>`. Stack two or three
-  inside a `<SectionCard bodyClassName="space-y-5 px-5 py-5
-  text-sm">` host — same rhythm every detail page now shares. Don't
-  fork the look — extend the primitive.
 - **DetailSheetHeader primitive** — extracted to
   `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
   Two surfaces now share the canonical icon-tile sheet header lockup:
@@ -353,29 +333,9 @@ next target, then updates this file at the end of the run.
   inline for a new Sheet — extend this primitive. `reauth-sheet` and
   `link-account-sheet` use different header shapes (no icon-tile
   lockup) and stay open-coded — promote if a third Sheet adopts the
-  lockup with a yet-different rhythm. Sandbox specimen shipped in
-  iter 42 (#1156) — wrap in `<Sheet open onOpenChange={() => {}}>`
-  to provide the Dialog.Root context without rendering a portaled
-  SheetContent. The same recipe unlocks specimens for any future
-  primitive that wraps radix Dialog/Popover/Sheet internals.
-- **Hover vocabulary** (iter 64, #1177) — three canonical
-  `transition-colors hover:bg-*` patterns documented in the
-  Foundations sandbox. Pattern selection is by *host surface*,
-  not visual weight. (1) Divide-y list row → `hover:bg-muted/40`
-  (matches `<TableRow>`); used by Home recent activity, Account
-  recent transactions, Categories, Shortcut sheet, Category-detail
-  children, Connection-row, Account-row. (2) Bordered card grid
-  pick → `hover:bg-accent/40 hover:border-primary/40`; used by
-  provider-picker, connection-accounts-list cards. (3)
-  Tinted-idle card grid → `bg-muted/20 hover:bg-muted/40
-  hover:border-ring/40`; used by not-found quick jumps. Don't
-  drift between the three — they encode different meanings (row
-  in a list vs selectable card vs interactive tile). The
-  rule-row `hover:bg-muted/30` is justified by its heavier idle
-  weight (bordered card with `bg-card`); when a second
-  bordered-list-card pattern lands, consider promoting that as a
-  fourth token. Future surfaces: never invent a hover tint
-  without checking the three canonical patterns first.
+  lockup with a yet-different rhythm. No sandbox specimen because
+  SheetTitle/SheetDescription require radix Dialog context; the live
+  consumers carry the visual reference.
 
 ## Backlog (ordered roughly by impact)
 
@@ -430,51 +390,17 @@ Cross-cutting components:
   hand-rolled empties retired onto the primitive (household-section,
   backups-section, connection-accounts-list, sync-history-list).
 - [x] `command-palette.tsx` — sections, kbd hints, recents — #1130
-- [x] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes —
-  iter 50 (#1164) shipped a shared `size` prop (`sm` | `md`) on
-  `CategoryBadge`, `TagChip`, and `TagList` (recipe: sm = h-5 / 11px /
-  size-2.5 icon; md = h-6 / 12px / size-3 icon) so chip + badge align
-  in the same row. Transactions table inline trigger
-  (`CategoryPicker`) and `TransactionPrimary` tag rail use `sm` for
-  density parity; the dashed empty-state pill mirrors the sm geometry
-  so the column doesn't shift. Retired the local `TagChip` fork in
-  `features/rules/rule-display.tsx`. The shared SIZE recipe lives
-  inline in both files — adjust as a pair if the density vocabulary
-  shifts.
-- [x] `transaction-amount.tsx` — currency rendering — iter 59 (#1172)
-  consolidated all money formatters into `lib/format.ts`. Two new
-  siblings to `formatAmount` (`formatBalance`, `formatCompactAmount`)
-  replaced the three forks (`home-stats.formatCompact`,
-  `connection-utils.formatCurrency`, `account-utils.formatCurrency`)
-  that each rebuilt `Intl.NumberFormat` per call. Five consumers
-  swept onto the shared helpers; `grep -rn "new Intl.NumberFormat"
-  web/src` now returns one hit (the helper itself). Sandbox
-  `AmountsSection` documents all three formatters in one place.
-  `TransactionAmount` component itself was already on `formatAmount`
-  — the work was in the surrounding currency-rendering ecosystem,
-  not the component file.
+- [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
+- [ ] `transaction-amount.tsx` — currency rendering
 - [x] Form patterns (used across new/edit pages) — `FormFooter` primitive
-  promoted in iter 15 (#1128); api-key-form swept onto it in iter 43
-  (#1157), closing the iter-13 carve-out. Iter 49 (#1163) added the
-  `inset` prop (`card` default + new `sheet` variant) so the CSV
-  import form's bespoke `CsvFooterStrip` could fold back in — five
-  form families now share the primitive. Canonical form-page shell:
-  `<SoftBackButton>` + `<PageHeader eyebrow=…>` + `<SectionCard>`
-  with the form, `<FormFooter>` at the bottom (flush bordered strip,
-  Cancel left, primary right with `<Loader2 className="animate-spin">`).
-  Live across tag-new/detail, category-new/detail, api-key-new, and
-  both stages of csv-import-form (`inset="sheet"`). Rule-form keeps
-  its bespoke bottom strip because the form lives inside a wide
-  two-column layout (form + live-preview rail), so the FormFooter
-  contract (negative margins to flush to a container body) doesn't
-  apply. Labels / validation / FormItem patterns already canonical
-  via shadcn `Form` primitive. Iter 53 (#1167) gave `<FormMessage>` a
-  leading `AlertCircle` for field validation errors so the destructive
-  line reads as a status signal — and swept rule-form's amber
-  `comboWarnings` `<Alert>` + csv-import-form's `<Alert
-  variant="destructive">` onto `<StatusPanel>` (warning / destructive
-  tones). Form validation now speaks one icon-led vocabulary across
-  the five form families.
+  promoted in iter 15 (#1128). Canonical form-page shell is now:
+  `<SoftBackButton>` + `<PageHeader eyebrow=…>` + `<SectionCard>` with the
+  form, `<FormFooter>` at the bottom (flush bordered strip, Cancel left,
+  primary right with `<Loader2 className="animate-spin">`). Live across
+  tag-new, tag-detail, category-new, category-detail. api-key-new (iter 13)
+  still hand-rolls the same strip inline — sweep onto `<FormFooter>` next
+  time we touch api-key-form. Labels / validation / FormItem patterns
+  already canonical via shadcn `Form` primitive.
 - [x] Toast (`sonner.tsx`) — variants, action affordances — iter 20 (#1133)
 - [x] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency — iter 18
 - [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
@@ -1636,6 +1562,42 @@ Cross-cutting components:
   - Queued the inner shell extraction into a `<DetailSheetHeader>`
     primitive for the next time a third Sheet adopts it.
 
+- **Iter 65 — `<TimelineRail.RowSkeleton>` (loading geometry matches the real row)** ([#1178](https://github.com/canalesb93/breadbox/pull/1178))
+  - ActivityTimeline was hand-rolling a `gap-3` skeleton with a
+    `size-7 rounded-full` chip that didn't carry the rail line —
+    loading-to-loaded swapped a flat row stack for a punched-through
+    rail, so the layout jumped on data arrival. Adds
+    `<TimelineRail.RowSkeleton>` to the timeline primitive's compound
+    API (third member alongside `Group` and `Row`). Geometry mirrors
+    `<TimelineRail.Row>` exactly: same `::before` rail clipped on
+    first/last rows to the disc centre, same 28px disc punched
+    through `bg-card`, same negative margin / pl-3.5 math.
+  - `body` prop (default `false`) renders an extra `Skeleton h-8`
+    block between the headline and timestamp lines for
+    comment-bubble-bearing rows. Activity timeline's loading state
+    uses four rows with one `body` to suggest the dominant comment +
+    system-event mix.
+  - Sandbox specimen at `/v2/sandbox` (Components → TimelineRail)
+    gains a side-by-side Loaded / Loading panel so the contract is
+    inspectable. The Loaded panel was already in place; just wrapped
+    the existing demo in a labelled column and added a matching
+    Loading column.
+  - Same pattern as iter 36's `<ListRowSkeleton>` for list surfaces
+    — extend the primitive, don't re-derive the loading shape. The
+    drift note in iter 26 ("primitive owns the loading shape") is
+    now resolved.
+  - Skeleton's disc carries `aria-hidden` since the real disc is
+    decorative (the row text carries the semantics). Skeleton
+    component reused from `components/ui/skeleton`.
+  - Process note: Skipped live AFTER screenshot — shared dev DB
+    admin password didn't match `password` in this worktree and
+    resetting the shared DB password isn't authorized. Future
+    iterations that hit the same wall: prefer reusing an
+    already-running `make dev` on the host (the
+    `BREADBOX_BACKEND_PORT=<port>` trick) over spinning a fresh
+    server on a new port; the active dev DB seed is the only one
+    where `admin@example.com / password` works.
+
 - **Iter 41 — `<DetailSheetHeader>` primitive** ([#1155](https://github.com/canalesb93/breadbox/pull/1155))
   - Promotes the icon-tile Sheet header lockup established by
     iter 39 (Shortcut sheet) and iter 40 (Connect-bank) into a
@@ -1652,832 +1614,11 @@ Cross-cutting components:
     standalone in `/v2/sandbox`. First specimen that couldn't
     ship — the live consumers carry the visual reference.
     Worth noting for any future primitive that wraps radix
-    Dialog/Sheet/Popover internals. *Resolved in iter 42 (#1156)
-    — wrap the specimen in `<Sheet open onOpenChange={() => {}}>`
-    to provide the Dialog.Root context without rendering a
-    portaled SheetContent.*
+    Dialog/Sheet/Popover internals.
 
-- **Iter 42 — DetailSheetHeader sandbox specimen** ([#1156](https://github.com/canalesb93/breadbox/pull/1156))
-  - Adds the missing iter-41 follow-up: both `default` and `accent`
-    density variants live in the Components section of `/v2/sandbox`,
-    side-by-side under labeled headers ("DEFAULT · SIZE-9 TILE · P-5"
-    vs "ACCENT · SIZE-10 TILE · P-6 · WITH EYEBROW + TRAILING").
-    Accent variant carries the eyebrow + trailing slot (Plaid badge)
-    so both lockup variations read at a glance.
-  - Pattern: wrap each specimen in a hidden
-    `<Sheet open onOpenChange={() => {}}>`. Radix's `Dialog.Root`
-    (= Sheet) provides the context that SheetTitle/SheetDescription
-    need without rendering any chrome — SheetContent is the portal,
-    Sheet itself is just a provider. Use this recipe for any future
-    primitive that wraps radix Dialog/Popover/Sheet internals.
-  - No code changes outside the sandbox file — purely additive to
-    the gallery. The DetailSheetHeader drift note in this file
-    is updated to retire the "no specimen" caveat.
-
-- **Iter 43 — api-key-form swept onto FormFooter** ([#1157](https://github.com/canalesb93/breadbox/pull/1157))
-  - Retires the last hand-rolled flush bordered action strip in v2.
-    api-key-form's bespoke `<div className="bg-muted/20 -mx-5 -mb-5
-    flex items-center justify-end gap-2 border-t px-5 py-3">` is
-    replaced with `<FormFooter secondary={…} primary={…} />` —
-    same vocabulary, now centralised in the primitive.
-  - Closes the iter-13 / iter-15 drift TODO ("api-key-form still
-    hand-rolls the same strip — sweep onto FormFooter next time we
-    touch it"). All four canonical form pages — tag-new,
-    category-new, api-key-new, plus edit variants — now share the
-    same Cancel-left + primary-right rhythm with leading
-    `<Loader2>` spinner.
-  - Rule-form's bottom strip stays bespoke because its host is a
-    wide two-column layout (form + live-preview rail), not a
-    SectionCard body — the FormFooter negative-margin contract
-    doesn't apply. Noted as the next sweep candidate if a second
-    wide-form surface lands.
-  - Pure markup unification — no visual diff at 1440. Local `bun
-    run lint` + `go build ./...` both green.
-
-- **Iter 44 — Mobile detail-page hero polish** ([#1158](https://github.com/canalesb93/breadbox/pull/1158))
-  - TX-detail hero: split the classify strip (category + tags) into
-    its own grid row so the priority order on a 375 viewport reads
-    **identity → amount → classify**. Previously the amount sat
-    below the classify strip on mobile — user had to scroll past
-    tags/category to see the headline number. Lg layout unchanged:
-    amount column still docks to the right via
-    `lg:grid-cols-[minmax(0,1fr)_auto]`, with the amount column
-    getting `lg:row-span-2` so it spans both the identity and
-    classify rows.
-  - All four `ColorRailCard` heros (TX / Account / Category /
-    Connection) tighten mobile padding from `px-6 py-6` →
-    `px-5 py-5` and gap from `gap-6` → `gap-5`; `sm:` keeps the
-    original `px-7 py-6` + `gap-6` rhythm. The hero now breathes
-    on 375 without crowding the rail. `ColorRailCard` footer
-    action strip picks up the same `px-5` mobile padding.
-  - Skeletons updated to match the new layout (TX-detail skeleton
-    also reordered to identity → amount → classify) so the page
-    doesn't shift on data arrival.
-  - No new primitive — sweep across four consumers. Padding /
-    gap vocabulary now reads `px-5 py-5 sm:px-7 sm:py-6` +
-    `gap-5 sm:gap-6` consistently across all four heros; if a
-    fifth detail hero ships, copy the same tokens.
-
-- **Iter 45 — Dark-mode checkbox visibility** ([#1159](https://github.com/canalesb93/breadbox/pull/1159))
-  - Stock shadcn's `border-input` + `dark:bg-input/30` makes
-    unchecked checkboxes nearly invisible in v2's dark palette:
-    `--input` is `oklch(1 0 0 / 15%)`, so 30% of that fill
-    renders at ~4.5% white — indistinguishable from `bg-card`
-    at oklch 0.205. The border at 15% is similarly weak.
-  - Override `dark:` unchecked-state with `border-white/25` +
-    `bg-white/[0.04]` (hover `bg-white/[0.07]`) inside
-    `ui/checkbox.tsx`. Light mode untouched. Checked state keeps
-    the stock `bg-primary` accent — selection vocabulary
-    unchanged across the connections list, accounts list, TX
-    table multi-select, and the `Exclude from sync` form
-    checkbox on account-detail.
-  - First iteration of the dark-mode spot-check on shared
-    primitives. Dark spot-check also verified clean (this pass):
-    Eyebrow, ListRowSkeleton, ColorRailCard (when carrying a
-    meaningful color), SectionCard, ListCard, StatusPanel,
-    FormFooter, DetailSheetHeader, Home ColorRailCard hero,
-    sandbox. No regressions surfaced outside the checkbox case.
-  - Open follow-up (not pursued — single consumer):
-    `ColorRailCard` collapses to `var(--muted)` when no accent is
-    provided (TX-detail uncategorised hero). At dark
-    `--muted = oklch(0.269)` the rail is technically visible but
-    barely. If a fourth surface ships an uncategorised hero, bump
-    the muted-rail rendering — for now, single consumer.
-
-- **Iter 46 — Dark-mode form-primitive sweep** ([#1160](https://github.com/canalesb93/breadbox/pull/1160))
-  - Extends iter 45's checkbox fix to the rest of the form
-    primitives. Same root cause: `border-input` is
-    `oklch(1 0 0 / 15%)` (~15% white), and over `bg-card`
-    (oklch 0.205) that border reads as a hairline. For the tiny
-    RadioGroup dish, the unchecked state was indistinguishable
-    from background.
-  - **Input / Textarea / Select**: keep the soft
-    `dark:bg-input/30` fill, bump the border to
-    `dark:border-white/20` with hover `/30`. The fill stays
-    soft (unfocused fields don't shout), the border is now
-    legible at a glance. Select keeps its stock
-    `dark:hover:bg-input/50` fill-hover rhythm.
-  - **RadioGroup**: applies the iter-45 checkbox recipe verbatim
-    — `dark:border-white/25` + `dark:bg-white/[0.04]` (hover
-    `/[0.07]`). Unchecked items now read as clear circles
-    rather than ghosts. Checked state untouched
-    (`text-primary` + filled dot).
-  - **Sandbox**: added a Select specimen (placeholder / chosen
-    / disabled variants) to the primitives section. Previously
-    Select was a blind spot — the next dark-mode regression
-    sweep will pick it up automatically.
-  - Live consumers benefiting: api-key-form's scope/mode radios
-    (the iter-44 RadioGroupItem inside OptionCard tiles);
-    every Input across login / setup-account / tag-form /
-    category-form / api-key-form / rule-form / search inputs;
-    every Textarea (rule-form / category-form descriptions);
-    every Select trigger (rules condition/action rows,
-    csv-import-form, connect-bank-sheet, link-account-sheet,
-    settings backups/household, providers cards).
-  - Pattern is now consistent across all 5 form-control
-    primitives (Input, Textarea, Select, Checkbox, RadioGroup):
-    bump idle border to `dark:border-white/20-30`, bump
-    unchecked fill on toggle controls to `dark:bg-white/[0.04]`.
-    New form primitives should follow the same vocabulary or
-    they'll regress dark mode.
-
-- **Iter 47 — Dark-mode Toggle/Tabs sweep + sandbox specimens** ([#1161](https://github.com/canalesb93/breadbox/pull/1161))
-  - Extends iter 45/46 to the remaining selection-state primitives.
-    Same root cause: stock `dark:bg-input/30` is ~4.5% white over the
-    `bg-muted` Tabs container (oklch 0.269), and `data-[state=on]:bg-accent`
-    is `--accent` (oklch 0.269) over `bg-card` (0.205) — both collapse
-    in dark, so the active/pressed signal disappears.
-  - **Tabs**: active trigger bumped from
-    `dark:data-[state=active]:bg-input/30` →
-    `dark:data-[state=active]:bg-white/[0.08]`, with
-    `dark:data-[state=active]:border-transparent` (the brighter fill
-    alone carries selection).
-  - **Toggle**: on-state bumped from `bg-accent` →
-    `dark:data-[state=on]:bg-white/[0.08]` +
-    `dark:data-[state=on]:text-foreground`; hover gets
-    `dark:hover:bg-white/[0.04]`. Outline variant picks up the iter-46
-    `dark:border-white/20` recipe for parity with Input / Textarea /
-    Select. ToggleGroup inherits via `toggleVariants`.
-  - **Sandbox**: added Tabs, Toggle (default + outline + pressed),
-    ToggleGroup (single + outline) specimens to the primitives section.
-    First specimens for any of the three — next dark sweep catches
-    them automatically.
-  - Pattern now consistent across all 7 selection-state primitives
-    (Input, Textarea, Select, Checkbox, RadioGroup, Tabs, Toggle):
-    bump idle border to `dark:border-white/20-30`, bump on/active fill
-    to `dark:bg-white/[0.04–0.08]`. New selection primitives should
-    follow this vocabulary or they'll regress dark mode.
-  - Live consumers benefiting: ToggleGroup on /accounts (institution
-    vs type grouping), Tabs on /accounts + /connections (FamilyTabs)
-    and /api-keys (active/revoked filter).
-
-- **Iter 48 — CSV import form polish** ([#1162](https://github.com/canalesb93/breadbox/pull/1162))
-  - Pivot away from the iter 45–47 dark-mode run. CSV import
-    (`features/connections/csv-import-form.tsx`) was the largest
-    unaudited surface left in `web/` — pre-v2 patterns inside an
-    otherwise polished Connect-bank Sheet.
-  - **Drop stage**: tile-on-tile icon affordance (size-11
-    rounded-xl tile holding the Upload icon, matching the
-    StatusPanel / EmptyState / category-tile vocabulary). Softer
-    rest tone (`bg-muted/20`), refined drag-over treatment
-    (`border-primary/70 bg-primary/[0.06] ring-4 ring-primary/15`)
-    so the affordance reads as a real surface rather than a
-    pencil-line. Swapped the `FileSpreadsheet` hint icon for
-    `Wand2` — the line is about auto-detection, not file format.
-  - **Map stage**: retired the misused `<Alert>` header for a
-    file pill (filename + KB + rows · cols · template metadata
-    in one strip with the amber CSV icon tile). Promoted the
-    hand-rolled `text-xs uppercase tracking-wide` labels to
-    `<Eyebrow as="p">`. Replaced the native `<input
-    type="checkbox">` and `<input type="radio">` with shadcn
-    `<Checkbox>` and `<RadioGroup>` + `<RadioGroupItem>` so the
-    iter 45–47 dark-mode sweep actually applies here (these were
-    the last native form controls in the v2 SPA — the iter-46
-    grep had missed them because they're inside a feature file,
-    not under `components/ui/`). Hand-rolled `<table>` lifted
-    onto the shadcn `Table` primitive family — same density
-    (`h-8 px-2.5`) but inherits the hover / border / dark-mode
-    contract. Required-field affordance is now a muted
-    destructive asterisk next to the label instead of `*` shoved
-    into the label string.
-  - **Validation `<Alert>`** now uses `variant="destructive"`
-    (was `default` — easy to miss against the rest of the
-    panel).
-  - **`ArrowLeft`** replaces the `X` icon on the "Different
-    file" action. X means dismiss; the action is "back to step
-    1".
-  - **`CsvFooterStrip`** (local to the file): mirrors the
-    `<FormFooter>` vocabulary (`bg-muted/20` + `border-t` +
-    flush to the parent edges) but bound to the Connect-bank
-    Sheet body (`-mx-6 -mb-6 px-6 py-3`) rather than a
-    SectionCard body (`-mx-5 -mb-5 px-5 py-3`). Carries an
-    optional hint slot — used to show "Ready to import N rows"
-    on the left while the primary CTA sits right. **Resolved in
-    iter 49 (#1163)** — folded back into `<FormFooter>` as the
-    `inset="sheet"` variant; the local helper is deleted.
-  - Live drift retired: the iter-46 dark-mode sweep notes that
-    the checkbox/radio fixes only cover the shadcn primitives.
-    Any feature using native `<input type="checkbox|radio">`
-    bypassed the fix. The CSV form was the only remaining
-    consumer in the SPA — `grep -rn 'type="checkbox"\\|type="radio"' web/src` now returns nothing under `features/`. New
-    feature code that reaches for the native input will regress
-    dark mode; treat the shadcn primitives as canonical.
-
-- **Iter 49 — FormFooter `inset="sheet"` (CsvFooterStrip merge)** ([#1163](https://github.com/canalesb93/breadbox/pull/1163))
-  - Folds the iter-48 `CsvFooterStrip` back into the canonical
-    `<FormFooter>` primitive. The two helpers shared the same
-    visual vocabulary (`bg-muted/20` + `border-t` + flush to the
-    parent edges) but diverged on padding scale because their
-    parent containers do — SectionCard bodies are `px-5 py-5`
-    while Sheet bodies are `p-6`. Iter 48's drift TODO said
-    "promote when a second non-SectionCard form needs the same
-    strip," but the right move is the opposite: collapse first,
-    re-fork only when a third inset shape appears. Single source
-    of truth for the muted bordered action-strip vocabulary.
-  - `FormFooter` API now: `inset?: "card" | "sheet"` (default
-    `"card"`). `card` keeps the established `-mx-5 -mb-5 px-5
-    py-3 mt-2` contract; `sheet` ships `-mx-6 -mb-6 px-6 py-3
-    mt-auto` (the `mt-auto` is the bit that makes the strip
-    stick to the Sheet bottom when the form body is short).
-    `primary` is now optional so the CSV drop stage's
-    Cancel-only footer is expressible.
-  - Five form families now share `<FormFooter>`: tag-form,
-    category-form, api-key-form, csv-import-form drop stage,
-    csv-import-form map stage. The local `CsvFooterStrip` helper
-    is deleted (~28 LOC retired from `csv-import-form.tsx`).
-  - Sandbox specimen rebuilt to show both insets side-by-side
-    (the iter-48 sandbox had only the `card` variant). Future
-    dark-mode / density sweeps now catch both insets without
-    needing to remember to look inside the CSV form.
-  - Pattern for the next time this comes up: when a feature
-    forks a primitive because the parent container has different
-    padding, the primitive should grow an inset variant — not
-    the feature a local helper. The padding scale of the host
-    is the variant axis, not the visual contract.
-
-- **Iter 50 — CategoryBadge + TagChip size tokens; rule-display fork retired** ([#1164](https://github.com/canalesb93/breadbox/pull/1164))
-  - Closes the cross-cutting backlog item
-    `category-badge.tsx / tag-chip.tsx — colour tokens, sizes` that
-    had been open since iter 1. Both primitives gain a `size` prop
-    (`sm` | `md`, default `md`) with a *shared* per-size recipe
-    inline in both files:
-    - `sm`: `h-5 px-1.5 text-[11px] gap-0.5 [&>svg]:size-2.5`
-    - `md`: `h-6 px-2 text-xs gap-1 [&>svg]:size-3`
-    A `CategoryBadge size="sm"` and a `TagChip size="sm"` are now
-    pixel-aligned when they sit side-by-side in a transaction row.
-  - `TagList` forwards the size to each chip *and* to the `+N`
-    overflow badge so dense rows don't fork halfway through.
-  - **Live consumers updated**:
-    - `CategoryPicker` (transactions-table inline trigger) uses
-      `size="sm"`. Its uncategorised dashed pill recipe was rebuilt
-      to mirror the sm geometry (h-5 / text-[11px] / px-1.5 /
-      Plus size-2.5) so the column doesn't shift when a row toggles
-      between "Category" empty state and a real category.
-    - `TransactionPrimary`'s tag rail (sm+ inline list in the
-      table) passes `size="sm"` to TagList.
-    - `tag-manager.tsx` (detail page editor) keeps `md` — the
-      single-transaction tag editor sits in a wider surface where
-      the chip is the primary affordance.
-    - `tags-table.tsx`'s Tag column keeps `md` — list pages are
-      less dense than the transactions table; the chip *is* the
-      identity column there.
-  - **Drift retired**: `features/rules/rule-display.tsx` carried
-    a local `TagChip` helper (15 LOC) that ignored the tag's color,
-    duplicated a `<TagIcon>` next to the label, and used the stock
-    md geometry. Replaced with the shared `<TagChip tag={…} size="sm"
-    className="align-middle" />` (wrapped as `RuleTagChip` so the
-    lookup-by-slug behaviour stays local). Rule actions now read
-    with the same color tinting as every other tag rendering in
-    the SPA, and the redundant trailing icon is gone.
-  - **Sandbox**: rebuilt both specimens to show `md` and `sm`
-    side-by-side with uppercase Eyebrow labels, plus a `TagList`
-    `md + sm` pair so the overflow badge geometry is visible in
-    both sizes. Future dark-mode / density sweeps catch both rows
-    automatically — the iter 45-47 pattern of "specimen the size
-    matrix so it's not invisible to grep" is upheld.
-  - **TagChip a11y nudge**: the inline remove button gains
-    `focus-visible:ring-ring/50 focus-visible:ring-[3px]
-    focus-visible:outline-none` — previously the rounded-full
-    button had no focus ring at all, so keyboard users had no way
-    to see which `×` was selected before pressing Enter. Same
-    vocabulary as the shadcn `Badge` focus ring.
-  - **Pattern for the next time this comes up**: when two
-    primitives serve the same row context (here: badge for category,
-    chip for tag) and share a host density, they should share a
-    *named* size recipe — `SIZE.sm` / `SIZE.md` literally typed out
-    in both files, not "size-3" guesses each consumer makes. The
-    recipe doesn't need a separate utility yet (only two consumers),
-    but it's grep-able so the third surface that grows a size
-    variant has an obvious template to copy.
-
-- **Iter 51 — a11y focus rings on bare custom buttons** ([#1165](https://github.com/canalesb93/breadbox/pull/1165))
-  - Sweeps the v2 SPA for hand-rolled `<button>` elements that
-    bypass the shadcn `Button` primitive and therefore had no
-    `focus-visible` ring at all. Continues the iter-50 TagChip
-    remove-button thread: keyboard users couldn't see which target
-    was selected before pressing Enter.
-  - **9 sites updated across 7 files**:
-    - `web/src/components/color-picker.tsx` — preset color swatches
-      (with `ring-offset-2` so the ring doesn't hug the fill).
-    - `web/src/components/icon-picker.tsx` — `IconTile` grid + the
-      "Clear icon" footer button.
-    - `web/src/components/settings-shell.tsx` — desktop side-nav
-      section buttons + mobile pill strip section buttons.
-    - `web/src/components/date-range-filter.tsx` — preset list
-      buttons (Last 30 days / This month / etc.).
-    - `web/src/features/transactions/transactions-toolbar.tsx` —
-      chip-clear `×` inside the filter chip row.
-    - `web/src/features/categories/category-list.tsx` — parent-row
-      expand/collapse chevron toggle.
-    - `web/src/features/rules/rule-form.tsx` — pipeline-stage
-      CollapsibleTrigger, STAGE_PRESETS pill row, AND/OR pill
-      row, "Edit as JSON" toggle. Gained a `cn()` import to
-      centralize the pill-toggle merge.
-  - **Shared recipe**: `focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none`
-    — matches the shadcn `Button` / `Sidebar*` / `Badge` /
-    `Input` ring vocabulary already in use. Single source of
-    truth via tokens (`ring-ring/50`) so a future ring-color
-    swap propagates automatically.
-  - **No new primitive**: the recipe is too small to extract
-    (3 utility classes). If a fourth surface needs the
-    `ring-offset-2` variant, consider a `focusRingClass`
-    tokenset in `lib/utils.ts` — but two consumers (color
-    swatch + maybe a future avatar picker) is below the
-    promote-to-helper threshold.
-  - **Pattern for the next time this comes up**: any hand-rolled
-    `<button>` that bypasses the shadcn `Button` must carry the
-    focus-visible recipe. The shadcn primitives have it baked in
-    (`button.tsx` line 14, `sidebar.tsx` line 475, `badge.tsx`
-    line 8) — reach for them first. If a feature needs a fully
-    custom look (toggle pills inside a `bg-muted` track, icon
-    tiles in a grid, etc.), copy the 3-class recipe verbatim.
-  - **Audit method**: `grep -rn "<button" web/src --include="*.tsx" | grep -v "focus-visible" | grep -v "asChild"`
-    returns the canonical list of bare buttons that need
-    auditing. Post-iter-51 this returns 8 entries — all 8 now
-    carry the recipe. New bare buttons that fail the grep are
-    the only regression vector.
-
-- **Iter 52 — Detail-page status banners swept onto `<StatusPanel>`** ([#1166](https://github.com/canalesb93/breadbox/pull/1166))
-  - Audit of detail pages found that account-detail
-    (`connectionStatusAlert`) and connection-detail
-    (`isReauthBanner` + `showFailureBanner`) hand-rolled `<Alert>`
-    with absolutely-positioned `AlertTriangle` icons +
-    inline amber utility classes (`border-amber-500/30
-    bg-amber-500/5` + `text-amber-700 dark:text-amber-400`).
-    Each used a `flex-wrap items-center justify-between` row
-    inside `<AlertDescription>` for the trailing CTA, which
-    dropped the CTA onto its own half-aligned row on narrow
-    viewports. Desynced from the canonical StatusPanel rhythm
-    that Setup, Providers, Home attention-panel, and the iter-35
-    404/Error pages already share.
-  - Migrated all five rendered banner variants onto
-    `<StatusPanel>` with the right tone token: `warning` for
-    `pending_reauth`, `destructive` for `error`, `info` for
-    `disconnected`. StatusPanel's `flex items-start gap-3 +
-    trailing` slot keeps the icon tile + heading + CTA aligned
-    on mobile / tablet / desktop — no more orphaned-CTA wrap on
-    375px.
-  - Drive-by polish: account-detail "Connection disconnected"
-    gained a `PowerOff` icon (was iconless); connection-detail
-    "Re-authenticate" CTA gained a leading `RefreshCw` +
-    tightened to `size="sm" h-7 gap-1.5 text-xs` to match the
-    other detail-page action affordances (hero footer Sync /
-    Re-authenticate / Import more strip).
-  - Drift retired (was open since iter 16/35 sprint notes
-    implicitly — the StatusPanel primitive existed but two
-    detail pages had never been swept): the only remaining
-    open-coded `<Alert>` sites in `web/src/routes/` are
-    connection-detail's inline disconnect-confirm (an interactive
-    two-button confirm-dialog, not a status banner — different
-    contract). Backups-section + reauth-sheet + link-account-sheet
-    + preview-panel + rule-form still hand-roll `<Alert>` for
-    their local idioms; sweep when convenient — none are on a
-    detail page hero.
-  - Pattern for the next time this comes up: any "tone-tinted
-    inline notice with optional trailing CTA" inside a v2 page
-    should be a `<StatusPanel>`. Inline confirm-dialogs with
-    multiple interactive buttons are a different shape — those
-    stay on `<Alert>` (or move to a future `InlineConfirm`
-    primitive when a second site adopts the pattern).
-
-- **Iter 53 — Form validation icon + rule/csv form banners onto StatusPanel** ([#1167](https://github.com/canalesb93/breadbox/pull/1167))
-  - Audit of v2 form pages found the `<FormMessage>` primitive
-    rendered validation errors as plain `text-sm text-destructive`
-    copy with no icon or visual anchor — the message read like
-    ordinary body text rather than a status signal. Fixed by giving
-    `<FormMessage>` a leading `AlertCircle` (`mt-0.5 size-3.5`) when
-    a field error is attached. Plain messages passed as
-    `children` without an underlying error stay
-    `text-muted-foreground` without an icon — the icon is reserved
-    for actual validation errors. All five form families (tag,
-    category, api-key, csv-import, rule) inherit the new look for
-    free; no per-page changes needed.
-  - `rule-form.tsx`'s in-row `<RowError>` (the `ml-12 text-xs`
-    per-condition / per-action error line) gains matching
-    `AlertCircle` (`size-3`) vocabulary so an inline error in the
-    conditions / actions builder reads as the same status signal
-    as the field-level errors above.
-  - `rule-form.tsx`'s open-coded amber `<Alert>` for
-    `comboWarnings` (`border-amber-500/30 bg-amber-500/5` +
-    `text-amber-700 dark:text-amber-400` title — the same
-    handcrafted recipe the iter-52 detail-page banners used)
-    swept onto `<StatusPanel tone="warning">` with
-    `AlertTriangle` icon and "Heads up" heading. Warnings now
-    render with the canonical 3px amber rail + amber-tinted icon
-    tile, parity with providers env-locked / account-detail
-    pending_reauth / connection-detail re-auth banners. The
-    iter-52 drift TODO ("rule-form still hand-rolls `<Alert>`
-    for its local idioms; sweep when convenient") is partially
-    resolved — the warning banner is gone; the right-rail
-    informational `<Alert>` ("Heads up: saving a rule only
-    affects future syncs") stays because it's content advice,
-    not a state notice.
-  - `csv-import-form.tsx`'s `<Alert variant="destructive">`
-    column-mapping validation banner swept onto `<StatusPanel
-    tone="destructive">` with `AlertCircle` icon + "Fix the
-    column mapping" heading. Drops the now-unused `Alert` /
-    `AlertDescription` imports.
-  - Drift retired (was open since iter 16/35/52 implicitly):
-    the only remaining open-coded `<Alert>` sites tied to form
-    pages are reauth-sheet, link-account-sheet, preview-panel,
-    backups-section, and the rule-form right-rail informational.
-    First three are sheet/panel host idioms, not form
-    validation; backups-section is a settings-section banner;
-    rule-form right-rail is informational content. None are
-    blocking — sweep when convenient.
-  - Pattern for the next time this comes up: any validation
-    error attached to a `<FormField>` should flow through
-    `<FormMessage>` (icon free). Any tone-tinted validation
-    banner that sits inside a form (column-mapping, combo
-    warnings, future cross-field validators) should be a
-    `<StatusPanel>` with the right tone — `destructive` for
-    "fix this before submitting", `warning` for "look at this,
-    but you can still submit". `<Alert>` stays the right
-    primitive for content advice / informational notices that
-    aren't tied to a field error.
-
-- **Iter 54 — DetailList primitive + SectionCard header band fix** ([#1168](https://github.com/canalesb93/breadbox/pull/1168))
-  - Promoted `<DetailList>` to `web/src/components/detail-list.tsx`.
-    The label / value KV block was open-coded as a local
-    `DetailGroup` on every v2 detail page (transaction, account,
-    connection, category) — four copies of the same `<div>
-    <Eyebrow><dl><dt><dd></dd></dt></dl></div>` markup plus four
-    copies of the `compactRows` nullable filter. Same playbook as
-    iter 6 SectionCard / iter 8 ListCard / iter 13 SoftBackButton:
-    when the same block lands on 3+ pages, promote. 15th shared
-    primitive of the sprint.
-  - Mobile (375px) readability fix baked in: the previous
-    open-coded version used `truncate` on `<dd>` which clipped
-    long values inside the Details sidebar (full datetimes,
-    multi-word provider categories like "Transfer In Other
-    Transfer In"). DetailList replaces it with `break-words` +
-    row-level `min-w-0` so values wrap inside the column instead.
-  - SectionCard header empty band fix (affects every detail page,
-    every viewport — most visible on TX-detail Activity card on
-    mobile): the shadcn Card primitive injects `[.border-b]:pb-6`
-    on `CardHeader` to give bordered headers extra breathing
-    room; combined with SectionCard's intentional `py-4` this
-    produced `pt-4 pb-6` plus an `auto-rows` grid gap where a
-    non-existent description row would have sat. Override with
-    `!pb-4` so the rhythm matches the design. Source-annotated.
-  - Drive-by TX-detail Details sidebar polish: "Account → Name"
-    inside the Account group (eyebrow + first row no longer
-    repeat the word); drop `Channel: other` low-signal rows
-    (the literal "other" reads as "Plaid didn't give us a
-    channel" noise, not data); "Provider category" → "Category"
-    (the group is already labelled "Provider"). Account-detail
-    "Last update" drops the wall-clock seconds
-    (`5/15/2026, 10:35:13 PM` → `5/15/2026`) so the row doesn't
-    overflow at 375px — connection detail is the right host for
-    sync-precision timestamps.
-  - Sandbox specimen shipped under Components: shows the
-    canonical "stack of three DetailLists inside a SectionCard
-    body" layout with the same fixture vocabulary the TX-detail
-    Details sidebar uses (Account / Provider / Reference). Three
-    `IdPill` imports in account-detail / connection-detail /
-    category-detail are now scoped to the primitive — those
-    routes no longer import IdPill directly.
-  - Audit method for the next time: `grep -rn "function DetailGroup\b"
-    web/src/routes/` returned the four duplicates that triggered
-    extraction. Combined with the (already-applied) `function
-    compactRows\b` grep, that's the canonical drift-detection
-    pattern for "this open-coded helper landed on too many pages
-    and earned a primitive promotion".
-
-- **Iter 56 — TimelineRail rail-tail clipped to disc centres** ([#1169](https://github.com/canalesb93/breadbox/pull/1169))
-  - Picked up the iter 55 audit observation. The old TimelineRail
-    drew its rail as `border-l` on the surrounding `<ol>`, but each
-    row's icon disc was inset with a negative margin
-    (`-ml-[calc(0.875rem+1px)]`) so it visually sat centred on that
-    border. The `<ol>`'s border ran from row 1's top to the last
-    row's bottom — i.e. past the centred icon — leaving a stray
-    rail-tail under every group.
-  - Fix: drop the `<ol border-l>` and draw the rail per-row via a
-    `::before` pseudo on each `<li>`. Default the line to span
-    `-top-3` → `-bottom-3` so it bridges the `space-y-3` gap
-    between rows; override `top: 14px` on `:first-of-type` and
-    `bottom: calc(100% - 14px)` on `:last-of-type` so the line
-    starts exactly on the first disc centre and ends on the last
-    one. Disc gains `relative z-10` + `bg-card` so it punches
-    through the rail line behind it (same "punch-through" identity
-    the primitive promised).
-  - Consumer API unchanged. `<TimelineRail>` /
-    `<TimelineRail.Group label="...">` / `<TimelineRail.Row icon=
-    {Icon}>` work exactly as before. The single consumer (TX-detail
-    Activity feed via `features/transactions/activity-timeline.tsx`)
-    + the sandbox specimen both render through the new pipeline
-    untouched.
-  - Cross-group continuity (one rail across day groups) is
-    deliberately deferred — see the updated open observation. That
-    fix needs a bigger refactor (Group becomes a Fragment, headings
-    become `<li role="presentation">` siblings of rows) and there's
-    still only one consumer, so the API churn doesn't pay off yet.
-
-- **Iter 57 — Loader2 spinner consistency across pending mutations** ([#1170](https://github.com/canalesb93/breadbox/pull/1170))
-  - Audit pass on every `isPending ? "…" : "…"` callsite across the
-    SPA. Convention established by `<FormFooter>` / plaid-card /
-    teller-card / backups Actions / reauth-sheet / connections
-    toolbar is: pending button shows a leading `<Loader2
-    className="size-4 animate-spin" />` next to the pending label.
-    Six straggler buttons (comment-composer "Post note", nav-user
-    "Sign out", backups "Save schedule", household "Add member" +
-    "Create login", account-section "Update password") shipped
-    text-only swaps — the click felt unacknowledged on
-    slow networks. Drift retired.
-  - `nav-user` sign-out (a `DropdownMenuItem` with a leading
-    `<LogOut />` glyph) swaps the icon for `<Loader2 />` during
-    pending so the row's leading slot also reflects the spin —
-    mirrors connect-bank-sheet's swap pattern. The label text swap
-    ("Sign out" → "Signing out…") still does the work, but the icon
-    swap means the row reads as "in flight" at a glance.
-  - `rule-form` was the seventh straggler (kept its leading
-    `<Save />` glyph on the submit button at rest). Swapped to
-    `<Loader2 />` during pending — icon-for-icon, not addition,
-    since rule-form's submit always carries a leading icon. No
-    consumers needed an import bump beyond the per-file `Loader2`
-    add (`lucide-react` tree-shakes).
-  - No new primitive — the pattern is small enough that an
-    abstraction would weigh more than the duplication. The audit
-    method (`grep -rn "isPending ?" web/src --include='*.tsx' |
-    grep -v Loader2`) is the canonical drift-detection pattern;
-    next iteration that lands a new mutating button should run it.
-    Worth promoting to a `<PendingButton>` helper only if a fourth
-    axis lands (e.g. variant-aware leading icon swap for both
-    "addition" and "replacement" patterns in the same primitive).
-
-- **Iter 58 — Empty state copy audit (20 callsites)** ([#1171](https://github.com/canalesb93/breadbox/pull/1171))
-  - Swept every `<EmptyState>` in the v2 SPA for voice, verb choice,
-    and helpful specificity. Three convention families established:
-    (1) "Not found" detail pages (transaction / account / connection /
-    category / tag) collapse onto one template — "This X may have
-    been {deleted|disconnected}, or the link is out of date. Head
-    back to the X list to pick another." — instead of five subtly
-    different lines that all said "the link is wrong." (2) Search /
-    filter empties end on the canonical phrase already used by
-    categories — "Try a different search term, or clear the filter
-    to see every X." — so tags, api-keys, rules, transactions,
-    connections, accounts all read the same. (3) "Yet-to-have-data"
-    empties name the actual trigger (manual / scheduled / webhook
-    for sync history; rules / reports / cross-cutting for the
-    library pages) and the time horizon ("within a minute") so the
-    user knows what to expect rather than reading the bare "they
-    appear after the first sync" line.
-  - Pages touched: `transactions.tsx`, `accounts.tsx`,
-    `connections.tsx`, `categories.tsx`, `tags.tsx`, `api-keys.tsx`,
-    `rules.tsx`, `tag-detail.tsx`, `account-detail.tsx`,
-    `connection-detail.tsx`, `category-detail.tsx`,
-    `transaction-detail.tsx`, plus features
-    `home-recent-transactions.tsx`, `home-connections-panel.tsx`,
-    `connection-accounts-list.tsx`, `sync-history-list.tsx`,
-    `activity-timeline.tsx`, `account-recent-transactions.tsx`,
-    `household-section.tsx`, `backups-section.tsx`.
-  - No new primitives. `EmptyState`'s contract is unchanged — this
-    was purely a copy sweep. Drift retired: the five "not found"
-    pages no longer drift independently because they all consume
-    the same canonical template; future detail pages should follow
-    the same shape.
-  - Sweep technique (worth recording): `grep -rn "EmptyState"
-    --include='*.tsx' web/src` enumerates every callsite in one
-    pass; the audit takes one read per file. If a future iteration
-    needs to re-audit, the same `grep` is the canonical
-    drift-detection pattern.
-
-- **Iter 59 — Currency formatters consolidated in `lib/format`** ([#1172](https://github.com/canalesb93/breadbox/pull/1172))
-  - Three private currency formatters had forked across the SPA:
-    `home-stats.formatCompact` (en-US, no minor units),
-    `connection-utils.formatCurrency` (Intl default locale, sign
-    preserved), and `account-utils.formatCurrency` (Intl default
-    locale + USD fallback for null currency). All three constructed a
-    fresh `Intl.NumberFormat` per call, side-stepping the cached
-    pattern that `formatAmount` had been using since iter 3.
-  - Promoted two siblings to `lib/format.ts` alongside `formatAmount`:
-    `formatBalance(amount, currency | null)` — same cache, sign
-    rendered literally (no leading `+`) — for account balances,
-    totals, scoreboard cells. And `formatCompactAmount(amount,
-    currency | null)` — strips minor units (`$1,234` not
-    `$1,234.56`) — for hero KPIs. Both use the same per-currency
-    cache pattern and null-currency fallback as `formatAmount`.
-  - Five consumers swept (home-stats, accounts-summary, account-row,
-    accounts list, account-detail, connection-row,
-    connection-accounts-list). The two leftover utility files
-    (`account-utils.ts`, `connection-utils.ts`) lose their inline
-    helpers and shrink to their actual domain logic (grouping,
-    primary-balance picking). Visual output across every money
-    surface is byte-for-byte identical — same locale, same
-    minor-units behaviour, same null fallback — but now one cached
-    formatter instance per currency for the whole SPA.
-  - Sandbox `AmountsSection` gains two new specimens documenting
-    `formatBalance` and `formatCompactAmount` (sign preservation,
-    EUR/JPY locale, null fallback, compact thousands). All three
-    `lib/format` money formatters are now visible in one place; the
-    design system tour covers the full vocabulary.
-  - Audit method (worth recording for the next consolidation): `grep
-    -rn "new Intl.NumberFormat\|formatCurrency\|formatCompact" web/src
-    --include='*.tsx' --include='*.ts'` enumerates every money
-    formatter callsite in one pass. After this iteration, the only
-    `new Intl.NumberFormat` in `web/src` is the helper itself —
-    canonical drift-detection state.
-
-- **Iter 60 — Date formatters consolidated in `lib/format`** ([#1173](https://github.com/canalesb93/breadbox/pull/1173))
-  - Mirror of iter 59 for the date/time vocabulary. Five callsites had
-    forked: `connection-detail` / `category-detail` / `rule-detail`
-    Reference rows all inlined `new Date(x).toLocaleDateString()`;
-    `account-detail` Last-update row inlined the same on an RFC3339
-    timestamp; `backups-section` shipped a private `formatRelative`
-    helper alongside `.toLocaleString()` for its tooltips; and
-    `connection-utils.relativeTime` was a parallel compact
-    "12m ago / 3h ago / 5d ago" helper consumed by connection-row,
-    sync-history-list, and home-connections-panel.
-  - Promoted two siblings to `lib/format.ts` alongside `formatDate` /
-    `formatLongDate` / `formatRelativeTime`: `formatDateTime(iso)` —
-    cached `Intl.DateTimeFormat` rendering RFC3339 → "Jan 2, 2026,
-    3:45 PM" for last-updated/created tooltips that want the
-    wall-clock time. And `formatRelativeShort(iso, now?)` — the
-    compact "12m ago" vocabulary lifted from connection-utils, with
-    "never" / "just now" / ISO fallback past 30d preserved.
-    `connection-utils.relativeTime` becomes a back-compat re-export so
-    no consumer churn was needed.
-  - Five consumer sweeps: connection-detail (Created, Updated rows),
-    category-detail (Created row), account-detail (Last update row),
-    rule-detail (Expires-at chip), backups-section (RelativeTime
-    component — `formatRelativeTime` for the body + `formatDateTime`
-    for the tooltip). Visual output is byte-for-byte identical on
-    every detail page — `toLocaleDateString` and `formatLongDate`
-    render the same string under en-US — but date logic now lives in
-    one place with cached Intl instances.
-  - Sandbox `PatternsSection` Date formatters specimen gains three new
-    entries: `formatDateTime` (one row), and `formatRelativeShort`
-    in three shapes (`-12m`, `-5d`, `null`). Long-vs-short usage
-    guidance added to the description: long form
-    (`formatRelativeTime`) for body copy / tooltips, compact
-    (`formatRelativeShort`) for dense list rows and pills. The full
-    date-formatter vocabulary (8 entry points) is now visible in one
-    place.
-  - Same audit method as iter 59: `grep -rn
-    "toLocaleDateString\|toLocaleString\|new Intl.RelativeTimeFormat\|new
-    Intl.DateTimeFormat" web/src --include='*.tsx' --include='*.ts'`
-    enumerates every inline date formatter. After this iteration, the
-    only `new Intl.DateTimeFormat` / `new Intl.RelativeTimeFormat` in
-    `web/src` are inside `lib/format.ts` itself — same canonical
-    drift-detection state achieved for currency in iter 59.
-
-- **Iter 61 — Toast success copy audit (split two-thought titles)** ([#1174](https://github.com/canalesb93/breadbox/pull/1174))
-  - Promoted `successDescription` from "documented but unused" to a
-    real adoption. The slot shipped in iter 20 (#1133) and had been
-    sitting in the helper for 41 iterations with zero call-site
-    consumers — every multi-thought success copy had been crammed
-    into the title.
-  - Seven surfaces swept onto the canonical title + description split:
-    backups restore (uploaded + by-row), provider disable (Plaid +
-    Teller), account exclude/include, accounts linked, rule applied
-    retroactively. Em-dash hacks retired in two places: account
-    excluded ("Account excluded — future syncs will skip it.") and
-    account reconciled ("Reconciled — N new matches."). The
-    description slot is the right home for "what to expect / do
-    next" copy; cramming it into the title via `.` or `—` was the
-    only available shape until the helper learned the slot.
-  - Enriched the three sync-queued surfaces (connection-detail
-    `onSync`, connections-list `onSyncAll`, multi-select action-bar
-    `onSync`) with a "New transactions land within a minute"
-    description so the user knows the time horizon — same vocabulary
-    the iter-58 empty-state sweep established for sync-history empties
-    ("Syncs trigger on schedule, on webhook, or when you press Sync
-    now — entries appear within a minute"). Iter 58 + iter 61 now
-    share one time-horizon vocabulary across empty-states and toasts.
-  - `account-links-section.onReconcile()` folded out of
-    `withMutationToast` into a `try/catch` because the new-matches
-    count lives on the awaited result — the helper captures the
-    success string *before* the mutation resolves, so the count was
-    always reading 0 from the previous run (stale `reconcile.data`
-    closure). Single-callsite fix, not a primitive change. If a
-    second caller needs "describe the success based on the mutation
-    result", consider promoting a `successDescriptionFn` callback to
-    the helper.
-  - Sandbox `PatternsSection` Toasts description updated to spell
-    out the canonical split ("Use the successDescription slot for any
-    two-thought outcome — what happened + what to expect / do next —
-    instead of cramming both into the title"). Future surfaces have
-    a one-line rule to follow.
-  - Audit method (worth recording for future copy sweeps): `grep -rn
-    'success: \|successDescription' web/src --include='*.tsx'
-    --include='*.ts'` enumerates every callsite in one pass.
-    `grep -rn 'success:.*—\|success:.*\. .*\.' …` finds the
-    em-dash + multi-sentence patterns specifically — both queries
-    return zero hits post-sweep.
-
-- **Iter 62 — Timeline day-headings as temporal dividers** ([#1175](https://github.com/canalesb93/breadbox/pull/1175))
-  - The activity-timeline's day labels ("Today" / "Yesterday" /
-    "Monday, May 13") used to render as a plain `<Eyebrow as="h3">` —
-    visually indistinguishable from the SectionCard "Activity" title
-    sitting above the whole feed. The day-heading's job is *segment
-    time inside the timeline*, not introduce a new section, so the
-    same vocabulary as a section header reads as drift.
-  - Re-rendered `TimelineRail.Group`'s `label` as a temporal divider:
-    a 6px dot anchored on the rail's x-axis (matching the disc
-    centres of the rows below) + the eyebrow label + a hairline rule
-    (`bg-border/60 h-px flex-1`) that fills the remaining width.
-    The dot + hairline make the heading read as a "this is a moment
-    in the feed" separator, distinct from the surrounding section
-    vocabulary.
-  - Geometry: the heading's container uses `pl-3.5` (matching the
-    rows below so the eyebrow's baseline aligns vertically with row
-    content) and the dot uses `marginLeft: "-17px"` (= -14px
-    row-padding − 3px half-dot-width) so its centre sits exactly on
-    the rail's x-axis at x=0. Inline style rather than an arbitrary
-    `[-ml-[17px]]` class because the 17px value comes from the
-    half-dot + row-padding math; promoting it to a Tailwind arbitrary
-    would hide the derivation.
-  - No consumer API change — every `<TimelineRail.Group>` site
-    inherits the new look automatically. Live consumer today:
-    activity-timeline on TX-detail. Sandbox specimen description
-    updated to call out the temporal-divider mechanic so future
-    consumers (rule run history, per-connection sync log — both
-    queued in the iter-26 / iter-56 notes) reach for the same
-    vocabulary.
-
-- **Iter 63 — `SettingsSectionHeader` primitive consolidates settings headings** ([#1176](https://github.com/canalesb93/breadbox/pull/1176))
-  - Promotes `<SettingsSectionHeader>` to
-    `web/src/components/settings-section-header.tsx`. 16th shared
-    primitive in the v2 vocabulary. The three settings panes
-    (Account, Household, Backups) each hand-rolled the section-title
-    vocabulary as `<h2 className="text-lg font-medium">` +
-    `<p className="text-muted-foreground text-sm">` blocks with
-    slightly different rhythms (Household stacked the Add-member
-    CTA below the description; Backups had three sub-section
-    headers — Actions / Automatic schedule / Stored backups — each
-    using `<h3 className="font-medium">` + muted paragraph; Account
-    had its own Change password sub-section in the same shape).
-  - Two tokens encode visual weight: `section` (h2, text-lg,
-    tracking-tight, baseline-aligned action) for top-of-pane
-    titles, and `sub` (h3, text-sm, baseline-aligned action) for
-    inline groupings. Both share the same `action` slot that
-    sm:right-aligns on `sm+` viewports and stacks below on mobile,
-    so the Household pane's Add-member CTA now baseline-aligns with
-    the "Household" title instead of stacking below the description
-    (saves ~24px of vertical real estate; reads as a real toolbar
-    on desktop).
-  - Five surfaces migrate onto the primitive in this PR:
-    `AccountSection` (Account title + Change password sub),
-    `HouseholdSection` (Household title + Add-member action),
-    `BackupsSection` (Backups title + Actions / Automatic schedule
-    / Stored backups subs), and `settings-shell.tsx`'s
-    Coming-soon placeholder pane. The new sandbox specimen
-    demonstrates both `section` (with action) and `sub`
-    (description-only) weights side-by-side.
-  - Drift retired: every `<h2 className="text-lg font-medium">`
-    + adjacent muted-paragraph pattern inside the settings shell
-    is gone. New settings panes (Security, anything else) should
-    reach for `<SettingsSectionHeader>` — don't fork. If a fourth
-    weight is needed (e.g. a "field group" rhythm tighter than
-    `sub`), add it as a new token on the primitive rather than
-    open-coding another `<h4>` block in a feature file.
-
-- **Iter 64 — List-row hover vocabulary unified on muted/40** ([#1177](https://github.com/canalesb93/breadbox/pull/1177))
-  - Three list-row surfaces had drifted to non-canonical hover tints
-    (Home recent activity `/50`, Account recent transactions
-    `accent/40`, rule-form pipeline-stage trigger `/50`). All three
-    swept onto `transition-colors hover:bg-muted/40` — same token
-    `<TableRow>` uses, so every row in the v2 vocabulary now shares
-    one hover signal.
-  - Adds a "Hover & transition vocabulary" specimen to Foundations
-    that documents the three canonical patterns side-by-side. The
-    point isn't visual weight — it's *which host surface you're on*:
-    (1) divide-y list row → `hover:bg-muted/40` (matches TableRow);
-    (2) bordered card grid pick → `hover:bg-accent/40
-    hover:border-primary/40` (provider-picker,
-    connection-accounts-list); (3) tinted-idle card grid →
-    `bg-muted/20 hover:bg-muted/40 hover:border-ring/40` (not-found
-    quick jumps). Drift between these three reads as inconsistency;
-    never invent a fourth.
-  - rule-row stays at `hover:bg-muted/30` because it's a bordered
-    card with `bg-card` already (different shape from divide-y list
-    rows) — the lower tint matches the heavier idle weight.
-    `transition` (no scope) usages in provider-picker /
-    csv-import-form / icon-picker stay because they animate the
-    border alongside background — `transition-colors` would drop
-    the border morph.
-  - Audit method (worth recording for future sweeps): `grep -rn
-    "hover:bg" web/src --include='*.tsx' --include='*.ts'`
-    enumerates every callsite. The three drift patterns to look for
-    are `hover:bg-muted/50`, `hover:bg-accent/40` on a divide-y
-    list row, and any `hover:` without a paired `transition-colors`
-    (snap-changes feel cheap).
+## Open observations / questions
 
 (Populated by iterations.)
-
-- **TimelineRail cross-group continuity** (iter 56 follow-up): the
-  rail-tail clipping bug from iter 55 is fixed (#1169) — each group's
-  rail now starts and ends exactly on the first/last disc centre via
-  per-row `::before` lines clipped with `:first-of-type` /
-  `:last-of-type`. The remaining piece is visual continuity *across*
-  groups: each `<TimelineRail.Group>` is still its own `<ol>`, so the
-  rail breaks between day-group boundaries. That fix requires merging
-  groups into a single `<ol>` with day headings as `<li
-  role="presentation">` siblings, which is a real consumer-API
-  refactor (Group becomes a Fragment that dissolves into the parent
-  `<ol>`) — defer until a second consumer (rule run history,
-  per-connection sync log) needs the same look, so we don't ship a
-  refactor for one consumer.
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
@@ -2581,13 +1722,6 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
-
-
-
-
-
-
-
 
 
 
