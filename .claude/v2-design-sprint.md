@@ -299,6 +299,21 @@ next target, then updates this file at the end of the run.
   rather than fork. The shadcn `<Skeleton>` primitive stays the
   one-off building block for non-list skeletons (backups stat
   grid, providers cards, transaction-row in a TableCell).
+- **Eyebrow primitive** — extracted to
+  `web/src/components/eyebrow.tsx` in iter 37 (#1151). Six surfaces
+  now share the canonical uppercase muted micro-label: TX-detail,
+  Account-detail, Category-detail, Connection-detail,
+  TimelineRail, ProviderScoreboard. Two variants: `default`
+  (`text-[10px] tracking-[0.1em]` for section heads, "Jump to"
+  pills, sync-activity action labels, scoreboard cells) and `hero`
+  (`text-[10px] tracking-[0.12em]` for detail-page hero card
+  eyebrows). Don't hand-roll `text-[10px] font-medium tracking-*
+  uppercase` markup for new surfaces — reach for `<Eyebrow>` or
+  extend it with a new variant if the rhythm needs to differ. The
+  brand-header / auth-shell / shortcut-sheet uppercase labels are
+  intentionally outside this vocabulary — they're surface-specific
+  framing (login chrome, brand lockup, command-palette grouping),
+  not detail-page eyebrows.
 
 ## Backlog (ordered roughly by impact)
 
@@ -1421,6 +1436,44 @@ Cross-cutting components:
     locally, captured BEFORE, then `git checkout HEAD -- <files>`
     to restore. Vite picked up both directions via HMR without
     needing a port restart this time.
+
+- **Iter 37 — `<Eyebrow>` primitive consolidates uppercase micro-label drift** ([#1151](https://github.com/canalesb93/breadbox/pull/1151))
+  - Audit of the codebase found six subtle variations of the
+    uppercase muted-foreground micro-label across ten files:
+    `tracking-[0.08em]` (1), `tracking-[0.1em]` (13, dominant),
+    `tracking-[0.12em]` (4, hero use), `tracking-wide` (6, mostly
+    inside pills), `tracking-wider` text-[11px] (3), and
+    `tracking-wider` text-xs (1). The dominant
+    `text-[10px] tracking-[0.1em]` shape is the canonical eyebrow.
+  - New primitive: `web/src/components/eyebrow.tsx`. Two variants:
+    - `default` — `text-[10px] tracking-[0.1em]` for section heads,
+      "Jump to" pills, sync-activity action labels, timeline-rail
+      day-headings, provider scoreboard cells.
+    - `hero` — `text-[10px] tracking-[0.12em]` for the detail-page
+      hero card eyebrows ("Transaction" / "Liability" / "Asset" /
+      "Income" / "Category") where the extra letter air pairs with
+      the large display title below.
+  - Migrated six files: `transaction-detail.tsx`,
+    `account-detail.tsx`, `category-detail.tsx`,
+    `connection-detail.tsx`, `timeline-rail.tsx`,
+    `features/providers/provider-status.tsx`. The
+    `<label htmlFor="sync-interval">` in connection-detail stays
+    as a raw `<label>` (accessibility) even though its visual
+    matches the eyebrow.
+  - Deliberately not migrated: brand-header (`text-[10px]
+    tracking-wide` inside the brand lockup), auth-shell
+    (`text-[11px] tracking-wider` framing for the sign-in chrome),
+    shortcut-sheet group label (`text-xs tracking-wider` matching
+    command-palette grouping). These are surface-specific framing
+    types, not the detail-page eyebrow vocabulary.
+  - Inside-pill uppercase (`text-[10px] tracking-wide uppercase`
+    on the direction badges in TX/account/category/connection
+    heroes + the "Pending" dashed badge on TX-detail) is part of
+    pill styling, not an eyebrow label — left alone.
+  - 13th primitive in the v2 vocabulary (alongside ListCard /
+    SectionCard / ColorRailCard / TimelineRail / EmptyState /
+    ListRowSkeleton / IdPill / PageHeader / PaginationBar /
+    DangerZone / FormFooter / SoftBackButton).
 
 ## Open observations / questions
 
