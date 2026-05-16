@@ -1,7 +1,17 @@
 import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
-import { Inbox, Plus, RefreshCw, RotateCcw, Users } from "lucide-react";
+import {
+  Inbox,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Shapes,
+  Tag,
+  Users,
+  Wand2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -10,6 +20,7 @@ import {
 } from "@/components/ui/popover";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { TimelineRail } from "@/components/timeline-rail";
 import { DataTable } from "@/components/data-table";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIconTile } from "@/components/category-icon-tile";
@@ -127,6 +138,65 @@ export function ComponentsSection() {
               description="Each sync will appear here with timing and result."
             />
           </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="TimelineRail"
+        code="components/timeline-rail"
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels sit outside the rail as anchors. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        className="block"
+      >
+        <div className="max-w-md">
+          <TimelineRail>
+            <TimelineRail.Group label="Today">
+              <TimelineRail.Row icon={MessageSquare}>
+                <p className="text-sm leading-snug">
+                  You left a comment
+                </p>
+                <p className="text-muted-foreground bg-muted/50 mt-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-pre-wrap">
+                  Recategorise after the refund clears.
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  2 minutes ago
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={Wand2}>
+                <p className="text-sm leading-snug">
+                  Rule "Coffee shops" applied — category set to Dining out
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  18 minutes ago
+                </p>
+              </TimelineRail.Row>
+            </TimelineRail.Group>
+            <TimelineRail.Group label="Yesterday">
+              <TimelineRail.Row icon={Shapes}>
+                <p className="text-sm leading-snug">
+                  Ricardo changed category to Groceries
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 4:12 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={Tag}>
+                <p className="text-sm leading-snug">
+                  Ricardo added tag "reimbursable"
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 4:11 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={MessageSquare} muted>
+                <p className="text-sm leading-snug">
+                  Ricardo deleted a comment
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 3:55 PM
+                </p>
+              </TimelineRail.Row>
+            </TimelineRail.Group>
+          </TimelineRail>
         </div>
       </Specimen>
 
