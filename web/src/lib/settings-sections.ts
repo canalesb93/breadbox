@@ -1,11 +1,4 @@
-import {
-  Bell,
-  Brush,
-  CreditCard,
-  Lock,
-  User,
-  type LucideIcon,
-} from "lucide-react";
+import { DatabaseBackup, Lock, User, type LucideIcon } from "lucide-react";
 
 export interface SettingsSection {
   slug: string;
@@ -22,27 +15,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     icon: User,
   },
   {
-    slug: "appearance",
-    title: "Appearance",
-    description: "Theme follows your system preference.",
-    icon: Brush,
-  },
-  {
-    slug: "notifications",
-    title: "Notifications",
-    description: "Email and in-app alerts.",
-    icon: Bell,
-  },
-  {
-    slug: "billing",
-    title: "Billing",
-    description: "Plan and invoices.",
-    icon: CreditCard,
-  },
-  {
     slug: "security",
     title: "Security",
     description: "Sessions and API keys.",
     icon: Lock,
+  },
+  {
+    slug: "backups",
+    title: "Backups",
+    description: "Snapshot the database, restore, and schedule automatic backups.",
+    icon: DatabaseBackup,
   },
 ];

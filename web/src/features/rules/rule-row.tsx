@@ -41,7 +41,9 @@ export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
       <Link
         to="/rules/$id"
         params={{ id: rule.short_id }}
-        className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-5 sm:py-5"
+        // pr-20 reserves space on the right for the absolutely-positioned
+        // action cluster so the lg stats columns don't tuck behind it.
+        className="flex items-center gap-3 px-4 py-4 pr-20 sm:gap-4 sm:px-5 sm:py-5 sm:pr-24"
         aria-label={`Open rule ${rule.name}`}
       >
         <RuleAvatar rule={rule} expired={expired} />

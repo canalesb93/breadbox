@@ -17,6 +17,12 @@ import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
 import { TransactionDetailPage } from "@/routes/transaction-detail";
+import { CategoriesPage } from "@/routes/categories";
+import { CategoryNewPage } from "@/routes/category-new";
+import { CategoryDetailPage } from "@/routes/category-detail";
+import { TagsPage } from "@/routes/tags";
+import { TagNewPage } from "@/routes/tag-new";
+import { TagDetailPage } from "@/routes/tag-detail";
 import {
   ConnectionsPage,
   connectionsSearchSchema,
@@ -25,6 +31,11 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
+import {
+  AccountDetailPage,
+  accountDetailSearchSchema,
+} from "@/routes/account-detail";
 import { RulesPage, rulesSearchSchema } from "@/routes/rules";
 import { RuleDetailPage } from "@/routes/rule-detail";
 import { RuleFormPage } from "@/routes/rule-form";
@@ -71,9 +82,19 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: TransactionsPage,
     validateSearch: transactionsSearchSchema,
   },
+  "/categories": {
+    component: CategoriesPage,
+  },
+  "/tags": {
+    component: TagsPage,
+  },
   "/connections": {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
+  },
+  "/accounts": {
+    component: AccountsPage,
+    validateSearch: accountsSearchSchema,
   },
   "/rules": {
     component: RulesPage,
@@ -82,12 +103,36 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
 };
 
 // Detail routes aren't nav leaves, so they're registered explicitly rather
-// than derived from NAV_LEAVES. isNavMatch's prefix match keeps the
-// Transactions sidebar item active on /transactions/$id.
+// than derived from NAV_LEAVES. isNavMatch's prefix match keeps the parent
+// sidebar item active on each sub-route.
 const transactionDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/transactions/$id",
   component: TransactionDetailPage,
+});
+
+const categoryNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/categories/new",
+  component: CategoryNewPage,
+});
+
+const categoryDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/categories/$id",
+  component: CategoryDetailPage,
+});
+
+const tagNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tags/new",
+  component: TagNewPage,
+});
+
+const tagDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tags/$slug",
+  component: TagDetailPage,
 });
 
 // The design-system sandbox — a dev/reference gallery, not a nav leaf.
@@ -103,6 +148,13 @@ const connectionDetailRoute = createRoute({
   path: "/connections/$id",
   component: ConnectionDetailPage,
   validateSearch: connectionDetailSearchSchema,
+});
+
+const accountDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/accounts/$id",
+  component: AccountDetailPage,
+  validateSearch: accountDetailSearchSchema,
 });
 
 // /rules/new and /rules/$id/edit share one form component (RuleFormPage) —
@@ -145,8 +197,13 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   transactionDetailRoute,
+  categoryNewRoute,
+  categoryDetailRoute,
+  tagNewRoute,
+  tagDetailRoute,
   sandboxRoute,
   connectionDetailRoute,
+  accountDetailRoute,
   ruleNewRoute,
   ruleEditRoute,
   ruleDetailRoute,
