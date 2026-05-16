@@ -314,6 +314,22 @@ next target, then updates this file at the end of the run.
   intentionally outside this vocabulary — they're surface-specific
   framing (login chrome, brand lockup, command-palette grouping),
   not detail-page eyebrows.
+- **DetailSheetHeader primitive** — extracted to
+  `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
+  Two surfaces now share the canonical icon-tile sheet header lockup:
+  ShortcutSheet (iter 39) and ConnectBankSheet (iter 40). Vocabulary
+  tokens: `density` (`default` = size-9 tile + p-5, ambient overlays
+  like Shortcut sheet; `accent` = size-10 tile + bg-muted/20 + p-6,
+  primary flows like Connect-bank), `eyebrow` (optional), `trailing`
+  (optional slot). The lockup mirrors StatusPanel / EmptyState /
+  SectionCard's icon-tile vocabulary so every v2 Sheet reads as part
+  of the system, not a stock shadcn surface. Don't open `<SheetHeader>`
+  inline for a new Sheet — extend this primitive. `reauth-sheet` and
+  `link-account-sheet` use different header shapes (no icon-tile
+  lockup) and stay open-coded — promote if a third Sheet adopts the
+  lockup with a yet-different rhythm. No sandbox specimen because
+  SheetTitle/SheetDescription require radix Dialog context; the live
+  consumers carry the visual reference.
 
 ## Backlog (ordered roughly by impact)
 
@@ -1525,43 +1541,38 @@ Cross-cutting components:
     `<DetailSheetHeader>`.
 
 - **Iter 40 — Connect-bank Sheet polish** ([#1154](https://github.com/canalesb93/breadbox/pull/1154))
-  - `ConnectBankSheet` (the Sheet that opens from Home +
-    Connections + Connection-detail "Import more") rebuilt onto
-    v2 vocabulary. Header gets the icon-tile lockup (`bg-muted
-    size-10 rounded-lg border` + `Landmark` lucide) used by
-    `StatusPanel`, `EmptyState`, `SectionCard`, and now the iter-39
-    `ShortcutSheet` — second Sheet to reach for the lockup, so the
-    iter-39 drift note's `<DetailSheetHeader>` candidate is
-    becoming real (queue the extraction once a third Sheet adopts
-    it). Append-mode header swaps to `Building2` + "Append rows"
-    eyebrow + "Import more rows" title so the same Sheet can host
-    both flows without forking.
-  - Body scrolls; footer is a flush bordered action strip
-    (`bg-muted/20 border-t px-6 py-3`) pinned to the bottom of
-    the Sheet (open-coded — the `FormFooter` negative-margin trick
-    doesn't apply inside a Sheet, the sticky bottom is the Sheet
-    chrome itself).
-  - `ProviderPicker` rows adopt the v2 active-state vocabulary:
-    `border-primary` + `bg-primary/5` selection, `rounded-xl`
-    tinted icon tile (parity with `CategoryIconTile` /
-    `StatusPanel` / `EmptyState`), trailing `Check` pill, and a
-    `focus-visible:ring-2 ring-primary/40` focus ring. The bare
-    `ring-2 ring-primary/20` selection vocabulary is retired —
-    this is now consistent with the nav/list active-row rail
-    language. "Not configured" copy moves from inline grey text
-    to a muted uppercase pill inside the row.
-  - Plaid / Teller hand-off loading state gets a primary-tinted
-    `rounded-xl` icon tile + spinner + `<Eyebrow>` "Hand-off"
-    label, so the launching state reads as a real surface instead
-    of a floating spinner.
-  - Alerts (no providers configured, save error) migrate onto
-    `<StatusPanel>` — tone-tinted left rail + tinted icon tile,
-    same vocabulary the Providers + Setup pages use. Two raw
-    `<Alert>` consumers retired.
-  - Form labels move onto `<Eyebrow>` (7th surface for the
-    primitive after the iter-37 consolidation — TX-detail,
-    Account-detail, Category-detail, Connection-detail,
-    TimelineRail, ProviderScoreboard, ConnectBankSheet).
+  - Header gets the v2 icon-tile lockup (Landmark in a muted
+    rounded tile) matching `EmptyState` / `StatusPanel` /
+    `SectionCard`, an `<Eyebrow>` label, larger title, and a
+    `bg-muted/20 border-b p-6` frame so the Sheet reads as a
+    first-class v2 surface. Same vocabulary as iter 39's
+    Shortcut sheet — second Sheet to adopt the lockup.
+  - Picker selection vocabulary inherits the active-state
+    language used by nav/list rows; alerts adopt `<StatusPanel>`
+    so tone is consistent with Providers + Setup. Action strip
+    uses the canonical flush bordered footer
+    (`bg-muted/20 border-t px-6 py-3`) — open-coded here
+    because the host is a Sheet, not a SectionCard.
+  - Queued the inner shell extraction into a `<DetailSheetHeader>`
+    primitive for the next time a third Sheet adopts it.
+
+- **Iter 41 — `<DetailSheetHeader>` primitive** ([#1155](https://github.com/canalesb93/breadbox/pull/1155))
+  - Promotes the icon-tile Sheet header lockup established by
+    iter 39 (Shortcut sheet) and iter 40 (Connect-bank) into a
+    shared primitive at `web/src/components/detail-sheet-header.tsx`.
+    14th shared primitive in the v2 vocabulary.
+  - Two density tokens: `default` (size-9 tile + p-5, ambient
+    overlays — Shortcut sheet's rhythm) and `accent` (size-10
+    tile + bg-muted/20 + p-6, primary flows — Connect-bank's
+    rhythm). Both consumers now route through the primitive;
+    `reauth-sheet` and `link-account-sheet` use different
+    header shapes (no icon-tile lockup) and stay open-coded.
+  - No sandbox specimen: `SheetTitle` / `SheetDescription` are
+    radix-Dialog-context-bound, so the primitive can't render
+    standalone in `/v2/sandbox`. First specimen that couldn't
+    ship — the live consumers carry the visual reference.
+    Worth noting for any future primitive that wraps radix
+    Dialog/Sheet/Popover internals.
 
 ## Open observations / questions
 
