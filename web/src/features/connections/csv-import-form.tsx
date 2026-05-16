@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   FileSpreadsheet,
   Loader2,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { StatusPanel } from "@/components/status-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -576,9 +577,12 @@ function CsvMapStage({
       </section>
 
       {validation && (
-        <Alert variant="destructive">
-          <AlertDescription>{validation}</AlertDescription>
-        </Alert>
+        <StatusPanel
+          tone="destructive"
+          icon={AlertCircle}
+          heading="Fix the column mapping"
+          body={validation}
+        />
       )}
 
       <FormFooter

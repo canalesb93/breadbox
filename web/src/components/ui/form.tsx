@@ -3,6 +3,7 @@
 import * as React from "react"
 import type { Label as LabelPrimitive } from "radix-ui"
 import { Slot } from "radix-ui"
+import { AlertCircle } from "lucide-react"
 import {
   Controller,
   FormProvider,
@@ -143,14 +144,27 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
     return null
   }
 
+  // Errored messages get a leading AlertCircle so validation reads
+  // as a status signal, not as ordinary copy. Plain messages (passed
+  // as children without an underlying field error) stay clean.
   return (
     <p
       data-slot="form-message"
       id={formMessageId}
-      className={cn("text-sm text-destructive", className)}
+      className={cn(
+        "flex items-start gap-1.5 text-sm",
+        error ? "text-destructive" : "text-muted-foreground",
+        className
+      )}
       {...props}
     >
-      {body}
+      {error ? (
+        <AlertCircle
+          aria-hidden="true"
+          className="mt-0.5 size-3.5 shrink-0"
+        />
+      ) : null}
+      <span className="min-w-0">{body}</span>
     </p>
   )
 }
