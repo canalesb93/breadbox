@@ -218,6 +218,30 @@ next target, then updates this file at the end of the run.
   and `preview-panel` "No matches yet" inside the rule-preview
   side panel. Both are intentionally lighter than EmptyState —
   promoting them would dominate their host panel. Don't sweep.
+- **Toast tone vocabulary** (iter 20, #1133) — every sonner
+  toast now inherits the StatusPanel vocabulary (3px tone-tinted
+  left rail + tinted icon tile) via Sonner's
+  `toastOptions.classNames` hook in `ui/sonner.tsx`. Six call-time
+  variants are styled: `success` (success token), `error`
+  (destructive), `warning` (amber-500, matches StatusPanel),
+  `info` (sky-500 — see note below), `message` / `default`
+  (muted-foreground neutral), `loading` (neutral + spinning
+  icon). All toasts ship with `closeButton`, `expand`,
+  `bottom-right`, and `visibleToasts={4}`. The shadcn primitive
+  (`ui/sonner.tsx`) stays upgradeable — every customization lives
+  in `toastOptions`, no fork of the Toaster component itself.
+  `withMutationToast` gains an optional `successDescription` slot
+  so call sites can promote messages without losing the
+  one-liner ergonomics. Don't fork the look — change the
+  toastOptions in one place. Tone divergence note: warning uses
+  `amber-500` (parity with StatusPanel), but info uses
+  `sky-500` while StatusPanel's `info` tone is muted-neutral.
+  Different host requirement: a toast is loud-by-virtue-of-being
+  -overlaid, so a neutral rail there would read as a
+  default-tone `message`; StatusPanel sits inline inside a
+  surface, so muted reads as "this surface is locked by config"
+  instead of "look at me". Live with the divergence; revisit if
+  a third surface picks up a tonal info.
 
 ## Backlog (ordered roughly by impact)
 
@@ -282,7 +306,7 @@ Cross-cutting components:
   still hand-rolls the same strip inline — sweep onto `<FormFooter>` next
   time we touch api-key-form. Labels / validation / FormItem patterns
   already canonical via shadcn `Form` primitive.
-- [ ] Toast (`sonner.tsx`) — variants, action affordances
+- [x] Toast (`sonner.tsx`) — variants, action affordances — iter 20 (#1133)
 - [x] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency — iter 18
 - [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
   optional flush body, optional action slot. Shipped at
@@ -856,6 +880,43 @@ Cross-cutting components:
     `inline · compact sub-panel` inside a card) so future iterations
     can see the intended host surface for each variant at a glance.
 
+- **Iter 20 — Toast tone vocabulary (sonner)** ([#1133](https://github.com/canalesb93/breadbox/pull/1133))
+  - Every Sonner toast now adopts the `<StatusPanel>` vocabulary —
+    3px tone-tinted left rail + tinted icon tile + optional
+    description — applied via `toastOptions.classNames` in
+    `ui/sonner.tsx`. Six call-time variants are styled:
+    `success` (success token), `error` (destructive),
+    `warning` (amber-500, matches StatusPanel), `info`
+    (sky-500), `message` / `default` (muted-foreground
+    neutral), `loading` (neutral + spinning icon). The shadcn
+    primitive stays upgradeable — no fork of the Toaster
+    component itself; all polish lives in `toastOptions`.
+    Defaults pinned: `bottom-right`, `expand`, `closeButton`,
+    `visibleToasts={4}` — matches the modern shadcn / Linear /
+    Raycast vocabulary.
+  - `withMutationToast` gains an optional `successDescription`
+    slot so call sites can promote messages without losing the
+    one-liner ergonomics. Three high-signal call sites adopted
+    the description pattern: connect-bank success ("Initial
+    sync queued — accounts and transactions will appear
+    shortly."), CSV import success (different copy for
+    appended-to-existing vs new connection), reauth success
+    ("Sync resumed — accounts will refresh on the next
+    webhook."). The error path stays single-line — ApiError
+    messages already say what went wrong.
+  - Sandbox patterns specimen rebuilt to demo every tone
+    side-by-side — success / error / warning / info / message
+    / loading — plus `withMutationToast — ok (with description)`
+    and a `success + action` toast that shows the description
+    + inline action button pattern. The first design-system
+    specimen that surfaces the inline-action affordance.
+  - Process note: HMR was unreliable in this worktree — went
+    through three Vite restarts on fresh ports (9290 → 9601 →
+    9602 → 9603) before edits to `ui/sonner.tsx` made it to the
+    browser. Same dance documented in iter 4/5 still applies:
+    stale browser content → start a fresh port with `--force`
+    rather than fighting the cache.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -927,6 +988,16 @@ Cross-cutting components:
   or rely on the harness's per-task output file in
   `/private/tmp/claude-501/.../tasks/<id>.output` (readable but not
   redirectable to from a `>` operator).
-
-
+- **Vite restart count creeping up** (iter 20): the
+  HMR-stale-edit dance from iter 4/5 keeps biting. Iter 20
+  burned through four Vite ports before the new
+  `ui/sonner.tsx` reached the browser even with
+  `CHOKIDAR_USEPOLLING=1 + --force`. Cost: ~30s extra per
+  iteration, no visual difference once a fresh port serves.
+  Worth investigating once: maybe `bun dev` under the
+  worktree's `node_modules` symlink chain confuses Vite's
+  dep-cache invalidation; or set `server.hmr.overlay=false`
+  + `optimizeDeps.force=true` permanently in
+  `web/vite.config.ts` so we don't need the `--force` CLI
+  flag. Not blocking — just chronic.
 
