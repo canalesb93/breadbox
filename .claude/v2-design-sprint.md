@@ -2255,6 +2255,49 @@ Cross-cutting components:
     `new Intl.NumberFormat` in `web/src` is the helper itself —
     canonical drift-detection state.
 
+- **Iter 60 — Date formatters consolidated in `lib/format`** ([#1173](https://github.com/canalesb93/breadbox/pull/1173))
+  - Mirror of iter 59 for the date/time vocabulary. Five callsites had
+    forked: `connection-detail` / `category-detail` / `rule-detail`
+    Reference rows all inlined `new Date(x).toLocaleDateString()`;
+    `account-detail` Last-update row inlined the same on an RFC3339
+    timestamp; `backups-section` shipped a private `formatRelative`
+    helper alongside `.toLocaleString()` for its tooltips; and
+    `connection-utils.relativeTime` was a parallel compact
+    "12m ago / 3h ago / 5d ago" helper consumed by connection-row,
+    sync-history-list, and home-connections-panel.
+  - Promoted two siblings to `lib/format.ts` alongside `formatDate` /
+    `formatLongDate` / `formatRelativeTime`: `formatDateTime(iso)` —
+    cached `Intl.DateTimeFormat` rendering RFC3339 → "Jan 2, 2026,
+    3:45 PM" for last-updated/created tooltips that want the
+    wall-clock time. And `formatRelativeShort(iso, now?)` — the
+    compact "12m ago" vocabulary lifted from connection-utils, with
+    "never" / "just now" / ISO fallback past 30d preserved.
+    `connection-utils.relativeTime` becomes a back-compat re-export so
+    no consumer churn was needed.
+  - Five consumer sweeps: connection-detail (Created, Updated rows),
+    category-detail (Created row), account-detail (Last update row),
+    rule-detail (Expires-at chip), backups-section (RelativeTime
+    component — `formatRelativeTime` for the body + `formatDateTime`
+    for the tooltip). Visual output is byte-for-byte identical on
+    every detail page — `toLocaleDateString` and `formatLongDate`
+    render the same string under en-US — but date logic now lives in
+    one place with cached Intl instances.
+  - Sandbox `PatternsSection` Date formatters specimen gains three new
+    entries: `formatDateTime` (one row), and `formatRelativeShort`
+    in three shapes (`-12m`, `-5d`, `null`). Long-vs-short usage
+    guidance added to the description: long form
+    (`formatRelativeTime`) for body copy / tooltips, compact
+    (`formatRelativeShort`) for dense list rows and pills. The full
+    date-formatter vocabulary (8 entry points) is now visible in one
+    place.
+  - Same audit method as iter 59: `grep -rn
+    "toLocaleDateString\|toLocaleString\|new Intl.RelativeTimeFormat\|new
+    Intl.DateTimeFormat" web/src --include='*.tsx' --include='*.ts'`
+    enumerates every inline date formatter. After this iteration, the
+    only `new Intl.DateTimeFormat` / `new Intl.RelativeTimeFormat` in
+    `web/src` are inside `lib/format.ts` itself — same canonical
+    drift-detection state achieved for currency in iter 59.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -2375,6 +2418,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
