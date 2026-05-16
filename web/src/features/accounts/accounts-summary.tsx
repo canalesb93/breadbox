@@ -70,9 +70,13 @@ interface SummaryStatProps {
 }
 
 function SummaryStat({ icon: Icon, label, value, sublabel, tone }: SummaryStatProps) {
+  // Override the Card primitive's default `py-6` — these stat cards are
+  // dense one-liners, not full-bleed content panels, so they need just
+  // enough breathing room to feel like a card without dominating the
+  // top of the page.
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 py-4">
+    <Card className="py-4">
+      <CardContent className="flex items-center gap-3">
         <div
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-lg",
@@ -83,13 +87,13 @@ function SummaryStat({ icon: Icon, label, value, sublabel, tone }: SummaryStatPr
         >
           <Icon className="size-4" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 leading-tight">
           <div className="text-muted-foreground text-xs">{label}</div>
           <div className="truncate text-lg font-semibold tabular-nums">
             {value}
           </div>
           {sublabel && (
-            <div className="text-muted-foreground truncate text-[10px]">
+            <div className="text-muted-foreground mt-0.5 truncate text-[10px]">
               {sublabel}
             </div>
           )}
