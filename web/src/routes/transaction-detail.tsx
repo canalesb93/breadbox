@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
+import { ColorRailCard } from "@/components/color-rail-card";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { CategoryEditor } from "@/features/transactions/category-editor";
@@ -133,20 +134,10 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
   const accent = t.category?.color ?? null;
 
   return (
-    <div
-      className={cn(
-        "bg-card relative overflow-hidden rounded-xl border",
-        t.pending && "border-dashed",
-      )}
+    <ColorRailCard
+      accent={accent}
+      cardClassName={cn(t.pending && "border-dashed")}
     >
-      {/* Color rail anchored to the category. Stays neutral when uncategorised
-          so the card reads "needs attention" rather than "decorative". */}
-      <div
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ backgroundColor: accent ?? "var(--muted)" }}
-      />
-
       <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
         {/* Identity column */}
         <div className="min-w-0 space-y-5">
@@ -248,7 +239,7 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
           )}
         </div>
       </div>
-    </div>
+    </ColorRailCard>
   );
 }
 
