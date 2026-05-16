@@ -58,7 +58,28 @@ function TimelineRailGroup({
   return (
     <div className={cn("space-y-3", className)} {...rest}>
       {label !== undefined && label !== null && (
-        <Eyebrow as="h3">{label}</Eyebrow>
+        // Day-heading separator: a small dot anchored on the rail's x-axis
+        // (matches the disc centre below), followed by the eyebrow label,
+        // and a hairline rule that fills the remaining width. The dot +
+        // hairline make the heading read as a *temporal divider inside the
+        // timeline* instead of a generic section header — distinguishing it
+        // from the SectionCard/CardHeader "Activity" title that sits above
+        // the whole feed. Iter 62.
+        //
+        // Geometry: `pl-3.5` mirrors the rows below so the eyebrow's
+        // baseline aligns vertically with row content. The 6px dot
+        // (`size-1.5`) needs `-ml-[17px]` (= -14px row-padding − 3px
+        // half-dot-width) so its centre sits exactly on the rail's x-axis
+        // at x=0, matching the disc centres of the rows.
+        <div className="flex items-center gap-2 pl-3.5">
+          <span
+            aria-hidden
+            className="bg-border/80 size-1.5 shrink-0 rounded-full"
+            style={{ marginLeft: "-17px" }}
+          />
+          <Eyebrow as="h3">{label}</Eyebrow>
+          <span aria-hidden className="bg-border/60 h-px flex-1" />
+        </div>
       )}
       {/* Rail is drawn per-row via `::before` on each <li>, not as a
           continuous border on the <ol>. This lets us clip the line to the
