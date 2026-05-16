@@ -3,9 +3,11 @@ import {
   Link,
   useNavigate,
   useParams,
+  useRouter,
   useSearch,
 } from "@tanstack/react-router";
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   Building2,
@@ -20,10 +22,10 @@ import {
   RefreshCw,
   Unplug,
   Upload,
+  Wallet,
 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,7 +43,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { IdPill } from "@/components/id-pill";
+import { SectionCard } from "@/components/section-card";
 import { withMutationToast } from "@/lib/mutation-toast";
+import { cn } from "@/lib/utils";
 import {
   useConnection,
   useDisconnectConnection,
@@ -59,7 +65,12 @@ import { ReauthSheet } from "@/features/connections/reauth-sheet";
 import { ConnectionAccountsList } from "@/features/connections/connection-accounts-list";
 import { SyncActivityBars } from "@/features/connections/sync-activity-bars";
 import { SyncHistoryList } from "@/features/connections/sync-history-list";
-import { providerLabel, relativeTime } from "@/features/connections/connection-utils";
+import {
+  providerLabel,
+  relativeTime,
+  statusLabel,
+  statusTone,
+} from "@/features/connections/connection-utils";
 
 // Search-param schema for the detail page. Mirrors the list schema's `reauth`
 // so the same Re-auth Sheet can open from either surface. `import_csv` opens
@@ -89,6 +100,21 @@ const PROVIDER_ICON: Record<string, typeof Building2> = {
   teller: Landmark,
   csv: FileSpreadsheet,
 };
+
+// Map the connection status enum onto a CSS colour for the hero rail. Same
+// principle as the iter-5/6/7 detail-page heroes — the rail's tint encodes
+// *meaning* (the connection's health), not decoration. `disconnected` and
+// paused-active drop to muted so the card reads "shelved" instead of
+// "active and demanding attention".
+function statusRailColor(status: string, paused: boolean): string {
+  if (status === "disconnected") return "var(--muted)";
+  if (status === "error") return "var(--destructive)";
+  if (status === "pending_reauth")
+    return "var(--warning, oklch(0.78 0.16 75))";
+  if (paused) return "var(--muted)";
+  // active
+  return "var(--success, oklch(0.65 0.18 145))";
+}
 
 export function ConnectionDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
@@ -171,12 +197,7 @@ export function ConnectionDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
-        <Link to="/connections">
-          <ArrowLeft className="size-4" />
-          Connections
-        </Link>
-      </Button>
+      <BackButton />
 
       {connQuery.isLoading ? (
         <DetailSkeleton />
@@ -223,6 +244,43 @@ export function ConnectionDetailPage() {
   );
 }
 
+// BackButton mirrors the TX-detail/Account-detail back-button pattern —
+// real link to the list (middle-click + open-in-new-tab still work),
+// soft-back on a plain left-click so the user lands on the exact list
+// state they came from (filter tabs, search).
+function BackButton() {
+  const router = useRouter();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      asChild
+      className="text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs"
+    >
+      <Link
+        to="/connections"
+        onClick={(e) => {
+          if (
+            !e.defaultPrevented &&
+            !e.metaKey &&
+            !e.ctrlKey &&
+            !e.shiftKey &&
+            !e.altKey &&
+            e.button === 0 &&
+            window.history.length > 1
+          ) {
+            e.preventDefault();
+            router.history.back();
+          }
+        }}
+      >
+        <ArrowLeft className="size-3.5" />
+        Back to connections
+      </Link>
+    </Button>
+  );
+}
+
 interface DetailBodyProps {
   conn: ConnectionDetail;
   accounts: Account[];
@@ -248,18 +306,18 @@ function DetailBody({
   const setInterval = useSetSyncInterval();
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
-  const Icon = PROVIDER_ICON[conn.provider] ?? Plug;
   const canSync = conn.provider !== "csv" && conn.status === "active";
   const isReauthBanner =
     conn.status === "pending_reauth" || conn.status === "error";
   const showFailureBanner =
     conn.consecutive_failures >= 3 && !isReauthBanner;
 
-  // Health card metrics — computed from the recent sync logs cache.
+  // Health metrics — computed from the recent sync logs cache.
   const successRate = useMemo(() => {
     const total = allLogsForActivity.length;
     if (total === 0) return null;
-    const success = allLogsForActivity.filter((l) => l.status === "success").length;
+    const success = allLogsForActivity.filter((l) => l.status === "success")
+      .length;
     return { success, total, pct: Math.round((success / total) * 100) };
   }, [allLogsForActivity]);
 
@@ -268,9 +326,10 @@ function DetailBody({
     [allLogsForActivity],
   );
 
-  const intervalValue = conn.sync_interval_override_minutes == null
-    ? "default"
-    : String(conn.sync_interval_override_minutes);
+  const intervalValue =
+    conn.sync_interval_override_minutes == null
+      ? "default"
+      : String(conn.sync_interval_override_minutes);
 
   async function onSync() {
     await withMutationToast(() => sync.mutateAsync(conn.id), {
@@ -309,108 +368,18 @@ function DetailBody({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-lg">
-            <Icon className="text-muted-foreground size-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-semibold tracking-tight">
-                {conn.institution_name ?? "Untitled connection"}
-              </h1>
-              <ConnectionStatusBadge status={conn.status} />
-              {conn.paused && (
-                <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-                  Paused
-                </span>
-              )}
-            </div>
-            <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-              <span>{providerLabel(conn.provider)}</span>
-              {conn.user_name && (
-                <>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span>{conn.user_name}</span>
-                </>
-              )}
-              {conn.last_synced_at && (
-                <>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span>Synced {relativeTime(conn.last_synced_at)}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {canSync && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onSync}
-              disabled={sync.isPending}
-            >
-              {sync.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              Sync now
-            </Button>
-          )}
-          {conn.provider === "csv" && conn.status !== "disconnected" && (
-            <Button variant="outline" size="sm" onClick={onImportCsv}>
-              <Upload className="size-4" />
-              Import more
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 rounded-full"
-                aria-label="Connection actions"
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {conn.status !== "disconnected" && (
-                <DropdownMenuItem onClick={onReauth}>
-                  <Plug className="size-4" /> Re-authenticate
-                </DropdownMenuItem>
-              )}
-              {conn.status !== "disconnected" && (
-                <DropdownMenuItem
-                  onClick={onTogglePause}
-                  disabled={pause.isPending}
-                >
-                  {conn.paused ? (
-                    <>
-                      <Play className="size-4" /> Resume syncing
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="size-4" /> Pause syncing
-                    </>
-                  )}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => setConfirmingDisconnect(true)}
-              >
-                <Unplug className="size-4" /> Disconnect…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      <Hero
+        conn={conn}
+        successRate={successRate}
+        canSync={canSync}
+        syncPending={sync.isPending}
+        pausePending={pause.isPending}
+        onSync={onSync}
+        onImportCsv={onImportCsv}
+        onReauth={onReauth}
+        onTogglePause={onTogglePause}
+        onDisconnect={() => setConfirmingDisconnect(true)}
+      />
 
       {/* Inline disconnect confirm */}
       {confirmingDisconnect && (
@@ -497,215 +466,532 @@ function DetailBody({
         </Alert>
       )}
 
-      {/* Health + Settings cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="gap-3">
-          <CardHeader>
-            <CardTitle className="text-base">Health</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <Stat
-              label="Success rate"
-              value={
-                successRate
-                  ? `${successRate.pct}%`
-                  : syncLogsLoading
-                    ? "…"
-                    : "—"
-              }
-              hint={
-                successRate
-                  ? `${successRate.success}/${successRate.total} (last 30)`
-                  : undefined
-              }
-            />
-            <Stat
-              label="Last sync"
-              value={
-                conn.last_synced_at ? relativeTime(conn.last_synced_at) : "Never"
-              }
-            />
-            <Stat
-              label="Failures (recent)"
-              value={syncLogsLoading ? "…" : String(failures30)}
-              hint="last 30 syncs"
-            />
-            <Stat
-              label="Total syncs"
-              value={
-                syncLogsQueryTotal(allLogsForActivity.length, syncLogsLoading)
-              }
-            />
-          </CardContent>
-        </Card>
+      <QuickActions conn={conn} />
 
-        <Card className="gap-3">
-          <CardHeader>
-            <CardTitle className="text-base">Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="sync-interval"
-                className="text-muted-foreground text-xs"
+      {/* Two-column body: primary content on the left, settings + details
+          on the right. Mirrors the Account-detail layout (which inverted
+          TX-detail's split for the same reason — when a page has more
+          first-class affordances on the side it earns the sidebar slot).
+          On <lg we stack: the sidebar drops below the primary column.  */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0 space-y-6">
+          {/* Sync activity */}
+          <SectionCard
+            title="Sync activity"
+            icon={<Activity className="text-muted-foreground size-4" />}
+            action={
+              <span className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+                Last 7 days
+              </span>
+            }
+          >
+            {syncLogsLoading ? (
+              <Skeleton className="h-[72px] w-full" />
+            ) : (
+              <SyncActivityBars logs={allLogsForActivity} days={7} />
+            )}
+          </SectionCard>
+
+          {/* Accounts */}
+          <SectionCard
+            title={`Accounts (${conn.account_count})`}
+            icon={<Wallet className="text-muted-foreground size-4" />}
+            action={
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="h-7 gap-1 px-2 text-xs"
               >
-                Sync interval
-              </label>
-              <Select
-                value={intervalValue}
-                onValueChange={onIntervalChange}
-                disabled={
-                  setInterval.isPending || conn.status === "disconnected"
-                }
+                <Link to="/accounts">
+                  Open in Accounts
+                  <ExternalLink className="size-3" />
+                </Link>
+              </Button>
+            }
+          >
+            {accountsQueryLoading(accounts.length, conn.account_count) ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({
+                  length: Math.min(conn.account_count || 1, 3),
+                }).map((_, i) => (
+                  <Skeleton key={i} className="h-[68px] w-full rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <ConnectionAccountsList accounts={accounts} />
+            )}
+          </SectionCard>
+
+          {/* Sync history */}
+          <SectionCard
+            title="Sync history"
+            icon={<RefreshCw className="text-muted-foreground size-4" />}
+            action={
+              <span className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+                Last 10
+              </span>
+            }
+            footer={
+              syncLogs.length > 0 ? (
+                <Link
+                  to="/sync-logs"
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                >
+                  View all →
+                </Link>
+              ) : undefined
+            }
+          >
+            {syncLogsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : (
+              <SyncHistoryList logs={syncLogs} />
+            )}
+          </SectionCard>
+        </div>
+
+        <aside className="space-y-6">
+          <SettingsCard
+            conn={conn}
+            intervalValue={intervalValue}
+            onIntervalChange={onIntervalChange}
+            setIntervalPending={setInterval.isPending}
+            pausePending={pause.isPending}
+            onTogglePause={onTogglePause}
+          />
+          <DetailsCard
+            conn={conn}
+            successRate={successRate}
+            failures30={failures30}
+            totalSyncs={allLogsForActivity.length}
+            syncLogsLoading={syncLogsLoading}
+          />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+// Hero condenses identity + status + the single most useful metric (last
+// sync) into one composed card. The 4px left rail is tinted by the
+// connection's status (success / warning / destructive / muted) — the
+// colour encodes meaning, not decoration. Same vocabulary as the iter-5/6/7
+// TX / Account / Category detail heroes, paired with a small uppercase
+// "Connection" eyebrow so colour never carries the signal alone.
+function Hero({
+  conn,
+  successRate,
+  canSync,
+  syncPending,
+  pausePending,
+  onSync,
+  onImportCsv,
+  onReauth,
+  onTogglePause,
+  onDisconnect,
+}: {
+  conn: ConnectionDetail;
+  successRate: { success: number; total: number; pct: number } | null;
+  canSync: boolean;
+  syncPending: boolean;
+  pausePending: boolean;
+  onSync: () => void;
+  onImportCsv: () => void;
+  onReauth: () => void;
+  onTogglePause: () => void;
+  onDisconnect: () => void;
+}) {
+  const Icon = PROVIDER_ICON[conn.provider] ?? Plug;
+  const accent = statusRailColor(conn.status, conn.paused);
+  const tone = statusTone(conn.status);
+
+  return (
+    <ColorRailCard
+      accent={accent}
+      footer={
+        <>
+          {canSync && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSync}
+              disabled={syncPending}
+              className="h-7 gap-1.5 text-xs"
+            >
+              {syncPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              Sync now
+            </Button>
+          )}
+          {conn.provider === "csv" && conn.status !== "disconnected" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onImportCsv}
+              className="h-7 gap-1.5 text-xs"
+            >
+              <Upload className="size-3.5" />
+              Import more
+            </Button>
+          )}
+          {conn.status !== "disconnected" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onReauth}
+              className="h-7 gap-1.5 text-xs"
+            >
+              <Plug className="size-3.5" />
+              Re-authenticate
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 rounded-full"
+                aria-label="Connection actions"
               >
-                <SelectTrigger id="sync-interval" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SYNC_INTERVAL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-xs">
-                Override the global default scheduled-sync cadence for this
-                connection.
+                <MoreHorizontal className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {conn.status !== "disconnected" && (
+                <DropdownMenuItem
+                  onClick={onTogglePause}
+                  disabled={pausePending}
+                >
+                  {conn.paused ? (
+                    <>
+                      <Play className="size-4" /> Resume syncing
+                    </>
+                  ) : (
+                    <>
+                      <Pause className="size-4" /> Pause syncing
+                    </>
+                  )}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={onDisconnect}>
+                <Unplug className="size-4" /> Disconnect…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      }
+    >
+      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+        {/* Identity column */}
+        <div className="min-w-0 space-y-3">
+          <div className="flex items-start gap-4">
+            <div
+              className={cn(
+                "bg-muted flex size-12 shrink-0 items-center justify-center rounded-lg",
+                (conn.status === "disconnected" || conn.paused) && "opacity-60",
+              )}
+            >
+              <Icon className="text-muted-foreground size-5" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
+                Connection
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-xl font-semibold tracking-tight">
+                  {conn.institution_name ?? "Untitled connection"}
+                </h1>
+                <ConnectionStatusBadge status={conn.status} />
+                {conn.paused && (
+                  <span className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
+                    <Pause className="size-2.5" /> Paused
+                  </span>
+                )}
+              </div>
+              <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                <span>{providerLabel(conn.provider)}</span>
+                {conn.user_name && (
+                  <>
+                    <span aria-hidden className="opacity-50">·</span>
+                    <span>{conn.user_name}</span>
+                  </>
+                )}
+                <span aria-hidden className="opacity-50">·</span>
+                <span>
+                  {conn.account_count}{" "}
+                  {conn.account_count === 1 ? "account" : "accounts"}
+                </span>
               </p>
             </div>
-            <div className="border-border/40 flex items-center justify-between border-t pt-3">
-              <div>
-                <div className="text-xs font-medium">Status</div>
-                <div className="text-muted-foreground text-xs">
-                  {conn.paused ? "Scheduled syncs paused" : "Syncing on schedule"}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onTogglePause}
-                disabled={pause.isPending || conn.status === "disconnected"}
-              >
-                {pause.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : conn.paused ? (
-                  <Play className="size-3.5" />
-                ) : (
-                  <Pause className="size-3.5" />
-                )}
-                {conn.paused ? "Resume" : "Pause"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 7-day sync activity */}
-      <Card className="gap-3">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
-            <span>Sync activity</span>
-            <span className="text-muted-foreground text-xs font-normal">
-              7 days
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {syncLogsLoading ? (
-            <Skeleton className="h-[72px] w-full" />
-          ) : (
-            <SyncActivityBars logs={allLogsForActivity} days={7} />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Accounts */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">
-            Accounts ({conn.account_count})
-          </h2>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/accounts">
-              Open in Accounts
-              <ExternalLink className="size-3.5" />
-            </Link>
-          </Button>
+          </div>
         </div>
-        {accountsQueryLoading(accounts.length, conn.account_count) ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: Math.min(conn.account_count || 1, 3) }).map(
-              (_, i) => (
-                <Skeleton key={i} className="h-[68px] w-full rounded-lg" />
-              ),
-            )}
-          </div>
-        ) : (
-          <ConnectionAccountsList accounts={accounts} />
-        )}
-      </section>
 
-      {/* Sync history */}
-      <Card className="gap-3">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
-            <span>Sync history</span>
-            <span className="text-muted-foreground text-xs font-normal">
-              Last 10
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {syncLogsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : (
-            <SyncHistoryList logs={syncLogs} />
-          )}
-        </CardContent>
-        {syncLogs.length > 0 && (
-          <div className="border-border/40 border-t px-6 py-3 text-right text-xs">
-            <Link
-              to="/sync-logs"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              View all →
-            </Link>
+        {/* Metric column — last sync as the headline number, success rate
+            as a smaller anchor underneath. Mirrors the Account-detail
+            balance-pill + amount + secondary-line vertical rhythm. */}
+        <div className="flex flex-col items-start gap-1.5 lg:items-end lg:text-right">
+          <div
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase whitespace-nowrap",
+              tone === "active" &&
+                "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+              tone === "warning" &&
+                "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+              tone === "destructive" && "bg-destructive/10 text-destructive",
+              tone === "muted" && "bg-muted text-muted-foreground",
+            )}
+          >
+            {conn.last_synced_at ? "Last synced" : statusLabel(conn.status)}
           </div>
-        )}
-      </Card>
+          <div
+            className={cn(
+              "font-semibold tabular-nums",
+              "text-2xl sm:text-3xl",
+              (conn.status === "disconnected" || conn.paused) && "opacity-60",
+            )}
+          >
+            {conn.last_synced_at ? relativeTime(conn.last_synced_at) : "Never"}
+          </div>
+          {successRate ? (
+            <p className="text-muted-foreground pt-1 text-[11px] tabular-nums">
+              {successRate.pct}% success ·{" "}
+              {successRate.success}/{successRate.total} recent
+            </p>
+          ) : conn.consecutive_failures > 0 ? (
+            <p className="text-destructive/80 pt-1 text-[11px]">
+              {conn.consecutive_failures} consecutive failures
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </ColorRailCard>
+  );
+}
+
+// QuickActions matches the iter-5/6 "Jump to" pill row used on TX and
+// Account detail — labelled lateral navigation that surfaces concrete
+// targets (the connection's accounts, the global sync-logs feed) rather
+// than just verbs.
+function QuickActions({ conn }: { conn: ConnectionDetail }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
+        Jump to
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 text-xs"
+        asChild
+      >
+        <Link to="/accounts">
+          <Wallet className="size-3" />
+          All accounts
+        </Link>
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 text-xs"
+        asChild
+      >
+        <Link to="/sync-logs">
+          <Activity className="size-3" />
+          Sync log
+        </Link>
+      </Button>
     </div>
   );
 }
 
-function Stat({
-  label,
-  value,
-  hint,
+function SettingsCard({
+  conn,
+  intervalValue,
+  onIntervalChange,
+  setIntervalPending,
+  pausePending,
+  onTogglePause,
 }: {
-  label: string;
-  value: string;
-  hint?: string;
+  conn: ConnectionDetail;
+  intervalValue: string;
+  onIntervalChange: (value: string) => void;
+  setIntervalPending: boolean;
+  pausePending: boolean;
+  onTogglePause: () => void;
 }) {
   return (
-    <div className="space-y-0.5">
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="text-base font-semibold tabular-nums">{value}</dd>
-      {hint && <dd className="text-muted-foreground text-[0.65rem]">{hint}</dd>}
+    <SectionCard title="Settings" bodyClassName="space-y-4 px-5 py-5 text-sm">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="sync-interval"
+          className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase"
+        >
+          Sync interval
+        </label>
+        <Select
+          value={intervalValue}
+          onValueChange={onIntervalChange}
+          disabled={setIntervalPending || conn.status === "disconnected"}
+        >
+          <SelectTrigger id="sync-interval" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SYNC_INTERVAL_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground text-xs">
+          Override the global default scheduled-sync cadence for this
+          connection.
+        </p>
+      </div>
+      <div className="border-border/40 flex items-center justify-between border-t pt-3">
+        <div>
+          <div className="text-xs font-medium">Schedule</div>
+          <div className="text-muted-foreground text-xs">
+            {conn.paused ? "Scheduled syncs paused" : "Syncing on schedule"}
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onTogglePause}
+          disabled={pausePending || conn.status === "disconnected"}
+          className="h-7 gap-1.5 text-xs"
+        >
+          {pausePending ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : conn.paused ? (
+            <Play className="size-3" />
+          ) : (
+            <Pause className="size-3" />
+          )}
+          {conn.paused ? "Resume" : "Pause"}
+        </Button>
+      </div>
+    </SectionCard>
+  );
+}
+
+interface DetailRowData {
+  label: string;
+  value: string | null | undefined;
+  mono?: boolean;
+}
+
+function compactRows(
+  rows: (DetailRowData | null | undefined | false)[],
+): DetailRowData[] {
+  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
+}
+
+function DetailGroup({
+  label,
+  rows,
+}: {
+  label: string;
+  rows: DetailRowData[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="space-y-2.5">
+      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+        {label}
+      </h3>
+      <dl className="space-y-2">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="flex items-baseline justify-between gap-3"
+          >
+            <dt className="text-muted-foreground shrink-0 text-xs">
+              {row.label}
+            </dt>
+            <dd className="min-w-0 truncate text-right text-xs">
+              {row.mono ? <IdPill value={row.value as string} /> : row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
-function syncLogsQueryTotal(loadedCount: number, loading: boolean): string {
-  if (loading) return "…";
-  // The `/sync/logs` page response includes a global `total` we could surface
-  // via the query; the simpler "loaded" approximation is fine for the recent
-  // window we render. A full count requires a separate /sync/stats query.
-  return String(loadedCount);
+function DetailsCard({
+  conn,
+  successRate,
+  failures30,
+  totalSyncs,
+  syncLogsLoading,
+}: {
+  conn: ConnectionDetail;
+  successRate: { success: number; total: number; pct: number } | null;
+  failures30: number;
+  totalSyncs: number;
+  syncLogsLoading: boolean;
+}) {
+  const healthRows: DetailRowData[] = compactRows([
+    {
+      label: "Success rate",
+      value: successRate
+        ? `${successRate.pct}%`
+        : syncLogsLoading
+          ? "…"
+          : "—",
+    },
+    {
+      label: "Failures",
+      value: syncLogsLoading ? "…" : String(failures30),
+    },
+    {
+      label: "Total syncs",
+      value: syncLogsLoading ? "…" : String(totalSyncs),
+    },
+  ]);
+
+  const providerRows: DetailRowData[] = compactRows([
+    { label: "Provider", value: providerLabel(conn.provider) },
+    conn.user_name ? { label: "User", value: conn.user_name } : null,
+    conn.institution_id
+      ? { label: "Institution", value: conn.institution_id, mono: true }
+      : null,
+  ]);
+
+  const referenceRows: DetailRowData[] = compactRows([
+    { label: "ID", value: conn.short_id, mono: true },
+    { label: "Created", value: new Date(conn.created_at).toLocaleDateString() },
+    {
+      label: "Updated",
+      value: new Date(conn.updated_at).toLocaleDateString(),
+    },
+  ]);
+
+  return (
+    <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
+      {healthRows.length > 0 && (
+        <DetailGroup label="Health" rows={healthRows} />
+      )}
+      {providerRows.length > 0 && (
+        <DetailGroup label="Provider" rows={providerRows} />
+      )}
+      {referenceRows.length > 0 && (
+        <DetailGroup label="Reference" rows={referenceRows} />
+      )}
+    </SectionCard>
+  );
 }
 
 function accountsQueryLoading(loaded: number, expected: number): boolean {
@@ -724,19 +1010,18 @@ function formatIntervalLabel(minutes: number): string {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-11 rounded-lg" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-4 w-56" />
+      <Skeleton className="h-32 rounded-xl" />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="space-y-6">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+        <div className="space-y-6">
+          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Skeleton className="h-40 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
-      </div>
-      <Skeleton className="h-32 rounded-xl" />
-      <Skeleton className="h-48 rounded-xl" />
     </div>
   );
 }
