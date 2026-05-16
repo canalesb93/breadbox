@@ -327,9 +327,11 @@ next target, then updates this file at the end of the run.
   inline for a new Sheet — extend this primitive. `reauth-sheet` and
   `link-account-sheet` use different header shapes (no icon-tile
   lockup) and stay open-coded — promote if a third Sheet adopts the
-  lockup with a yet-different rhythm. No sandbox specimen because
-  SheetTitle/SheetDescription require radix Dialog context; the live
-  consumers carry the visual reference.
+  lockup with a yet-different rhythm. Sandbox specimen shipped in
+  iter 42 (#1156) — wrap in `<Sheet open onOpenChange={() => {}}>`
+  to provide the Dialog.Root context without rendering a portaled
+  SheetContent. The same recipe unlocks specimens for any future
+  primitive that wraps radix Dialog/Popover/Sheet internals.
 
 ## Backlog (ordered roughly by impact)
 
@@ -1572,7 +1574,27 @@ Cross-cutting components:
     standalone in `/v2/sandbox`. First specimen that couldn't
     ship — the live consumers carry the visual reference.
     Worth noting for any future primitive that wraps radix
-    Dialog/Sheet/Popover internals.
+    Dialog/Sheet/Popover internals. *Resolved in iter 42 (#1156)
+    — wrap the specimen in `<Sheet open onOpenChange={() => {}}>`
+    to provide the Dialog.Root context without rendering a
+    portaled SheetContent.*
+
+- **Iter 42 — DetailSheetHeader sandbox specimen** ([#1156](https://github.com/canalesb93/breadbox/pull/1156))
+  - Adds the missing iter-41 follow-up: both `default` and `accent`
+    density variants live in the Components section of `/v2/sandbox`,
+    side-by-side under labeled headers ("DEFAULT · SIZE-9 TILE · P-5"
+    vs "ACCENT · SIZE-10 TILE · P-6 · WITH EYEBROW + TRAILING").
+    Accent variant carries the eyebrow + trailing slot (Plaid badge)
+    so both lockup variations read at a glance.
+  - Pattern: wrap each specimen in a hidden
+    `<Sheet open onOpenChange={() => {}}>`. Radix's `Dialog.Root`
+    (= Sheet) provides the context that SheetTitle/SheetDescription
+    need without rendering any chrome — SheetContent is the portal,
+    Sheet itself is just a provider. Use this recipe for any future
+    primitive that wraps radix Dialog/Popover/Sheet internals.
+  - No code changes outside the sandbox file — purely additive to
+    the gallery. The DetailSheetHeader drift note in this file
+    is updated to retire the "no specimen" caveat.
 
 ## Open observations / questions
 
