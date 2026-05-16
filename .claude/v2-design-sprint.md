@@ -419,7 +419,13 @@ Cross-cutting components:
   two-column layout (form + live-preview rail), so the FormFooter
   contract (negative margins to flush to a container body) doesn't
   apply. Labels / validation / FormItem patterns already canonical
-  via shadcn `Form` primitive.
+  via shadcn `Form` primitive. Iter 53 (#1167) gave `<FormMessage>` a
+  leading `AlertCircle` for field validation errors so the destructive
+  line reads as a status signal — and swept rule-form's amber
+  `comboWarnings` `<Alert>` + csv-import-form's `<Alert
+  variant="destructive">` onto `<StatusPanel>` (warning / destructive
+  tones). Form validation now speaks one icon-led vocabulary across
+  the five form families.
 - [x] Toast (`sonner.tsx`) — variants, action affordances — iter 20 (#1133)
 - [x] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency — iter 18
 - [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
@@ -1984,6 +1990,62 @@ Cross-cutting components:
     multiple interactive buttons are a different shape — those
     stay on `<Alert>` (or move to a future `InlineConfirm`
     primitive when a second site adopts the pattern).
+
+- **Iter 53 — Form validation icon + rule/csv form banners onto StatusPanel** ([#1167](https://github.com/canalesb93/breadbox/pull/1167))
+  - Audit of v2 form pages found the `<FormMessage>` primitive
+    rendered validation errors as plain `text-sm text-destructive`
+    copy with no icon or visual anchor — the message read like
+    ordinary body text rather than a status signal. Fixed by giving
+    `<FormMessage>` a leading `AlertCircle` (`mt-0.5 size-3.5`) when
+    a field error is attached. Plain messages passed as
+    `children` without an underlying error stay
+    `text-muted-foreground` without an icon — the icon is reserved
+    for actual validation errors. All five form families (tag,
+    category, api-key, csv-import, rule) inherit the new look for
+    free; no per-page changes needed.
+  - `rule-form.tsx`'s in-row `<RowError>` (the `ml-12 text-xs`
+    per-condition / per-action error line) gains matching
+    `AlertCircle` (`size-3`) vocabulary so an inline error in the
+    conditions / actions builder reads as the same status signal
+    as the field-level errors above.
+  - `rule-form.tsx`'s open-coded amber `<Alert>` for
+    `comboWarnings` (`border-amber-500/30 bg-amber-500/5` +
+    `text-amber-700 dark:text-amber-400` title — the same
+    handcrafted recipe the iter-52 detail-page banners used)
+    swept onto `<StatusPanel tone="warning">` with
+    `AlertTriangle` icon and "Heads up" heading. Warnings now
+    render with the canonical 3px amber rail + amber-tinted icon
+    tile, parity with providers env-locked / account-detail
+    pending_reauth / connection-detail re-auth banners. The
+    iter-52 drift TODO ("rule-form still hand-rolls `<Alert>`
+    for its local idioms; sweep when convenient") is partially
+    resolved — the warning banner is gone; the right-rail
+    informational `<Alert>` ("Heads up: saving a rule only
+    affects future syncs") stays because it's content advice,
+    not a state notice.
+  - `csv-import-form.tsx`'s `<Alert variant="destructive">`
+    column-mapping validation banner swept onto `<StatusPanel
+    tone="destructive">` with `AlertCircle` icon + "Fix the
+    column mapping" heading. Drops the now-unused `Alert` /
+    `AlertDescription` imports.
+  - Drift retired (was open since iter 16/35/52 implicitly):
+    the only remaining open-coded `<Alert>` sites tied to form
+    pages are reauth-sheet, link-account-sheet, preview-panel,
+    backups-section, and the rule-form right-rail informational.
+    First three are sheet/panel host idioms, not form
+    validation; backups-section is a settings-section banner;
+    rule-form right-rail is informational content. None are
+    blocking — sweep when convenient.
+  - Pattern for the next time this comes up: any validation
+    error attached to a `<FormField>` should flow through
+    `<FormMessage>` (icon free). Any tone-tinted validation
+    banner that sits inside a form (column-mapping, combo
+    warnings, future cross-field validators) should be a
+    `<StatusPanel>` with the right tone — `destructive` for
+    "fix this before submitting", `warning` for "look at this,
+    but you can still submit". `<Alert>` stays the right
+    primitive for content advice / informational notices that
+    aren't tied to a field error.
 
 ## Open observations / questions
 
