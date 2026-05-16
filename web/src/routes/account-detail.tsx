@@ -14,18 +14,19 @@ import {
   EyeOff,
   Landmark,
   Link2,
+  PowerOff,
   Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
+import { StatusPanel } from "@/components/status-panel";
 import { useAccount, useAccounts } from "@/api/queries/accounts";
 import type { AccountDetail } from "@/api/types";
 import {
@@ -458,61 +459,55 @@ function DetailGroup({ label, rows }: { label: string; rows: DetailRowData[] }) 
 function connectionStatusAlert(a: AccountDetail) {
   const status = a.connection_status;
   if (!status || status === "active") return null;
+
+  // Tone-tinted `<StatusPanel>` so account-detail speaks the same banner
+  // vocabulary as Setup, Providers, Home attention-panel, and the iter-35
+  // 404/Error pages. Optional trailing slot carries the "Open connection"
+  // CTA — same shape as the iter-35 error-page Reload button. On narrow
+  // viewports StatusPanel's `flex items-start gap-3` row keeps the icon
+  // tile + heading + trailing CTA aligned where the previous
+  // `<AlertDescription>` flex-wrap row would wrap the CTA below the body
+  // text in a half-aligned column.
+  const openCta = a.connection_short_id ? (
+    <Button size="sm" variant="outline" asChild className="h-7 gap-1.5 text-xs">
+      <Link to="/connections/$id" params={{ id: a.connection_short_id }}>
+        Open connection
+        <ArrowRight className="size-3.5" />
+      </Link>
+    </Button>
+  ) : undefined;
+
   if (status === "pending_reauth") {
     return (
-      <Alert className="border-amber-500/30 bg-amber-500/5">
-        <AlertTriangle className="size-4 text-amber-700 dark:text-amber-400" />
-        <AlertTitle className="text-amber-700 dark:text-amber-400">
-          Connection needs re-authentication
-        </AlertTitle>
-        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-          <span>Recent syncs may be stale until you reconnect.</span>
-          {a.connection_short_id && (
-            <Button size="sm" variant="outline" asChild>
-              <Link
-                to="/connections/$id"
-                params={{ id: a.connection_short_id }}
-              >
-                Open connection
-                <ArrowRight className="size-3.5" />
-              </Link>
-            </Button>
-          )}
-        </AlertDescription>
-      </Alert>
+      <StatusPanel
+        tone="warning"
+        icon={AlertTriangle}
+        heading="Connection needs re-authentication"
+        body="Recent syncs may be stale until you reconnect."
+        trailing={openCta}
+      />
     );
   }
   if (status === "error") {
     return (
-      <Alert variant="destructive">
-        <AlertTriangle className="size-4" />
-        <AlertTitle>Connection error</AlertTitle>
-        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-          <span>Sync is currently failing. Check the connection for details.</span>
-          {a.connection_short_id && (
-            <Button size="sm" variant="outline" asChild>
-              <Link
-                to="/connections/$id"
-                params={{ id: a.connection_short_id }}
-              >
-                Open connection
-                <ArrowRight className="size-3.5" />
-              </Link>
-            </Button>
-          )}
-        </AlertDescription>
-      </Alert>
+      <StatusPanel
+        tone="destructive"
+        icon={AlertTriangle}
+        heading="Connection error"
+        body="Sync is currently failing. Check the connection for details."
+        trailing={openCta}
+      />
     );
   }
   if (status === "disconnected") {
     return (
-      <Alert>
-        <AlertTitle>Connection disconnected</AlertTitle>
-        <AlertDescription>
-          This account is read-only — its parent connection no longer syncs.
-          Historical transactions remain.
-        </AlertDescription>
-      </Alert>
+      <StatusPanel
+        tone="info"
+        icon={PowerOff}
+        heading="Connection disconnected"
+        body="This account is read-only — its parent connection no longer syncs. Historical transactions remain."
+        trailing={openCta}
+      />
     );
   }
   return null;
