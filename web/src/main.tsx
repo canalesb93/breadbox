@@ -10,6 +10,7 @@ import {
   lazyRouteComponent,
 } from "@tanstack/react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/theme-provider";
 import type { AnyRoute } from "@tanstack/react-router";
 import { RootLayout } from "@/routes/__root";
 import { HomePage } from "@/routes/home";
@@ -267,9 +268,11 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <RouterProvider router={router} />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <RouterProvider router={router} />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

@@ -4,17 +4,21 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   ArrowUpRight,
+  Check,
   CheckCircle2,
   Inbox,
   Info,
   KeyRound,
   MessageSquare,
+  Monitor,
+  Moon,
   Plus,
   RefreshCw,
   RotateCcw,
   Save,
   Shapes,
   ShieldAlert,
+  Sun,
   Tag,
   Trash2,
   Users,
@@ -53,6 +57,8 @@ import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProviderPicker } from "@/features/connections/provider-picker";
+import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 import {
@@ -380,6 +386,25 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
+        label="ThemeToggle"
+        code="next-themes · ThemeProvider"
+        description="The theme switcher mounted at the React root via `<ThemeProvider>` in main.tsx. The picker keys off the user's stored choice (`system`/`light`/`dark`), not the realised mode, so 'System' stays selected when the OS resolves to dark. The same hook drives the Sonner Toaster's theme prop and the NavUser dropdown's Theme submenu — change it in one place, every surface follows."
+        className="block"
+      >
+        <ThemeSpecimen />
+      </Specimen>
+
+      <Specimen
+        label="NavUser footer"
+        code="components/nav-user"
+        description="The bottom-of-sidebar account row + dropdown that hosts the theme switcher, keyboard-shortcut overlay, classic-UI link, and sign-out. Lives inside the SidebarProvider — view it live in any app route. The role pill picks the same primary tint as the BrandHeader's V2 chip for admins, muted neutral for editor/viewer."
+      >
+        <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+          <UserChipDemo />
+        </div>
+      </Specimen>
+
+      <Specimen
         label="EmptyState"
         code="components/empty-state"
         description="Three variants share one primitive — pick the weight that fits the surface. Same icon-tile vocabulary as the rest of v2 (square rounded-xl, not circle)."
@@ -693,5 +718,80 @@ export function ComponentsSection() {
         />
       </Specimen>
     </SandboxSection>
+  );
+}
+
+// Live theme picker — three pill buttons backed by next-themes. Renders the
+// same `<Check>` affordance the NavUser submenu uses for the selected row, so
+// the two surfaces share their visual vocabulary.
+function ThemeSpecimen() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const choices = [
+    { value: "system", label: "System", icon: Monitor },
+    { value: "light", label: "Light", icon: Sun },
+    { value: "dark", label: "Dark", icon: Moon },
+  ] as const;
+  const current = theme ?? "system";
+  return (
+    <div className="space-y-3">
+      <div className="bg-muted/30 inline-flex items-center gap-1 rounded-md border p-1">
+        {choices.map(({ value, label, icon: Icon }) => {
+          const active = current === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 text-xs font-medium transition-colors",
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-3.5" />
+              {label}
+              {active ? (
+                <Check className="text-primary -mr-0.5 ml-1 size-3" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Stored: <span className="text-foreground font-mono">{current}</span> ·
+        Resolved:{" "}
+        <span className="text-foreground font-mono">
+          {resolvedTheme ?? "—"}
+        </span>{" "}
+        · Storage key{" "}
+        <span className="text-foreground font-mono">breadbox:theme</span>
+      </p>
+    </div>
+  );
+}
+
+// Inline visual demo of the NavUser trigger — the dropdown itself depends on
+// `SidebarProvider`, so we render just the trigger shape (avatar + name + role
+// pill + chevron) here and point readers at the live sidebar for the menu.
+function UserChipDemo() {
+  return (
+    <div className="bg-sidebar/40 ring-sidebar-border flex w-full max-w-sm items-center gap-2.5 rounded-md p-2 ring-1">
+      <span className="bg-primary/10 text-primary ring-border/60 inline-flex size-8 items-center justify-center rounded-md text-[11px] font-semibold ring-1">
+        AD
+      </span>
+      <div className="grid flex-1 leading-tight">
+        <span className="text-sm font-medium">admin</span>
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px]">
+          <span className="bg-primary/15 text-primary inline-flex items-center gap-1 rounded-sm px-1.5 py-px text-[10px] font-semibold tracking-wider uppercase">
+            admin
+          </span>
+          @example.com
+        </span>
+      </div>
+      <span className="text-muted-foreground/70 text-[10px]">
+        click in sidebar →
+      </span>
+    </div>
   );
 }
