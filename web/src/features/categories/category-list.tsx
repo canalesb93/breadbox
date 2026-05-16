@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight, EyeOff, Lock, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ListCard } from "@/components/list-card";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { IdPill } from "@/components/id-pill";
 import { cn } from "@/lib/utils";
@@ -17,13 +17,12 @@ interface CategoryListProps {
   emptyState?: React.ReactNode;
 }
 
-// CategoryList renders the full parent → child tree as one bordered card with
-// `divide-y` rows — matching the Home / Tags / TX-detail "Card gap-0 py-0 +
-// CardHeader border-b + ul divide-y" vocabulary. Each parent row toggles its
-// children inline; the expanded children sit in a tinted band with a 2px
-// left rail tinted by the parent's color, so the nesting is both visible
-// and meaningful (the rail encodes which parent owns the group, not just
-// "these are indented").
+// CategoryList renders the full parent → child tree using the shared
+// `<ListCard>` primitive so the bordered card + divide-y rail comes from one
+// place across the v2 surface. Each parent row toggles its children inline;
+// the expanded children sit in a tinted band with a 2px left rail tinted by
+// the parent's color, so the nesting is both visible and meaningful (the
+// rail encodes which parent owns the group, not just "these are indented").
 export function CategoryList({ tree, query, emptyState }: CategoryListProps) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -45,13 +44,13 @@ export function CategoryList({ tree, query, emptyState }: CategoryListProps) {
   if (filtered.length === 0) return emptyState ?? null;
 
   return (
-    <Card className="gap-0 py-0">
-      <ul className="divide-y">
-        {filtered.map((parent) => (
-          <CategoryRow key={parent.id} category={parent} forceOpen={!!query} />
-        ))}
-      </ul>
-    </Card>
+    <ListCard
+      rows={filtered}
+      getRowKey={(parent) => parent.id}
+      renderRow={(parent) => (
+        <CategoryRow category={parent} forceOpen={!!query} />
+      )}
+    />
   );
 }
 
@@ -69,7 +68,7 @@ function CategoryRow({
   const accent = category.color ?? undefined;
 
   return (
-    <li>
+    <>
       <div
         className={cn(
           "group hover:bg-muted/40 flex items-center gap-3 px-4 py-2.5 transition-colors",
@@ -202,6 +201,6 @@ function CategoryRow({
           ))}
         </ul>
       )}
-    </li>
+    </>
   );
 }
