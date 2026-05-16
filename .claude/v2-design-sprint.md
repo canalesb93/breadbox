@@ -142,7 +142,12 @@ next target, then updates this file at the end of the run.
   extend the primitive. The iter-5 drift note ("Generic enough to
   ship as a `<TimelineRail>` primitive if a second timeline lands")
   is now resolved (shipped pre-emptively before the second
-  consumer to avoid forking later).
+  consumer to avoid forking later). Iter 62 reworked the
+  `<TimelineRail.Group>` `label` rendering to read as a temporal
+  divider (dot anchored on the rail x-axis + uppercase eyebrow +
+  hairline rule extending right) instead of a plain `<Eyebrow>`
+  that drifted into the section-header vocabulary — same Eyebrow
+  primitive inside, distinct visual role outside.
 - **AuthShell primitive** (iter 14, #1127) — two-pane shell for
   unauthenticated pages at `web/src/components/auth-shell.tsx`.
   Left pane reuses the in-app sidebar surface (`bg-sidebar` +
@@ -2341,6 +2346,36 @@ Cross-cutting components:
     `grep -rn 'success:.*—\|success:.*\. .*\.' …` finds the
     em-dash + multi-sentence patterns specifically — both queries
     return zero hits post-sweep.
+
+- **Iter 62 — Timeline day-headings as temporal dividers** ([#1175](https://github.com/canalesb93/breadbox/pull/1175))
+  - The activity-timeline's day labels ("Today" / "Yesterday" /
+    "Monday, May 13") used to render as a plain `<Eyebrow as="h3">` —
+    visually indistinguishable from the SectionCard "Activity" title
+    sitting above the whole feed. The day-heading's job is *segment
+    time inside the timeline*, not introduce a new section, so the
+    same vocabulary as a section header reads as drift.
+  - Re-rendered `TimelineRail.Group`'s `label` as a temporal divider:
+    a 6px dot anchored on the rail's x-axis (matching the disc
+    centres of the rows below) + the eyebrow label + a hairline rule
+    (`bg-border/60 h-px flex-1`) that fills the remaining width.
+    The dot + hairline make the heading read as a "this is a moment
+    in the feed" separator, distinct from the surrounding section
+    vocabulary.
+  - Geometry: the heading's container uses `pl-3.5` (matching the
+    rows below so the eyebrow's baseline aligns vertically with row
+    content) and the dot uses `marginLeft: "-17px"` (= -14px
+    row-padding − 3px half-dot-width) so its centre sits exactly on
+    the rail's x-axis at x=0. Inline style rather than an arbitrary
+    `[-ml-[17px]]` class because the 17px value comes from the
+    half-dot + row-padding math; promoting it to a Tailwind arbitrary
+    would hide the derivation.
+  - No consumer API change — every `<TimelineRail.Group>` site
+    inherits the new look automatically. Live consumer today:
+    activity-timeline on TX-detail. Sandbox specimen description
+    updated to call out the temporal-divider mechanic so future
+    consumers (rule run history, per-connection sync log — both
+    queued in the iter-26 / iter-56 notes) reach for the same
+    vocabulary.
 
 (Populated by iterations.)
 
