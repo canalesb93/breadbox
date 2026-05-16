@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { StatusPanel } from "@/components/status-panel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -378,55 +379,49 @@ function DetailBody({
         </Alert>
       )}
 
-      {/* Banners */}
+      {/* Banners — promoted onto `<StatusPanel>` so they speak the same
+          tone-tinted vocabulary as Setup, Providers, Home attention-panel,
+          and account-detail's connection-status banners. The previous
+          open-coded `<Alert>` row used absolute-positioned icons +
+          inline amber utilities, which forced a different rhythm from the
+          rest of the v2 surfaces and wrapped the Re-authenticate CTA below
+          the body text in a half-aligned column on narrow viewports. The
+          StatusPanel's `flex items-start gap-3 + trailing` slot keeps the
+          icon tile + heading + CTA aligned on mobile, tablet, and desktop. */}
       {isReauthBanner && (
-        <Alert
-          className={
-            conn.status === "error"
-              ? "border-destructive/30 bg-destructive/5"
-              : "border-amber-500/30 bg-amber-500/5"
-          }
-        >
-          <AlertTriangle
-            className={
-              conn.status === "error"
-                ? "text-destructive size-4"
-                : "size-4 text-amber-700 dark:text-amber-400"
-            }
-          />
-          <AlertTitle
-            className={
-              conn.status === "error"
-                ? "text-destructive"
-                : "text-amber-700 dark:text-amber-400"
-            }
-          >
-            {conn.status === "pending_reauth"
+        <StatusPanel
+          tone={conn.status === "error" ? "destructive" : "warning"}
+          icon={AlertTriangle}
+          heading={
+            conn.status === "pending_reauth"
               ? "Login expired"
-              : "This connection had an error"}
-          </AlertTitle>
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-            <span>
-              {conn.error_message ??
-                "Reconnect to the bank to resume syncing this connection."}
-            </span>
-            <Button size="sm" variant="outline" onClick={onReauth}>
+              : "This connection had an error"
+          }
+          body={
+            conn.error_message ??
+            "Reconnect to the bank to resume syncing this connection."
+          }
+          trailing={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onReauth}
+              className="h-7 gap-1.5 text-xs"
+            >
+              <RefreshCw className="size-3.5" />
               Re-authenticate
             </Button>
-          </AlertDescription>
-        </Alert>
+          }
+        />
       )}
 
       {showFailureBanner && (
-        <Alert className="border-amber-500/30 bg-amber-500/5">
-          <AlertTriangle className="size-4 text-amber-700 dark:text-amber-400" />
-          <AlertTitle className="text-amber-700 dark:text-amber-400">
-            {conn.consecutive_failures} syncs failed in a row
-          </AlertTitle>
-          <AlertDescription>
-            Recent syncs have been failing. Check the history below for details.
-          </AlertDescription>
-        </Alert>
+        <StatusPanel
+          tone="warning"
+          icon={AlertTriangle}
+          heading={`${conn.consecutive_failures} syncs failed in a row`}
+          body="Recent syncs have been failing. Check the history below for details."
+        />
       )}
 
       <QuickActions conn={conn} />
