@@ -54,6 +54,7 @@ import {
   type BackupStatus,
 } from "@/api/queries/backups";
 import { withMutationToast } from "@/lib/mutation-toast";
+import { EmptyState } from "@/components/empty-state";
 
 const SCHEDULE_OPTIONS = [
   { value: "off", label: "Disabled — manual only" },
@@ -441,12 +442,12 @@ function BackupsTable({
       </div>
 
       {backups.length === 0 ? (
-        <div className="border-border rounded-md border border-dashed p-8 text-center">
-          <CheckCircle2 className="text-muted-foreground mx-auto mb-2 size-5" />
-          <p className="text-muted-foreground text-sm">
-            No backups yet. Create one above or set a schedule.
-          </p>
-        </div>
+        <EmptyState
+          variant="card"
+          icon={HardDrive}
+          title="No backups yet"
+          description="Create one above or set a schedule to start a regular cadence."
+        />
       ) : (
         <div className="border-border overflow-hidden rounded-md border">
           <ul className="divide-border divide-y">
