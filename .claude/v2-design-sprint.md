@@ -263,7 +263,7 @@ Cross-cutting components:
   time we touch api-key-form. Labels / validation / FormItem patterns
   already canonical via shadcn `Form` primitive.
 - [ ] Toast (`sonner.tsx`) — variants, action affordances
-- [ ] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency
+- [x] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency — iter 18
 - [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
   optional flush body, optional action slot. Shipped at
   `web/src/components/section-card.tsx`. Migrated TX-detail (Activity
@@ -784,6 +784,27 @@ Cross-cutting components:
     (`text-muted-foreground/0` →
     `group-data-[selected=true]:text-muted-foreground/70`). Reads
     as "this is a jump target" without crowding unselected rows.
+
+- **Iter 18 — ConfirmDialog primitive + 8-callsite sweep** ([#1131](https://github.com/canalesb93/breadbox/pull/1131))
+  - New `<ConfirmDialog>` wraps shadcn AlertDialog with: tone-tinted icon
+    tile, standard Cancel-left/primary-right footer, built-in `pending`
+    state (spinner + disabled actions so the dialog stays open on slow
+    mutations and users can't double-fire). Tones: `destructive` and
+    `default`.
+  - Migrated 8 callsites off open-coded AlertDialog blocks: `rule-detail`,
+    `rules`, `account-links-section`, `selection-action-bar`,
+    `plaid-card`, `teller-card`, `backups-section`, `household-section`.
+    Disconnect/Delete/Remove/Regenerate/Apply-retroactively flows now read
+    at a glance via the icon tile, not just button colour.
+  - Eighth shared primitive of the sprint (after ListCard,
+    ColorRailCard, IdPill, SectionCard, SoftBackButton, AuthShell,
+    StatusPanel, FormFooter).
+  - Process note: the iter-18 agent stopped mid-flow before committing
+    (got distracted taking an extra screenshot). Main session reconciled
+    and shipped — the work was already done in the worktree. Future
+    iterations: end with `result:` only AFTER the PR is merged and sprint
+    state is updated. Don't pause for "one more screenshot" — the PR diff
+    is the source of truth.
 
 ## Open observations / questions
 
