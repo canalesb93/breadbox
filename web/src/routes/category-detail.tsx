@@ -18,9 +18,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { DangerZone } from "@/components/danger-zone";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
-import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
@@ -320,18 +324,18 @@ function DetailsCard({
   category: Category;
   parent: Category | undefined;
 }) {
-  const identityRows: DetailRowData[] = compactRows([
+  const identityRows: DetailRowData[] = compactDetailRows([
     { label: "Slug", value: category.slug, mono: true },
     { label: "Sort order", value: String(category.sort_order) },
     parent ? { label: "Parent", value: parent.display_name } : null,
   ]);
 
-  const stateRows: DetailRowData[] = compactRows([
+  const stateRows: DetailRowData[] = compactDetailRows([
     { label: "System", value: category.is_system ? "Yes" : "No" },
     { label: "Hidden", value: category.hidden ? "Yes" : "No" },
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
+  const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: category.short_id, mono: true },
     category.created_at
       ? {
@@ -343,52 +347,10 @@ function DetailsCard({
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      {identityRows.length > 0 && (
-        <DetailGroup label="Identity" rows={identityRows} />
-      )}
-      {stateRows.length > 0 && (
-        <DetailGroup label="State" rows={stateRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Identity" rows={identityRows} />
+      <DetailList label="State" rows={stateRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
-  );
-}
-
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined | false)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({ label, rows }: { label: string; rows: DetailRowData[] }) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <Eyebrow as="h3">{label}</Eyebrow>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value as string} /> : row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 

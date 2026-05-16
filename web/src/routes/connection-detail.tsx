@@ -43,8 +43,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
 import { Eyebrow } from "@/components/eyebrow";
-import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -834,48 +838,6 @@ function SettingsCard({
   );
 }
 
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined | false)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: DetailRowData[];
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <Eyebrow as="h3">{label}</Eyebrow>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value as string} /> : row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
 function DetailsCard({
   conn,
   successRate,
@@ -889,7 +851,7 @@ function DetailsCard({
   totalSyncs: number;
   syncLogsLoading: boolean;
 }) {
-  const healthRows: DetailRowData[] = compactRows([
+  const healthRows: DetailRowData[] = compactDetailRows([
     {
       label: "Success rate",
       value: successRate
@@ -908,7 +870,7 @@ function DetailsCard({
     },
   ]);
 
-  const providerRows: DetailRowData[] = compactRows([
+  const providerRows: DetailRowData[] = compactDetailRows([
     { label: "Provider", value: providerLabel(conn.provider) },
     conn.user_name ? { label: "User", value: conn.user_name } : null,
     conn.institution_id
@@ -916,7 +878,7 @@ function DetailsCard({
       : null,
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
+  const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: conn.short_id, mono: true },
     { label: "Created", value: new Date(conn.created_at).toLocaleDateString() },
     {
@@ -927,15 +889,9 @@ function DetailsCard({
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      {healthRows.length > 0 && (
-        <DetailGroup label="Health" rows={healthRows} />
-      )}
-      {providerRows.length > 0 && (
-        <DetailGroup label="Provider" rows={providerRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Health" rows={healthRows} />
+      <DetailList label="Provider" rows={providerRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
   );
 }
