@@ -1,4 +1,4 @@
-import { formatAmount } from "@/lib/format";
+import { formatAmount, formatBalance, formatCompactAmount } from "@/lib/format";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 import { sampleTransactions } from "@/sandbox/fixtures";
@@ -106,6 +106,69 @@ export function AmountsSection() {
               </div>
               <span className="shrink-0 text-sm font-medium tabular-nums">
                 {a.output}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="formatBalance"
+        code="lib/format"
+        description="Account balances, totals, scoreboard cells — anything that isn't following the transaction sign convention. Same cached Intl.NumberFormat as formatAmount; no leading + for negatives, sign rendered literally."
+        className="block"
+      >
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            { code: "formatBalance(8240.55, 'USD')", out: formatBalance(8240.55, "USD"), note: "asset balance" },
+            { code: "formatBalance(-1240, 'USD')", out: formatBalance(-1240, "USD"), note: "overdraft — sign preserved" },
+            { code: "formatBalance(42, 'EUR')", out: formatBalance(42, "EUR") },
+            { code: "formatBalance(0, null)", out: formatBalance(0, null), note: "null currency → USD fallback" },
+          ].map((a) => (
+            <div
+              key={a.code}
+              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+            >
+              <div className="min-w-0">
+                <code className="text-muted-foreground block truncate font-mono text-xs">
+                  {a.code}
+                </code>
+                {a.note && (
+                  <span className="text-muted-foreground text-[10px]">
+                    {a.note}
+                  </span>
+                )}
+              </div>
+              <span className="shrink-0 text-sm font-medium tabular-nums">
+                {a.out}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="formatCompactAmount"
+        code="lib/format"
+        description="Hero KPIs — strips minor units so the headline number reads at a glance. Used by the home stats card. Cached Intl.NumberFormat per currency."
+        className="block"
+      >
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            { code: "formatCompactAmount(12450.55, 'USD')", out: formatCompactAmount(12450.55, "USD") },
+            { code: "formatCompactAmount(-3200, 'USD')", out: formatCompactAmount(-3200, "USD") },
+            { code: "formatCompactAmount(8240, 'EUR')", out: formatCompactAmount(8240, "EUR") },
+            { code: "formatCompactAmount(420000, 'JPY')", out: formatCompactAmount(420000, "JPY") },
+          ].map((a) => (
+            <div
+              key={a.code}
+              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+            >
+              <code className="text-muted-foreground block truncate font-mono text-xs">
+                {a.code}
+              </code>
+              <span className="shrink-0 text-sm font-medium tabular-nums">
+                {a.out}
               </span>
             </div>
           ))}

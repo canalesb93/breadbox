@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronRight, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { formatBalance } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/api/types";
 import {
@@ -8,7 +9,6 @@ import {
   accountTypeIcon,
   accountTypeLabel,
   creditUtilization,
-  formatCurrency,
   isLiability,
   utilizationBarClass,
 } from "./account-utils";
@@ -65,7 +65,7 @@ export function AccountRow({ account: a }: AccountRowProps) {
               <span>{Math.round(util)}% used</span>
               {a.balance_limit != null && (
                 <span>
-                  {formatCurrency(a.balance_limit, a.iso_currency_code)} limit
+                  {formatBalance(a.balance_limit, a.iso_currency_code)} limit
                 </span>
               )}
             </div>
@@ -89,7 +89,7 @@ export function AccountRow({ account: a }: AccountRowProps) {
             )}
           >
             {a.balance_current != null
-              ? formatCurrency(
+              ? formatBalance(
                   liability ? -a.balance_current : a.balance_current,
                   a.iso_currency_code,
                 )

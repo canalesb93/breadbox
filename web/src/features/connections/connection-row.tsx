@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { formatBalance } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -28,7 +29,6 @@ import {
 import type { Connection } from "@/api/types";
 import { ConnectionStatusBadge } from "./connection-status-badge";
 import {
-  formatCurrency,
   primaryBalance,
   providerLabel,
   relativeTime,
@@ -165,7 +165,7 @@ export function ConnectionRow({
           <div className="text-right">
             {balance ? (
               <div className="text-sm font-semibold tabular-nums">
-                {formatCurrency(balance.amount, balance.currency)}
+                {formatBalance(balance.amount, balance.currency)}
               </div>
             ) : null}
             <div className="text-muted-foreground text-xs">
