@@ -57,7 +57,7 @@ const selectionColumn: ColumnDef<Transaction> = {
 const baseColumns: ColumnDef<Transaction>[] = [
   {
     id: "description",
-    header: "Description",
+    header: "Transaction",
     // `max-w-0 w-full` is the classic auto-table truncation trick: the cell
     // fills available width but its max-width is 0, so descendants with
     // `truncate` actually clamp. Without this, a long merchant name expands
@@ -87,7 +87,7 @@ const baseColumns: ColumnDef<Transaction>[] = [
     // `w-px` shrinks to content on mobile (where space is tight); `sm:min-w-28`
     // pins a comfortable floor on desktop so the right edge of the column
     // stays steady across rows of varying amount length.
-    meta: { className: "w-px sm:min-w-28" },
+    meta: { className: "w-px sm:min-w-28 text-right" },
     cell: ({ row }) => <TransactionAmount transaction={row.original} />,
   },
 ];

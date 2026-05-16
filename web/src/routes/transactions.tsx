@@ -8,8 +8,10 @@ import {
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Receipt } from "lucide-react";
+import { Plus, Receipt } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { CommandDialog } from "@/components/ui/command";
@@ -359,13 +361,40 @@ export function TransactionsPage() {
     !!search.pending;
 
   const count = totalCount.data?.count;
-  const showCountLine = !transactions.isLoading && !transactions.isError;
+  const eyebrow = (() => {
+    if (transactions.isLoading) return "Loading";
+    if (transactions.isError) return "Error";
+    if (rows.length === 0) {
+      return hasActiveFilters ? "No matches" : "No transactions";
+    }
+    if (count != null && count > rows.length) {
+      return `Showing ${rows.length.toLocaleString()} of ${count.toLocaleString()}`;
+    }
+    const total = count ?? rows.length;
+    return `${total.toLocaleString()} ${total === 1 ? "transaction" : "transactions"}`;
+  })();
 
   return (
-    <div>
-      <PageHeader title="Transactions" />
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        eyebrow={eyebrow}
+        title="Transactions"
+        description="Search, filter, and review every transaction across your connected accounts."
+        actions={
+          <Button asChild size="sm">
+            <Link
+              to="/connections"
+              search={{ action: "connect" }}
+              className="inline-flex items-center gap-1.5"
+            >
+              <Plus className="size-4" />
+              Connect bank
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="mb-4">
+      <div className="flex flex-col gap-3">
         <TransactionsToolbar
           search={search}
           onChange={setFilter}
@@ -377,29 +406,12 @@ export function TransactionsPage() {
         />
       </div>
 
-      {showCountLine && rows.length > 0 && (
-        <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm">
-          <span>
-            {count != null && count > rows.length
-              ? `Showing ${rows.length} of ${count.toLocaleString()} transactions`
-              : `${(count ?? rows.length).toLocaleString()} ${
-                  (count ?? rows.length) === 1 ? "transaction" : "transactions"
-                }`}
-          </span>
-          {focusedIndex == null && (
-            <span className="hidden text-xs sm:inline">
-              · Press J / K to navigate
-            </span>
-          )}
-        </div>
-      )}
-
       <DataTable
         columns={columns}
         data={rows}
         isLoading={transactions.isLoading}
         isError={transactions.isError}
-        loadingRows={6}
+        loadingRows={8}
         renderSkeletonRow={() => (
           <TransactionRowSkeleton showSelect={selectMode} />
         )}
@@ -410,6 +422,8 @@ export function TransactionsPage() {
         meta={tableMeta}
         focusedRowId={focusedRowId}
         onRowClick={selectMode ? toggleRowSelection : openTransaction}
+        stickyHeader
+        refinedHeader
         emptyState={
           <EmptyState
             icon={Receipt}
@@ -420,8 +434,22 @@ export function TransactionsPage() {
             }
             description={
               hasActiveFilters
-                ? "Try adjusting or clearing your filters."
-                : "Transactions appear here once an account finishes syncing."
+                ? "Adjust or clear your filters to see more results."
+                : "Once a connected account finishes syncing, transactions will land here."
+            }
+            action={
+              hasActiveFilters ? undefined : (
+                <Button asChild size="sm">
+                  <Link
+                    to="/connections"
+                    search={{ action: "connect" }}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="size-4" />
+                    Connect a bank
+                  </Link>
+                </Button>
+              )
             }
           />
         }
