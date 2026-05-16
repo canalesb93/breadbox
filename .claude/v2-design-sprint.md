@@ -61,7 +61,7 @@ Pages:
 
 - [x] App shell + sidebar (`app-sidebar.tsx`, `__root.tsx`, `settings-shell.tsx`) — #1113
 - [x] Home / dashboard (`home.tsx`) — #1115
-- [ ] Transactions list (`transactions.tsx`)
+- [x] Transactions list (`transactions.tsx`) — #1116
 - [ ] Transaction detail (`transaction-detail.tsx`)
 - [ ] Accounts list (`accounts.tsx`)
 - [ ] Account detail (`account-detail.tsx`)
@@ -84,7 +84,10 @@ Cross-cutting components:
   `eyebrow`, tightened spacing, sm:flex-row footer). Still needs a sweep
   to migrate the remaining pages that build their own headers.
 - [ ] `empty-state.tsx` — visual language
-- [ ] `data-table.tsx` — density, sort headers, hover
+- [~] `data-table.tsx` — density + hover tightened in #1116 (new
+  `stickyHeader` + `refinedHeader` opt-ins; `Table` primitive picks
+  up softer borders and `px-3 py-2.5` cell padding). Sort header
+  affordances still TODO when we wire interactive sorting.
 - [ ] `command-palette.tsx` — sections, kbd hints, recents
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
 - [ ] `transaction-amount.tsx` — currency rendering
@@ -121,6 +124,24 @@ Cross-cutting components:
   - Reuses `ConnectionStatusBadge` + `relativeTime` from
     `features/connections` — no forked rendering.
 
+- **Iter 3 — Transactions list** ([#1116](https://github.com/canalesb93/breadbox/pull/1116))
+  - PageHeader now carries a description + "Showing N of M" eyebrow
+    + primary "Connect bank" CTA, so the densest page in the app
+    lands with intent instead of a naked H1. The redundant
+    "Showing 50 of 879 · Press J / K to navigate" sub-line is gone
+    — count moved up, j/k discoverability handed off to the global
+    shortcut sheet.
+  - `DataTable` gains opt-in `stickyHeader` + `refinedHeader` props.
+    Transactions opts into both: column band stays pinned on scroll
+    with a tinted backdrop blur and reads as small uppercase tracked
+    labels (Transaction / Category / Amount).
+  - `Table` primitive picks up softer `border-border/60` row
+    separators, calmer `hover:bg-muted/40`, and a uniform
+    `px-3 py-2.5` cell — denser scan path without feeling cramped.
+    Container is `rounded-lg` with a quieter border.
+  - No-filters empty state offers a "Connect a bank" CTA instead of
+    a dead end.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -150,3 +171,16 @@ Cross-cutting components:
   `mkdir -p static/css && touch static/css/styles.css` is enough for
   the embed pattern to resolve). After that, no Go regen needed for
   v2 SPA work.
+- **Templ also needs `templ generate`** in a fresh worktree (iter 3):
+  `internal/templates/components/helpers.go` references the
+  lowercase generated `txAvatarColorStyle`, which only appears in the
+  `*_templ.go` siblings — without regen, `go build ./...` fails with
+  "undefined: txAvatarColorStyle". `/Users/canales/go/bin/templ` is
+  on PATH; running it once at worktree setup is enough.
+- **Vite restart with `CHOKIDAR_USEPOLLING=1` is the fix** when the
+  worktree lives under `/tmp/claude-501/...` and fsevents silently
+  drops edits (iter 3). Symptom: edits are saved to disk and `curl`
+  hits Vite's transform showing OLD content. Polling watcher catches
+  every change reliably, at the cost of more CPU — fine for an
+  iteration. `bun dev --port <N> --force` on a fresh port also flushes
+  Vite's dep cache.
