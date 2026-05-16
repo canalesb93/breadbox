@@ -3,6 +3,7 @@ import {
   ChevronsUpDown,
   ExternalLink,
   Keyboard,
+  Loader2,
   LogOut,
   type LucideIcon,
   MessageSquareText,
@@ -287,7 +288,11 @@ export function NavUser({ me }: { me: Me | null }) {
               }}
               className="text-destructive focus:text-destructive focus:bg-destructive/10 gap-2"
             >
-              <LogOut />
+              {logout.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <LogOut />
+              )}
               {logout.isPending ? "Signing out…" : "Sign out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
