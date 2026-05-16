@@ -1675,6 +1675,43 @@ Cross-cutting components:
     barely. If a fourth surface ships an uncategorised hero, bump
     the muted-rail rendering — for now, single consumer.
 
+- **Iter 46 — Dark-mode form-primitive sweep** ([#1160](https://github.com/canalesb93/breadbox/pull/1160))
+  - Extends iter 45's checkbox fix to the rest of the form
+    primitives. Same root cause: `border-input` is
+    `oklch(1 0 0 / 15%)` (~15% white), and over `bg-card`
+    (oklch 0.205) that border reads as a hairline. For the tiny
+    RadioGroup dish, the unchecked state was indistinguishable
+    from background.
+  - **Input / Textarea / Select**: keep the soft
+    `dark:bg-input/30` fill, bump the border to
+    `dark:border-white/20` with hover `/30`. The fill stays
+    soft (unfocused fields don't shout), the border is now
+    legible at a glance. Select keeps its stock
+    `dark:hover:bg-input/50` fill-hover rhythm.
+  - **RadioGroup**: applies the iter-45 checkbox recipe verbatim
+    — `dark:border-white/25` + `dark:bg-white/[0.04]` (hover
+    `/[0.07]`). Unchecked items now read as clear circles
+    rather than ghosts. Checked state untouched
+    (`text-primary` + filled dot).
+  - **Sandbox**: added a Select specimen (placeholder / chosen
+    / disabled variants) to the primitives section. Previously
+    Select was a blind spot — the next dark-mode regression
+    sweep will pick it up automatically.
+  - Live consumers benefiting: api-key-form's scope/mode radios
+    (the iter-44 RadioGroupItem inside OptionCard tiles);
+    every Input across login / setup-account / tag-form /
+    category-form / api-key-form / rule-form / search inputs;
+    every Textarea (rule-form / category-form descriptions);
+    every Select trigger (rules condition/action rows,
+    csv-import-form, connect-bank-sheet, link-account-sheet,
+    settings backups/household, providers cards).
+  - Pattern is now consistent across all 5 form-control
+    primitives (Input, Textarea, Select, Checkbox, RadioGroup):
+    bump idle border to `dark:border-white/20-30`, bump
+    unchecked fill on toggle controls to `dark:bg-white/[0.04]`.
+    New form primitives should follow the same vocabulary or
+    they'll regress dark mode.
+
 ## Open observations / questions
 
 (Populated by iterations.)
