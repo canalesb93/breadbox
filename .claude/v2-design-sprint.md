@@ -976,23 +976,43 @@ Cross-cutting components:
     every nav leaf has either a real page or a polished
     coming-soon shell.
 
+- **Iter 23 — Transactions toolbar + PageHeader mobile fix** ([#1136](https://github.com/canalesb93/breadbox/pull/1136))
+  - Two related mobile-only layout fixes flagged in iter-22's audit:
+    `PageHeader` had a stale `mb-6` while every caller wraps it in a
+    `flex flex-col gap-{5,6}` parent — the margin stacked with the
+    parent gap and produced a ~44px void below the wrapped action
+    button on mobile. Dropped the margin, tightened the title→action
+    gap (gap-3 on mobile, gap-4 on sm+) since the wrapped layout
+    already implies separation.
+  - `TransactionsToolbar` used a `<div className="grow" />` spacer to
+    push Sort + Select right of the filter pills. On mobile that flex
+    spacer stole the entire remaining row, orphaning Status with empty
+    space to its right and flinging Sort/Select to the far edge of the
+    next line. Replaced the spacer with `sm:ml-auto` on the
+    sort/select cluster — on mobile they flow inline with the filter
+    pills, on sm+ right-alignment is preserved.
+  - Cross-cutting drop of `mb-6` is safe: all 15+ `PageHeader` callers
+    already provide a flex-column `gap-*` parent. Verified at 375x812
+    and 1440x900; desktop unchanged.
+
 ## Open observations / questions
 
 (Populated by iterations.)
 
-- **Mobile sweep audit findings** (iter 22, partial — pre-merge halt):
-  Quick 375x812 walkthrough surfaced concrete breakage worth a dedicated
-  iteration:
-  - **Transactions list**: giant whitespace gap between the Connect-bank
-    section and the search row; "Newest first" and "Select" controls are
-    oddly right-aligned and visually disconnected from the rest of the
-    toolbar.
-  - **Accounts / Providers settings**: not yet audited — flagged as likely
-    candidates for layout breakage at small viewports.
-  No code shipped this iteration (agent stopped mid-investigation before
-  taking screenshots or making fixes). Next mobile-focused iteration:
-  fix the Transactions toolbar collapse + audit Accounts/Providers; ship
-  one focused PR.
+- **Mobile audit — Accounts / Providers / Settings** (carried from iter
+  22, now the residual): Transactions list mobile issues are fixed in
+  iter 23. Still owed: a 375x812 walk through `/accounts`,
+  `/providers`, and the settings shell to catch toolbar/grid breakage
+  before promoting `design/v2-shadcn` to main. Likely the same flex-row
+  + grow-spacer anti-pattern that bit Transactions — worth a focused
+  iteration after a few non-mobile ones to keep the sprint varied.
+- **`grow`-spacer anti-pattern on mobile** (iter 23 drift, watch for):
+  any toolbar/header that uses `<div className="grow" />` to push a
+  trailing cluster right will produce the same orphaned-pill behaviour
+  on narrow viewports. The fix is `sm:ml-auto` on the trailing cluster
+  (or `ms-auto` if directionality matters). Suspect surfaces to audit
+  in a future pass: rules table toolbar, categories index, tags index,
+  any future filter-and-action band.
 
 - **Backend already on 8090** in this dev environment — iter 1 reused
   it instead of starting a second `make dev`. Future iterations should
