@@ -134,7 +134,7 @@ Pages:
 - [ ] Category new (`category-new.tsx`)
 - [x] Tags list (`tags.tsx`) — #1117
 - [ ] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`)
-- [ ] Connections list (`connections.tsx`)
+- [x] Connections list (`connections.tsx`) — iter 8
 - [ ] Connection detail (`connection-detail.tsx`)
 - [ ] Providers settings (`providers.tsx`)
 - [ ] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`)
@@ -307,6 +307,24 @@ Cross-cutting components:
     (it didn't open a menu) is replaced with a calm chevron
     pointing to the detail page. Parent-row edit pencils fade
     in on hover instead of being permanently loud.
+
+- **Iter 8 — Connections list + ListCard primitive** ([#1121](https://github.com/canalesb93/breadbox/pull/1121))
+  - Promoted the `<Card gap-0 py-0>` + `<ul divide-y>` pattern into a
+    shared `web/src/components/list-card.tsx` primitive (sixth surface
+    triggered extraction as planned in iter 7). Sibling of
+    `<SectionCard>` but pre-tuned for list bodies — `<ListCard>` with
+    optional `eyebrow` / `title` / `description` / `action` slots and a
+    `<ul>` body wired up.
+  - Connections list adopts `ListCard`: PageHeader gains the iter-3/4
+    list eyebrow vocabulary, status badges align with the active-state
+    tokens, last-sync renders as relative time. Floating card soup
+    collapsed into one bordered list.
+  - Still TODO (queued for follow-ups): migrate Home recent-activity,
+    Home connections panel, TX-detail Activity, Account-detail Recent
+    transactions, and Categories list to use `<ListCard>` instead of
+    open-coded `<Card gap-0 py-0>` + `<ul divide-y>` markup. Mechanical
+    sweep, can ride along with the next iteration that touches any of
+    those surfaces.
 
 ## Open observations / questions
 
