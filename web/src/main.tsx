@@ -34,6 +34,11 @@ import {
 import { APIKeysPage, apiKeysSearchSchema } from "@/routes/api-keys";
 import { APIKeyNewPage } from "@/routes/api-key-new";
 import { APIKeyCreatedPage } from "@/routes/api-key-created";
+import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
+import {
+  AccountDetailPage,
+  accountDetailSearchSchema,
+} from "@/routes/account-detail";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -90,6 +95,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/api-keys": {
     component: APIKeysPage,
     validateSearch: apiKeysSearchSchema,
+  },
+  "/accounts": {
+    component: AccountsPage,
+    validateSearch: accountsSearchSchema,
   },
 };
 
@@ -156,6 +165,13 @@ const apiKeyCreatedRoute = createRoute({
   component: APIKeyCreatedPage,
 });
 
+const accountDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/accounts/$id",
+  component: AccountDetailPage,
+  validateSearch: accountDetailSearchSchema,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -183,6 +199,7 @@ const routeTree = rootRoute.addChildren([
   connectionDetailRoute,
   apiKeyNewRoute,
   apiKeyCreatedRoute,
+  accountDetailRoute,
   ...pageRoutes,
 ]);
 
