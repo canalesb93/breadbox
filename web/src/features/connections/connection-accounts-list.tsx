@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Banknote, CreditCard, Landmark, PiggyBank, Wallet } from "lucide-react";
 import type { Account } from "@/api/types";
 import { formatCurrency } from "./connection-utils";
@@ -13,9 +14,8 @@ interface ConnectionAccountsListProps {
   accounts: Account[];
 }
 
-// Read-only list of accounts attached to a connection. Inline rename / exclude
-// live on the per-account detail page in a future surface; for now each row is
-// a placeholder link that will resolve once /accounts/$shortId ships.
+// Compact list of accounts attached to a connection — each card links to
+// the per-account detail page where rename / exclude / linking live.
 export function ConnectionAccountsList({ accounts }: ConnectionAccountsListProps) {
   if (accounts.length === 0) {
     return (
@@ -38,7 +38,11 @@ export function ConnectionAccountsList({ accounts }: ConnectionAccountsListProps
 function AccountCard({ account: a }: { account: Account }) {
   const Icon = TYPE_ICON[a.type] ?? Banknote;
   return (
-    <div className="bg-card flex items-center gap-3 rounded-lg border p-3">
+    <Link
+      to="/accounts/$id"
+      params={{ id: a.short_id }}
+      className="bg-card hover:bg-accent/40 flex items-center gap-3 rounded-lg border p-3 transition-colors"
+    >
       <div className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
         <Icon className="text-muted-foreground size-4" />
       </div>
@@ -54,6 +58,6 @@ function AccountCard({ account: a }: { account: Account }) {
           ? formatCurrency(a.balance_current, a.iso_currency_code)
           : "—"}
       </div>
-    </div>
+    </Link>
   );
 }
