@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table";
+import { IdPill } from "@/components/id-pill";
 import { formatLongDate, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useRevokeAPIKey } from "@/api/queries/api-keys";
@@ -53,12 +54,14 @@ export function APIKeysTable({
       {
         id: "name",
         header: "Name",
+        meta: { className: "w-[32%]" },
         cell: ({ row }) => (
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-1">
             <span className="font-medium">{row.original.name}</span>
-            <code className="text-muted-foreground text-xs font-mono">
-              {row.original.key_prefix}…
-            </code>
+            <IdPill
+              value={`${row.original.key_prefix}…`}
+              className="text-muted-foreground self-start"
+            />
           </div>
         ),
       },
@@ -176,6 +179,8 @@ export function APIKeysTable({
         isError={isError}
         getRowId={(k) => k.id}
         emptyState={emptyState}
+        stickyHeader
+        refinedHeader
       />
 
       <Dialog

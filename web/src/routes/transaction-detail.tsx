@@ -1,7 +1,6 @@
-import { Link, useParams, useRouter } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
-  ArrowLeft,
   ArrowUpRight,
   Building2,
   Receipt,
@@ -17,6 +16,7 @@ import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryEditor } from "@/features/transactions/category-editor";
 import { TagManager } from "@/features/transactions/tag-manager";
 import { ActivityTimeline } from "@/features/transactions/activity-timeline";
@@ -32,7 +32,7 @@ export function TransactionDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <BackButton />
+      <SoftBackButton to="/transactions">Back to transactions</SoftBackButton>
 
       {isLoading ? (
         <DetailSkeleton />
@@ -51,43 +51,6 @@ export function TransactionDetailPage() {
         <DetailBody transaction={data} />
       )}
     </div>
-  );
-}
-
-// BackButton renders as a real link to /transactions (so middle-click and
-// "open in new tab" still work), but on a normal left-click it prefers
-// `router.history.back()` — that lands the user on the exact list state they
-// came from (filters, scroll, focus) instead of resetting to defaults.
-function BackButton() {
-  const router = useRouter();
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      asChild
-      className="text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs"
-    >
-      <Link
-        to="/transactions"
-        onClick={(e) => {
-          if (
-            !e.defaultPrevented &&
-            !e.metaKey &&
-            !e.ctrlKey &&
-            !e.shiftKey &&
-            !e.altKey &&
-            e.button === 0 &&
-            window.history.length > 1
-          ) {
-            e.preventDefault();
-            router.history.back();
-          }
-        }}
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to transactions
-      </Link>
-    </Button>
   );
 }
 

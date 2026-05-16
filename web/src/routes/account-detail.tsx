@@ -3,13 +3,11 @@ import {
   Link,
   useNavigate,
   useParams,
-  useRouter,
   useSearch,
 } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   Banknote,
   Eye,
@@ -26,6 +24,7 @@ import { ColorRailCard } from "@/components/color-rail-card";
 import { EmptyState } from "@/components/empty-state";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { useAccount, useAccounts } from "@/api/queries/accounts";
 import type { AccountDetail } from "@/api/types";
 import {
@@ -83,7 +82,7 @@ export function AccountDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <BackButton />
+      <SoftBackButton to="/accounts">Back to accounts</SoftBackButton>
 
       {acctQuery.isLoading ? (
         <DetailSkeleton />
@@ -117,44 +116,6 @@ export function AccountDetailPage() {
         />
       )}
     </div>
-  );
-}
-
-// BackButton renders as a real link to /accounts (so middle-click and
-// "open in new tab" still work), but on a normal left-click it prefers
-// `router.history.back()` — that lands the user on the exact list state
-// they came from (filters, family tab, group-by). Mirrors the TX-detail
-// back button so the muscle memory matches.
-function BackButton() {
-  const router = useRouter();
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      asChild
-      className="text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs"
-    >
-      <Link
-        to="/accounts"
-        onClick={(e) => {
-          if (
-            !e.defaultPrevented &&
-            !e.metaKey &&
-            !e.ctrlKey &&
-            !e.shiftKey &&
-            !e.altKey &&
-            e.button === 0 &&
-            window.history.length > 1
-          ) {
-            e.preventDefault();
-            router.history.back();
-          }
-        }}
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to accounts
-      </Link>
-    </Button>
   );
 }
 
