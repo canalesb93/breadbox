@@ -13,19 +13,20 @@ import {
   utilizationBarClass,
 } from "./account-utils";
 
-interface AccountCardProps {
+interface AccountRowProps {
   account: Account;
-  className?: string;
 }
 
-// AccountCard is the list-row shown on the Accounts page and on the
-// connection-detail accounts grid. Click anywhere to open the account
-// detail page. Keeps the visual rhythm tight: a 9×9 type-tile, the label,
-// a metadata subline (type · mask), and the current balance to the right.
-// Credit cards render their utilization bar below; non-active connections
-// show an inline status pill so problem accounts stand out without an
-// extra trip to /connections.
-export function AccountCard({ account: a, className }: AccountCardProps) {
+// AccountRow is the in-card row used by the Accounts list — each
+// institution / type group is a `ListCard` and each row inside is one of
+// these. No self-border (the parent ListCard owns the bordered card +
+// divide-y rail); padding + hover match the established `px-5 py-3.5`
+// density shared by ConnectionRow / TransactionPrimary.
+//
+// The connection-detail accounts grid uses its own local `AccountCard`
+// (defined inline in `features/connections/connection-accounts-list.tsx`)
+// because that surface is a two-column bordered grid, not a divide-y list.
+export function AccountRow({ account: a }: AccountRowProps) {
   const Icon = accountTypeIcon(a.type);
   const liability = isLiability(a.type);
   const util = creditUtilization(a);
@@ -34,13 +35,10 @@ export function AccountCard({ account: a, className }: AccountCardProps) {
     <Link
       to="/accounts/$id"
       params={{ id: a.short_id }}
-      className={cn(
-        "bg-card hover:bg-accent/40 group flex items-center gap-3 rounded-lg border p-3 transition-colors",
-        className,
-      )}
+      className="hover:bg-muted/40 group flex items-center gap-3 px-5 py-3.5 transition-colors sm:gap-4"
     >
-      <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-lg">
-        <Icon className="text-muted-foreground size-4" />
+      <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
+        <Icon className="size-4" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -60,15 +58,9 @@ export function AccountCard({ account: a, className }: AccountCardProps) {
               <span className="tabular-nums">····{a.mask}</span>
             </>
           )}
-          {a.institution_name && (
-            <>
-              <span className="text-muted-foreground/40">·</span>
-              <span className="truncate">{a.institution_name}</span>
-            </>
-          )}
         </div>
         {util != null && (
-          <div className="mt-2">
+          <div className="mt-2 max-w-xs">
             <div className="text-muted-foreground mb-1 flex items-center justify-between text-[10px] tabular-nums">
               <span>{Math.round(util)}% used</span>
               {a.balance_limit != null && (
