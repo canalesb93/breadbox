@@ -18,14 +18,17 @@ interface FormFooterProps {
 // adopts it. Iter 15 brings tag-form and category-form onto the pattern, so
 // it lives here.
 //
-// Visual contract (matches the api-key-new pattern):
-//   `<div className="bg-muted/20 -mx-5 -mb-5 mt-2 flex items-center justify-end
+// Visual contract:
+//   `<div className="bg-muted/20 -mx-5 -mb-5 flex items-center justify-end
 //                    gap-2 border-t px-5 py-3">`
 //
 // The negative margins (`-mx-5 -mb-5`) push the strip out to the SectionCard
 // body's edges so the top border lines up with the card's outer border and
 // the action strip reads as a footer of the card, not as floating content.
-// Drop it inside a SectionCard with the default `bodyClassName="px-5 py-5"`.
+// Drop it inside a SectionCard with the default `bodyClassName="px-5 py-5"` —
+// the body's `py-5` (20px) supplies the breathing room above the strip; no
+// extra `mt-*` is needed (and adding one re-introduces a sliver of plain
+// card background above the muted footer, breaking the flush look).
 //
 // Don't fork the look — change this primitive instead.
 export function FormFooter({
@@ -37,7 +40,7 @@ export function FormFooter({
   return (
     <div
       className={cn(
-        "bg-muted/20 -mx-5 -mb-5 mt-2 flex flex-wrap items-center justify-end gap-2 border-t px-5 py-3",
+        "bg-muted/20 -mx-5 -mb-5 flex flex-wrap items-center justify-end gap-2 border-t px-5 py-3",
         hint && "sm:justify-between",
         className,
       )}

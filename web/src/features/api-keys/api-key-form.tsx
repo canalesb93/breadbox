@@ -245,7 +245,7 @@ export function APIKeyForm() {
           )}
         />
 
-        <div className="bg-muted/20 -mx-5 -mb-5 mt-2 flex items-center justify-end gap-2 border-t px-5 py-3">
+        <div className="bg-muted/20 -mx-5 -mb-5 flex items-center justify-end gap-2 border-t px-5 py-3">
           <Button
             type="button"
             variant="ghost"
