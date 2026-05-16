@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
+import {
+  ArrowLeft,
+  FileSpreadsheet,
+  Loader2,
+  Upload,
+  Wand2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -10,8 +18,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Eyebrow } from "@/components/eyebrow";
 import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 import {
@@ -26,6 +43,7 @@ import { cn } from "@/lib/utils";
 // 10MB matches the v1 admin behaviour and gives the user instant local
 // feedback before the network round-trip.
 const MAX_CSV_BYTES = 10 * 1024 * 1024;
+const MAX_CSV_MB = Math.floor(MAX_CSV_BYTES / 1024 / 1024);
 
 // CsvImportForm is the CSV branch of the Connect-bank Sheet. It owns the
 // upload → mapping → import flow inside whichever Sheet renders it (the
@@ -69,7 +87,7 @@ export function CsvImportForm({
     if (!file) return;
     if (file.size > MAX_CSV_BYTES) {
       toast.error(
-        `File is too large. Keep CSVs under ${Math.floor(MAX_CSV_BYTES / 1024 / 1024)} MB.`,
+        `File is too large. Keep CSVs under ${MAX_CSV_MB} MB.`,
       );
       return;
     }
@@ -159,9 +177,14 @@ function CsvDropStage({
           if (file) onFile(file);
         }}
         className={cn(
-          "border-border/60 hover:border-primary/40 hover:bg-accent/30 flex min-h-[180px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 text-center transition",
-          dragOver && "border-primary bg-accent/40",
-          loading && "pointer-events-none opacity-60",
+          // Dashed drop zone. Refined the rest tone so the muted backdrop
+          // reads softer than `bg-accent/30` (which renders almost-white in
+          // light + a noticeably blue tint in dark), and tightened the
+          // drag-over treatment so the primary tint is unambiguous.
+          "group bg-muted/20 hover:border-primary/50 hover:bg-muted/40 flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border/70 p-6 text-center transition",
+          dragOver &&
+            "border-primary/70 bg-primary/[0.06] ring-4 ring-primary/15",
+          loading && "pointer-events-none opacity-70",
         )}
       >
         <input
@@ -173,35 +196,51 @@ function CsvDropStage({
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
           disabled={loading}
         />
-        {loading ? (
-          <Loader2 className="text-muted-foreground size-8 animate-spin" />
-        ) : (
-          <Upload className="text-muted-foreground size-8" />
-        )}
-        <div>
-          <div className="text-sm font-medium">
+        <span
+          className={cn(
+            // Icon tile vocabulary borrowed from StatusPanel / EmptyState —
+            // a size-11 rounded surface with a tinted background, so the
+            // affordance reads as a primitive, not a stray icon.
+            "bg-background text-muted-foreground border border-border/70 group-hover:border-primary/40 group-hover:bg-primary/8 group-hover:text-primary flex size-11 items-center justify-center rounded-xl transition",
+            dragOver &&
+              "border-primary/50 bg-primary/10 text-primary",
+            loading && "border-primary/40 bg-primary/8 text-primary",
+          )}
+        >
+          {loading ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <Upload className="size-5" />
+          )}
+        </span>
+        <div className="space-y-1">
+          <div className="text-foreground text-sm font-medium">
             {loading ? "Parsing CSV…" : "Drop a CSV here, or click to browse"}
           </div>
-          <p className="text-muted-foreground mt-1 text-xs">
-            Up to {Math.floor(MAX_CSV_BYTES / 1024 / 1024)} MB. We'll detect
-            columns automatically — you can adjust them on the next step.
+          <p className="text-muted-foreground text-xs">
+            Up to {MAX_CSV_MB} MB · we'll detect columns automatically.
           </p>
         </div>
       </label>
 
-      <div className="text-muted-foreground flex items-start gap-2 rounded-md border bg-muted/30 p-3 text-xs">
-        <FileSpreadsheet className="text-muted-foreground/80 mt-0.5 size-4 shrink-0" />
+      <div className="text-muted-foreground flex items-start gap-2.5 rounded-md border bg-muted/20 px-3 py-2.5 text-xs">
+        <Wand2 className="text-muted-foreground/80 mt-0.5 size-3.5 shrink-0" />
         <span>
           Header row required. Common bank exports (Chase, Capital One, Amex,
-          BofA) are auto-detected.
+          BofA) are auto-detected and pre-mapped on the next step.
         </span>
       </div>
 
-      <div className="mt-auto flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel} disabled={loading}>
+      <CsvFooterStrip>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCancel}
+          disabled={loading}
+        >
           Cancel
         </Button>
-      </div>
+      </CsvFooterStrip>
     </div>
   );
 }
@@ -277,8 +316,14 @@ function CsvMapStage({
       const inferredCredit = preview.inferred_mapping.credit;
       setMapping((m) => ({
         ...m,
-        debit: m.debit === -1 && typeof inferredDebit === "number" ? inferredDebit : m.debit,
-        credit: m.credit === -1 && typeof inferredCredit === "number" ? inferredCredit : m.credit,
+        debit:
+          m.debit === -1 && typeof inferredDebit === "number"
+            ? inferredDebit
+            : m.debit,
+        credit:
+          m.credit === -1 && typeof inferredCredit === "number"
+            ? inferredCredit
+            : m.credit,
       }));
     }
   }, [hasDebitCredit, preview.inferred_mapping, mapping.debit, mapping.credit]);
@@ -332,31 +377,48 @@ function CsvMapStage({
     };
   }
 
+  const fileSizeKb = Math.max(1, Math.round(file.size / 1024));
+
   return (
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto">
-      <Alert variant="default">
-        <AlertTitle className="text-sm">
-          {file.name}
-          <span className="text-muted-foreground ml-2 text-xs font-normal">
-            {preview.total_rows} rows · {preview.headers.length} columns
-            {preview.template_name ? ` · ${preview.template_name}` : ""}
-          </span>
-        </AlertTitle>
-        <AlertDescription className="text-xs">
-          {preview.template_name
-            ? "Detected template — column mapping pre-filled. Review before importing."
-            : "No template detected — confirm each column is mapped to the right field."}
-        </AlertDescription>
-      </Alert>
+      {/* File pill — replaces the misused Alert. Filename + meta on one
+          line so the eye keeps scanning down to the mapping. */}
+      <div className="bg-muted/20 flex items-start gap-3 rounded-md border px-3.5 py-2.5">
+        <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 flex size-9 shrink-0 items-center justify-center rounded-md">
+          <FileSpreadsheet className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex items-baseline gap-2">
+            <p className="text-foreground truncate text-sm font-medium">
+              {file.name}
+            </p>
+            <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+              {fileSizeKb.toLocaleString()} KB
+            </span>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            <span className="tabular-nums">{preview.total_rows}</span> rows ·{" "}
+            <span className="tabular-nums">{preview.headers.length}</span>{" "}
+            columns
+            {preview.template_name ? (
+              <>
+                {" · "}
+                <span className="text-foreground/80 font-medium">
+                  {preview.template_name}
+                </span>{" "}
+                detected
+              </>
+            ) : null}
+          </p>
+        </div>
+      </div>
 
-      <div className="space-y-3">
-        <Label className="text-muted-foreground text-xs uppercase tracking-wide">
-          Map columns
-        </Label>
+      <section className="space-y-3">
+        <Eyebrow as="p">Map columns</Eyebrow>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ColumnSelect
             id="map-date"
-            label={COLUMN_LABELS.date + " *"}
+            label={COLUMN_LABELS.date}
             headers={preview.headers}
             value={mapping.date}
             required
@@ -364,7 +426,7 @@ function CsvMapStage({
           />
           <ColumnSelect
             id="map-description"
-            label={COLUMN_LABELS.description + " *"}
+            label={COLUMN_LABELS.description}
             headers={preview.headers}
             value={mapping.description}
             required
@@ -374,7 +436,7 @@ function CsvMapStage({
             <>
               <ColumnSelect
                 id="map-debit"
-                label={COLUMN_LABELS.debit + " *"}
+                label={COLUMN_LABELS.debit}
                 headers={preview.headers}
                 value={mapping.debit}
                 required
@@ -382,7 +444,7 @@ function CsvMapStage({
               />
               <ColumnSelect
                 id="map-credit"
-                label={COLUMN_LABELS.credit + " *"}
+                label={COLUMN_LABELS.credit}
                 headers={preview.headers}
                 value={mapping.credit}
                 required
@@ -392,7 +454,7 @@ function CsvMapStage({
           ) : (
             <ColumnSelect
               id="map-amount"
-              label={COLUMN_LABELS.amount + " *"}
+              label={COLUMN_LABELS.amount}
               headers={preview.headers}
               value={mapping.amount}
               required
@@ -410,55 +472,53 @@ function CsvMapStage({
             />
           ))}
         </div>
-      </div>
+      </section>
 
-      <fieldset className="space-y-2">
-        <Label className="text-muted-foreground text-xs uppercase tracking-wide">
-          Amount format
-        </Label>
-        <label className="text-muted-foreground flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
+      <section className="space-y-3">
+        <Eyebrow as="p">Amount format</Eyebrow>
+        <label className="flex items-start gap-2.5 text-sm">
+          <Checkbox
+            id="csv-has-debit-credit"
             checked={hasDebitCredit}
-            onChange={(e) => setHasDebitCredit(e.target.checked)}
+            onCheckedChange={(v) => setHasDebitCredit(v === true)}
+            className="mt-0.5"
           />
-          Separate Debit and Credit columns (instead of one Amount column)
+          <span className="text-foreground/90 leading-snug">
+            Separate Debit and Credit columns{" "}
+            <span className="text-muted-foreground">
+              (instead of one Amount column)
+            </span>
+          </span>
         </label>
         {!hasDebitCredit && (
-          <div className="ml-6 mt-2 flex flex-col gap-1.5 text-sm">
-            <label className="text-muted-foreground flex items-center gap-2">
-              <input
-                type="radio"
-                name="csv-sign"
-                className="size-4 accent-primary"
-                checked={positiveIsDebit}
-                onChange={() => setPositiveIsDebit(true)}
-              />
-              Positive numbers are charges (money out)
+          <RadioGroup
+            value={positiveIsDebit ? "positive" : "negative"}
+            onValueChange={(v) => setPositiveIsDebit(v === "positive")}
+            className="ml-6 gap-2"
+          >
+            <label className="flex items-center gap-2.5 text-sm leading-none">
+              <RadioGroupItem id="csv-sign-positive" value="positive" />
+              <span className="text-foreground/90">
+                Positive numbers are charges{" "}
+                <span className="text-muted-foreground">(money out)</span>
+              </span>
             </label>
-            <label className="text-muted-foreground flex items-center gap-2">
-              <input
-                type="radio"
-                name="csv-sign"
-                className="size-4 accent-primary"
-                checked={!positiveIsDebit}
-                onChange={() => setPositiveIsDebit(false)}
-              />
-              Negative numbers are charges (money out)
+            <label className="flex items-center gap-2.5 text-sm leading-none">
+              <RadioGroupItem id="csv-sign-negative" value="negative" />
+              <span className="text-foreground/90">
+                Negative numbers are charges{" "}
+                <span className="text-muted-foreground">(money out)</span>
+              </span>
             </label>
-          </div>
+          </RadioGroup>
         )}
-      </fieldset>
+      </section>
 
       {!appendToConnectionId && (
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="account-name"
-            className="text-muted-foreground text-xs uppercase tracking-wide"
-          >
+        <section className="space-y-2">
+          <Eyebrow as="label" htmlFor="account-name">
             Account name
-          </Label>
+          </Eyebrow>
           <Input
             id="account-name"
             value={accountName}
@@ -468,61 +528,113 @@ function CsvMapStage({
           <p className="text-muted-foreground text-xs">
             Shown in the accounts list. You can rename it later.
           </p>
-        </div>
+        </section>
       )}
 
-      <div className="space-y-2">
-        <Label className="text-muted-foreground text-xs uppercase tracking-wide">
-          Preview ({Math.min(preview.preview_rows.length, 10)} of {preview.total_rows} rows)
-        </Label>
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <Eyebrow as="p">Preview</Eyebrow>
+          <span className="text-muted-foreground text-[11px] tabular-nums">
+            {Math.min(preview.preview_rows.length, 10)} of {preview.total_rows}{" "}
+            rows
+          </span>
+        </div>
         <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40">
-              <tr>
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
                 {preview.headers.map((h, i) => (
-                  <th key={i} className="px-2 py-1.5 text-left font-medium">
+                  <TableHead
+                    key={i}
+                    className="h-8 px-2.5 text-[11px] font-medium"
+                  >
                     {h}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {preview.preview_rows.slice(0, 10).map((row, ri) => (
-                <tr key={ri} className="border-border/60 border-t">
+                <TableRow key={ri}>
                   {row.map((cell, ci) => (
-                    <td
+                    <TableCell
                       key={ci}
-                      className="text-muted-foreground max-w-[16ch] truncate px-2 py-1.5"
+                      className="text-muted-foreground max-w-[16ch] truncate px-2.5 py-1.5"
                     >
                       {cell}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      </section>
 
       {validation && (
-        <Alert variant="default">
-          <AlertDescription className="text-xs">{validation}</AlertDescription>
+        <Alert variant="destructive">
+          <AlertDescription>{validation}</AlertDescription>
         </Alert>
       )}
 
-      <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-2">
-        <Button variant="ghost" onClick={onBack} disabled={importing}>
-          <X className="size-4" />
-          Pick a different file
+      <CsvFooterStrip
+        hint={
+          validation ? null : (
+            <span className="text-muted-foreground text-xs">
+              Ready to import{" "}
+              <span className="text-foreground tabular-nums font-medium">
+                {preview.total_rows}
+              </span>{" "}
+              rows.
+            </span>
+          )
+        }
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          disabled={importing}
+        >
+          <ArrowLeft className="size-3.5" />
+          Different file
         </Button>
         <Button
+          size="sm"
           onClick={() => onImport(buildImportInput())}
           disabled={!!validation || importing}
         >
-          {importing ? <Loader2 className="size-4 animate-spin" /> : null}
+          {importing ? <Loader2 className="size-3.5 animate-spin" /> : null}
           Import {preview.total_rows} rows
         </Button>
-      </div>
+      </CsvFooterStrip>
+    </div>
+  );
+}
+
+// CsvFooterStrip is the bottom action strip for the CSV form. The form
+// lives inside the Connect-bank Sheet body (`p-6`) rather than a
+// SectionCard, so we can't reuse `<FormFooter>` directly — its negative
+// margins assume the SectionCard `px-5 py-5` contract. Instead we mirror
+// the same visual vocabulary (`bg-muted/20` strip, top border, flush to
+// the parent container edges via `-mx-6 -mb-6 px-6 py-3`) so the action
+// row reads as a footer of the Sheet, not floating content.
+function CsvFooterStrip({
+  children,
+  hint,
+}: {
+  children: React.ReactNode;
+  hint?: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "bg-muted/20 -mx-6 -mb-6 mt-auto flex flex-wrap items-center gap-2 border-t px-6 py-3",
+        hint ? "justify-between" : "justify-end",
+      )}
+    >
+      {hint && <div className="min-w-0">{hint}</div>}
+      <div className="ml-auto flex items-center gap-2">{children}</div>
     </div>
   );
 }
@@ -544,15 +656,31 @@ function ColumnSelect({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-xs">
+      <Label
+        htmlFor={id}
+        className="text-foreground/80 flex items-center gap-1 text-xs font-medium"
+      >
         {label}
+        {required && (
+          // Required indicator — a small destructive-toned asterisk that
+          // doesn't shout. Mirrors the affordance used on shadcn form
+          // examples without coupling to `<FormItem>`.
+          <span
+            aria-hidden="true"
+            className="text-destructive/80 text-[11px] leading-none"
+          >
+            *
+          </span>
+        )}
       </Label>
       <Select
         value={value < 0 ? "none" : String(value)}
         onValueChange={onChange}
       >
-        <SelectTrigger id={id}>
-          <SelectValue placeholder={required ? "Pick a column…" : "— None —"} />
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue
+            placeholder={required ? "Pick a column…" : "— None —"}
+          />
         </SelectTrigger>
         <SelectContent>
           {!required && <SelectItem value="none">— None —</SelectItem>}
