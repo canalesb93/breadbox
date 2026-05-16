@@ -730,33 +730,81 @@ export function ComponentsSection() {
       <Specimen
         label="CategoryBadge"
         code="components/category-badge"
-        description="Single rendering of a category — rounded-rect, color-tinted. The ring marks a manual override; em-dash when uncategorized."
+        description="Single rendering of a category — rounded-rect, color-tinted. The ring marks a manual override; em-dash when uncategorized. Two sizes share one recipe with TagChip — sm (h-5 / 11px) for dense list cells, md (h-6 / 12px) for hero / pickers / sandbox."
+        className="block"
       >
-        <CategoryBadge category={coffeeCategory} />
-        <CategoryBadge category={gasCategory} />
-        <CategoryBadge category={coffeeCategory} overridden />
-        <CategoryBadge category={null} />
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            md (default)
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <CategoryBadge category={coffeeCategory} />
+            <CategoryBadge category={gasCategory} />
+            <CategoryBadge category={coffeeCategory} overridden />
+            <CategoryBadge category={null} />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            sm — dense list / table cells
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <CategoryBadge category={coffeeCategory} size="sm" />
+            <CategoryBadge category={gasCategory} size="sm" />
+            <CategoryBadge category={coffeeCategory} size="sm" overridden />
+            <CategoryBadge category={null} size="sm" />
+          </div>
+        </div>
       </Specimen>
 
       <Specimen
         label="TagChip · TagList"
         code="components/tag-chip"
-        description="Pill-shaped (the shape category badges deliberately avoid). TagList resolves slugs against the tag catalog and caps with a +N overflow."
+        description="Pill-shaped (the shape category badges deliberately avoid). Color-tinted icon + label; optional remove (×) for editable contexts. TagList resolves slugs against the tag catalog and caps with a +N overflow. Same sm / md sizes as CategoryBadge — pass through TagList to keep dense rows aligned."
         className="block"
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <TagChip tag={sampleTags[0]} />
-          <TagChip tag={sampleTags[1]} />
-          <TagChip
-            tag={sampleTags[2]}
-            onRemove={() => toast.message("Removed Subscription")}
-          />
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            md (default)
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <TagChip tag={sampleTags[0]} />
+            <TagChip tag={sampleTags[1]} />
+            <TagChip
+              tag={sampleTags[2]}
+              onRemove={() => toast.message("Removed Subscription")}
+            />
+          </div>
         </div>
-        <div className="mt-3">
-          <TagList
-            slugs={["needs-review", "business", "subscription", "reimbursable"]}
-            max={2}
-          />
+        <div className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            sm — dense list / table cells
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <TagChip tag={sampleTags[0]} size="sm" />
+            <TagChip tag={sampleTags[1]} size="sm" />
+            <TagChip
+              tag={sampleTags[2]}
+              size="sm"
+              onRemove={() => toast.message("Removed Subscription")}
+            />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            TagList · md + sm
+          </p>
+          <div className="space-y-2">
+            <TagList
+              slugs={["needs-review", "business", "subscription", "reimbursable"]}
+              max={2}
+            />
+            <TagList
+              slugs={["needs-review", "business", "subscription", "reimbursable"]}
+              max={2}
+              size="sm"
+            />
+          </div>
         </div>
       </Specimen>
 

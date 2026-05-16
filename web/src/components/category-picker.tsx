@@ -53,10 +53,17 @@ export function CategoryPicker({
           )}
         >
           {category?.display_name ? (
-            <CategoryBadge category={category} overridden={overridden} />
+            <CategoryBadge
+              category={category}
+              overridden={overridden}
+              size="sm"
+            />
           ) : (
-            <span className="text-muted-foreground border-border hover:text-foreground inline-flex items-center gap-1 rounded-md border border-dashed px-2 py-0.5 text-xs">
-              <Plus className="size-3" />
+            // Empty-state pill mirrors the sm CategoryBadge geometry (h-5,
+            // text-[11px], rounded-md) so the column doesn't shift when the
+            // user assigns or clears a category from the row.
+            <span className="text-muted-foreground border-border hover:text-foreground inline-flex h-5 items-center gap-0.5 rounded-md border border-dashed px-1.5 text-[11px]">
+              <Plus className="size-2.5" />
               Category
             </span>
           )}
