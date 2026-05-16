@@ -64,16 +64,156 @@ export interface TransactionsPage {
 }
 
 // --- Accounts (public /api/v1/accounts) ---
-// A trimmed view — the transactions filter only needs identity + labels.
+// Mirrors internal/service.AccountResponse. The transactions filter only
+// touches identity + labels; the connections list rolls up balances per
+// connection by joining client-side, so connection_id and balance_current are
+// load-bearing there.
 export interface Account {
   id: string;
   short_id: string;
+  connection_id: string | null;
+  user_id: string | null;
   name: string;
   institution_name: string;
   type: string;
   subtype: string | null;
   mask: string | null;
+  balance_current: number | null;
+  balance_available: number | null;
   iso_currency_code: string | null;
+  is_dependent_linked: boolean;
+}
+
+// --- Users (public /api/v1/users) ---
+// Mirrors internal/service.UserResponse — household members. Used by the
+// connections page to filter by family member.
+export interface User {
+  id: string;
+  short_id: string;
+  name: string;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Connections (public /api/v1/connections) ---
+// Mirrors internal/service.ConnectionResponse. The list endpoint returns this
+// shape; ConnectionDetail extends it with paused/account_count/sync interval
+// override (used on the detail page).
+export interface Connection {
+  id: string;
+  short_id: string;
+  user_id: string | null;
+  user_name: string | null;
+  provider: string; // plaid | teller | csv
+  institution_id: string | null;
+  institution_name: string | null;
+  status: string; // active | error | pending_reauth | disconnected
+  error_code: string | null;
+  error_message: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConnectionDetail extends Connection {
+  paused: boolean;
+  sync_interval_override_minutes: number | null;
+  consecutive_failures: number;
+  account_count: number;
+}
+
+// --- Providers (public /api/v1/providers) ---
+// Mirrors internal/api.providerInfo. Used by the Connect-bank Sheet to filter
+// which provider cards are clickable on this server.
+export interface ProviderCredentialField {
+  type: string;
+  required: boolean | string;
+  description?: string;
+}
+
+export interface ProviderInfo {
+  name: string; // plaid | teller | csv
+  configured: boolean;
+  needs_link_session: boolean;
+  capabilities: string[];
+  credentials_schema: Record<string, ProviderCredentialField>;
+}
+
+// --- Connect: link-session response (POST /providers/{name}/link-session) ---
+// Returned by providers that need a server-issued init token (Plaid today).
+// Providers without one (Teller, CSV) get a 204 — surfaced here as a null
+// result.
+export interface LinkSession {
+  link_token: string;
+  expiration: string;
+}
+
+// --- Connect: connection-create envelope (POST /connections) ---
+// Mirrors internal/api.connectionEnvelope. The detail page consumes
+// connection_id (which is the new connection's short_id).
+export interface CreateConnectionResult {
+  connection_id: string;
+  institution_name: string;
+  status: string;
+}
+
+// --- Connect: per-provider credentials shapes (POST /connections body) ---
+// What goes in the `credentials` field for each provider — the shape the
+// generic dispatch endpoint hands to the provider extractor in
+// internal/api/providers.go.
+export interface PlaidExchangeCredentials {
+  public_token: string;
+  institution_id: string;
+  institution_name: string;
+  accounts: { id: string; name?: string; mask?: string; type?: string; subtype?: string }[];
+}
+
+export interface TellerExchangeCredentials {
+  access_token: string;
+  enrollment_id: string;
+  institution_id?: string;
+  institution_name: string;
+  accounts?: { id: string; name?: string; type?: string; subtype?: string; last_four?: string }[];
+}
+
+// --- Connect: CSV preview / import (POST /connections/csv/{preview,import}) ---
+// Mirrors the JSON shapes returned by internal/api/csv_import.go. The CSV
+// branch in the Connect-bank Sheet posts the file as multipart/form-data; the
+// preview returns parsed headers + the first N rows + an inferred column
+// mapping (with optional auto-detected template hints), and the import
+// commits the file with the user-chosen mapping.
+export interface CsvPreviewResult {
+  headers: string[];
+  preview_rows: string[][];
+  total_rows: number;
+  delimiter: string; // "," | ";" | "|" | "tab"
+  inferred_mapping: Partial<Record<CsvColumnKey, number>>;
+  template_name?: string;
+  positive_is_debit?: boolean;
+  date_format?: string;
+  has_debit_credit?: boolean;
+}
+
+// CsvColumnKey is the union of every field the backend importer recognises.
+// `date` + `description` are always required; `amount` is required unless
+// `has_debit_credit` is true (then `debit` + `credit` carry the value).
+export type CsvColumnKey =
+  | "date"
+  | "description"
+  | "amount"
+  | "debit"
+  | "credit"
+  | "category"
+  | "merchant_name";
+
+export interface CsvImportResult {
+  connection_id: string;
+  account_id: string;
+  imported_transactions: number;
+  updated_transactions: number;
+  skipped_duplicates: number;
+  total_rows: number;
 }
 
 // --- Tags (public /api/v1/tags) ---

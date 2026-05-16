@@ -52,8 +52,8 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (f transact
 		return
 	}
 
-	if f.StartDate != nil && f.EndDate != nil && !f.StartDate.Before(*f.EndDate) {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
+	if f.StartDate != nil && f.EndDate != nil && f.EndDate.Before(*f.StartDate) {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be on or before end_date")
 		return
 	}
 
@@ -154,8 +154,15 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			}
 		}
 
+		offset, err := parseIntParam(q, "offset", 0, 0, 1_000_000)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+
 		params := service.TransactionListParams{
 			Cursor:        q.Get("cursor"),
+			Offset:        offset,
 			Limit:         limit,
 			StartDate:     f.StartDate,
 			EndDate:       f.EndDate,

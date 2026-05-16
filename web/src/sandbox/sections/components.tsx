@@ -14,6 +14,8 @@ import { DataTable } from "@/components/data-table";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { CategoryCommandList } from "@/components/category-command";
+import { DateRangeFilter } from "@/components/date-range-filter";
+import type { DateRangeValue } from "@/components/date-range-filter";
 import { TagChip, TagList } from "@/components/tag-chip";
 import { TagCommandList } from "@/components/tag-command";
 import { IconPicker } from "@/components/icon-picker";
@@ -21,6 +23,7 @@ import { ColorPicker } from "@/components/color-picker";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
+import { ProviderPicker } from "@/features/connections/provider-picker";
 import type { Transaction } from "@/api/types";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 import {
@@ -64,6 +67,8 @@ export function ComponentsSection() {
   >("data");
   const [iconValue, setIconValue] = useState<string | null>("shopping-cart");
   const [colorValue, setColorValue] = useState<string | null>("#f97316");
+  const [pickedProvider, setPickedProvider] = useState<string | null>("plaid");
+  const [dateRange, setDateRange] = useState<DateRangeValue>({});
 
   return (
     <SandboxSection
@@ -243,6 +248,35 @@ export function ComponentsSection() {
         <KbdTooltip label="Command palette" keys={["mod", "k"]}>
           <Button variant="outline">Search</Button>
         </KbdTooltip>
+      </Specimen>
+
+      <Specimen
+        label="ProviderPicker"
+        code="features/connections/provider-picker"
+        description="Stacked provider cards used in the Connect-bank Sheet (and the future hosted-link page). `enabledProviders` gates which cards are clickable; everything else renders as 'Not configured'."
+        className="block"
+      >
+        <div className="max-w-sm">
+          <ProviderPicker
+            enabledProviders={["plaid"]}
+            providers={["plaid", "teller", "csv"]}
+            value={pickedProvider}
+            onChange={setPickedProvider}
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DateRangeFilter"
+        code="components/date-range-filter"
+        description="Date-range filter pill — preset chips beside a 2-month calendar (single month on mobile). Click to open."
+      >
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <span className="text-muted-foreground text-xs">
+          {dateRange.start || dateRange.end
+            ? `${dateRange.start ?? "any"} → ${dateRange.end ?? "any"}`
+            : "no range selected"}
+        </span>
       </Specimen>
 
       <Specimen

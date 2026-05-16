@@ -2,7 +2,6 @@ import { useMemo, useState, type ReactNode, type RefObject } from "react";
 import {
   ArrowUpDown,
   Banknote,
-  CalendarRange,
   Check,
   CheckSquare,
   CircleDot,
@@ -30,7 +29,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KbdTooltip } from "@/components/kbd-tooltip";
 import { CategoryCommandList } from "@/components/category-command";
-import { formatLongDate } from "@/lib/format";
+import {
+  DateRangeFilter,
+  formatDateRangeLabel,
+} from "@/components/date-range-filter";
 import { cn } from "@/lib/utils";
 import { useAccounts } from "@/api/queries/accounts";
 import { useCategories, flattenCategories } from "@/api/queries/categories";
@@ -159,10 +161,12 @@ export function TransactionsToolbar({
     "categories",
   );
   if (categoryChip) chips.push(categoryChip);
-  if (search.start || search.end) {
-    const from = search.start ? formatLongDate(search.start) : "Any";
-    const to = search.end ? formatLongDate(search.end) : "Any";
-    chips.push({ key: "dateRange", label: `${from} – ${to}` });
+  const dateRangeLabel = formatDateRangeLabel({
+    start: search.start,
+    end: search.end,
+  });
+  if (dateRangeLabel) {
+    chips.push({ key: "dateRange", label: dateRangeLabel });
   }
   if (search.min != null || search.max != null) {
     const lo = search.min != null ? `$${search.min}` : "Any";
@@ -262,35 +266,12 @@ export function TransactionsToolbar({
             />
           </FilterPill>
 
-          <FilterPill
-            icon={CalendarRange}
-            label="Date"
-            active={!!(search.start || search.end)}
-            className="w-64 p-3"
-          >
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">From</Label>
-                <Input
-                  type="date"
-                  value={search.start ?? ""}
-                  onChange={(e) =>
-                    onChange({ start: e.target.value || undefined })
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">To</Label>
-                <Input
-                  type="date"
-                  value={search.end ?? ""}
-                  onChange={(e) =>
-                    onChange({ end: e.target.value || undefined })
-                  }
-                />
-              </div>
-            </div>
-          </FilterPill>
+          <DateRangeFilter
+            value={{ start: search.start, end: search.end }}
+            onChange={(range) =>
+              onChange({ start: range.start, end: range.end })
+            }
+          />
 
           <FilterPill
             icon={DollarSign}

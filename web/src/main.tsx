@@ -23,6 +23,14 @@ import { CategoryDetailPage } from "@/routes/category-detail";
 import { TagsPage } from "@/routes/tags";
 import { TagNewPage } from "@/routes/tag-new";
 import { TagDetailPage } from "@/routes/tag-detail";
+import {
+  ConnectionsPage,
+  connectionsSearchSchema,
+} from "@/routes/connections";
+import {
+  ConnectionDetailPage,
+  connectionDetailSearchSchema,
+} from "@/routes/connection-detail";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -72,6 +80,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/tags": {
     component: TagsPage,
   },
+  "/connections": {
+    component: ConnectionsPage,
+    validateSearch: connectionsSearchSchema,
+  },
 };
 
 // Detail routes aren't nav leaves, so they're registered explicitly rather
@@ -115,6 +127,13 @@ const sandboxRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/sandbox"), "SandboxPage"),
 });
 
+const connectionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/connections/$id",
+  component: ConnectionDetailPage,
+  validateSearch: connectionDetailSearchSchema,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -139,6 +158,7 @@ const routeTree = rootRoute.addChildren([
   tagNewRoute,
   tagDetailRoute,
   sandboxRoute,
+  connectionDetailRoute,
   ...pageRoutes,
 ]);
 
