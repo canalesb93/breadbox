@@ -1,15 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Building2, FileSpreadsheet, Landmark, Plug } from "lucide-react";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { ListCard } from "@/components/list-card";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
 import { relativeTime } from "@/features/connections/connection-utils";
 import { cn } from "@/lib/utils";
@@ -36,26 +30,47 @@ export function HomeConnectionsPanel({
   const visible = connections ? rankForDashboard(connections).slice(0, 5) : [];
   const remaining = connections ? Math.max(0, connections.length - visible.length) : 0;
 
-  return (
-    <Card className="gap-0 py-0">
-      <CardHeader className="border-b py-4">
-        <CardTitle className="text-sm font-medium">Connections</CardTitle>
-        <CardAction>
-          <Button asChild variant="ghost" size="sm" className="-mr-2 h-8 px-2">
-            <Link
-              to="/connections"
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-            >
-              Manage
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-0 py-0">
-        {isLoading ? (
-          <ConnectionsSkeleton />
-        ) : !connections || connections.length === 0 ? (
+  const manage = (
+    <Button asChild variant="ghost" size="sm" className="-mr-2 h-8 px-2">
+      <Link
+        to="/connections"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+      >
+        Manage
+        <ArrowRight className="size-3.5" />
+      </Link>
+    </Button>
+  );
+
+  if (isLoading) {
+    return (
+      <ListCard
+        title="Connections"
+        action={manage}
+        rows={[0, 1, 2, 3]}
+        getRowKey={(i) => i}
+        renderRow={(i) => (
+          <div className="flex items-center gap-3 px-5 py-3.5" key={i}>
+            <Skeleton className="size-9 rounded-md" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-3.5 w-36" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-5 w-16 rounded-md" />
+          </div>
+        )}
+      />
+    );
+  }
+
+  if (!connections || connections.length === 0) {
+    return (
+      <ListCard
+        title="Connections"
+        action={manage}
+        rows={[]}
+        renderRow={() => null}
+        empty={
           <EmptyState
             icon={Plug}
             title="No banks connected"
@@ -68,29 +83,34 @@ export function HomeConnectionsPanel({
               </Button>
             }
           />
-        ) : (
-          <>
-            <ul className="divide-y">
-              {visible.map((c) => (
-                <ConnectionRow key={c.id} connection={c} />
-              ))}
-            </ul>
-            {remaining > 0 && (
-              <div className="text-muted-foreground border-t px-5 py-3 text-xs">
-                +{remaining} more on the Connections page
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+        }
+      />
+    );
+  }
+
+  return (
+    <ListCard
+      title="Connections"
+      action={manage}
+      rows={visible}
+      getRowKey={(c) => c.id}
+      renderRow={(c) => <ConnectionRow connection={c} />}
+      footer={
+        remaining > 0 ? (
+          <span className="text-muted-foreground text-xs">
+            +{remaining} more on the Connections page
+          </span>
+        ) : undefined
+      }
+      footerClassName="text-left"
+    />
   );
 }
 
 function ConnectionRow({ connection: c }: { connection: Connection }) {
   const Icon = PROVIDER_ICON[c.provider] ?? Building2;
   return (
-    <li className="flex items-center gap-3 px-5 py-3">
+    <div className="flex items-center gap-3 px-5 py-3">
       <div
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-md border",
@@ -108,24 +128,7 @@ function ConnectionRow({ connection: c }: { connection: Connection }) {
         </div>
       </div>
       <ConnectionStatusBadge status={c.status} />
-    </li>
-  );
-}
-
-function ConnectionsSkeleton() {
-  return (
-    <ul className="divide-y">
-      {[0, 1, 2, 3].map((i) => (
-        <li key={i} className="flex items-center gap-3 px-5 py-3.5">
-          <Skeleton className="size-9 rounded-md" />
-          <div className="flex-1 space-y-1.5">
-            <Skeleton className="h-3.5 w-36" />
-            <Skeleton className="h-3 w-20" />
-          </div>
-          <Skeleton className="h-5 w-16 rounded-md" />
-        </li>
-      ))}
-    </ul>
+    </div>
   );
 }
 
