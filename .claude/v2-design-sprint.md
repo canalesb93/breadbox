@@ -1495,6 +1495,35 @@ Cross-cutting components:
     remaining hit is a `// tag pages tend to grow long` comment
     inside `tags-table.tsx`). Observation closed.
 
+- **Iter 39 — Shortcut sheet polish** ([#1153](https://github.com/canalesb93/breadbox/pull/1153))
+  - `web/src/components/shortcut-sheet.tsx` rebuilt onto v2
+    vocabulary. Header gets the icon-tile lockup
+    (`bg-muted size-9 rounded-lg border` + `Keyboard` lucide)
+    used by `StatusPanel`, `EmptyState`, and `SectionCard`, so
+    the sheet reads as a first-class v2 surface instead of a
+    stock shadcn Sheet.
+  - Group rows move into bordered `<section>` cards with a
+    `bg-muted/30 border-b` header carrying an uppercase eyebrow
+    label + a tabular-nums count pill on the right + a
+    `divide-y` body of rows with a subtle `hover:bg-muted/40`
+    response. Mirrors the ListCard vocabulary used across the
+    rest of v2 (Home recent-activity, Accounts groups,
+    Categories list, etc.).
+  - Footer now carries a thin cmdk-style action strip
+    (`bg-muted/30 border-t text-[11px]`) with `⇧?` Toggle this
+    sheet on the left + `esc` Close on the right. The
+    `<Kbd className="bg-background/80">` variant is the same one
+    `CommandPalette` uses on its footer pills, so the two
+    overlays now read as siblings.
+  - Empty-state added for the no-shortcuts-registered case (a
+    dashed-border tile + "No shortcuts registered" headline).
+    Paranoia — in practice Global always registers ⌘K and ⇧?.
+  - No new shared primitive: the inline cards are tightly
+    coupled to the sheet chrome (icon tile + scrollable body +
+    footer strip). If a second sheet adopts the same
+    icon-tile-header lockup, promote the inner shell into a
+    `<DetailSheetHeader>`.
+
 ## Open observations / questions
 
 (Populated by iterations.)
