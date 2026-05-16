@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { Eyebrow } from "@/components/eyebrow";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
@@ -111,9 +112,9 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
               size="lg"
             />
             <div className="min-w-0 space-y-1">
-              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
+              <Eyebrow as="p" variant="hero">
                 Transaction
-              </p>
+              </Eyebrow>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-xl font-semibold tracking-tight">
                   {t.provider_name}
@@ -215,9 +216,7 @@ function ClassifyField({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </p>
+      <Eyebrow as="p">{label}</Eyebrow>
       {children}
     </div>
   );
@@ -235,9 +234,7 @@ function QuickActions({
   // straight into the transactions list `?account=` filter.
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
-        Jump to
-      </span>
+      <Eyebrow className="mr-1">Jump to</Eyebrow>
       <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
         <Link
           to="/transactions"
@@ -347,9 +344,7 @@ function DetailGroup({
   if (rows.length === 0) return null;
   return (
     <div className="space-y-2.5">
-      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </h3>
+      <Eyebrow as="h3">{label}</Eyebrow>
       <dl className="space-y-2">
         {rows.map((row) => (
           <div
