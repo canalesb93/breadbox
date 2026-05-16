@@ -2,15 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Building2, Trash2, Webhook } from "lucide-react";
+import { Building2, Loader2, Trash2, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -39,6 +32,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { SectionCard } from "@/components/section-card";
+import { FormFooter } from "@/components/form-footer";
+import { IdPill } from "@/components/id-pill";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useDisableProvider,
@@ -49,15 +46,16 @@ import type {
   ProviderHealthResponse,
 } from "@/api/types";
 import { EnvLockedNotice } from "./env-locked-notice";
-import { ProviderStats, ProviderStatusBadge } from "./provider-status";
+import {
+  ProviderScoreboard,
+  ProviderStatusBadge,
+  providerToneAccent,
+  resolveProviderTone,
+} from "./provider-status";
 import { TestConnectionButton } from "./test-connection-button";
 
 const ENVS = ["sandbox", "development", "production"] as const;
 
-// We don't validate the secret as required at the schema level. When the
-// provider already has a stored secret, an empty input means "keep the
-// existing one" — that's the same UX as the v1 admin form. The schema
-// `.refine` below enforces required only for first-time setup.
 const schema = z
   .object({
     client_id: z.string().min(1, "Client ID is required"),
@@ -121,28 +119,41 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
     });
   }
 
+  const tone = resolveProviderTone(health, config.configured);
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b">
-        <div className="flex items-center gap-3">
-          <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 flex size-10 items-center justify-center rounded-lg">
-            <Building2 className="size-5" />
+    <div className="space-y-4">
+      <ColorRailCard accent={providerToneAccent(tone)}>
+        <div className="flex flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 flex size-11 shrink-0 items-center justify-center rounded-lg">
+              <Building2 className="size-5" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <div className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
+                Provider
+              </div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-foreground text-lg font-semibold tracking-tight">
+                  Plaid
+                </h2>
+                <ProviderStatusBadge health={health} configured={config.configured} />
+              </div>
+              <p className="text-muted-foreground max-w-md text-sm">
+                Thousands of financial institutions across the US, Canada, and Europe.
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <CardTitle className="text-base">Plaid</CardTitle>
-            <CardDescription className="text-xs">
-              Thousands of financial institutions across the US, Canada, and Europe.
-            </CardDescription>
-          </div>
-          <ProviderStatusBadge health={health} configured={config.configured} />
+          <ProviderScoreboard health={health} tone={tone} />
         </div>
-      </CardHeader>
+      </ColorRailCard>
 
-      <CardContent className="space-y-6 pt-2">
-        <ProviderStats health={health} />
-
+      <SectionCard
+        title="Credentials"
+        icon={<Building2 className="text-muted-foreground size-4" />}
+      >
         {config.from_env ? (
-          <>
+          <div className="space-y-4">
             <EnvLockedNotice provider="Plaid" />
             <dl className="grid grid-cols-1 gap-y-3 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-6">
               <Row label="Client ID" value={config.client_id ?? "—"} mono />
@@ -150,10 +161,10 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
               <Row label="Environment" value={config.environment ?? "—"} />
               <Row label="Webhook URL" value={config.webhook_url || "Not set"} mono />
             </dl>
-          </>
+          </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -242,74 +253,77 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
                 )}
               />
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <Button type="submit" disabled={update.isPending}>
-                  {update.isPending ? "Saving…" : "Save Plaid settings"}
-                </Button>
-                {config.configured && (
-                  <AlertDialog open={confirmingDisable} onOpenChange={setConfirmingDisable}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                        Disable Plaid
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Disable Plaid?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Stored credentials will be deleted from the database. Existing Plaid connections stay in your
-                          household but syncs will fail until you re-enter credentials.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={onDisable}
-                          className="bg-destructive text-white hover:bg-destructive/90"
+              <FormFooter
+                secondary={
+                  config.configured ? (
+                    <AlertDialog
+                      open={confirmingDisable}
+                      onOpenChange={setConfirmingDisable}
+                    >
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
                         >
+                          <Trash2 className="size-3.5" />
                           Disable
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Disable Plaid?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Stored credentials will be deleted from the database. Existing
+                            Plaid connections stay in your household but syncs will fail until
+                            you re-enter credentials.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={onDisable}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                          >
+                            Disable
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null
+                }
+                primary={
+                  <Button type="submit" size="sm" disabled={update.isPending}>
+                    {update.isPending && <Loader2 className="size-4 animate-spin" />}
+                    {update.isPending ? "Saving…" : "Save settings"}
+                  </Button>
+                }
+              />
             </form>
           </Form>
         )}
+      </SectionCard>
 
-        {config.configured && (
-          <div className="border-t pt-4">
-            <TestConnectionButton provider="plaid" />
-          </div>
-        )}
-
-        {config.configured && (
-          <details className="group rounded-md border bg-muted/30 px-3 py-2 text-sm">
-            <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 text-xs font-medium">
-              <Webhook className="size-3.5" />
-              Webhook setup
-            </summary>
-            <div className="text-muted-foreground mt-3 space-y-2 text-xs">
-              <p>
-                Plaid automatically subscribes to webhooks when the URL above is set during link-token creation. No
-                separate Plaid-dashboard step needed.
-              </p>
-              <p>Point Plaid at:</p>
-              <code className="bg-background block break-all rounded border px-2 py-1.5 font-mono text-xs select-all">
-                https://&lt;your-domain&gt;/webhooks/plaid
-              </code>
+      {config.configured && (
+        <SectionCard
+          title="Diagnostics"
+          icon={<Webhook className="text-muted-foreground size-4" />}
+          action={<TestConnectionButton provider="plaid" />}
+        >
+          <div className="text-muted-foreground space-y-3 text-xs">
+            <p className="text-foreground text-sm font-medium">Webhook endpoint</p>
+            <p>
+              Plaid automatically subscribes to webhooks when the URL above is set during
+              link-token creation. No separate Plaid-dashboard step needed.
+            </p>
+            <div>
+              <IdPill value="https://<your-domain>/webhooks/plaid" />
             </div>
-          </details>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+        </SectionCard>
+      )}
+    </div>
   );
 }
 

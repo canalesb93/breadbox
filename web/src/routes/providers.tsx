@@ -6,6 +6,29 @@ import {
   useProviderHealth,
 } from "@/api/queries/provider-config";
 import { CsvCard, PlaidCard, TellerCard } from "@/features/providers";
+import type { ProviderConfigResponse, ProviderHealthResponse } from "@/api/types";
+
+// Build the small "N healthy · M of 3 configured" eyebrow that lands in
+// PageHeader so the page reads as a status overview before the cards.
+function buildEyebrow(
+  config: ProviderConfigResponse,
+  health: Record<string, ProviderHealthResponse>,
+): string {
+  const configured = [
+    config.plaid.configured,
+    config.teller.configured,
+    true, // CSV is always available
+  ].filter(Boolean).length;
+  const healthyCount = ["plaid", "teller", "csv"].reduce((acc, key) => {
+    const h = health[key];
+    if (h && h.last_sync_time && h.last_sync_status === "success") return acc + 1;
+    return acc;
+  }, 0);
+  if (healthyCount > 0) {
+    return `${healthyCount} healthy · ${configured} of 3 configured`;
+  }
+  return `${configured} of 3 configured`;
+}
 
 export function ProvidersPage() {
   const config = useProviderConfig();
@@ -15,6 +38,7 @@ export function ProvidersPage() {
     return (
       <>
         <PageHeader
+          eyebrow="Settings"
           title="Providers"
           description="Configure bank data providers that sync accounts and transactions."
         />
@@ -29,6 +53,7 @@ export function ProvidersPage() {
     return (
       <>
         <PageHeader
+          eyebrow="Settings"
           title="Providers"
           description="Configure bank data providers that sync accounts and transactions."
         />
@@ -46,14 +71,16 @@ export function ProvidersPage() {
 
   const { plaid, teller, has_encryption_key } = config.data;
   const healthMap = health.data ?? {};
+  const eyebrow = buildEyebrow(config.data, healthMap);
 
   return (
     <>
       <PageHeader
+        eyebrow={eyebrow}
         title="Providers"
-        description="Configure bank data providers that sync accounts and transactions into Breadbox."
+        description="Bank data providers that sync accounts and transactions into Breadbox. Each provider stores its own encrypted credentials."
       />
-      <div className="grid gap-4">
+      <div className="grid gap-5">
         <PlaidCard config={plaid} health={healthMap["plaid"]} />
         <TellerCard
           config={teller}
