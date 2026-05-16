@@ -543,7 +543,7 @@ function DetailSkeleton() {
             <Skeleton className="h-3 w-28" />
           </div>
         </div>
-        <div className="border-t flex justify-end gap-2 px-6 py-2.5">
+        <div className="border-t flex justify-end gap-2 px-6 py-3">
           <Skeleton className="h-7 w-24 rounded-md" />
           <Skeleton className="h-7 w-32 rounded-md" />
         </div>

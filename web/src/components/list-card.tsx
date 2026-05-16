@@ -51,10 +51,15 @@ interface ListCardProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "c
 // Visual contract — identical to SectionCard but the body is always a
 // `<ul className="divide-y">`:
 //   `<Card className="gap-0 py-0">`
-//     optional `<CardHeader className="border-b px-5 py-3.5">` title + action
+//     optional `<CardHeader className="border-b px-5 py-4">` title + action
 //     optional `<div className="border-b px-5 py-2">` toolbar slot
 //     `<ul className="divide-y">` rows (each `renderRow` result wrapped in `<li>`)
 //     optional `<div className="border-t px-5 py-3 text-right">` footer
+//
+// Header uses `py-4` (16px) to match `SectionCard`'s header — the two
+// primitives must share vertical rhythm or pages that stack them feel
+// off. Row padding is consumer-supplied (typically `px-5 py-3` or
+// `px-5 py-3.5`), one stride below the header.
 //
 // When `rows.length === 0`, the `empty` slot replaces the `<ul>`. Pass
 // `<EmptyState>` for first-class look + CTA, or a short muted string for a
@@ -89,7 +94,7 @@ export function ListCard<T>({
       {...rest}
     >
       {showHeader && (
-        <CardHeader className={cn("border-b px-5 py-3.5", headerClassName)}>
+        <CardHeader className={cn("border-b px-5 py-4", headerClassName)}>
           {title !== undefined && (
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
               {icon}

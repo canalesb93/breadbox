@@ -70,7 +70,7 @@ export function ColorRailCard({
       {footer && (
         <div
           className={cn(
-            "border-t bg-muted/20 flex flex-wrap items-center justify-end gap-2 px-6 py-2.5 sm:px-7",
+            "border-t bg-muted/20 flex flex-wrap items-center justify-end gap-2 px-6 py-3 sm:px-7",
             footerClassName,
           )}
         >
