@@ -1,5 +1,6 @@
 import * as React from "react";
 import { type LucideIcon } from "lucide-react";
+import { Eyebrow } from "@/components/eyebrow";
 import { cn } from "@/lib/utils";
 
 // TimelineRail is the v2 vocabulary for a vertical activity feed: a thin
@@ -52,9 +53,7 @@ function TimelineRailGroup({
   return (
     <div className={cn("space-y-3", className)} {...rest}>
       {label !== undefined && label !== null && (
-        <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-          {label}
-        </h3>
+        <Eyebrow as="h3">{label}</Eyebrow>
       )}
       {/* Subtle vertical rail behind the icons gives the feed a sense of
           continuity without leaning on dividers between rows. Icons sit on

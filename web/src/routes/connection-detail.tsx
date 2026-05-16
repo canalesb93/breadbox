@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { Eyebrow } from "@/components/eyebrow";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
@@ -441,11 +442,7 @@ function DetailBody({
           <SectionCard
             title="Sync activity"
             icon={<Activity className="text-muted-foreground size-4" />}
-            action={
-              <span className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-                Last 7 days
-              </span>
-            }
+            action={<Eyebrow>Last 7 days</Eyebrow>}
           >
             {syncLogsLoading ? (
               <Skeleton className="h-[72px] w-full" />
@@ -489,11 +486,7 @@ function DetailBody({
           <SectionCard
             title="Sync history"
             icon={<RefreshCw className="text-muted-foreground size-4" />}
-            action={
-              <span className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-                Last 10
-              </span>
-            }
+            action={<Eyebrow>Last 10</Eyebrow>}
             footer={
               syncLogs.length > 0 ? (
                 <Link
@@ -665,9 +658,9 @@ function Hero({
               <Icon className="text-muted-foreground size-5" />
             </div>
             <div className="min-w-0 space-y-1">
-              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
+              <Eyebrow as="p" variant="hero">
                 Connection
-              </p>
+              </Eyebrow>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-xl font-semibold tracking-tight">
                   {conn.institution_name ?? "Untitled connection"}
@@ -746,9 +739,7 @@ function Hero({
 function QuickActions({ conn }: { conn: ConnectionDetail }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
-        Jump to
-      </span>
+      <Eyebrow className="mr-1">Jump to</Eyebrow>
       <Button
         variant="outline"
         size="sm"
@@ -870,9 +861,7 @@ function DetailGroup({
   if (rows.length === 0) return null;
   return (
     <div className="space-y-2.5">
-      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </h3>
+      <Eyebrow as="h3">{label}</Eyebrow>
       <dl className="space-y-2">
         {rows.map((row) => (
           <div
