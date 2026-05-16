@@ -63,7 +63,14 @@ export function SectionCard({
       className={cn("gap-0 py-0", cardClassName, className)}
       {...rest}
     >
-      <CardHeader className={cn("border-b px-5 py-4", headerClassName)}>
+      {/* Override the shadcn Card primitive's `[.border-b]:pb-6` rule: when
+          a SectionCard header carries the divider the primitive injects an
+          extra 24px of bottom padding, which on top of our intentional
+          `py-4` produced an empty band before the body. `!pb-4` keeps the
+          density we designed for and matches the `pt-4` on top. */}
+      <CardHeader
+        className={cn("border-b px-5 py-4 !pb-4", headerClassName)}
+      >
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           {icon}
           {title}

@@ -21,9 +21,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
-import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
@@ -373,7 +377,7 @@ function QuickActions({ account: a }: { account: AccountDetail }) {
 }
 
 function DetailsCard({ account: a }: { account: AccountDetail }) {
-  const balanceRows: DetailRowData[] = compactRows([
+  const balanceRows: DetailRowData[] = compactDetailRows([
     a.balance_limit != null && isLiability(a.type)
       ? {
           label: "Credit limit",
@@ -389,70 +393,31 @@ function DetailsCard({ account: a }: { account: AccountDetail }) {
     a.iso_currency_code ? { label: "Currency", value: a.iso_currency_code } : null,
     a.last_balance_update
       ? {
+          // Short date keeps the row from wrapping on a 375px viewport; the
+          // exact wall-clock seconds are noise — last-sync precision lives
+          // on the connection page.
           label: "Last update",
-          value: new Date(a.last_balance_update).toLocaleString(),
+          value: new Date(a.last_balance_update).toLocaleDateString(),
         }
       : null,
   ]);
 
-  const providerRows: DetailRowData[] = compactRows([
+  const providerRows: DetailRowData[] = compactDetailRows([
     a.official_name ? { label: "Bank name", value: a.official_name } : null,
     a.mask ? { label: "Mask", value: `····${a.mask}`, mono: false } : null,
     a.subtype ? { label: "Subtype", value: a.subtype } : null,
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
+  const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: a.short_id, mono: true },
   ]);
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      {balanceRows.length > 0 && (
-        <DetailGroup label="Balance" rows={balanceRows} />
-      )}
-      {providerRows.length > 0 && (
-        <DetailGroup label="Provider" rows={providerRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Balance" rows={balanceRows} />
+      <DetailList label="Provider" rows={providerRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
-  );
-}
-
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined | false)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({ label, rows }: { label: string; rows: DetailRowData[] }) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <Eyebrow as="h3">{label}</Eyebrow>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value as string} /> : row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 

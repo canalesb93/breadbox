@@ -14,8 +14,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
 import { Eyebrow } from "@/components/eyebrow";
-import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryEditor } from "@/features/transactions/category-editor";
@@ -285,8 +289,8 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
   const attributedDiffers =
     !!t.attributed_user_name && t.attributed_user_name !== t.user_name;
 
-  const accountRows: DetailRowData[] = compactRows([
-    { label: "Account", value: t.account_name },
+  const accountRows: DetailRowData[] = compactDetailRows([
+    { label: "Name", value: t.account_name },
     { label: "Member", value: t.user_name },
     attributedDiffers
       ? {
@@ -298,82 +302,36 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
     { label: "Currency", value: t.iso_currency_code },
   ]);
 
-  const providerRows: DetailRowData[] = compactRows([
+  // Drop low-signal provider rows: a `Channel: other` row reads as
+  // "Breadbox didn't get a channel" noise; same for an empty category. We
+  // already render the detailed category in the hero. The Details sidebar
+  // earns its keep when every row carries information the user couldn't get
+  // upstream — pad it out and it reads as a dump.
+  const channelLabel = titleize(t.provider_payment_channel);
+  const providerCategory = titleize(
+    t.provider_category_detailed ?? t.provider_category_primary,
+  );
+  const providerRows: DetailRowData[] = compactDetailRows([
     {
       label: "Authorized",
       value: t.authorized_date ? formatLongDate(t.authorized_date) : null,
     },
-    { label: "Channel", value: titleize(t.provider_payment_channel) },
-    {
-      label: "Provider category",
-      value: titleize(
-        t.provider_category_detailed ?? t.provider_category_primary,
-      ),
-    },
+    channelLabel && channelLabel.toLowerCase() !== "other"
+      ? { label: "Channel", value: channelLabel }
+      : null,
+    providerCategory ? { label: "Category", value: providerCategory } : null,
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
+  const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: t.short_id, mono: true },
   ]);
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      <DetailGroup label="Account" rows={accountRows} />
-      {providerRows.length > 0 && (
-        <DetailGroup label="Provider" rows={providerRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Account" rows={accountRows} />
+      <DetailList label="Provider" rows={providerRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
-  );
-}
-
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  hint?: string;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: DetailRowData[];
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <Eyebrow as="h3">{label}</Eyebrow>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value} /> : row.value}
-              {row.hint && (
-                <span className="text-muted-foreground mt-1 block text-[11px] leading-snug whitespace-normal">
-                  {row.hint}
-                </span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 

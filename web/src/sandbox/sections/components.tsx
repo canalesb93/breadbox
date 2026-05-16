@@ -50,6 +50,7 @@ import { ColorPicker } from "@/components/color-picker";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
+import { DetailList } from "@/components/detail-list";
 import { ListCard } from "@/components/list-card";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
@@ -300,6 +301,40 @@ export function ComponentsSection() {
         <IdPill value="acct_3rR9pq01" />
         <IdPill value="food_and_drink_coffee" />
         <IdPill value="/api/v1/transactions" />
+      </Specimen>
+
+      <Specimen
+        label="DetailList"
+        code="components/detail-list"
+        description="The canonical label / value KV block used by every v2 detail-page Details sidebar (transaction, account, connection, category). Stack two or three inside a `<SectionCard bodyClassName='space-y-5 px-5 py-5 text-sm'>` host — uppercase tracked group label, `<dl>` for screen-reader semantics, label-left / value-right with `break-words` so long values wrap inside the column on 375px viewports. `compactDetailRows` keeps callsites declarative — pass nullable rows inline, the helper filters anything without a value. Mono rows route through `<IdPill>`. Don't fork — extend this primitive."
+        className="block"
+      >
+        <div className="max-w-sm rounded-xl border">
+          <div className="space-y-5 px-5 py-5 text-sm">
+            <DetailList
+              label="Account"
+              rows={[
+                { label: "Name", value: "Plaid Checking" },
+                { label: "Member", value: "Ricardo (hosted-link test)" },
+                { label: "Currency", value: "USD" },
+              ]}
+            />
+            <DetailList
+              label="Provider"
+              rows={[
+                { label: "Authorized", value: "May 9, 2026" },
+                {
+                  label: "Category",
+                  value: "Transfer In Other Transfer In",
+                },
+              ]}
+            />
+            <DetailList
+              label="Reference"
+              rows={[{ label: "ID", value: "JKHqiBWP", mono: true }]}
+            />
+          </div>
+        </div>
       </Specimen>
 
       <Specimen
