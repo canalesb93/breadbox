@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { Infinity as InfinityIcon, MessageSquare, Plus, Shapes, Tag as TagIcon, X } from "lucide-react";
+import { Infinity as InfinityIcon, MessageSquare, Plus, Shapes, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TagChip } from "@/components/tag-chip";
 import { DynamicIcon } from "@/lib/icon";
 import { useCategories } from "@/api/queries/categories";
 import { useTags } from "@/api/queries/tags";
@@ -152,7 +153,7 @@ function ActionCard({
             <Plus className="size-4" />
           </div>
           <p className="text-sm">
-            Add tag <TagChip slug={action.tag_slug} tagBySlug={tagBySlug} />
+            Add tag <RuleTagChip slug={action.tag_slug} tagBySlug={tagBySlug} />
           </p>
         </div>
       );
@@ -163,7 +164,7 @@ function ActionCard({
             <X className="size-4" />
           </div>
           <p className="text-sm">
-            Remove tag <TagChip slug={action.tag_slug} tagBySlug={tagBySlug} />
+            Remove tag <RuleTagChip slug={action.tag_slug} tagBySlug={tagBySlug} />
           </p>
         </div>
       );
@@ -188,7 +189,11 @@ function ActionCard({
   }
 }
 
-function TagChip({
+// RuleTagChip resolves a slug against the cached tag catalog, then renders the
+// shared inline `<TagChip>` so color tinting and density match every other
+// tag rendering in the v2 SPA. The "?" badge fallback is reserved for the rare
+// case where the rule action carries no slug at all (malformed legacy data).
+function RuleTagChip({
   slug,
   tagBySlug,
 }: {
@@ -196,14 +201,13 @@ function TagChip({
   tagBySlug: Map<string, Tag>;
 }) {
   if (!slug) return <Badge variant="outline">?</Badge>;
-  const tag = tagBySlug.get(slug);
-  return (
-    <Badge variant="outline" className="gap-1">
-      {tag?.icon && <DynamicIcon name={tag.icon} className="size-3" />}
-      <span>{tag?.display_name ?? slug}</span>
-      <TagIcon className="text-muted-foreground/60 size-3" />
-    </Badge>
-  );
+  const tag = tagBySlug.get(slug) ?? {
+    slug,
+    display_name: slug,
+    color: null,
+    icon: null,
+  };
+  return <TagChip tag={tag} size="sm" className="align-middle" />;
 }
 
 // indexCategoriesBySlug walks the parent/children tree once into a Map keyed
