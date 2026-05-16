@@ -66,7 +66,7 @@ export function HomeRecentTransactions({
         <Link
           to="/transactions/$txId"
           params={{ txId: t.short_id }}
-          className="hover:bg-muted/50 focus-visible:bg-muted/50 flex min-w-0 items-center gap-4 px-5 py-3 outline-none transition-colors"
+          className="hover:bg-muted/40 focus-visible:bg-muted/40 flex min-w-0 items-center gap-4 px-5 py-3 outline-none transition-colors"
         >
           <div className="min-w-0 flex-1">
             <TransactionPrimary transaction={t} />

@@ -174,6 +174,88 @@ export function FoundationsSection() {
           </div>
         ))}
       </Specimen>
+
+      <Specimen
+        label="Hover & transition vocabulary"
+        code="transition-colors · hover:bg-*"
+        description="Three canonical hover patterns — pick the one that matches the host surface, not by visual weight. Drift across these tokens reads as inconsistency; never invent a fourth."
+        className="block"
+      >
+        <div className="grid w-full gap-3 sm:grid-cols-3">
+          <div className="space-y-2">
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <div className="border-b px-3 py-2 text-xs text-muted-foreground">
+                Divide-y list row
+              </div>
+              <ul className="divide-y">
+                {["Coffee", "Groceries", "Fuel"].map((label) => (
+                  <li
+                    key={label}
+                    className="hover:bg-muted/40 flex items-center justify-between gap-3 px-3 py-2.5 text-sm transition-colors"
+                  >
+                    <span>{label}</span>
+                    <span className="text-muted-foreground tabular-nums text-xs">
+                      −$12.34
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              <code className="font-mono">transition-colors hover:bg-muted/40</code>
+              — matches <code className="font-mono">&lt;TableRow&gt;</code>. Use
+              inside <code className="font-mono">&lt;ListCard&gt;</code> rows
+              (Home recent activity, Account recent transactions, Categories,
+              Shortcut sheet).
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="grid gap-2">
+              {["Plaid", "Teller"].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="hover:bg-accent/40 hover:border-primary/40 flex w-full items-center gap-3 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors"
+                >
+                  <span className="bg-muted/50 size-7 rounded-md" />
+                  <span className="flex-1 font-medium">{label}</span>
+                  <span className="text-muted-foreground text-xs">Connect</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              <code className="font-mono">transition-colors hover:bg-accent/40</code>
+              — bordered card grid items that act as selectable picks
+              (provider-picker, connection-accounts-list cards).
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="grid gap-2">
+              {["Jump to Categories", "Open shortcuts"].map((label) => (
+                <a
+                  key={label}
+                  href="#"
+                  onClick={(e) => e.preventDefault()}
+                  className="group bg-muted/20 hover:bg-muted/40 hover:border-ring/40 relative flex items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors"
+                >
+                  <span>{label}</span>
+                  <span className="text-muted-foreground text-xs">↗</span>
+                </a>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              <code className="font-mono">
+                bg-muted/20 hover:bg-muted/40 hover:border-ring/40
+              </code>
+              — tinted-idle card grid items (not-found quick jumps). Idle
+              tint signals "this is interactive" before hover; ring border on
+              hover doubles the affordance.
+            </p>
+          </div>
+        </div>
+      </Specimen>
     </SandboxSection>
   );
 }
