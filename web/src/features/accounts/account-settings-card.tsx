@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Check, ExternalLink, Loader2, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SectionCard } from "@/components/section-card";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useUpdateAccount } from "@/api/queries/accounts";
 import type { AccountDetail } from "@/api/types";
@@ -60,11 +60,10 @@ export function AccountSettingsCard({ account: a }: AccountSettingsCardProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Settings</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5 text-sm">
+    <SectionCard
+      title="Settings"
+      bodyClassName="space-y-5 px-5 py-5 text-sm"
+    >
         <div className="space-y-1.5">
           <Label htmlFor="display-name" className="text-muted-foreground text-xs">
             Display name
@@ -183,7 +182,6 @@ export function AccountSettingsCard({ account: a }: AccountSettingsCardProps) {
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </SectionCard>
   );
 }
