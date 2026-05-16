@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
-  Clock,
   Receipt,
   Search,
   Wallet,
@@ -12,6 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
@@ -59,7 +59,12 @@ export function TransactionDetailPage() {
 function BackButton() {
   const router = useRouter();
   return (
-    <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
+    <Button
+      variant="ghost"
+      size="sm"
+      asChild
+      className="text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs"
+    >
       <Link
         to="/transactions"
         onClick={(e) => {
@@ -77,8 +82,8 @@ function BackButton() {
           }
         }}
       >
-        <ArrowLeft className="size-4" />
-        Transactions
+        <ArrowLeft className="size-3.5" />
+        Back to transactions
       </Link>
     </Button>
   );
@@ -91,17 +96,16 @@ function DetailBody({ transaction: t }: { transaction: Transaction }) {
     <div className="space-y-6">
       <Hero transaction={t} />
 
-      <ClassifyStrip transaction={t} />
-
       <QuickActions transaction={t} merchantQuery={merchantQuery} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Activity</CardTitle>
+        <Card className="gap-0 py-0">
+          <CardHeader className="border-b px-5 py-3.5">
+            <CardTitle className="text-sm font-medium">Activity</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-5 px-5 py-5">
             <CommentComposer transactionId={t.id} />
+            <Separator />
             <ActivityTimeline transactionId={t.id} />
           </CardContent>
         </Card>
@@ -114,113 +118,155 @@ function DetailBody({ transaction: t }: { transaction: Transaction }) {
   );
 }
 
+// Hero condenses the four most important things — identity, direction, amount,
+// classification — into one card so the page lands with intent before the eye
+// drops into the activity feed. Left rail = category color stripe (or muted
+// when uncategorised) so the page has a single point of color anchored to the
+// transaction's classification.
 function Hero({ transaction: t }: { transaction: Transaction }) {
   const isInflow = t.amount < 0;
   const subtitle =
     t.provider_merchant_name && t.provider_merchant_name !== t.provider_name
       ? t.provider_merchant_name
       : null;
-  const directionLabel = isInflow ? "Money in" : "Money out";
   const DirectionIcon = isInflow ? ArrowDownLeft : ArrowUpRight;
+  const directionLabel = isInflow ? "Money in" : "Money out";
+  const accent = t.category?.color ?? null;
+
   return (
     <div
       className={cn(
-        "bg-card flex flex-col gap-5 rounded-xl border p-5 sm:p-6",
-        "lg:flex-row lg:items-start lg:justify-between lg:gap-6",
+        "bg-card relative overflow-hidden rounded-xl border",
         t.pending && "border-dashed",
       )}
     >
-      <div className="flex min-w-0 items-start gap-4">
-        <CategoryIconTile
-          icon={t.category?.icon}
-          color={t.category?.color}
-          size="lg"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-lg font-semibold tracking-tight">
-              {t.provider_name}
-            </h1>
-            {t.pending && (
-              <Badge variant="outline" className="text-muted-foreground">
-                Pending
-              </Badge>
-            )}
-          </div>
-          {subtitle && (
-            <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
-          )}
-          <p className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
-            <Clock className="size-3" aria-hidden />
-            <span>{formatLongDate(t.date)}</span>
-            {t.account_name && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="truncate">{t.account_name}</span>
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-
+      {/* Color rail anchored to the category. Stays neutral when uncategorised
+          so the card reads "needs attention" rather than "decorative". */}
       <div
-        className={cn(
-          "flex flex-wrap items-center gap-x-3 gap-y-1.5",
-          "lg:flex-col lg:items-end lg:gap-1.5 lg:text-right lg:whitespace-nowrap",
-        )}
-      >
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-1"
+        style={{ backgroundColor: accent ?? "var(--muted)" }}
+      />
+
+      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+        {/* Identity column */}
+        <div className="min-w-0 space-y-5">
+          <div className="flex items-start gap-4">
+            <CategoryIconTile
+              icon={t.category?.icon}
+              color={t.category?.color}
+              size="lg"
+            />
+            <div className="min-w-0 space-y-1">
+              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
+                Transaction
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-xl font-semibold tracking-tight">
+                  {t.provider_name}
+                </h1>
+                {t.pending && (
+                  <Badge
+                    variant="outline"
+                    className="text-muted-foreground border-dashed text-[10px] font-medium tracking-wide uppercase"
+                  >
+                    Pending
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                <span>{formatLongDate(t.date)}</span>
+                {(subtitle || t.account_name) && (
+                  <span aria-hidden className="opacity-50">
+                    ·
+                  </span>
+                )}
+                {subtitle && <span className="truncate">{subtitle}</span>}
+                {subtitle && t.account_name && (
+                  <span aria-hidden className="opacity-50">
+                    ·
+                  </span>
+                )}
+                {t.account_name && (
+                  <span className="truncate">{t.account_name}</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Inline classify strip — keeps the identity, category, and tags
+              within one glance instead of three stacked cards. */}
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+            <ClassifyField label="Category">
+              <CategoryEditor
+                transactionId={t.id}
+                category={t.category}
+                overridden={t.category_override}
+              />
+            </ClassifyField>
+            <ClassifyField label="Tags">
+              <div className="min-h-9 flex items-center">
+                <TagManager transactionId={t.id} tags={t.tags ?? []} />
+              </div>
+            </ClassifyField>
+          </div>
+        </div>
+
+        {/* Amount column */}
         <div
           className={cn(
-            "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-            isInflow
-              ? "bg-success/10 text-success"
-              : "bg-muted text-muted-foreground",
+            "flex flex-col items-start gap-1.5",
+            "lg:items-end lg:text-right",
           )}
         >
-          <DirectionIcon className="size-3" aria-hidden />
-          {directionLabel}
-        </div>
-        <div
-          className={cn(
-            "text-3xl font-semibold tabular-nums sm:text-4xl",
-            isInflow && "text-success",
-            t.pending && "opacity-80",
+          <div
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase whitespace-nowrap",
+              isInflow
+                ? "bg-success/10 text-success"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            <DirectionIcon className="size-3" aria-hidden />
+            {directionLabel}
+          </div>
+          <div
+            className={cn(
+              "font-semibold tabular-nums",
+              "text-3xl sm:text-4xl",
+              isInflow && "text-success",
+              t.pending && "opacity-80",
+            )}
+          >
+            {formatAmount(t.amount, t.iso_currency_code)}
+          </div>
+          {t.pending && (
+            <p className="text-muted-foreground max-w-[12rem] text-[11px]">
+              Amount may change once posted.
+            </p>
           )}
-        >
-          {formatAmount(t.amount, t.iso_currency_code)}
         </div>
-        {t.pending && (
-          <p className="text-muted-foreground basis-full text-xs lg:basis-auto">
-            Amount may change once posted.
-          </p>
-        )}
       </div>
     </div>
   );
 }
 
-function ClassifyStrip({ transaction: t }: { transaction: Transaction }) {
+function ClassifyField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card>
-      <CardContent className="grid gap-4 sm:grid-cols-2 sm:gap-6">
-        <section className="space-y-2">
-          <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Category
-          </h2>
-          <CategoryEditor
-            transactionId={t.id}
-            category={t.category}
-            overridden={t.category_override}
-          />
-        </section>
-        <section className="space-y-2">
-          <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Tags
-          </h2>
-          <TagManager transactionId={t.id} tags={t.tags ?? []} />
-        </section>
-      </CardContent>
-    </Card>
+    <div className="space-y-1.5">
+      <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+        {label}
+      </p>
+      {children}
+    </div>
   );
 }
 
@@ -235,38 +281,41 @@ function QuickActions({
   // internal/mcp/tools.go compactIDs + REST handler shape), so it can flow
   // straight into the transactions list `?account=` filter.
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="outline" size="sm" asChild>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
+        Jump to
+      </span>
+      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
         <Link
           to="/transactions"
           search={{ q: merchantQuery }}
           aria-label={`Find similar transactions matching ${merchantQuery}`}
         >
-          <Search className="size-3.5" />
-          Find similar
+          <Search className="size-3" />
+          Similar transactions
         </Link>
       </Button>
       {t.account_id && (
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
           <Link
             to="/transactions"
             search={{ account: t.account_id }}
             aria-label={`Show all transactions on ${t.account_name ?? "this account"}`}
           >
-            <Wallet className="size-3.5" />
-            All on account
+            <Wallet className="size-3" />
+            {t.account_name ?? "All on account"}
           </Link>
         </Button>
       )}
       {t.category?.slug && (
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
           <Link
             to="/transactions"
             search={{ category: t.category.slug }}
             aria-label={`Show all ${t.category.display_name} transactions`}
           >
-            <Building2 className="size-3.5" />
-            All in category
+            <Building2 className="size-3" />
+            {t.category.display_name}
           </Link>
         </Button>
       )}
@@ -280,12 +329,12 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
 
   const accountRows: DetailRowData[] = compactRows([
     { label: "Account", value: t.account_name },
-    { label: "Household member", value: t.user_name },
+    { label: "Member", value: t.user_name },
     attributedDiffers
       ? {
           label: "Attributed to",
           value: t.attributed_user_name,
-          hint: "This transaction counts toward this member, even though the account belongs to someone else.",
+          hint: "Counts toward this member, even though the account belongs to someone else.",
         }
       : null,
     { label: "Currency", value: t.iso_currency_code },
@@ -296,7 +345,7 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
       label: "Authorized",
       value: t.authorized_date ? formatLongDate(t.authorized_date) : null,
     },
-    { label: "Payment channel", value: titleize(t.provider_payment_channel) },
+    { label: "Channel", value: titleize(t.provider_payment_channel) },
     {
       label: "Provider category",
       value: titleize(
@@ -305,15 +354,22 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
     },
   ]);
 
+  const referenceRows: DetailRowData[] = compactRows([
+    { label: "ID", value: t.short_id, mono: true },
+  ]);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Details</CardTitle>
+    <Card className="gap-0 py-0">
+      <CardHeader className="border-b px-5 py-3.5">
+        <CardTitle className="text-sm font-medium">Details</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5 text-sm">
+      <CardContent className="space-y-5 px-5 py-5 text-sm">
         <DetailGroup label="Account" rows={accountRows} />
         {providerRows.length > 0 && (
           <DetailGroup label="Provider" rows={providerRows} />
+        )}
+        {referenceRows.length > 0 && (
+          <DetailGroup label="Reference" rows={referenceRows} />
         )}
       </CardContent>
     </Card>
@@ -324,6 +380,7 @@ interface DetailRowData {
   label: string;
   value: string | null | undefined;
   hint?: string;
+  mono?: boolean;
 }
 
 function compactRows(
@@ -341,8 +398,8 @@ function DetailGroup({
 }) {
   if (rows.length === 0) return null;
   return (
-    <div className="space-y-2">
-      <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+    <div className="space-y-2.5">
+      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
         {label}
       </h3>
       <dl className="space-y-2">
@@ -354,10 +411,16 @@ function DetailGroup({
             <dt className="text-muted-foreground shrink-0 text-xs">
               {row.label}
             </dt>
-            <dd className="min-w-0 truncate text-right text-sm">
-              {row.value}
+            <dd className="min-w-0 truncate text-right text-xs">
+              {row.mono ? (
+                <span className="bg-muted/60 inline-block rounded px-1.5 py-0.5 font-mono text-[11px]">
+                  {row.value}
+                </span>
+              ) : (
+                row.value
+              )}
               {row.hint && (
-                <span className="text-muted-foreground mt-0.5 block text-[11px] leading-snug whitespace-normal">
+                <span className="text-muted-foreground mt-1 block text-[11px] leading-snug whitespace-normal">
                   {row.hint}
                 </span>
               )}
@@ -385,27 +448,39 @@ function titleize(value: string | null | undefined): string | null {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="bg-card rounded-xl border p-5 sm:p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-4">
-            <Skeleton className="size-12 rounded-md" />
-            <div className="space-y-2 py-1">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-3 w-32" />
+      <div className="bg-card relative overflow-hidden rounded-xl border">
+        <div className="bg-muted absolute inset-y-0 left-0 w-1" />
+        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="space-y-5">
+            <div className="flex items-start gap-4">
+              <Skeleton className="size-12 rounded-md" />
+              <div className="space-y-2 py-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+            <Separator />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
+              <div className="space-y-1.5">
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-9 w-24 rounded-md" />
+              </div>
             </div>
           </div>
-          <div className="space-y-2 sm:items-end sm:text-right">
+          <div className="space-y-2 lg:items-end">
             <Skeleton className="h-5 w-20" />
             <Skeleton className="h-9 w-32" />
           </div>
         </div>
       </div>
-      <Skeleton className="h-24 rounded-xl" />
       <div className="flex gap-2">
-        <Skeleton className="h-8 w-28 rounded-md" />
-        <Skeleton className="h-8 w-28 rounded-md" />
-        <Skeleton className="h-8 w-32 rounded-md" />
+        <Skeleton className="h-7 w-32 rounded-md" />
+        <Skeleton className="h-7 w-32 rounded-md" />
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Skeleton className="h-72 rounded-xl" />
