@@ -31,6 +31,9 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { APIKeysPage, apiKeysSearchSchema } from "@/routes/api-keys";
+import { APIKeyNewPage } from "@/routes/api-key-new";
+import { APIKeyCreatedPage } from "@/routes/api-key-created";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -84,6 +87,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
   },
+  "/api-keys": {
+    component: APIKeysPage,
+    validateSearch: apiKeysSearchSchema,
+  },
 };
 
 // Detail routes aren't nav leaves, so they're registered explicitly rather
@@ -134,6 +141,21 @@ const connectionDetailRoute = createRoute({
   validateSearch: connectionDetailSearchSchema,
 });
 
+// /api-keys/new and /api-keys/created sit beside the list (declared via
+// PAGE_OVERRIDES) but aren't nav leaves themselves. The list match still
+// keeps the sidebar item active thanks to the prefix match in isNavMatch.
+const apiKeyNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/api-keys/new",
+  component: APIKeyNewPage,
+});
+
+const apiKeyCreatedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/api-keys/created",
+  component: APIKeyCreatedPage,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -159,6 +181,8 @@ const routeTree = rootRoute.addChildren([
   tagDetailRoute,
   sandboxRoute,
   connectionDetailRoute,
+  apiKeyNewRoute,
+  apiKeyCreatedRoute,
   ...pageRoutes,
 ]);
 

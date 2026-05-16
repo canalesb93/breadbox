@@ -1,0 +1,129 @@
+import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Key, Plus, Search } from "lucide-react";
+import { z } from "zod";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAPIKeys } from "@/api/queries/api-keys";
+import { APIKeysTable } from "@/features/api-keys/api-keys-table";
+import type { APIKey } from "@/api/types";
+
+// URL state lives in `?status=active|revoked&q=…` so a refresh keeps the
+// filter context — same convention as the connections/transactions pages.
+export const apiKeysSearchSchema = z.object({
+  status: z.enum(["active", "revoked"]).optional(),
+  q: z.string().optional(),
+});
+
+function filterKeys(keys: APIKey[], query: string): APIKey[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return keys;
+  return keys.filter(
+    (k) =>
+      k.name.toLowerCase().includes(q) ||
+      k.key_prefix.toLowerCase().includes(q) ||
+      (k.actor_name?.toLowerCase().includes(q) ?? false),
+  );
+}
+
+export function APIKeysPage() {
+  const { data: keys, isLoading, isError } = useAPIKeys();
+  const [tab, setTab] = useState<"active" | "revoked">("active");
+  const [query, setQuery] = useState("");
+
+  const { active, revoked } = useMemo(() => {
+    const all = keys ?? [];
+    return {
+      active: all.filter((k) => !k.revoked_at),
+      revoked: all.filter((k) => k.revoked_at),
+    };
+  }, [keys]);
+
+  const rows = filterKeys(tab === "active" ? active : revoked, query);
+
+  const newKeyButton = (
+    <Button asChild>
+      <Link to="/api-keys/new">
+        <Plus className="size-4" />
+        New key
+      </Link>
+    </Button>
+  );
+
+  const emptyState =
+    tab === "active" ? (
+      query ? (
+        <EmptyState
+          icon={Key}
+          title="No matching keys"
+          description="Try a different search."
+        />
+      ) : (
+        <EmptyState
+          icon={Key}
+          title="No API keys yet"
+          description="Mint a key to let agents, scripts, or the CLI talk to Breadbox."
+          action={newKeyButton}
+        />
+      )
+    ) : (
+      <EmptyState
+        icon={Key}
+        title="No revoked keys"
+        description="Revoked keys show up here so you can audit the trail."
+      />
+    );
+
+  return (
+    <div>
+      <PageHeader
+        title="API keys"
+        description="Credentials for programmatic access — agents, the CLI, the MCP server."
+        actions={newKeyButton}
+      />
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "active" | "revoked")}
+        >
+          <TabsList>
+            <TabsTrigger value="active">
+              Active
+              <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
+                {active.length}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="revoked">
+              Revoked
+              <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
+                {revoked.length}
+              </span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="relative ml-auto w-full max-w-xs">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, prefix, actor…"
+            className="pl-8"
+          />
+        </div>
+      </div>
+
+      <APIKeysTable
+        keys={rows}
+        isLoading={isLoading}
+        isError={isError}
+        revoked={tab === "revoked"}
+        emptyState={emptyState}
+      />
+    </div>
+  );
+}
