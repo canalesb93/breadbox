@@ -1,12 +1,7 @@
 import * as React from "react";
 import { Keyboard } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { displayKey } from "@/lib/kbd-display";
 import {
@@ -71,28 +66,19 @@ export function ShortcutSheet() {
         // sticky footer sits flush against the panel edge.
         className="w-full gap-0 p-0 sm:max-w-md"
       >
-        {/* Header — mirrors the icon-tile vocabulary used by StatusPanel /
-            EmptyState / SectionCard so the sheet reads as part of the v2
-            system, not an ad-hoc overlay. */}
-        <SheetHeader className="gap-3 border-b p-5">
-          <div className="flex items-start gap-3">
-            <span
-              className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border"
-              aria-hidden
-            >
-              <Keyboard className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <SheetTitle className="text-base leading-tight">
-                Keyboard shortcuts
-              </SheetTitle>
-              <SheetDescription className="mt-0.5 text-xs">
-                Available across the app. Shortcuts pause while you&apos;re
-                typing in an input.
-              </SheetDescription>
-            </div>
-          </div>
-        </SheetHeader>
+        {/* Header — `DetailSheetHeader` mirrors the icon-tile vocabulary used
+            by StatusPanel / EmptyState / SectionCard so the sheet reads as
+            part of the v2 system, not an ad-hoc overlay. */}
+        <DetailSheetHeader
+          icon={Keyboard}
+          title="Keyboard shortcuts"
+          description={
+            <>
+              Available across the app. Shortcuts pause while you&apos;re
+              typing in an input.
+            </>
+          }
+        />
 
         {/* Body — scrollable list of grouped cards. Each group is a bordered
             card with an uppercase eyebrow header + a divide-y body, mirroring

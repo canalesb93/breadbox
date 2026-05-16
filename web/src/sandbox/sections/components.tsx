@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   Inbox,
   Info,
+  Keyboard,
   KeyRound,
+  Landmark,
   MessageSquare,
   Monitor,
   Moon,
@@ -53,6 +55,7 @@ import { ColorRailCard } from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
@@ -320,6 +323,38 @@ export function ComponentsSection() {
             <p className="text-muted-foreground mt-1 text-xs">
               hero variant — sits under a display title with extra letter air
             </p>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DetailSheetHeader"
+        code="components/detail-sheet-header"
+        description="The canonical icon-tile header for v2 Sheets — leading muted-tile icon + optional eyebrow + title + description. Same lockup vocabulary as StatusPanel / EmptyState / SectionCard so every Sheet reads as part of the v2 system, not a stock shadcn surface. Two density tokens: `default` (size-9 tile + p-5, used by ShortcutSheet for ambient overlays) and `accent` (size-10 tile + bg-muted/20 + p-6, used by ConnectBankSheet for primary flows). Don't open `<SheetHeader>` inline for a new Sheet — extend this primitive instead."
+        className="block"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="bg-card overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              default · ambient overlay
+            </div>
+            <DetailSheetHeader
+              icon={Keyboard}
+              title="Keyboard shortcuts"
+              description="Available across the app. Shortcuts pause while you're typing in an input."
+            />
+          </div>
+          <div className="bg-card overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              accent · primary flow
+            </div>
+            <DetailSheetHeader
+              density="accent"
+              icon={Landmark}
+              eyebrow="New connection"
+              title="Connect a bank"
+              description="Pick a provider and the family member this connection belongs to."
+            />
           </div>
         </div>
       </Specimen>
