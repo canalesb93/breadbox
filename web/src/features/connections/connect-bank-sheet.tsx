@@ -1,13 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Building2, Landmark, Loader2 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -17,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Eyebrow } from "@/components/eyebrow";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { StatusPanel } from "@/components/status-panel";
 import { toast } from "sonner";
 import { ApiError } from "@/api/client";
@@ -267,30 +262,13 @@ export function ConnectBankSheet({
   return (
     <Sheet open={open} onOpenChange={handleSheetChange}>
       <SheetContent className="flex flex-col gap-0 p-0">
-        <SheetHeader className="bg-muted/20 border-b p-6">
-          <div className="flex items-start gap-3">
-            <span
-              aria-hidden
-              className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg border"
-            >
-              {(() => {
-                const Icon = headerIcon;
-                return <Icon className="size-5" />;
-              })()}
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <Eyebrow as="p">
-                {appendToConnectionId ? "Append rows" : "New connection"}
-              </Eyebrow>
-              <SheetTitle className="text-lg font-semibold leading-tight">
-                {headerTitle}
-              </SheetTitle>
-              <SheetDescription className="text-sm">
-                {headerDescription}
-              </SheetDescription>
-            </div>
-          </div>
-        </SheetHeader>
+        <DetailSheetHeader
+          density="accent"
+          icon={headerIcon}
+          eyebrow={appendToConnectionId ? "Append rows" : "New connection"}
+          title={headerTitle}
+          description={headerDescription}
+        />
 
         <div className="flex flex-1 flex-col overflow-y-auto p-6">
           {stage.kind === "pick" && (
