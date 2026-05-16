@@ -162,8 +162,15 @@ export function ProviderScoreboard({ health, tone, alwaysAvailable }: ProviderSc
             : "Awaiting connection"
           : "Not connected";
 
+  // Mobile (<sm): scoreboard left-aligns under the identity column so it
+  // reads as a continuation of the same column instead of floating right
+  // with the eye having to jump across the card. The status pill + score
+  // cells flow inline on a single row so the block stays one line tall
+  // even with both scoreboard values present. From `sm` up we return to
+  // the right-stacked layout that pairs with the hero's `sm:flex-row
+  // sm:items-center sm:justify-between`.
   return (
-    <div className="flex flex-col items-end gap-2 sm:items-end">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:flex-col sm:items-end sm:gap-2">
       <span
         className={cn(
           "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
@@ -173,7 +180,7 @@ export function ProviderScoreboard({ health, tone, alwaysAvailable }: ProviderSc
         {headlineLabel}
       </span>
       {health && (
-        <div className="flex items-center gap-4 text-right">
+        <div className="flex items-center gap-4 sm:text-right">
           <ScoreCell label="Connections" value={String(health.connection_count)} />
           <ScoreCell label="Accounts" value={String(health.account_count)} />
         </div>

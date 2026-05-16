@@ -32,8 +32,13 @@ export function AccountsSummary({ accounts }: AccountsSummaryProps) {
     { assets: 0, liabilities: 0 },
   );
 
+  // Mobile layout: stack Net worth on its own (full-bleed, dominant) and
+  // pair Assets + Liabilities side-by-side underneath in a 2-col grid. The
+  // previous single-column stack of three full-width cards consumed the
+  // whole viewport before reaching the actual accounts list. From `sm` up
+  // we return to the original 3-col strip.
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       <SummaryStat
         icon={Wallet}
         label="Net worth"
@@ -44,6 +49,7 @@ export function AccountsSummary({ accounts }: AccountsSummaryProps) {
             : `${primary.count} accounts`
         }
         tone="primary"
+        className="col-span-2 sm:col-span-1"
       />
       <SummaryStat
         icon={ArrowUpRight}
@@ -67,16 +73,17 @@ interface SummaryStatProps {
   value: string;
   sublabel?: string;
   tone: "primary" | "success" | "muted";
+  className?: string;
 }
 
-function SummaryStat({ icon: Icon, label, value, sublabel, tone }: SummaryStatProps) {
+function SummaryStat({ icon: Icon, label, value, sublabel, tone, className }: SummaryStatProps) {
   // Override the Card primitive's default `py-6` — these stat cards are
   // dense one-liners, not full-bleed content panels, so they need just
   // enough breathing room to feel like a card without dominating the
   // top of the page.
   return (
-    <Card className="py-4">
-      <CardContent className="flex items-center gap-3">
+    <Card className={cn("py-4", className)}>
+      <CardContent className="flex items-center gap-3 px-4 sm:px-6">
         <div
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-lg",
