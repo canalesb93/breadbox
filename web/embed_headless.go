@@ -12,10 +12,16 @@ package webui
 import (
 	"net/http"
 
+	"breadbox/internal/app"
 	"breadbox/internal/db"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 )
+
+// MountBackupRoutes is a no-op stub. Headless builds strip the SPA, so the
+// /web/v1/backups/* surface is unreachable.
+func MountBackupRoutes(_ chi.Router, _ *app.App, _ *scs.SessionManager) {}
 
 // Handler returns a 410 Gone for every request. The real Handler embeds the
 // SPA bundle and serves /v2/*.
