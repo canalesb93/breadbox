@@ -284,6 +284,21 @@ next target, then updates this file at the end of the run.
   so the radius / padding / font-weight stays in one place.
   Until then, copy is fine — the pattern is small enough that
   the abstraction would weigh more than the duplication.
+- **ListRowSkeleton primitive** — extracted to
+  `web/src/components/list-row-skeleton.tsx` in iter 36 (#1150).
+  Five surfaces now share the canonical loading-row shape:
+  Connections list, Accounts list, Categories list, Home
+  connections panel, Home recent activity. Vocabulary tokens:
+  `density` (`compact`/`regular`/`comfortable`), `leading`
+  (`sm-square`/`md-square`/`lg-square` matching CategoryIconTile
+  sizes), `trailing` (`none`/`badge`/`value-stack`). Every
+  consumer picks the tokens that match its real row so the
+  skeleton no longer shifts on data arrival. When adding a new
+  list page, reach for `<ListRowSkeleton>` and pick from the
+  existing tokens — if no combination fits, extend the primitive
+  rather than fork. The shadcn `<Skeleton>` primitive stays the
+  one-off building block for non-list skeletons (backups stat
+  grid, providers cards, transaction-row in a TableCell).
 
 ## Backlog (ordered roughly by impact)
 
@@ -1358,6 +1373,55 @@ Cross-cutting components:
     to flush its dep cache between the revert and the AFTER capture
     — same dance as iters 4/5.
 
+- **Iter 36 — `ListRowSkeleton` primitive + skeleton drift sweep** ([#1150](https://github.com/canalesb93/breadbox/pull/1150))
+  - Five list surfaces were hand-rolling their loading rows
+    with subtly divergent paddings, gaps, icon-tile sizes, and
+    trailing chips. Skeletons no longer matched the real rows
+    underneath, so pages visually shifted on data arrival and
+    the loading vocabulary felt forked.
+  - Adds `<ListRowSkeleton>` at
+    `web/src/components/list-row-skeleton.tsx` with three
+    vocabulary tokens:
+    - `density`: `compact` (px-4 py-2.5) / `regular` (px-5 py-3)
+      / `comfortable` (px-5 py-3.5 sm:gap-4)
+    - `leading`: `sm-square` (size-7) / `md-square` (size-9) /
+      `lg-square` (size-10) — matches the `CategoryIconTile`
+      size scale so a "row with an icon tile of size X"
+      always picks the matching skeleton.
+    - `trailing`: `none` / `badge` (single chip) /
+      `value-stack` (two-line right-aligned column)
+  - Migrates Connections list, Accounts list, Categories list,
+    Home connections panel, and Home recent activity onto the
+    primitive (-45 LOC net of hand-rolled markup retired).
+  - Drift retired:
+    - home recent-activity skeleton `size-9`/`py-3.5` vs real
+      row `size-7`/`py-3` — now correctly tiny.
+    - home connections-panel skeleton `py-3.5` vs real row
+      `py-3` — tightened.
+    - categories skeleton `py-3` + fake `h-5 w-10` trailing
+      chip vs real row `py-2.5` with IdPill subtitle and no
+      trailing chip — chip dropped, density tightened.
+  - Reusing the existing `<ListCard>` host + the new
+    `<ListRowSkeleton>` body — sixth primitive in the v2 list
+    vocabulary alongside ListCard / SectionCard /
+    ColorRailCard / TimelineRail / EmptyState. Don't fork the
+    look — extend the primitive (add a `Leading` size if a new
+    consumer's real row uses a different icon tile size; add
+    a `Trailing` shape if a new consumer's real row has a
+    different right column).
+  - Tags list + transaction-rule list deliberately stay on the
+    `DataTable` skeleton (which has its own per-cell shape).
+    Backups + providers skeletons are not list-row shaped
+    (4-up stat grid + tall bar) and stay bespoke. The
+    `TransactionRowSkeleton` stays as-is — it's a *table cell*
+    skeleton (TableCell-wrapped), not a div row, so it can't
+    cleanly merge with this primitive.
+  - Process note: same BEFORE/AFTER dance as iter 35 — captured
+    AFTER first, then `git checkout HEAD~1 -- <files>` to revert
+    locally, captured BEFORE, then `git checkout HEAD -- <files>`
+    to restore. Vite picked up both directions via HMR without
+    needing a port restart this time.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1464,5 +1528,6 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
