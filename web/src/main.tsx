@@ -17,6 +17,12 @@ import { LoginPage } from "@/routes/login";
 import { Placeholder } from "@/routes/placeholder";
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
 import { TransactionDetailPage } from "@/routes/transaction-detail";
+import { CategoriesPage } from "@/routes/categories";
+import { CategoryNewPage } from "@/routes/category-new";
+import { CategoryDetailPage } from "@/routes/category-detail";
+import { TagsPage } from "@/routes/tags";
+import { TagNewPage } from "@/routes/tag-new";
+import { TagDetailPage } from "@/routes/tag-detail";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -60,15 +66,45 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: TransactionsPage,
     validateSearch: transactionsSearchSchema,
   },
+  "/categories": {
+    component: CategoriesPage,
+  },
+  "/tags": {
+    component: TagsPage,
+  },
 };
 
 // Detail routes aren't nav leaves, so they're registered explicitly rather
-// than derived from NAV_LEAVES. isNavMatch's prefix match keeps the
-// Transactions sidebar item active on /transactions/$id.
+// than derived from NAV_LEAVES. isNavMatch's prefix match keeps the parent
+// sidebar item active on each sub-route.
 const transactionDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/transactions/$id",
   component: TransactionDetailPage,
+});
+
+const categoryNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/categories/new",
+  component: CategoryNewPage,
+});
+
+const categoryDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/categories/$id",
+  component: CategoryDetailPage,
+});
+
+const tagNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tags/new",
+  component: TagNewPage,
+});
+
+const tagDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tags/$slug",
+  component: TagDetailPage,
 });
 
 // The design-system sandbox — a dev/reference gallery, not a nav leaf.
@@ -98,6 +134,10 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   transactionDetailRoute,
+  categoryNewRoute,
+  categoryDetailRoute,
+  tagNewRoute,
+  tagDetailRoute,
   sandboxRoute,
   ...pageRoutes,
 ]);

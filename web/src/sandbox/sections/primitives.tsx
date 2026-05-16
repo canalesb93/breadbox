@@ -2,6 +2,7 @@ import { Bell, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -119,6 +120,17 @@ export function PrimitivesSection() {
         <div className="mt-3 grid max-w-xs gap-1.5">
           <Label htmlFor="sb-input-disabled">Disabled</Label>
           <Input id="sb-input-disabled" placeholder="Disabled" disabled />
+        </div>
+      </Specimen>
+
+      <Specimen label="Textarea" className="block">
+        <div className="grid max-w-md gap-1.5">
+          <Label htmlFor="sb-textarea">Description</Label>
+          <Textarea
+            id="sb-textarea"
+            placeholder="Optional — what this thing means."
+            rows={3}
+          />
         </div>
       </Specimen>
 
