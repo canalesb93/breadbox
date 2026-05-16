@@ -177,12 +177,18 @@ next target, then updates this file at the end of the run.
   `<Loader2 className="animate-spin">` while pending). Three
   surfaces share it today: tag-form, category-form, and the
   surfaces that consume those forms (tag-new, tag-detail,
-  category-new, category-detail). api-key-form (iter 13) still
-  hand-rolls the same strip inline; sweep onto `<FormFooter>`
-  next time we touch it. Don't fork the look — extend the
-  primitive. The optional `hint` slot is wired but no consumer
-  uses it yet — useful for validation messages that should sit
-  next to the actions instead of above them.
+  category-new, category-detail, api-key-new). api-key-form
+  (iter 43, #1157) was the last hand-rolled copy of the strip —
+  swept onto `<FormFooter>` and the iter-13 / iter-15 drift TODO
+  is resolved. Don't fork the look — extend the primitive. The
+  optional `hint` slot is wired but no consumer uses it yet —
+  useful for validation messages that should sit next to the
+  actions instead of above them. Rule-form keeps its bespoke
+  bottom strip because the form lives inside a wide two-column
+  layout (form + live-preview rail) rather than a SectionCard
+  body, so the FormFooter contract (negative margins to flush
+  out to the card edges) doesn't apply — promote when a second
+  surface adopts that wider layout.
 - **Canonical form-page shell** (iter 15): for any new/edit
   page that hangs off a list, the vocabulary is now
   `<SoftBackButton>` + `<PageHeader eyebrow="New X" title="…">`
@@ -389,14 +395,17 @@ Cross-cutting components:
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
 - [ ] `transaction-amount.tsx` — currency rendering
 - [x] Form patterns (used across new/edit pages) — `FormFooter` primitive
-  promoted in iter 15 (#1128). Canonical form-page shell is now:
-  `<SoftBackButton>` + `<PageHeader eyebrow=…>` + `<SectionCard>` with the
-  form, `<FormFooter>` at the bottom (flush bordered strip, Cancel left,
-  primary right with `<Loader2 className="animate-spin">`). Live across
-  tag-new, tag-detail, category-new, category-detail. api-key-new (iter 13)
-  still hand-rolls the same strip inline — sweep onto `<FormFooter>` next
-  time we touch api-key-form. Labels / validation / FormItem patterns
-  already canonical via shadcn `Form` primitive.
+  promoted in iter 15 (#1128); api-key-form swept onto it in iter 43
+  (#1157), closing the iter-13 carve-out. Canonical form-page shell is
+  now: `<SoftBackButton>` + `<PageHeader eyebrow=…>` + `<SectionCard>`
+  with the form, `<FormFooter>` at the bottom (flush bordered strip,
+  Cancel left, primary right with `<Loader2 className="animate-spin">`).
+  Live across tag-new/detail, category-new/detail, and api-key-new.
+  Rule-form keeps its bespoke bottom strip because the form lives
+  inside a wide two-column layout (form + live-preview rail), so the
+  FormFooter contract (negative margins to flush to a SectionCard
+  body) doesn't apply. Labels / validation / FormItem patterns already
+  canonical via shadcn `Form` primitive.
 - [x] Toast (`sonner.tsx`) — variants, action affordances — iter 20 (#1133)
 - [x] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency — iter 18
 - [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
@@ -1595,6 +1604,26 @@ Cross-cutting components:
   - No code changes outside the sandbox file — purely additive to
     the gallery. The DetailSheetHeader drift note in this file
     is updated to retire the "no specimen" caveat.
+
+- **Iter 43 — api-key-form swept onto FormFooter** ([#1157](https://github.com/canalesb93/breadbox/pull/1157))
+  - Retires the last hand-rolled flush bordered action strip in v2.
+    api-key-form's bespoke `<div className="bg-muted/20 -mx-5 -mb-5
+    flex items-center justify-end gap-2 border-t px-5 py-3">` is
+    replaced with `<FormFooter secondary={…} primary={…} />` —
+    same vocabulary, now centralised in the primitive.
+  - Closes the iter-13 / iter-15 drift TODO ("api-key-form still
+    hand-rolls the same strip — sweep onto FormFooter next time we
+    touch it"). All four canonical form pages — tag-new,
+    category-new, api-key-new, plus edit variants — now share the
+    same Cancel-left + primary-right rhythm with leading
+    `<Loader2>` spinner.
+  - Rule-form's bottom strip stays bespoke because its host is a
+    wide two-column layout (form + live-preview rail), not a
+    SectionCard body — the FormFooter negative-margin contract
+    doesn't apply. Noted as the next sweep candidate if a second
+    wide-form surface lands.
+  - Pure markup unification — no visual diff at 1440. Local `bun
+    run lint` + `go build ./...` both green.
 
 ## Open observations / questions
 
