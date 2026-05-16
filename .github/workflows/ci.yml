@@ -17,10 +17,12 @@ permissions:
   packages: write
 
 jobs:
-  test:
+  test-shards:
     # Integration tests are sharded across parallel jobs so the two
     # heavy packages (api, service) don't run end-to-end on one
-    # runner. api+service alone are ~76% of integration time.
+    # runner. api+service alone are ~76% of integration time. The
+    # `test` aggregator below collapses the matrix into one required
+    # check named "Test" for the branch ruleset.
     name: Test (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     strategy:
@@ -147,6 +149,25 @@ jobs:
         env:
           DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
         run: go test -tags integration -count=1 -p 1 ${{ matrix.shard.packages }}
+
+  # Aggregator that the branch ruleset's required status check ("Test")
+  # targets. Without this, the rename to "Test (api)" / "Test (service)"
+  # / "Test (rest)" would leave the required "Test" check in Expected
+  # state forever. Keeping the gate as a single name also means future
+  # shard count changes don't require ruleset edits.
+  test:
+    name: Test
+    needs: test-shards
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all shards passed
+        run: |
+          if [ "${{ needs.test-shards.result }}" != "success" ]; then
+            echo "::error::One or more test shards failed: ${{ needs.test-shards.result }}"
+            exit 1
+          fi
+          echo "All shards green"
 
   test-headless:
     name: Test (headless)
