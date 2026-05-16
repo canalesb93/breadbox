@@ -140,7 +140,7 @@ function Hero({
 
   return (
     <ColorRailCard accent={accent}>
-      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -432,15 +432,13 @@ function DetailSkeleton() {
     <div className="space-y-6">
       <div className="bg-card relative overflow-hidden rounded-xl border">
         <div className="bg-muted absolute inset-y-0 left-0 w-1" />
-        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="space-y-3">
-            <div className="flex items-start gap-4">
-              <Skeleton className="size-12 rounded-lg" />
-              <div className="space-y-2 py-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-48" />
-              </div>
+        <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <Skeleton className="size-12 rounded-lg" />
+            <div className="space-y-2 py-1">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-48" />
             </div>
           </div>
           <div className="space-y-2 lg:items-end">

@@ -645,7 +645,7 @@ function Hero({
         </>
       }
     >
-      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
