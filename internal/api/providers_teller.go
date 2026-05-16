@@ -29,7 +29,7 @@ type tellerCredentials struct {
 
 var tellerEntry = providerEntry{
 	name:             "teller",
-	needsLinkSession: false, // Teller Connect runs entirely client-side; no init token
+	needsLinkSession: true, // Teller Connect needs the server-configured app_id; returned as link_token
 	capabilities:     []string{"transactions", "balances"},
 	credentialsSchema: map[string]CredentialField{
 		"access_token": {

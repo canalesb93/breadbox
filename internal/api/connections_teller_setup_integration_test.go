@@ -44,7 +44,7 @@ type fakeTellerProvider struct {
 }
 
 func (f *fakeTellerProvider) CreateLinkSession(context.Context, string) (provider.LinkSession, error) {
-	panic("fakeTellerProvider.CreateLinkSession not implemented")
+	return provider.LinkSession{Token: "teller-app-fake"}, nil
 }
 
 func (f *fakeTellerProvider) ExchangeToken(_ context.Context, publicToken string) (provider.Connection, []provider.Account, error) {
