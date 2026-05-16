@@ -2139,6 +2139,38 @@ Cross-cutting components:
     become `<li role="presentation">` siblings of rows) and there's
     still only one consumer, so the API churn doesn't pay off yet.
 
+- **Iter 57 — Loader2 spinner consistency across pending mutations** ([#1170](https://github.com/canalesb93/breadbox/pull/1170))
+  - Audit pass on every `isPending ? "…" : "…"` callsite across the
+    SPA. Convention established by `<FormFooter>` / plaid-card /
+    teller-card / backups Actions / reauth-sheet / connections
+    toolbar is: pending button shows a leading `<Loader2
+    className="size-4 animate-spin" />` next to the pending label.
+    Six straggler buttons (comment-composer "Post note", nav-user
+    "Sign out", backups "Save schedule", household "Add member" +
+    "Create login", account-section "Update password") shipped
+    text-only swaps — the click felt unacknowledged on
+    slow networks. Drift retired.
+  - `nav-user` sign-out (a `DropdownMenuItem` with a leading
+    `<LogOut />` glyph) swaps the icon for `<Loader2 />` during
+    pending so the row's leading slot also reflects the spin —
+    mirrors connect-bank-sheet's swap pattern. The label text swap
+    ("Sign out" → "Signing out…") still does the work, but the icon
+    swap means the row reads as "in flight" at a glance.
+  - `rule-form` was the seventh straggler (kept its leading
+    `<Save />` glyph on the submit button at rest). Swapped to
+    `<Loader2 />` during pending — icon-for-icon, not addition,
+    since rule-form's submit always carries a leading icon. No
+    consumers needed an import bump beyond the per-file `Loader2`
+    add (`lucide-react` tree-shakes).
+  - No new primitive — the pattern is small enough that an
+    abstraction would weigh more than the duplication. The audit
+    method (`grep -rn "isPending ?" web/src --include='*.tsx' |
+    grep -v Loader2`) is the canonical drift-detection pattern;
+    next iteration that lands a new mutating button should run it.
+    Worth promoting to a `<PendingButton>` helper only if a fourth
+    axis lands (e.g. variant-aware leading icon swap for both
+    "addition" and "replacement" patterns in the same primitive).
+
 ## Open observations / questions
 
 (Populated by iterations.)
