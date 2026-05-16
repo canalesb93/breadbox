@@ -1098,6 +1098,32 @@ Cross-cutting components:
     pane in either viewport. Closes the iter-22 mobile-audit
     residual for `/settings/*`.
 
+- **Iter 28 — Sandbox primitive coverage** ([#1140](https://github.com/canalesb93/breadbox/pull/1140))
+  - `/v2/sandbox` claims to be the v2 design-system showcase but had
+    drifted: only 2 of the 11 promoted v2 primitives (PageHeader,
+    EmptyState, TimelineRail) had specimens. The other 9 —
+    `SectionCard`, `ListCard`, `ColorRailCard`, `StatusPanel`,
+    `SoftBackButton`, `IdPill`, `FormFooter`, `ConfirmDialog`,
+    `AuthShell` — were invisible to anyone treating the sandbox as the
+    canonical "what's the right primitive for this shape" reference.
+  - Added all 9 to `sandbox/sections/components.tsx` between
+    `PageHeader` and `EmptyState` in a navigation → containers →
+    status → references → forms → dialogs → shell order. Each
+    specimen carries the same usage description as the primitive's
+    docblock, so the gallery doubles as the "name + when do I use it"
+    reference.
+  - `ConfirmDialog` specimen exercises its `pending` state via a fake
+    900ms async resolve so the locked-cancel + spinner contract is
+    inspectable. `AuthShell` is whole-screen and resists scaling into
+    a specimen, so its entry is a link out to `/v2/login` and
+    `/v2/setup-account` — the right call for any primitive that owns
+    the viewport instead of fitting inside it.
+  - Cross-cutting backlog item "Sandbox / Components page polish"
+    closed. Next sandbox drift to watch: when the **12th** primitive
+    lands, the section will be long enough to want sub-grouping
+    (containers / status / forms / etc) instead of a flat scroll —
+    today's order is logical but unannounced. Defer until needed.
+
 ## Open observations / questions
 
 (Populated by iterations.)
