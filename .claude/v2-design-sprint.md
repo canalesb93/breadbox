@@ -1942,6 +1942,49 @@ Cross-cutting components:
     carry the recipe. New bare buttons that fail the grep are
     the only regression vector.
 
+- **Iter 52 — Detail-page status banners swept onto `<StatusPanel>`** ([#1166](https://github.com/canalesb93/breadbox/pull/1166))
+  - Audit of detail pages found that account-detail
+    (`connectionStatusAlert`) and connection-detail
+    (`isReauthBanner` + `showFailureBanner`) hand-rolled `<Alert>`
+    with absolutely-positioned `AlertTriangle` icons +
+    inline amber utility classes (`border-amber-500/30
+    bg-amber-500/5` + `text-amber-700 dark:text-amber-400`).
+    Each used a `flex-wrap items-center justify-between` row
+    inside `<AlertDescription>` for the trailing CTA, which
+    dropped the CTA onto its own half-aligned row on narrow
+    viewports. Desynced from the canonical StatusPanel rhythm
+    that Setup, Providers, Home attention-panel, and the iter-35
+    404/Error pages already share.
+  - Migrated all five rendered banner variants onto
+    `<StatusPanel>` with the right tone token: `warning` for
+    `pending_reauth`, `destructive` for `error`, `info` for
+    `disconnected`. StatusPanel's `flex items-start gap-3 +
+    trailing` slot keeps the icon tile + heading + CTA aligned
+    on mobile / tablet / desktop — no more orphaned-CTA wrap on
+    375px.
+  - Drive-by polish: account-detail "Connection disconnected"
+    gained a `PowerOff` icon (was iconless); connection-detail
+    "Re-authenticate" CTA gained a leading `RefreshCw` +
+    tightened to `size="sm" h-7 gap-1.5 text-xs` to match the
+    other detail-page action affordances (hero footer Sync /
+    Re-authenticate / Import more strip).
+  - Drift retired (was open since iter 16/35 sprint notes
+    implicitly — the StatusPanel primitive existed but two
+    detail pages had never been swept): the only remaining
+    open-coded `<Alert>` sites in `web/src/routes/` are
+    connection-detail's inline disconnect-confirm (an interactive
+    two-button confirm-dialog, not a status banner — different
+    contract). Backups-section + reauth-sheet + link-account-sheet
+    + preview-panel + rule-form still hand-roll `<Alert>` for
+    their local idioms; sweep when convenient — none are on a
+    detail page hero.
+  - Pattern for the next time this comes up: any "tone-tinted
+    inline notice with optional trailing CTA" inside a v2 page
+    should be a `<StatusPanel>`. Inline confirm-dialogs with
+    multiple interactive buttons are a different shape — those
+    stay on `<Alert>` (or move to a future `InlineConfirm`
+    primitive when a second site adopts the pattern).
+
 ## Open observations / questions
 
 (Populated by iterations.)
