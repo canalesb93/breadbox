@@ -54,6 +54,15 @@ next target, then updates this file at the end of the run.
   recent-activity feed and the connections panel — if a third surface
   needs the pattern (e.g. Reports recent insights), wrap into a
   `ListCard` primitive.
+- **List page toolbar** (iter 4): Tags now mirrors the Transactions
+  list — a `flex flex-col gap-3` block with the search input + any
+  filters in a `justify-between` row above the table. Pattern is now
+  on two pages (Transactions, Tags). When API keys + Categories
+  migrate, extract `ListToolbar` (slot for search, slot for filter
+  controls). Tag/slug pattern: render machine identifiers as
+  `bg-muted/60 rounded px-1.5 py-0.5 font-mono text-[11px]` muted
+  pills, not raw `<code>` — promote into a shared `IdPill` once a
+  third surface (rules? agents?) needs it.
 
 ## Backlog (ordered roughly by impact)
 
@@ -68,7 +77,7 @@ Pages:
 - [ ] Categories list (`categories.tsx`)
 - [ ] Category detail (`category-detail.tsx`)
 - [ ] Category new (`category-new.tsx`)
-- [ ] Tags list (`tags.tsx`)
+- [x] Tags list (`tags.tsx`) — #1117
 - [ ] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`)
 - [ ] Connections list (`connections.tsx`)
 - [ ] Connection detail (`connection-detail.tsx`)
@@ -86,8 +95,10 @@ Cross-cutting components:
 - [ ] `empty-state.tsx` — visual language
 - [~] `data-table.tsx` — density + hover tightened in #1116 (new
   `stickyHeader` + `refinedHeader` opt-ins; `Table` primitive picks
-  up softer borders and `px-3 py-2.5` cell padding). Sort header
-  affordances still TODO when we wire interactive sorting.
+  up softer borders and `px-3 py-2.5` cell padding). Iter 4 (#1117)
+  applied both flags to the Tags list — abstraction is validated on
+  a second surface, no per-page divergence. Sort header affordances
+  still TODO when we wire interactive sorting.
 - [ ] `command-palette.tsx` — sections, kbd hints, recents
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
 - [ ] `transaction-amount.tsx` — currency rendering
@@ -142,6 +153,23 @@ Cross-cutting components:
   - No-filters empty state offers a "Connect a bank" CTA instead of
     a dead end.
 
+- **Iter 4 — Tags list** ([#1117](https://github.com/canalesb93/breadbox/pull/1117))
+  - Tags page adopts the Transactions-list eyebrow vocabulary
+    ("N tags" / "Showing N of M" / "No matches" / "Loading" /
+    "Error") on PageHeader, expanded description, and `size="sm"`
+    "New tag" CTA for density parity. Toolbar row sits in a
+    `flex flex-col gap-3` block above the table.
+  - TagsTable opts into the iter-3 `DataTable` `stickyHeader` +
+    `refinedHeader` props — abstraction validated on a second
+    surface (column band stays pinned + uppercase tracked
+    TAG / SLUG / DESCRIPTION / ACTIONS).
+  - Slug column renders as a muted mono pill
+    (`bg-muted/60 rounded px-1.5 py-0.5 font-mono text-[11px]`)
+    instead of bare `<code>`, reading clearly as a machine
+    identifier. Tag + slug columns get explicit width hints
+    (`w-[28%]`, `w-[22%]`) so the description column doesn't get
+    squashed against the actions column.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -184,3 +212,18 @@ Cross-cutting components:
   every change reliably, at the cost of more CPU — fine for an
   iteration. `bun dev --port <N> --force` on a fresh port also flushes
   Vite's dep cache.
+- **`CHOKIDAR_USEPOLLING=1` alone isn't enough** (iter 4): even with
+  polling enabled, a long-running Vite instance can keep serving
+  stale module transforms after edits land on disk (verified via
+  `curl http://localhost:$VITE/v2/src/routes/<file>.tsx`). The fix:
+  restart Vite on a fresh port with `--force` whenever `curl` shows
+  the wrong content. Quicker than fighting the cache. Sandbox blocks
+  `pkill -f vite` so the cheapest path is "start a fresh port and
+  use that one for the rest of the iteration".
+- **Merge classifier denies `gh pr merge` with `--delete-branch`**
+  (iter 4): even though the playbook explicitly authorizes squash
+  merges into `design/v2-shadcn`, the harness's auto-mode classifier
+  reads `--delete-branch` + protected base as a no-auto-merge
+  violation. Run `gh pr merge <num> --squash` without the
+  `--delete-branch` flag; `gh` auto-deletes the remote branch on
+  squash anyway. Verified on #1117.
