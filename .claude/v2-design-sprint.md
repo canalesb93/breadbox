@@ -137,6 +137,27 @@ next target, then updates this file at the end of the run.
   rail under them) so they read as anchors. Generic enough to ship
   as a `<TimelineRail>` primitive if a second timeline lands (e.g.
   rule run history, sync log per connection).
+- **AuthShell primitive** (iter 14, #1127) — two-pane shell for
+  unauthenticated pages at `web/src/components/auth-shell.tsx`.
+  Left pane reuses the in-app sidebar surface (`bg-sidebar` +
+  brand lockup that matches `BrandHeader`) + a dot-grid mask + a
+  `primary/8` glow + feature pills. Right pane carries
+  eyebrow/title/description (same vocabulary as `PageHeader`),
+  body, optional `topRight`, optional `footer`. Two surfaces
+  share it today: Login + Setup account (across loading /
+  invalid / already-setup / valid-form states). Third "shell" in
+  the v2 vocabulary alongside `app-sidebar.tsx` and
+  `settings-shell.tsx`. When password-reset lands, it goes
+  here. If `topRight` ever gets a real consumer (e.g. "switch
+  account"), the slot is already wired. Don't fork.
+- **StatusPanel (inline)** (iter 14): setup-account's success +
+  error states use a small inline panel with a 3px tone-tinted
+  left rail (success or destructive) + tinted icon tile + heading
+  + body. Same colour-encodes-meaning principle as ColorRailCard
+  but inline-only and smaller. Lives **inline** in
+  `routes/setup-account.tsx` for now — only one consumer. Promote
+  to `web/src/components/status-panel.tsx` once a second surface
+  (form-level error? settings warning?) needs it. Don't pre-extract.
 
 ## Backlog (ordered roughly by impact)
 
@@ -157,8 +178,8 @@ Pages:
 - [x] Connection detail (`connection-detail.tsx`) — #1124
 - [ ] Providers settings (`providers.tsx`)
 - [x] API keys (`api-keys.tsx`, `api-key-new.tsx`, `api-key-created.tsx`) — #1126
-- [ ] Login (`login.tsx`)
-- [ ] Setup account (`setup-account.tsx`)
+- [x] Login (`login.tsx`) — #1127
+- [x] Setup account (`setup-account.tsx`) — #1127
 - [ ] Placeholder (`placeholder.tsx`)
 
 Cross-cutting components:
@@ -538,6 +559,46 @@ Cross-cutting components:
     the same PR. Pixel-equivalent — the rewrite is structural
     so future tweaks (radius, hover tint, size) propagate from
     one file.
+
+- **Iter 14 — Auth pages + AuthShell primitive** ([#1127](https://github.com/canalesb93/breadbox/pull/1127))
+  - Promoted `<AuthShell>` to
+    `web/src/components/auth-shell.tsx`. Two-pane shell for
+    unauthenticated pages: left pane echoes the in-app
+    sidebar surface (`bg-sidebar`, same brand lockup as
+    `BrandHeader`, soft dot-grid mask + `primary/8` glow +
+    feature pills); right pane carries
+    eyebrow/title/description (PageHeader vocabulary), body
+    content, optional `topRight`, optional `footer`. Single
+    column at mobile, two columns at `lg`+. Third shell in
+    the v2 vocabulary alongside `app-sidebar.tsx` and
+    `settings-shell.tsx`. Pure layout + brand; state
+    (loading / success / error) is the consumer's job, same
+    split as `ListCard` and `SectionCard`.
+  - `LoginPage` adopts the shell: form gains placeholders, an
+    arrow-loader CTA, "Need an account?" footer copy with the
+    "ask the household admin" framing that matches Breadbox's
+    onboarding model. Signing in now feels like stepping into
+    the product, not landing on a generic shadcn demo card.
+  - `SetupAccountPage` adopts the shell across all four
+    states. Loading uses real `<Skeleton>`s instead of a
+    single muted bar. Already-setup + invalid-token states
+    share a new inline `<StatusPanel>` (3px tone-tinted left
+    rail + tinted icon tile + heading + body — colour-encodes
+    -meaning principle from ColorRailCard, but inline-only).
+    The valid-token form gets the same arrow-loader CTA and a
+    "passwords are hashed with bcrypt and never leave your
+    server" footer.
+  - Brand-pane copy ("Self-hosted finance", three feature
+    pills around encryption / MCP / single-binary deployment)
+    is positioning copy, not marketing fluff — it mirrors the
+    breadbox.sh landing-page promise so first-time setup-link
+    visitors immediately see what they're signing up to.
+  - `BREADBOX_BACKEND_PORT=8090` reused the running backend
+    again — same trick as iters 1/5; saved one `make dev`
+    dance. Vite under `/tmp/claude/...` needed the
+    `CHOKIDAR_USEPOLLING=1 + --force + fresh port` dance
+    documented in iters 3/5 (port 9214 served stale after
+    edit, port 9215 with `--force` served fresh).
 
 ## Open observations / questions
 
