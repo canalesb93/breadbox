@@ -78,17 +78,23 @@ next target, then updates this file at the end of the run.
   identifier. The api-key-created page still uses its own
   `<code className="bg-muted ...">` markup — migrate when that page
   gets a design pass (different `bg-muted` token, intentional).
-- **ListCard pattern watching for promotion** (iter 7): a single
-  bordered `<Card className="gap-0 py-0">` with a
-  `<ul className="divide-y">` body is now on **five** surfaces —
-  Home recent-activity, Home connections, TX-detail Activity,
-  Account-detail Recent transactions, Categories (iter 7). The
-  Categories variant also nests a secondary `<ul>` band for
-  child rows with a color-tinted inset left rail. Once a sixth
-  flat-list surface adopts it (Connections list is the obvious
-  next candidate), promote to `<ListCard>` — effectively a
-  sibling of `<SectionCard>` pre-tuned for list bodies
-  (`flushBody` + `<ul divide-y>` baked in).
+- **ListCard primitive** (iter 8, expanded iter 9): the canonical
+  bordered-card-with-divide-y-rows container lives at
+  `web/src/components/list-card.tsx`. Seven surfaces now share it
+  (iter 9 added two): Home recent-activity, Home connections panel,
+  Connections list + Connections skeleton (iter 8), Account-detail
+  Recent transactions, Categories list, Categories skeleton (iter 9).
+  CategoryRow nests a secondary `<ul>` band for children with a
+  color-tinted inset left rail — that pattern stays inside the row
+  renderer (ListCard handles the outer card + first-level rail).
+  Don't fork the look — extend the primitive. SectionCard remains
+  the right choice when the body is *not* a list (forms, prose,
+  KV blocks like TX-detail Activity which hosts the comment
+  composer + timeline). Remaining bespoke list markup
+  (`features/settings/backups-section.tsx`,
+  `features/connections/sync-history-list.tsx`,
+  `features/rules/preview-panel.tsx`) is a different shape (no
+  bordered card wrapper) — don't force those onto ListCard.
 - **Color-rail "hero" pattern** (iter 5 + iter 6): Now used on two
   detail pages — TX-detail (category color, neutral when
   uncategorised) and Account-detail (success for assets, destructive
@@ -325,6 +331,22 @@ Cross-cutting components:
     open-coded `<Card gap-0 py-0>` + `<ul divide-y>` markup. Mechanical
     sweep, can ride along with the next iteration that touches any of
     those surfaces.
+
+- **Iter 9 — ListCard sweep (Categories + Account recent transactions)** ([#1122](https://github.com/canalesb93/breadbox/pull/1122))
+  - Mechanical sweep of two remaining open-coded `<Card gap-0 py-0>` +
+    `<ul divide-y>` sites onto the shared `<ListCard>` primitive
+    promoted in iter 8: `features/categories/category-list.tsx` (parent
+    rows + the loading skeleton on the Categories route) and
+    `features/accounts/account-recent-transactions.tsx` (was using
+    `SectionCard` + a hand-rolled `<ul>` inside).
+  - Both migrations are byte-identical at the pixel level — same MD5
+    on before/after screenshots. The point isn't a visual change, it's
+    that the list-card vocabulary now lives in exactly one place so
+    future tweaks (border, hover, density) propagate to every surface.
+  - Home recent-activity + Home connections panel were already on
+    ListCard (the iter-8 primitive landed wired up to them). TX-detail
+    Activity intentionally stays on `SectionCard` — its body is the
+    comment composer + timeline, not a list.
 
 ## Open observations / questions
 
