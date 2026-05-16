@@ -307,6 +307,7 @@ Pages:
 - [x] Login (`login.tsx`) — #1127
 - [x] Setup account (`setup-account.tsx`) — #1127
 - [x] Placeholder (`placeholder.tsx`) — #1134
+- [x] Not-found + Error boundary (`not-found.tsx`, `error.tsx`) — #1149
 
 Cross-cutting components:
 
@@ -1308,6 +1309,54 @@ Cross-cutting components:
     (new), `routes/home.tsx` (mounts the attention panel).
   - Process note: ran from a worktree at `/tmp/claude/breadbox-iter34`
     — clean, didn't disturb the main repo (corrects the iter 33 lapse).
+
+- **Iter 35 — 404 + Error boundary pages** ([#1149](https://github.com/canalesb93/breadbox/pull/1149))
+  - Adds `NotFoundPage` (`web/src/routes/not-found.tsx`) and
+    `ErrorPage` (`web/src/routes/error.tsx`), wired into
+    `createRouter({ defaultNotFoundComponent, defaultErrorComponent })`
+    on the TanStack router. Both render in place of `<Outlet/>` inside
+    the authenticated shell — sidebar, topbar, and command palette
+    stay live, so the user has a way out without a hard reload. The
+    previous behaviour was TanStack's bare default `Not Found` text
+    on a blank page (captured as the BEFORE in the PR).
+  - `NotFoundPage`: PageHeader `404 · NOT FOUND` eyebrow + title +
+    description; `StatusPanel tone="info"` showing the attempted
+    pathname as an `IdPill`; `SectionCard` "Jump to a page" with a
+    2x2 grid of quick-jump tiles (Home / Transactions / Accounts /
+    Categories) rendered as hover-aware `bg-muted/20` rounded cards
+    with a trailing `ArrowRight`. Header actions: `⌘K Jump to…`
+    button (dispatches the existing `breadbox:command-palette:open`
+    event) + Back to Home link.
+  - `ErrorPage`: PageHeader `500 · ERROR` eyebrow + title +
+    description; `StatusPanel tone="destructive"` with the human
+    -readable error message + trailing Reload button; collapsible
+    `SectionCard` "Technical details" hosting the raw stack trace
+    inside a `bg-muted/40 overflow-auto` `<pre>` (showDetails
+    toggle keeps it quiet by default — dev affordance). Header
+    actions: `⌘K Jump to…` + Try again (uses TanStack Router's
+    per-route `reset()` callback) + Back to Home.
+  - Pure composition of existing primitives (PageHeader,
+    StatusPanel, SectionCard, IdPill, Kbd/KbdGroup) — no new design
+    vocabulary, just two more production surfaces speaking it.
+    StatusPanel picks up new `info` + `destructive` consumers;
+    IdPill picks up a surface where it carries a URL path instead
+    of a short_id/slug — fits its "machine identifier" framing.
+  - Drift queued (not part of this iteration): `routes/__root.tsx`
+    still hand-rolls an inline `AuthError` component for the
+    `useMe()` failure case — same shape (fixed-position centered
+    message + reload affordance) but predates the StatusPanel
+    vocabulary. Sweep onto a `<StatusPanel tone="destructive">`
+    inside `<AuthShell>` next time we touch the root layout. Same
+    story for `AuthSplash` — a bare centered Loader2 — which a
+    `<StatusPanel tone="info">` inside `<AuthShell>` (or a
+    dedicated `<AuthShellSplash>`) would speak.
+  - Process note: tested BEFORE/AFTER by temporarily reverting
+    `web/src/main.tsx` to the pre-commit content via
+    `git show HEAD~1:web/src/main.tsx > web/src/main.tsx`, taking
+    the screenshot, then `git checkout HEAD -- web/src/main.tsx`
+    to restore. Vite needs a fresh port (`bun dev --port <N> --force`)
+    to flush its dep cache between the revert and the AFTER capture
+    — same dance as iters 4/5.
 
 ## Open observations / questions
 
