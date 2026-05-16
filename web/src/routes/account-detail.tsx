@@ -41,7 +41,7 @@ import {
   isLiability,
   utilizationBarClass,
 } from "@/features/accounts/account-utils";
-import { formatBalance } from "@/lib/format";
+import { formatBalance, formatLongDate } from "@/lib/format";
 import { AccountSettingsCard } from "@/features/accounts/account-settings-card";
 import { AccountRecentTransactions } from "@/features/accounts/account-recent-transactions";
 import { AccountLinksSection } from "@/features/accounts/account-links-section";
@@ -397,7 +397,7 @@ function DetailsCard({ account: a }: { account: AccountDetail }) {
           // exact wall-clock seconds are noise — last-sync precision lives
           // on the connection page.
           label: "Last update",
-          value: new Date(a.last_balance_update).toLocaleDateString(),
+          value: formatLongDate(a.last_balance_update.slice(0, 10)),
         }
       : null,
   ]);

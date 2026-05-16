@@ -51,6 +51,7 @@ import {
 import { Eyebrow } from "@/components/eyebrow";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
+import { formatLongDate } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -880,10 +881,10 @@ function DetailsCard({
 
   const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: conn.short_id, mono: true },
-    { label: "Created", value: new Date(conn.created_at).toLocaleDateString() },
+    { label: "Created", value: formatLongDate(conn.created_at.slice(0, 10)) },
     {
       label: "Updated",
-      value: new Date(conn.updated_at).toLocaleDateString(),
+      value: formatLongDate(conn.updated_at.slice(0, 10)),
     },
   ]);
 

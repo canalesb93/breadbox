@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelativeTime } from "@/lib/format";
+import { formatLongDate, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useApplyRule,
@@ -267,7 +267,7 @@ export function RuleDetailPage() {
                   <span className="text-muted-foreground text-xs">·</span>
                   <span className="text-xs text-amber-600 dark:text-amber-400">
                     Expires{" "}
-                    {new Date(rule.expires_at).toLocaleDateString()}
+                    {formatLongDate(rule.expires_at.slice(0, 10))}
                   </span>
                 </>
               )}
