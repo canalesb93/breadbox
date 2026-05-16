@@ -52,8 +52,8 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (f transact
 		return
 	}
 
-	if f.StartDate != nil && f.EndDate != nil && !f.StartDate.Before(*f.EndDate) {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
+	if f.StartDate != nil && f.EndDate != nil && f.EndDate.Before(*f.StartDate) {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be on or before end_date")
 		return
 	}
 
