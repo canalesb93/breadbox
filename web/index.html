@@ -45,16 +45,36 @@
     <meta name="twitter:image" content="./og-image.svg" />
 
     <script>
-      // Light/dark theme follows the OS — same contract as `BrandHeader`
-      // and the rest of the v2 SPA. Inline + synchronous so the first
-      // paint never flashes the wrong theme.
+      // No-flash theme bootstrap. Inline + synchronous so the first paint
+      // never flashes the wrong theme. Reads the same `breadbox:theme`
+      // storage key that `<ThemeProvider>` (from next-themes, in
+      // `components/theme-provider.tsx`) writes — so a user who picked
+      // "Dark" in the NavUser menu reloads to dark, not to whatever the
+      // OS happens to be. Falls back to the OS preference whenever the
+      // stored value is missing or "system" (next-themes' contract).
       (function () {
-        var mql = window.matchMedia("(prefers-color-scheme: dark)");
-        function apply(e) {
-          document.documentElement.classList.toggle("dark", e.matches);
+        try {
+          var stored = window.localStorage.getItem("breadbox:theme");
+          var mql = window.matchMedia("(prefers-color-scheme: dark)");
+          function resolve() {
+            if (stored === "dark") return true;
+            if (stored === "light") return false;
+            return mql.matches;
+          }
+          function apply() {
+            document.documentElement.classList.toggle("dark", resolve());
+          }
+          apply();
+          // Track OS changes only while the user is on "system" (or has
+          // not chosen yet). next-themes owns the explicit case once the
+          // React tree mounts and re-applies on its own.
+          mql.addEventListener("change", function () {
+            if (!stored || stored === "system") apply();
+          });
+        } catch (_) {
+          // localStorage unavailable (e.g. private window with strict
+          // settings) — leave the default light theme alone.
         }
-        apply(mql);
-        mql.addEventListener("change", apply);
       })();
     </script>
   </head>
