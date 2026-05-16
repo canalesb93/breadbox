@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { ListCard } from "@/components/list-card";
 import { CategoryList } from "@/features/categories/category-list";
 import { useCategories } from "@/api/queries/categories";
@@ -91,14 +91,14 @@ export function CategoriesPage() {
             rows={Array.from({ length: 6 })}
             getRowKey={(_, i) => i}
             renderRow={() => (
-              <div className="flex items-center gap-3 px-4 py-3">
-                <Skeleton className="size-9 rounded-md" />
-                <div className="flex-1 space-y-1.5">
-                  <Skeleton className="h-3.5 w-40" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <Skeleton className="h-5 w-10 rounded-full" />
-              </div>
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                lines={2}
+                trailing="none"
+                titleClassName="w-40"
+                subtitleClassName="w-24"
+              />
             )}
           />
         ) : isError ? (
