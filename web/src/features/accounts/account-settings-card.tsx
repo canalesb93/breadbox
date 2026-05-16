@@ -52,9 +52,10 @@ export function AccountSettingsCard({ account: a }: AccountSettingsCardProps) {
     await withMutationToast(
       () => update.mutateAsync({ id: a.short_id, input: { is_excluded: next } }),
       {
-        success: next
-          ? "Account excluded — future syncs will skip it."
-          : "Account included in sync.",
+        success: next ? "Account excluded." : "Account included.",
+        successDescription: next
+          ? "Future syncs will skip it."
+          : "Future syncs will include it again.",
       },
     );
   }

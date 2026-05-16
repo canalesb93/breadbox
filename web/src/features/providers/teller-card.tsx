@@ -128,7 +128,8 @@ export function TellerCard({ config, health, hasEncryptionKey }: TellerCardProps
 
   async function onDisable() {
     const ok = await withMutationToast(() => disable.mutateAsync("teller"), {
-      success: "Teller disabled. Stored credentials were cleared.",
+      success: "Teller disabled.",
+      successDescription: "Stored credentials were cleared.",
     });
     if (ok) setConfirmingDisable(false);
   }

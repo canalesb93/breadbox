@@ -303,6 +303,7 @@ function DetailBody({
   async function onSync() {
     await withMutationToast(() => sync.mutateAsync(conn.id), {
       success: `Sync queued for ${conn.institution_name ?? "connection"}.`,
+      successDescription: "New transactions land within a minute.",
     });
   }
 
