@@ -3,13 +3,11 @@ import {
   Link,
   useNavigate,
   useParams,
-  useRouter,
   useSearch,
 } from "@tanstack/react-router";
 import {
   Activity,
   AlertTriangle,
-  ArrowLeft,
   Building2,
   ExternalLink,
   FileSpreadsheet,
@@ -46,6 +44,7 @@ import {
 import { ColorRailCard } from "@/components/color-rail-card";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -197,7 +196,7 @@ export function ConnectionDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <BackButton />
+      <SoftBackButton to="/connections">Back to connections</SoftBackButton>
 
       {connQuery.isLoading ? (
         <DetailSkeleton />
@@ -241,43 +240,6 @@ export function ConnectionDetailPage() {
         />
       )}
     </div>
-  );
-}
-
-// BackButton mirrors the TX-detail/Account-detail back-button pattern —
-// real link to the list (middle-click + open-in-new-tab still work),
-// soft-back on a plain left-click so the user lands on the exact list
-// state they came from (filter tabs, search).
-function BackButton() {
-  const router = useRouter();
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      asChild
-      className="text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs"
-    >
-      <Link
-        to="/connections"
-        onClick={(e) => {
-          if (
-            !e.defaultPrevented &&
-            !e.metaKey &&
-            !e.ctrlKey &&
-            !e.shiftKey &&
-            !e.altKey &&
-            e.button === 0 &&
-            window.history.length > 1
-          ) {
-            e.preventDefault();
-            router.history.back();
-          }
-        }}
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to connections
-      </Link>
-    </Button>
   );
 }
 

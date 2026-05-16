@@ -5,18 +5,13 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { IdPill } from "@/components/id-pill";
+import { SectionCard } from "@/components/section-card";
 import {
   clearPendingPlaintextKey,
   readPendingPlaintextKey,
@@ -76,26 +71,16 @@ export function APIKeyCreatedPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        title="Key created"
-        description="Copy the plaintext now — it isn't shown again."
+        eyebrow="Key created"
+        title={pending.name}
+        description="Copy the plaintext now — Breadbox only stores a SHA-256 hash, so this is the one and only time it appears."
       />
 
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
-              <KeyRound className="size-4" />
-            </div>
-            <div>
-              <CardTitle className="text-base">{pending.name}</CardTitle>
-              <CardDescription>
-                Stash this in your password manager before leaving the page.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-5">
+      <SectionCard
+        icon={<KeyRound className="text-muted-foreground size-4" />}
+        title="Plaintext key"
+      >
+        <div className="space-y-5">
           <div className="space-y-1.5">
             <label
               htmlFor="api-key-plaintext"
@@ -126,15 +111,8 @@ export function APIKeyCreatedPage() {
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Send it as the{" "}
-              <code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">
-                X-API-Key
-              </code>{" "}
-              header on every request to{" "}
-              <code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">
-                /api/v1/*
-              </code>
-              .
+              Send it as the <IdPill value="X-API-Key" /> header on every
+              request to <IdPill value="/api/v1/*" />.
             </p>
           </div>
 
@@ -146,14 +124,16 @@ export function APIKeyCreatedPage() {
               plaintext you'll need to revoke and mint a new one.
             </AlertDescription>
           </Alert>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
       <div className="mt-6 flex items-center justify-between gap-2">
-        <Button variant="ghost" asChild>
+        <Button variant="ghost" size="sm" asChild>
           <Link to="/api-keys/new">Mint another</Link>
         </Button>
-        <Button onClick={onDone}>I've saved it — done</Button>
+        <Button size="sm" onClick={onDone}>
+          I've saved it — done
+        </Button>
       </div>
     </div>
   );

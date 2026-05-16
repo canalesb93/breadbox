@@ -3,10 +3,8 @@ import {
   Link,
   useNavigate,
   useParams,
-  useRouter,
 } from "@tanstack/react-router";
 import {
-  ArrowLeft,
   ArrowRight,
   EyeOff,
   Folder,
@@ -23,6 +21,7 @@ import { DangerZone } from "@/components/danger-zone";
 import { EmptyState } from "@/components/empty-state";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
 import {
   flattenCategories,
@@ -47,7 +46,7 @@ export function CategoryDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <BackButton />
+      <SoftBackButton to="/categories">Back to categories</SoftBackButton>
 
       {isLoading ? (
         <DetailSkeleton />
@@ -66,43 +65,6 @@ export function CategoryDetailPage() {
         <DetailBody category={category} tree={tree ?? []} />
       )}
     </div>
-  );
-}
-
-// BackButton mirrors the TX-detail / Account-detail muscle memory: real
-// link to /categories so middle-click works, but a normal left-click
-// prefers `router.history.back()` to land on the exact list state the
-// user came from (filter + expanded parents).
-function BackButton() {
-  const router = useRouter();
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      asChild
-      className="text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs"
-    >
-      <Link
-        to="/categories"
-        onClick={(e) => {
-          if (
-            !e.defaultPrevented &&
-            !e.metaKey &&
-            !e.ctrlKey &&
-            !e.shiftKey &&
-            !e.altKey &&
-            e.button === 0 &&
-            window.history.length > 1
-          ) {
-            e.preventDefault();
-            router.history.back();
-          }
-        }}
-      >
-        <ArrowLeft className="size-3.5" />
-        Back to categories
-      </Link>
-    </Button>
   );
 }
 

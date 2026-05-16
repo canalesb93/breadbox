@@ -47,10 +47,29 @@ export function APIKeysPage() {
     };
   }, [keys]);
 
+  const tabRows = tab === "active" ? active : revoked;
   const rows = useMemo(
-    () => filterKeys(tab === "active" ? active : revoked, query),
-    [tab, active, revoked, query],
+    () => filterKeys(tabRows, query),
+    [tabRows, query],
   );
+
+  // Eyebrow vocabulary matches Tags / Transactions / Connections list pages:
+  // "Loading" / "Error" / "N keys" / "Showing N of M" / "No matches".
+  const tabLabel = tab === "active" ? "active" : "revoked";
+  const eyebrow = (() => {
+    if (isLoading) return "Loading";
+    if (isError) return "Error";
+    if (tabRows.length === 0) {
+      return tab === "active" ? "No active keys" : "No revoked keys";
+    }
+    if (query.trim()) {
+      if (rows.length === 0) return "No matches";
+      if (rows.length < tabRows.length) {
+        return `Showing ${rows.length.toLocaleString()} of ${tabRows.length.toLocaleString()}`;
+      }
+    }
+    return `${tabRows.length.toLocaleString()} ${tabLabel} ${tabRows.length === 1 ? "key" : "keys"}`;
+  })();
 
   function setTab(next: Tab) {
     navigate({
@@ -75,7 +94,7 @@ export function APIKeysPage() {
   }
 
   const newKeyButton = (
-    <Button asChild>
+    <Button asChild size="sm">
       <Link to="/api-keys/new">
         <Plus className="size-4" />
         New key
@@ -86,49 +105,52 @@ export function APIKeysPage() {
   const emptyState = renderEmptyState({ tab, query, newKeyButton });
 
   return (
-    <div>
+    <div className="flex flex-col gap-5">
       <PageHeader
+        eyebrow={eyebrow}
         title="API keys"
-        description="Credentials for programmatic access — agents, the CLI, the MCP server."
+        description="Credentials for programmatic access — agents, the CLI, the MCP server. Each key carries a fixed scope and an attributed actor, and is hashed in storage."
         actions={newKeyButton}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-          <TabsList>
-            <TabsTrigger value="active">
-              Active
-              <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
-                {active.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="revoked">
-              Revoked
-              <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
-                {revoked.length}
-              </span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+            <TabsList>
+              <TabsTrigger value="active">
+                Active
+                <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
+                  {active.length}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="revoked">
+                Revoked
+                <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
+                  {revoked.length}
+                </span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-        <div className="relative ml-auto w-full max-w-xs">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, prefix, actor…"
-            className="pl-8"
-          />
+          <div className="relative w-full max-w-xs">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, prefix, actor…"
+              className="pl-8"
+            />
+          </div>
         </div>
-      </div>
 
-      <APIKeysTable
-        keys={rows}
-        isLoading={isLoading}
-        isError={isError}
-        revoked={tab === "revoked"}
-        emptyState={emptyState}
-      />
+        <APIKeysTable
+          keys={rows}
+          isLoading={isLoading}
+          isError={isError}
+          revoked={tab === "revoked"}
+          emptyState={emptyState}
+        />
+      </div>
     </div>
   );
 }
