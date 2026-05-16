@@ -95,17 +95,24 @@ next target, then updates this file at the end of the run.
   `features/connections/sync-history-list.tsx`,
   `features/rules/preview-panel.tsx`) is a different shape (no
   bordered card wrapper) — don't force those onto ListCard.
-- **Color-rail "hero" pattern** (iter 5 + iter 6): Now used on two
-  detail pages — TX-detail (category color, neutral when
-  uncategorised) and Account-detail (success for assets, destructive
-  for liabilities, muted when excluded). The rail's colour encodes
-  *meaning* (classification, accounting role) rather than
-  decoration. Both heroes also share a small uppercase eyebrow
-  ("Transaction" / "Asset" / "Liability") so the visual accent has a
-  textual anchor — colour alone shouldn't carry meaning. **Pull
-  into `<ColorRailCard>` once a 3rd detail page adopts it**
-  (Category detail with category-color rail is the obvious next
-  candidate).
+- **ColorRailCard primitive** — extracted to
+  `web/src/components/color-rail-card.tsx` in iter 10 (#1123).
+  Three surfaces now share it: TX-detail hero (category color,
+  neutral when uncategorised), Account-detail hero (success for
+  assets, destructive for liabilities, muted when excluded),
+  Category-detail hero (category's own color, neutral if unset).
+  The rail's colour encodes *meaning* (classification, accounting
+  role, palette token) rather than decoration. All three heroes
+  share a small uppercase eyebrow ("Transaction" / "Asset" /
+  "Liability" / "Category" / "Sub-category") so colour never
+  carries the signal alone. Optional `footer` slot ships
+  pre-styled (`border-t bg-muted/20 ...`) for inline action
+  strips — the Account-detail Link/View buttons live there.
+  Don't fork the look — extend the primitive. If a fourth surface
+  wants a different right-column shape, consider a `scoreboard`
+  slot prop; for now the right column is open-coded inside each
+  consumer because the metric per entity varies (amount vs
+  balance vs count).
 - **Color-rail "nested band" variant** (iter 7, new mechanic):
   Categories' expanded children sit in a `bg-muted/15` band with
   a 2px inset left rail tinted by the parent category's color
@@ -136,7 +143,7 @@ Pages:
 - [ ] Accounts list (`accounts.tsx`)
 - [x] Account detail (`account-detail.tsx`) — #1119
 - [x] Categories list (`categories.tsx`) — #1120
-- [ ] Category detail (`category-detail.tsx`)
+- [x] Category detail (`category-detail.tsx`) — #1123
 - [ ] Category new (`category-new.tsx`)
 - [x] Tags list (`tags.tsx`) — #1117
 - [ ] Tag detail / new (`tag-detail.tsx`, `tag-new.tsx`)
@@ -181,6 +188,14 @@ Cross-cutting components:
   (iter 7 added Categories): Tags slug column, TX-detail
   Reference row, Account-detail Reference row, Categories list
   parent + child slug pills. Don't re-derive the same span.
+- [x] `ColorRailCard` primitive (iter 10, #1123) — bordered hero
+  card with a 4px coloured left rail that encodes meaning, at
+  `web/src/components/color-rail-card.tsx`. Three surfaces share
+  it: TX-detail hero, Account-detail hero (with the `footer` slot
+  hosting the inline Link/View action strip), Category-detail
+  hero. Sibling of `<SectionCard>` and `<ListCard>` — third
+  primitive in the v2 vocabulary. Reach for it for any new
+  detail-page hero.
 
 ## Completed
 
@@ -347,6 +362,40 @@ Cross-cutting components:
     ListCard (the iter-8 primitive landed wired up to them). TX-detail
     Activity intentionally stays on `SectionCard` — its body is the
     comment composer + timeline, not a list.
+
+- **Iter 10 — Category detail + ColorRailCard primitive** ([#1123](https://github.com/canalesb93/breadbox/pull/1123))
+  - Promoted `<ColorRailCard>` to
+    `web/src/components/color-rail-card.tsx`. The bordered-card
+    -with-coloured-left-rail pattern was open-coded in iter 5 (TX
+    detail) and iter 6 (account detail); the iter 5/6 drift note
+    explicitly called for extraction once a third detail page
+    adopts it. Category detail is that surface, so the primitive
+    landed in the same PR that consumed it. Three surfaces now
+    share it. Optional `footer` slot ships pre-styled
+    (`border-t bg-muted/20 ...`) for inline action strips —
+    Account-detail Link/View buttons live there.
+  - Rebuilt Category-detail around the new hero: icon tile +
+    eyebrow ("Category" / "Sub-category") + display name + parent
+    breadcrumb + slug, paired with a "Transactions" scoreboard on
+    the right (count via `useTransactionCount` on the category
+    slug). The scoreboard eyebrow tint picks up the category
+    colour so the right column also lands in the palette.
+  - New two-column body: form in `SectionCard` ("Appearance &
+    metadata") + DangerZone in `SectionCard` on the left;
+    sub-categories `ListCard` (children link to their own detail
+    page, icons inherit the parent's colour when child has no
+    own colour — mirrors the iter-7 nested-band behaviour) +
+    Details `SectionCard` on the right. Page now feels like a
+    sibling of TX-detail and Account-detail instead of "a form
+    with a back button".
+  - Trimmed `CategoryForm` preview tile from edit mode — the
+    hero already shows live identity. Create mode keeps it so the
+    new-category page can stand alone (queued: mount the same
+    hero shell on `category-new` for vocabulary parity).
+  - Refactored TX-detail and Account-detail heroes onto
+    `<ColorRailCard>` in the same PR. Both are pixel-equivalent;
+    the rewrite is purely structural so future hero tweaks
+    propagate from one file.
 
 ## Open observations / questions
 
