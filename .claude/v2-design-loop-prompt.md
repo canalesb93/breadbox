@@ -10,6 +10,33 @@ You are running one autonomous iteration of the **v2 SPA design sprint** for the
 
 ## Iteration steps
 
+### Step ordering rule (read before reordering anything below)
+
+Four iterations (#18, #22, #25, #29) stopped mid-screenshot or
+mid-investigation, leaving uncommitted work that had to be reconstructed.
+The fix: **commit and push your implementation BEFORE taking any
+screenshots.** Screenshots are PR decoration; they are not part of the
+implementation. The robust order is:
+
+1. Pick target + enter worktree
+2. Implement the change
+3. Lint (`bun run lint`) + build (`go build ./...`) green
+4. `git add` + `git commit` + `git push`
+5. Open the PR (description can say "screenshots incoming")
+6. NOW take screenshots, upload to img402, edit the PR description
+7. Merge (`gh pr merge <num> --squash`)
+8. Update sprint state
+9. ExitWorktree
+10. `result:` line
+
+If the harness ends your turn between step 4 and step 5, the main
+session can still reconcile by opening + merging the PR. If you stop
+at step 2 with uncommitted changes, the implementation is essentially
+lost (a different agent has to rebuild context to reconstruct it).
+Treat the commit-and-push as the safety checkpoint.
+
+---
+
 1. **Enter a worktree based on `design/v2-shadcn`.** Use the `EnterWorktree` tool with a name like `design-v2-<topic-slug>` (e.g. `design-v2-home`). The worktree's branch should be `design/v2-shadcn/<topic>` based on the latest `origin/design/v2-shadcn`. If `EnterWorktree` branches from `origin/main` by default, recover by running, inside the new worktree, `git fetch origin design/v2-shadcn && git reset --hard origin/design/v2-shadcn` before creating any commits.
 
 2. **Read the latest sprint state.** From the worktree: `cat .claude/v2-design-sprint.md`. Pick the next unchecked backlog item — rotate through pages and cross-cutting components so we don't keep polishing the same thing. If a previous iteration left an open observation worth pursuing, prefer that.
