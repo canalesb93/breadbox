@@ -202,6 +202,22 @@ next target, then updates this file at the end of the run.
   These events have no payload — they're "open me", not "open me
   on tab X". If a payload becomes necessary, that's the signal
   to lift to a small store (zustand or context).
+- **EmptyState variants** (iter 19, #1132) — `<EmptyState>` ships
+  three variants today and they encode *which container* you're
+  inside, not just visual weight. `default` for already-bordered
+  hosts (table emptyState slot, `<ListCard>`'s `empty` slot,
+  `<SectionCard>` body). `card` for raw page space — adds the
+  dashed bordered card so the placeholder reads as "fill me"
+  instead of floating text (household-section, backups-section).
+  `inline` for compact secondary panels where the full block
+  would be too loud (connection-accounts-list, sync-history-list).
+  Icon tile is `rounded-xl` (matches ColorRailCard / StatusPanel
+  / CategoryIconTile) — don't re-introduce the rounded-full
+  circle. Two remaining one-line muted empties stay as plain
+  text: `rule-form` "No actions configured" inside the form body,
+  and `preview-panel` "No matches yet" inside the rule-preview
+  side panel. Both are intentionally lighter than EmptyState —
+  promoting them would dominate their host panel. Don't sweep.
 
 ## Backlog (ordered roughly by impact)
 
@@ -249,7 +265,11 @@ Cross-cutting components:
   + leading `ArrowLeft`. Use `<SoftBackButton to="/foo">Back to
   foo</SoftBackButton>` on any new detail or form page that hangs
   off a list. Don't fork the look.
-- [ ] `empty-state.tsx` — visual language
+- [x] `empty-state.tsx` — visual language — iter 19 (#1132). Three
+  variants (`default` / `card` / `inline`), rounded-xl icon tile
+  matching ColorRailCard / StatusPanel / category tiles. Four
+  hand-rolled empties retired onto the primitive (household-section,
+  backups-section, connection-accounts-list, sync-history-list).
 - [x] `command-palette.tsx` — sections, kbd hints, recents — #1130
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
 - [ ] `transaction-amount.tsx` — currency rendering
@@ -805,6 +825,36 @@ Cross-cutting components:
     iterations: end with `result:` only AFTER the PR is merged and sprint
     state is updated. Don't pause for "one more screenshot" — the PR diff
     is the source of truth.
+
+- **Iter 19 — EmptyState variants + drift sweep** ([#1132](https://github.com/canalesb93/breadbox/pull/1132))
+  - `<EmptyState>` ships three variants: `default` (current behaviour,
+    bare centered block for already-bordered hosts), `card` (dashed
+    bordered card for raw page space), `inline` (compact for sub-panels
+    where the full block weight would dominate). Variant encodes
+    *which container you're inside*, not just visual weight — pick by
+    host surface, not by importance. Icon tile switches from
+    `rounded-full p-3` to `flex size-11 rounded-xl` so it matches the
+    rest of v2's icon language (ColorRailCard, StatusPanel,
+    CategoryIconTile). `inline` shrinks the tile to `size-9` + `size-4`
+    icon. Title size dropped from `font-medium` (default) to
+    `text-sm font-medium` so a nested empty state doesn't compete with
+    a SectionCard header.
+  - Four hand-rolled empties retired onto the primitive:
+    `household-section` (had a local `EmptyState()` helper with a
+    dashed card + circular tile — gone), `backups-section` (dashed
+    border + CheckCircle2 → `variant=card` with HardDrive to match the
+    page identity), `connection-accounts-list` (opacity-40 Wallet stack
+    → `variant=inline`), `sync-history-list` (opacity-40 RefreshCw
+    stack → `variant=inline`). Two remaining one-line muted empties in
+    `rule-form` (No actions configured) and `preview-panel` (No matches
+    yet) stay as plain text — full EmptyState would dominate the host
+    form panel. Documented in the drift section so we don't sweep them
+    next pass.
+  - Sandbox EmptyState specimen rebuilt around all three variants
+    side-by-side with labelled wrappers (`default · inside a container`
+    inside a fake bordered card, `card · in raw page space` bare, and
+    `inline · compact sub-panel` inside a card) so future iterations
+    can see the intended host surface for each variant at a glance.
 
 ## Open observations / questions
 
