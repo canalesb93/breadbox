@@ -18,6 +18,8 @@ import { DateRangeFilter } from "@/components/date-range-filter";
 import type { DateRangeValue } from "@/components/date-range-filter";
 import { TagChip, TagList } from "@/components/tag-chip";
 import { TagCommandList } from "@/components/tag-command";
+import { IconPicker } from "@/components/icon-picker";
+import { ColorPicker } from "@/components/color-picker";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
@@ -63,6 +65,8 @@ export function ComponentsSection() {
   const [tableState, setTableState] = useState<
     "data" | "loading" | "empty"
   >("data");
+  const [iconValue, setIconValue] = useState<string | null>("shopping-cart");
+  const [colorValue, setColorValue] = useState<string | null>("#f97316");
   const [pickedProvider, setPickedProvider] = useState<string | null>("plaid");
   const [dateRange, setDateRange] = useState<DateRangeValue>({});
 
@@ -218,6 +222,19 @@ export function ComponentsSection() {
             />
           </PopoverContent>
         </Popover>
+      </Specimen>
+
+      <Specimen
+        label="IconPicker · ColorPicker"
+        code="components/icon-picker, color-picker"
+        description="Form-friendly pickers used by the Categories and Tags forms. Each is pure-presentational; caller owns the value. Icons are searchable across the full Lucide catalog with a curated 'popular' default; colors offer a preset palette plus free-form hex."
+      >
+        <IconPicker
+          value={iconValue}
+          onChange={setIconValue}
+          tint={colorValue}
+        />
+        <ColorPicker value={colorValue} onChange={setColorValue} />
       </Specimen>
 
       <Specimen
