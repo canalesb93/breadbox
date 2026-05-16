@@ -63,6 +63,7 @@ import { Badge } from "@/components/ui/badge";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
@@ -553,6 +554,40 @@ export function ComponentsSection() {
                 primary={<Button size="sm">Import 241 rows</Button>}
               />
             </div>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="SettingsSectionHeader"
+        code="components/settings-section-header"
+        description="The canonical title + description block used by every section inside the Settings shell. Top-of-pane titles (Account / Household / Backups) and inline sub-sections (Change password / Actions / Stored backups / Automatic schedule) both route through here, so the typographic rhythm — heading size + weight, description colour + line-height, action alignment — stays in one place. Tokens: `section` (h2, text-lg, baseline-aligned action) and `sub` (h3, text-sm). The optional `action` slot is sm:right-aligned and baseline-aligned to the heading so an Add-member CTA sits flush with the title."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-lg border p-5">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              section · h2 · with action
+            </div>
+            <SettingsSectionHeader
+              title="Household"
+              description="Add family members to track everyone's accounts in one place. Each member can be invited to sign in with their own login."
+              action={
+                <Button size="sm">
+                  <Plus /> Add member
+                </Button>
+              }
+            />
+          </div>
+          <div className="rounded-lg border p-5">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              sub · h3 · description only
+            </div>
+            <SettingsSectionHeader
+              level="sub"
+              title="Automatic schedule"
+              description="Backups older than the retention window are pruned at the end of each scheduled run."
+            />
           </div>
         </div>
       </Specimen>

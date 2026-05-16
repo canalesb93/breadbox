@@ -56,6 +56,7 @@ import {
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { EmptyState } from "@/components/empty-state";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 const SCHEDULE_OPTIONS = [
   { value: "off", label: "Disabled — manual only" },
@@ -74,13 +75,16 @@ export function BackupsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-medium">Backups</h2>
-        <p className="text-muted-foreground text-sm">
-          Compressed PostgreSQL dumps (<code className="font-mono text-xs">.sql.gz</code>) of the
-          household database. Restore replaces every row — handle with care.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        title="Backups"
+        description={
+          <>
+            Compressed PostgreSQL dumps (
+            <code className="font-mono text-xs">.sql.gz</code>) of the
+            household database. Restore replaces every row — handle with care.
+          </>
+        }
+      />
 
       {query.isLoading ? (
         <BackupsSkeleton />
@@ -243,12 +247,11 @@ function BackupActions({ disabled }: { disabled: boolean }) {
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="font-medium">Actions</h3>
-        <p className="text-muted-foreground text-sm">
-          Create an on-demand backup, or restore from a file you have on disk.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        level="sub"
+        title="Actions"
+        description="Create an on-demand backup, or restore from a file you have on disk."
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -358,12 +361,11 @@ function ScheduleForm({
         className="space-y-4"
         noValidate
       >
-        <div className="space-y-1">
-          <h3 className="font-medium">Automatic schedule</h3>
-          <p className="text-muted-foreground text-sm">
-            Backups older than the retention window are pruned at the end of each scheduled run.
-          </p>
-        </div>
+        <SettingsSectionHeader
+          level="sub"
+          title="Automatic schedule"
+          description="Backups older than the retention window are pruned at the end of each scheduled run."
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
           <FormField
@@ -437,12 +439,11 @@ function BackupsTable({
 }) {
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="font-medium">Stored backups</h3>
-        <p className="text-muted-foreground text-sm">
-          Newest first. Filenames carry the trigger (manual or scheduled) and a UTC timestamp.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        level="sub"
+        title="Stored backups"
+        description="Newest first. Filenames carry the trigger (manual or scheduled) and a UTC timestamp."
+      />
 
       {backups.length === 0 ? (
         <EmptyState

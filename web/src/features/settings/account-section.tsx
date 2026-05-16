@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { useMe } from "@/api/queries/me";
 import { useChangePassword } from "@/api/queries/account";
 import { withMutationToast } from "@/lib/mutation-toast";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 const schema = z
   .object({
@@ -48,12 +49,10 @@ export function AccountSection() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-medium">Account</h2>
-        <p className="text-muted-foreground text-sm">
-          Your sign-in identity. The admin role is managed by the household owner.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        title="Account"
+        description="Your sign-in identity. The admin role is managed by the household owner."
+      />
 
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Email" value={me?.username ?? "—"} />
@@ -61,12 +60,11 @@ export function AccountSection() {
       </dl>
 
       <div className="border-border space-y-4 border-t pt-6">
-        <div className="space-y-1">
-          <h3 className="font-medium">Change password</h3>
-          <p className="text-muted-foreground text-sm">
-            At least 8 characters. You'll stay signed in.
-          </p>
-        </div>
+        <SettingsSectionHeader
+          level="sub"
+          title="Change password"
+          description="At least 8 characters. You'll stay signed in."
+        />
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
