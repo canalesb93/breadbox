@@ -1073,18 +1073,41 @@ Cross-cutting components:
     can see the rail vocabulary at a glance without booting a
     transaction with annotations. Closes the iter-5 drift note.
 
+- **Iter 27 — Settings shell mobile tab strip** ([#1139](https://github.com/canalesb93/breadbox/pull/1139))
+  - The mobile sheet was rendering every section stacked vertically
+    (Account → Change password → Household with N members → Security
+    → Backups). To reach Backups you had to scroll past all of
+    Account + every household row. Now mobile renders one section at
+    a time using a horizontally-scrollable pill tab strip above the
+    section body — same vocabulary as the desktop sidebar's
+    "one section at a time" pattern, and same overflow-x-auto +
+    w-max + flex-nowrap + scrollbar-hidden trick that iter 24
+    applied to `FamilyTabs` (#1137).
+  - Active pill uses the `border-primary/30 bg-primary/10
+    text-primary` token combo that the desktop sidebar already uses
+    for active state — same active-state vocabulary across both
+    viewports of the same shell.
+  - Tightened the sheet header to `text-base` title + `text-xs`
+    description with a sticky `border-b` so the tab strip reads as
+    chrome and not as content. Removed the now-dead `mobile` prop
+    + `wrapper` `border-t pt-4 first:border-t-0` styling from
+    `SectionContent` — only one section renders at a time so the
+    inter-section divider is gone.
+  - Mobile + desktop both read from `useActiveModal`'s `section`
+    slug, so opening `/?m=settings&ms=backups` lands on the Backups
+    pane in either viewport. Closes the iter-22 mobile-audit
+    residual for `/settings/*`.
+
 ## Open observations / questions
 
 (Populated by iterations.)
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
-  + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137)).
-  Still owed: a 375x812 walk through `/settings/*` (household,
-  backups, profile sections) to catch toolbar/grid breakage before
-  promoting `design/v2-shadcn` to main. Settings shell uses its own
-  navigation pattern (`settings-shell.tsx`) so the breakage is
-  unlikely to be the same family of fixes — more likely the
-  list-then-content split rendering awkwardly at 375px.
+  + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
+  Settings shell retired in iter 27 ([#1139](https://github.com/canalesb93/breadbox/pull/1139))
+  — mobile body now uses a horizontally-scrollable pill tab strip +
+  one-section-at-a-time render, mirroring the desktop sidebar
+  pattern. Observation closed.
 - **`grow`-spacer anti-pattern on mobile** (iter 23 drift, iter 24
   swept clean): any future toolbar/header that uses
   `<div className="grow" />` to push a trailing cluster right will
