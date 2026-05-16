@@ -21,7 +21,7 @@ export function SyncHistoryList({ logs }: SyncHistoryListProps) {
         variant="inline"
         icon={RefreshCw}
         title="No sync history yet"
-        description="Each sync run will appear here with its timing and result."
+        description="Every sync run lands here — manual, scheduled, or webhook-triggered — with its timing, counts, and result."
       />
     );
   }

@@ -45,7 +45,7 @@ export function TransactionDetailPage() {
         <EmptyState
           icon={Receipt}
           title="Transaction not found"
-          description="It may have been deleted, or the link is wrong."
+          description="This transaction may have been deleted, or the link is out of date. Head back to the transactions list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/transactions">Back to transactions</Link>

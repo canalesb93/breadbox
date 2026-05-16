@@ -106,7 +106,7 @@ export function HomeConnectionsPanel({
           <EmptyState
             icon={Plug}
             title="No banks connected"
-            description="Link a bank or upload a CSV to start syncing transactions."
+            description="Link a bank via Plaid or Teller — or upload a CSV — to start the first sync."
             action={
               <Button asChild size="sm">
                 <Link to="/connections" search={{ action: "connect" }}>

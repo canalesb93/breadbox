@@ -183,8 +183,8 @@ export function RulesPage() {
           title={hasActiveFilters ? "No matching rules" : "No rules yet"}
           description={
             hasActiveFilters
-              ? "Try adjusting or clearing your filters."
-              : "Create a rule to automatically categorize, tag, or comment on transactions during sync."
+              ? "Try adjusting your filters, or clear them to see every rule."
+              : "Create a rule to automatically categorize, tag, or comment on transactions as they sync in."
           }
           action={
             <Button asChild>

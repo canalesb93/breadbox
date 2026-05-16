@@ -105,13 +105,13 @@ export function CategoriesPage() {
           <EmptyState
             icon={Shapes}
             title="Couldn't load categories"
-            description="Refresh the page or check back in a moment."
+            description="Something went wrong fetching the category tree. Refresh the page or check back in a moment."
           />
         ) : !tree || tree.length === 0 ? (
           <EmptyState
             icon={Shapes}
             title="No categories yet"
-            description="Create your first category to start organizing transactions."
+            description="Create your first category to start organizing transactions — rules and reports both key off the tree you build here."
             action={
               <Button asChild>
                 <Link to="/categories/new">

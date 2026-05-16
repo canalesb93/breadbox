@@ -198,7 +198,7 @@ export function AccountsPage() {
         <EmptyState
           icon={Banknote}
           title="No accounts yet"
-          description="Connect a bank to start syncing accounts and transactions."
+          description="Link a bank via Plaid or Teller and accounts will land here as soon as the first sync completes."
           action={
             <Button asChild>
               <Link to="/connections" search={{ action: "connect" }}>
@@ -211,7 +211,7 @@ export function AccountsPage() {
       ) : visible.length === 0 ? (
         <EmptyState
           title="No accounts for this filter"
-          description="Switch family member or clear the filter to see other accounts."
+          description="Switch family member, or clear the filter to see every account in the household."
         />
       ) : (
         <div className="flex flex-col gap-4">

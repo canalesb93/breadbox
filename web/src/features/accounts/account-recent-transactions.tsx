@@ -47,7 +47,7 @@ export function AccountRecentTransactions({
       empty={
         <EmptyState
           title="No transactions yet"
-          description="They appear after the first sync."
+          description="Transactions for this account will land here after the first successful sync."
           className="py-10"
         />
       }

@@ -210,7 +210,7 @@ export function ConnectionDetailPage() {
         <EmptyState
           icon={Plug}
           title="Connection not found"
-          description="It may have been disconnected, or the link is wrong."
+          description="This connection may have been removed, or the link is out of date. Head back to the connections list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/connections">Back to connections</Link>

@@ -434,8 +434,8 @@ export function TransactionsPage() {
             }
             description={
               hasActiveFilters
-                ? "Adjust or clear your filters to see more results."
-                : "Once a connected account finishes syncing, transactions will land here."
+                ? "Try adjusting your filters, or clear them to see every transaction."
+                : "Once a connected account finishes syncing, transactions will land here — usually within a minute."
             }
             action={
               hasActiveFilters ? undefined : (

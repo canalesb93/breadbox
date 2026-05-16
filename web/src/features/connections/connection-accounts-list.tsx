@@ -24,7 +24,7 @@ export function ConnectionAccountsList({ accounts }: ConnectionAccountsListProps
         variant="inline"
         icon={Wallet}
         title="No accounts yet"
-        description="Accounts will appear here after the first successful sync."
+        description="Accounts will land here after the first successful sync — usually within a minute of connecting."
       />
     );
   }

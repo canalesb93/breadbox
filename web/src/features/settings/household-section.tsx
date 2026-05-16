@@ -103,7 +103,7 @@ export function HouseholdSection() {
           variant="card"
           icon={Users}
           title="No family members yet"
-          description="Add members to connect their banks and attribute transactions by person."
+          description="Add a member to give each person their own connections and attribute transactions across the household."
         />
       ) : (
         <ul className="space-y-3">

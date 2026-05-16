@@ -32,7 +32,7 @@ export function TagDetailPage() {
         <EmptyState
           icon={TagsIcon}
           title="Tag not found"
-          description="It may have been deleted, or the link is wrong."
+          description="This tag may have been deleted, or the link is out of date. Head back to the tags list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/tags">Back to tags</Link>
