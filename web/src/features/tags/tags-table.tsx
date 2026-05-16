@@ -60,6 +60,7 @@ export function TagsTable({
       {
         id: "tag",
         header: "Tag",
+        meta: { className: "w-[28%]" },
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
             <TagChip tag={row.original} />
@@ -69,9 +70,12 @@ export function TagsTable({
       {
         id: "slug",
         header: "Slug",
-        meta: { className: "hidden md:table-cell" },
+        meta: { className: "hidden w-[22%] md:table-cell" },
         cell: ({ row }) => (
-          <code className="text-muted-foreground text-xs">
+          // Render the slug as a faint mono pill — it visually reads as a
+          // machine identifier (used in the API + rule DSL) without competing
+          // with the human-facing display name in the Tag column.
+          <code className="bg-muted/60 text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">
             {row.original.slug}
           </code>
         ),
@@ -154,6 +158,11 @@ export function TagsTable({
           navigate({ to: "/tags/$slug", params: { slug: t.slug } })
         }
         emptyState={emptyState}
+        // Validates the iter-3 DataTable abstraction on a second list:
+        // tag pages tend to grow long and benefit from the same column
+        // band + uppercase vocabulary as the Transactions list.
+        stickyHeader
+        refinedHeader
       />
 
       <Dialog
