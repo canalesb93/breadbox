@@ -64,6 +64,15 @@ export function CommandPalette() {
     global: true,
   });
 
+  // Topbar search affordance fires this event — keeps the palette as the
+  // sole source of open state without exposing a global store.
+  React.useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("breadbox:command-palette:open", onOpen);
+    return () =>
+      window.removeEventListener("breadbox:command-palette:open", onOpen);
+  }, []);
+
   const go = (to: string) => {
     setOpen(false);
     navigate({ to });

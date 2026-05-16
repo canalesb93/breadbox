@@ -85,8 +85,11 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
   if (desktop) {
     return (
       <div className="flex h-full">
-        <nav className="bg-muted/40 w-56 shrink-0 border-r p-2">
-          <ul className="space-y-1">
+        <nav className="bg-muted/40 w-56 shrink-0 border-r p-3">
+          <p className="text-muted-foreground/80 mb-2 px-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
+            Settings
+          </p>
+          <ul className="space-y-0.5">
             {SETTINGS_SECTIONS.map((s) => {
               const Icon = s.icon;
               const isActive = s.slug === active.slug;
@@ -95,14 +98,17 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                   <button
                     type="button"
                     onClick={() => onSelect(s.slug)}
+                    data-active={isActive ? "true" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                      "group relative flex w-full items-center gap-2 rounded-md py-2 pr-3 pl-3.5 text-left text-sm transition-colors",
+                      "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r-full before:bg-transparent before:transition-all",
+                      "[&>svg]:size-4 [&>svg]:text-muted-foreground",
                       isActive
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent/50",
+                        ? "bg-accent text-accent-foreground before:bg-primary before:inset-y-1 [&>svg]:text-primary"
+                        : "hover:bg-accent/60",
                     )}
                   >
-                    <Icon className="size-4" />
+                    <Icon />
                     <span>{s.title}</span>
                   </button>
                 </li>

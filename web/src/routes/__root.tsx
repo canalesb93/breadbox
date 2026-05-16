@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { SettingsShell } from "@/components/settings-shell";
@@ -11,6 +11,14 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Toaster } from "@/components/ui/sonner";
 import { NAV_LEAVES, isNavMatch } from "@/lib/nav";
 import { useMe } from "@/api/queries/me";
@@ -104,17 +112,30 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
           horizontally-scrolling table) grows the inset past the viewport
           instead of letting the page's own overflow container scroll. */}
       <SidebarInset className="min-w-0">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b">
-          <div className="flex items-center gap-2 px-4">
+        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b backdrop-blur">
+          <div className="flex w-full items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            {group && (
-              <>
-                <span className="text-muted-foreground text-sm">{group}</span>
-                <span className="text-muted-foreground text-sm">/</span>
-              </>
-            )}
-            <span className="text-sm font-medium">{title}</span>
+            <Separator orientation="vertical" className="mr-1 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                {group && (
+                  <>
+                    <BreadcrumbItem className="hidden md:inline-flex">
+                      <span className="text-muted-foreground">{group}</span>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator className="hidden md:inline-flex" />
+                  </>
+                )}
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-foreground font-medium">
+                    {title}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <div className="ml-auto flex items-center gap-2">
+              <CommandPaletteTrigger />
+            </div>
           </div>
         </header>
         <main className="min-w-0 flex-1 p-3 sm:p-6">
@@ -126,5 +147,32 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
       <SettingsShell />
       <Toaster />
     </SidebarProvider>
+  );
+}
+
+// Topbar pill that mirrors the command palette's purpose: tap or press
+// ⌘K. The visual is intentionally search-input-ish (faded text, leading
+// icon, trailing kbd hint) so it advertises the shortcut to first-time
+// users without consuming a discrete keyboard control.
+function CommandPaletteTrigger() {
+  const open = () =>
+    window.dispatchEvent(new CustomEvent("breadbox:command-palette:open"));
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      className="text-muted-foreground hover:text-foreground hover:border-ring focus-visible:ring-ring/40 inline-flex h-8 items-center gap-2 rounded-md border bg-transparent px-2.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none sm:min-w-56"
+      aria-label="Open command palette"
+    >
+      <Search className="size-3.5 shrink-0" aria-hidden />
+      <span className="hidden flex-1 text-left sm:inline">
+        Search or jump to…
+      </span>
+      <KbdGroup className="ml-auto hidden sm:inline-flex">
+        <Kbd className="bg-muted/60">⌘</Kbd>
+        <Kbd className="bg-muted/60">K</Kbd>
+      </KbdGroup>
+    </button>
   );
 }
