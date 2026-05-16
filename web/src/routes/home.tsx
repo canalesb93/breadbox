@@ -11,6 +11,7 @@ import { relativeTime } from "@/features/connections/connection-utils";
 import { HomeStats } from "@/features/home/home-stats";
 import { HomeRecentTransactions } from "@/features/home/home-recent-transactions";
 import { HomeConnectionsPanel } from "@/features/home/home-connections-panel";
+import { HomeAttentionPanel } from "@/features/home/home-attention-panel";
 
 // Greeting strips the email domain so "admin@example.com" reads as "admin".
 // Username can already be a display name on real installs, in which case it
@@ -77,6 +78,8 @@ export function HomePage() {
           </>
         }
       />
+
+      <HomeAttentionPanel connections={connectionsQuery.data} />
 
       <HomeStats
         accounts={accountsQuery.data}
