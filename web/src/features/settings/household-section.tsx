@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   Link2,
+  Loader2,
   MoreVertical,
   RefreshCw,
   Trash2,
@@ -497,6 +498,7 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
+              {submitting && <Loader2 className="size-4 animate-spin" />}
               {submitting ? "Adding…" : "Add member"}
             </Button>
           </DialogFooter>
@@ -606,6 +608,7 @@ function CreateLoginDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={createLogin.isPending}>
+              {createLogin.isPending && <Loader2 className="size-4 animate-spin" />}
               {createLogin.isPending ? "Creating…" : "Create login"}
             </Button>
           </DialogFooter>

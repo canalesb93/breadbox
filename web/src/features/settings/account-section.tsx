@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -108,6 +109,7 @@ export function AccountSection() {
               )}
             />
             <Button type="submit" disabled={changePassword.isPending}>
+              {changePassword.isPending && <Loader2 className="size-4 animate-spin" />}
               {changePassword.isPending ? "Updating…" : "Update password"}
             </Button>
           </form>

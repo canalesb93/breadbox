@@ -418,6 +418,7 @@ function ScheduleForm({
         </div>
 
         <Button type="submit" disabled={save.isPending}>
+          {save.isPending && <Loader2 className="size-4 animate-spin" />}
           {save.isPending ? "Saving…" : "Save schedule"}
         </Button>
       </form>

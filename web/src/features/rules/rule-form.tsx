@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useFieldArray, useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AlertCircle, AlertTriangle, ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Plus, Save, Wand2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Loader2, Plus, Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -656,7 +656,11 @@ export function RuleForm({
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              <Save className="size-4" />
+              {submitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
               {submitting ? "Saving…" : submitLabel}
             </Button>
           </div>
