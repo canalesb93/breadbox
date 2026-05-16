@@ -34,6 +34,7 @@ import {
   useDeleteCategory,
 } from "@/api/queries/categories";
 import { useTransactionCount } from "@/api/queries/transactions";
+import { formatLongDate } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/api/types";
@@ -340,7 +341,7 @@ function DetailsCard({
     category.created_at
       ? {
           label: "Created",
-          value: new Date(category.created_at).toLocaleDateString(),
+          value: formatLongDate(category.created_at.slice(0, 10)),
         }
       : null,
   ]);

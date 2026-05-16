@@ -9,7 +9,9 @@ import { useShortcut } from "@/lib/shortcuts";
 import { displayKey } from "@/lib/kbd-display";
 import {
   formatDate,
+  formatDateTime,
   formatLongDate,
+  formatRelativeShort,
   formatRelativeTime,
 } from "@/lib/format";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -30,6 +32,11 @@ const FORMATTERS: { code: string; input: string; output: string }[] = [
     output: formatLongDate("2026-05-13"),
   },
   {
+    code: "formatDateTime(…)",
+    input: "RFC3339 timestamp",
+    output: formatDateTime(new Date().toISOString()),
+  },
+  {
     code: "formatRelativeTime(…-3h)",
     input: "3 hours ago",
     output: formatRelativeTime(new Date(Date.now() - 3 * 3600_000).toISOString()),
@@ -40,6 +47,25 @@ const FORMATTERS: { code: string; input: string; output: string }[] = [
     output: formatRelativeTime(
       new Date(Date.now() - 8 * 86_400_000).toISOString(),
     ),
+  },
+  {
+    code: "formatRelativeShort(…-12m)",
+    input: "12 minutes ago",
+    output: formatRelativeShort(
+      new Date(Date.now() - 12 * 60_000).toISOString(),
+    ),
+  },
+  {
+    code: "formatRelativeShort(…-5d)",
+    input: "5 days ago",
+    output: formatRelativeShort(
+      new Date(Date.now() - 5 * 86_400_000).toISOString(),
+    ),
+  },
+  {
+    code: "formatRelativeShort(null)",
+    input: "null",
+    output: formatRelativeShort(null),
   },
 ];
 
@@ -176,7 +202,7 @@ export function PatternsSection() {
       <Specimen
         label="Date formatters"
         code="lib/format"
-        description="Cached Intl instances — short and long dates, relative time. Amount formatting lives in the Amounts section."
+        description="Cached Intl instances — short, long and date+time renders, plus two relative variants. Use long form (formatRelativeTime) in body copy / tooltips; compact form (formatRelativeShort) in dense lists and pills. Amount formatting lives in the Amounts section."
         className="block"
       >
         <div className="grid gap-2 sm:grid-cols-2">

@@ -90,6 +90,19 @@ export function formatLongDate(date: string): string {
   return Number.isNaN(d.getTime()) ? date : longDateFormatter.format(d);
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+// formatDateTime renders an RFC3339 timestamp as e.g. "Jan 2, 2026, 3:45 PM".
+// Use for "last updated" / "created at" rows where the time-of-day matters.
+// Returns the input unchanged if it isn't a parseable date.
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : dateTimeFormatter.format(d);
+}
+
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("en-US", {
   numeric: "auto",
 });
@@ -105,6 +118,8 @@ const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 
 // formatRelativeTime renders an RFC3339 timestamp as e.g. "3 hours ago" or
 // "in 2 days"; returns the input unchanged if it isn't a parseable date.
+// Long form — use in body copy and tooltips. For compact pills/badges, use
+// `formatRelativeShort`.
 export function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return iso;
@@ -116,4 +131,28 @@ export function formatRelativeTime(iso: string): string {
     }
   }
   return relativeTimeFormatter.format(Math.round(diffSec), "second");
+}
+
+// formatRelativeShort renders an RFC3339 timestamp as a compact "12m ago" /
+// "3h ago" / "5d ago" — the dense form for connection rows, sync history,
+// and other surfaces where the long form ("12 minutes ago") would crowd
+// the layout. Falls back to an ISO date past 30 days, and returns "never"
+// when the input is null. Mirrors the v1 LastSyncedAtRelative shape.
+export function formatRelativeShort(
+  iso: string | null,
+  now: Date = new Date(),
+): string {
+  if (!iso) return "never";
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return iso;
+  const diffSec = Math.floor((now.getTime() - then.getTime()) / 1000);
+  if (diffSec < 30) return "just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return then.toISOString().slice(0, 10);
 }

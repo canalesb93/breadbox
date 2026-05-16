@@ -53,6 +53,7 @@ import {
   type BackupRow,
   type BackupStatus,
 } from "@/api/queries/backups";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { EmptyState } from "@/components/empty-state";
 
@@ -624,25 +625,9 @@ function BackupsSkeleton() {
 }
 
 function RelativeTime({ iso }: { iso: string }) {
-  const date = new Date(iso);
-  const label = formatRelative(date);
   return (
-    <time dateTime={iso} title={date.toLocaleString()}>
-      {label}
+    <time dateTime={iso} title={formatDateTime(iso)}>
+      {formatRelativeTime(iso)}
     </time>
   );
-}
-
-function formatRelative(date: Date): string {
-  const diffMs = date.getTime() - Date.now();
-  const diffSec = Math.round(diffMs / 1000);
-  const abs = Math.abs(diffSec);
-  const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (abs < 60) return fmt.format(diffSec, "second");
-  if (abs < 3600) return fmt.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86_400) return fmt.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 2_592_000) return fmt.format(Math.round(diffSec / 86_400), "day");
-  if (abs < 31_536_000)
-    return fmt.format(Math.round(diffSec / 2_592_000), "month");
-  return fmt.format(Math.round(diffSec / 31_536_000), "year");
 }
