@@ -392,7 +392,17 @@ Cross-cutting components:
   hand-rolled empties retired onto the primitive (household-section,
   backups-section, connection-accounts-list, sync-history-list).
 - [x] `command-palette.tsx` — sections, kbd hints, recents — #1130
-- [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
+- [x] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes —
+  iter 50 (#1164) shipped a shared `size` prop (`sm` | `md`) on
+  `CategoryBadge`, `TagChip`, and `TagList` (recipe: sm = h-5 / 11px /
+  size-2.5 icon; md = h-6 / 12px / size-3 icon) so chip + badge align
+  in the same row. Transactions table inline trigger
+  (`CategoryPicker`) and `TransactionPrimary` tag rail use `sm` for
+  density parity; the dashed empty-state pill mirrors the sm geometry
+  so the column doesn't shift. Retired the local `TagChip` fork in
+  `features/rules/rule-display.tsx`. The shared SIZE recipe lives
+  inline in both files — adjust as a pair if the density vocabulary
+  shifts.
 - [ ] `transaction-amount.tsx` — currency rendering
 - [x] Form patterns (used across new/edit pages) — `FormFooter` primitive
   promoted in iter 15 (#1128); api-key-form swept onto it in iter 43
@@ -1830,6 +1840,61 @@ Cross-cutting components:
     the feature a local helper. The padding scale of the host
     is the variant axis, not the visual contract.
 
+- **Iter 50 — CategoryBadge + TagChip size tokens; rule-display fork retired** ([#1164](https://github.com/canalesb93/breadbox/pull/1164))
+  - Closes the cross-cutting backlog item
+    `category-badge.tsx / tag-chip.tsx — colour tokens, sizes` that
+    had been open since iter 1. Both primitives gain a `size` prop
+    (`sm` | `md`, default `md`) with a *shared* per-size recipe
+    inline in both files:
+    - `sm`: `h-5 px-1.5 text-[11px] gap-0.5 [&>svg]:size-2.5`
+    - `md`: `h-6 px-2 text-xs gap-1 [&>svg]:size-3`
+    A `CategoryBadge size="sm"` and a `TagChip size="sm"` are now
+    pixel-aligned when they sit side-by-side in a transaction row.
+  - `TagList` forwards the size to each chip *and* to the `+N`
+    overflow badge so dense rows don't fork halfway through.
+  - **Live consumers updated**:
+    - `CategoryPicker` (transactions-table inline trigger) uses
+      `size="sm"`. Its uncategorised dashed pill recipe was rebuilt
+      to mirror the sm geometry (h-5 / text-[11px] / px-1.5 /
+      Plus size-2.5) so the column doesn't shift when a row toggles
+      between "Category" empty state and a real category.
+    - `TransactionPrimary`'s tag rail (sm+ inline list in the
+      table) passes `size="sm"` to TagList.
+    - `tag-manager.tsx` (detail page editor) keeps `md` — the
+      single-transaction tag editor sits in a wider surface where
+      the chip is the primary affordance.
+    - `tags-table.tsx`'s Tag column keeps `md` — list pages are
+      less dense than the transactions table; the chip *is* the
+      identity column there.
+  - **Drift retired**: `features/rules/rule-display.tsx` carried
+    a local `TagChip` helper (15 LOC) that ignored the tag's color,
+    duplicated a `<TagIcon>` next to the label, and used the stock
+    md geometry. Replaced with the shared `<TagChip tag={…} size="sm"
+    className="align-middle" />` (wrapped as `RuleTagChip` so the
+    lookup-by-slug behaviour stays local). Rule actions now read
+    with the same color tinting as every other tag rendering in
+    the SPA, and the redundant trailing icon is gone.
+  - **Sandbox**: rebuilt both specimens to show `md` and `sm`
+    side-by-side with uppercase Eyebrow labels, plus a `TagList`
+    `md + sm` pair so the overflow badge geometry is visible in
+    both sizes. Future dark-mode / density sweeps catch both rows
+    automatically — the iter 45-47 pattern of "specimen the size
+    matrix so it's not invisible to grep" is upheld.
+  - **TagChip a11y nudge**: the inline remove button gains
+    `focus-visible:ring-ring/50 focus-visible:ring-[3px]
+    focus-visible:outline-none` — previously the rounded-full
+    button had no focus ring at all, so keyboard users had no way
+    to see which `×` was selected before pressing Enter. Same
+    vocabulary as the shadcn `Badge` focus ring.
+  - **Pattern for the next time this comes up**: when two
+    primitives serve the same row context (here: badge for category,
+    chip for tag) and share a host density, they should share a
+    *named* size recipe — `SIZE.sm` / `SIZE.md` literally typed out
+    in both files, not "size-3" guesses each consumer makes. The
+    recipe doesn't need a separate utility yet (only two consumers),
+    but it's grep-able so the third surface that grows a size
+    variant has an obvious template to copy.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1936,6 +2001,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
