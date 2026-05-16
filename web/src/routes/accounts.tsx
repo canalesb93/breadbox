@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { Banknote, Building2, Layers, Loader2, Plus } from "lucide-react";
+import { Banknote, Building2, Layers, Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ToggleGroup,
@@ -13,10 +15,12 @@ import {
 import { useAccounts } from "@/api/queries/accounts";
 import { useUsers } from "@/api/queries/users";
 import { FamilyTabs } from "@/features/connections/family-tabs";
-import { AccountCard } from "@/features/accounts/account-card";
+import { AccountRow } from "@/features/accounts/account-row";
 import { AccountsSummary } from "@/features/accounts/accounts-summary";
 import {
+  formatCurrency,
   groupAccounts,
+  groupNetTotal,
   type AccountGroupBy,
 } from "@/features/accounts/account-utils";
 
@@ -102,9 +106,23 @@ export function AccountsPage() {
   const accounts = accountsQuery.data ?? [];
   const totalCount = accounts.length;
 
+  // Eyebrow matches the vocabulary of the other v2 list pages (Connections,
+  // Tags, Categories, Transactions): one short string per state, "Showing N
+  // of M" only when filtering narrows the view.
+  const eyebrow = isLoading
+    ? "Loading"
+    : isError
+      ? "Error loading"
+      : totalCount === 0
+        ? "No accounts yet"
+        : visible.length === totalCount
+          ? `${totalCount} ${totalCount === 1 ? "account" : "accounts"}`
+          : `Showing ${visible.length} of ${totalCount}`;
+
   return (
-    <>
+    <div className="flex flex-col gap-5">
       <PageHeader
+        eyebrow={eyebrow}
         title="Accounts"
         description="Every bank account, credit card, loan, and investment Breadbox has synced. Click an account to edit, exclude, or link it."
         actions={
@@ -119,26 +137,20 @@ export function AccountsPage() {
         }
       />
 
-      {accounts.length > 0 && (
-        <div className="-mt-4 mb-4">
-          <AccountsSummary accounts={visible} />
-        </div>
+      {accounts.length > 0 && <AccountsSummary accounts={visible} />}
+
+      {(usersQuery.data?.length ?? 0) > 1 && (
+        <FamilyTabs
+          users={usersQuery.data ?? []}
+          value={userFilter}
+          onChange={setUserFilter}
+          counts={countsByUserShortId}
+          totalCount={totalCount}
+        />
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        {(usersQuery.data?.length ?? 0) > 1 ? (
-          <FamilyTabs
-            users={usersQuery.data ?? []}
-            value={userFilter}
-            onChange={setUserFilter}
-            counts={countsByUserShortId}
-            totalCount={totalCount}
-          />
-        ) : (
-          <div />
-        )}
-
-        {accounts.length > 0 && (
+      {accounts.length > 0 && (
+        <div className="flex items-center justify-end">
           <ToggleGroup
             type="single"
             size="sm"
@@ -153,13 +165,27 @@ export function AccountsPage() {
               <Layers className="size-3.5" /> Type
             </ToggleGroupItem>
           </ToggleGroup>
-        )}
-      </div>
+        </div>
+      )}
 
       {isLoading ? (
-        <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
-          <Loader2 className="size-4 animate-spin" /> Loading accounts…
-        </div>
+        <ListCard
+          rows={[0, 1, 2, 3]}
+          getRowKey={(i) => i}
+          renderRow={(i) => (
+            <div className="flex items-center gap-4 px-5 py-3.5" key={i}>
+              <Skeleton className="size-10 rounded-lg" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <div className="space-y-1.5 text-right">
+                <Skeleton className="ml-auto h-3.5 w-20" />
+                <Skeleton className="ml-auto h-3 w-8" />
+              </div>
+            </div>
+          )}
+        />
       ) : isError ? (
         <Alert variant="destructive">
           <AlertTitle>Couldn't load accounts</AlertTitle>
@@ -189,26 +215,33 @@ export function AccountsPage() {
           description="Switch family member or clear the filter to see other accounts."
         />
       ) : (
-        <div className="space-y-6">
-          {groups.map((g) => (
-            <section key={g.key} className="space-y-2">
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                  {g.label}
-                </h2>
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {g.accounts.length}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {g.accounts.map((a) => (
-                  <AccountCard key={a.id} account={a} />
-                ))}
-              </div>
-            </section>
-          ))}
+        <div className="flex flex-col gap-4">
+          {groups.map((g) => {
+            const totals = groupNetTotal(g.accounts);
+            return (
+              <ListCard
+                key={g.key}
+                title={g.label}
+                rows={g.accounts}
+                getRowKey={(a) => a.id}
+                renderRow={(a) => <AccountRow account={a} />}
+                action={
+                  <div className="flex items-center gap-3">
+                    {totals.currency != null && (
+                      <span className="text-sm font-medium tabular-nums whitespace-nowrap">
+                        {formatCurrency(totals.total, totals.currency)}
+                      </span>
+                    )}
+                    <span className="bg-muted text-muted-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums">
+                      {g.accounts.length}
+                    </span>
+                  </div>
+                }
+              />
+            );
+          })}
         </div>
       )}
-    </>
+    </div>
   );
 }

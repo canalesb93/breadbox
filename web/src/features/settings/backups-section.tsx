@@ -14,16 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +54,7 @@ import {
   type BackupStatus,
 } from "@/api/queries/backups";
 import { withMutationToast } from "@/lib/mutation-toast";
+import { EmptyState } from "@/components/empty-state";
 
 const SCHEDULE_OPTIONS = [
   { value: "off", label: "Disabled — manual only" },
@@ -238,11 +230,13 @@ function BackupActions({ disabled }: { disabled: boolean }) {
   const confirmUpload = async () => {
     if (!pendingUpload) return;
     const file = pendingUpload;
-    setPendingUpload(null);
-    await withMutationToast(() => upload.mutateAsync(file), {
+    const ok = await withMutationToast(() => upload.mutateAsync(file), {
       success: "Restored from uploaded backup. Restart the server to be safe.",
     });
-    if (fileInput.current) fileInput.current.value = "";
+    if (ok) {
+      setPendingUpload(null);
+      if (fileInput.current) fileInput.current.value = "";
+    }
   };
 
   return (
@@ -293,18 +287,24 @@ function BackupActions({ disabled }: { disabled: boolean }) {
         />
       </div>
 
-      <ConfirmRestoreDialog
+      <ConfirmDialog
+        open={!!pendingUpload}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingUpload(null);
+            if (fileInput.current) fileInput.current.value = "";
+          }
+        }}
+        icon={Upload}
         title="Restore from uploaded file?"
         description={
           pendingUpload
             ? `This will OVERWRITE the current database with the contents of ${pendingUpload.name}. The action runs in a single transaction and rolls back on error, but on success the existing rows are gone.`
             : ""
         }
-        open={!!pendingUpload}
-        onCancel={() => {
-          setPendingUpload(null);
-          if (fileInput.current) fileInput.current.value = "";
-        }}
+        confirmLabel="Restore"
+        pendingLabel="Restoring…"
+        pending={upload.isPending}
         onConfirm={confirmUpload}
       />
     </div>
@@ -442,12 +442,12 @@ function BackupsTable({
       </div>
 
       {backups.length === 0 ? (
-        <div className="border-border rounded-md border border-dashed p-8 text-center">
-          <CheckCircle2 className="text-muted-foreground mx-auto mb-2 size-5" />
-          <p className="text-muted-foreground text-sm">
-            No backups yet. Create one above or set a schedule.
-          </p>
-        </div>
+        <EmptyState
+          variant="card"
+          icon={HardDrive}
+          title="No backups yet"
+          description="Create one above or set a schedule to start a regular cadence."
+        />
       ) : (
         <div className="border-border overflow-hidden rounded-md border">
           <ul className="divide-border divide-y">
@@ -477,17 +477,17 @@ function BackupRowItem({
   const [confirm, setConfirm] = useState<"restore" | "delete" | null>(null);
 
   const runRestore = async () => {
-    setConfirm(null);
-    await withMutationToast(() => restore.mutateAsync(row.filename), {
+    const ok = await withMutationToast(() => restore.mutateAsync(row.filename), {
       success: `Restored from ${row.filename}. Restart the server to be safe.`,
     });
+    if (ok) setConfirm(null);
   };
 
   const runDelete = async () => {
-    setConfirm(null);
-    await withMutationToast(() => del.mutateAsync(row.filename), {
+    const ok = await withMutationToast(() => del.mutateAsync(row.filename), {
       success: `Deleted ${row.filename}.`,
     });
+    if (ok) setConfirm(null);
   };
 
   const busy = restore.isPending || del.isPending;
@@ -570,86 +570,42 @@ function BackupRowItem({
         </div>
       </TooltipProvider>
 
-      <ConfirmRestoreDialog
+      <ConfirmDialog
+        open={confirm === "restore"}
+        onOpenChange={(open) => {
+          if (!open) setConfirm(null);
+        }}
+        icon={RotateCcw}
         title="Restore this backup?"
         description={`This will OVERWRITE the current database with the contents of ${row.filename}. The action runs in a single transaction and rolls back on error, but on success the existing rows are gone.`}
-        open={confirm === "restore"}
-        onCancel={() => setConfirm(null)}
+        confirmLabel="Restore"
+        pendingLabel="Restoring…"
+        pending={restore.isPending}
         onConfirm={runRestore}
       />
 
-      <ConfirmDeleteDialog
-        filename={row.filename}
+      <ConfirmDialog
         open={confirm === "delete"}
-        onCancel={() => setConfirm(null)}
+        onOpenChange={(open) => {
+          if (!open) setConfirm(null);
+        }}
+        icon={Trash2}
+        title="Delete backup?"
+        description="This file will be removed from disk. This cannot be undone."
+        body={
+          <p className="bg-muted/60 text-foreground rounded-md border px-2 py-1 font-mono text-xs">
+            {row.filename}
+          </p>
+        }
+        confirmLabel="Delete backup"
+        pendingLabel="Deleting…"
+        pending={del.isPending}
         onConfirm={runDelete}
       />
     </li>
   );
 }
 
-function ConfirmRestoreDialog({
-  title,
-  description,
-  open,
-  onCancel,
-  onConfirm,
-}: {
-  title: string;
-  description: string;
-  open: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onConfirm}>
-            Restore
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function ConfirmDeleteDialog({
-  filename,
-  open,
-  onCancel,
-  onConfirm,
-}: {
-  filename: string;
-  open: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete backup?</AlertDialogTitle>
-          <AlertDialogDescription>
-            <span className="font-mono text-xs">{filename}</span> will be removed from disk. This
-            cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onConfirm}>
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
 
 function BackupsSkeleton() {
   return (

@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { withMutationToast } from "@/lib/mutation-toast";
+import { cn } from "@/lib/utils";
 import {
   useDisconnectConnection,
   usePauseConnection,
@@ -90,11 +91,17 @@ export function ConnectionRow({
 
   return (
     <div
-      className={`bg-card overflow-hidden rounded-lg border transition-colors ${
-        selected ? "border-primary/60 ring-primary/20 ring-2" : ""
-      }`}
+      className={cn(
+        "group transition-colors",
+        selected && "bg-primary/5",
+      )}
     >
-      <div className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
+      <div
+        className={cn(
+          "hover:bg-muted/40 flex items-center gap-3 px-5 py-3.5 transition-colors sm:gap-4",
+          selected && "hover:bg-primary/5",
+        )}
+      >
         {onSelectChange && (
           // Wrapper stops the click from bubbling to the surrounding Link, so
           // toggling selection never navigates to the detail page. The label
@@ -116,12 +123,22 @@ export function ConnectionRow({
           className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4"
           aria-label={`Open ${connection.institution_name ?? "connection"} detail`}
         >
-          <div className="bg-muted hidden size-10 shrink-0 items-center justify-center rounded-lg sm:flex">
-            <Icon className="text-muted-foreground size-5" />
+          <div
+            className={cn(
+              "bg-muted/40 hidden size-9 shrink-0 items-center justify-center rounded-md border sm:flex",
+              showReauthBanner && "bg-amber-500/10 border-amber-500/30",
+            )}
+          >
+            <Icon
+              className={cn(
+                "text-muted-foreground size-4",
+                showReauthBanner && "text-amber-700 dark:text-amber-400",
+              )}
+            />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-sm font-semibold sm:text-base">
+              <h3 className="truncate text-sm font-semibold">
                 {connection.institution_name ?? "Untitled connection"}
               </h3>
               <ConnectionStatusBadge status={connection.status} />
@@ -147,7 +164,7 @@ export function ConnectionRow({
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <div className="text-right">
             {balance ? (
-              <div className="text-sm font-semibold tabular-nums sm:text-base">
+              <div className="text-sm font-semibold tabular-nums">
                 {formatCurrency(balance.amount, balance.currency)}
               </div>
             ) : null}
@@ -161,7 +178,7 @@ export function ConnectionRow({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-full"
+                className="text-muted-foreground hover:text-foreground size-8"
                 aria-label="Connection actions"
               >
                 <MoreHorizontal className="size-4" />

@@ -215,7 +215,9 @@ export function ConnectBankSheet({
     setCreateError(null);
     try {
       const result = await createConnection.mutateAsync(payload);
-      toast.success(`Connected ${result.institution_name}.`);
+      toast.success(`Connected ${result.institution_name}.`, {
+        description: "Initial sync queued — accounts and transactions will appear shortly.",
+      });
       handleSheetChange(false);
       navigate({
         to: "/connections/$id",
@@ -338,6 +340,11 @@ export function ConnectBankSheet({
                 result.appended
                   ? `Imported ${result.imported} more transactions.`
                   : `Imported ${result.imported} transactions.`,
+                {
+                  description: result.appended
+                    ? "Appended to the existing connection — new rows will appear after re-categorisation."
+                    : "Connection created. Categorise or apply rules to enrich the new rows.",
+                },
               );
               handleSheetChange(false);
               if (!result.appended) {

@@ -64,10 +64,15 @@ export function SettingsShell() {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[92dvh] p-0">
-        <SheetHeader>
-          <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>Manage your account and app preferences.</SheetDescription>
+      <SheetContent
+        side="bottom"
+        className="flex h-[92dvh] flex-col gap-0 p-0"
+      >
+        <SheetHeader className="border-b px-4 pt-5 pb-3">
+          <SheetTitle className="text-base">Settings</SheetTitle>
+          <SheetDescription className="text-xs">
+            Manage your account and app preferences.
+          </SheetDescription>
         </SheetHeader>
         {body}
       </SheetContent>
@@ -85,8 +90,11 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
   if (desktop) {
     return (
       <div className="flex h-full">
-        <nav className="bg-muted/40 w-56 shrink-0 border-r p-2">
-          <ul className="space-y-1">
+        <nav className="bg-muted/40 w-56 shrink-0 border-r p-3">
+          <p className="text-muted-foreground/80 mb-2 px-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
+            Settings
+          </p>
+          <ul className="space-y-0.5">
             {SETTINGS_SECTIONS.map((s) => {
               const Icon = s.icon;
               const isActive = s.slug === active.slug;
@@ -95,14 +103,17 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                   <button
                     type="button"
                     onClick={() => onSelect(s.slug)}
+                    data-active={isActive ? "true" : undefined}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                      "group relative flex w-full items-center gap-2 rounded-md py-2 pr-3 pl-3.5 text-left text-sm transition-colors",
+                      "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r-full before:bg-transparent before:transition-all",
+                      "[&>svg]:size-4 [&>svg]:text-muted-foreground",
                       isActive
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent/50",
+                        ? "bg-accent text-accent-foreground before:bg-primary before:inset-y-1 [&>svg]:text-primary"
+                        : "hover:bg-accent/60",
                     )}
                   >
-                    <Icon className="size-4" />
+                    <Icon />
                     <span>{s.title}</span>
                   </button>
                 </li>
@@ -118,51 +129,61 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
   }
 
   return (
-    <div className="space-y-6 overflow-y-auto p-4">
-      {SETTINGS_SECTIONS.map((s) => (
-        <SectionContent key={s.slug} section={s} mobile />
-      ))}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <nav
+        aria-label="Settings sections"
+        className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 -mx-px border-b px-2 backdrop-blur"
+      >
+        <ul
+          className="-mx-2 flex w-max flex-nowrap items-center gap-1 overflow-x-auto px-2 py-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {SETTINGS_SECTIONS.map((s) => {
+            const Icon = s.icon;
+            const isActive = s.slug === active.slug;
+            return (
+              <li key={s.slug}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(s.slug)}
+                  data-active={isActive ? "true" : undefined}
+                  className={cn(
+                    "group flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                    "[&>svg]:size-3.5",
+                    isActive
+                      ? "border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary"
+                      : "border-border bg-card text-muted-foreground hover:bg-accent/60 hover:text-foreground [&>svg]:text-muted-foreground",
+                  )}
+                >
+                  <Icon />
+                  <span>{s.title}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <section className="flex-1 overflow-y-auto p-4">
+        <SectionContent section={active} />
+      </section>
     </div>
   );
 }
 
-function SectionContent({
-  section,
-  mobile = false,
-}: {
-  section: SettingsSection;
-  mobile?: boolean;
-}) {
-  const wrapper = mobile
-    ? "border-border border-t pt-4 first:border-t-0 first:pt-0"
-    : "";
-
+function SectionContent({ section }: { section: SettingsSection }) {
   if (section.slug === "account") {
-    return (
-      <div className={wrapper}>
-        <AccountSection />
-      </div>
-    );
+    return <AccountSection />;
   }
 
   if (section.slug === "household") {
-    return (
-      <div className={wrapper}>
-        <HouseholdSection />
-      </div>
-    );
+    return <HouseholdSection />;
   }
 
   if (section.slug === "backups") {
-    return (
-      <div className={wrapper}>
-        <BackupsSection />
-      </div>
-    );
+    return <BackupsSection />;
   }
 
   return (
-    <div className={cn(wrapper, mobile ? "space-y-2" : "space-y-1")}>
+    <div className="space-y-1">
       <h2 className="text-lg font-medium">{section.title}</h2>
       <p className="text-muted-foreground text-sm">{section.description}</p>
       <p className="text-muted-foreground mt-4 text-sm">Coming soon.</p>

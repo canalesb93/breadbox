@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Banknote, CreditCard, Landmark, PiggyBank, Wallet } from "lucide-react";
 import type { Account } from "@/api/types";
+import { EmptyState } from "@/components/empty-state";
 import { formatCurrency } from "./connection-utils";
 
 const TYPE_ICON: Record<string, typeof Banknote> = {
@@ -19,11 +20,12 @@ interface ConnectionAccountsListProps {
 export function ConnectionAccountsList({ accounts }: ConnectionAccountsListProps) {
   if (accounts.length === 0) {
     return (
-      <div className="text-muted-foreground flex flex-col items-center gap-2 py-10 text-sm">
-        <Wallet className="size-8 opacity-40" />
-        <span>No accounts yet</span>
-        <span className="text-xs">Accounts appear after the first sync.</span>
-      </div>
+      <EmptyState
+        variant="inline"
+        icon={Wallet}
+        title="No accounts yet"
+        description="Accounts will appear here after the first successful sync."
+      />
     );
   }
   return (

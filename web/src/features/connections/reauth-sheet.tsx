@@ -131,7 +131,9 @@ export function ReauthSheet({
     setStage({ kind: "completing" });
     try {
       await reauthComplete.mutateAsync(conn.id);
-      toast.success(`Reconnected ${institutionName}.`);
+      toast.success(`Reconnected ${institutionName}.`, {
+        description: "Sync resumed — accounts will refresh on the next webhook.",
+      });
       handleSheetChange(false);
     } catch (err) {
       const msg =

@@ -1,54 +1,102 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo } from "react";
+import { Link } from "@tanstack/react-router";
+import { ArrowUpRight, Plus } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { useMe } from "@/api/queries/me";
+import { useAccounts } from "@/api/queries/accounts";
+import { useConnections } from "@/api/queries/connections";
+import { useTransactions } from "@/api/queries/transactions";
+import { relativeTime } from "@/features/connections/connection-utils";
+import { HomeStats } from "@/features/home/home-stats";
+import { HomeRecentTransactions } from "@/features/home/home-recent-transactions";
+import { HomeConnectionsPanel } from "@/features/home/home-connections-panel";
+
+// Greeting strips the email domain so "admin@example.com" reads as "admin".
+// Username can already be a display name on real installs, in which case it
+// passes through unchanged.
+function greetingName(username: string | undefined): string {
+  if (!username) return "";
+  const at = username.indexOf("@");
+  return at === -1 ? username : username.slice(0, at);
+}
 
 export function HomePage() {
   const { data: me } = useMe();
+  const accountsQuery = useAccounts();
+  const connectionsQuery = useConnections();
+  // Default sort = date desc; cap to one page worth and only render the top
+  // few. Reuses the same cache key the Transactions list uses for an empty
+  // filter set, so navigating to /transactions hits a warm cache.
+  const txQuery = useTransactions({});
+
+  const recent = useMemo(
+    () => txQuery.data?.pages?.[0]?.transactions?.slice(0, 6),
+    [txQuery.data],
+  );
+
+  // The freshest `last_synced_at` across all connections is the household-level
+  // "synced X ago" stamp — matches what the v1 dashboard's header showed and
+  // gives the page a single trustworthy freshness signal.
+  const lastSyncedAt = useMemo(() => {
+    const stamps = (connectionsQuery.data ?? [])
+      .map((c) => c.last_synced_at)
+      .filter((s): s is string => !!s)
+      .map((s) => new Date(s).getTime());
+    if (stamps.length === 0) return null;
+    return new Date(Math.max(...stamps)).toISOString();
+  }, [connectionsQuery.data]);
+
+  const isLoadingShell =
+    accountsQuery.isLoading || connectionsQuery.isLoading;
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {me ? `Welcome, ${me.username}` : "Welcome"}
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          You're using the v2 admin preview. Real dashboard data lands in the next PR.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow={lastSyncedAt ? `Synced ${relativeTime(lastSyncedAt)}` : "Overview"}
+        title={me ? `Welcome back, ${greetingName(me.username)}` : "Welcome"}
+        description="A quick read on balances, recent activity, and the health of your bank connections."
+        actions={
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/transactions" className="inline-flex items-center gap-1.5">
+                <ArrowUpRight className="size-4" />
+                Transactions
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link
+                to="/connections"
+                search={{ action: "connect" }}
+                className="inline-flex items-center gap-1.5"
+              >
+                <Plus className="size-4" />
+                Connect bank
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardDescription>Tech stack</CardDescription>
-            <CardTitle className="text-base font-medium">
-              React · TypeScript · Vite · TanStack · shadcn/ui
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">
-            Single binary in production. Old admin UI stays at <code>/</code>.
-          </CardContent>
-        </Card>
+      <HomeStats
+        accounts={accountsQuery.data}
+        connections={connectionsQuery.data}
+        isLoading={isLoadingShell}
+      />
 
-        <Card>
-          <CardHeader>
-            <CardDescription>API split</CardDescription>
-            <CardTitle className="text-base font-medium">
-              <code>/api/v1/*</code> public · <code>/web/v1/*</code> internal
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">
-            Session-cookie auth on <code>/web/v1/*</code>. Zero stability promise.
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardDescription>Status</CardDescription>
-            <CardTitle className="text-base font-medium">Phase 0 · shell</CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">
-            Navigable scaffold. Pages built one at a time per weekend.
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <HomeRecentTransactions
+            transactions={recent}
+            isLoading={txQuery.isLoading}
+          />
+        </div>
+        <div className="lg:col-span-1">
+          <HomeConnectionsPanel
+            connections={connectionsQuery.data}
+            isLoading={connectionsQuery.isLoading}
+          />
+        </div>
       </div>
     </div>
   );

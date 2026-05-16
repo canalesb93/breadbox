@@ -66,40 +66,83 @@ export function PatternsSection() {
       <Specimen
         label="Toasts"
         code="sonner · withMutationToast"
-        description="One toast surface for the whole app. withMutationToast wraps a mutation: success toast on resolve, the ApiError message on reject."
+        description="One toast surface for the whole app. Each tone gets a coloured left rail + tinted icon tile — same vocabulary as <StatusPanel>. withMutationToast wraps a mutation: success toast on resolve, the ApiError message on reject."
+        className="block"
       >
-        <Button variant="outline" onClick={() => toast.success("Saved.")}>
-          toast.success
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => toast.error("Something went wrong.")}
-        >
-          toast.error
-        </Button>
-        <Button variant="outline" onClick={() => toast.message("Heads up.")}>
-          toast.message
-        </Button>
-        <Button
-          onClick={() =>
-            withMutationToast(() => Promise.resolve(), {
-              success: "Category updated.",
-            })
-          }
-        >
-          withMutationToast — ok
-        </Button>
-        <Button
-          variant="destructive"
-          onClick={() =>
-            withMutationToast(() => Promise.reject(new Error("nope")), {
-              success: "won't show",
-              error: "Couldn't update the category.",
-            })
-          }
-        >
-          withMutationToast — fail
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => toast.success("Saved.")}>
+            success
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => toast.error("Something went wrong.")}
+          >
+            error
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.warning("Sync took longer than usual.", {
+                description: "Two accounts returned partial data on the last pull.",
+              })
+            }
+          >
+            warning
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.info("Imported 50 of 1,243 transactions.", {
+                description: "Showing the first page — keep scrolling to load more.",
+              })
+            }
+          >
+            info
+          </Button>
+          <Button variant="outline" onClick={() => toast.message("Heads up.")}>
+            message
+          </Button>
+          <Button variant="outline" onClick={() => toast.loading("Re-syncing…")}>
+            loading
+          </Button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            onClick={() =>
+              withMutationToast(() => Promise.resolve(), {
+                success: "Rule applied.",
+                successDescription: "12 transactions matched and were re-categorised.",
+              })
+            }
+          >
+            withMutationToast — ok (with description)
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() =>
+              withMutationToast(() => Promise.reject(new Error("nope")), {
+                success: "won't show",
+                error: "Couldn't update the category.",
+              })
+            }
+          >
+            withMutationToast — fail
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.success("Plaid sync queued.", {
+                description: "Webhook will fire when the next batch lands.",
+                action: {
+                  label: "View",
+                  onClick: () => toast.message("Action clicked."),
+                },
+              })
+            }
+          >
+            success + action
+          </Button>
+        </div>
       </Specimen>
 
       <Specimen

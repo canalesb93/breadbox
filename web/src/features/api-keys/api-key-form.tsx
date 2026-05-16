@@ -245,18 +245,19 @@ export function APIKeyForm() {
           )}
         />
 
-        <div className="flex gap-2 border-t pt-6">
-          <Button type="submit" disabled={create.isPending}>
-            {create.isPending && <Loader2 className="size-4 animate-spin" />}
-            {create.isPending ? "Creating…" : "Create key"}
-          </Button>
+        <div className="bg-muted/20 -mx-5 -mb-5 mt-2 flex items-center justify-end gap-2 border-t px-5 py-3">
           <Button
             type="button"
             variant="ghost"
+            size="sm"
             onClick={() => navigate({ to: "/api-keys" })}
             disabled={create.isPending}
           >
             Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={create.isPending}>
+            {create.isPending && <Loader2 className="size-4 animate-spin" />}
+            {create.isPending ? "Creating…" : "Create key"}
           </Button>
         </div>
       </form>

@@ -1,8 +1,32 @@
 import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
-import { Inbox, Plus, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  Inbox,
+  Info,
+  KeyRound,
+  MessageSquare,
+  Monitor,
+  Moon,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Shapes,
+  ShieldAlert,
+  Sun,
+  Tag,
+  Trash2,
+  Users,
+  Wand2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -10,6 +34,7 @@ import {
 } from "@/components/ui/popover";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { TimelineRail } from "@/components/timeline-rail";
 import { DataTable } from "@/components/data-table";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIconTile } from "@/components/category-icon-tile";
@@ -23,7 +48,17 @@ import { ColorPicker } from "@/components/color-picker";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
+import { ListCard } from "@/components/list-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { SectionCard } from "@/components/section-card";
+import { IdPill } from "@/components/id-pill";
+import { SoftBackButton } from "@/components/soft-back-button";
+import { StatusPanel } from "@/components/status-panel";
+import { FormFooter } from "@/components/form-footer";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProviderPicker } from "@/features/connections/provider-picker";
+import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 import {
@@ -69,6 +104,8 @@ export function ComponentsSection() {
   const [colorValue, setColorValue] = useState<string | null>("#f97316");
   const [pickedProvider, setPickedProvider] = useState<string | null>("plaid");
   const [dateRange, setDateRange] = useState<DateRangeValue>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmPending, setConfirmPending] = useState(false);
 
   return (
     <SandboxSection
@@ -88,16 +125,385 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
-        label="EmptyState"
-        code="components/empty-state"
+        label="SoftBackButton"
+        code="components/soft-back-button"
+        description="The tiny ghost link that hangs at the top of every detail / form page. Prefers in-app history on a plain click (so you land on the exact list state you came from), falls through to the canonical `to` URL otherwise. Don't fork the look."
         className="block"
       >
-        <EmptyState
-          icon={Inbox}
-          title="No matching transactions"
-          description="Try adjusting or clearing your filters."
-          action={<Button variant="outline">Clear filters</Button>}
+        <SoftBackButton to="/v2/transactions">
+          Back to transactions
+        </SoftBackButton>
+      </Specimen>
+
+      <Specimen
+        label="SectionCard"
+        code="components/section-card"
+        description="The bordered 'section in a card' primitive: header rail names the section, optional action slot on the right, body holds prose / forms / KV blocks. Use `flushBody` when the body is a `<ul className='divide-y'>` (or reach for `ListCard`, which bakes that in)."
+        className="block"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <SectionCard
+            title="Details"
+            action={
+              <Button size="sm" variant="outline">
+                Edit
+              </Button>
+            }
+          >
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Reference</dt>
+              <dd className="font-mono text-xs">tx_aB12cD34</dd>
+              <dt className="text-muted-foreground">Created</dt>
+              <dd>May 14, 2026</dd>
+              <dt className="text-muted-foreground">Source</dt>
+              <dd>Plaid · Chase ····2890</dd>
+            </dl>
+          </SectionCard>
+          <SectionCard
+            title="Notes"
+            footer={
+              <Button size="sm" variant="ghost">
+                View all
+              </Button>
+            }
+          >
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Reach for `SectionCard` for any non-list section. The footer slot
+              renders a flush bordered strip — typically a "See all" link.
+            </p>
+          </SectionCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ListCard"
+        code="components/list-card"
+        description="`SectionCard`'s sibling for divide-y lists. Pass `rows` + `renderRow` and each row is wrapped in an `<li>` automatically — the rail of dividers stays consistent across surfaces (Home recent activity, Account-detail recent transactions, Connections list, …)."
+        className="block"
+      >
+        <div className="max-w-md">
+          <ListCard
+            title="Recent transactions"
+            action={
+              <Button size="sm" variant="ghost">
+                View all
+              </Button>
+            }
+            rows={sampleTransactions.slice(0, 3)}
+            getRowKey={(t) => t.id}
+            renderRow={(t) => (
+              <div className="flex items-center justify-between gap-4 px-5 py-3">
+                <TransactionPrimary transaction={t} />
+                <TransactionAmount transaction={t} />
+              </div>
+            )}
+            empty={
+              <EmptyState
+                variant="inline"
+                icon={Inbox}
+                title="Nothing yet"
+                description="New transactions will appear here."
+              />
+            }
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ColorRailCard"
+        code="components/color-rail-card"
+        description="The canonical 'detail-page hero': bordered card with a 4px coloured left rail that encodes meaning (category colour, accounting role, connection status). Optional `footer` slot hosts an inline action strip. Pair the rail with a small uppercase eyebrow so colour never carries the signal alone."
+        className="block"
+      >
+        <div className="max-w-xl">
+          <ColorRailCard
+            accent="#f97316"
+            footer={
+              <>
+                <Button size="sm" variant="outline">
+                  Recategorise
+                </Button>
+                <Button size="sm">
+                  Open
+                  <ArrowUpRight />
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-2 px-6 py-5 sm:px-7">
+              <span className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                Transaction · Food & Drink
+              </span>
+              <div className="flex items-baseline justify-between gap-4">
+                <h3 className="text-foreground text-xl font-semibold tracking-tight">
+                  Blue Bottle Coffee
+                </h3>
+                <span className="text-foreground text-xl font-semibold tabular-nums">
+                  −$6.25
+                </span>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Posted May 14, 2026 · Chase ····2890
+              </p>
+            </div>
+          </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="StatusPanel"
+        code="components/status-panel"
+        description="Inline tone-tinted status block — 3px left rail + tinted icon tile + heading + body. Same 'colour encodes meaning' principle as `ColorRailCard`, sized for in-page notices (env-locked panels, already-set-up confirmation, sync warnings). Four tones: success / destructive / warning / info."
+        className="block"
+      >
+        <div className="grid w-full gap-3 md:grid-cols-2">
+          <StatusPanel
+            tone="success"
+            icon={CheckCircle2}
+            heading="Encryption key configured"
+            body="Tokens for new connections will be encrypted at rest."
+          />
+          <StatusPanel
+            tone="warning"
+            icon={AlertTriangle}
+            heading="Plaid sync took longer than usual"
+            body="Two accounts returned partial data — check the connection details."
+          />
+          <StatusPanel
+            tone="destructive"
+            icon={ShieldAlert}
+            heading="Setup token is invalid"
+            body="Generate a fresh one from the CLI and try again."
+          />
+          <StatusPanel
+            tone="info"
+            icon={Info}
+            heading="Provider locked by environment"
+            body="The PLAID_ENV variable is set — override it in the env to unlock."
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="IdPill"
+        code="components/id-pill"
+        description="Machine identifier (short_id, slug, URL fragment) rendered as a muted monospace pill — reads as 'this is a stable reference, not display copy'. Six surfaces share it; don't fork the look."
+      >
+        <IdPill value="tx_aB12cD34" />
+        <IdPill value="acct_3rR9pq01" />
+        <IdPill value="food_and_drink_coffee" />
+        <IdPill value="/api/v1/transactions" />
+      </Specimen>
+
+      <Specimen
+        label="FormFooter"
+        code="components/form-footer"
+        description="The flush bordered action strip at the bottom of a `<SectionCard>` that wraps a form. Sticks Cancel left, primary right; optional `hint` slot for an inline validation note. Drop inside a `SectionCard` with default body padding — negative margins line the strip up with the card's outer border."
+        className="block"
+      >
+        <div className="max-w-md">
+          <SectionCard title="Edit tag">
+            <div className="grid gap-1.5">
+              <Label htmlFor="sb-form-name">Display name</Label>
+              <Input id="sb-form-name" defaultValue="Reimbursable" />
+            </div>
+            <FormFooter
+              hint="Slug is generated automatically from the name."
+              secondary={
+                <Button variant="outline" size="sm">
+                  Cancel
+                </Button>
+              }
+              primary={
+                <Button size="sm">
+                  <Save /> Save changes
+                </Button>
+              }
+            />
+          </SectionCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ConfirmDialog"
+        code="components/confirm-dialog"
+        description="Canonical confirmation surface for any destructive / irreversible action. Tone-tinted icon tile, built-in `pending` state (spinner + locked Cancel) so the dialog stays open on slow mutations. Tones: `destructive` (default) and `default`."
+      >
+        <Button
+          variant="destructive"
+          onClick={() => {
+            setConfirmPending(false);
+            setConfirmOpen(true);
+          }}
+        >
+          <Trash2 /> Open confirm
+        </Button>
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          tone="destructive"
+          icon={Trash2}
+          title="Delete this tag?"
+          description="The tag will be removed from every transaction it's attached to. This can't be undone."
+          confirmLabel="Delete tag"
+          pendingLabel="Deleting…"
+          pending={confirmPending}
+          onConfirm={() => {
+            setConfirmPending(true);
+            window.setTimeout(() => {
+              setConfirmPending(false);
+              setConfirmOpen(false);
+              toast.success("Tag deleted.");
+            }, 900);
+          }}
         />
+      </Specimen>
+
+      <Specimen
+        label="AuthShell"
+        code="components/auth-shell"
+        description="Two-pane brand + form shell used by Login and Setup. It's a whole-screen primitive — view it live on the unauthenticated routes rather than scaled into this gallery."
+      >
+        <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+          <KeyRound className="size-4" />
+          <span>
+            See it in context at{" "}
+            <a
+              href="/v2/login"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
+              /v2/login
+            </a>{" "}
+            ·{" "}
+            <a
+              href="/v2/setup-account"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
+              /v2/setup-account
+            </a>
+          </span>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ThemeToggle"
+        code="next-themes · ThemeProvider"
+        description="The theme switcher mounted at the React root via `<ThemeProvider>` in main.tsx. The picker keys off the user's stored choice (`system`/`light`/`dark`), not the realised mode, so 'System' stays selected when the OS resolves to dark. The same hook drives the Sonner Toaster's theme prop and the NavUser dropdown's Theme submenu — change it in one place, every surface follows."
+        className="block"
+      >
+        <ThemeSpecimen />
+      </Specimen>
+
+      <Specimen
+        label="NavUser footer"
+        code="components/nav-user"
+        description="The bottom-of-sidebar account row + dropdown that hosts the theme switcher, keyboard-shortcut overlay, classic-UI link, and sign-out. Lives inside the SidebarProvider — view it live in any app route. The role pill picks the same primary tint as the BrandHeader's V2 chip for admins, muted neutral for editor/viewer."
+      >
+        <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+          <UserChipDemo />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="EmptyState"
+        code="components/empty-state"
+        description="Three variants share one primitive — pick the weight that fits the surface. Same icon-tile vocabulary as the rest of v2 (square rounded-xl, not circle)."
+        className="block"
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              default · inside a container
+            </div>
+            <EmptyState
+              icon={Inbox}
+              title="No matching transactions"
+              description="Try adjusting or clearing your filters."
+              action={<Button variant="outline">Clear filters</Button>}
+            />
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+              card · in raw page space
+            </div>
+            <EmptyState
+              variant="card"
+              icon={Users}
+              title="No family members yet"
+              description="Add members to connect their banks and attribute transactions by person."
+            />
+          </div>
+          <div className="bg-card rounded-lg border p-4">
+            <div className="text-muted-foreground mb-1 text-[11px] tracking-wide uppercase">
+              inline · compact sub-panel
+            </div>
+            <EmptyState
+              variant="inline"
+              icon={RefreshCw}
+              title="No sync history yet"
+              description="Each sync will appear here with timing and result."
+            />
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="TimelineRail"
+        code="components/timeline-rail"
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels sit outside the rail as anchors. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        className="block"
+      >
+        <div className="max-w-md">
+          <TimelineRail>
+            <TimelineRail.Group label="Today">
+              <TimelineRail.Row icon={MessageSquare}>
+                <p className="text-sm leading-snug">
+                  You left a comment
+                </p>
+                <p className="text-muted-foreground bg-muted/50 mt-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-pre-wrap">
+                  Recategorise after the refund clears.
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  2 minutes ago
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={Wand2}>
+                <p className="text-sm leading-snug">
+                  Rule "Coffee shops" applied — category set to Dining out
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  18 minutes ago
+                </p>
+              </TimelineRail.Row>
+            </TimelineRail.Group>
+            <TimelineRail.Group label="Yesterday">
+              <TimelineRail.Row icon={Shapes}>
+                <p className="text-sm leading-snug">
+                  Ricardo changed category to Groceries
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 4:12 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={Tag}>
+                <p className="text-sm leading-snug">
+                  Ricardo added tag "reimbursable"
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 4:11 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={MessageSquare} muted>
+                <p className="text-sm leading-snug">
+                  Ricardo deleted a comment
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 3:55 PM
+                </p>
+              </TimelineRail.Row>
+            </TimelineRail.Group>
+          </TimelineRail>
+        </div>
       </Specimen>
 
       <Specimen
@@ -312,5 +718,80 @@ export function ComponentsSection() {
         />
       </Specimen>
     </SandboxSection>
+  );
+}
+
+// Live theme picker — three pill buttons backed by next-themes. Renders the
+// same `<Check>` affordance the NavUser submenu uses for the selected row, so
+// the two surfaces share their visual vocabulary.
+function ThemeSpecimen() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const choices = [
+    { value: "system", label: "System", icon: Monitor },
+    { value: "light", label: "Light", icon: Sun },
+    { value: "dark", label: "Dark", icon: Moon },
+  ] as const;
+  const current = theme ?? "system";
+  return (
+    <div className="space-y-3">
+      <div className="bg-muted/30 inline-flex items-center gap-1 rounded-md border p-1">
+        {choices.map(({ value, label, icon: Icon }) => {
+          const active = current === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 text-xs font-medium transition-colors",
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-3.5" />
+              {label}
+              {active ? (
+                <Check className="text-primary -mr-0.5 ml-1 size-3" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Stored: <span className="text-foreground font-mono">{current}</span> ·
+        Resolved:{" "}
+        <span className="text-foreground font-mono">
+          {resolvedTheme ?? "—"}
+        </span>{" "}
+        · Storage key{" "}
+        <span className="text-foreground font-mono">breadbox:theme</span>
+      </p>
+    </div>
+  );
+}
+
+// Inline visual demo of the NavUser trigger — the dropdown itself depends on
+// `SidebarProvider`, so we render just the trigger shape (avatar + name + role
+// pill + chevron) here and point readers at the live sidebar for the menu.
+function UserChipDemo() {
+  return (
+    <div className="bg-sidebar/40 ring-sidebar-border flex w-full max-w-sm items-center gap-2.5 rounded-md p-2 ring-1">
+      <span className="bg-primary/10 text-primary ring-border/60 inline-flex size-8 items-center justify-center rounded-md text-[11px] font-semibold ring-1">
+        AD
+      </span>
+      <div className="grid flex-1 leading-tight">
+        <span className="text-sm font-medium">admin</span>
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px]">
+          <span className="bg-primary/15 text-primary inline-flex items-center gap-1 rounded-sm px-1.5 py-px text-[10px] font-semibold tracking-wider uppercase">
+            admin
+          </span>
+          @example.com
+        </span>
+      </div>
+      <span className="text-muted-foreground/70 text-[10px]">
+        click in sidebar →
+      </span>
+    </div>
   );
 }

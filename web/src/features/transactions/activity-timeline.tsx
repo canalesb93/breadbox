@@ -10,9 +10,9 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { TimelineRail } from "@/components/timeline-rail";
 import { useAnnotations } from "@/api/queries/annotations";
 import { formatRelativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { Annotation } from "@/api/types";
 
 const KIND_ICON: Record<string, LucideIcon> = {
@@ -66,7 +66,7 @@ function groupByDay(annotations: Annotation[]): DayGroup[] {
 // ActivityTimeline renders a transaction's enriched annotation feed — comments,
 // rule applications, tag/category changes, sync events — grouped by day. The
 // server hands back ready-to-render `summary` lines, so this stays a pure
-// layout component.
+// layout component on top of the shared <TimelineRail> primitive (iter 26).
 export function ActivityTimeline({ transactionId }: { transactionId: string }) {
   const { data, isLoading, isError } = useAnnotations(transactionId);
   const groups = useMemo(() => groupByDay(data ?? []), [data]);
@@ -106,20 +106,15 @@ export function ActivityTimeline({ transactionId }: { transactionId: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <TimelineRail>
       {groups.map((group) => (
-        <div key={group.label} className="space-y-3">
-          <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            {group.label}
-          </h3>
-          <ol className="space-y-3">
-            {group.rows.map((row) => (
-              <TimelineRow key={row.id} annotation={row} />
-            ))}
-          </ol>
-        </div>
+        <TimelineRail.Group key={group.label} label={group.label}>
+          {group.rows.map((row) => (
+            <TimelineRow key={row.id} annotation={row} />
+          ))}
+        </TimelineRail.Group>
       ))}
-    </div>
+    </TimelineRail>
   );
 }
 
@@ -130,31 +125,21 @@ function TimelineRow({ annotation }: { annotation: Annotation }) {
   const showBody = annotation.kind === "comment" && !deleted && annotation.content;
 
   return (
-    <li className="flex gap-3">
-      <div
-        className={cn(
-          "bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-full",
-          deleted && "opacity-50",
-        )}
-      >
-        <Icon className="size-3.5" />
-      </div>
-      <div className={cn("min-w-0 flex-1 py-0.5", deleted && "opacity-60")}>
-        <p className="text-sm">
-          {deleted
-            ? `${annotation.actor_name} deleted a comment`
-            : (annotation.summary ??
-              `${annotation.actor_name} ${annotation.action ?? annotation.kind}`)}
+    <TimelineRail.Row icon={Icon} muted={deleted ? true : false}>
+      <p className="text-sm leading-snug">
+        {deleted
+          ? `${annotation.actor_name} deleted a comment`
+          : (annotation.summary ??
+            `${annotation.actor_name} ${annotation.action ?? annotation.kind}`)}
+      </p>
+      {showBody && (
+        <p className="text-muted-foreground bg-muted/50 mt-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-pre-wrap">
+          {annotation.content}
         </p>
-        {showBody && (
-          <p className="text-muted-foreground bg-muted/50 mt-1 rounded-md px-2.5 py-1.5 text-sm whitespace-pre-wrap">
-            {annotation.content}
-          </p>
-        )}
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          {formatRelativeTime(annotation.created_at)}
-        </p>
-      </div>
-    </li>
+      )}
+      <p className="text-muted-foreground mt-1 text-[11px]">
+        {formatRelativeTime(annotation.created_at)}
+      </p>
+    </TimelineRail.Row>
   );
 }

@@ -132,6 +132,53 @@ export interface AccountGroup {
   accounts: Account[];
 }
 
+// groupNetTotal returns the signed net balance for a group of accounts in
+// the group's dominant currency. Liabilities flip sign so the total reads
+// as "what this slice contributes to net worth." Mixed-currency groups
+// fall back to the most-populated currency; the count of accounts excluded
+// from the total (because they're in a different currency or have no
+// balance) is returned alongside so the header can hint at it.
+export interface GroupTotal {
+  currency: string | null;
+  total: number;
+  excluded: number;
+}
+
+export function groupNetTotal(accounts: Account[]): GroupTotal {
+  // Pick the most-populated currency in the group as the display currency.
+  const counts = new Map<string, number>();
+  for (const a of accounts) {
+    if (!a.iso_currency_code) continue;
+    counts.set(a.iso_currency_code, (counts.get(a.iso_currency_code) ?? 0) + 1);
+  }
+  let primary: string | null = null;
+  let max = 0;
+  for (const [k, v] of counts) {
+    if (v > max) {
+      max = v;
+      primary = k;
+    }
+  }
+  if (primary == null) {
+    return { currency: null, total: 0, excluded: accounts.length };
+  }
+  let total = 0;
+  let excluded = 0;
+  for (const a of accounts) {
+    if (a.is_dependent_linked) continue;
+    if (a.balance_current == null) {
+      excluded += 1;
+      continue;
+    }
+    if (a.iso_currency_code !== primary) {
+      excluded += 1;
+      continue;
+    }
+    total += isLiability(a.type) ? -a.balance_current : a.balance_current;
+  }
+  return { currency: primary, total, excluded };
+}
+
 export function groupAccounts(
   accounts: Account[],
   by: AccountGroupBy,

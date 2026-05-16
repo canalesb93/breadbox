@@ -1,11 +1,14 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Tags as TagsIcon } from "lucide-react";
+import { Tags as TagsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { DangerZone } from "@/components/danger-zone";
+import { SectionCard } from "@/components/section-card";
+import { SoftBackButton } from "@/components/soft-back-button";
+import { TagChip } from "@/components/tag-chip";
 import { TagForm } from "@/features/tags/tag-form";
 import { useDeleteTag, useTags } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -21,15 +24,10 @@ export function TagDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
-        <Link to="/tags">
-          <ArrowLeft className="size-4" />
-          Tags
-        </Link>
-      </Button>
+      <SoftBackButton to="/tags">Back to tags</SoftBackButton>
 
       {isLoading ? (
-        <Skeleton className="h-96 rounded-xl" />
+        <DetailSkeleton />
       ) : isError || !tag ? (
         <EmptyState
           icon={TagsIcon}
@@ -51,13 +49,29 @@ export function TagDetailPage() {
 function DetailBody({ tag }: { tag: Tag }) {
   const navigate = useNavigate();
   const del = useDeleteTag();
+
+  // Tag identity: title carries the human name; eyebrow holds the canonical
+  // "Tag" label so the page reads the same as the other detail pages
+  // (Category, Account, Transaction, Connection) that anchor on an eyebrow.
+  // The live preview chip in the page header makes the icon + colour
+  // immediately visible above the form — same role the inline "Live
+  // preview" tile used to play, but lifted up so the form body stays clean.
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
+        eyebrow="Tag"
         title={tag.display_name}
         description={tag.description || "No description yet."}
+        actions={<TagChip tag={tag} />}
       />
-      <TagForm mode="edit" tag={tag} />
+
+      <SectionCard
+        icon={<TagsIcon className="text-muted-foreground size-4" />}
+        title="Tag details"
+      >
+        <TagForm mode="edit" tag={tag} />
+      </SectionCard>
+
       <DangerZone
         description="The tag will be removed from every transaction it's attached to. Activity history is preserved. This can't be undone."
         confirmTarget={<span className="font-semibold">{tag.display_name}</span>}
@@ -71,6 +85,20 @@ function DetailBody({ tag }: { tag: Tag }) {
           if (ok) navigate({ to: "/tags" });
         }}
       />
-    </>
+    </div>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-12" />
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-[28rem] rounded-xl" />
+      <Skeleton className="h-32 rounded-xl" />
+    </div>
   );
 }

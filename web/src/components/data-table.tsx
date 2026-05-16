@@ -70,6 +70,18 @@ export interface DataTableProps<TData, TValue> {
    * scrolled into view — drives j/k list navigation.
    */
   focusedRowId?: string;
+  /**
+   * Render the column header as a sticky band that pins to the top of the
+   * scroll container. Pairs well with long lists. Uses a subtle muted
+   * backdrop so it visually separates from the body without a hard line.
+   */
+  stickyHeader?: boolean;
+  /**
+   * When true, render the column headers with the v2 list vocabulary —
+   * uppercase, tracked, smaller, muted. The default is the shadcn table's
+   * standard sentence-case treatment used by other list pages.
+   */
+  refinedHeader?: boolean;
 }
 
 // Shared table wrapper over @tanstack/react-table + the shadcn Table
@@ -94,6 +106,8 @@ export function DataTable<TData, TValue>({
   getRowId,
   meta,
   focusedRowId,
+  stickyHeader = false,
+  refinedHeader = false,
 }: DataTableProps<TData, TValue>) {
   const focusedRowRef = useRef<HTMLTableRowElement>(null);
   useEffect(() => {
@@ -122,15 +136,30 @@ export function DataTable<TData, TValue>({
     // The shadcn Table primitive already wraps the <table> in its own
     // overflow-x-auto container, so narrow viewports scroll horizontally
     // without a second scroll container here.
-    <div className="rounded-md border">
+    <div className="bg-card overflow-hidden rounded-lg border">
       <Table>
-        <TableHeader>
+        <TableHeader
+          className={cn(
+            stickyHeader &&
+              "bg-muted/40 supports-[backdrop-filter]:bg-muted/30 sticky top-0 z-10 backdrop-blur-sm",
+          )}
+        >
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
+            <TableRow
+              key={headerGroup.id}
+              className={cn(
+                // Header rows never react to hover; they're chrome, not data.
+                "hover:bg-transparent",
+              )}
+            >
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
-                  className={header.column.columnDef.meta?.className}
+                  className={cn(
+                    refinedHeader &&
+                      "text-muted-foreground h-9 text-[11px] font-medium tracking-[0.06em] uppercase",
+                    header.column.columnDef.meta?.className,
+                  )}
                 >
                   {header.isPlaceholder
                     ? null
