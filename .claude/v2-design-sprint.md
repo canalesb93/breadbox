@@ -1204,6 +1204,43 @@ Cross-cutting components:
     dance documented since iter 4 — chronic but trivially worked
     around.
 
+- **Iter 31 — No-flash dark-mode bootstrap** ([#1144](https://github.com/canalesb93/breadbox/pull/1144))
+  - After iter 30 wired `<ThemeProvider>` (storageKey
+    `breadbox:theme`), a user who picked Dark in the NavUser menu
+    still saw a brief light flash on every reload — the inline
+    pre-React bootstrap in `index.html` was ignoring the saved
+    choice and always resolving to OS preference. First paint was
+    light (assuming a light OS) until next-themes mounted and
+    corrected (~100ms).
+  - Inline bootstrap now reads `localStorage["breadbox:theme"]`
+    first and falls back to OS preference for the `system` and
+    unset cases. OS change tracking only auto-applies while the
+    saved choice is missing or "system" — next-themes owns the
+    explicit case once React mounts. Wrapped in `try { … }` so a
+    private window with localStorage blocked falls through to
+    light without throwing.
+  - Side effect: same flash also stopped affecting sonner toasts,
+    which read `useTheme()` during their first render and were
+    previously seeing the wrong "system" snapshot before the
+    provider hydrated.
+  - Drive-by dark-mode audit of Home, Connections, and Transaction
+    detail at 1440x900 — all three render cleanly on the existing
+    OKLCH tokens (no hard-coded `bg-white` / `text-black`
+    regressions). One observation queued: the disabled primary
+    Button in dark (e.g. "Post note" idle state on TX detail) is
+    bright via `--primary: oklch(0.922)` × default `disabled:opacity-50`
+    — reads as a mid-gray block. Acceptable per shadcn defaults,
+    but if dark-mode polish wants more restraint, consider tuning
+    the disabled treatment to `bg-muted text-muted-foreground` in
+    a follow-up.
+  - Process note: iter agent first opened a redundant PR (#1143)
+    re-implementing iter-30's work after misreading the prompt's
+    "iter 30 added a theme switcher" claim as not-yet-shipped. Closed
+    it and reset to the actual `design/v2-shadcn` HEAD before doing
+    the bootstrap fix. Lesson: when the prompt says a recent iter
+    "is now wired," verify against `git log origin/design/v2-shadcn`
+    before redoing the work.
+
 ## Open observations / questions
 
 (Populated by iterations.)
