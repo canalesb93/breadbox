@@ -995,24 +995,70 @@ Cross-cutting components:
     already provide a flex-column `gap-*` parent. Verified at 375x812
     and 1440x900; desktop unchanged.
 
+- **Iter 24 — Accounts + Providers mobile sweep** ([#1137](https://github.com/canalesb93/breadbox/pull/1137))
+  - Three small fixes catch the residual breakage flagged in iter-22's
+    audit (and queued in iter 23): `/accounts` and `/providers` at
+    375x812. All three are mobile-only adjustments; desktop unchanged.
+  - **FamilyTabs** now wraps into a horizontally scrollable strip
+    (`overflow-x-auto`, `w-max`, `flex-nowrap`, `whitespace-nowrap`)
+    instead of a wrapping `TabsList`. Previously, when the household
+    had more than ~3 members, the wrapped tab pile bled into the
+    Institution / Type toggle group on the row below it. Since
+    `FamilyTabs` is shared, the fix benefits both `/connections` and
+    `/accounts`. Scrollbar is hidden via the standard
+    `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden` combo so
+    the strip reads as a swipeable segment, not a desktop-style
+    horizontal scrollbar. Negative `-mx-2 px-2` lets the scrollable
+    edge bleed to the page padding without visible clipping.
+  - **AccountsSummary** mobile layout is now a 2-col grid: Net worth
+    full-bleed dominant (`col-span-2 sm:col-span-1`), Assets +
+    Liabilities side-by-side underneath. Saves ~150px of vertical
+    space before reaching the actual accounts list. Returns to
+    `sm:grid-cols-3` at sm+. Tightened the inner `CardContent`
+    padding to `px-4 sm:px-6` so the side-by-side pair doesn't feel
+    cramped at the narrow viewport.
+  - **ProviderScoreboard** at mobile flows the status pill +
+    Connections / Accounts cells inline on a single horizontal row
+    (`flex-wrap items-center gap-x-4 gap-y-2`), left-aligned under
+    the description column. Preserves the desktop
+    right-stacked-`items-end` layout from `sm`+. Same principle as
+    Accounts: the floating-right scoreboard read as disconnected
+    from the description above on a 375px viewport.
+  - **grow-spacer sweep**: only remaining `<div className="grow" />`
+    spacer in the SPA was the Transactions toolbar one already fixed
+    in iter 23. No fresh occurrences across the codebase — anti-pattern
+    is contained. The `flex-1` references are real (icon-name truncation
+    columns and the connection picker), not spacers. The iter-23 watch
+    note can stay as a forward guard; the audit retires.
+
 ## Open observations / questions
 
 (Populated by iterations.)
 
-- **Mobile audit — Accounts / Providers / Settings** (carried from iter
-  22, now the residual): Transactions list mobile issues are fixed in
-  iter 23. Still owed: a 375x812 walk through `/accounts`,
-  `/providers`, and the settings shell to catch toolbar/grid breakage
-  before promoting `design/v2-shadcn` to main. Likely the same flex-row
-  + grow-spacer anti-pattern that bit Transactions — worth a focused
-  iteration after a few non-mobile ones to keep the sprint varied.
-- **`grow`-spacer anti-pattern on mobile** (iter 23 drift, watch for):
-  any toolbar/header that uses `<div className="grow" />` to push a
-  trailing cluster right will produce the same orphaned-pill behaviour
-  on narrow viewports. The fix is `sm:ml-auto` on the trailing cluster
-  (or `ms-auto` if directionality matters). Suspect surfaces to audit
-  in a future pass: rules table toolbar, categories index, tags index,
-  any future filter-and-action band.
+- **Mobile audit — Settings shell** (residual from iter 22): Accounts
+  + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137)).
+  Still owed: a 375x812 walk through `/settings/*` (household,
+  backups, profile sections) to catch toolbar/grid breakage before
+  promoting `design/v2-shadcn` to main. Settings shell uses its own
+  navigation pattern (`settings-shell.tsx`) so the breakage is
+  unlikely to be the same family of fixes — more likely the
+  list-then-content split rendering awkwardly at 375px.
+- **`grow`-spacer anti-pattern on mobile** (iter 23 drift, iter 24
+  swept clean): any future toolbar/header that uses
+  `<div className="grow" />` to push a trailing cluster right will
+  produce the same orphaned-pill behaviour on narrow viewports. The
+  fix is `sm:ml-auto` on the trailing cluster (or `ms-auto` if
+  directionality matters). As of iter 24 the codebase has no such
+  spacers — guard against new ones.
+- **`MetricColumn` primitive candidate** (iter 24): the
+  `flex-wrap items-center gap-x-4 gap-y-2 sm:flex-col sm:items-end
+  sm:gap-2` pattern in `ProviderScoreboard` is the v2 vocabulary for
+  "mobile flows left, desktop stacks right" on a hero metric column.
+  Connection-detail and Account-detail heroes have similar shapes
+  (status pill + scoreboard cells) but are open-coded inside each
+  consumer. If a fourth hero adopts the same shape, promote to a
+  `<MetricColumn>` slot prop on `<ColorRailCard>` so the
+  mobile-flow-left behaviour propagates from one place.
 
 - **Backend already on 8090** in this dev environment — iter 1 reused
   it instead of starting a second `make dev`. Future iterations should
