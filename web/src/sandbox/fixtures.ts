@@ -255,8 +255,18 @@ export const sampleTransactions: Transaction[] = [
 
 // --- Accounts (full view useAccounts returns) ---
 
+const sampleAccountBase = {
+  official_name: null,
+  balance_limit: null,
+  last_balance_update: null,
+  created_at: "2025-01-01T00:00:00Z",
+  updated_at: "2026-05-01T00:00:00Z",
+  connection_status: "active" as const,
+};
+
 export const sampleAccounts: Account[] = [
   {
+    ...sampleAccountBase,
     id: "acct-checking",
     short_id: "checking",
     connection_id: "demo-conn",
@@ -272,6 +282,7 @@ export const sampleAccounts: Account[] = [
     is_dependent_linked: false,
   },
   {
+    ...sampleAccountBase,
     id: "acct-platinum",
     short_id: "platinum",
     connection_id: "demo-conn",
@@ -281,8 +292,9 @@ export const sampleAccounts: Account[] = [
     type: "credit",
     subtype: "credit card",
     mask: "0093",
-    balance_current: -842.16,
+    balance_current: 842.16,
     balance_available: null,
+    balance_limit: 5000,
     iso_currency_code: "USD",
     is_dependent_linked: false,
   },

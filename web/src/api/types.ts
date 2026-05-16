@@ -64,24 +64,82 @@ export interface TransactionsPage {
 }
 
 // --- Accounts (public /api/v1/accounts) ---
-// Mirrors internal/service.AccountResponse. The transactions filter only
-// touches identity + labels; the connections list rolls up balances per
-// connection by joining client-side, so connection_id and balance_current are
-// load-bearing there.
+// Mirrors internal/service.AccountResponse. The accounts page surfaces every
+// field; the connections page joins on `connection_id` + sums `balance_current`
+// per currency.
 export interface Account {
   id: string;
   short_id: string;
   connection_id: string | null;
   user_id: string | null;
+  institution_name: string | null;
   name: string;
-  institution_name: string;
+  official_name: string | null;
   type: string;
   subtype: string | null;
   mask: string | null;
   balance_current: number | null;
   balance_available: number | null;
+  balance_limit: number | null;
   iso_currency_code: string | null;
+  last_balance_update: string | null;
+  created_at: string;
+  updated_at: string;
+  connection_status: string | null;
   is_dependent_linked: boolean;
+}
+
+// AccountBalance mirrors internal/service.AccountBalance. Today every
+// Breadbox account has a single balance; the slice shape exists so the
+// payload stays stable if multi-currency accounts ever land.
+export interface AccountBalance {
+  iso_currency_code: string | null;
+  balance_current: number | null;
+  balance_available: number | null;
+  balance_limit: number | null;
+}
+
+// AccountDetail mirrors internal/service.AccountDetailResponse. Composes the
+// list-row shape with admin-only fields (display_name, excluded), balances
+// per currency, and the most recent N transactions for the account.
+export interface AccountDetail extends Account {
+  display_name: string | null;
+  excluded: boolean;
+  provider?: string;
+  connection_user_name?: string;
+  connection_short_id?: string;
+  balances: AccountBalance[];
+  recent_transactions: Transaction[];
+}
+
+// AccountLink mirrors internal/service.AccountLinkResponse. Links a primary
+// account to a dependent account so the dependent's transactions are
+// attributed to the primary cardholder. The dependent account is excluded
+// from totals; matched transactions are attributed via attributed_user_id.
+export interface AccountLink {
+  id: string;
+  short_id: string;
+  primary_account_id: string;
+  primary_account_name: string;
+  primary_user_name: string;
+  dependent_account_id: string;
+  dependent_account_name: string;
+  dependent_user_name: string;
+  match_strategy: string;
+  match_tolerance_days: number;
+  enabled: boolean;
+  match_count: number;
+  unmatched_dependent_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// MatchReconciliationResult mirrors internal/service.MatchReconciliationResult.
+// Returned from POST /account-links/{id}/reconcile after a manual rerun.
+export interface MatchReconciliationResult {
+  new_matches: number;
+  total_matched: number;
+  unmatched: number;
 }
 
 // --- Users (public /api/v1/users) ---

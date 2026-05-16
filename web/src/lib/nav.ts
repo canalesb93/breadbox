@@ -3,10 +3,8 @@ import {
   BadgeDollarSign,
   Banknote,
   Bot,
-  ClipboardCheck,
   FileText,
   Key,
-  Link2,
   Plug,
   Settings,
   Shapes,
@@ -58,31 +56,24 @@ export const NAV: NavGroup[] = [
     items: [
       { kind: "link", title: "Home", to: "/", icon: BadgeDollarSign },
       { kind: "link", title: "Transactions", to: "/transactions", icon: ArrowLeftRight },
-      { kind: "link", title: "Reviews", to: "/reviews", icon: ClipboardCheck },
       { kind: "link", title: "Reports", to: "/reports", icon: FileText },
     ],
   },
   {
-    label: "Setup",
+    label: "Library",
     items: [
       { kind: "link", title: "Accounts", to: "/accounts", icon: Banknote },
       { kind: "link", title: "Connections", to: "/connections", icon: Plug },
-      { kind: "link", title: "Account links", to: "/account-links", icon: Link2 },
       { kind: "link", title: "Providers", to: "/providers", icon: ToyBrick },
-    ],
-  },
-  {
-    label: "Automation",
-    items: [
-      { kind: "link", title: "Rules", to: "/rules", icon: Wand2 },
-      { kind: "link", title: "Agents", to: "/agents", icon: Bot },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
       { kind: "link", title: "Categories", to: "/categories", icon: Shapes },
       { kind: "link", title: "Tags", to: "/tags", icon: Tags },
+      { kind: "link", title: "Rules", to: "/rules", icon: Wand2 },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { kind: "link", title: "Agents", to: "/agents", icon: Bot },
       { kind: "link", title: "API keys", to: "/api-keys", icon: Key },
       { kind: "modal", title: "Settings", modalKey: "settings", icon: Settings },
     ],
