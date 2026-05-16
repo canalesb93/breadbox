@@ -1625,6 +1625,30 @@ Cross-cutting components:
   - Pure markup unification — no visual diff at 1440. Local `bun
     run lint` + `go build ./...` both green.
 
+- **Iter 44 — Mobile detail-page hero polish** ([#1158](https://github.com/canalesb93/breadbox/pull/1158))
+  - TX-detail hero: split the classify strip (category + tags) into
+    its own grid row so the priority order on a 375 viewport reads
+    **identity → amount → classify**. Previously the amount sat
+    below the classify strip on mobile — user had to scroll past
+    tags/category to see the headline number. Lg layout unchanged:
+    amount column still docks to the right via
+    `lg:grid-cols-[minmax(0,1fr)_auto]`, with the amount column
+    getting `lg:row-span-2` so it spans both the identity and
+    classify rows.
+  - All four `ColorRailCard` heros (TX / Account / Category /
+    Connection) tighten mobile padding from `px-6 py-6` →
+    `px-5 py-5` and gap from `gap-6` → `gap-5`; `sm:` keeps the
+    original `px-7 py-6` + `gap-6` rhythm. The hero now breathes
+    on 375 without crowding the rail. `ColorRailCard` footer
+    action strip picks up the same `px-5` mobile padding.
+  - Skeletons updated to match the new layout (TX-detail skeleton
+    also reordered to identity → amount → classify) so the page
+    doesn't shift on data arrival.
+  - No new primitive — sweep across four consumers. Padding /
+    gap vocabulary now reads `px-5 py-5 sm:px-7 sm:py-6` +
+    `gap-5 sm:gap-6` consistently across all four heros; if a
+    fifth detail hero ships, copy the same tokens.
+
 ## Open observations / questions
 
 (Populated by iterations.)
