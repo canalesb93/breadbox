@@ -190,6 +190,18 @@ next target, then updates this file at the end of the run.
   pickers' triggers already show the live selection, and
   tag-detail's PageHeader.actions slot now hosts a `<TagChip>`
   preview of the live tag. Don't re-introduce the inline tile.
+- **Cross-surface event bus** (iter 17): two singleton overlays
+  (`CommandPalette`, `ShortcutSheet`) now expose
+  `window.dispatchEvent(new CustomEvent("breadbox:<surface>:open"))`
+  as the way to open them from anywhere without lifting state into
+  a context. Names: `breadbox:command-palette:open` and
+  `breadbox:shortcut-sheet:open`. If a third singleton overlay
+  needs the same pattern (e.g. SettingsShell from outside the
+  topbar), follow the same `breadbox:<kebab>:open` shape; resist
+  the urge to add a generic event bus utility for two callers.
+  These events have no payload — they're "open me", not "open me
+  on tab X". If a payload becomes necessary, that's the signal
+  to lift to a small store (zustand or context).
 
 ## Backlog (ordered roughly by impact)
 
@@ -238,7 +250,7 @@ Cross-cutting components:
   foo</SoftBackButton>` on any new detail or form page that hangs
   off a list. Don't fork the look.
 - [ ] `empty-state.tsx` — visual language
-- [ ] `command-palette.tsx` — sections, kbd hints, recents
+- [x] `command-palette.tsx` — sections, kbd hints, recents — #1130
 - [ ] `category-badge.tsx` / `tag-chip.tsx` — colour tokens, sizes
 - [ ] `transaction-amount.tsx` — currency rendering
 - [x] Form patterns (used across new/edit pages) — `FormFooter` primitive
@@ -736,6 +748,42 @@ Cross-cutting components:
     into a single SectionCard with the "Import CSV" CTA in the
     header action slot — symmetric with the Plaid/Teller
     Diagnostics card structure.
+
+- **Iter 17 — Command palette polish** ([#1130](https://github.com/canalesb93/breadbox/pull/1130))
+  - Each NAV group's heading is now `Jump to · <Group>` so the
+    first word reads as an action — eliminates the "Money /
+    Library / System" headings reading as standalone titles. The
+    misleading "Transactions" group (which held filter/sort quick
+    actions, not navigation) is now "Transactions · Quick
+    actions"; "Developer" merges with the new keyboard-shortcuts
+    entry as "Help & developer".
+  - Tightens cmdk density via className overrides on `CommandList`
+    (rows `py-3 → py-2`, icons `size-5 → size-4`, group headings
+    rendered as uppercase tracked muted eyebrows like every other
+    v2 section label). Keeps `ui/command.tsx` upstream-clean —
+    all polish lives in the wrapper, the primitive is upgradeable.
+  - New Recent section (top 4, localStorage-backed at
+    `breadbox:cmdk:recents`, LRU eviction at write time). Sources
+    icons + group labels from `NAV_LEAVES` so there's no forked
+    metadata; clock icon + group eyebrow on each row so recents
+    are visually distinct from primary jump items.
+  - Footer action strip — `↑↓ Navigate · ↵ Select · esc Close`
+    using the existing `Kbd` + `KbdGroup` primitives. Standard
+    cmdk vocabulary (Linear / Raycast / shadcn examples) and
+    matches the topbar trigger pill's `⌘K` rendering. Sits
+    inside the `CommandDialog` body in a `bg-muted/30 border-t`
+    band — same visual language as `FormFooter`'s flush strip.
+  - New "Keyboard shortcuts" item opens the existing
+    `<ShortcutSheet>` via a new
+    `window.dispatchEvent("breadbox:shortcut-sheet:open")` event
+    (mirrors the existing `breadbox:command-palette:open`
+    pattern). Carries an inline `⇧?` Kbd hint so mouse-first
+    users discover the global shortcut.
+  - Subtle `ChevronRight` on the right of each jump-target row,
+    only visible on the selected row
+    (`text-muted-foreground/0` →
+    `group-data-[selected=true]:text-muted-foreground/70`). Reads
+    as "this is a jump target" without crowding unselected rows.
 
 ## Open observations / questions
 
