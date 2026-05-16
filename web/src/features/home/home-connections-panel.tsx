@@ -22,13 +22,20 @@ const PROVIDER_ICON: Record<string, typeof Building2> = {
 
 // Side-rail summary of household connections. Sorts attention-needed ones to
 // the top so the user sees what to fix first. Caps at 5 rows; the card
-// header's "Manage" link goes to the full Connections page.
+// header's "Manage" link goes to the full Connections page. The bordered
+// header carries the household-level health summary (active/needs-action
+// count) so the page header doesn't need a fourth scoreboard tile for the
+// same number.
 export function HomeConnectionsPanel({
   connections,
   isLoading,
 }: HomeConnectionsPanelProps) {
   const visible = connections ? rankForDashboard(connections).slice(0, 5) : [];
   const remaining = connections ? Math.max(0, connections.length - visible.length) : 0;
+  const attention = (connections ?? []).filter(
+    (c) => c.status === "pending_reauth" || c.status === "error",
+  ).length;
+  const active = (connections ?? []).filter((c) => c.status === "active").length;
 
   const manage = (
     <Button asChild variant="ghost" size="sm" className="-mr-2 h-8 px-2">
@@ -42,10 +49,34 @@ export function HomeConnectionsPanel({
     </Button>
   );
 
+  // Health line appears in the header subtitle when we have any connections.
+  // It replaces the standalone "Connections" stat card in the hero strip —
+  // the same number, but inline next to where the user is about to read it.
+  const title =
+    !isLoading && connections && connections.length > 0 ? (
+      <span className="flex flex-col gap-0.5">
+        <span>Connections</span>
+        <span className="text-muted-foreground text-xs font-normal">
+          {attention > 0 ? (
+            <>
+              <span className="text-amber-600 dark:text-amber-400">
+                {attention} need{attention === 1 ? "s" : ""} action
+              </span>
+              <span> · {active} healthy</span>
+            </>
+          ) : (
+            <>{active} healthy</>
+          )}
+        </span>
+      </span>
+    ) : (
+      "Connections"
+    );
+
   if (isLoading) {
     return (
       <ListCard
-        title="Connections"
+        title={title}
         action={manage}
         rows={[0, 1, 2, 3]}
         getRowKey={(i) => i}
@@ -66,7 +97,7 @@ export function HomeConnectionsPanel({
   if (!connections || connections.length === 0) {
     return (
       <ListCard
-        title="Connections"
+        title={title}
         action={manage}
         rows={[]}
         renderRow={() => null}
@@ -90,7 +121,7 @@ export function HomeConnectionsPanel({
 
   return (
     <ListCard
-      title="Connections"
+      title={title}
       action={manage}
       rows={visible}
       getRowKey={(c) => c.id}
