@@ -451,8 +451,8 @@ function DetailBody({
 
       {/* Health + Settings cards */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className="gap-3">
+          <CardHeader>
             <CardTitle className="text-base">Health</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -491,8 +491,8 @@ function DetailBody({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className="gap-3">
+          <CardHeader>
             <CardTitle className="text-base">Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -554,8 +554,8 @@ function DetailBody({
       </div>
 
       {/* 7-day sync activity */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="gap-3">
+        <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
             <span>Sync activity</span>
             <span className="text-muted-foreground text-xs font-normal">
@@ -599,8 +599,8 @@ function DetailBody({
       </section>
 
       {/* Sync history */}
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="gap-3">
+        <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
             <span>Sync history</span>
             <span className="text-muted-foreground text-xs font-normal">

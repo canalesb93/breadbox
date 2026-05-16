@@ -85,41 +85,26 @@ function BackButton() {
 }
 
 function DetailBody({ transaction: t }: { transaction: Transaction }) {
-  const isInflow = t.amount < 0;
-  const subtitle =
-    t.provider_merchant_name && t.provider_merchant_name !== t.provider_name
-      ? t.provider_merchant_name
-      : null;
-  const directionLabel = isInflow ? "Money in" : "Money out";
-  const DirectionIcon = isInflow ? ArrowDownLeft : ArrowUpRight;
   const merchantQuery = (t.provider_merchant_name ?? t.provider_name).trim();
 
   return (
     <div className="space-y-6">
-      <Hero
-        transaction={t}
-        subtitle={subtitle}
-        isInflow={isInflow}
-        directionLabel={directionLabel}
-        DirectionIcon={DirectionIcon}
-      />
+      <Hero transaction={t} />
 
       <ClassifyStrip transaction={t} />
 
       <QuickActions transaction={t} merchantQuery={merchantQuery} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <CommentComposer transactionId={t.id} />
-              <ActivityTimeline transactionId={t.id} />
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Activity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <CommentComposer transactionId={t.id} />
+            <ActivityTimeline transactionId={t.id} />
+          </CardContent>
+        </Card>
 
         <aside className="space-y-6">
           <DetailsCard transaction={t} />
@@ -129,21 +114,14 @@ function DetailBody({ transaction: t }: { transaction: Transaction }) {
   );
 }
 
-interface HeroProps {
-  transaction: Transaction;
-  subtitle: string | null;
-  isInflow: boolean;
-  directionLabel: string;
-  DirectionIcon: typeof ArrowDownLeft;
-}
-
-function Hero({
-  transaction: t,
-  subtitle,
-  isInflow,
-  directionLabel,
-  DirectionIcon,
-}: HeroProps) {
+function Hero({ transaction: t }: { transaction: Transaction }) {
+  const isInflow = t.amount < 0;
+  const subtitle =
+    t.provider_merchant_name && t.provider_merchant_name !== t.provider_name
+      ? t.provider_merchant_name
+      : null;
+  const directionLabel = isInflow ? "Money in" : "Money out";
+  const DirectionIcon = isInflow ? ArrowDownLeft : ArrowUpRight;
   return (
     <div
       className={cn(

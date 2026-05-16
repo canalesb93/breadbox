@@ -8,18 +8,14 @@ interface CommentComposerProps {
   transactionId: string;
 }
 
-// CommentComposer is the inline note-add affordance on the transaction detail
-// page — a compact textarea that submits via the same batch update endpoint
-// (one operation: a `comment` append). Cmd/Ctrl+Enter submits without leaving
-// the keyboard. The Activity timeline auto-refreshes via the shared mutation
-// invalidation.
 export function CommentComposer({ transactionId }: CommentComposerProps) {
   const [value, setValue] = useState("");
   const update = useUpdateTransactions();
+  const trimmed = value.trim();
+  const canSubmit = trimmed.length > 0 && !update.isPending;
 
   const submit = async () => {
-    const trimmed = value.trim();
-    if (!trimmed || update.isPending) return;
+    if (!canSubmit) return;
     const ok = await withMutationToast(
       () =>
         update.mutateAsync({
@@ -56,7 +52,7 @@ export function CommentComposer({ transactionId }: CommentComposerProps) {
           type="button"
           size="sm"
           onClick={submit}
-          disabled={!value.trim() || update.isPending}
+          disabled={!canSubmit}
           className="ml-auto"
         >
           {update.isPending ? "Posting…" : "Post note"}
