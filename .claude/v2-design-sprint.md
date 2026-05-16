@@ -130,13 +130,19 @@ next target, then updates this file at the end of the run.
   principle, not the implementation. If a second "nested rows
   under a parent" surface needs it (rule conditions? account
   sub-accounts?), the inset-boxShadow trick is the one to lift.
-- **Bordered timeline rail** (iter 5, new): activity-timeline now
-  uses `<ol class="border-l">` with each row's icon disc set to
-  `bg-card border-border/60 -ml-[calc(0.875rem+1px)]` so the discs
-  punch through the line. Day headings sit outside the `<ol>` (no
-  rail under them) so they read as anchors. Generic enough to ship
-  as a `<TimelineRail>` primitive if a second timeline lands (e.g.
-  rule run history, sync log per connection).
+- **TimelineRail primitive** — extracted to
+  `web/src/components/timeline-rail.tsx` in iter 26 (#1138).
+  Compound API: `<TimelineRail>` / `<TimelineRail.Group label="…">`
+  / `<TimelineRail.Row icon={Icon} muted>`. Bordered `<ol>` rail +
+  punched-through `bg-card` icon discs + day-headings as anchors
+  outside the rail. One consumer today (transaction-detail
+  Activity); queued for rule run history and per-connection sync
+  log. `muted` prop centralises the soft-delete opacity vocabulary
+  so consumers don't fork the class string. Don't fork the look —
+  extend the primitive. The iter-5 drift note ("Generic enough to
+  ship as a `<TimelineRail>` primitive if a second timeline lands")
+  is now resolved (shipped pre-emptively before the second
+  consumer to avoid forking later).
 - **AuthShell primitive** (iter 14, #1127) — two-pane shell for
   unauthenticated pages at `web/src/components/auth-shell.tsx`.
   Left pane reuses the in-app sidebar surface (`bg-sidebar` +
@@ -1031,6 +1037,42 @@ Cross-cutting components:
     columns and the connection picker), not spacers. The iter-23 watch
     note can stay as a forward guard; the audit retires.
 
+- **Iter 26 — TimelineRail primitive** ([#1138](https://github.com/canalesb93/breadbox/pull/1138))
+  - Promoted `<TimelineRail>` to
+    `web/src/components/timeline-rail.tsx`. The bordered timeline rail
+    (border-l `<ol>` + icon discs with `bg-card border-border/60`
+    `-ml-[calc(0.875rem+1px)]` that punch through the line + day-headings
+    sitting outside the `<ol>` as anchors) was open-coded inside
+    `features/transactions/activity-timeline.tsx` since iter 5. The
+    iter-5 drift note explicitly queued promotion once a second
+    timeline surface needed it — shipped the primitive now even with
+    a single consumer so future surfaces (rule run history,
+    per-connection sync log, agent activity) inherit one vocabulary
+    instead of forking the rail markup. Tenth shared primitive of
+    the sprint (after ListCard, ColorRailCard, IdPill, SectionCard,
+    SoftBackButton, AuthShell, StatusPanel, FormFooter, ConfirmDialog,
+    EmptyState).
+  - Compound component API: `<TimelineRail>` (wrapper, default
+    `space-y-5`), `<TimelineRail.Group label="…">` (optional day
+    heading + rail-bearing `<ol>`), `<TimelineRail.Row icon={Icon}
+    muted={'icon-only' | true}>` (icon disc + content slot). Matches
+    the shadcn-style nested composition used by Card / Sidebar /
+    Table. Pure presentation; data-fetching, grouping, and
+    annotation-specific copy stay in the `ActivityTimeline`
+    consumer — same split as ListCard / SectionCard. The `muted`
+    prop centralises the soft-delete opacity vocabulary so consumers
+    don't fork the `opacity-50` / `opacity-60` class strings.
+  - Migration is byte-identical at the pixel level — md5 of full-page
+    before/after screenshots match (c9a2321d3ddbe2283aa2c450aaab199a
+    on both). Same mechanical sweep as iter 9 — the rewrite is
+    purely structural so future tweaks to the rail (radius, disc
+    size, hover, dark-mode rail tint) propagate from one file.
+  - Sandbox specimen added under Components with a two-group /
+    mixed-row demo (Today: comment + rule-applied; Yesterday:
+    category-set + tag-added + deleted comment) so future iterations
+    can see the rail vocabulary at a glance without booting a
+    transaction with annotations. Closes the iter-5 drift note.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1139,4 +1181,5 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
