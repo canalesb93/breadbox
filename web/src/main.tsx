@@ -34,6 +34,7 @@ import {
 import { APIKeysPage, apiKeysSearchSchema } from "@/routes/api-keys";
 import { APIKeyNewPage } from "@/routes/api-key-new";
 import { APIKeyCreatedPage } from "@/routes/api-key-created";
+import { ProvidersPage } from "@/routes/providers";
 import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
 import {
   AccountDetailPage,
@@ -95,6 +96,9 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/api-keys": {
     component: APIKeysPage,
     validateSearch: apiKeysSearchSchema,
+  },
+  "/providers": {
+    component: ProvidersPage,
   },
   "/accounts": {
     component: AccountsPage,

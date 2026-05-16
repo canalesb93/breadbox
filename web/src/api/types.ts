@@ -387,3 +387,64 @@ export interface APIKey {
 export interface CreateAPIKeyResult extends APIKey {
   plaintext_key: string;
 }
+
+// --- Provider configuration (GET/PUT /settings/providers/*) ---
+// Wire shapes for the v2 providers page. Sensitive fields (Plaid secret,
+// Teller PEM cert/key) never leave the server in plaintext — clients see
+// boolean *_set flags only.
+
+export interface PlaidConfigView {
+  configured: boolean;
+  from_env: boolean;
+  client_id?: string;
+  environment?: string;
+  webhook_url?: string;
+  secret_set: boolean;
+}
+
+export interface TellerConfigView {
+  configured: boolean;
+  from_env: boolean;
+  application_id?: string;
+  environment?: string;
+  certificate_set: boolean;
+  webhook_secret_set: boolean;
+}
+
+export interface ProviderConfigResponse {
+  plaid: PlaidConfigView;
+  teller: TellerConfigView;
+  has_encryption_key: boolean;
+}
+
+export interface UpdatePlaidConfigRequest {
+  client_id: string;
+  // null/omitted preserves the existing secret. Required on first save.
+  secret?: string | null;
+  environment: "sandbox" | "development" | "production";
+  webhook_url?: string;
+}
+
+export interface UpdateTellerConfigRequest {
+  application_id: string;
+  environment: "sandbox" | "development" | "production";
+  // PEM bodies. Send both together to rotate; omit to keep the existing pair.
+  certificate?: string | null;
+  private_key?: string | null;
+  webhook_secret?: string | null;
+}
+
+export interface ProviderHealthResponse {
+  provider: string;
+  connection_count: number;
+  account_count: number;
+  last_sync_status?: string;
+  last_sync_time?: string;
+  last_sync_error?: string;
+}
+
+export interface ProviderTestResult {
+  provider: string;
+  ok: boolean;
+  message?: string;
+}
