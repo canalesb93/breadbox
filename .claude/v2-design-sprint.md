@@ -54,13 +54,13 @@ next target, then updates this file at the end of the run.
   recent-activity feed and the connections panel — if a third surface
   needs the pattern (e.g. Reports recent insights), wrap into a
   `ListCard` primitive.
-- **Bordered "header card" pattern** (iter 5): The transaction
-  detail's Activity and Details cards now adopt the same
-  `<Card className="gap-0 py-0">` + `border-b` CardHeader pattern
-  Home introduced. Now used on 3 surfaces (Home recent / Home
-  connections / TX-detail Activity + Details). **This is the
-  threshold**: pull into a `SectionCard` (or `PaneCard`) primitive
-  before the next page needs it.
+- **Bordered "header card" pattern** — extracted to
+  `web/src/components/section-card.tsx` in iter 6 (#1119). Use
+  `SectionCard` for any new "page section in a card" surface.
+  Migrated Home / TX-detail / Account-detail are still hand-rolled
+  on the Home page only — sweep when convenient. Don't add fresh
+  `<Card gap-0 py-0>` + `<CardHeader className="border-b">`
+  open-coded sites.
 - **List page toolbar** (iter 4): Tags now mirrors the Transactions
   list — a `flex flex-col gap-3` block with the search input + any
   filters in a `justify-between` row above the table. Pattern is now
@@ -70,19 +70,24 @@ next target, then updates this file at the end of the run.
   `bg-muted/60 rounded px-1.5 py-0.5 font-mono text-[11px]` muted
   pills, not raw `<code>` — promote into a shared `IdPill` once a
   third surface (rules? agents?) needs it.
-- **IdPill candidates** (iter 5): the transaction-detail Reference
-  group now renders `short_id` as the same muted mono pill the Tags
-  page uses for slugs. Two surfaces. When the Connections/Account
-  detail page wants the same affordance for its short_id, extract
-  `<IdPill value="...">` — exactly `inline-block bg-muted/60 rounded
-  px-1.5 py-0.5 font-mono text-[11px]`. Stop reinventing.
-- **Category-rail "hero" pattern** (iter 5, new): The TX-detail Hero
-  uses a 1px-wide absolute left rail painted with the category's
-  color (`var(--muted)` fallback when uncategorised) over a rounded
-  card. Reads as "this card belongs to this thing." Worth keeping in
-  mind for Account detail (account-color rail?), Category detail
-  (category-color rail) and Rule detail. Promote to `<ColorRailCard>`
-  if 2+ detail pages adopt it.
+- **IdPill** — extracted to `web/src/components/id-pill.tsx` in
+  iter 6 (#1119). Three surfaces (Tags slug column, TX-detail
+  Reference row, Account-detail Reference row) now share it. Use
+  `<IdPill value={shortId} />` for any short_id / slug / machine
+  identifier. The api-key-created page still uses its own
+  `<code className="bg-muted ...">` markup — migrate when that page
+  gets a design pass (different `bg-muted` token, intentional).
+- **Color-rail "hero" pattern** (iter 5 + iter 6): Now used on two
+  detail pages — TX-detail (category color, neutral when
+  uncategorised) and Account-detail (success for assets, destructive
+  for liabilities, muted when excluded). The rail's colour encodes
+  *meaning* (classification, accounting role) rather than
+  decoration. Both heroes also share a small uppercase eyebrow
+  ("Transaction" / "Asset" / "Liability") so the visual accent has a
+  textual anchor — colour alone shouldn't carry meaning. **Pull
+  into `<ColorRailCard>` once a 3rd detail page adopts it**
+  (Category detail with category-color rail is the obvious next
+  candidate).
 - **Bordered timeline rail** (iter 5, new): activity-timeline now
   uses `<ol class="border-l">` with each row's icon disc set to
   `bg-card border-border/60 -ml-[calc(0.875rem+1px)]` so the discs
@@ -100,7 +105,7 @@ Pages:
 - [x] Transactions list (`transactions.tsx`) — #1116
 - [x] Transaction detail (`transaction-detail.tsx`) — #1118
 - [ ] Accounts list (`accounts.tsx`)
-- [ ] Account detail (`account-detail.tsx`)
+- [x] Account detail (`account-detail.tsx`) — #1119
 - [ ] Categories list (`categories.tsx`)
 - [ ] Category detail (`category-detail.tsx`)
 - [ ] Category new (`category-new.tsx`)
@@ -135,10 +140,17 @@ Cross-cutting components:
 - [ ] Form patterns (used across new/edit pages) — labels, validation, footers
 - [ ] Toast (`sonner.tsx`) — variants, action affordances
 - [ ] Confirmation dialogs (`alert-dialog.tsx` usage) — consistency
-- [ ] `SectionCard` primitive — bordered header + zero-padding body
-  card. Used on 3 surfaces (see drift). Worth extracting before #6.
-- [ ] `IdPill` primitive — mono short_id pill. Used on 2 surfaces.
-  Extract when a 3rd lands.
+- [x] `SectionCard` primitive (iter 6, #1119) — bordered header +
+  optional flush body, optional action slot. Shipped at
+  `web/src/components/section-card.tsx`. Migrated TX-detail (Activity
+  + Details) + Account-detail (Settings + Links + Recent
+  transactions + Details) onto it in the same iteration. New surfaces
+  should reach for this instead of hand-rolling
+  `<Card gap-0 py-0>` + `<CardHeader className="border-b">`.
+- [x] `IdPill` primitive (iter 6, #1119) — mono short_id pill at
+  `web/src/components/id-pill.tsx`. Three surfaces now share it:
+  Tags slug column, TX-detail Reference row, Account-detail
+  Reference row. Don't re-derive the same span.
 
 ## Completed
 
@@ -222,6 +234,29 @@ Cross-cutting components:
   - Details sidebar adds a Reference group with the short_id
     rendered as the same muted mono pill the Tags page uses for
     slugs — second surface for the pattern.
+
+- **Iter 6 — Account detail + IdPill / SectionCard primitives**
+  ([#1119](https://github.com/canalesb93/breadbox/pull/1119))
+  - Hero card parallels the iter-5 TX-detail hero — icon tile +
+    name + meta in one identity column, balance pill + value +
+    utilization / available credit in the amount column, wrapped in
+    a card with a 1px left rail tinted by accounting role (success
+    for assets, destructive for liabilities, muted when excluded).
+    Inline Link / View action strip sits in the card footer, "Jump
+    to" pills mirror the TX-detail vocabulary below.
+  - `IdPill` promoted to `web/src/components/id-pill.tsx`. Tags
+    slug column + TX-detail Reference row + Account-detail
+    Reference row all source from it.
+  - `SectionCard` promoted to `web/src/components/section-card.tsx`
+    (bordered CardHeader + optional flush-or-padded body + optional
+    action slot + optional footer). TX-detail (Activity + Details)
+    and Account-detail (Settings + Links + Recent transactions +
+    Details) all use it. Every "page section in a card" surface
+    now speaks the same vocabulary.
+  - Sidebar inverts the iter-5 split: Settings + Details on the
+    side, Recent transactions + Links in the main column. Account
+    detail has more first-class affordances (rename, exclude, link,
+    reauth) than TX detail, so Settings earned its own sidebar slot.
 
 ## Open observations / questions
 
