@@ -980,6 +980,20 @@ Cross-cutting components:
 
 (Populated by iterations.)
 
+- **Mobile sweep audit findings** (iter 22, partial — pre-merge halt):
+  Quick 375x812 walkthrough surfaced concrete breakage worth a dedicated
+  iteration:
+  - **Transactions list**: giant whitespace gap between the Connect-bank
+    section and the search row; "Newest first" and "Select" controls are
+    oddly right-aligned and visually disconnected from the rest of the
+    toolbar.
+  - **Accounts / Providers settings**: not yet audited — flagged as likely
+    candidates for layout breakage at small viewports.
+  No code shipped this iteration (agent stopped mid-investigation before
+  taking screenshots or making fixes). Next mobile-focused iteration:
+  fix the Transactions toolbar collapse + audit Accounts/Providers; ship
+  one focused PR.
+
 - **Backend already on 8090** in this dev environment — iter 1 reused
   it instead of starting a second `make dev`. Future iterations should
   do the same when a healthy `/v2/` is already serving; saves ~10s and
