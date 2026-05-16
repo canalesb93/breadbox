@@ -59,7 +59,7 @@ export function CategoryDetailPage() {
         <EmptyState
           icon={Shapes}
           title="Category not found"
-          description="It may have been deleted, or the link is wrong."
+          description="This category may have been deleted, or the link is out of date. Head back to the categories list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/categories">Back to categories</Link>

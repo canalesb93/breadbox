@@ -447,7 +447,7 @@ function BackupsTable({
           variant="card"
           icon={HardDrive}
           title="No backups yet"
-          description="Create one above or set a schedule to start a regular cadence."
+          description="Take a manual snapshot above, or enable scheduled backups to start a regular cadence."
         />
       ) : (
         <div className="border-border overflow-hidden rounded-md border">

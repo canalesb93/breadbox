@@ -96,7 +96,7 @@ export function AccountDetailPage() {
         <EmptyState
           icon={Banknote}
           title="Account not found"
-          description="It may have been disconnected, or the link is wrong."
+          description="This account may have been disconnected, or the link is out of date. Head back to the accounts list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/accounts">Back to accounts</Link>

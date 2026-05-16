@@ -78,7 +78,7 @@ export function HomeRecentTransactions({
         <EmptyState
           icon={Receipt}
           title="No transactions yet"
-          description="Connect a bank or import a CSV to start seeing activity here."
+          description="Connect a bank or import a CSV — fresh activity will start landing here within a minute."
         />
       }
     />

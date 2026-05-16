@@ -100,7 +100,7 @@ export function ActivityTimeline({ transactionId }: { transactionId: string }) {
       <EmptyState
         icon={Activity}
         title="No activity yet"
-        description="Comments, rule applications, and category changes show up here."
+        description="Comments, category changes, and rule applications will appear here as this transaction evolves."
       />
     );
   }

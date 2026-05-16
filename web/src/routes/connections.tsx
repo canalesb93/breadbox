@@ -298,7 +298,7 @@ export function ConnectionsPage() {
         <EmptyState
           icon={Plug}
           title="No connections yet"
-          description="Connect a bank to start syncing transactions across your household."
+          description="Link a bank via Plaid or Teller — or drop in a CSV — to start syncing transactions across the household."
           action={
             <Button onClick={openConnectSheet}>
               <Plus className="size-4" />
@@ -354,7 +354,7 @@ export function ConnectionsPage() {
           empty={
             <EmptyState
               title="No connections for this filter"
-              description="Switch family member or clear the filter to see other connections."
+              description="Switch family member, or clear the filter to see every connection in the household."
               className="py-10"
             />
           }
