@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Card,
   CardContent,
@@ -152,6 +153,20 @@ export function PrimitivesSection() {
         <Label className="text-muted-foreground flex items-center gap-2">
           <Checkbox disabled /> Disabled
         </Label>
+      </Specimen>
+
+      <Specimen label="RadioGroup" className="block">
+        <RadioGroup defaultValue="full" className="gap-2">
+          <Label className="flex items-center gap-2">
+            <RadioGroupItem value="full" /> Full access
+          </Label>
+          <Label className="flex items-center gap-2">
+            <RadioGroupItem value="read" /> Read only
+          </Label>
+          <Label className="text-muted-foreground flex items-center gap-2">
+            <RadioGroupItem value="disabled" disabled /> Disabled
+          </Label>
+        </RadioGroup>
       </Specimen>
 
       <Specimen label="Card" className="block">

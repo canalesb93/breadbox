@@ -366,6 +366,28 @@ export interface UpdateTransactionsResult {
   error?: string;
 }
 
+// --- API keys (public /api/v1/api-keys) ---
+// Mirrors internal/service.APIKeyResponse. Plaintext is returned only on the
+// create response and surfaced once at /api-keys/created.
+export type APIKeyScope = "full_access" | "read_only";
+export type APIKeyActorType = "user" | "agent" | "system";
+
+export interface APIKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  scope: APIKeyScope;
+  actor_type: APIKeyActorType;
+  actor_name?: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface CreateAPIKeyResult extends APIKey {
+  plaintext_key: string;
+}
+
 // --- Provider configuration (GET/PUT /settings/providers/*) ---
 // Wire shapes for the v2 providers page. Sensitive fields (Plaid secret,
 // Teller PEM cert/key) never leave the server in plaintext — clients see
