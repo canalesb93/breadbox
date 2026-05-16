@@ -1124,6 +1124,22 @@ Cross-cutting components:
     (containers / status / forms / etc) instead of a flat scroll —
     today's order is logical but unannounced. Defer until needed.
 
+- **Iter 29 — Brand polish: favicon, OG image, meta tags** ([#1141](https://github.com/canalesb93/breadbox/pull/1141))
+  - New brand-aligned SVG favicon (`web/public/favicon.svg`) matched to
+    the v2 primary token.
+  - New 1200x630 OG card (`web/public/og-image.svg`) with the brand
+    lockup + tagline ("Self-hosted finance for households") — replaces
+    the default no-OG fallback for Slack/Discord/iMessage/Linear
+    previews.
+  - `web/index.html` meta sweep: real `<title>`, SEO description,
+    prefers-color-scheme theme-color split, full Open Graph + Twitter
+    summary_large_image card.
+  - Process note: iter-29 agent stopped mid-screenshot before
+    committing (same pattern as iter #18). Main session reconciled and
+    shipped. Future iterations: end with `result:` only AFTER the PR
+    is merged. Don't pause for "one more screenshot" — the PR is the
+    deliverable.
+
 ## Open observations / questions
 
 (Populated by iterations.)
