@@ -25,6 +25,9 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { RulesPage, rulesSearchSchema } from "@/routes/rules";
+import { RuleDetailPage } from "@/routes/rule-detail";
+import { RuleFormPage } from "@/routes/rule-form";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -72,6 +75,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
   },
+  "/rules": {
+    component: RulesPage,
+    validateSearch: rulesSearchSchema,
+  },
 };
 
 // Detail routes aren't nav leaves, so they're registered explicitly rather
@@ -98,6 +105,27 @@ const connectionDetailRoute = createRoute({
   validateSearch: connectionDetailSearchSchema,
 });
 
+// /rules/new and /rules/$id/edit share one form component (RuleFormPage) —
+// the `mode` distinguishes them. Declared before /rules/$id so the more
+// specific path wins the route match.
+const ruleNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/rules/new",
+  component: () => <RuleFormPage mode="create" />,
+});
+
+const ruleEditRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/rules/$id/edit",
+  component: () => <RuleFormPage mode="edit" />,
+});
+
+const ruleDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/rules/$id",
+  component: RuleDetailPage,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -119,6 +147,9 @@ const routeTree = rootRoute.addChildren([
   transactionDetailRoute,
   sandboxRoute,
   connectionDetailRoute,
+  ruleNewRoute,
+  ruleEditRoute,
+  ruleDetailRoute,
   ...pageRoutes,
 ]);
 

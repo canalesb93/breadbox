@@ -307,3 +307,103 @@ export interface UpdateTransactionsResult {
   aborted?: boolean;
   error?: string;
 }
+
+// --- Transaction rules (public /api/v1/rules) ---
+// Mirrors internal/service.TransactionRuleResponse + Condition + RuleAction.
+// See docs/rule-dsl.md for the condition/action/trigger grammar.
+
+// Condition is a recursive tree: either a leaf ({field, op, value}) or a
+// combinator ({and|or|not}). A zero-value Condition means "match every
+// transaction".
+export interface Condition {
+  field?: string;
+  op?: string;
+  value?: unknown;
+  and?: Condition[];
+  or?: Condition[];
+  not?: Condition;
+}
+
+// RuleAction.type: "set_category" | "add_tag" | "remove_tag" | "add_comment".
+// The relevant payload field is keyed off `type` — see docs/rule-dsl.md.
+export interface RuleAction {
+  type: string;
+  category_slug?: string;
+  tag_slug?: string;
+  content?: string;
+}
+
+export interface TransactionRule {
+  id: string;
+  short_id: string;
+  name: string;
+  conditions: Condition;
+  actions: RuleAction[];
+  trigger: string; // on_create | on_change | always
+  category_slug?: string | null;
+  category_display_name?: string | null;
+  category_icon?: string | null;
+  category_color?: string | null;
+  priority: number;
+  enabled: boolean;
+  expires_at?: string | null;
+  created_by_type: string; // user | agent | system
+  created_by_id?: string | null;
+  created_by_name: string;
+  hit_count: number;
+  last_hit_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RulesPage {
+  rules: TransactionRule[];
+  next_cursor?: string;
+  has_more: boolean;
+  // Offset-pagination fields, populated by the admin path. The v2 SPA reads
+  // these to render numbered pagination.
+  total?: number;
+  page?: number;
+  page_size?: number;
+  total_pages?: number;
+}
+
+export interface RulePreviewMatch {
+  transaction_id: string;
+  provider_name: string;
+  provider_merchant_name?: string;
+  amount: number;
+  iso_currency_code: string;
+  date: string;
+  provider_category_primary: string;
+  current_category_slug?: string;
+}
+
+export interface RulePreviewResult {
+  match_count: number;
+  total_scanned: number;
+  sample_matches: RulePreviewMatch[];
+}
+
+// Request shapes — what the form posts back. CreateRuleInput sits next to
+// the API type so the resolver in features/rules/ has one import location.
+export interface CreateRuleInput {
+  name: string;
+  conditions?: Condition;
+  actions: RuleAction[];
+  trigger?: string;
+  priority?: number;
+  stage?: string;
+  expires_in?: string;
+}
+
+export interface UpdateRuleInput {
+  name?: string;
+  conditions?: Condition;
+  actions?: RuleAction[];
+  trigger?: string;
+  priority?: number;
+  stage?: string;
+  enabled?: boolean;
+  expires_at?: string;
+}
