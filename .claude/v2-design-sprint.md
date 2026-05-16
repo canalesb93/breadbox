@@ -2298,7 +2298,49 @@ Cross-cutting components:
     `web/src` are inside `lib/format.ts` itself — same canonical
     drift-detection state achieved for currency in iter 59.
 
-## Open observations / questions
+- **Iter 61 — Toast success copy audit (split two-thought titles)** ([#1174](https://github.com/canalesb93/breadbox/pull/1174))
+  - Promoted `successDescription` from "documented but unused" to a
+    real adoption. The slot shipped in iter 20 (#1133) and had been
+    sitting in the helper for 41 iterations with zero call-site
+    consumers — every multi-thought success copy had been crammed
+    into the title.
+  - Seven surfaces swept onto the canonical title + description split:
+    backups restore (uploaded + by-row), provider disable (Plaid +
+    Teller), account exclude/include, accounts linked, rule applied
+    retroactively. Em-dash hacks retired in two places: account
+    excluded ("Account excluded — future syncs will skip it.") and
+    account reconciled ("Reconciled — N new matches."). The
+    description slot is the right home for "what to expect / do
+    next" copy; cramming it into the title via `.` or `—` was the
+    only available shape until the helper learned the slot.
+  - Enriched the three sync-queued surfaces (connection-detail
+    `onSync`, connections-list `onSyncAll`, multi-select action-bar
+    `onSync`) with a "New transactions land within a minute"
+    description so the user knows the time horizon — same vocabulary
+    the iter-58 empty-state sweep established for sync-history empties
+    ("Syncs trigger on schedule, on webhook, or when you press Sync
+    now — entries appear within a minute"). Iter 58 + iter 61 now
+    share one time-horizon vocabulary across empty-states and toasts.
+  - `account-links-section.onReconcile()` folded out of
+    `withMutationToast` into a `try/catch` because the new-matches
+    count lives on the awaited result — the helper captures the
+    success string *before* the mutation resolves, so the count was
+    always reading 0 from the previous run (stale `reconcile.data`
+    closure). Single-callsite fix, not a primitive change. If a
+    second caller needs "describe the success based on the mutation
+    result", consider promoting a `successDescriptionFn` callback to
+    the helper.
+  - Sandbox `PatternsSection` Toasts description updated to spell
+    out the canonical split ("Use the successDescription slot for any
+    two-thought outcome — what happened + what to expect / do next —
+    instead of cramming both into the title"). Future surfaces have
+    a one-line rule to follow.
+  - Audit method (worth recording for future copy sweeps): `grep -rn
+    'success: \|successDescription' web/src --include='*.tsx'
+    --include='*.ts'` enumerates every callsite in one pass.
+    `grep -rn 'success:.*—\|success:.*\. .*\.' …` finds the
+    em-dash + multi-sentence patterns specifically — both queries
+    return zero hits post-sweep.
 
 (Populated by iterations.)
 
@@ -2418,6 +2460,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
