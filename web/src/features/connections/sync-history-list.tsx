@@ -1,5 +1,6 @@
 import { Check, Loader2, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
 import { relativeTime } from "./connection-utils";
 import type { SyncLog } from "@/api/queries/sync-logs";
 
@@ -16,10 +17,12 @@ const STATUS_TILE: Record<string, string> = {
 export function SyncHistoryList({ logs }: SyncHistoryListProps) {
   if (logs.length === 0) {
     return (
-      <div className="text-muted-foreground flex flex-col items-center gap-2 py-10 text-sm">
-        <RefreshCw className="size-8 opacity-40" />
-        <span>No sync history yet</span>
-      </div>
+      <EmptyState
+        variant="inline"
+        icon={RefreshCw}
+        title="No sync history yet"
+        description="Each sync run will appear here with its timing and result."
+      />
     );
   }
 

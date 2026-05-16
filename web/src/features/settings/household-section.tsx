@@ -75,6 +75,7 @@ import {
 import { withMutationToast } from "@/lib/mutation-toast";
 import type { LoginAccount, User } from "@/api/types";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
 
 export function HouseholdSection() {
   const { data: users, isLoading } = useUsers();
@@ -106,7 +107,12 @@ export function HouseholdSection() {
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading members…</p>
       ) : !hasMembers ? (
-        <EmptyState />
+        <EmptyState
+          variant="card"
+          icon={Users}
+          title="No family members yet"
+          description="Add members to connect their banks and attribute transactions by person."
+        />
       ) : (
         <ul className="space-y-3">
           {users.map((u) => (
@@ -114,21 +120,6 @@ export function HouseholdSection() {
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="border-border rounded-lg border border-dashed p-8 text-center">
-      <div className="bg-muted mx-auto mb-3 flex size-12 items-center justify-center rounded-xl">
-        <Users className="text-muted-foreground size-6" />
-      </div>
-      <h3 className="text-sm font-medium">No family members yet</h3>
-      <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
-        Add members to connect their banks and attribute transactions by
-        person.
-      </p>
     </div>
   );
 }

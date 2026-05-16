@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
-import { Inbox, Plus, RotateCcw } from "lucide-react";
+import { Inbox, Plus, RefreshCw, RotateCcw, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -90,14 +90,44 @@ export function ComponentsSection() {
       <Specimen
         label="EmptyState"
         code="components/empty-state"
+        description="Three variants share one primitive — pick the weight that fits the surface. Same icon-tile vocabulary as the rest of v2 (square rounded-xl, not circle)."
         className="block"
       >
-        <EmptyState
-          icon={Inbox}
-          title="No matching transactions"
-          description="Try adjusting or clearing your filters."
-          action={<Button variant="outline">Clear filters</Button>}
-        />
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              default · inside a container
+            </div>
+            <EmptyState
+              icon={Inbox}
+              title="No matching transactions"
+              description="Try adjusting or clearing your filters."
+              action={<Button variant="outline">Clear filters</Button>}
+            />
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+              card · in raw page space
+            </div>
+            <EmptyState
+              variant="card"
+              icon={Users}
+              title="No family members yet"
+              description="Add members to connect their banks and attribute transactions by person."
+            />
+          </div>
+          <div className="bg-card rounded-lg border p-4">
+            <div className="text-muted-foreground mb-1 text-[11px] tracking-wide uppercase">
+              inline · compact sub-panel
+            </div>
+            <EmptyState
+              variant="inline"
+              icon={RefreshCw}
+              title="No sync history yet"
+              description="Each sync will appear here with timing and result."
+            />
+          </div>
+        </div>
       </Specimen>
 
       <Specimen
