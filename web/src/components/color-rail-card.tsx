@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface ColorRailCardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -75,6 +76,82 @@ export function ColorRailCard({
           )}
         >
           {footer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ColorRailCardSkeletonProps {
+  /**
+   * Shape of the hero icon tile to mirror — match what the loaded hero
+   * renders. `rounded-md` for transaction-detail (matches
+   * `<CategoryIconTile>`), `rounded-lg` for account-detail and
+   * category-detail (slightly chunkier accounting/folder tile).
+   */
+  tileShape?: "rounded-md" | "rounded-lg";
+  /**
+   * Whether to render the bordered footer strip (action bar) under the
+   * hero. Matches `<ColorRailCard footer={…}>` consumers.
+   */
+  withFooter?: boolean;
+  /**
+   * Optional content slot rendered between the hero body and the footer
+   * strip — used by transaction-detail for the secondary details grid
+   * that sits below the identity row.
+   */
+  body?: React.ReactNode;
+  className?: string;
+}
+
+// ColorRailCardSkeleton mirrors the `<ColorRailCard>` wrapper for loading
+// states — the same `bg-card rounded-xl border` shell + 4px muted left
+// rail. The identity column on the left is a stable shape across every
+// detail-page hero (size-12 tile, eyebrow line, title line, meta line) so
+// it lives inside the primitive; the trailing column carries the
+// per-entity metric (amount / balance / count) and is a smaller shared
+// shape. Don't fork the look — consumers can hang an additional `body`
+// row off the bottom (e.g. TX-detail's secondary details grid) or opt in
+// to a `withFooter` strip when the loaded hero has a footer action bar.
+export function ColorRailCardSkeleton({
+  tileShape = "rounded-md",
+  withFooter = false,
+  body,
+  className,
+}: ColorRailCardSkeletonProps) {
+  return (
+    <div
+      className={cn(
+        "bg-card relative overflow-hidden rounded-xl border",
+        className,
+      )}
+    >
+      <div
+        aria-hidden
+        className="bg-muted absolute inset-y-0 left-0 w-1"
+      />
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+        {/* Identity column */}
+        <div className="flex items-start gap-3 sm:gap-4">
+          <Skeleton className={cn("size-12", tileShape)} />
+          <div className="space-y-2 py-1">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+        </div>
+        {/* Metric column */}
+        <div className="space-y-2 lg:items-end">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+        {body && <div className="lg:col-span-2">{body}</div>}
+      </div>
+      {withFooter && (
+        <div className="border-t flex justify-end gap-2 px-5 py-3 sm:px-7">
+          <Skeleton className="h-7 w-24 rounded-md" />
+          <Skeleton className="h-7 w-32 rounded-md" />
         </div>
       )}
     </div>

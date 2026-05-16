@@ -16,7 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  ColorRailCard,
+  ColorRailCardSkeleton,
+} from "@/components/color-rail-card";
 import { DangerZone } from "@/components/danger-zone";
 import {
   DetailList,
@@ -393,24 +396,7 @@ function DeleteCategory({ category }: { category: Category }) {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="bg-card relative overflow-hidden rounded-xl border">
-        <div className="bg-muted absolute inset-y-0 left-0 w-1" />
-        <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <Skeleton className="size-12 rounded-lg" />
-            <div className="space-y-2 py-1">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </div>
-          <div className="space-y-2 lg:items-end">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-9 w-32" />
-            <Skeleton className="h-3 w-28" />
-          </div>
-        </div>
-      </div>
+      <ColorRailCardSkeleton tileShape="rounded-lg" />
       <div className="flex gap-2">
         <Skeleton className="h-7 w-48 rounded-md" />
         <Skeleton className="h-7 w-32 rounded-md" />

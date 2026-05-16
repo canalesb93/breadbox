@@ -52,7 +52,10 @@ import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
 import { DetailList } from "@/components/detail-list";
 import { ListCard } from "@/components/list-card";
-import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  ColorRailCard,
+  ColorRailCardSkeleton,
+} from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
@@ -256,6 +259,18 @@ export function ComponentsSection() {
               </p>
             </div>
           </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ColorRailCardSkeleton"
+        code="components/color-rail-card"
+        description="Loading mirror of `<ColorRailCard>` — same shell + rail, with the stable identity column (tile + eyebrow + title + meta) and trailing metric column already baked in. `tileShape` picks `rounded-md` (transactions) vs `rounded-lg` (accounts, categories) to match the loaded tile. `withFooter` toggles the bordered action strip; `body` slots in any extra hero row (e.g. TX-detail's secondary details grid)."
+        className="block"
+      >
+        <div className="max-w-xl space-y-4">
+          <ColorRailCardSkeleton tileShape="rounded-md" />
+          <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
         </div>
       </Specimen>
 
