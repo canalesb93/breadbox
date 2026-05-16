@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useShortcut } from "@/lib/shortcuts";
@@ -272,18 +272,17 @@ export function ConnectionsPage() {
         <ListCard
           rows={[0, 1, 2]}
           getRowKey={(i) => i}
-          renderRow={(i) => (
-            <div className="flex items-center gap-4 px-5 py-3.5" key={i}>
-              <Skeleton className="size-9 rounded-md" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-3.5 w-40" />
-                <Skeleton className="h-3 w-56" />
-              </div>
-              <div className="space-y-1.5 text-right">
-                <Skeleton className="ml-auto h-3.5 w-20" />
-                <Skeleton className="ml-auto h-3 w-12" />
-              </div>
-            </div>
+          renderRow={() => (
+            <ListRowSkeleton
+              density="comfortable"
+              leading="md-square"
+              lines={2}
+              trailing="value-stack"
+              titleClassName="w-40"
+              subtitleClassName="w-56"
+              trailingTopClassName="w-20"
+              trailingBottomClassName="w-12"
+            />
           )}
         />
       ) : isError ? (
