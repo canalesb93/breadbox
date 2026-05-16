@@ -31,25 +31,6 @@ export function useCreateUser() {
   });
 }
 
-export interface UpdateUserInput {
-  name?: string;
-  email?: string;
-}
-
-export function useUpdateUser() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateUserInput }) =>
-      api<User>(`/api/v1/users/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(input),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["users"] });
-    },
-  });
-}
-
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
