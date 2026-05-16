@@ -1616,6 +1616,36 @@ Cross-cutting components:
     Worth noting for any future primitive that wraps radix
     Dialog/Sheet/Popover internals.
 
+- **Iter 66 — Rule pages join the canonical `rounded-xl` surface vocabulary** ([#1179](https://github.com/canalesb93/breadbox/pull/1179))
+  - Foundational radii sweep. Four stray `rounded-2xl` surface
+    cards in `features/rules/rule-form.tsx` (form shell) and
+    `routes/rule-detail.tsx` (What this rule does, Apply
+    retroactively, Delete rule) collapse to `rounded-xl`, the
+    canonical v2 surface card radius used by shadcn `Card`,
+    `SectionCard`, `ListCard`, `ColorRailCard`, `rule-row`, and
+    `preview-panel` (54 instances pre-sweep, 58 after). These
+    four were the only `rounded-2xl` sites anywhere in
+    `web/src` — the entire codebase is now on one surface
+    radius.
+  - Visual diff is a 2px corner reduction (`16px → 12px`) — the
+    rule pages now read at the same surface scale as the
+    surrounding `rule-row` cards on the same routes, instead of
+    one notch louder. No behavioural change.
+  - Post-sweep radius vocabulary census: `rounded-md` 130
+    (buttons, inputs, small controls), `rounded-lg` 60 (nested
+    panels, picker tiles), `rounded-xl` 58 (every surface card),
+    `rounded-full` 40 (badges, status dots, avatars),
+    `rounded-sm` 16 (cmdk pills, dense chips), `rounded-none` 5
+    (all inside shadcn calendar / tabs / toggle-group
+    internals), `rounded-xs` 2 (Dialog/Sheet close buttons,
+    shadcn defaults), `rounded-2xl` 0. No further radius drift
+    detected — the iter-66 backlog item from the prompt
+    ("Border radii consistency") closes here.
+  - No live screenshot pair: the same dev DB / admin password
+    wall noted by iter 65 ("admin@example.com / password" no
+    longer accepted by the active seed). The diff is mechanical
+    and small enough that the code review is the visual review.
+
 ## Open observations / questions
 
 (Populated by iterations.)
