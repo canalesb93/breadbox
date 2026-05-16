@@ -1,7 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
@@ -21,15 +27,15 @@ export function AccountRecentTransactions({
 }: AccountRecentTransactionsProps) {
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-base">
-          <span>Recent transactions</span>
-          {transactions.length > 0 && (
-            <span className="text-muted-foreground text-xs font-normal">
+      <CardHeader>
+        <CardTitle>Recent transactions</CardTitle>
+        {transactions.length > 0 && (
+          <CardAction>
+            <span className="text-muted-foreground text-xs">
               Last {transactions.length}
             </span>
-          )}
-        </CardTitle>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         {transactions.length === 0 ? (

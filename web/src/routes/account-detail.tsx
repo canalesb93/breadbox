@@ -17,7 +17,14 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/empty-state";
@@ -308,15 +315,18 @@ function BalanceCard({ account: a, liability, util }: BalanceCardProps) {
   // to mean "you owe this much". The label is "Balance owed", so show the
   // raw positive — the destructive tint already conveys it's a negative
   // line on the household sheet.
+  //
+  // Stat-card layout follows shadcn's dashboard pattern: label as
+  // CardDescription and value as CardTitle inside CardHeader (gap-2),
+  // optional context in CardFooter — no separate CardHeader / CardContent
+  // split with the wide gap-6 between them.
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-muted-foreground text-xs font-medium">
+      <CardHeader>
+        <CardDescription>
           {liability ? "Balance owed" : "Current balance"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div
+        </CardDescription>
+        <CardTitle
           className={cn(
             "text-3xl font-semibold tabular-nums tracking-tight",
             liability && current != null && current > 0 && "text-destructive/90",
@@ -325,34 +335,38 @@ function BalanceCard({ account: a, liability, util }: BalanceCardProps) {
           {current != null
             ? formatCurrency(current, a.iso_currency_code)
             : "—"}
-        </div>
-        {util != null && (
-          <div className="space-y-1">
-            <div className="text-muted-foreground flex items-center justify-between text-xs tabular-nums">
-              <span>{Math.round(util)}% utilization</span>
-              {a.balance_limit != null && (
-                <span>
-                  of {formatCurrency(a.balance_limit, a.iso_currency_code)}
-                </span>
-              )}
-            </div>
-            <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-              <div
-                className={cn(
-                  "h-full transition-all",
-                  utilizationBarClass(util),
+        </CardTitle>
+      </CardHeader>
+      {(util != null || a.iso_currency_code) && (
+        <CardFooter className="flex-col items-stretch gap-2">
+          {util != null && (
+            <>
+              <div className="text-muted-foreground flex items-center justify-between text-xs tabular-nums">
+                <span>{Math.round(util)}% utilization</span>
+                {a.balance_limit != null && (
+                  <span>
+                    of {formatCurrency(a.balance_limit, a.iso_currency_code)}
+                  </span>
                 )}
-                style={{ width: `${util}%` }}
-              />
+              </div>
+              <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+                <div
+                  className={cn(
+                    "h-full transition-all",
+                    utilizationBarClass(util),
+                  )}
+                  style={{ width: `${util}%` }}
+                />
+              </div>
+            </>
+          )}
+          {a.iso_currency_code && util == null && (
+            <div className="text-muted-foreground text-xs">
+              {a.iso_currency_code}
             </div>
-          </div>
-        )}
-        {a.iso_currency_code && (
-          <div className="text-muted-foreground text-[10px]">
-            {a.iso_currency_code}
-          </div>
-        )}
-      </CardContent>
+          )}
+        </CardFooter>
+      )}
     </Card>
   );
 }
@@ -395,27 +409,27 @@ function SecondaryCard({
       value: new Date(a.last_balance_update).toLocaleString(),
     });
   }
-
   if (a.official_name) {
     rows.push({ label: "Bank official name", value: a.official_name });
   }
 
+  // No CardHeader — the "Details" label was generic filler. Mirror the
+  // balance card's vertical rhythm (py-6 + a single inner block) so the
+  // pair sits flush, then list the rows directly.
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-muted-foreground text-xs font-medium">
-          Details
-        </CardTitle>
-      </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No additional balance or refresh information.
           </p>
         ) : (
-          <dl className="space-y-2 text-sm">
+          <dl className="space-y-2.5 text-sm">
             {rows.map((r) => (
-              <div key={r.label} className="flex items-baseline justify-between gap-3">
+              <div
+                key={r.label}
+                className="flex items-baseline justify-between gap-3"
+              >
                 <dt className="text-muted-foreground text-xs">{r.label}</dt>
                 <dd className="truncate text-right font-medium tabular-nums">
                   {r.value}

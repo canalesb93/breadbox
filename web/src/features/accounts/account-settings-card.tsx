@@ -61,8 +61,8 @@ export function AccountSettingsCard({ account: a }: AccountSettingsCardProps) {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Settings</CardTitle>
+      <CardHeader>
+        <CardTitle>Settings</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5 text-sm">
         <div className="space-y-1.5">

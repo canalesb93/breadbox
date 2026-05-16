@@ -11,7 +11,13 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,11 +77,11 @@ export function AccountLinksSection({
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-base">
-          <span className="flex items-center gap-2">
-            <Link2 className="size-4" /> Account links
-          </span>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Link2 className="size-4" /> Account links
+        </CardTitle>
+        <CardAction>
           <Button
             size="sm"
             variant="outline"
@@ -85,7 +91,7 @@ export function AccountLinksSection({
             <Plus className="size-3.5" />
             Link an account
           </Button>
-        </CardTitle>
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-3">
         {linksQuery.isLoading ? (
