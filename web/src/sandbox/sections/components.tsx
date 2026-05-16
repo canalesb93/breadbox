@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   Inbox,
   Info,
+  Keyboard,
   KeyRound,
+  Landmark,
   MessageSquare,
   Monitor,
   Moon,
@@ -54,6 +56,9 @@ import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
+import { Sheet } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
@@ -409,6 +414,43 @@ export function ComponentsSection() {
                 lines={1}
               />
             </div>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DetailSheetHeader"
+        code="components/detail-sheet-header"
+        description="The canonical icon-tile header lockup for every v2 Sheet — leading rounded-lg icon tile + optional uppercase eyebrow + title + description + optional trailing slot. Two densities: `default` (size-9 tile, p-5, ambient overlays like Shortcut sheet) and `accent` (size-10 tile + bg-muted/20 + p-6, primary flows like Connect-bank). Mirrors the StatusPanel / EmptyState / SectionCard icon-tile vocabulary so every Sheet reads as part of the v2 system. Wrapped in a hidden `<Sheet open>` here so the radix Dialog context is available for SheetTitle/SheetDescription — live consumers carry the surrounding `<SheetContent>` chrome."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              default · size-9 tile · p-5
+            </div>
+            <Sheet open onOpenChange={() => {}}>
+              <DetailSheetHeader
+                icon={Keyboard}
+                title="Keyboard shortcuts"
+                description="Available across the app. Shortcuts pause while you're typing in an input."
+              />
+            </Sheet>
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              accent · size-10 tile · p-6 · with eyebrow + trailing
+            </div>
+            <Sheet open onOpenChange={() => {}}>
+              <DetailSheetHeader
+                icon={Landmark}
+                eyebrow="New connection"
+                title="Connect a bank"
+                description="Pick a provider to link an institution and start syncing transactions."
+                density="accent"
+                trailing={<Badge variant="secondary">Plaid</Badge>}
+              />
+            </Sheet>
           </div>
         </div>
       </Specimen>
