@@ -38,10 +38,10 @@ import {
   accountTypeIcon,
   accountTypeLabel,
   creditUtilization,
-  formatCurrency,
   isLiability,
   utilizationBarClass,
 } from "@/features/accounts/account-utils";
+import { formatBalance } from "@/lib/format";
 import { AccountSettingsCard } from "@/features/accounts/account-settings-card";
 import { AccountRecentTransactions } from "@/features/accounts/account-recent-transactions";
 import { AccountLinksSection } from "@/features/accounts/account-links-section";
@@ -305,7 +305,7 @@ function Hero({
             )}
           >
             {current != null
-              ? formatCurrency(current, a.iso_currency_code)
+              ? formatBalance(current, a.iso_currency_code)
               : "—"}
           </div>
 
@@ -315,7 +315,7 @@ function Hero({
                 <span>{Math.round(util)}% used</span>
                 {a.balance_limit != null && (
                   <span>
-                    of {formatCurrency(a.balance_limit, a.iso_currency_code)}
+                    of {formatBalance(a.balance_limit, a.iso_currency_code)}
                   </span>
                 )}
               </div>
@@ -331,7 +331,7 @@ function Hero({
             </div>
           ) : a.balance_available != null ? (
             <p className="text-muted-foreground pt-1 text-[11px] tabular-nums">
-              {formatCurrency(a.balance_available, a.iso_currency_code)} available
+              {formatBalance(a.balance_available, a.iso_currency_code)} available
             </p>
           ) : a.iso_currency_code ? (
             <p className="text-muted-foreground pt-1 text-[11px]">
@@ -381,13 +381,13 @@ function DetailsCard({ account: a }: { account: AccountDetail }) {
     a.balance_limit != null && isLiability(a.type)
       ? {
           label: "Credit limit",
-          value: formatCurrency(a.balance_limit, a.iso_currency_code),
+          value: formatBalance(a.balance_limit, a.iso_currency_code),
         }
       : null,
     a.balance_available != null && !isLiability(a.type)
       ? {
           label: "Available",
-          value: formatCurrency(a.balance_available, a.iso_currency_code),
+          value: formatBalance(a.balance_available, a.iso_currency_code),
         }
       : null,
     a.iso_currency_code ? { label: "Currency", value: a.iso_currency_code } : null,

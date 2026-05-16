@@ -127,16 +127,3 @@ export function primaryBalance(
   };
 }
 
-// Currency formatter — defers to Intl. Returns the original number formatted
-// to the supplied currency, no leading sign manipulation.
-export function formatCurrency(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
-}

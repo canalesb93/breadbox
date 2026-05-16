@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { formatCompactAmount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account, Connection } from "@/api/types";
 
@@ -42,14 +43,6 @@ function primary(b: CurrencyTotals): { amount: number; currency: string } {
     }
   }
   return { amount: b.totals.get(bestC) ?? 0, currency: bestC };
-}
-
-function formatCompact(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 // HomeStats is the hero balance summary on the home page. A single
@@ -109,7 +102,7 @@ export function HomeStats({ accounts, connections, isLoading }: HomeStatsProps) 
               Net cash
             </>
           }
-          value={formatCompact(netP.amount, netP.currency)}
+          value={formatCompactAmount(netP.amount, netP.currency)}
           valueTone={positive ? "positive" : "negative"}
           hint={
             <>
@@ -131,7 +124,7 @@ export function HomeStats({ accounts, connections, isLoading }: HomeStatsProps) 
               Cash
             </>
           }
-          value={formatCompact(cashP.amount, cashP.currency)}
+          value={formatCompactAmount(cashP.amount, cashP.currency)}
           hint={`${cash.count} ${cash.count === 1 ? "depository" : "depository accounts"}`}
           className="px-6 py-5 sm:border-l sm:py-7"
         />
@@ -142,7 +135,7 @@ export function HomeStats({ accounts, connections, isLoading }: HomeStatsProps) 
               Credit &amp; loans
             </>
           }
-          value={formatCompact(creditP.amount, creditP.currency)}
+          value={formatCompactAmount(creditP.amount, creditP.currency)}
           valueTone={creditP.amount > 0 ? "warning" : "neutral"}
           hint={`${credit.count} ${credit.count === 1 ? "balance" : "balances"}`}
           className="px-6 py-5 sm:border-l sm:py-7 sm:pr-7"

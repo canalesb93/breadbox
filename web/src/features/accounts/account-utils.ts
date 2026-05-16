@@ -75,21 +75,6 @@ export function utilizationBarClass(pct: number): string {
   return "bg-emerald-500";
 }
 
-// formatCurrency renders an amount in the supplied ISO code via Intl.
-// Currency keys are scarce enough that we don't bother caching formatters
-// (cf. lib/format.ts) — most accounts use one of two currencies and
-// list pages re-render rarely.
-export function formatCurrency(amount: number, currency: string | null): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency ?? "USD",
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency ?? ""}`.trim();
-  }
-}
 
 export interface CurrencyTotal {
   currency: string;

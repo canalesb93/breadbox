@@ -1,8 +1,9 @@
 import { ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatBalance } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/api/types";
-import { formatCurrency, isLiability, totalsByCurrency } from "./account-utils";
+import { isLiability, totalsByCurrency } from "./account-utils";
 
 interface AccountsSummaryProps {
   accounts: Account[];
@@ -42,7 +43,7 @@ export function AccountsSummary({ accounts }: AccountsSummaryProps) {
       <SummaryStat
         icon={Wallet}
         label="Net worth"
-        value={formatCurrency(primary.total, primary.currency)}
+        value={formatBalance(primary.total, primary.currency)}
         sublabel={
           others.length > 0
             ? `+ ${others.length} other currenc${others.length === 1 ? "y" : "ies"}`
@@ -54,13 +55,13 @@ export function AccountsSummary({ accounts }: AccountsSummaryProps) {
       <SummaryStat
         icon={ArrowUpRight}
         label="Assets"
-        value={formatCurrency(assets, primary.currency)}
+        value={formatBalance(assets, primary.currency)}
         tone="success"
       />
       <SummaryStat
         icon={ArrowDownRight}
         label="Liabilities"
-        value={formatCurrency(liabilities, primary.currency)}
+        value={formatBalance(liabilities, primary.currency)}
         tone="muted"
       />
     </div>
