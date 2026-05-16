@@ -1,16 +1,14 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Building2, Landmark, Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Eyebrow } from "@/components/eyebrow";
+import { StatusPanel } from "@/components/status-panel";
 import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 import {
@@ -65,6 +64,15 @@ type Stage =
 //      launcher hands back the public_token / enrollment payload, we POST
 //      to the generic /api/v1/connections endpoint, toast success, and
 //      navigate to the new connection's detail page.
+//
+// Iter 40 polish: header gets the v2 icon-tile lockup (Landmark in a muted
+// rounded tile) matching `EmptyState` / `StatusPanel` / `SectionCard`;
+// labels move onto `<Eyebrow>`; the picker selection vocabulary inherits
+// the active-state language used by nav/list rows; alerts adopt
+// `<StatusPanel>` so tone is consistent with Providers + Setup; the
+// action strip uses the canonical `<FormFooter>`-style flush bordered
+// footer (open-coded here because the host is a Sheet, not a SectionCard
+// — the negative-margin trick doesn't apply).
 export function ConnectBankSheet({
   open,
   onOpenChange,
@@ -247,166 +255,199 @@ export function ConnectBankSheet({
     linkSession.isPending ||
     createConnection.isPending;
 
+  const headerIcon = (() => {
+    if (appendToConnectionId) return Building2;
+    return Landmark;
+  })();
+  const headerTitle = appendToConnectionId ? "Import more rows" : "Connect a bank";
+  const headerDescription = appendToConnectionId
+    ? "Upload another statement to append rows to this CSV connection."
+    : "Pick a provider and the family member this connection belongs to.";
+
   return (
     <Sheet open={open} onOpenChange={handleSheetChange}>
-      <SheetContent className="flex flex-col gap-6 p-6">
-        <SheetHeader className="p-0">
-          <SheetTitle>Connect a bank</SheetTitle>
-          <SheetDescription>
-            Pick a provider and the family member this connection belongs to.
-          </SheetDescription>
+      <SheetContent className="flex flex-col gap-0 p-0">
+        <SheetHeader className="bg-muted/20 border-b p-6">
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg border"
+            >
+              {(() => {
+                const Icon = headerIcon;
+                return <Icon className="size-5" />;
+              })()}
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <Eyebrow as="p">
+                {appendToConnectionId ? "Append rows" : "New connection"}
+              </Eyebrow>
+              <SheetTitle className="text-lg font-semibold leading-tight">
+                {headerTitle}
+              </SheetTitle>
+              <SheetDescription className="text-sm">
+                {headerDescription}
+              </SheetDescription>
+            </div>
+          </div>
         </SheetHeader>
 
-        {stage.kind === "pick" && (
-          <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
-            {providersQuery.isLoading ? (
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Loader2 className="size-4 animate-spin" /> Loading providers…
-              </div>
-            ) : enabledProviders.length === 0 ? (
-              <Alert variant="default">
-                <AlertTitle>No bank providers configured</AlertTitle>
-                <AlertDescription>
-                  Set up Plaid or Teller credentials on this server, or import
-                  a CSV statement.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Provider
-                </Label>
-                <ProviderPicker
-                  enabledProviders={enabledProviders}
-                  value={provider}
-                  onChange={setProvider}
+        <div className="flex flex-1 flex-col overflow-y-auto p-6">
+          {stage.kind === "pick" && (
+            <div className="flex flex-col gap-6">
+              {providersQuery.isLoading ? (
+                <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="size-4 animate-spin" /> Loading providers…
+                </div>
+              ) : enabledProviders.length === 0 ? (
+                <StatusPanel
+                  tone="info"
+                  icon={Landmark}
+                  heading="No bank providers configured"
+                  body="Set up Plaid or Teller credentials on this server, or import a CSV statement."
                 />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Eyebrow as="p">Provider</Eyebrow>
+                  <ProviderPicker
+                    enabledProviders={enabledProviders}
+                    value={provider}
+                    onChange={setProvider}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <Eyebrow as="label" htmlFor="connect-bank-user">
+                  Family member
+                </Eyebrow>
+                <Select value={effectiveUserId} onValueChange={setUserId}>
+                  <SelectTrigger id="connect-bank-user">
+                    <SelectValue placeholder="Pick a household member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Family member
-              </Label>
-              <Select value={effectiveUserId} onValueChange={setUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a household member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {createError && (
+                <StatusPanel
+                  tone="destructive"
+                  icon={Landmark}
+                  heading="Couldn't save the connection"
+                  body={createError}
+                />
+              )}
             </div>
+          )}
 
-            {createError && (
-              <Alert variant="destructive">
-                <AlertTitle>Couldn't save the connection</AlertTitle>
-                <AlertDescription>{createError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-        )}
-
-        {(stage.kind === "plaid" || stage.kind === "teller") && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <Loader2 className="text-muted-foreground size-6 animate-spin" />
-            <div className="text-sm font-medium">
-              Opening {PROVIDER_META[stage.kind]?.name ?? stage.kind}…
+          {(stage.kind === "plaid" || stage.kind === "teller") && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 py-8 text-center">
+              <span className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-xl border border-primary/20">
+                <Loader2 className="size-5 animate-spin" />
+              </span>
+              <div className="flex flex-col gap-1">
+                <Eyebrow as="p">Hand-off</Eyebrow>
+                <p className="text-foreground text-sm font-medium">
+                  Opening {PROVIDER_META[stage.kind]?.name ?? stage.kind}…
+                </p>
+                <p className="text-muted-foreground max-w-xs text-xs leading-relaxed">
+                  Finish the flow in the popup. Closing it brings you back here.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStage({ kind: "pick" })}
+              >
+                Cancel
+              </Button>
             </div>
-            <p className="text-muted-foreground max-w-xs text-xs">
-              Finish the flow in the popup. Closing it brings you back here.
-            </p>
+          )}
+
+          {stage.kind === "csv" && (
+            <CsvImportForm
+              appendToConnectionId={appendToConnectionId}
+              userId={stage.userId || undefined}
+              onSuccess={(result) => {
+                toast.success(
+                  result.appended
+                    ? `Imported ${result.imported} more transactions.`
+                    : `Imported ${result.imported} transactions.`,
+                  {
+                    description: result.appended
+                      ? "Appended to the existing connection — new rows will appear after re-categorisation."
+                      : "Connection created. Categorise or apply rules to enrich the new rows.",
+                  },
+                );
+                handleSheetChange(false);
+                if (!result.appended) {
+                  navigate({
+                    to: "/connections/$id",
+                    params: { id: result.connection_id },
+                  });
+                }
+              }}
+              onCancel={() => {
+                if (appendToConnectionId) {
+                  handleSheetChange(false);
+                } else {
+                  setStage({ kind: "pick" });
+                }
+              }}
+            />
+          )}
+
+          {stage.kind === "plaid" && (
+            <PlaidLinkButton
+              linkToken={stage.linkToken}
+              onSuccess={onPlaidSuccess}
+              onExit={(err) =>
+                onLaunchExit(
+                  err
+                    ? err.display_message ||
+                        err.error_message ||
+                        "Plaid Link exited with an error."
+                    : null,
+                )
+              }
+            />
+          )}
+
+          {stage.kind === "teller" && (
+            <TellerConnectButton
+              applicationId={stage.applicationId}
+              onSuccess={onTellerSuccess}
+              onExit={() => onLaunchExit(null)}
+              onFailure={(f) =>
+                onLaunchExit(f.message || "Teller Connect failed.")
+              }
+            />
+          )}
+        </div>
+
+        {stage.kind === "pick" && (
+          <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
             <Button
               variant="outline"
               size="sm"
-              className="mt-2"
-              onClick={() => setStage({ kind: "pick" })}
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
-
-        {stage.kind === "csv" && (
-          <CsvImportForm
-            appendToConnectionId={appendToConnectionId}
-            userId={stage.userId || undefined}
-            onSuccess={(result) => {
-              toast.success(
-                result.appended
-                  ? `Imported ${result.imported} more transactions.`
-                  : `Imported ${result.imported} transactions.`,
-                {
-                  description: result.appended
-                    ? "Appended to the existing connection — new rows will appear after re-categorisation."
-                    : "Connection created. Categorise or apply rules to enrich the new rows.",
-                },
-              );
-              handleSheetChange(false);
-              if (!result.appended) {
-                navigate({
-                  to: "/connections/$id",
-                  params: { id: result.connection_id },
-                });
-              }
-            }}
-            onCancel={() => {
-              if (appendToConnectionId) {
-                handleSheetChange(false);
-              } else {
-                setStage({ kind: "pick" });
-              }
-            }}
-          />
-        )}
-
-        {stage.kind === "plaid" && (
-          <PlaidLinkButton
-            linkToken={stage.linkToken}
-            onSuccess={onPlaidSuccess}
-            onExit={(err) =>
-              onLaunchExit(
-                err
-                  ? err.display_message ||
-                      err.error_message ||
-                      "Plaid Link exited with an error."
-                  : null,
-              )
-            }
-          />
-        )}
-
-        {stage.kind === "teller" && (
-          <TellerConnectButton
-            applicationId={stage.applicationId}
-            onSuccess={onTellerSuccess}
-            onExit={() => onLaunchExit(null)}
-            onFailure={(f) =>
-              onLaunchExit(f.message || "Teller Connect failed.")
-            }
-          />
-        )}
-
-        {stage.kind === "pick" && (
-          <SheetFooter className="px-0">
-            <Button
-              variant="outline"
               onClick={() => handleSheetChange(false)}
               disabled={linkSession.isPending}
             >
               Cancel
             </Button>
-            <Button onClick={onContinue} disabled={continueDisabled}>
+            <Button size="sm" onClick={onContinue} disabled={continueDisabled}>
               {linkSession.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : null}
               Continue
             </Button>
-          </SheetFooter>
+          </div>
         )}
       </SheetContent>
     </Sheet>
