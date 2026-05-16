@@ -8,13 +8,14 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
+import { IdPill } from "@/components/id-pill";
+import { SectionCard } from "@/components/section-card";
 import { CategoryEditor } from "@/features/transactions/category-editor";
 import { TagManager } from "@/features/transactions/tag-manager";
 import { ActivityTimeline } from "@/features/transactions/activity-timeline";
@@ -99,16 +100,14 @@ function DetailBody({ transaction: t }: { transaction: Transaction }) {
       <QuickActions transaction={t} merchantQuery={merchantQuery} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Card className="gap-0 py-0">
-          <CardHeader className="border-b px-5 py-3.5">
-            <CardTitle className="text-sm font-medium">Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5 px-5 py-5">
-            <CommentComposer transactionId={t.id} />
-            <Separator />
-            <ActivityTimeline transactionId={t.id} />
-          </CardContent>
-        </Card>
+        <SectionCard
+          title="Activity"
+          bodyClassName="space-y-5 px-5 py-5"
+        >
+          <CommentComposer transactionId={t.id} />
+          <Separator />
+          <ActivityTimeline transactionId={t.id} />
+        </SectionCard>
 
         <aside className="space-y-6">
           <DetailsCard transaction={t} />
@@ -359,20 +358,15 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
   ]);
 
   return (
-    <Card className="gap-0 py-0">
-      <CardHeader className="border-b px-5 py-3.5">
-        <CardTitle className="text-sm font-medium">Details</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5 px-5 py-5 text-sm">
-        <DetailGroup label="Account" rows={accountRows} />
-        {providerRows.length > 0 && (
-          <DetailGroup label="Provider" rows={providerRows} />
-        )}
-        {referenceRows.length > 0 && (
-          <DetailGroup label="Reference" rows={referenceRows} />
-        )}
-      </CardContent>
-    </Card>
+    <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
+      <DetailGroup label="Account" rows={accountRows} />
+      {providerRows.length > 0 && (
+        <DetailGroup label="Provider" rows={providerRows} />
+      )}
+      {referenceRows.length > 0 && (
+        <DetailGroup label="Reference" rows={referenceRows} />
+      )}
+    </SectionCard>
   );
 }
 
@@ -412,13 +406,7 @@ function DetailGroup({
               {row.label}
             </dt>
             <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? (
-                <span className="bg-muted/60 inline-block rounded px-1.5 py-0.5 font-mono text-[11px]">
-                  {row.value}
-                </span>
-              ) : (
-                row.value
-              )}
+              {row.mono ? <IdPill value={row.value} /> : row.value}
               {row.hint && (
                 <span className="text-muted-foreground mt-1 block text-[11px] leading-snug whitespace-normal">
                   {row.hint}

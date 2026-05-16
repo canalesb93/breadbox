@@ -12,13 +12,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -26,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SectionCard } from "@/components/section-card";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAccountLinks,
@@ -76,24 +70,22 @@ export function AccountLinksSection({
   }, [linksQuery.data, account.short_id]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Link2 className="size-4" /> Account links
-        </CardTitle>
-        <CardAction>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onAddLink}
-            disabled={account.is_dependent_linked}
-          >
-            <Plus className="size-3.5" />
-            Link an account
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <SectionCard
+      title="Account links"
+      icon={<Link2 className="size-4" />}
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onAddLink}
+          disabled={account.is_dependent_linked}
+        >
+          <Plus className="size-3.5" />
+          Link an account
+        </Button>
+      }
+      bodyClassName="space-y-3 px-5 py-5"
+    >
         {linksQuery.isLoading ? (
           <div className="text-muted-foreground flex items-center gap-2 text-xs">
             <Loader2 className="size-3 animate-spin" /> Loading links…
@@ -123,8 +115,7 @@ export function AccountLinksSection({
             ))}
           </ul>
         )}
-      </CardContent>
-    </Card>
+    </SectionCard>
   );
 }
 

@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table";
+import { IdPill } from "@/components/id-pill";
 import { TagChip } from "@/components/tag-chip";
 import { useDeleteTag } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -75,9 +76,10 @@ export function TagsTable({
           // Render the slug as a faint mono pill — it visually reads as a
           // machine identifier (used in the API + rule DSL) without competing
           // with the human-facing display name in the Tag column.
-          <code className="bg-muted/60 text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">
-            {row.original.slug}
-          </code>
+          <IdPill
+            value={row.original.slug}
+            className="text-muted-foreground"
+          />
         ),
       },
       {
