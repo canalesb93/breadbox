@@ -174,9 +174,10 @@ type linkSessionResponse struct {
 //
 // Returns:
 //   - 200 OK with {link_token, expiration} for providers that issue a token
-//     (Plaid today; MoneyKit / Salt Edge in the future).
+//     (Plaid; Teller returns the server-configured application id here so the
+//     SPA can bootstrap Teller Connect without a window global).
 //   - 204 No Content for providers where the link flow is fully client-side
-//     and no init token is needed (Teller, CSV).
+//     and no init token is needed (CSV).
 //   - 404 NOT_FOUND for an unknown provider name.
 //   - 400 INVALID_PARAMETER when the provider isn't configured.
 func LinkSessionHandler(a *app.App) http.HandlerFunc {

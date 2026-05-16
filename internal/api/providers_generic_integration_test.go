@@ -179,8 +179,8 @@ func TestListProviders_ReturnsAll(t *testing.T) {
 	if !gotByName["plaid"].NeedsLinkSession {
 		t.Errorf("plaid should need link session")
 	}
-	if gotByName["teller"].NeedsLinkSession {
-		t.Errorf("teller should not need link session")
+	if !gotByName["teller"].NeedsLinkSession {
+		t.Errorf("teller should need link session (server returns app_id as link_token)")
 	}
 	if gotByName["csv"].NeedsLinkSession {
 		t.Errorf("csv should not need link session")
@@ -299,7 +299,13 @@ func TestLinkSession_Teller(t *testing.T) {
 	resp := env.doPostJSON(t, "/api/v1/providers/teller/link-session", map[string]string{
 		"user_id": pgconv.FormatUUID(user.ID),
 	})
-	assertStatus(t, resp, http.StatusNoContent)
+	assertStatus(t, resp, http.StatusOK)
+
+	var body linkSessionResponse
+	parseJSON(t, resp, &body)
+	if body.LinkToken != "teller-app-fake" {
+		t.Errorf("want link_token %q, got %q", "teller-app-fake", body.LinkToken)
+	}
 }
 
 func TestLinkSession_CSV(t *testing.T) {
