@@ -234,7 +234,11 @@ function DetailBody({ account: a, accounts, onAddLink }: DetailBodyProps) {
 
       <AccountRecentTransactions
         accountShortId={a.short_id}
-        transactions={a.recent_transactions}
+        // The detail endpoint returns up to 25; cap at 15 here so the
+        // section reads as a preview rather than a second-tier list. The
+        // footer link jumps to the full Transactions table filtered to
+        // this account.
+        transactions={a.recent_transactions.slice(0, 15)}
       />
     </div>
   );
