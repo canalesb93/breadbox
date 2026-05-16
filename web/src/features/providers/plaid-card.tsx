@@ -21,17 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
 import { FormFooter } from "@/components/form-footer";
@@ -113,10 +103,10 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
   }
 
   async function onDisable() {
-    setConfirmingDisable(false);
-    await withMutationToast(() => disable.mutateAsync("plaid"), {
+    const ok = await withMutationToast(() => disable.mutateAsync("plaid"), {
       success: "Plaid disabled. Stored credentials were cleared.",
     });
+    if (ok) setConfirmingDisable(false);
   }
 
   const tone = resolveProviderTone(health, config.configured);
@@ -256,41 +246,16 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
               <FormFooter
                 secondary={
                   config.configured ? (
-                    <AlertDialog
-                      open={confirmingDisable}
-                      onOpenChange={setConfirmingDisable}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setConfirmingDisable(true)}
                     >
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="size-3.5" />
-                          Disable
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Disable Plaid?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Stored credentials will be deleted from the database. Existing
-                            Plaid connections stay in your household but syncs will fail until
-                            you re-enter credentials.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={onDisable}
-                            className="bg-destructive text-white hover:bg-destructive/90"
-                          >
-                            Disable
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                      <Trash2 className="size-3.5" />
+                      Disable
+                    </Button>
                   ) : null
                 }
                 primary={
@@ -323,6 +288,18 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
           </div>
         </SectionCard>
       )}
+
+      <ConfirmDialog
+        open={confirmingDisable}
+        onOpenChange={setConfirmingDisable}
+        icon={Trash2}
+        title="Disable Plaid?"
+        description="Stored credentials will be deleted from the database. Existing Plaid connections stay in your household but syncs will fail until you re-enter credentials."
+        confirmLabel="Disable Plaid"
+        pendingLabel="Disabling…"
+        pending={disable.isPending}
+        onConfirm={onDisable}
+      />
     </div>
   );
 }

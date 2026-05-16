@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SectionCard } from "@/components/section-card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAccountLinks,
@@ -153,6 +154,7 @@ interface LinkRowProps {
 function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
   const reconcile = useReconcileAccountLink();
   const remove = useDeleteAccountLink();
+  const [confirmUnlink, setConfirmUnlink] = useState(false);
 
   const isPrimary = link.primary_account_id === viewingShortId;
   const otherShortId = isPrimary
@@ -181,10 +183,10 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
   }
 
   async function onDelete() {
-    if (!confirm("Unlink these accounts? Matches will be discarded.")) return;
-    await withMutationToast(() => remove.mutateAsync(link.id), {
+    const ok = await withMutationToast(() => remove.mutateAsync(link.id), {
       success: "Accounts unlinked.",
     });
+    if (ok) setConfirmUnlink(false);
   }
 
   return (
@@ -247,13 +249,25 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            onClick={onDelete}
+            onClick={() => setConfirmUnlink(true)}
             disabled={remove.isPending}
           >
             <Unlink className="size-3.5" /> Unlink
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ConfirmDialog
+        open={confirmUnlink}
+        onOpenChange={setConfirmUnlink}
+        icon={Unlink}
+        title={`Unlink ${otherName ?? "these accounts"}?`}
+        description="Existing matches between these accounts will be discarded. You can re-link them later, but the dependent transactions you've matched so far will need to be re-paired."
+        confirmLabel="Unlink"
+        pendingLabel="Unlinking…"
+        pending={remove.isPending}
+        onConfirm={onDelete}
+      />
     </li>
   );
 }

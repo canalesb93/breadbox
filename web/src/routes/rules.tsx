@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { Loader2, Plus, Wand2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PaginationBar } from "@/components/pagination-bar";
@@ -15,16 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -121,15 +112,14 @@ export function RulesPage() {
   const onDeleteConfirm = useCallback(async () => {
     if (!pendingDelete) return;
     const target = pendingDelete;
-    setPendingDelete(null);
+    // ConfirmDialog stays open while `pending` is true (deleteRule.isPending);
+    // only clear after success so a failed mutation lets the user retry from
+    // the open dialog instead of having to re-find the row.
     const ok = await withMutationToast(
       () => deleteRule.mutateAsync(target.short_id),
       { success: `Deleted rule "${target.name}".` },
     );
-    if (!ok) {
-      // Restore the confirm so the user can retry without re-finding the row.
-      setPendingDelete(target);
-    }
+    if (ok) setPendingDelete(null);
   }, [deleteRule, pendingDelete]);
 
   const total = rulesQuery.data?.total ?? rows.length;
@@ -236,30 +226,19 @@ export function RulesPage() {
         />
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={!!pendingDelete}
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete rule "{pendingDelete?.name}"?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              The rule will stop firing on future syncs. Past actions it
-              applied stay on transactions; this only removes the rule itself.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={onDeleteConfirm}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        icon={Trash2}
+        title={`Delete rule "${pendingDelete?.name ?? ""}"?`}
+        description="The rule will stop firing on future syncs. Past actions it applied stay on transactions; this only removes the rule itself."
+        confirmLabel="Delete rule"
+        pendingLabel="Deleting…"
+        pending={deleteRule.isPending}
+        onConfirm={onDeleteConfirm}
+      />
     </>
   );
 }

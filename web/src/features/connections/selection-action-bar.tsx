@@ -1,15 +1,6 @@
 import { useState } from "react";
 import { Pause, Play, RefreshCw, Unplug, X } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { KbdTooltip } from "@/components/kbd-tooltip";
@@ -115,8 +106,10 @@ export function SelectionActionBar({
       () => runChunked(selected, (c) => disconnect.mutateAsync(c.id)),
       { success: `Disconnected ${selected.length} connection${selected.length === 1 ? "" : "s"}.` },
     );
-    setConfirmOpen(false);
-    if (ok) onClear();
+    if (ok) {
+      setConfirmOpen(false);
+      onClear();
+    }
   }
 
   return (
@@ -203,41 +196,17 @@ export function SelectionActionBar({
         </div>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Disconnect {selected.length} connection
-              {selected.length === 1 ? "" : "s"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Disconnecting wipes saved credentials and soft-deletes the
-              connection's transactions. Accounts stay in the household for
-              historical reference, but no new transactions will sync. This
-              can't be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={disconnect.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={(e) => {
-                // Keep the dialog open until the mutation resolves so the user
-                // sees the spinner instead of an instant close on a slow link.
-                e.preventDefault();
-                void onDisconnect();
-              }}
-              disabled={disconnect.isPending}
-            >
-              {disconnect.isPending
-                ? "Disconnecting…"
-                : `Disconnect ${selected.length}`}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        icon={Unplug}
+        title={`Disconnect ${selected.length} connection${selected.length === 1 ? "" : "s"}?`}
+        description="Disconnecting wipes saved credentials and soft-deletes the connection's transactions. Accounts stay in the household for historical reference, but no new transactions will sync. This can't be undone."
+        confirmLabel={`Disconnect ${selected.length}`}
+        pendingLabel="Disconnecting…"
+        pending={disconnect.isPending}
+        onConfirm={() => void onDisconnect()}
+      />
     </>
   );
 }
