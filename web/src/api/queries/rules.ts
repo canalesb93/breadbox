@@ -119,13 +119,11 @@ export function useUpdateRule() {
     onSuccess: (rule) => {
       qc.invalidateQueries({ queryKey: ["rules"] });
       qc.invalidateQueries({ queryKey: ["rule", rule.short_id] });
-      qc.invalidateQueries({ queryKey: ["rule", rule.id] });
     },
   });
 }
 
-// useToggleRule flips `enabled`. Optimistically patches every cached
-// representation of the rule so the row updates instantly; reverts on error.
+// useToggleRule flips `enabled`.
 export function useToggleRule() {
   const qc = useQueryClient();
   return useMutation({
@@ -137,7 +135,6 @@ export function useToggleRule() {
     onSuccess: (rule) => {
       qc.invalidateQueries({ queryKey: ["rules"] });
       qc.invalidateQueries({ queryKey: ["rule", rule.short_id] });
-      qc.invalidateQueries({ queryKey: ["rule", rule.id] });
     },
   });
 }

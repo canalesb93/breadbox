@@ -8,10 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DynamicIcon } from "@/lib/icon";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/format";
 import type { TransactionRule } from "@/api/types";
+import { RuleAvatar } from "./rule-avatar";
 import { countConditions, isMatchAll, stageForPriority } from "./rule-utils";
 
 export interface RuleRowProps {
@@ -20,9 +20,6 @@ export interface RuleRowProps {
   onDelete: (rule: TransactionRule) => void;
 }
 
-// RuleRow renders one row in the rules list — visual parity with the v1
-// rules.templ rulesRow component, ported to v2 primitives (Card-shaped
-// container via border + bg, shadcn Button + DropdownMenu, lucide icons).
 export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
   const isSystem = rule.created_by_type === "system";
   const expired = ruleExpired(rule);
@@ -117,8 +114,8 @@ export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
         </div>
       </Link>
 
-      {/* Row actions sit on top of the Link with click stopPropagation so the
-          Edit button + kebab menu don't navigate to the detail page. */}
+      {/* Sibling action cluster — absolutely positioned over the Link so
+          clicks land on the buttons before bubbling into the navigation. */}
       <div className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-0.5">
         <Button
           asChild
@@ -126,7 +123,6 @@ export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
           size="icon"
           className="size-7"
           aria-label={`Edit rule ${rule.name}`}
-          onClick={(e) => e.stopPropagation()}
         >
           <Link to="/rules/$id/edit" params={{ id: rule.short_id }}>
             <Pencil className="size-3.5" />
@@ -139,7 +135,6 @@ export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
               size="icon"
               className="size-7"
               aria-label={`Rule ${rule.name} actions`}
-              onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="size-4" />
             </Button>
@@ -175,58 +170,4 @@ function ruleExpired(rule: TransactionRule): boolean {
   if (!rule.expires_at) return false;
   const t = new Date(rule.expires_at).getTime();
   return Number.isFinite(t) && t < Date.now();
-}
-
-// RuleAvatar mirrors the branchy avatar logic from rules.templ rulesAvatar:
-// category icon (when enabled + not expired) → expired clock → disabled pause
-// → system shield → default zap.
-function RuleAvatar({
-  rule,
-  expired,
-}: {
-  rule: TransactionRule;
-  expired: boolean;
-}) {
-  const isSystem = rule.created_by_type === "system";
-  if (rule.category_icon && rule.enabled && !expired) {
-    return (
-      <div
-        className="flex size-9 items-center justify-center rounded-xl"
-        style={{
-          backgroundColor: rule.category_color
-            ? `color-mix(in oklab, ${rule.category_color} 18%, transparent)`
-            : "var(--muted)",
-          color: rule.category_color ?? undefined,
-        }}
-      >
-        <DynamicIcon name={rule.category_icon} className="size-5" />
-      </div>
-    );
-  }
-  if (expired) {
-    return (
-      <div className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-        <Pause className="size-5" />
-      </div>
-    );
-  }
-  if (!rule.enabled) {
-    return (
-      <div className="bg-muted text-muted-foreground/50 flex size-9 items-center justify-center rounded-xl">
-        <Pause className="size-5" />
-      </div>
-    );
-  }
-  if (isSystem) {
-    return (
-      <div className="flex size-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-        <Shield className="size-5" />
-      </div>
-    );
-  }
-  return (
-    <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-      <Zap className="size-5" />
-    </div>
-  );
 }

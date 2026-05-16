@@ -31,6 +31,10 @@ import {
   ConnectionDetailPage,
   connectionDetailSearchSchema,
 } from "@/routes/connection-detail";
+import { APIKeysPage, apiKeysSearchSchema } from "@/routes/api-keys";
+import { APIKeyNewPage } from "@/routes/api-key-new";
+import { APIKeyCreatedPage } from "@/routes/api-key-created";
+import { ProvidersPage } from "@/routes/providers";
 import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
 import {
   AccountDetailPage,
@@ -92,6 +96,13 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: ConnectionsPage,
     validateSearch: connectionsSearchSchema,
   },
+  "/api-keys": {
+    component: APIKeysPage,
+    validateSearch: apiKeysSearchSchema,
+  },
+  "/providers": {
+    component: ProvidersPage,
+  },
   "/accounts": {
     component: AccountsPage,
     validateSearch: accountsSearchSchema,
@@ -150,6 +161,21 @@ const connectionDetailRoute = createRoute({
   validateSearch: connectionDetailSearchSchema,
 });
 
+// /api-keys/new and /api-keys/created sit beside the list (declared via
+// PAGE_OVERRIDES) but aren't nav leaves themselves. The list match still
+// keeps the sidebar item active thanks to the prefix match in isNavMatch.
+const apiKeyNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/api-keys/new",
+  component: APIKeyNewPage,
+});
+
+const apiKeyCreatedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/api-keys/created",
+  component: APIKeyCreatedPage,
+});
+
 const accountDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/accounts/$id",
@@ -203,6 +229,8 @@ const routeTree = rootRoute.addChildren([
   tagDetailRoute,
   sandboxRoute,
   connectionDetailRoute,
+  apiKeyNewRoute,
+  apiKeyCreatedRoute,
   accountDetailRoute,
   ruleNewRoute,
   ruleEditRoute,

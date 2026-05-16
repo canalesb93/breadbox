@@ -1,3 +1,4 @@
+import type React from "react";
 import type { Condition, RuleAction } from "@/api/types";
 
 // Field grammar — mirrors fieldTypes in static/js/admin/components/rule_form.js
@@ -253,6 +254,18 @@ export function actionLabel(action: RuleAction): string {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+// categoryTileStyle returns the inline style for a category-coloured icon
+// tile — a 18% color-mix backdrop with the category color as the foreground.
+// Returns an empty object when the rule's category color is unset so the
+// tile falls back to the neutral muted background.
+export function categoryTileStyle(color: string | null | undefined): React.CSSProperties {
+  if (!color) return {};
+  return {
+    backgroundColor: `color-mix(in oklab, ${color} 18%, transparent)`,
+    color,
+  };
 }
 
 export function triggerLabel(trigger: string): string {

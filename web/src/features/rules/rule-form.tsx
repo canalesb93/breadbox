@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Plus, Save, Wand2 } from "lucide-react";
@@ -39,6 +39,7 @@ import {
   conditionsToForm,
   formToActions,
   formToConditions,
+  isMatchAll,
   stageForPriority,
   type ActionField,
   type ActionRow,
@@ -200,6 +201,7 @@ export function RuleForm({
   const watchedActions = form.watch("actions");
   const watchedLogic = form.watch("logic");
   const watchedPriority = form.watch("priority");
+  const watchedTrigger = form.watch("trigger");
   const useJsonEditor = form.watch("useJsonEditor");
   const conditionsJson = form.watch("conditionsJson");
 
@@ -253,20 +255,19 @@ export function RuleForm({
       }
     }
     const hasComment = watchedActions.some((a) => a.field === "comment");
-    if (hasComment && form.watch("trigger") === "always") {
+    if (hasComment && watchedTrigger === "always") {
       out.push(
         `"Add comment" + "Always" trigger duplicates comments on every sync. Prefer "On sync create".`,
       );
     }
-    const matchAll = parsedConditions && Object.keys(parsedConditions).length === 0;
     const hasCategory = watchedActions.some((a) => a.field === "category");
-    if (matchAll && hasCategory) {
+    if (isMatchAll(parsedConditions) && hasCategory) {
       out.push(
         "Set category with no conditions will reclassify every transaction on every sync.",
       );
     }
     return out;
-  }, [watchedActions, form, parsedConditions]);
+  }, [watchedActions, watchedTrigger, parsedConditions]);
 
   const submitHandler = form.handleSubmit((values) => {
     const conditionsPayload = useJsonEditor
@@ -288,7 +289,6 @@ export function RuleForm({
           onSubmit={submitHandler}
           className="bg-card overflow-hidden rounded-2xl border"
         >
-          {/* Header: rule name */}
           <div className="space-y-4 p-5 sm:p-6">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-xl">
@@ -319,7 +319,6 @@ export function RuleForm({
             />
           </div>
 
-          {/* When: trigger + optional pipeline stage. */}
           <div className="space-y-3 border-t p-5 sm:p-6">
             <div>
               <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
@@ -419,7 +418,6 @@ export function RuleForm({
             </Collapsible>
           </div>
 
-          {/* Match: condition tree */}
           <div className="space-y-3 border-t p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -580,7 +578,6 @@ export function RuleForm({
             />
           </div>
 
-          {/* Then: actions */}
           <div className="space-y-3 border-t p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -647,7 +644,6 @@ export function RuleForm({
             )}
           </div>
 
-          {/* Footer: cancel + submit */}
           <div className="bg-muted/30 flex items-center justify-end gap-2 border-t px-5 py-4 sm:px-6">
             <Button type="button" variant="ghost" onClick={onCancel}>
               Cancel
@@ -764,9 +760,7 @@ function MatchSubtitle({
 // `conditions.2.op` and `conditions.2.value` so we can render a single line
 // of errors under each row.
 function getRowErrors(
-  // The form type carries record-shape generics that don't matter here.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form: any,
+  form: UseFormReturn<RuleFormValues>,
   key: "conditions" | "actions",
   idx: number,
 ): string[] {

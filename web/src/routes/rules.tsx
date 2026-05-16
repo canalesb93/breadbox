@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Loader2, Plus, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { PaginationBar } from "@/components/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -131,7 +132,6 @@ export function RulesPage() {
     }
   }, [deleteRule, pendingDelete]);
 
-  const totalPages = rulesQuery.data?.total_pages ?? 1;
   const total = rulesQuery.data?.total ?? rows.length;
 
   const hasActiveFilters = !!search.q || !!search.enabled;
@@ -217,10 +217,11 @@ export function RulesPage() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <RulesPager
+      {total > RULES_PAGE_SIZE && (
+        <PaginationBar
           page={page}
-          totalPages={totalPages}
+          pageSize={RULES_PAGE_SIZE}
+          total={total}
           onPageChange={(next) =>
             navigate({
               to: ".",
@@ -230,6 +231,8 @@ export function RulesPage() {
               }),
             })
           }
+          isFetching={isFetching}
+          itemLabel="rules"
         />
       )}
 
@@ -251,10 +254,7 @@ export function RulesPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={onDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction variant="destructive" onClick={onDeleteConfirm}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -299,10 +299,7 @@ function RulesToolbar({
         placeholder="Search rules…"
         className="h-9 max-w-xs"
       />
-      <Select
-        value={enabled ?? "all"}
-        onValueChange={onEnabledChange}
-      >
+      <Select value={enabled ?? "all"} onValueChange={onEnabledChange}>
         <SelectTrigger className="h-9 w-[140px]">
           <SelectValue />
         </SelectTrigger>
@@ -312,60 +309,18 @@ function RulesToolbar({
           <SelectItem value="false">Disabled</SelectItem>
         </SelectContent>
       </Select>
-      <div className="ml-auto">
-        <Select value={sort} onValueChange={onSortChange}>
-          <SelectTrigger className="h-9 w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="priority">Pipeline stage</SelectItem>
-            <SelectItem value="hit_count">Most hits</SelectItem>
-            <SelectItem value="last_hit_at">Recently active</SelectItem>
-            <SelectItem value="created_at">Newest first</SelectItem>
-            <SelectItem value="name">Name (A–Z)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Select value={sort} onValueChange={onSortChange}>
+        <SelectTrigger className="ml-auto h-9 w-[160px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="priority">Pipeline stage</SelectItem>
+          <SelectItem value="hit_count">Most hits</SelectItem>
+          <SelectItem value="last_hit_at">Recently active</SelectItem>
+          <SelectItem value="created_at">Newest first</SelectItem>
+          <SelectItem value="name">Name (A–Z)</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
-
-function RulesPager({
-  page,
-  totalPages,
-  onPageChange,
-}: {
-  page: number;
-  totalPages: number;
-  onPageChange: (next: number) => void;
-}) {
-  return (
-    <div className="mt-6 flex items-center justify-between gap-2">
-      <span className="text-muted-foreground text-xs tabular-nums">
-        Page {page} of {totalPages}
-      </span>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-          disabled={page <= 1}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          disabled={page >= totalPages}
-        >
-          Next
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// PAGE_SIZE re-export so detail/edit-page tests that mock useRules can
-// reference the same constant.
-export { RULES_PAGE_SIZE };

@@ -1,8 +1,10 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ApiError } from "@/api/client";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useCreateRule,
@@ -56,27 +58,19 @@ export function RuleFormPage({ mode }: RuleFormPageProps) {
       );
       if (ok) navigate({ to: "/rules/$id", params: { id: rule.short_id } });
     } else {
-      let created;
       try {
-        created = await createRule.mutateAsync({
+        const created = await createRule.mutateAsync({
           name: values.name,
           conditions: values.conditions,
           actions: values.actions,
           trigger: values.trigger,
           priority: values.priority,
         });
+        toast.success(`Created rule "${created.name}".`);
+        navigate({ to: "/rules/$id", params: { id: created.short_id } });
       } catch (err) {
-        await withMutationToast(() => Promise.reject(err), {
-          success: "",
-          error: "Failed to create rule.",
-        });
-        return;
+        toast.error(err instanceof ApiError ? err.message : "Failed to create rule.");
       }
-      // Toast + redirect to the new rule's detail page.
-      await withMutationToast(() => Promise.resolve(), {
-        success: `Created rule "${created.name}".`,
-      });
-      navigate({ to: "/rules/$id", params: { id: created.short_id } });
     }
   };
 

@@ -10,8 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCategories } from "@/api/queries/categories";
-import { useTags } from "@/api/queries/tags";
+import { flattenCategories, useCategories } from "@/api/queries/categories";
 import {
   RULE_FIELDS,
   defaultOp,
@@ -41,8 +40,6 @@ export function ConditionRowFields({
   onRemove,
 }: ConditionRowFieldsProps) {
   const t = value.field ? fieldType(value.field) : "string";
-  const isCategoryEq =
-    value.field === "category" && (value.op === "eq" || value.op === "neq");
 
   // Pre-fill operator with the field-type's default when the user picks a
   // field for the first time. Same behaviour as v1's onFieldChange.
@@ -103,7 +100,6 @@ export function ConditionRowFields({
 
       <ValueInput
         type={t}
-        isCategoryEq={isCategoryEq}
         field={value.field}
         op={value.op}
         value={value.value}
@@ -151,21 +147,19 @@ function groupedFieldOptions() {
 
 function ValueInput({
   type,
-  isCategoryEq,
   field,
   op,
   value,
   onChange,
 }: {
   type: ReturnType<typeof fieldType>;
-  isCategoryEq: boolean;
   field: string;
   op: string;
   value: string;
   onChange: (v: string) => void;
 }) {
   const { data: categories } = useCategories();
-  const { data: tags } = useTags();
+  const isCategoryEq = field === "category" && (op === "eq" || op === "neq");
 
   if (!field) {
     return (
@@ -202,7 +196,7 @@ function ValueInput({
     );
   }
   if (isCategoryEq) {
-    const flat = flattenCategories(categories ?? []);
+    const flat = flattenCategories(categories);
     return (
       <Select value={value || undefined} onValueChange={onChange}>
         <SelectTrigger className="bg-background h-8 min-w-0 flex-1">
@@ -211,8 +205,8 @@ function ValueInput({
         <SelectContent>
           {flat.map((c) => (
             <SelectItem key={c.slug} value={c.slug}>
-              {c.parentName ? `${c.parentName} › ` : ""}
-              {c.displayName}
+              {c.parent_display_name ? `${c.parent_display_name} › ` : ""}
+              {c.display_name}
             </SelectItem>
           ))}
         </SelectContent>
@@ -227,14 +221,9 @@ function ValueInput({
         onChange={(e) => onChange(e.target.value)}
         className="bg-background h-8 min-w-0 flex-1"
         placeholder={op === "in" ? "slug1, slug2, …" : "tag-slug"}
-      >
-        {/* The shared datalist is rendered once by the parent form so we don't
-            mount one per row. */}
-      </Input>
+      />
     );
   }
-  // Default: string text input. tags datalist appears for power users who
-  // want autocomplete on tag slugs via the in/contains operators.
   return (
     <Input
       value={value}
@@ -243,33 +232,6 @@ function ValueInput({
       placeholder={
         op === "in" ? "value1, value2, …" : op === "matches" ? "regex…" : "value…"
       }
-      list={field === "tags" ? "bb-tag-slugs" : undefined}
     />
   );
-  // tags input is reachable above only for the explicit tags field-type
-  // branch; this fallthrough exists to silence the unused warning.
-  void tags;
-}
-
-interface FlatCategory {
-  slug: string;
-  displayName: string;
-  parentName: string | null;
-}
-
-function flattenCategories(
-  tree: { slug: string; display_name: string; children?: { slug: string; display_name: string }[] }[],
-): FlatCategory[] {
-  const out: FlatCategory[] = [];
-  for (const parent of tree) {
-    out.push({ slug: parent.slug, displayName: parent.display_name, parentName: null });
-    for (const child of parent.children ?? []) {
-      out.push({
-        slug: child.slug,
-        displayName: child.display_name,
-        parentName: parent.display_name,
-      });
-    }
-  }
-  return out;
 }

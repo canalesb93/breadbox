@@ -1,19 +1,14 @@
+import { useMemo } from "react";
 import { Infinity as InfinityIcon, MessageSquare, Plus, Shapes, Tag as TagIcon, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DynamicIcon } from "@/lib/icon";
 import { useCategories } from "@/api/queries/categories";
 import { useTags } from "@/api/queries/tags";
-import type { Condition, RuleAction, TransactionRule } from "@/api/types";
-import { RULE_FIELDS, isMatchAll, opsFor } from "./rule-utils";
+import type { Category, Condition, RuleAction, Tag, TransactionRule } from "@/api/types";
+import { RULE_FIELDS, categoryTileStyle, isMatchAll, opsFor } from "./rule-utils";
 
-// RuleConditionsDisplay is the read-only counterpart to ConditionRowFields —
-// used on the detail page to show what the rule matches without the form
-// machinery.
-export function RuleConditionsDisplay({
-  conditions,
-}: {
-  conditions: Condition;
-}) {
+// Read-only condition display, used on the detail page.
+export function RuleConditionsDisplay({ conditions }: { conditions: Condition }) {
   if (isMatchAll(conditions)) {
     return (
       <div className="bg-blue-500/5 border-blue-500/20 flex items-center gap-3 rounded-xl border p-3">
@@ -80,7 +75,18 @@ function prettyCondition(c: Condition): string {
 }
 
 // RuleActionsDisplay shows the rule's effects as a list of action cards.
+// Resolves category and tag slugs to display labels once at this level so
+// each action row reads from local maps instead of subscribing to the
+// queries individually.
 export function RuleActionsDisplay({ rule }: { rule: TransactionRule }) {
+  const { data: categoryTree } = useCategories();
+  const { data: tags } = useTags();
+  const categoryBySlug = useMemo(() => indexCategoriesBySlug(categoryTree), [categoryTree]);
+  const tagBySlug = useMemo(
+    () => new Map((tags ?? []).map((t) => [t.slug, t])),
+    [tags],
+  );
+
   if (rule.actions.length === 0) {
     return (
       <p className="text-muted-foreground py-3 text-sm">
@@ -91,7 +97,13 @@ export function RuleActionsDisplay({ rule }: { rule: TransactionRule }) {
   return (
     <div className="space-y-1.5">
       {rule.actions.map((a, i) => (
-        <ActionCard key={i} action={a} rule={rule} />
+        <ActionCard
+          key={i}
+          action={a}
+          rule={rule}
+          categoryBySlug={categoryBySlug}
+          tagBySlug={tagBySlug}
+        />
       ))}
     </div>
   );
@@ -100,9 +112,13 @@ export function RuleActionsDisplay({ rule }: { rule: TransactionRule }) {
 function ActionCard({
   action,
   rule,
+  categoryBySlug,
+  tagBySlug,
 }: {
   action: RuleAction;
   rule: TransactionRule;
+  categoryBySlug: Map<string, { display: string }>;
+  tagBySlug: Map<string, Tag>;
 }) {
   switch (action.type) {
     case "set_category":
@@ -110,12 +126,7 @@ function ActionCard({
         <div className="bg-muted/40 flex items-center gap-3 rounded-xl p-3">
           <div
             className="flex size-8 items-center justify-center rounded-lg"
-            style={{
-              backgroundColor: rule.category_color
-                ? `color-mix(in oklab, ${rule.category_color} 18%, transparent)`
-                : "var(--muted)",
-              color: rule.category_color ?? undefined,
-            }}
+            style={categoryTileStyle(rule.category_color)}
           >
             {rule.category_icon ? (
               <DynamicIcon name={rule.category_icon} className="size-4" />
@@ -125,7 +136,12 @@ function ActionCard({
           </div>
           <p className="text-sm">
             Set category to{" "}
-            <CategoryName slug={action.category_slug} fallback={rule.category_display_name} />
+            <span className="font-semibold">
+              {categoryBySlug.get(action.category_slug ?? "")?.display ??
+                rule.category_display_name ??
+                action.category_slug ??
+                "?"}
+            </span>
           </p>
         </div>
       );
@@ -136,7 +152,7 @@ function ActionCard({
             <Plus className="size-4" />
           </div>
           <p className="text-sm">
-            Add tag <TagChip slug={action.tag_slug} />
+            Add tag <TagChip slug={action.tag_slug} tagBySlug={tagBySlug} />
           </p>
         </div>
       );
@@ -147,7 +163,7 @@ function ActionCard({
             <X className="size-4" />
           </div>
           <p className="text-sm">
-            Remove tag <TagChip slug={action.tag_slug} />
+            Remove tag <TagChip slug={action.tag_slug} tagBySlug={tagBySlug} />
           </p>
         </div>
       );
@@ -172,34 +188,15 @@ function ActionCard({
   }
 }
 
-function CategoryName({
+function TagChip({
   slug,
-  fallback,
+  tagBySlug,
 }: {
   slug: string | undefined;
-  fallback?: string | null;
+  tagBySlug: Map<string, Tag>;
 }) {
-  const { data: tree } = useCategories();
-  if (!slug) return <span className="font-semibold">{fallback ?? "?"}</span>;
-  for (const parent of tree ?? []) {
-    if (parent.slug === slug) return <span className="font-semibold">{parent.display_name}</span>;
-    for (const c of parent.children ?? []) {
-      if (c.slug === slug) {
-        return (
-          <span className="font-semibold">
-            {parent.display_name} › {c.display_name}
-          </span>
-        );
-      }
-    }
-  }
-  return <span className="font-semibold">{fallback ?? slug}</span>;
-}
-
-function TagChip({ slug }: { slug: string | undefined }) {
-  const { data: tags } = useTags();
   if (!slug) return <Badge variant="outline">?</Badge>;
-  const tag = (tags ?? []).find((t) => t.slug === slug);
+  const tag = tagBySlug.get(slug);
   return (
     <Badge variant="outline" className="gap-1">
       {tag?.icon && <DynamicIcon name={tag.icon} className="size-3" />}
@@ -207,4 +204,20 @@ function TagChip({ slug }: { slug: string | undefined }) {
       <TagIcon className="text-muted-foreground/60 size-3" />
     </Badge>
   );
+}
+
+// indexCategoriesBySlug walks the parent/children tree once into a Map keyed
+// by slug, with the display value pre-rendered as "Parent › Child" for
+// children and just "Parent" for top-level rows.
+function indexCategoriesBySlug(
+  tree: Category[] | undefined,
+): Map<string, { display: string }> {
+  const out = new Map<string, { display: string }>();
+  for (const parent of tree ?? []) {
+    out.set(parent.slug, { display: parent.display_name });
+    for (const c of parent.children ?? []) {
+      out.set(c.slug, { display: `${parent.display_name} › ${c.display_name}` });
+    }
+  }
+  return out;
 }

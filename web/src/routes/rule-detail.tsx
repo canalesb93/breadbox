@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Loader2, Pause, Pencil, Play, PlayCircle, Shield, Trash2, Zap } from "lucide-react";
+import { Loader2, Pause, Pencil, Play, PlayCircle, Shield, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -15,7 +15,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DynamicIcon } from "@/lib/icon";
 import { formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
@@ -28,6 +27,7 @@ import {
   RuleActionsDisplay,
   RuleConditionsDisplay,
 } from "@/features/rules/rule-display";
+import { RuleAvatar } from "@/features/rules/rule-avatar";
 import { stageForPriority, triggerLabel } from "@/features/rules/rule-utils";
 import type { TransactionRule } from "@/api/types";
 
@@ -237,10 +237,7 @@ export function RuleDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={onDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction variant="destructive" onClick={onDeleteConfirm}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -253,7 +250,7 @@ export function RuleDetailPage() {
     return (
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <RuleHeaderAvatar rule={rule} />
+          <RuleAvatar rule={rule} size="lg" />
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">
               {rule.name}
@@ -320,44 +317,6 @@ export function RuleDetailPage() {
       </div>
     );
   }
-}
-
-function RuleHeaderAvatar({ rule }: { rule: TransactionRule }) {
-  const isSystem = rule.created_by_type === "system";
-  if (rule.category_icon && rule.enabled) {
-    return (
-      <div
-        className="flex size-12 items-center justify-center rounded-xl"
-        style={{
-          backgroundColor: rule.category_color
-            ? `color-mix(in oklab, ${rule.category_color} 18%, transparent)`
-            : "var(--muted)",
-          color: rule.category_color ?? undefined,
-        }}
-      >
-        <DynamicIcon name={rule.category_icon} className="size-6" />
-      </div>
-    );
-  }
-  if (!rule.enabled) {
-    return (
-      <div className="bg-muted text-muted-foreground/60 flex size-12 items-center justify-center rounded-xl">
-        <Pause className="size-6" />
-      </div>
-    );
-  }
-  if (isSystem) {
-    return (
-      <div className="flex size-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-        <Shield className="size-6" />
-      </div>
-    );
-  }
-  return (
-    <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-      <Zap className="size-6" />
-    </div>
-  );
 }
 
 function Stat({
