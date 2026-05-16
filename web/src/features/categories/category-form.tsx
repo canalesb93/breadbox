@@ -125,20 +125,23 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="bg-muted/30 flex items-center gap-3 rounded-md border p-3">
-          <CategoryIconTile icon={icon} color={color} size="lg" />
-          <div className="min-w-0">
-            <div className="truncate font-medium">
-              {displayName || "Untitled category"}
-            </div>
-            <div className="text-muted-foreground text-xs">
-              {category?.parent_display_name ??
-                (mode === "create" && parentId
-                  ? "Sub-category"
-                  : "Top-level category")}
+        {/* In create mode the form is the only thing on the page so it
+            needs its own live preview. In edit mode the hero card above
+            already carries the identity preview live (icon + colour are
+            sourced from the same Category), so skip the redundant tile. */}
+        {mode === "create" && (
+          <div className="bg-muted/30 flex items-center gap-3 rounded-md border p-3">
+            <CategoryIconTile icon={icon} color={color} size="lg" />
+            <div className="min-w-0">
+              <div className="truncate font-medium">
+                {displayName || "Untitled category"}
+              </div>
+              <div className="text-muted-foreground text-xs">
+                {parentId ? "Sub-category" : "Top-level category"}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <FormField
           control={form.control}

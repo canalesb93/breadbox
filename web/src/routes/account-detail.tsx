@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ColorRailCard } from "@/components/color-rail-card";
 import { EmptyState } from "@/components/empty-state";
 import { IdPill } from "@/components/id-pill";
 import { SectionCard } from "@/components/section-card";
@@ -233,16 +234,25 @@ function Hero({
   const directionLabel = liability ? "Balance owed" : "Current balance";
 
   return (
-    <div className="bg-card relative overflow-hidden rounded-xl border">
-      {/* Asset/liability rail anchored to the account's accounting role.
-          Excluded accounts collapse to neutral so the card reads "shelved"
-          rather than "demands attention". */}
-      <div
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ backgroundColor: accent }}
-      />
-
+    <ColorRailCard
+      accent={accent}
+      footer={
+        <>
+          {!a.is_dependent_linked && (
+            <Button variant="ghost" size="sm" onClick={onAddLink} className="h-7 gap-1.5 text-xs">
+              <Link2 className="size-3.5" />
+              Link account
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" asChild className="h-7 gap-1.5 text-xs">
+            <Link to="/transactions" search={{ account: a.short_id }}>
+              <Eye className="size-3.5" />
+              View transactions
+            </Link>
+          </Button>
+        </>
+      }
+    >
       <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
@@ -364,24 +374,7 @@ function Hero({
         </div>
       </div>
 
-      {/* Inline action strip lives inside the hero so primary actions sit
-          adjacent to the identity they act on. Keeps the page from leading
-          with a row of "Link / View" buttons floating above the card. */}
-      <div className="border-t bg-muted/20 flex flex-wrap items-center justify-end gap-2 px-6 py-2.5 sm:px-7">
-        {!a.is_dependent_linked && (
-          <Button variant="ghost" size="sm" onClick={onAddLink} className="h-7 gap-1.5 text-xs">
-            <Link2 className="size-3.5" />
-            Link account
-          </Button>
-        )}
-        <Button variant="ghost" size="sm" asChild className="h-7 gap-1.5 text-xs">
-          <Link to="/transactions" search={{ account: a.short_id }}>
-            <Eye className="size-3.5" />
-            View transactions
-          </Link>
-        </Button>
-      </div>
-    </div>
+    </ColorRailCard>
   );
 }
 
