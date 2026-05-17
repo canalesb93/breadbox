@@ -350,7 +350,18 @@ export function AgentsSection() {
               <Alert variant="destructive">
                 <XCircle className="size-4" />
                 <AlertTitle>Test failed — {testError.code}</AlertTitle>
-                <AlertDescription>{testError.message}</AlertDescription>
+                <AlertDescription className="space-y-1">
+                  <p>{testError.message}</p>
+                  <p className="text-xs">
+                    For deeper diagnostics run{" "}
+                    <code className="rounded bg-background/40 px-1 py-0.5 font-mono">
+                      breadbox agent test
+                    </code>{" "}
+                    in a shell (exit codes 3 / 5 / 1 distinguish auth /
+                    binary / runtime failures) or check the server logs
+                    for the sidecar stderr.
+                  </p>
+                </AlertDescription>
               </Alert>
             )}
           </form>
