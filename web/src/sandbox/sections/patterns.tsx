@@ -86,6 +86,7 @@ export function PatternsSection() {
 
   return (
     <SandboxSection
+      id="patterns"
       title="Patterns"
       description="Cross-cutting behaviors — not components, but the shared building blocks every feature reaches for."
     >

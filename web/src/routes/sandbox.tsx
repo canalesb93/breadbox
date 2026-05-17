@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SandboxIsolationProvider } from "@/sandbox/kit";
 import { FoundationsSection } from "@/sandbox/sections/foundations";
 import { PrimitivesSection } from "@/sandbox/sections/primitives";
 import { ComponentsSection } from "@/sandbox/sections/components";
@@ -37,7 +38,23 @@ export function SandboxPage() {
     return null;
   });
 
-  const [active, setActive] = useState<SectionId>("foundations");
+  // `?only=<slug>` isolates a single specimen for clean before/after or
+  // variant screenshots. `?section=<id>` scopes which section's tree
+  // mounts in isolation mode — defaults to `components` since that's the
+  // bulk of the gallery. Scoping matters because mounting every section
+  // would mount every Specimen wrapper (and their lazy children), and
+  // some of those side-mount via popover triggers that can hit the API.
+  const { only, scopedSection } = useMemo(() => {
+    if (typeof window === "undefined")
+      return { only: null as string | null, scopedSection: null as SectionId | null };
+    const params = new URLSearchParams(window.location.search);
+    const onlyParam = params.get("only");
+    const sectionParam = params.get("section");
+    const matched = SECTIONS.find((s) => s.id === sectionParam)?.id ?? null;
+    return { only: onlyParam, scopedSection: matched };
+  }, []);
+
+  const [active, setActive] = useState<SectionId>("components");
   // The theme toggle is a scoped preview: it flips the global `.dark` class
   // so the whole gallery re-themes, but restores the original mode on
   // unmount so it never leaks out to the rest of the app.
@@ -61,8 +78,44 @@ export function SandboxPage() {
   const ActiveSection =
     SECTIONS.find((s) => s.id === active)?.Component ?? FoundationsSection;
 
+  // In isolation mode, drop the section nav + outline and mount ONLY the
+  // scoped section (default `components`). Specimen / SandboxGroup
+  // self-filter so only the matching specimen actually renders. We mount
+  // a single section (not all five) because Specimen wrappers + their lazy
+  // popover triggers can side-fetch live data — scoping keeps the page
+  // entirely fixture-backed.
+  if (only) {
+    const exitHref = window.location.pathname;
+    const sectionId = scopedSection ?? "components";
+    const Scoped =
+      SECTIONS.find((s) => s.id === sectionId)?.Component ?? ComponentsSection;
+    return (
+      <SandboxIsolationProvider only={only}>
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="text-muted-foreground mb-4 flex items-center justify-between text-xs">
+            <span>
+              Isolating <code className="font-mono">{only}</code>
+              <span className="text-muted-foreground/60 ml-2">
+                in <code className="font-mono">{sectionId}</code>
+              </span>
+            </span>
+            <a
+              href={exitHref}
+              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+            >
+              <X className="size-3" />
+              Exit isolation
+            </a>
+          </div>
+          <Scoped />
+        </div>
+      </SandboxIsolationProvider>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-5xl">
+    <SandboxIsolationProvider only={null}>
+    <div className="w-full">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold tracking-tight">
@@ -126,16 +179,28 @@ export function SandboxPage() {
         </div>
       </div>
     </div>
+    </SandboxIsolationProvider>
   );
+}
+
+interface OutlineSpecimen {
+  id: string;
+  label: string;
+}
+interface OutlineGroup {
+  id: string;
+  title: string;
+  items: OutlineSpecimen[];
 }
 
 // SectionWithOutline pairs an active sandbox section with a sticky right-rail
 // outline of its specimens. Specimens self-register via `data-specimen-label`
-// from the `<Specimen>` primitive — we scan the section's DOM after each
-// section change (and on resize) so the outline reflects whatever lives in
-// the gallery without per-section wiring. Active item highlights via
-// IntersectionObserver: whichever specimen is closest to the top of the
-// viewport (under the 56px shell header) wins.
+// from the `<Specimen>` primitive; `<SandboxGroup>` wraps clusters and emits
+// `data-specimen-group="Title"`. The outline walks the section in document
+// order, grouping every specimen under its nearest preceding group (an
+// implicit "General" bucket catches specimens that live outside any group).
+// Active item highlights via IntersectionObserver — whichever specimen is
+// closest to the top of the viewport (under the 56px shell header) wins.
 function SectionWithOutline({
   sectionId,
   children,
@@ -144,77 +209,106 @@ function SectionWithOutline({
   children: React.ReactNode;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState<Array<{ id: string; label: string }>>([]);
+  const [groups, setGroups] = useState<OutlineGroup[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Rebuild the outline on section change. `useEffect` runs after children
-  // commit, so specimens are mounted and queryable.
   useEffect(() => {
     const root = contentRef.current;
     if (!root) return;
-    const next = [...root.querySelectorAll<HTMLElement>("[data-specimen-label]")].map(
-      (el) => ({
-        id: el.id,
-        label: el.getAttribute("data-specimen-label") ?? el.id,
-      }),
+    const nodes = root.querySelectorAll<HTMLElement>(
+      "[data-specimen-group], [data-specimen-label]",
     );
-    setItems(next);
-    setActiveId(next[0]?.id ?? null);
+    const next: OutlineGroup[] = [];
+    let current: OutlineGroup | null = null;
+    const ungrouped: OutlineSpecimen[] = [];
+    for (const el of Array.from(nodes)) {
+      const groupTitle = el.getAttribute("data-specimen-group");
+      if (groupTitle) {
+        current = { id: el.id, title: groupTitle, items: [] };
+        next.push(current);
+        continue;
+      }
+      const label = el.getAttribute("data-specimen-label");
+      if (!label) continue;
+      const item: OutlineSpecimen = { id: el.id, label };
+      if (current) current.items.push(item);
+      else ungrouped.push(item);
+    }
+    setGroups(
+      ungrouped.length
+        ? [{ id: "outline-general", title: "General", items: ungrouped }, ...next]
+        : next,
+    );
+    setActiveId(ungrouped[0]?.id ?? next[0]?.items[0]?.id ?? null);
   }, [sectionId]);
 
-  // Highlight whichever specimen is closest to the top under the 56px shell
-  // header. Rebuild when the item list changes (new section).
   useEffect(() => {
-    if (items.length === 0) return;
     const root = contentRef.current;
     if (!root) return;
-    const els = items
+    const all = groups.flatMap((g) => g.items);
+    if (all.length === 0) return;
+    const els = all
       .map((i) => root.querySelector<HTMLElement>(`#${CSS.escape(i.id)}`))
       .filter((el): el is HTMLElement => !!el);
     const observer = new IntersectionObserver(
       (entries) => {
-        // Collect the entries that are currently intersecting and pick the
-        // one with the smallest `top` — i.e. nearest the top of the root.
         const visible = entries
           .filter((e) => e.isIntersecting)
-          .sort(
-            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
-          );
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible[0]) setActiveId(visible[0].target.id);
       },
       { rootMargin: "-56px 0px -60% 0px", threshold: 0 },
     );
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [items]);
+  }, [groups]);
+
+  const hasItems = groups.some((g) => g.items.length > 0);
 
   return (
     <div className="flex gap-8">
       <div ref={contentRef} className="min-w-0 flex-1">
         {children}
       </div>
-      {items.length > 0 && (
-        <aside className="sticky top-20 hidden h-fit w-48 shrink-0 lg:block">
+      {hasItems && (
+        <aside className="sticky top-20 hidden h-[calc(100vh-6rem)] w-52 shrink-0 overflow-y-auto pr-2 lg:block">
           <p className="text-muted-foreground mb-2 px-2 text-[10px] font-semibold tracking-wider uppercase">
             On this page
           </p>
-          <ul className="space-y-0.5">
-            {items.map((i) => (
-              <li key={i.id}>
-                <a
-                  href={`#${i.id}`}
-                  className={cn(
-                    "block truncate rounded-md px-2 py-1 text-xs transition-colors",
-                    activeId === i.id
-                      ? "text-foreground bg-accent/50 font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
-                  )}
-                >
-                  {i.label}
-                </a>
-              </li>
+          <div className="space-y-3">
+            {groups.map((g) => (
+              <div key={g.id}>
+                {/* Only render group label when there are real groups —
+                    the implicit "General" bucket is unlabeled. */}
+                {g.id !== "outline-general" && (
+                  <p className="text-muted-foreground/80 mb-1 px-2 text-[10px] font-semibold tracking-wider uppercase">
+                    {g.title}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {g.items.map((i) => (
+                    <li key={i.id}>
+                      <a
+                        href={`#${i.id}`}
+                        className={cn(
+                          "block truncate rounded-md py-1 pr-2 text-xs transition-colors",
+                          // Indent subitems under a real group label so the
+                          // outline reads as a hierarchy; ungrouped fallback
+                          // keeps the flush left edge.
+                          g.id === "outline-general" ? "pl-2" : "pl-4",
+                          activeId === i.id
+                            ? "text-foreground bg-accent/50 font-medium"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
+                        )}
+                      >
+                        {i.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         </aside>
       )}
     </div>
