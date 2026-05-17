@@ -1,0 +1,43 @@
+//go:build !lite
+
+package appconfig
+
+// Agent subsystem config keys. All values live in the app_config table.
+// Read via the helpers in read.go (plaintext) or encrypted.go (AES-GCM).
+const (
+	// KeyAgentAuthMode controls which credential the sidecar uses.
+	// Values: "subscription" (Claude OAuth token) or "api_key" (Anthropic API key).
+	// Default: "subscription".
+	KeyAgentAuthMode = "agent.auth_mode"
+
+	// KeyAgentSubscriptionToken stores the encrypted Claude OAuth token
+	// (sk-ant-oat01-…) obtained via `claude setup-token`.
+	KeyAgentSubscriptionToken = "agent.subscription_token"
+
+	// KeyAgentAnthropicAPIKey stores the encrypted Anthropic API key (sk-ant-…).
+	KeyAgentAnthropicAPIKey = "agent.anthropic_api_key"
+
+	// KeyAgentMaxConcurrent is the server-wide cap on simultaneous agent runs.
+	// Default: "1". v1 enforces strictly 1; future iterations may lift the cap.
+	KeyAgentMaxConcurrent = "agent.max_concurrent"
+
+	// KeyAgentGlobalMaxBudgetUSD is the absolute ceiling on per-run cost,
+	// regardless of per-agent max_budget_usd. Empty = no global ceiling.
+	KeyAgentGlobalMaxBudgetUSD = "agent.global_max_budget_usd"
+
+	// KeyAgentRuntimePath is the absolute path to the breadbox-agent binary.
+	// When empty, Sidecar.resolveBinary falls through to env BREADBOX_AGENT_BIN,
+	// then ./bin/breadbox-agent, then PATH.
+	KeyAgentRuntimePath = "agent.runtime_path"
+
+	// KeyAgentTranscriptDir is the directory where agent runs' NDJSON
+	// transcripts are written. One file per run, named "<runID>.ndjson".
+	// Default: "<data dir>/agent-transcripts" resolved by the runner.
+	KeyAgentTranscriptDir = "agent.transcript_dir"
+)
+
+// AuthMode values for KeyAgentAuthMode.
+const (
+	AuthModeSubscription = "subscription"
+	AuthModeAPIKey       = "api_key"
+)

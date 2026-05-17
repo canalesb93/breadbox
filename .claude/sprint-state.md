@@ -133,7 +133,24 @@ Every loop iteration appends a dated entry here. Format:
 - What's next
 ```
 
-(none yet — first loop fire will write iteration 1)
+## ITER 1 — 2026-05-17 00:05
+Shipped (PR-#TBD on this branch):
+- Migrations: `agent_definitions` + `agent_runs` with full schema, short_id triggers, CHECK constraints, FK SET NULL behavior, indexes.
+- sqlc queries: complete CRUD + lifecycle queries for both tables; `make sqlc` regenerated cleanly and the new `*.sql.go` files are tagged `!lite`.
+- `internal/appconfig/keys.go` (`agent.*` key constants, `AuthMode*` enum-like consts) and `internal/appconfig/encrypted.go` (`ReadEncrypted` / `WriteEncrypted` helpers wrapping AES-256-GCM via `internal/crypto`).
+- `internal/agent/` Go package: `spec.go` (JobSpec, AuthConfig, MCPServerConfig), `event.go` (NDJSON event union + typed payload accessors), `runner.go` (Runner interface, RunResult, status consts), `errors.go` (sentinel errors), `sidecar.go` (full Sidecar.Run implementation — locates binary, pipes spec to stdin, streams NDJSON from stdout, writes transcript to disk, populates RunResult).
+- TS sidecar in `agent/sidecar/`: package.json + tsconfig + spec.ts (zod-validated JobSpec) + events.ts (sync NDJSON emit + transcript append) + index.ts (full SDK query loop with auth scrubbing, cost cap detection, max-turns detection, structured `result` event emission, graceful SIGTERM/SIGINT). README + .gitignore.
+- Makefile: `agent-sidecar`, `agent-sidecar-install`, `agent-sidecar-typecheck` targets. .gitignore already covers `/bin/`.
+- Tests: 14 integration tests passing (schema-pin + sqlc round-trips for both tables, FK SET NULL behavior, short_id trigger fires, CHECK enforcement). 3 unit tests for the Runner (NDJSON parsing, binary-not-found, non-zero exit). All unit tests pass; `go build ./...`, `go vet ./...`, `go build -tags=headless ./...`, `go build -tags=lite ./...` clean.
+
+Deferred to iteration 2:
+- Service layer (`internal/service/agents.go`) — CRUD + mint-and-revoke for scoped API keys.
+- REST handlers — `/api/v1/agents` + `/web/v1/agents` + settings endpoints for the Anthropic / OAuth token.
+- Wiring app_config defaults at server startup (so `agent.auth_mode` defaults to `subscription`).
+- Release workflow update for `breadbox-agent` cross-platform binaries — deferred to iteration 7 (will land alongside docs + observability so the release artifact story ships in one cohesive piece).
+
+Next iteration: service layer + REST API + scoped key mint/revoke.
+
 
 ## Operating instructions for the loop
 
