@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"breadbox/internal/agent"
@@ -398,5 +399,86 @@ func TestOrchestratorRunNow_CleanSuccess_LeavesHitCapNil(t *testing.T) {
 	}
 	if runResp.HitCap != nil {
 		t.Errorf("HitCap should be nil on clean success, got %q", *runResp.HitCap)
+	}
+}
+
+// TestOrchestratorRunNow_TripleConcurrency exercises the iter-29 default
+// (max_concurrent=3). Fires 3 RunNow calls concurrently; all should
+// complete cleanly with no semaphore lockout. Verifies mint-and-revoke,
+// per-run row creation, and end-state run count all behave under
+// contention. The 4th concurrent attempt should still lock — the cap is
+// a real ceiling, not a no-op.
+func TestOrchestratorRunNow_TripleConcurrency(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-3x", true)
+
+	var running atomic.Int32
+	var maxObserved atomic.Int32
+	release := make(chan struct{})
+	started := make(chan struct{}, 4)
+
+	runner := agent.RunnerFunc(func(ctx context.Context, _ agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		now := running.Add(1)
+		defer running.Add(-1)
+		for {
+			old := maxObserved.Load()
+			if now <= old || maxObserved.CompareAndSwap(old, now) {
+				break
+			}
+		}
+		started <- struct{}{}
+		<-release
+		return agent.RunResult{Status: agent.StatusSuccess, DurationMs: 1}, nil
+	})
+
+	// Cap=3 — should let the first three Runs all run in parallel.
+	orch := service.NewOrchestrator(svc, runner, 3, encKey, slog.Default())
+
+	var wg sync.WaitGroup
+	results := make([]error, 3)
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			_, err := orch.RunNow(context.Background(), def, "")
+			results[idx] = err
+		}(i)
+	}
+
+	// Wait for all three goroutines to enter the runner before releasing.
+	for i := 0; i < 3; i++ {
+		<-started
+	}
+
+	// A 4th concurrent attempt should hit ErrConcurrencyLocked while the
+	// other three are still running.
+	_, fourthErr := orch.RunNow(context.Background(), def, "")
+	if !errors.Is(fourthErr, agent.ErrConcurrencyLocked) {
+		t.Errorf("4th RunNow under cap=3 should return ErrConcurrencyLocked, got %v", fourthErr)
+	}
+
+	close(release)
+	wg.Wait()
+
+	for i, err := range results {
+		if err != nil {
+			t.Errorf("RunNow #%d err = %v, want nil", i, err)
+		}
+	}
+	if got := maxObserved.Load(); got != 3 {
+		t.Errorf("max concurrent runs observed = %d, want 3 (cap=3 should NOT serialize)", got)
+	}
+
+	// Every successful run minted an api_key and revoked it. After all three
+	// complete, no `agent:orch-3x:*` key should remain unrevoked.
+	keys, err := svc.ListAPIKeys(context.Background())
+	if err != nil {
+		t.Fatalf("ListAPIKeys: %v", err)
+	}
+	for _, k := range keys {
+		if strings.HasPrefix(k.Name, "agent:orch-3x:") && k.RevokedAt == nil {
+			t.Errorf("unrevoked minted key after concurrent runs: %s", k.Name)
+		}
 	}
 }
