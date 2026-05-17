@@ -10,6 +10,28 @@ You are running one autonomous iteration of the **v2 SPA design sprint** for the
 
 ## Iteration steps
 
+### Locked out of dev login? You have permission to reset the admin password.
+
+If `admin@example.com` / `password` doesn't log you in (a prior test or a
+recent migration changed the credentials), Ricardo has given explicit
+permission to reset it locally:
+
+```bash
+# Build a working binary (any tag is fine; you don't need `serve`).
+go build -o /tmp/breadbox-cli ./cmd/breadbox
+
+# DATABASE_URL must point at the dev DB. Standard local default:
+DATABASE_URL="postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable" \
+  /tmp/breadbox-cli reset-password --password=password
+```
+
+The command is `Hidden: true` in `internal/cli/admin.go` — it resets the
+first admin login account's password against the local DB. After that
+`admin@example.com` / `password` works again. Don't run this against
+anything other than the local dev DB.
+
+---
+
 ### Worktree, not main repo (hard rule)
 
 **NEVER work in the main repo at `/Users/canales/dev/breadbox`.** Always
