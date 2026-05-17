@@ -2791,3 +2791,53 @@ Cross-cutting components:
     new code. Still chronic; queue: `optimizeDeps.force=true` in
     `web/vite.config.ts` for dev so the CLI flag isn't required
     (queued since iter 91, not yet picked up).
+
+
+- **Iter 96 — SearchInput primitive (4 list-page search inputs unified)** ([#1211](https://github.com/canalesb93/breadbox/pull/1211))
+  - Long-className audit found 4 sites open-coding the same
+    icon-input lockup: `<div className="relative w-full max-w-sm">
+    <Search className="text-muted-foreground pointer-events-none
+    absolute top-1/2 left-2.5 size-4 -translate-y-1/2"/>
+    <Input className="pl-8" .../></div>`. Tags, Categories, and
+    API keys list pages were byte-identical except for the wrapper
+    width (`max-w-sm` vs `max-w-xs`); Transactions toolbar shared
+    the same shape but added a `ref` + an `Esc`-to-blur
+    `onKeyDown`. Promoted to `<SearchInput>` at
+    `web/src/components/search-input.tsx` — 24th shared primitive
+    in the v2 vocabulary.
+  - API: `React.forwardRef` so the Transactions toolbar's
+    `searchRef` keeps working; spreads all native input props
+    (value / onChange / onKeyDown / placeholder / defaultValue);
+    `containerClassName` is the escape hatch for the outer wrapper
+    width — default `w-full max-w-sm` matches the dominant
+    list-page pattern (Tags / Categories), with explicit overrides
+    documented in the docstring for the API keys (`max-w-xs`) and
+    Transactions toolbar (`min-w-48 sm:w-64`) shapes. Input
+    `type="search"` so browsers know to surface the clear-X on
+    desktop without us having to wire one.
+  - Sandbox specimen at `/v2/sandbox#components` (right after
+    `<ViewAllPill>`) shows three preset widths so future consumers
+    don't have to spelunk through call sites to pick the right
+    `containerClassName`. Visual change is by design negligible —
+    every consumer renders byte-equivalent geometry (same icon
+    position, same `pl-8`, same wrapper width). The win is one
+    place to evolve the search-field vocabulary (focus glow,
+    icon glyph, density) instead of four.
+  - Audit observation: the same long-className pass surfaced two
+    more 3-site duplications worth promoting in subsequent
+    iterations — the `grid gap-5 px-5 py-5 sm:gap-6 sm:px-7
+    sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start
+    lg:gap-10` detail-page hero body grid (account-detail,
+    category-detail, connection-detail) and the `flex flex-col
+    gap-5 px-6 py-5 sm:flex-row sm:items-center
+    sm:justify-between sm:px-7` provider-card header bar
+    (plaid-card, teller-card, csv-card). Both are good
+    candidates: each retires three open-coded sites and gives the
+    primitive a clear name (`<HeroGrid>` / `<ProviderCardHeader>`).
+    Queued for the long-className backlog.
+  - Iter 4 (#1117) called out a `<ListToolbar>` primitive
+    opportunity for "search input + filter controls in a flex row";
+    this PR ships the search-input half. The filter half stays
+    per-page until a third page picks up the Transactions
+    toolbar's `FilterPill` vocabulary — at which point a
+    `<ListToolbar>` slot composition makes sense.
