@@ -60,6 +60,12 @@ SET status        = 'skipped',
     error_message = $2
 WHERE id = $1;
 
+-- name: SetAgentRunNote :one
+UPDATE agent_runs
+SET operator_note = $2
+WHERE id = $1
+RETURNING *;
+
 -- name: CleanupOrphanedAgentRuns :execresult
 UPDATE agent_runs
 SET status        = 'error',

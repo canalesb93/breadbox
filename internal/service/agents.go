@@ -92,6 +92,7 @@ type AgentRunResponse struct {
 	ErrorMessage        *string  `json:"error_message,omitempty"`
 	TranscriptPath      *string  `json:"transcript_path,omitempty"`
 	SessionID           *string  `json:"session_id,omitempty"`
+	OperatorNote        *string  `json:"operator_note,omitempty"`
 }
 
 // AgentRunListResult is the paginated envelope for run lists.
@@ -456,6 +457,32 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 	}, nil
 }
 
+// AgentRunNoteMaxLen caps the operator note size both in the SPA textarea
+// and on the server. Free-form text but bounded so we don't accidentally
+// host arbitrarily-large blobs.
+const AgentRunNoteMaxLen = 2000
+
+// SetAgentRunNote updates the operator note on one run. Empty string
+// clears the field. Returns the updated row.
+func (s *Service) SetAgentRunNote(ctx context.Context, shortIDOrUUID, note string) (*AgentRunResponse, error) {
+	if len(note) > AgentRunNoteMaxLen {
+		return nil, fmt.Errorf("%w: operator note must be <= %d chars", ErrInvalidParameter, AgentRunNoteMaxLen)
+	}
+	existing, err := s.resolveAgentRun(ctx, shortIDOrUUID)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.SetAgentRunNote(ctx, db.SetAgentRunNoteParams{
+		ID:           existing.ID,
+		OperatorNote: pgconv.TextIfNotEmpty(note),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("set agent run note: %w", err)
+	}
+	resp := agentRunFromRow(row)
+	return &resp, nil
+}
+
 // GetAgentRun resolves by short_id or UUID.
 func (s *Service) GetAgentRun(ctx context.Context, shortIDOrUUID string) (*AgentRunResponse, error) {
 	row, err := s.resolveAgentRun(ctx, shortIDOrUUID)
@@ -807,6 +834,7 @@ func agentRunFromRow(row db.AgentRun) AgentRunResponse {
 		ErrorMessage:        pgconv.TextPtr(row.ErrorMessage),
 		TranscriptPath:      pgconv.TextPtr(row.TranscriptPath),
 		SessionID:           pgconv.TextPtr(row.SessionID),
+		OperatorNote:        pgconv.TextPtr(row.OperatorNote),
 	}
 }
 

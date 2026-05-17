@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { ArrowLeft, Clock, FilterX, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, FilterX, Loader2, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,12 +27,17 @@ import {
   type DateRangeValue,
 } from "@/components/date-range-filter";
 import {
+  AGENT_RUN_NOTE_MAX_LEN,
   useAgent,
+  useAgentRun,
   useAgentRuns,
   useTranscript,
+  useUpdateAgentRunNote,
   type AgentRun,
   type AgentRunsFilters,
 } from "@/api/queries/agents";
+import { withMutationToast } from "@/lib/mutation-toast";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDuration, formatRelativeTime } from "@/lib/format";
 import { RunStatusPill } from "@/features/agents/run-status-pill";
 import { TranscriptViewer } from "@/features/agents/transcript-viewer";
@@ -232,6 +238,82 @@ export function AgentRunsPage() {
   );
 }
 
+interface OperatorNoteEditorProps {
+  shortId: string;
+  storedNote: string;
+  loading: boolean;
+}
+
+function OperatorNoteEditor({
+  shortId,
+  storedNote,
+  loading,
+}: OperatorNoteEditorProps) {
+  const update = useUpdateAgentRunNote();
+  const [draft, setDraft] = useState(storedNote);
+
+  // Re-hydrate when the loaded note changes (e.g. opening a different run
+  // in the same Sheet instance after navigating).
+  useEffect(() => {
+    setDraft(storedNote);
+  }, [storedNote, shortId]);
+
+  const dirty = draft !== storedNote;
+  const tooLong = draft.length > AGENT_RUN_NOTE_MAX_LEN;
+  const onSave = () => {
+    if (tooLong) return;
+    void withMutationToast(
+      () => update.mutateAsync({ shortId, note: draft }),
+      {
+        success: storedNote === "" ? "Note added" : draft === "" ? "Note cleared" : "Note saved",
+        error: "Failed to save note",
+      },
+    );
+  };
+
+  return (
+    <div className="mb-4 rounded-md border p-3">
+      <label
+        htmlFor={`note-${shortId}`}
+        className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider"
+      >
+        <StickyNote className="size-3.5" />
+        Operator note
+      </label>
+      <Textarea
+        id={`note-${shortId}`}
+        rows={2}
+        placeholder={
+          loading ? "Loading…" : "Add context — why this fired, what you're investigating, follow-ups…"
+        }
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        disabled={loading}
+        aria-invalid={tooLong}
+      />
+      <div className="mt-1.5 flex items-center justify-between">
+        <span
+          className={`text-xs ${tooLong ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {draft.length} / {AGENT_RUN_NOTE_MAX_LEN}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant={dirty ? "default" : "outline"}
+          onClick={onSave}
+          disabled={!dirty || tooLong || update.isPending}
+        >
+          {update.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : null}
+          {draft === "" && storedNote !== "" ? "Clear note" : "Save note"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
   return (
     <button
@@ -266,11 +348,8 @@ interface TranscriptSheetProps {
 
 function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
   const open = Boolean(shortId);
-  const runQuery = useAgentRuns; // unused — kept here as a reminder that the
-  // single-run detail comes via useTranscript; the run summary is in the
-  // parent's runs list.
-  void runQuery;
   const transcript = useTranscript(shortId ?? undefined);
+  const runDetail = useAgentRun(shortId ?? undefined);
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -284,6 +363,13 @@ function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {shortId && (
+            <OperatorNoteEditor
+              shortId={shortId}
+              storedNote={runDetail.data?.operator_note ?? ""}
+              loading={runDetail.isLoading}
+            />
+          )}
           {transcript.isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-20 w-full" />
