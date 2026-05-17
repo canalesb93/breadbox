@@ -370,6 +370,23 @@ next target, then updates this file at the end of the run.
   category-detail, connection-detail. Reach for it for any new
   detail-page hero lateral-nav cluster. Don't open-code the
   className triplet — pass props.
+- **PageError primitive** — extracted to
+  `web/src/components/page-error.tsx` in iter 82 (#1196). The
+  canonical page-level "couldn't fetch its data" state.
+  Composition on top of `<StatusPanel tone="destructive">` with
+  the AlertTriangle icon, `Couldn't load {resource}` heading,
+  `Error.message` body (or a fallback), and an outline
+  `RefreshCw` Retry button in StatusPanel's `trailing` slot.
+  Retry swaps to a spinning icon + `Retrying…` label while
+  `isFetching` is true. Six surfaces share it today: accounts,
+  connections, providers, rules, rule-form, rule-detail. Sibling
+  of `EmptyState` (no-data) and `StatusPanel` (inline notice) —
+  three states, three vocabularies, one visual system. Don't
+  fork the look — extend this primitive. Component-level alerts
+  inside features (`backups-section`, `reauth-sheet`,
+  `account-links-section`, `preview-panel`) intentionally stay
+  on the raw `Alert` primitive — they're scoped inline contexts,
+  not full-page error surfaces.
 
 ## Backlog (ordered roughly by impact)
 
@@ -2094,6 +2111,39 @@ Cross-cutting components:
     unused `conn` prop to `_props`.
   - No visual change. Future design iterations now have a real
     type-check gate before merge.
+
+- **Iter 82 — Unified page-level error state via `PageError` primitive** ([#1196](https://github.com/canalesb93/breadbox/pull/1196))
+  - New `PageError` at `web/src/components/page-error.tsx` wraps
+    `StatusPanel` (tone `destructive`) with the canonical
+    "Couldn't load X" lockup + an inline Retry button that calls
+    the query's `refetch()`. Outline `RefreshCw` button lands in
+    `StatusPanel`'s `trailing` slot; switches to an animated
+    spinner + "Retrying…" label while `isFetching` is true.
+  - Six pages converted from hand-rolled `<Alert variant="destructive">
+    + AlertTitle + AlertDescription` blocks to `<PageError>`:
+    accounts, connections, providers, rules, rule-form, rule-detail.
+    Destructive page-level errors now speak the same 3px tone-tinted
+    left rail vocabulary as warnings (StatusPanel), success notices
+    (setup-account), and env-locked providers — closing the last
+    "destructive notice fork" in the app.
+  - Drift cleanups in the same sweep:
+    - Connections' amber "N connections need attention" alert
+      moves to `<StatusPanel tone="warning">` (third surface in the
+      iter-16 vocabulary, retiring an open-coded `border-amber-500/30
+      bg-amber-500/5` alert).
+    - Rule-form / rule-detail "Rule not found" branches drop the
+      bare `<Alert>` for `<EmptyState variant="card">`, matching
+      tag-detail / category-detail. Not-found is now a single
+      vocabulary across all detail pages.
+  - Component-level alerts inside features (`backups-section`,
+    `reauth-sheet`, `account-links-section`, `preview-panel`)
+    intentionally stay on the raw `Alert` primitive — they're
+    scoped inline contexts, not full-page error surfaces.
+  - PageError is the 21st shared v2 primitive. Sibling of
+    `EmptyState` (no-data) and `StatusPanel` (inline notice) —
+    three states, three vocabularies, one visual system. Don't
+    fork the look — extend this primitive if a seventh consumer
+    needs a new variant.
 
 ## Open observations / questions
 
