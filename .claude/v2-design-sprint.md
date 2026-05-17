@@ -2841,3 +2841,34 @@ Cross-cutting components:
     per-page until a third page picks up the Transactions
     toolbar's `FilterPill` vocabulary — at which point a
     `<ListToolbar>` slot composition makes sense.
+
+
+- **Iter 97 — HeroGrid primitive (4 detail-page hero bodies unified)** ([#1212](https://github.com/canalesb93/breadbox/pull/1212))
+  - Picked up iter 96's first queued long-className candidate. Three
+    byte-identical sites (account-detail, category-detail,
+    connection-detail) and one near-identical variant
+    (transaction-detail) all open-coded the same body grid:
+    `grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6
+    lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10`.
+    Promoted to `<HeroGrid>` at `web/src/components/hero-grid.tsx` —
+    25th shared primitive in the v2 vocabulary.
+  - API: thin `lgGapClassName` escape hatch (default `lg:gap-10`)
+    admits the TX-detail variant (`lg:gap-x-10 lg:gap-y-5`). The
+    transaction-detail left column stacks identity on top of a
+    classify row so its vertical rhythm needs to be tighter — the
+    other three consumers don't have that stack and stay on the
+    looser default. Forwards `className` + native div attrs.
+  - Visual change is by design negligible — every consumer renders
+    byte-equivalent geometry (same breakpoints, same px / py, same
+    column tracks, same lg row-gap). The win is one place to evolve
+    the hero body density (eg. tighten the lg padding or change the
+    column track expression) instead of four.
+  - Sandbox specimen at `/v2/sandbox?section=components` between
+    `ColorRailCard` and `ColorRailCardSkeleton` shows the asset hero
+    shape (`<ColorRailCard accent="#0ea5e9">` wrapping
+    `<HeroGrid>` with identity + metric columns).
+  - One iter-96 candidate left in the long-className backlog:
+    `<ProviderCardHeader>` for the `flex flex-col gap-5 px-6 py-5
+    sm:flex-row sm:items-center sm:justify-between sm:px-7` bar
+    shared by plaid-card, teller-card, csv-card. Next iteration if
+    no higher-priority target appears.
