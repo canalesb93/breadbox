@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Agent SDK integration**: schedule recurring AI workflows from the v2 SPA at `/v2/agents`. Self-hosters configure an Anthropic credential (subscription OAuth token or API key, AES-256-GCM encrypted at rest), pick from 5 seeded starter agents (Initial Setup, Bulk Review, Quick Review, Routine Review, Spending Report), or author their own with a full prompt builder. Runs fire via the bundled `breadbox-agent` sidecar (built with `make agent-sidecar`), call breadbox MCP to enrich/categorize/review data, and surface in a run history page with a transcript viewer showing turns, tool calls, cost, and token usage. Safety: per-agent + global cost/turn caps; server-wide concurrency mutex; mint-and-revoke scoped API keys per run; daily cleanup of old runs. Every legacy v1 admin agent URL (`/agent-prompts`, `/agent-wizard/*`, `/agents`) now 302s to `/v2/agents`. See `docs/agents.md`.
+
 ### Breaking Changes (Pre-1.0)
 
 - **Renamed provider-data fields on transactions table.** Raw data fields from bank providers are now prefixed with `provider_` to clarify they are unmodified provider data, not Breadbox assignments. This affects:
