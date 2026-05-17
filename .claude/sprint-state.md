@@ -651,6 +651,40 @@ Next iteration candidates (refreshed):
 
 Picking **#1 inline rule-DSL help card** next iteration — concrete operator-value win for the most common agent intent (rule creation), bounded UI scope, captures clean evidence.
 
+## ITER 26 — 2026-05-17 05:20
+Shipped (PR #1252 squash-merged into sprint branch as 64da4308):
+- New `web/src/features/agents/rule-dsl-help.tsx` — shadcn Collapsible wrapping a concise grammar reference: shape skeleton, fields, operators per type, combinators, actions/triggers, preview_rule tip.
+- Renders under the Prompt textarea on agents.$slug.edit; closed by default so prompt-only edits stay compact.
+- No new shadcn install (used existing Collapsible primitive).
+- Feature-only component (under features/agents/*), not subject to sandbox specimen rule per the v2-frontend rules.
+- Screenshot captured via Chrome MCP, uploaded to img402.dev, embedded in PR body.
+- All 5 CI jobs green.
+
+## ITER 27 — 2026-05-17 05:35
+Shipped (PR #1253 squash-merged into sprint branch as ca39929f):
+- Migration 20260517115556: agent_runs.hit_cap TEXT NULL with CHECK constraint ('max_turns' | 'max_budget'). Additive.
+- sqlc SetAgentRunHitCap :one returns the full row so orchestrator can rebuild the response in one shot.
+- New service helper SetAgentRunHitCapDB; AgentRunResponse.HitCap surfaces the field.
+- Orchestrator: capFromRunErr() maps sidecar sentinels (ErrMaxTurnsReached, ErrBudgetExceeded) to the discrete hit_cap string. Called after CompleteAgentRunDB so cap signal layers on top of status — max_turns stays success-tagged, max_budget stays error-tagged.
+- SPA: AgentRun.hit_cap typed union; new HitCapPill renders amber "max turns" (clean stop, work may be incomplete) and red "over budget" (mid-run abort), each with operator-actionable title hint.
+- 3 new orchestrator integration tests covering all three branches.
+- All 5 CI jobs green.
+
+Screenshot intentionally omitted — pill only renders when an actual run hit a cap; seeding requires DB writes the sandbox correctly denies (iter-24 lesson). Implementation is documented in PR body + code comments.
+
+Next iteration candidates (refreshed):
+1. **Force-cleanup button on Settings → Agents** — tiny follow-up to iter-25. POST /api/v1/agents/cleanup-now triggers daily tick synchronously, returns counts.
+2. **Aggregate "recent caps hit" pill on /v2/agents** — list-level signal like iter-21's error pill, leans on iter-27's hit_cap field.
+3. **Filter chip for hit_cap on run history page** — small UI add.
+4. **Empty/error state polish across agent pages** — UI sweep.
+5. **Mobile-responsive sweep on agent pages** — UI sweep.
+6. **Multi-concurrent runs** — lift v1 max_concurrent=1 cap; needs careful semaphore tests under contention.
+7. **Per-model cost breakdown** — needs model column on agent_runs.
+8. **Webhook trigger** — fire after sync completion. Bigger.
+9. **Suggested rules agent** — bigger.
+
+Picking **#1 force-cleanup button** next iteration — tight scope, real operator value after lowering retention, naturally closes the iter-25 deferred item.
+
 
 
 
