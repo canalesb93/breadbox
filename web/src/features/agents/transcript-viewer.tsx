@@ -112,13 +112,46 @@ export function TranscriptViewer({
   shortId,
 }: TranscriptViewerProps) {
   const [query, setQuery] = useState("");
+  const [toolsOnly, setToolsOnly] = useState(false);
+  const [errorsOnly, setErrorsOnly] = useState(false);
   const trimmed = query.trim();
   const searching = trimmed.length > 0;
 
   const matchingEvents = useMemo(() => {
-    if (!searching) return events;
-    return events.filter((ev) => eventMatchesQuery(ev, trimmed));
-  }, [events, trimmed, searching]);
+    let filtered = events;
+    if (searching) {
+      filtered = filtered.filter((ev) => eventMatchesQuery(ev, trimmed));
+    }
+    if (toolsOnly) {
+      // Keep tool_use + tool_result so input/output pairs render together;
+      // also keep error/cost_cap_hit so the headline Alerts up top still
+      // fire — those aren't part of the noise the chip suppresses.
+      filtered = filtered.filter(
+        (ev) =>
+          ev.type === "tool_use" ||
+          ev.type === "tool_result" ||
+          ev.type === "error" ||
+          ev.type === "cost_cap_hit",
+      );
+    }
+    if (errorsOnly) {
+      // Keep errored tool_results + the error/cost_cap_hit events. Skip
+      // tool_use entries whose matching result didn't error (they'd render
+      // as orphan "pending" badges).
+      const errResultIds = new Set(
+        filtered
+          .filter((ev) => ev.type === "tool_result" && ev.data.is_error === true)
+          .map((ev) => (ev.type === "tool_result" ? ev.data.tool_use_id : "")),
+      );
+      filtered = filtered.filter((ev) => {
+        if (ev.type === "error" || ev.type === "cost_cap_hit") return true;
+        if (ev.type === "tool_result") return ev.data.is_error === true;
+        if (ev.type === "tool_use") return errResultIds.has(ev.data.id);
+        return false;
+      });
+    }
+    return filtered;
+  }, [events, trimmed, searching, toolsOnly, errorsOnly]);
 
   const turns = useMemo(
     () => groupIntoTurns(matchingEvents),
@@ -162,13 +195,27 @@ export function TranscriptViewer({
           </button>
         )}
       </div>
-      {searching && (
-        <div className="text-muted-foreground text-xs">
-          {noMatches
-            ? `No matching events for "${trimmed}"`
-            : `Showing ${matchedCount} of ${events.length} events matching "${trimmed}"`}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterChip
+          icon={<Wrench className="size-3" />}
+          label="Tools only"
+          active={toolsOnly}
+          onToggle={() => setToolsOnly((v) => !v)}
+        />
+        <FilterChip
+          icon={<AlertCircle className="size-3" />}
+          label="Errors only"
+          active={errorsOnly}
+          onToggle={() => setErrorsOnly((v) => !v)}
+        />
+        {(searching || toolsOnly || errorsOnly) && (
+          <span className="text-muted-foreground text-xs">
+            {noMatches
+              ? "No matching events"
+              : `Showing ${matchedCount} of ${events.length} events`}
+          </span>
+        )}
+      </div>
 
       {truncated && (
         <Alert>
@@ -265,6 +312,39 @@ function extractText(content: AssistantContent[]): string {
 interface ToolCallPairProps {
   toolUse: ToolUseData & { ts: number };
   toolResult?: ToolResultData & { ts: number };
+}
+
+// FilterChip is a small toggle button used for the iter-43 "Tools only" /
+// "Errors only" quick filters above the transcript event stream. Active
+// state inverts the visual (filled badge) so the chip reads as "currently
+// applied" without a separate state indicator.
+function FilterChip({
+  icon,
+  label,
+  active,
+  onToggle,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition",
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-background hover:bg-accent text-muted-foreground",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }
 
 function ToolCallPair({ toolUse, toolResult }: ToolCallPairProps) {
