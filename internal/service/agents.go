@@ -40,22 +40,24 @@ var validAgentSlug = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`
 
 // AgentDefinitionResponse is the API shape for an agent_definition row.
 type AgentDefinitionResponse struct {
-	ID           string           `json:"id"`
-	ShortID      string           `json:"short_id"`
-	Name         string           `json:"name"`
-	Slug         string           `json:"slug"`
-	Prompt       string           `json:"prompt"`
-	SystemPrompt *string          `json:"system_prompt,omitempty"`
-	ScheduleCron *string          `json:"schedule_cron,omitempty"`
-	ToolScope    string           `json:"tool_scope"`
-	AllowedTools []string         `json:"allowed_tools"`
-	Model        string           `json:"model"`
-	MaxTurns     int              `json:"max_turns"`
-	MaxBudgetUSD *float64         `json:"max_budget_usd,omitempty"`
-	Enabled      bool             `json:"enabled"`
-	LastRun      *AgentRunSummary `json:"last_run,omitempty"`
-	CreatedAt    string           `json:"created_at"`
-	UpdatedAt    string           `json:"updated_at"`
+	ID              string           `json:"id"`
+	ShortID         string           `json:"short_id"`
+	Name            string           `json:"name"`
+	Slug            string           `json:"slug"`
+	Prompt          string           `json:"prompt"`
+	SystemPrompt    *string          `json:"system_prompt,omitempty"`
+	ScheduleCron    *string          `json:"schedule_cron,omitempty"`
+	ToolScope       string           `json:"tool_scope"`
+	AllowedTools    []string         `json:"allowed_tools"`
+	Model           string           `json:"model"`
+	MaxTurns        int              `json:"max_turns"`
+	MaxBudgetUSD    *float64         `json:"max_budget_usd,omitempty"`
+	Enabled         bool             `json:"enabled"`
+	QuietHoursStart *string          `json:"quiet_hours_start,omitempty"`
+	QuietHoursEnd   *string          `json:"quiet_hours_end,omitempty"`
+	LastRun         *AgentRunSummary `json:"last_run,omitempty"`
+	CreatedAt       string           `json:"created_at"`
+	UpdatedAt       string           `json:"updated_at"`
 }
 
 // AgentRunSummary is the inline last-run shape on list/detail responses.
@@ -102,34 +104,38 @@ type AgentRunListResult struct {
 
 // CreateAgentDefinitionParams holds validated inputs for definition creation.
 type CreateAgentDefinitionParams struct {
-	Name         string
-	Slug         string
-	Prompt       string
-	SystemPrompt *string
-	ScheduleCron *string
-	ToolScope    string
-	AllowedTools []string
-	Model        string
-	MaxTurns     int
-	MaxBudgetUSD *float64
-	Enabled      bool
+	Name            string
+	Slug            string
+	Prompt          string
+	SystemPrompt    *string
+	ScheduleCron    *string
+	ToolScope       string
+	AllowedTools    []string
+	Model           string
+	MaxTurns        int
+	MaxBudgetUSD    *float64
+	Enabled         bool
+	QuietHoursStart *string // "HH:MM" 24-hour; nil disables window
+	QuietHoursEnd   *string
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
 // nil = don't touch; non-nil = replace. Slug is mutable here; if you want
 // it pinned, omit Slug from your PATCH body.
 type UpdateAgentDefinitionParams struct {
-	Name         *string
-	Slug         *string
-	Prompt       *string
-	SystemPrompt *string
-	ScheduleCron *string
-	ToolScope    *string
-	AllowedTools *[]string
-	Model        *string
-	MaxTurns     *int
-	MaxBudgetUSD *float64
-	Enabled      *bool
+	Name            *string
+	Slug            *string
+	Prompt          *string
+	SystemPrompt    *string
+	ScheduleCron    *string
+	ToolScope       *string
+	AllowedTools    *[]string
+	Model           *string
+	MaxTurns        *int
+	MaxBudgetUSD    *float64
+	Enabled         *bool
+	QuietHoursStart *string
+	QuietHoursEnd   *string
 }
 
 // ListAgentDefinitions returns all definitions ordered by created_at DESC,
@@ -193,18 +199,23 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 		budget = &def
 	}
 
+	if err := validateQuietHours(p.QuietHoursStart, p.QuietHoursEnd); err != nil {
+		return nil, err
+	}
 	row, err := s.Queries.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
-		Name:         p.Name,
-		Slug:         p.Slug,
-		Prompt:       p.Prompt,
-		SystemPrompt: pgconv.TextPtrIfNotEmpty(p.SystemPrompt),
-		ScheduleCron: pgconv.TextPtrIfNotEmpty(p.ScheduleCron),
-		ToolScope:    toolScope,
-		AllowedTools: allowedJSON,
-		Model:        model,
-		MaxTurns:     int32(maxTurns),
-		MaxBudgetUsd: agentNumericFromFloat(budget),
-		Enabled:      p.Enabled,
+		Name:            p.Name,
+		Slug:            p.Slug,
+		Prompt:          p.Prompt,
+		SystemPrompt:    pgconv.TextPtrIfNotEmpty(p.SystemPrompt),
+		ScheduleCron:    pgconv.TextPtrIfNotEmpty(p.ScheduleCron),
+		ToolScope:       toolScope,
+		AllowedTools:    allowedJSON,
+		Model:           model,
+		MaxTurns:        int32(maxTurns),
+		MaxBudgetUsd:    agentNumericFromFloat(budget),
+		Enabled:         p.Enabled,
+		QuietHoursStart: pgconv.TextPtrIfNotEmpty(p.QuietHoursStart),
+		QuietHoursEnd:   pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
@@ -256,8 +267,17 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 	if p.Enabled != nil {
 		merged.Enabled = *p.Enabled
 	}
+	if p.QuietHoursStart != nil {
+		merged.QuietHoursStart = emptyToNil(*p.QuietHoursStart)
+	}
+	if p.QuietHoursEnd != nil {
+		merged.QuietHoursEnd = emptyToNil(*p.QuietHoursEnd)
+	}
 
 	if err := validateAgentDefinitionFields(merged.Name, merged.Slug, merged.Prompt, merged.ToolScope, merged.Model, merged.MaxTurns, merged.MaxBudgetUSD, merged.ScheduleCron); err != nil {
+		return nil, err
+	}
+	if err := validateQuietHours(merged.QuietHoursStart, merged.QuietHoursEnd); err != nil {
 		return nil, err
 	}
 	allowedJSON, err := agentAllowedToolsToBytes(merged.AllowedTools)
@@ -271,18 +291,20 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 	}
 
 	row, err := s.Queries.UpdateAgentDefinition(ctx, db.UpdateAgentDefinitionParams{
-		ID:           existing.ID,
-		Name:         merged.Name,
-		Slug:         merged.Slug,
-		Prompt:       merged.Prompt,
-		SystemPrompt: pgconv.TextPtrIfNotEmpty(merged.SystemPrompt),
-		ScheduleCron: pgconv.TextPtrIfNotEmpty(merged.ScheduleCron),
-		ToolScope:    merged.ToolScope,
-		AllowedTools: allowedJSON,
-		Model:        merged.Model,
-		MaxTurns:     int32(merged.MaxTurns),
-		MaxBudgetUsd: agentNumericFromFloat(budget),
-		Enabled:      merged.Enabled,
+		ID:              existing.ID,
+		Name:            merged.Name,
+		Slug:            merged.Slug,
+		Prompt:          merged.Prompt,
+		SystemPrompt:    pgconv.TextPtrIfNotEmpty(merged.SystemPrompt),
+		ScheduleCron:    pgconv.TextPtrIfNotEmpty(merged.ScheduleCron),
+		ToolScope:       merged.ToolScope,
+		AllowedTools:    allowedJSON,
+		Model:           merged.Model,
+		MaxTurns:        int32(merged.MaxTurns),
+		MaxBudgetUsd:    agentNumericFromFloat(budget),
+		Enabled:         merged.Enabled,
+		QuietHoursStart: pgconv.TextPtrIfNotEmpty(merged.QuietHoursStart),
+		QuietHoursEnd:   pgconv.TextPtrIfNotEmpty(merged.QuietHoursEnd),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update agent definition: %w", err)
@@ -738,22 +760,24 @@ func agentIntFromInt4(n pgtype.Int4) *int {
 
 func agentDefinitionFromRow(row db.AgentDefinition, lastRun *AgentRunSummary) AgentDefinitionResponse {
 	return AgentDefinitionResponse{
-		ID:           pgconv.FormatUUID(row.ID),
-		ShortID:      row.ShortID,
-		Name:         row.Name,
-		Slug:         row.Slug,
-		Prompt:       row.Prompt,
-		SystemPrompt: pgconv.TextPtr(row.SystemPrompt),
-		ScheduleCron: pgconv.TextPtr(row.ScheduleCron),
-		ToolScope:    row.ToolScope,
-		AllowedTools: agentAllowedToolsFromBytes(row.AllowedTools),
-		Model:        row.Model,
-		MaxTurns:     int(row.MaxTurns),
-		MaxBudgetUSD: agentFloatFromNumeric(row.MaxBudgetUsd),
-		Enabled:      row.Enabled,
-		LastRun:      lastRun,
-		CreatedAt:    pgconv.TimestampStr(row.CreatedAt),
-		UpdatedAt:    pgconv.TimestampStr(row.UpdatedAt),
+		ID:              pgconv.FormatUUID(row.ID),
+		ShortID:         row.ShortID,
+		Name:            row.Name,
+		Slug:            row.Slug,
+		Prompt:          row.Prompt,
+		SystemPrompt:    pgconv.TextPtr(row.SystemPrompt),
+		ScheduleCron:    pgconv.TextPtr(row.ScheduleCron),
+		ToolScope:       row.ToolScope,
+		AllowedTools:    agentAllowedToolsFromBytes(row.AllowedTools),
+		Model:           row.Model,
+		MaxTurns:        int(row.MaxTurns),
+		MaxBudgetUSD:    agentFloatFromNumeric(row.MaxBudgetUsd),
+		Enabled:         row.Enabled,
+		QuietHoursStart: pgconv.TextPtr(row.QuietHoursStart),
+		QuietHoursEnd:   pgconv.TextPtr(row.QuietHoursEnd),
+		LastRun:         lastRun,
+		CreatedAt:       pgconv.TimestampStr(row.CreatedAt),
+		UpdatedAt:       pgconv.TimestampStr(row.UpdatedAt),
 	}
 }
 
@@ -803,4 +827,74 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func emptyToNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	out := s
+	return &out
+}
+
+// validateQuietHours enforces both bounds are valid "HH:MM" 24-hour
+// strings, or both nil. One-sided is rejected — a quiet window needs both edges.
+func validateQuietHours(start, end *string) error {
+	startSet := start != nil && *start != ""
+	endSet := end != nil && *end != ""
+	if !startSet && !endSet {
+		return nil
+	}
+	if startSet != endSet {
+		return fmt.Errorf("%w: quiet_hours_start and quiet_hours_end must both be set or both empty", ErrInvalidParameter)
+	}
+	if _, ok := parseHHMM(*start); !ok {
+		return fmt.Errorf("%w: quiet_hours_start must be HH:MM (24-hour)", ErrInvalidParameter)
+	}
+	if _, ok := parseHHMM(*end); !ok {
+		return fmt.Errorf("%w: quiet_hours_end must be HH:MM (24-hour)", ErrInvalidParameter)
+	}
+	return nil
+}
+
+// parseHHMM returns minutes-from-midnight and ok=true for a valid "HH:MM"
+// 24-hour string.
+func parseHHMM(s string) (int, bool) {
+	if len(s) != 5 || s[2] != ':' {
+		return 0, false
+	}
+	h, err := strconv.Atoi(s[:2])
+	if err != nil || h < 0 || h > 23 {
+		return 0, false
+	}
+	m, err := strconv.Atoi(s[3:])
+	if err != nil || m < 0 || m > 59 {
+		return 0, false
+	}
+	return h*60 + m, true
+}
+
+// IsWithinQuietHours reports whether `now` falls inside the [start, end)
+// window. False on unset/unparseable. Handles windows that wrap midnight
+// (e.g. start=22:00, end=07:00 → quiet 10 PM through 7 AM next morning).
+func IsWithinQuietHours(now time.Time, start, end *string) bool {
+	if start == nil || end == nil || *start == "" || *end == "" {
+		return false
+	}
+	startMin, ok := parseHHMM(*start)
+	if !ok {
+		return false
+	}
+	endMin, ok := parseHHMM(*end)
+	if !ok {
+		return false
+	}
+	if startMin == endMin {
+		return false
+	}
+	cur := now.Hour()*60 + now.Minute()
+	if startMin < endMin {
+		return cur >= startMin && cur < endMin
+	}
+	return cur >= startMin || cur < endMin
 }

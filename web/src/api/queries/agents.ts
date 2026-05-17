@@ -29,6 +29,8 @@ export interface AgentDefinition {
   max_turns: number;
   max_budget_usd?: number | null;
   enabled: boolean;
+  quiet_hours_start?: string | null; // "HH:MM" 24-hour; nil disables window
+  quiet_hours_end?: string | null;
   last_run?: AgentRunSummary | null;
   created_at: string;
   updated_at: string;
@@ -85,6 +87,8 @@ export interface CreateAgentInput {
   max_turns?: number;
   max_budget_usd?: number | null;
   enabled?: boolean;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
 }
 
 export type UpdateAgentInput = Partial<CreateAgentInput>;

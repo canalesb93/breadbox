@@ -117,6 +117,14 @@ func (s *AgentScheduler) fireCronJob(defID pgtype.UUID, slug string) {
 	if !def.Enabled {
 		return
 	}
+	if IsWithinQuietHours(time.Now(), def.QuietHoursStart, def.QuietHoursEnd) {
+		s.logger.Info("agent scheduler: run skipped (quiet hours)",
+			"agent", slug,
+			"quiet_start", derefString(def.QuietHoursStart),
+			"quiet_end", derefString(def.QuietHoursEnd),
+		)
+		return
+	}
 	_, runErr := s.orch.RunOrSkip(ctx, def, "cron")
 	if errors.Is(runErr, agent.ErrConcurrencyLocked) {
 		s.logger.Warn("agent scheduler: run skipped (concurrency locked)", "agent", slug)

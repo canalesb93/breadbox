@@ -54,6 +54,16 @@ const agentEditSchema = z.object({
     (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
     z.number().positive().nullable(),
   ),
+  quiet_hours_start: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24-hour")
+    .optional()
+    .or(z.literal("")),
+  quiet_hours_end: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24-hour")
+    .optional()
+    .or(z.literal("")),
 });
 type AgentEditForm = z.input<typeof agentEditSchema>;
 
@@ -75,6 +85,8 @@ export function AgentEditPage() {
       model: "claude-opus-4-7",
       max_turns: 10,
       max_budget_usd: null,
+      quiet_hours_start: "",
+      quiet_hours_end: "",
     },
   });
 
@@ -93,6 +105,8 @@ export function AgentEditPage() {
       model: agent.model,
       max_turns: agent.max_turns,
       max_budget_usd: agent.max_budget_usd ?? null,
+      quiet_hours_start: agent.quiet_hours_start ?? "",
+      quiet_hours_end: agent.quiet_hours_end ?? "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentQuery.data?.short_id]);
@@ -114,6 +128,12 @@ export function AgentEditPage() {
           model: values.model,
           max_turns: values.max_turns as unknown as number,
           max_budget_usd: values.max_budget_usd as unknown as number | null,
+          quiet_hours_start: values.quiet_hours_start
+            ? values.quiet_hours_start
+            : null,
+          quiet_hours_end: values.quiet_hours_end
+            ? values.quiet_hours_end
+            : null,
         }),
       {
         success: "Agent saved",
@@ -352,6 +372,48 @@ export function AgentEditPage() {
                             ref={field.ref}
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="quiet_hours_start"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quiet hours start</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            placeholder="22:00"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="quiet_hours_end"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quiet hours end</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            placeholder="07:00"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Cron fires inside the window are silently skipped.
+                          Leave both blank to disable.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
