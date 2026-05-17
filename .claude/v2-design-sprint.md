@@ -2361,3 +2361,27 @@ Cross-cutting components:
     `ListRowSkeleton` drift note now documents the per-cell
     sibling family + the rule for when to lift them into a
     `<TableRowSkeleton>` primitive (fourth or fifth consumer).
+
+- **Iter 85 — Sandbox specimens for `<PageError>` + `<DetailPageSkeleton>`** ([#1200](https://github.com/canalesb93/breadbox/pull/1200))
+  - Adds the two iter 82/83 primitives to the sandbox showcase so
+    the "three states, three vocabularies, one visual system"
+    sibling family (no data → load failed → loading) reads top
+    to bottom in one place at `/v2/sandbox#components`. Both
+    specimens land immediately after `<EmptyState>` so the
+    vocabulary triad is colocated.
+  - `<PageError>` specimen covers both shapes consumers actually
+    hit: with-retry (interactive spinner driven by a local
+    `useState` so the `Retrying…` label is reachable from the
+    showcase) and without-retry (fallback `Try again or refresh
+    the page.` body when the query exposes no `refetch` hook).
+  - `<DetailPageSkeleton>` specimen shows two real consumer
+    configurations side-by-side: the transaction shape (hero
+    `tileShape="rounded-md"` + 3 jump pills + 1+2 grid) and the
+    connection shape (hero `withFooter` + no pills + 3+0
+    single-column grid). The two cards make the API knobs
+    (`hero` / `jumpPills` / `main` / `sidebar`) visually obvious
+    without prose.
+  - Sandbox-only addition: no runtime change, no new primitive
+    (still 22). Resolves the iteration-prompt observation that
+    PageError + DetailPageSkeleton specimens were missing from
+    the sandbox after their iter 82 / 83 PRs landed.
