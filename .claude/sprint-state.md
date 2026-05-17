@@ -527,6 +527,27 @@ Next iteration candidates (in rough impact order):
 
 Picking **#3 next-fire preview** next iteration — smallest follow-up to iter 15, UI-only, lands a quality-of-life win for the cron preview that now also accounts for quiet hours.
 
+## ITER 20 — 2026-05-17 03:43
+Shipped (PR #1246 squash-merged into sprint branch as 33550d8a):
+- ComputeNextFire(def, now) reuses robfig/cron + iter-15 quiet-hours logic. Loops with a 100-step safety belt; -1s offset before re-asking cron correctly includes a fire AT the quiet-end minute.
+- AgentDefinitionResponse.NextFireAt (list-only, omitempty, RFC3339).
+- SPA NextFirePill renders "Next: 2h" via formatRelativeTime; native title for absolute time.
+- 7 new unit-test sub-cases covering nil/empty/malformed/no-quiet/with-quiet branches.
+- All 5 CI jobs green.
+
+Iter-15 scheduling loop is now fully closed: configure quiet hours → the list page shows when the next REAL fire will be, not just when cron says it would have been.
+
+Next iteration candidates (in rough impact order):
+1. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine + agent_definitions schema. Bigger.
+2. **Suggested rules agent** — proposes new transaction_rules from recent transactions, queues for review. Bigger.
+3. **breadbox doctor --with-live** — option to also run the smoke test (not just check prereqs).
+4. **Per-model cost breakdown** — extend iter-19 stats with model-by-model spend.
+5. **Per-agent run-rate alert** — flag agents that have errored 3+ times in a row.
+6. **"Run now" with custom prompt prefix** — operator can prepend ad-hoc context to a manual fire (e.g. "Focus on Amazon Prime transactions only").
+
+Picking **#5 run-rate error alert** next iteration — small, leans on the iter-19 stats infra (add `error_count_30d` alongside `run_count`), surfaces a destructive-tone Alert on the agent row when ≥3 of the last 5 runs errored. High signal for "is this agent broken?"
+
+
 
 
 
