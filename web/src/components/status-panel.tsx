@@ -13,11 +13,11 @@ interface StatusPanelProps {
   className?: string;
 }
 
-// StatusPanel renders the canonical inline tone-tinted status block: 3px
-// left rail in the tone colour + tinted icon tile + heading + body. Same
-// "colour encodes meaning" principle as ColorRailCard, but inline-only and
-// smaller — meant for "this surface is in state X" notices that aren't the
-// primary hero.
+// StatusPanel renders the canonical inline tone-tinted status block:
+// tinted icon tile + heading + body on a muted surface. Tone is carried
+// by the icon tile alone — the earlier 3px tone-tinted left rail was
+// removed once the icon proved to be the dominant signal and the rail
+// added visual weight without adding scannability.
 //
 // Originally established inline in `routes/setup-account.tsx` (iter 14) for
 // already-setup + invalid-token states. Promoted in iter 16 once the
@@ -25,28 +25,20 @@ interface StatusPanelProps {
 // warnings. Don't fork the look — change this primitive.
 //
 // Visual contract:
-//   `bg-muted/30 relative overflow-hidden rounded-md border p-4 pl-5`
-//     `before:` 3px tone-tinted left rail
+//   `bg-muted/30 overflow-hidden rounded-md border p-4`
 //     row: tinted icon tile (size-8) + heading + body
 //     optional trailing slot at the right edge
-const PALETTES: Record<
-  StatusPanelTone,
-  { rail: string; iconBg: string }
-> = {
+const PALETTES: Record<StatusPanelTone, { iconBg: string }> = {
   success: {
-    rail: "before:bg-success",
     iconBg: "bg-success/12 text-success",
   },
   destructive: {
-    rail: "before:bg-destructive",
     iconBg: "bg-destructive/10 text-destructive",
   },
   warning: {
-    rail: "before:bg-amber-500",
     iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
   info: {
-    rail: "before:bg-muted-foreground/40",
     iconBg: "bg-muted text-muted-foreground",
   },
 };
@@ -63,8 +55,7 @@ export function StatusPanel({
   return (
     <div
       className={cn(
-        "bg-muted/30 relative overflow-hidden rounded-md border p-4 pl-5 before:absolute before:top-0 before:bottom-0 before:left-0 before:w-[3px]",
-        palette.rail,
+        "bg-muted/30 overflow-hidden rounded-md border p-4",
         className,
       )}
     >
