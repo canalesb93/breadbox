@@ -117,14 +117,14 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - [ ] **Deferred:** full deletion of v1 templ + handler files — belongs in the broader v1-admin retirement sweep
 - [ ] **Deferred:** removing the v1 sidebar "Agent Prompts" nav entry — staying as a discoverable bridge during transition
 
-### Iteration 7 — polish + docs + observability
-- [ ] Structured logging on every agent event
-- [ ] Optional OTel export wired through SDK env vars (`OTEL_*`)
-- [ ] CHANGELOG entry
-- [ ] `docs/agents.md` canonical spec (architecture, schemas, security model)
-- [ ] `.claude/rules/agents.md` for future contributors touching the system
-- [ ] Final pass: error paths, edge cases (sidecar crash mid-run, scheduler restart, sidecar binary missing)
-- **PR title:** `feat(agents): observability, docs, polish`
+### Iteration 7 — polish + docs + observability ✅ MERGED #1233 (into sprint branch)
+- [x] Structured slog.Debug per sidecar NDJSON event in the orchestrator
+- [x] OTel passthrough — sidecar inherits parent env, so OTEL_* on `breadbox serve` flows in; documented in rules + docs
+- [x] CHANGELOG.md Unreleased → Added entry
+- [x] docs/agents.md (shipped in iter 6)
+- [x] .claude/rules/agents.md with locked invariants + Do-Not list
+- [x] Sandbox specimens (deferred from iter 5): CronField + TranscriptViewer (success + error variants) with sampleTranscriptEvents fixtures
+- [x] All edge cases already covered by orchestrator code (sidecar crash, no auth, no binary, runner error, concurrency)
 
 ### Iteration 8+ (stretch — loop keeps going until Ricardo says merge)
 
@@ -281,6 +281,22 @@ Deferred:
 - Removing the v1 sidebar nav entry.
 
 Next iteration: iter 7 — observability + docs polish + final cleanup. Specifically: structured logging on every agent event, optional OTel export wired via SDK env vars (OTEL_*), CHANGELOG entry, .claude/rules/agents.md for future contributors, and the deferred sandbox specimens from iter 5 (TranscriptViewer + CronField).
+
+## ITER 7 — 2026-05-17 01:22
+Shipped (PR #1233 squash-merged into sprint branch as 06294ab7):
+- .claude/rules/agents.md with the load-bearing locked invariants in one place.
+- CHANGELOG entry under Unreleased → Added.
+- Orchestrator emits per-NDJSON-event slog.Debug for cheap runtime tracing.
+- OTel passthrough documented (env inheritance is the default).
+- 3 new sandbox specimens (CronField + TranscriptViewer success/error variants) with fixture data.
+- All 5 CI jobs green.
+
+**Iteration 1-7 are all merged. The original sprint plan is complete.** The system is feature-complete and ready for the sprint→main PR whenever Ricardo signals.
+
+Per the End-of-sprint exit instructions: DO NOT open the sprint→main PR autonomously. Instead, move on to the Iteration 8+ stretch menu (subscription auth smoke test, suggested-rules agent, webhook trigger, per-agent quiet hours, multi-concurrent runs, cost dashboards, transcript file GC, dry-run mode, audit page, `breadbox agent run <slug>` CLI, `breadbox agent test` doctor command, seed expansion, polish, mobile sweep, etc.).
+
+Next iteration: pick the next-most-valuable Iteration 8+ item. Lean toward **subscription auth smoke test** since it's the only item that can be developed in isolation right now without depending on something else, AND it unblocks Ricardo's first real live run.
+
 
 
 
