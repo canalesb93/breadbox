@@ -7,6 +7,7 @@ import {
   RotateCw,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { ActionPill } from "@/components/action-pill";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
@@ -111,15 +112,10 @@ export function ErrorPage({ error, reset }: ErrorPageProps) {
           heading={message}
           body="If this keeps happening, reload the page or check the browser console for more context."
           trailing={
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.location.reload()}
-              className="h-7 gap-1.5 px-2.5 text-xs"
-            >
-              <RotateCw className="size-3" />
+            <ActionPill onClick={() => window.location.reload()}>
+              <RotateCw className="size-3.5" />
               Reload
-            </Button>
+            </ActionPill>
           }
         />
 

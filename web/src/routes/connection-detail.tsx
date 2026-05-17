@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ActionPill } from "@/components/action-pill";
 import { ColorRailCard, ColorRailCardSkeleton } from "@/components/color-rail-card";
 import {
   DetailList,
@@ -411,15 +412,10 @@ function DetailBody({
             "Reconnect to the bank to resume syncing this connection."
           }
           trailing={
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onReauth}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill variant="outline" onClick={onReauth}>
               <RefreshCw className="size-3.5" />
               Re-authenticate
-            </Button>
+            </ActionPill>
           }
         />
       )}
@@ -575,42 +571,26 @@ function Hero({
       footer={
         <>
           {canSync && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onSync}
-              disabled={syncPending}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill onClick={onSync} disabled={syncPending}>
               {syncPending ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="size-3.5" />
               )}
               Sync now
-            </Button>
+            </ActionPill>
           )}
           {conn.provider === "csv" && conn.status !== "disconnected" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onImportCsv}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill onClick={onImportCsv}>
               <Upload className="size-3.5" />
               Import more
-            </Button>
+            </ActionPill>
           )}
           {conn.status !== "disconnected" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onReauth}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill onClick={onReauth}>
               <Plug className="size-3.5" />
               Re-authenticate
-            </Button>
+            </ActionPill>
           )}
           <DropdownMenu>
             <Tooltip>
@@ -816,22 +796,20 @@ function SettingsCard({
             {conn.paused ? "Scheduled syncs paused" : "Syncing on schedule"}
           </div>
         </div>
-        <Button
+        <ActionPill
           variant="outline"
-          size="sm"
           onClick={onTogglePause}
           disabled={pausePending || conn.status === "disconnected"}
-          className="h-7 gap-1.5 text-xs"
         >
           {pausePending ? (
-            <Loader2 className="size-3 animate-spin" />
+            <Loader2 className="size-3.5 animate-spin" />
           ) : conn.paused ? (
-            <Play className="size-3" />
+            <Play className="size-3.5" />
           ) : (
-            <Pause className="size-3" />
+            <Pause className="size-3.5" />
           )}
           {conn.paused ? "Resume" : "Pause"}
-        </Button>
+        </ActionPill>
       </div>
     </SectionCard>
   );
