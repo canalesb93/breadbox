@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"breadbox/internal/agent"
 	"breadbox/internal/api"
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
@@ -115,6 +116,29 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger, syncTimeout)
 	scheduler.Start(cfg.SyncIntervalMinutes)
 	a.Scheduler = scheduler
+
+	// Agent orchestrator + scheduler — drives Claude Agent SDK runs against
+	// the MCP server. Both subscription-token and Anthropic API-key auth
+	// modes are supported (see app_config agent.auth_mode).
+	if cleanupResult, cerr := a.Queries.CleanupOrphanedAgentRuns(ctx); cerr != nil {
+		logger.Warn("failed to clean up orphaned agent runs", "error", cerr)
+	} else if n := cleanupResult.RowsAffected(); n > 0 {
+		logger.Info("cleaned up orphaned agent runs", "count", n)
+	}
+	agentMaxConcurrent := appconfig.Int(ctx, a.Queries, appconfig.KeyAgentMaxConcurrent, 1)
+	agentRuntimePath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
+	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "")
+	agentSidecar := &agent.Sidecar{
+		BinaryPath:    agentRuntimePath,
+		TranscriptDir: agentTranscriptDir,
+	}
+	agentOrch := service.NewOrchestrator(a.Service, agentSidecar, agentMaxConcurrent, cfg.EncryptionKey, logger)
+	agentSched := service.NewAgentScheduler(agentOrch, a.Service, logger)
+	agentOrch.AttachScheduler(agentSched)
+	agentSched.Start(ctx)
+	a.AgentOrchestrator = agentOrch
+	a.AgentScheduler = agentSched
+	a.Service.OnDefinitionChanged = agentOrch.NotifyDefinitionChanged
 
 	if _, err := exec.LookPath("pg_dump"); err == nil {
 		backupDir := os.Getenv("BACKUP_DIR")

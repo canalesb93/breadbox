@@ -47,3 +47,12 @@ type EventHandler func(Event) error
 type Runner interface {
 	Run(ctx context.Context, spec JobSpec, handler EventHandler) (RunResult, error)
 }
+
+// RunnerFunc adapts a plain function to the Runner interface, useful for
+// fake runners in tests.
+type RunnerFunc func(ctx context.Context, spec JobSpec, handler EventHandler) (RunResult, error)
+
+// Run implements Runner.
+func (f RunnerFunc) Run(ctx context.Context, spec JobSpec, handler EventHandler) (RunResult, error) {
+	return f(ctx, spec, handler)
+}

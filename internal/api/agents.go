@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"breadbox/internal/agent"
 	"breadbox/internal/app"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -297,6 +298,60 @@ func UpdateAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFu
 			return
 		}
 		writeData(w, out)
+	}
+}
+
+// RunAgentNowHandler triggers an immediate synchronous run of the named agent.
+// 503 CONCURRENCY_LOCKED when another run is in progress (no DB row written).
+// 422 AUTH_NOT_CONFIGURED when no Anthropic credentials are set.
+// 422 AGENT_BINARY_NOT_FOUND when the sidecar binary can't be located.
+// 200 with the agent_runs row otherwise (status may be 'error' if the run
+// itself failed — the row contains error_message).
+func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if orch == nil {
+			mw.WriteError(w, http.StatusServiceUnavailable, "AGENTS_DISABLED",
+				"Agent orchestrator is not configured on this server")
+			return
+		}
+		slug := chi.URLParam(r, "slug")
+		def, err := svc.GetAgentDefinition(r.Context(), slug)
+		if err != nil {
+			writeAgentError(w, err, "agent not found")
+			return
+		}
+		runResp, runErr := orch.RunNow(r.Context(), def)
+		if errors.Is(runErr, agent.ErrConcurrencyLocked) {
+			mw.WriteError(w, http.StatusServiceUnavailable,
+				"CONCURRENCY_LOCKED",
+				"Another agent run is in progress. Retry when it completes.")
+			return
+		}
+		if errors.Is(runErr, agent.ErrAuthNotConfigured) {
+			mw.WriteError(w, http.StatusUnprocessableEntity,
+				"AUTH_NOT_CONFIGURED",
+				"Agent authentication is not configured. Set subscription_token or anthropic_api_key in settings.")
+			return
+		}
+		if errors.Is(runErr, agent.ErrBinaryNotFound) {
+			mw.WriteError(w, http.StatusUnprocessableEntity,
+				"AGENT_BINARY_NOT_FOUND",
+				"breadbox-agent binary not found. Run `make agent-sidecar` or set agent.runtime_path.")
+			return
+		}
+		// runResp may be non-nil even when runErr is set (mint succeeded but
+		// the sidecar reported failure). Return the row in that case.
+		if runResp != nil {
+			w.WriteHeader(http.StatusCreated)
+			writeData(w, runResp)
+			return
+		}
+		if runErr != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Agent run failed")
+			return
+		}
+		// Unreachable in practice: runResp nil and err nil.
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
