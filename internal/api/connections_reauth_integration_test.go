@@ -164,6 +164,9 @@ func TestConnectionReauth_Success(t *testing.T) {
 	if body.Expiration != "2030-01-02T03:04:05Z" {
 		t.Errorf("want expiration %q, got %q", "2030-01-02T03:04:05Z", body.Expiration)
 	}
+	if body.ApplicationID != "" {
+		t.Errorf("want empty application_id for plaid, got %q", body.ApplicationID)
+	}
 	if env.Provider.reauthCalls != 1 {
 		t.Errorf("want 1 provider call, got %d", env.Provider.reauthCalls)
 	}
@@ -263,6 +266,42 @@ func TestConnectionReauthComplete_NotFound(t *testing.T) {
 	env := setupReauthEnv(t, "full_access")
 	resp := env.doPost(t, "/api/v1/connections/00000000-0000-0000-0000-000000000000/reauth-complete")
 	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
+}
+
+// TestConnectionReauth_TellerReturnsApplicationID guards the v2 SPA's
+// re-auth path: Teller Connect can't bootstrap reconnection mode without
+// both the existing enrollment id (LinkToken) and the configured
+// application id. The reauth handler must surface ApplicationID untouched
+// so the SPA can launch the SDK without falling back to a window global.
+func TestConnectionReauth_TellerReturnsApplicationID(t *testing.T) {
+	env := setupReauthEnv(t, "full_access")
+	tellerFake := &fakeProvider{
+		name: "teller",
+		reauthSession: provider.LinkSession{
+			Token:         "enrollment-from-conn-external-id",
+			ApplicationID: "app_test_teller_123",
+			Expiry:        time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC),
+		},
+	}
+	env.App.Providers["teller"] = tellerFake
+
+	user := testutil.MustCreateUser(t, env.Queries, "Tess")
+	conn := testutil.MustCreateTellerConnection(t, env.Queries, user.ID, "ext_teller_reauth")
+
+	resp := env.doPost(t, "/api/v1/connections/"+conn.ShortID+"/reauth")
+	assertStatus(t, resp, http.StatusOK)
+
+	var body reauthLinkTokenResponse
+	parseJSON(t, resp, &body)
+	if body.LinkToken != "enrollment-from-conn-external-id" {
+		t.Errorf("want link_token %q, got %q", "enrollment-from-conn-external-id", body.LinkToken)
+	}
+	if body.ApplicationID != "app_test_teller_123" {
+		t.Errorf("want application_id %q, got %q", "app_test_teller_123", body.ApplicationID)
+	}
+	if tellerFake.reauthCalls != 1 {
+		t.Errorf("want 1 teller provider call, got %d", tellerFake.reauthCalls)
+	}
 }
 
 func TestConnectionReauth_RequiresWriteScope(t *testing.T) {

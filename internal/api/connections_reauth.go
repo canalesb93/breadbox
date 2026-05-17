@@ -19,9 +19,14 @@ import (
 // POST /api/v1/connections/{id}/reauth. Mirrors the admin
 // linkTokenResponse field-for-field so SDK clients see one contract for
 // link-token issuance regardless of which surface called it.
+//
+// ApplicationID is Teller-specific: Teller Connect needs both the app id
+// and the existing enrollment id (carried in LinkToken) to launch in
+// reconnection mode. Plaid leaves it empty.
 type reauthLinkTokenResponse struct {
-	LinkToken  string `json:"link_token"`
-	Expiration string `json:"expiration"`
+	LinkToken     string `json:"link_token"`
+	Expiration    string `json:"expiration"`
+	ApplicationID string `json:"application_id,omitempty"`
 }
 
 // ConnectionReauthHandler serves POST /api/v1/connections/{id}/reauth.
@@ -71,8 +76,9 @@ func ConnectionReauthHandler(a *app.App) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, reauthLinkTokenResponse{
-			LinkToken:  session.Token,
-			Expiration: session.Expiry.Format("2006-01-02T15:04:05Z"),
+			LinkToken:     session.Token,
+			Expiration:    session.Expiry.Format("2006-01-02T15:04:05Z"),
+			ApplicationID: session.ApplicationID,
 		})
 	}
 }

@@ -37,6 +37,10 @@ type Provider interface {
 type LinkSession struct {
 	Token  string
 	Expiry time.Time
+	// ApplicationID is populated by Teller's reauth flow so the SPA can boot
+	// Teller Connect with both the configured app id and the existing
+	// enrollment id (carried in Token). Other providers leave it empty.
+	ApplicationID string
 }
 
 type Connection struct {

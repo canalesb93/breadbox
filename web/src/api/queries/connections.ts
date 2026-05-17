@@ -249,9 +249,9 @@ export function useCsvImport() {
 //   - Plaid replies with {link_token, expiration} — pass link_token straight
 //     to PlaidLinkButton, which runs Plaid Link in update mode when given an
 //     update-mode token.
-//   - Teller replies with {link_token: <enrollment_id>} — the v1 reauth flow
-//     reuses the enrollment_id as the "token". TellerConnectButton accepts it
-//     as `enrollmentId` to launch Connect in reconnection mode.
+//   - Teller replies with {link_token: <enrollment_id>, application_id} —
+//     enrollment_id pins Teller Connect to the existing connection (reconnect
+//     mode); application_id boots the SDK. Both are needed.
 //   - CSV has no concept of re-auth — the dispatcher returns an error there.
 export function useReauthStart() {
   return useMutation({
