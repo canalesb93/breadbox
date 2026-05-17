@@ -8,17 +8,13 @@ import {
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
-// Sonner Toaster customized to match the v2 design vocabulary established by
-// <StatusPanel>: a 3px tone-tinted left rail + a tone-tinted icon tile + the
-// existing popover surface. Tone is encoded in the rail/icon colour so
-// success/error/warning/info are scannable at a glance without changing the
-// background fill (which keeps the toast quiet enough to live next to dense
-// surfaces like the transactions table).
-//
-// All polish lives here; `lib/mutation-toast.ts` and direct `toast.*` calls
-// stay one-liners. Default position bottom-right, expand-on-hover, and a
-// close button on every toast (mutation results are often quick reads and
-// dismissing them feels right).
+// Tracks the shadcn sonner registry verbatim (theme inheritance + lucide
+// icon overrides + popover-themed CSS vars), then layers v2-specific
+// chrome on top: a 3px tone-tinted left rail and a tone-tinted icon
+// tile, both echoing <StatusPanel> so the toast/panel pair speaks the
+// same vocabulary. Everything else (positioning, dismiss behaviour,
+// close affordance) is left at sonner's defaults so the surface matches
+// the shadcn reference.
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
@@ -26,10 +22,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      position="bottom-right"
-      expand
-      closeButton
-      visibleToasts={4}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -38,7 +30,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
         loading: <Loader2Icon className="size-4 animate-spin" />,
       }}
       toastOptions={{
-        // Class hooks are concatenated by Sonner onto each toast/element.
         // The base toast keeps `pl-5` so the absolute `before:` rail and
         // the icon both clear the left edge. `data-[type=*]` selectors
         // tint the rail and the icon tile per variant; "message" (the
@@ -47,8 +38,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast:
             "group/toast toast relative overflow-hidden " +
-            "!bg-popover !text-popover-foreground !border !border-border !rounded-md " +
-            "!gap-3 !p-4 !pl-5 " +
+            "!pl-5 " +
             "before:absolute before:inset-y-0 before:left-0 before:w-[3px] " +
             "data-[type=success]:before:bg-success " +
             "data-[type=error]:before:bg-destructive " +
@@ -72,20 +62,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-data-[type=default]/toast:!text-muted-foreground " +
             "group-data-[type=loading]/toast:!bg-muted " +
             "group-data-[type=loading]/toast:!text-muted-foreground",
-          content: "!gap-0.5",
-          title: "!text-sm !font-medium !text-foreground !leading-snug",
-          description:
-            "!text-xs !text-muted-foreground !leading-relaxed !mt-0.5",
-          actionButton:
-            "!bg-primary !text-primary-foreground hover:!bg-primary/90 " +
-            "!h-7 !rounded-md !px-2.5 !text-xs !font-medium",
-          cancelButton:
-            "!bg-transparent !text-muted-foreground hover:!text-foreground " +
-            "!h-7 !rounded-md !px-2 !text-xs",
-          closeButton:
-            "!bg-popover !border !border-border !text-muted-foreground " +
-            "hover:!bg-muted hover:!text-foreground " +
-            "!left-auto !right-2 !top-2 !translate-x-0 !translate-y-0",
         },
       }}
       style={
