@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -120,9 +120,103 @@ export function SandboxPage() {
               </Button>
             ))}
           </div>
-          <ActiveSection />
+          <SectionWithOutline sectionId={active}>
+            <ActiveSection />
+          </SectionWithOutline>
         </div>
       </div>
+    </div>
+  );
+}
+
+// SectionWithOutline pairs an active sandbox section with a sticky right-rail
+// outline of its specimens. Specimens self-register via `data-specimen-label`
+// from the `<Specimen>` primitive — we scan the section's DOM after each
+// section change (and on resize) so the outline reflects whatever lives in
+// the gallery without per-section wiring. Active item highlights via
+// IntersectionObserver: whichever specimen is closest to the top of the
+// viewport (under the 56px shell header) wins.
+function SectionWithOutline({
+  sectionId,
+  children,
+}: {
+  sectionId: string;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [items, setItems] = useState<Array<{ id: string; label: string }>>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Rebuild the outline on section change. `useEffect` runs after children
+  // commit, so specimens are mounted and queryable.
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) return;
+    const next = [...root.querySelectorAll<HTMLElement>("[data-specimen-label]")].map(
+      (el) => ({
+        id: el.id,
+        label: el.getAttribute("data-specimen-label") ?? el.id,
+      }),
+    );
+    setItems(next);
+    setActiveId(next[0]?.id ?? null);
+  }, [sectionId]);
+
+  // Highlight whichever specimen is closest to the top under the 56px shell
+  // header. Rebuild when the item list changes (new section).
+  useEffect(() => {
+    if (items.length === 0) return;
+    const root = contentRef.current;
+    if (!root) return;
+    const els = items
+      .map((i) => root.querySelector<HTMLElement>(`#${CSS.escape(i.id)}`))
+      .filter((el): el is HTMLElement => !!el);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Collect the entries that are currently intersecting and pick the
+        // one with the smallest `top` — i.e. nearest the top of the root.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          );
+        if (visible[0]) setActiveId(visible[0].target.id);
+      },
+      { rootMargin: "-56px 0px -60% 0px", threshold: 0 },
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [items]);
+
+  return (
+    <div className="flex gap-8">
+      <div ref={contentRef} className="min-w-0 flex-1">
+        {children}
+      </div>
+      {items.length > 0 && (
+        <aside className="sticky top-20 hidden h-fit w-48 shrink-0 lg:block">
+          <p className="text-muted-foreground mb-2 px-2 text-[10px] font-semibold tracking-wider uppercase">
+            On this page
+          </p>
+          <ul className="space-y-0.5">
+            {items.map((i) => (
+              <li key={i.id}>
+                <a
+                  href={`#${i.id}`}
+                  className={cn(
+                    "block truncate rounded-md px-2 py-1 text-xs transition-colors",
+                    activeId === i.id
+                      ? "text-foreground bg-accent/50 font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
+                  )}
+                >
+                  {i.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
     </div>
   );
 }
