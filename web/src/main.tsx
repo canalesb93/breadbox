@@ -45,6 +45,7 @@ import {
   accountDetailSearchSchema,
 } from "@/routes/account-detail";
 import { RulesPage, rulesSearchSchema } from "@/routes/rules";
+import { AgentsPage } from "@/routes/agents";
 import { RuleDetailPage } from "@/routes/rule-detail";
 import { RuleFormPage } from "@/routes/rule-form";
 import { NAV_LEAVES } from "@/lib/nav";
@@ -120,6 +121,9 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   "/rules": {
     component: RulesPage,
     validateSearch: rulesSearchSchema,
+  },
+  "/agents": {
+    component: AgentsPage,
   },
 };
 
