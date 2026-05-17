@@ -111,6 +111,19 @@ UPDATE agent_runs
 SET prompt_prefix = $2
 WHERE id = $1;
 
+-- name: GetAgentLastPromptPrefixes :many
+-- Per-definition most recent non-null prompt_prefix. Skipped + null-prefix
+-- rows don't shadow earlier prefixes — only runs that actually carried a
+-- prefix are eligible. Used by the v2 SPA "Use last prefix" button on the
+-- Run now dialog to pre-fill the operator's prior context.
+SELECT DISTINCT ON (agent_definition_id)
+       agent_definition_id, prompt_prefix
+FROM agent_runs
+WHERE agent_definition_id IS NOT NULL
+  AND prompt_prefix IS NOT NULL
+  AND prompt_prefix <> ''
+ORDER BY agent_definition_id, started_at DESC;
+
 -- name: CleanupOrphanedAgentRuns :execresult
 UPDATE agent_runs
 SET status        = 'error',
