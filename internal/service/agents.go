@@ -52,10 +52,13 @@ type AgentDefinitionResponse struct {
 	Model           string           `json:"model"`
 	MaxTurns        int              `json:"max_turns"`
 	MaxBudgetUSD    *float64         `json:"max_budget_usd,omitempty"`
-	Enabled         bool             `json:"enabled"`
-	QuietHoursStart *string          `json:"quiet_hours_start,omitempty"`
-	QuietHoursEnd   *string          `json:"quiet_hours_end,omitempty"`
-	LastRun         *AgentRunSummary `json:"last_run,omitempty"`
+	Enabled               bool             `json:"enabled"`
+	QuietHoursStart       *string          `json:"quiet_hours_start,omitempty"`
+	QuietHoursEnd         *string          `json:"quiet_hours_end,omitempty"`
+	// TriggerOnSyncComplete fires this agent after every successful sync
+	// (in addition to any cron schedule). Disabled by default.
+	TriggerOnSyncComplete bool             `json:"trigger_on_sync_complete"`
+	LastRun               *AgentRunSummary `json:"last_run,omitempty"`
 	// CostStats30d is populated only by ListAgentDefinitions (the surface
 	// where users want to compare spend at a glance). Single-row
 	// GetAgentDefinition leaves it nil so the edit-page hot path doesn't
@@ -141,38 +144,55 @@ type AgentRunListResult struct {
 
 // CreateAgentDefinitionParams holds validated inputs for definition creation.
 type CreateAgentDefinitionParams struct {
-	Name            string
-	Slug            string
-	Prompt          string
-	SystemPrompt    *string
-	ScheduleCron    *string
-	ToolScope       string
-	AllowedTools    []string
-	Model           string
-	MaxTurns        int
-	MaxBudgetUSD    *float64
-	Enabled         bool
-	QuietHoursStart *string // "HH:MM" 24-hour; nil disables window
-	QuietHoursEnd   *string
+	Name                  string
+	Slug                  string
+	Prompt                string
+	SystemPrompt          *string
+	ScheduleCron          *string
+	ToolScope             string
+	AllowedTools          []string
+	Model                 string
+	MaxTurns              int
+	MaxBudgetUSD          *float64
+	Enabled               bool
+	QuietHoursStart       *string // "HH:MM" 24-hour; nil disables window
+	QuietHoursEnd         *string
+	TriggerOnSyncComplete bool // fire after each successful sync completes
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
 // nil = don't touch; non-nil = replace. Slug is mutable here; if you want
 // it pinned, omit Slug from your PATCH body.
 type UpdateAgentDefinitionParams struct {
-	Name            *string
-	Slug            *string
-	Prompt          *string
-	SystemPrompt    *string
-	ScheduleCron    *string
-	ToolScope       *string
-	AllowedTools    *[]string
-	Model           *string
-	MaxTurns        *int
-	MaxBudgetUSD    *float64
-	Enabled         *bool
-	QuietHoursStart *string
-	QuietHoursEnd   *string
+	Name                  *string
+	Slug                  *string
+	Prompt                *string
+	SystemPrompt          *string
+	ScheduleCron          *string
+	ToolScope             *string
+	AllowedTools          *[]string
+	Model                 *string
+	MaxTurns              *int
+	MaxBudgetUSD          *float64
+	Enabled               *bool
+	QuietHoursStart       *string
+	QuietHoursEnd         *string
+	TriggerOnSyncComplete *bool
+}
+
+// ListAgentDefinitionsForSyncWebhook returns enabled definitions with
+// trigger_on_sync_complete=true. Used by the post-sync hook in the
+// orchestrator to dispatch webhook-triggered runs.
+func (s *Service) ListAgentDefinitionsForSyncWebhook(ctx context.Context) ([]AgentDefinitionResponse, error) {
+	rows, err := s.Queries.ListAgentDefinitionsForSyncWebhook(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list sync-webhook agents: %w", err)
+	}
+	out := make([]AgentDefinitionResponse, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, agentDefinitionFromRow(row, nil))
+	}
+	return out, nil
 }
 
 // ListAgentDefinitions returns all definitions ordered by created_at DESC,
@@ -304,19 +324,20 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 		return nil, err
 	}
 	row, err := s.Queries.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
-		Name:            p.Name,
-		Slug:            p.Slug,
-		Prompt:          p.Prompt,
-		SystemPrompt:    pgconv.TextPtrIfNotEmpty(p.SystemPrompt),
-		ScheduleCron:    pgconv.TextPtrIfNotEmpty(p.ScheduleCron),
-		ToolScope:       toolScope,
-		AllowedTools:    allowedJSON,
-		Model:           model,
-		MaxTurns:        int32(maxTurns),
-		MaxBudgetUsd:    agentNumericFromFloat(budget),
-		Enabled:         p.Enabled,
-		QuietHoursStart: pgconv.TextPtrIfNotEmpty(p.QuietHoursStart),
-		QuietHoursEnd:   pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
+		Name:                  p.Name,
+		Slug:                  p.Slug,
+		Prompt:                p.Prompt,
+		SystemPrompt:          pgconv.TextPtrIfNotEmpty(p.SystemPrompt),
+		ScheduleCron:          pgconv.TextPtrIfNotEmpty(p.ScheduleCron),
+		ToolScope:             toolScope,
+		AllowedTools:          allowedJSON,
+		Model:                 model,
+		MaxTurns:              int32(maxTurns),
+		MaxBudgetUsd:          agentNumericFromFloat(budget),
+		Enabled:               p.Enabled,
+		QuietHoursStart:       pgconv.TextPtrIfNotEmpty(p.QuietHoursStart),
+		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
+		TriggerOnSyncComplete: p.TriggerOnSyncComplete,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
@@ -374,6 +395,9 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 	if p.QuietHoursEnd != nil {
 		merged.QuietHoursEnd = emptyToNil(*p.QuietHoursEnd)
 	}
+	if p.TriggerOnSyncComplete != nil {
+		merged.TriggerOnSyncComplete = *p.TriggerOnSyncComplete
+	}
 
 	if err := validateAgentDefinitionFields(merged.Name, merged.Slug, merged.Prompt, merged.ToolScope, merged.Model, merged.MaxTurns, merged.MaxBudgetUSD, merged.ScheduleCron); err != nil {
 		return nil, err
@@ -392,20 +416,21 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 	}
 
 	row, err := s.Queries.UpdateAgentDefinition(ctx, db.UpdateAgentDefinitionParams{
-		ID:              existing.ID,
-		Name:            merged.Name,
-		Slug:            merged.Slug,
-		Prompt:          merged.Prompt,
-		SystemPrompt:    pgconv.TextPtrIfNotEmpty(merged.SystemPrompt),
-		ScheduleCron:    pgconv.TextPtrIfNotEmpty(merged.ScheduleCron),
-		ToolScope:       merged.ToolScope,
-		AllowedTools:    allowedJSON,
-		Model:           merged.Model,
-		MaxTurns:        int32(merged.MaxTurns),
-		MaxBudgetUsd:    agentNumericFromFloat(budget),
-		Enabled:         merged.Enabled,
-		QuietHoursStart: pgconv.TextPtrIfNotEmpty(merged.QuietHoursStart),
-		QuietHoursEnd:   pgconv.TextPtrIfNotEmpty(merged.QuietHoursEnd),
+		ID:                    existing.ID,
+		Name:                  merged.Name,
+		Slug:                  merged.Slug,
+		Prompt:                merged.Prompt,
+		SystemPrompt:          pgconv.TextPtrIfNotEmpty(merged.SystemPrompt),
+		ScheduleCron:          pgconv.TextPtrIfNotEmpty(merged.ScheduleCron),
+		ToolScope:             merged.ToolScope,
+		AllowedTools:          allowedJSON,
+		Model:                 merged.Model,
+		MaxTurns:              int32(merged.MaxTurns),
+		MaxBudgetUsd:          agentNumericFromFloat(budget),
+		Enabled:               merged.Enabled,
+		QuietHoursStart:       pgconv.TextPtrIfNotEmpty(merged.QuietHoursStart),
+		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(merged.QuietHoursEnd),
+		TriggerOnSyncComplete: merged.TriggerOnSyncComplete,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update agent definition: %w", err)
@@ -921,9 +946,10 @@ func agentDefinitionFromRow(row db.AgentDefinition, lastRun *AgentRunSummary) Ag
 		MaxTurns:        int(row.MaxTurns),
 		MaxBudgetUSD:    agentFloatFromNumeric(row.MaxBudgetUsd),
 		Enabled:         row.Enabled,
-		QuietHoursStart: pgconv.TextPtr(row.QuietHoursStart),
-		QuietHoursEnd:   pgconv.TextPtr(row.QuietHoursEnd),
-		LastRun:         lastRun,
+		QuietHoursStart:       pgconv.TextPtr(row.QuietHoursStart),
+		QuietHoursEnd:         pgconv.TextPtr(row.QuietHoursEnd),
+		TriggerOnSyncComplete: row.TriggerOnSyncComplete,
+		LastRun:               lastRun,
 		CreatedAt:       pgconv.TimestampStr(row.CreatedAt),
 		UpdatedAt:       pgconv.TimestampStr(row.UpdatedAt),
 	}

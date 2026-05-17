@@ -109,6 +109,40 @@ func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse,
 	return o.runLocked(ctx, def, "manual", promptPrefix)
 }
 
+// FireSyncCompleteAgents dispatches a webhook-triggered run for every
+// agent definition with trigger_on_sync_complete=true. Called by the sync
+// engine's OnSyncComplete hook after a successful sync. Each agent fires
+// through RunOrSkip with trigger="webhook" so a busy semaphore leaves a
+// skipped row in the history rather than dropping the event silently.
+//
+// Runs each agent in its own goroutine so the sync engine returns
+// immediately. Concurrency is bounded by the orchestrator's existing
+// semaphore (iter-29 default: 3) — excess fires roll into skipped rows.
+func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
+	defs, err := o.svc.ListAgentDefinitionsForSyncWebhook(ctx)
+	if err != nil {
+		o.logger.Warn("orchestrator: list sync-webhook agents failed", "error", err)
+		return
+	}
+	if len(defs) == 0 {
+		return
+	}
+	o.logger.Info("orchestrator: dispatching sync-webhook agents",
+		"agent_count", len(defs))
+	for i := range defs {
+		def := defs[i] // capture range value before goroutine
+		go func() {
+			// New ctx with timeout so a stuck run doesn't outlive shutdown.
+			runCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			if _, rerr := o.RunOrSkip(runCtx, &def, "webhook"); rerr != nil {
+				o.logger.Warn("orchestrator: sync-webhook run failed",
+					"agent", def.Slug, "error", rerr)
+			}
+		}()
+	}
+}
+
 // RunOrSkip is the entry point for scheduled (cron) runs. Always leaves
 // a row in agent_runs — either completed/errored, or 'skipped' when the
 // semaphore was full. Returns ErrConcurrencyLocked alongside the skipped

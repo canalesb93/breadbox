@@ -23,6 +23,7 @@ import (
 	"breadbox/internal/sync"
 	versionpkg "breadbox/internal/version"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/spf13/cobra"
 )
 
@@ -139,6 +140,12 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	agentOrch := service.NewOrchestrator(a.Service, agentSidecar, agentMaxConcurrent, cfg.EncryptionKey, logger)
 	agentSched := service.NewAgentScheduler(agentOrch, a.Service, logger)
 	agentOrch.AttachScheduler(agentSched)
+	// Wire the post-sync hook so trigger_on_sync_complete agents fire
+	// after every successful sync. The orchestrator dispatches asynchronously
+	// so the sync engine returns immediately.
+	a.SyncEngine.OnSyncComplete = func(ctx context.Context, _ pgtype.UUID) {
+		agentOrch.FireSyncCompleteAgents(ctx)
+	}
 	if err := agent.SeedDefaults(ctx, a.Queries, logger); err != nil {
 		logger.Warn("agent seed failed", "error", err)
 	}
