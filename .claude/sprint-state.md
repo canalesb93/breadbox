@@ -62,14 +62,16 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - Sidecar precedence trap: if `ANTHROPIC_API_KEY` is set in the env (e.g. from a dev shell), it wins over the OAuth token. The sidecar process must scrub it before launching the SDK.
 - No native expiry detection. Surface "auth failed — re-token" errors clearly in the run row; consider an expiry warning at ~11mo.
 
-### Iteration 2 — service layer + REST API
-- [ ] `internal/service/agents.go`: CRUD for definitions, run listing, transcript retrieval
-- [ ] `internal/api/agents.go`: REST handlers under `/api/v1/agents` and `/web/v1/agents`
-- [ ] OpenAPI / `docs/api-endpoints.md` updated per `.claude/rules/api-endpoints.md`
-- [ ] Settings endpoints: get/set Anthropic key (encrypted at rest, never returned in GET except as masked prefix), get/set global caps
-- [ ] Mint-and-revoke flow: per agent run, mint a scoped API key, expose it to the sidecar via env, revoke on completion
-- **Tests:** handler tests + service integration tests for definitions, runs, key minting
-- **PR title:** `feat(agents): service layer + REST API + scoped key minting`
+### Iteration 2 — service layer + REST API ✅ MERGED #1227 (into sprint branch)
+- [x] `internal/service/agents.go` (CRUD + last_run inlining + MintRunAPIKey + AssembleJobSpec)
+- [x] `internal/service/agent_settings.go` (get/set with token masking)
+- [x] `internal/api/agents.go` — 12 handlers wired under /api/v1/agents
+- [x] OpenAPI stubs + docs/api-endpoints.md updated; drift test green
+- [x] Settings endpoints with encrypted at rest + masked at GET
+- [x] MintRunAPIKey + AssembleJobSpec helpers (iter 3 orchestrator invokes them)
+- [x] 14 new service-layer integration tests passing
+- [ ] **Deferred to iter 3:** handler-layer integration tests (need *app.App in buildTestRouter)
+- [ ] **Deferred to iter 3:** add `agents/**` to .github/workflows/ci.yml `pull_request.branches` so iteration PRs targeting the sprint branch actually run CI. Currently only main / stack/** / feat/** match — sprint PRs merge on local-test confidence + standing auth.
 
 ### Iteration 3 — scheduler + runner orchestrator
 - [ ] Extend `internal/sync/scheduler.go` (or new `internal/agent/scheduler.go`) to register a cron entry per enabled agent_definition
@@ -188,6 +190,22 @@ Deferred to iteration 2:
 - Release workflow update for `breadbox-agent` cross-platform binaries — deferred to iteration 7 (will land alongside docs + observability so the release artifact story ships in one cohesive piece).
 
 Next iteration: service layer + REST API + scoped key mint/revoke.
+
+## ITER 2 — 2026-05-17 00:25
+Shipped (PR #1227, squash-merged into sprint branch):
+- Full service + REST surface for agent definitions, runs, and settings (12 endpoints).
+- Token masking + AES-256-GCM at rest for `subscription_token` / `anthropic_api_key`.
+- MintRunAPIKey + AssembleJobSpec helpers ready for the iter 3 orchestrator.
+- OpenAPI stubs + docs/api-endpoints.md updates (drift test green).
+- 14 new service-layer integration tests pass.
+
+Deferred to iter 3:
+- Handler-layer integration tests (need *app.App in buildTestRouter — non-trivial refactor of an existing test scaffold).
+- **CI trigger gap:** `.github/workflows/ci.yml` only fires on PRs to `main`, `stack/**`, `feat/**`. Sprint branch is `agents/claude-agent-sdk-sprint` so iter PRs don't run CI. Add `agents/**` to the trigger list in iter 3 (small one-line change; piggyback on the scheduler PR).
+- Orchestrator that actually invokes Mint → Assemble → Runner.Run → Revoke.
+
+Next iteration: scheduler + run-now + orchestrator + CI trigger fix.
+
 
 
 ## Operating instructions for the loop
