@@ -104,7 +104,7 @@ import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
-import { SandboxSection, Specimen } from "@/sandbox/kit";
+import { SandboxGroup, SandboxSection, Specimen } from "@/sandbox/kit";
 import {
   sampleTags,
   sampleTranscriptEvents,
@@ -163,6 +163,7 @@ export function ComponentsSection() {
       title="Components"
       description="Composed, reusable v2 components — the layer built on top of the primitives. Shared across the transactions list, detail page, and (soon) elsewhere."
     >
+      <SandboxGroup title="Page layout">
       <Specimen
         label="PageHeader"
         code="components/page-header"
@@ -423,7 +424,9 @@ export function ComponentsSection() {
           />
         </div>
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Pills & inline">
       <Specimen
         label="IdPill"
         code="components/id-pill"
@@ -712,7 +715,9 @@ export function ComponentsSection() {
           <ViewAllPill to="/">See all transactions</ViewAllPill>
         </div>
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Forms & overlays">
       <Specimen
         label="SearchInput"
         code="components/search-input"
@@ -1049,7 +1054,9 @@ export function ComponentsSection() {
           }}
         />
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Shells & states">
       <Specimen
         label="DangerZone"
         code="components/danger-zone"
@@ -1248,7 +1255,9 @@ export function ComponentsSection() {
           </div>
         </div>
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Domain & data">
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
@@ -1470,7 +1479,9 @@ export function ComponentsSection() {
           </div>
         ))}
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Pickers & specialty">
       <Specimen
         label="CategoryCommandList"
         code="components/category-command"
@@ -1671,6 +1682,7 @@ export function ComponentsSection() {
           />
         </div>
       </Specimen>
+      </SandboxGroup>
     </SandboxSection>
   );
 }

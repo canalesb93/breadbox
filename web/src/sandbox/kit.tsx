@@ -26,6 +26,33 @@ export function SandboxSection({
   );
 }
 
+// SandboxGroup wraps a cluster of specimens under a small sub-heading. The
+// section outline in `routes/sandbox.tsx` walks the DOM and groups every
+// Specimen under the nearest preceding SandboxGroup, so the outline mirrors
+// the visible structure. Use it to give long sections (Components,
+// Patterns) a navigable shape — Foundations / Primitives may not need it.
+export function SandboxGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  const slug = specimenSlug(title);
+  return (
+    <div
+      id={`group-${slug}`}
+      data-specimen-group={title}
+      className="scroll-mt-20 space-y-6 pt-2"
+    >
+      <h3 className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
 // `data-specimen-label` + an id derived from the label make every Specimen
 // addressable for the per-section outline rendered in `routes/sandbox.tsx`.
 // Keep it on the wrapper (not the heading) so the scroll anchor sits just
