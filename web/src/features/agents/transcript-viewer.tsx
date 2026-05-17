@@ -7,7 +7,9 @@ import {
   Coins,
   Cpu,
   Download,
+  Search,
   Wrench,
+  X,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format";
 import type {
@@ -66,13 +69,61 @@ function groupIntoTurns(events: TranscriptEvent[]): TurnGroup[] {
   return turns;
 }
 
+// eventMatchesQuery does a case-insensitive substring search across the
+// event's user-visible content: assistant text blocks, tool names, and
+// tool-use input / tool-result content (JSON-stringified for tools so the
+// search hits argument values like transaction IDs and category slugs).
+function eventMatchesQuery(ev: TranscriptEvent, q: string): boolean {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  switch (ev.type) {
+    case "assistant_message": {
+      const blocks = ev.data.message?.content ?? [];
+      return blocks.some(
+        (b) =>
+          b.type === "text" && b.text.toLowerCase().includes(needle),
+      );
+    }
+    case "tool_use":
+      if (ev.data.name?.toLowerCase().includes(needle)) return true;
+      try {
+        return JSON.stringify(ev.data.input).toLowerCase().includes(needle);
+      } catch {
+        return false;
+      }
+    case "tool_result":
+      try {
+        return JSON.stringify(ev.data.content).toLowerCase().includes(needle);
+      } catch {
+        return false;
+      }
+    case "error":
+      return ev.data.message?.toLowerCase().includes(needle) ?? false;
+    case "cost_cap_hit":
+      return ev.data.message?.toLowerCase().includes(needle) ?? false;
+  }
+  return false;
+}
+
 export function TranscriptViewer({
   events,
   rawLength,
   truncated,
   shortId,
 }: TranscriptViewerProps) {
-  const turns = useMemo(() => groupIntoTurns(events), [events]);
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim();
+  const searching = trimmed.length > 0;
+
+  const matchingEvents = useMemo(() => {
+    if (!searching) return events;
+    return events.filter((ev) => eventMatchesQuery(ev, trimmed));
+  }, [events, trimmed, searching]);
+
+  const turns = useMemo(
+    () => groupIntoTurns(matchingEvents),
+    [matchingEvents],
+  );
   const resultEvent = useMemo(
     () => events.find((e) => e.type === "result"),
     [events],
@@ -86,8 +137,39 @@ export function TranscriptViewer({
     [events],
   );
 
+  const matchedCount = matchingEvents.length;
+  const noMatches = searching && matchedCount === 0;
+
   return (
     <div className="flex flex-col gap-4 px-1 pb-4">
+      <div className="relative">
+        <Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2" />
+        <Input
+          placeholder="Search transcript (assistant text, tool names, args, results)…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-8 pr-8"
+          aria-label="Search transcript"
+        />
+        {searching && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
+            aria-label="Clear search"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+      {searching && (
+        <div className="text-muted-foreground text-xs">
+          {noMatches
+            ? `No matching events for "${trimmed}"`
+            : `Showing ${matchedCount} of ${events.length} events matching "${trimmed}"`}
+        </div>
+      )}
+
       {truncated && (
         <Alert>
           <AlertTriangle className="size-4" />
