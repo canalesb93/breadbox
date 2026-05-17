@@ -2578,6 +2578,25 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/recent-errors:
+    parameters:
+      - { name: hours, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 168 } }
+      - { name: limit, in: query, schema: { type: integer, default: 5, minimum: 1, maximum: 50 } }
+    get:
+      tags: [Agents]
+      summary: List recent errored agent runs across all agents
+      description: |
+        Returns errored agent_runs from the last `hours` hours (default 24),
+        joined with agent slug + name for deep-linking. Powers the v2 SPA's
+        "Run-failed banner" on /v2/agents. Bare JSON array; most-recent first.
+      responses:
+        "200":
+          description: Bare JSON array of `{agent_slug, agent_name, run_short_id, started_at, error_message, duration_ms, hit_cap}`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
   /api/v1/agents/cleanup:
     post:
       tags: [Agents]

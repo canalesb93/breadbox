@@ -66,6 +66,7 @@ import {
   useAgentSubsystemStatus,
   useCreateAgent,
   useDeleteAgent,
+  useRecentErroredAgentRuns,
   useRunAgentNow,
   useToggleAgent,
   PROMPT_PREFIX_MAX_LEN,
@@ -73,6 +74,7 @@ import {
   type AgentDefinition,
   type AgentRecentCapStats,
   type AgentRecentErrorStats,
+  type RecentErroredAgentRun,
 } from "@/api/queries/agents";
 import { openModal } from "@/lib/modals";
 import { useNavigate } from "@tanstack/react-router";
@@ -206,6 +208,8 @@ export function AgentsPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      <RecentErrorsBanner />
 
       {agentsQuery.isError ? (
         <PageError
@@ -476,6 +480,66 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
         </div>
       </div>
     </Card>
+  );
+}
+
+// RecentErrorsBanner surfaces errored runs from the last 24h at the top
+// of /v2/agents, with one row per recent error and a click-through to the
+// matching run's transcript drawer. Hidden when there's nothing to show.
+// 60s auto-refetch (hook-side) so a fresh failure surfaces without a
+// manual reload. Catches operators who only open the SPA every few days.
+function RecentErrorsBanner() {
+  const navigate = useNavigate();
+  const recent = useRecentErroredAgentRuns(24, 5);
+  const rows = recent.data ?? [];
+  if (rows.length === 0) return null;
+
+  const openRun = (row: RecentErroredAgentRun) => {
+    navigate({
+      to: "/agents/$slug/runs",
+      params: { slug: row.agent_slug },
+      search: { run: row.run_short_id },
+    });
+  };
+
+  return (
+    <Alert variant="destructive" className="mb-4">
+      <AlertCircle className="size-4" />
+      <AlertTitle>
+        {rows.length === 1
+          ? "1 errored agent run in the last 24h"
+          : `${rows.length} errored agent runs in the last 24h`}
+      </AlertTitle>
+      <AlertDescription className="space-y-1">
+        <ul className="space-y-1">
+          {rows.map((r) => (
+            <li
+              key={r.run_short_id}
+              className="flex flex-wrap items-baseline gap-2 text-sm"
+            >
+              <button
+                type="button"
+                className="font-medium underline-offset-2 hover:underline"
+                onClick={() => openRun(r)}
+              >
+                {r.agent_name}
+              </button>
+              <span className="text-muted-foreground text-xs">
+                {formatRelativeTime(r.started_at)}
+              </span>
+              {r.error_message && (
+                <span
+                  className="text-muted-foreground truncate text-xs"
+                  title={r.error_message}
+                >
+                  — {r.error_message}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
   );
 }
 

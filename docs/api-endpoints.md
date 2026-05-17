@@ -268,6 +268,7 @@ Agent definitions are scheduled Claude Agent SDK runs that call breadbox MCP to 
 | POST | `/agents/test` | W | Run the diagnostic smoke test (tiny "say OK" prompt, no MCP servers, ~5¢ cap); 422 `AUTH_NOT_CONFIGURED` / `AGENT_BINARY_NOT_FOUND` |
 | POST | `/agents/cleanup` | W | Run the agent cleanup pass on demand; returns `{runs_deleted, transcripts_deleted, transcripts_scanned, retention_days, transcript_dir}` |
 | GET | `/agents/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200); filters: `status`, `trigger`, `hit_cap` (`max_turns`/`max_budget`/`any`), `start`, `end` |
+| GET | `/agents/runs/recent-errors` | R | Errored runs across all agents in the last `hours` (default 24, max 168); `?limit=5` (max 50); joined with `agent_slug`+`agent_name` for deep-link |
 | GET | `/agents/runs/{shortId}` | R | One run detail (by short_id or UUID) |
 | PATCH | `/agents/runs/{shortId}` | W | Set/clear the operator note on a run. Body `{ "note": "..." }`; empty string clears. Capped at 2000 chars |
 | GET | `/agents/runs/{shortId}/transcript` | R | Streams the NDJSON transcript; 404 when not yet written |
