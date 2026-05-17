@@ -49,14 +49,72 @@ func (s *AgentScheduler) Start(ctx context.Context) {
 	s.registerAll(ctx)
 	_, err := s.cron.AddFunc("15 3 * * *", func() {
 		bg := context.Background()
-		s.cleanupAgentRuns(bg)
-		s.cleanupTranscriptFiles(bg)
+		result := s.runCleanupAll(bg)
+		s.logCleanupResult(result, "scheduled")
 	})
 	if err != nil {
 		s.logger.Error("agent scheduler: add cleanup job failed", "error", err)
 	}
 	s.cron.Start()
 	s.logger.Info("agent scheduler started", "enabled_count", len(s.entryIDs))
+}
+
+// AgentCleanupResult summarizes one cleanup pass — what was deleted from
+// agent_runs and the transcript directory, plus the retention setting in
+// effect at the time. Returned by RunCleanupNow so the HTTP handler can
+// echo it back for operator toast/display.
+type AgentCleanupResult struct {
+	RunsDeleted        int64 `json:"runs_deleted"`
+	TranscriptsDeleted int   `json:"transcripts_deleted"`
+	TranscriptsScanned int   `json:"transcripts_scanned"`
+	RetentionDays      int   `json:"retention_days"`
+	TranscriptDir      string `json:"transcript_dir,omitempty"`
+}
+
+// RunCleanupNow runs the same prune pass the daily tick runs, synchronously,
+// and returns the counts. Used by the Settings → Agents "Run cleanup now"
+// button so an operator who just lowered retention can see the effect
+// without waiting for 3:15 AM. Safe to call repeatedly — a no-op when
+// nothing's eligible.
+func (s *AgentScheduler) RunCleanupNow(ctx context.Context) AgentCleanupResult {
+	result := s.runCleanupAll(ctx)
+	s.logCleanupResult(result, "on-demand")
+	return result
+}
+
+// runCleanupAll is the shared body: both the cron tick and RunCleanupNow
+// go through it so they can't drift.
+func (s *AgentScheduler) runCleanupAll(ctx context.Context) AgentCleanupResult {
+	retentionDays := appconfig.Int(ctx, s.svc.Queries, appconfig.KeyAgentRunRetentionDays, 30)
+	transcriptDir := appconfig.String(ctx, s.svc.Queries, appconfig.KeyAgentTranscriptDir, "")
+	result := AgentCleanupResult{
+		RetentionDays: retentionDays,
+		TranscriptDir: transcriptDir,
+	}
+	if retentionDays <= 0 {
+		return result
+	}
+	result.RunsDeleted = s.cleanupAgentRuns(ctx)
+	if transcriptDir != "" {
+		result.TranscriptsDeleted, result.TranscriptsScanned = s.cleanupTranscriptFiles(ctx)
+	}
+	return result
+}
+
+// logCleanupResult writes the structured slog line both cleanup paths share,
+// tagged with how the pass was triggered.
+func (s *AgentScheduler) logCleanupResult(r AgentCleanupResult, source string) {
+	if r.RunsDeleted == 0 && r.TranscriptsDeleted == 0 {
+		s.logger.Debug("agent cleanup pass: nothing to do",
+			"source", source, "retention_days", r.RetentionDays)
+		return
+	}
+	s.logger.Info("agent cleanup pass completed",
+		"source", source,
+		"runs_deleted", r.RunsDeleted,
+		"transcripts_deleted", r.TranscriptsDeleted,
+		"transcripts_scanned", r.TranscriptsScanned,
+		"retention_days", r.RetentionDays)
 }
 
 // Stop gracefully halts the scheduler, waiting for any in-flight jobs.
@@ -192,31 +250,20 @@ func nextMinuteAfterQuietEnd(now time.Time, end string) time.Time {
 
 // cleanupTranscriptFiles prunes NDJSON transcript files older than the
 // retention window. Reuses the same `agent.run_retention_days` setting as
-// the agent_runs cleanup, so the two surfaces stay aligned — deleting a
-// run row but keeping its transcript on disk (or vice versa) would be
-// confusing. Skips silently when transcript_dir is unset or retention=0.
-func (s *AgentScheduler) cleanupTranscriptFiles(ctx context.Context) {
+// the agent_runs cleanup, so the two surfaces stay aligned. Returns the
+// number deleted + number scanned so callers can surface counts. Caller
+// is responsible for the transcript_dir + retention preflight.
+func (s *AgentScheduler) cleanupTranscriptFiles(ctx context.Context) (deleted, scanned int) {
 	transcriptDir := appconfig.String(ctx, s.svc.Queries, appconfig.KeyAgentTranscriptDir, "")
-	if transcriptDir == "" {
-		return
-	}
 	retentionDays := appconfig.Int(ctx, s.svc.Queries, appconfig.KeyAgentRunRetentionDays, 30)
-	if retentionDays <= 0 {
-		s.logger.Debug("agent transcript cleanup disabled", "retention_days", retentionDays)
-		return
-	}
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	deleted, scanned, err := pruneTranscriptFiles(transcriptDir, cutoff)
 	if err != nil {
 		s.logger.Error("agent transcript cleanup failed",
 			"dir", transcriptDir, "error", err)
-		return
+		return 0, 0
 	}
-	if deleted > 0 {
-		s.logger.Info("agent transcript cleanup completed",
-			"dir", transcriptDir, "deleted", deleted,
-			"scanned", scanned, "retention_days", retentionDays)
-	}
+	return deleted, scanned
 }
 
 // pruneTranscriptFiles is the pure file-walking pass — split out so tests
@@ -255,23 +302,16 @@ func pruneTranscriptFiles(dir string, cutoff time.Time) (deleted, scanned int, e
 }
 
 // cleanupAgentRuns prunes completed agent_runs older than the retention
-// period (default 30 days; 0 disables). The matching on-disk transcript
-// files are pruned by cleanupTranscriptFiles using the same retention.
-func (s *AgentScheduler) cleanupAgentRuns(ctx context.Context) {
+// period and returns the number deleted. Caller is responsible for the
+// retention preflight (runCleanupAll short-circuits when retention<=0).
+func (s *AgentScheduler) cleanupAgentRuns(ctx context.Context) int64 {
 	retentionDays := appconfig.Int(ctx, s.svc.Queries, appconfig.KeyAgentRunRetentionDays, 30)
-	if retentionDays <= 0 {
-		s.logger.Debug("agent run cleanup disabled", "retention_days", retentionDays)
-		return
-	}
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	result, err := s.svc.Queries.DeleteAgentRunsOlderThan(ctx,
 		pgtype.Timestamptz{Time: cutoff, Valid: true})
 	if err != nil {
 		s.logger.Error("agent run cleanup failed", "error", err)
-		return
+		return 0
 	}
-	if n := result.RowsAffected(); n > 0 {
-		s.logger.Info("agent run cleanup completed",
-			"deleted", n, "retention_days", retentionDays)
-	}
+	return result.RowsAffected()
 }

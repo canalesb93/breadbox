@@ -552,3 +552,22 @@ func writeAgentError(w http.ResponseWriter, err error, notFoundMsg string) {
 		mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Unexpected error")
 	}
 }
+
+// RunAgentCleanupHandler triggers an on-demand agent cleanup pass (the
+// same one the 3:15 AM cron does) and returns the resulting counts. Lets
+// operators who just lowered retention see the effect without waiting
+// for the next cron tick.
+// 503 AGENTS_DISABLED when no scheduler is configured.
+// 200 with { runs_deleted, transcripts_deleted, transcripts_scanned,
+// retention_days, transcript_dir } otherwise.
+func RunAgentCleanupHandler(sched *service.AgentScheduler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if sched == nil {
+			mw.WriteError(w, http.StatusServiceUnavailable, "AGENTS_DISABLED",
+				"Agent scheduler is not configured on this server")
+			return
+		}
+		result := sched.RunCleanupNow(r.Context())
+		writeData(w, result)
+	}
+}

@@ -2573,6 +2573,24 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/cleanup:
+    post:
+      tags: [Agents]
+      summary: Run the agent cleanup pass on demand
+      description: |
+        Synchronously runs the same prune pass the 3:15 AM cron does:
+        deletes completed agent_runs older than `agent.run_retention_days`
+        and prunes the matching `*.ndjson` transcripts under
+        `agent.transcript_dir`. Returns the counts. Safe to call
+        repeatedly — a no-op when nothing's eligible. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Cleanup counts.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "503":
+          description: Agent scheduler not configured (AGENTS_DISABLED).
   /api/v1/agents/test:
     post:
       tags: [Agents]

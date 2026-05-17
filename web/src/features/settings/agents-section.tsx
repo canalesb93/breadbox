@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Bot, CheckCircle2, KeyRound, Loader2, Stethoscope, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, KeyRound, Loader2, Stethoscope, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -28,11 +28,13 @@ import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAgentSettings,
+  useRunAgentCleanup,
   useSmokeTestAgent,
   useUpdateAgentSettings,
   type AgentTestResult,
 } from "@/api/queries/agents";
 import { ApiError } from "@/api/client";
+import { toast } from "sonner";
 
 const settingsSchema = z.object({
   auth_mode: z.enum(["subscription", "api_key"]),
@@ -47,6 +49,19 @@ export function AgentsSection() {
   const settingsQuery = useAgentSettings();
   const updateSettings = useUpdateAgentSettings();
   const smokeTest = useSmokeTestAgent();
+  const cleanup = useRunAgentCleanup();
+
+  const runCleanup = async () => {
+    try {
+      const r = await cleanup.mutateAsync();
+      toast.success(
+        `Cleanup: ${r.runs_deleted} run(s), ${r.transcripts_deleted}/${r.transcripts_scanned} transcript(s) removed (retention ${r.retention_days}d).`,
+      );
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : String(err);
+      toast.error(`Cleanup failed — ${msg}`);
+    }
+  };
   const [tokenDraft, setTokenDraft] = useState("");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [testResult, setTestResult] = useState<AgentTestResult | null>(null);
@@ -271,19 +286,35 @@ export function AgentsSection() {
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={runSmokeTest}
-                disabled={smokeTest.isPending}
-              >
-                {smokeTest.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Stethoscope className="size-4" />
-                )}
-                Test connection
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={runSmokeTest}
+                  disabled={smokeTest.isPending}
+                >
+                  {smokeTest.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Stethoscope className="size-4" />
+                  )}
+                  Test connection
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={runCleanup}
+                  disabled={cleanup.isPending}
+                  title="Runs the same daily prune pass on demand — useful after lowering retention so you don't have to wait for 3:15 AM."
+                >
+                  {cleanup.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                  Run cleanup now
+                </Button>
+              </div>
               <Button type="submit" disabled={updateSettings.isPending}>
                 {updateSettings.isPending && (
                   <Loader2 className="size-4 animate-spin" />

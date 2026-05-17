@@ -332,6 +332,25 @@ export interface AgentTestResult {
   response?: string;
 }
 
+export interface AgentCleanupResult {
+  runs_deleted: number;
+  transcripts_deleted: number;
+  transcripts_scanned: number;
+  retention_days: number;
+  transcript_dir?: string;
+}
+
+export function useRunAgentCleanup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<AgentCleanupResult>("/api/v1/agents/cleanup", { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agents"] });
+    },
+  });
+}
+
 export function useSmokeTestAgent() {
   return useMutation({
     mutationFn: () =>
