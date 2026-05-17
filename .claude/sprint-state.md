@@ -504,6 +504,30 @@ Next iteration candidates (in rough impact order):
 
 Picking **#1 cost dashboard** next iteration — high-impact, becomes load-bearing once a self-hoster has been running real agents for a few weeks. Aiming for the smallest useful version: a sparkline or single-column total on the existing list page, NOT a new page. Can expand later.
 
+## ITER 19 — 2026-05-17 03:28
+Shipped (PR #1245 squash-merged into sprint branch as b3cd76b2):
+- New GetAgentCostStats30d sqlc aggregation (SUM cost + COUNT runs by definition, last 30 days, excludes skipped).
+- ListAgentDefinitions fetches the rollup once + zips into responses; soft-fails on query error.
+- AgentDefinitionResponse.CostStats30d (list-only; edit-page hot path stays cheap).
+- SPA: CostStatsPill renders "$X.XX / 30d" with Coins icon between Max turns and the last-run pill. Hides on zero runs.
+- New TestListAgentDefinitions_PopulatesCostStats30d (skipped rows excluded, sum verified).
+- All 5 CI jobs green.
+
+Side note: img402.dev still unreachable for screenshot upload (HTTP 000 — same outage from iter 14). Local capture verified correct rendering. Future iters resume normal evidence flow when img402 recovers.
+
+Stale-server lesson: bg `serve` from a prior iter (iter 14) was still holding port 8200 — my iter-19 binary crashed on bind, and the screenshot caught the stale server. Killed + restarted clean. **Future iters: `lsof -ti:8200 | xargs kill 2>/dev/null` before starting a fresh test server.**
+
+Next iteration candidates (in rough impact order):
+1. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine + agent_definitions schema. Bigger.
+2. **Suggested rules agent** — scans recent transactions, proposes new transaction_rules, queues for review. Bigger.
+3. **"Next fire" preview honoring quiet hours** — small iter-15 follow-up. UI-only.
+4. **breadbox doctor extension** — add live smoke test option (--with-live).
+5. **Cost breakdown per model** — extend iter-19's stats with model-by-model spend (which model is your spend leader?).
+6. **Per-agent enable schedule (start_date / end_date)** — schema field for "enable on Monday, disable next Friday" workflows.
+
+Picking **#3 next-fire preview** next iteration — smallest follow-up to iter 15, UI-only, lands a quality-of-life win for the cron preview that now also accounts for quiet hours.
+
+
 
 
 
