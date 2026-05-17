@@ -64,7 +64,9 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte) (*AgentSe
 	// Default lifted from 1 → 3 in iter-29; see serve.go for the rationale.
 	maxConcurrent := appconfig.Int(ctx, s.Queries, appconfig.KeyAgentMaxConcurrent, 3)
 	runtimePath := appconfig.String(ctx, s.Queries, appconfig.KeyAgentRuntimePath, "")
-	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, "")
+	// Default matches serve.go fallback — keeps the Settings → Agents
+	// form showing the active path on a fresh install rather than blank.
+	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
 	globalBudget := readOptionalFloat(ctx, s.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD)
 
 	return &AgentSettingsResponse{

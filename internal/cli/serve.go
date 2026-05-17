@@ -132,7 +132,14 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	// Settings → Agents.
 	agentMaxConcurrent := appconfig.Int(ctx, a.Queries, appconfig.KeyAgentMaxConcurrent, 3)
 	agentRuntimePath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
-	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "")
+	// Default transcripts to ./transcripts/agents (relative to the cwd
+	// `breadbox serve` was launched from). Iter-1 left this empty, which
+	// silently dropped transcripts — every run row had transcript_path=""
+	// and the v2 SPA's "open transcript" hit 404. Operators can override
+	// via Settings → Agents → "breadbox-agent transcripts dir" if they
+	// want them elsewhere. Daily cleanup (iter-25) still prunes whatever
+	// path is in effect.
+	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
 	agentSidecar := &agent.Sidecar{
 		BinaryPath:    agentRuntimePath,
 		TranscriptDir: agentTranscriptDir,
