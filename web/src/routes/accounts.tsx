@@ -208,6 +208,7 @@ export function AccountsPage() {
         />
       ) : visible.length === 0 ? (
         <EmptyState
+          icon={Banknote}
           title="No accounts for this filter"
           description="Switch family member, or clear the filter to see every account in the household."
         />

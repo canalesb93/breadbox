@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { ListCard } from "@/components/list-card";
+import { PageError } from "@/components/page-error";
 import { CategoryList } from "@/features/categories/category-list";
 import { useCategories } from "@/api/queries/categories";
 
 export function CategoriesPage() {
   const [query, setQuery] = useState("");
-  const { data: tree, isLoading, isError } = useCategories();
+  const categoriesQuery = useCategories();
+  const { data: tree, isLoading, isError, isFetching } = categoriesQuery;
 
   // Mirror the iter-3/4 list-page eyebrow vocabulary
   // ("Loading" / "Error" / "N categories" / "Showing N of M" / "No matches" /
@@ -102,10 +104,11 @@ export function CategoriesPage() {
             )}
           />
         ) : isError ? (
-          <EmptyState
-            icon={Shapes}
-            title="Couldn't load categories"
-            description="Something went wrong fetching the category tree. Refresh the page or check back in a moment."
+          <PageError
+            resource="categories"
+            error={categoriesQuery.error}
+            onRetry={() => categoriesQuery.refetch()}
+            retrying={isFetching}
           />
         ) : !tree || tree.length === 0 ? (
           <EmptyState

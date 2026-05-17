@@ -354,6 +354,7 @@ export function ConnectionsPage() {
           }
           empty={
             <EmptyState
+              icon={Plug}
               title="No connections for this filter"
               description="Switch family member, or clear the filter to see every connection in the household."
               className="py-10"
