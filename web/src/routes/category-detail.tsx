@@ -28,6 +28,7 @@ import {
 } from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
+import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
@@ -165,15 +166,9 @@ function Hero({
                 <h1 className="truncate text-xl font-semibold tracking-tight">
                   {category.display_name}
                 </h1>
-                {category.is_system && (
-                  <Badge variant="outline" className="text-[10px]">
-                    System
-                  </Badge>
-                )}
+                {category.is_system && <MetaBadge>System</MetaBadge>}
                 {category.hidden && (
-                  <Badge variant="outline" className="gap-1 text-[10px]">
-                    <EyeOff className="size-2.5" /> Hidden
-                  </Badge>
+                  <MetaBadge icon={EyeOff}>Hidden</MetaBadge>
                 )}
               </div>
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">

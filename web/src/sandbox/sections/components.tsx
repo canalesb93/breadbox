@@ -6,14 +6,18 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  EyeOff,
   Inbox,
   Info,
   Keyboard,
   KeyRound,
   Landmark,
+  Link2,
+  Lock,
   MessageSquare,
   Monitor,
   Moon,
+  Pause,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -59,6 +63,7 @@ import {
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
+import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { Sheet } from "@/components/ui/sheet";
@@ -317,6 +322,32 @@ export function ComponentsSection() {
         <IdPill value="acct_3rR9pq01" />
         <IdPill value="food_and_drink_coffee" />
         <IdPill value="/api/v1/transactions" />
+      </Specimen>
+
+      <Specimen
+        label="MetaBadge"
+        code="components/meta-badge"
+        description="Tiny meta chip used in list rows and detail-page hero columns to label a row's secondary state — Hidden, Excluded, Linked, Re-auth, System, Paused, … Owns the v2 density vocabulary (`text-[10px]` + `gap-1` + `px-1.5 py-0` + `[&>svg]:size-2.5`) so the same chip never gets re-derived. Tone routes through the underlying `<Badge>` variant — `outline` by default because a meta label is intentionally calmer than the row's primary classification. `muted` opts into the `text-muted-foreground font-normal` shading the categories list uses so 'System' / 'Hidden' don't compete with the category name. For tone-specific chips (the amber Re-auth pill) pass `className` — the density tokens still apply, which is the whole point. Six surfaces share it: accounts list, accounts detail, categories list (parent + child rows), category detail, connection detail."
+      >
+        <MetaBadge icon={Lock} muted>
+          System
+        </MetaBadge>
+        <MetaBadge icon={EyeOff} muted>
+          Hidden
+        </MetaBadge>
+        <MetaBadge icon={EyeOff}>Excluded</MetaBadge>
+        <MetaBadge icon={Link2} variant="secondary">
+          Linked
+        </MetaBadge>
+        <MetaBadge icon={Pause} variant="secondary">
+          Paused
+        </MetaBadge>
+        <MetaBadge
+          icon={AlertTriangle}
+          className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
+        >
+          Re-auth
+        </MetaBadge>
       </Specimen>
 
       <Specimen

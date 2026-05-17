@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronRight, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { MetaBadge } from "@/components/meta-badge";
 import { formatBalance } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/api/types";
@@ -44,9 +45,9 @@ export function AccountRow({ account: a }: AccountRowProps) {
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{accountLabel(a)}</span>
           {a.is_dependent_linked && (
-            <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">
-              <Link2 className="size-2.5" /> Linked
-            </Badge>
+            <MetaBadge icon={Link2} variant="secondary">
+              Linked
+            </MetaBadge>
           )}
           {statusPill}
         </div>
@@ -111,12 +112,12 @@ function statusBadge(status: string | null) {
   if (!status || status === "active") return null;
   if (status === "pending_reauth") {
     return (
-      <Badge
-        variant="outline"
-        className="gap-1 border-amber-500/40 bg-amber-500/5 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-400"
+      <MetaBadge
+        icon={AlertTriangle}
+        className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
       >
-        <AlertTriangle className="size-2.5" /> Re-auth
-      </Badge>
+        Re-auth
+      </MetaBadge>
     );
   }
   if (status === "error") {

@@ -49,6 +49,7 @@ import {
   type DetailRowData,
 } from "@/components/detail-list";
 import { Eyebrow } from "@/components/eyebrow";
+import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { formatLongDate } from "@/lib/format";
@@ -668,9 +669,9 @@ function Hero({
                 </h1>
                 <ConnectionStatusBadge status={conn.status} />
                 {conn.paused && (
-                  <span className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
-                    <Pause className="size-2.5" /> Paused
-                  </span>
+                  <MetaBadge icon={Pause} variant="secondary">
+                    Paused
+                  </MetaBadge>
                 )}
               </div>
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">

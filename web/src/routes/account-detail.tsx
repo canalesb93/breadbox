@@ -17,7 +17,6 @@ import {
   PowerOff,
   Wallet,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -31,6 +30,7 @@ import {
 } from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
+import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
@@ -244,14 +244,12 @@ function Hero({
                   {accountLabel(a)}
                 </h1>
                 {a.excluded && (
-                  <Badge variant="outline" className="gap-1 text-[10px]">
-                    <EyeOff className="size-2.5" /> Excluded
-                  </Badge>
+                  <MetaBadge icon={EyeOff}>Excluded</MetaBadge>
                 )}
                 {a.is_dependent_linked && (
-                  <Badge variant="secondary" className="gap-1 text-[10px]">
-                    <Link2 className="size-2.5" /> Linked dependent
-                  </Badge>
+                  <MetaBadge icon={Link2} variant="secondary">
+                    Linked dependent
+                  </MetaBadge>
                 )}
               </div>
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
