@@ -74,3 +74,19 @@ func ChangePasswordHandler(_ *scs.SessionManager, _ *db.Queries) http.HandlerFun
 		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
 	}
 }
+
+// SetupAccountInfoHandler validates a setup token for the SPA new-member flow.
+// Stub returns 410.
+func SetupAccountInfoHandler(_ *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
+	}
+}
+
+// SetupAccountHandler consumes a setup token and opens a SPA session. Stub
+// returns 410.
+func SetupAccountHandler(_ *scs.SessionManager, _ *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "v2 SPA disabled in this build", http.StatusGone)
+	}
+}

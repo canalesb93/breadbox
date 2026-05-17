@@ -18,6 +18,7 @@ import { FamilyTabs } from "@/features/connections/family-tabs";
 import { AccountRow } from "@/features/accounts/account-row";
 import { AccountsSummary } from "@/features/accounts/accounts-summary";
 import {
+  formatCurrency,
   groupAccounts,
   groupNetTotal,
   type AccountGroupBy,
