@@ -354,20 +354,23 @@ next target, then updates this file at the end of the run.
   not detail-page eyebrows.
 - **DetailSheetHeader primitive** — extracted to
   `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
-  Two surfaces now share the canonical icon-tile sheet header lockup:
-  ShortcutSheet (iter 39) and ConnectBankSheet (iter 40). Vocabulary
-  tokens: `density` (`default` = size-9 tile + p-5, ambient overlays
-  like Shortcut sheet; `accent` = size-10 tile + bg-muted/20 + p-6,
-  primary flows like Connect-bank), `eyebrow` (optional), `trailing`
-  (optional slot). The lockup mirrors StatusPanel / EmptyState /
-  SectionCard's icon-tile vocabulary so every v2 Sheet reads as part
-  of the system, not a stock shadcn surface. Don't open `<SheetHeader>`
-  inline for a new Sheet — extend this primitive. `reauth-sheet` and
-  `link-account-sheet` use different header shapes (no icon-tile
-  lockup) and stay open-coded — promote if a third Sheet adopts the
-  lockup with a yet-different rhythm. No sandbox specimen because
-  SheetTitle/SheetDescription require radix Dialog context; the live
-  consumers carry the visual reference.
+  Four surfaces share the canonical icon-tile sheet header lockup
+  (iter 90 #1205 added `reauth-sheet` + `link-account-sheet`):
+  ShortcutSheet (iter 39), ConnectBankSheet (iter 40), LinkAccountSheet
+  (iter 90), ReauthSheet (iter 90). Vocabulary tokens: `density`
+  (`default` = size-9 tile + p-5, ambient overlays like Shortcut
+  sheet; `accent` = size-10 tile + bg-muted/20 + p-6, primary flows
+  like Connect-bank / Link-account / Re-auth), `eyebrow` (optional),
+  `trailing` (optional slot). The lockup mirrors StatusPanel /
+  EmptyState / SectionCard's icon-tile vocabulary so every v2 Sheet
+  reads as part of the system, not a stock shadcn surface. Every v2
+  Sheet now also shares the canonical body padding (`p-6`) + bordered
+  footer strip (`bg-muted/20 border-t px-6 py-3` with `size="sm"`
+  Cancel + primary). Don't open `<SheetHeader>` inline for a new
+  Sheet — extend this primitive. The iter-41 "promote if a third
+  Sheet adopts the lockup" follow-up is now resolved. No sandbox
+  specimen because SheetTitle/SheetDescription require radix Dialog
+  context; the live consumers carry the visual reference.
 - **JumpToPill primitive** — extracted to
   `web/src/components/jump-to-pill.tsx` in iter 75 (#1188). The
   canonical detail-page "Jump to" lateral-link pill: 28px tall
@@ -2529,3 +2532,37 @@ Cross-cutting components:
     `<EmptyState>` blocks. The backlog item "list-page empty states —
     verify filter empty vs zero-data empty distinction across all
     lists" is closed.
+
+- **Iter 90 — DetailSheetHeader sweep for link-account + reauth** ([#1205](https://github.com/canalesb93/breadbox/pull/1205))
+  - Both remaining open-coded Sheet headers — `link-account-sheet`
+    and `reauth-sheet` — now route through `<DetailSheetHeader
+    density="accent">`, joining `shortcut-sheet` and
+    `connect-bank-sheet`. The icon-tile lockup (size-10 tile +
+    `bg-muted/20` border-bottom band + eyebrow + title +
+    description) is now canonical across all four v2 Sheet
+    consumers. Resolves the iter-41 drift observation
+    ("`reauth-sheet` and `link-account-sheet` use different header
+    shapes (no icon-tile lockup) and stay open-coded — promote if
+    a third Sheet adopts the lockup").
+  - link-account-sheet: Link2 icon, eyebrow "Account link",
+    SheetFooter swapped for the canonical
+    `bg-muted/20 border-t px-6 py-3` strip with `size="sm"` Cancel
+    + primary buttons, body switched to `flex/gap-5 p-6` with
+    `<Eyebrow as="label">` labels matching the Connect-bank rhythm.
+    Dropped the now-unused `Label` import.
+  - reauth-sheet: ShieldAlert icon, eyebrow "Re-authenticate",
+    title bound to `institution_name` once loaded (falls back to
+    "Re-authenticate" while the connection query resolves) so the
+    user knows at a glance which connection they're about to
+    reauth. Same canonical footer strip for the Confirm +
+    Unsupported stages. Plaid + Teller launcher buttons
+    (invisible auto-opening SDK shells) moved into the body's
+    scroll container instead of sitting as siblings of the old
+    `SheetFooter`.
+  - Component drift "Modal/Sheet content density consistency" is
+    now closed for Sheets — every v2 Sheet shares the
+    DetailSheetHeader lockup, the body padding rhythm (`p-6`), and
+    the bordered footer strip. Dialogs (confirm, household,
+    backups, command-palette) keep their own rhythm because they're
+    a different surface type (centered modal vs side sheet);
+    content-density audit of those is queued separately.
