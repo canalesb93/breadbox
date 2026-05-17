@@ -226,6 +226,26 @@ export function useUpdateAgentSettings() {
   });
 }
 
+// --- Smoke test (diagnostic) ---
+
+export interface AgentTestResult {
+  auth_mode: string;
+  binary_path?: string;
+  model: string;
+  duration_ms: number;
+  total_cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  response?: string;
+}
+
+export function useSmokeTestAgent() {
+  return useMutation({
+    mutationFn: () =>
+      api<AgentTestResult>("/api/v1/agents/test", { method: "POST" }),
+  });
+}
+
 // --- Transcript types ---
 
 // Discriminated union of NDJSON event shapes emitted by the breadbox sidecar.

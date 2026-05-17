@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Bot, KeyRound, Loader2 } from "lucide-react";
+import { Bot, CheckCircle2, KeyRound, Loader2, Stethoscope, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -28,8 +28,11 @@ import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAgentSettings,
+  useSmokeTestAgent,
   useUpdateAgentSettings,
+  type AgentTestResult,
 } from "@/api/queries/agents";
+import { ApiError } from "@/api/client";
 
 const settingsSchema = z.object({
   auth_mode: z.enum(["subscription", "api_key"]),
@@ -43,8 +46,11 @@ const settingsSchema = z.object({
 export function AgentsSection() {
   const settingsQuery = useAgentSettings();
   const updateSettings = useUpdateAgentSettings();
+  const smokeTest = useSmokeTestAgent();
   const [tokenDraft, setTokenDraft] = useState("");
   const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const [testResult, setTestResult] = useState<AgentTestResult | null>(null);
+  const [testError, setTestError] = useState<{ code: string; message: string } | null>(null);
 
   const form = useForm({
     resolver: zodResolver(settingsSchema),
@@ -111,6 +117,21 @@ export function AgentsSection() {
         error: "Failed to clear credential",
       },
     );
+  };
+
+  const runSmokeTest = async () => {
+    setTestResult(null);
+    setTestError(null);
+    try {
+      const r = await smokeTest.mutateAsync();
+      setTestResult(r);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setTestError({ code: err.code, message: err.message });
+      } else {
+        setTestError({ code: "UNKNOWN", message: String(err) });
+      }
+    }
   };
 
   const settings = settingsQuery.data;
@@ -249,7 +270,20 @@ export function AgentsSection() {
               )}
             />
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={runSmokeTest}
+                disabled={smokeTest.isPending}
+              >
+                {smokeTest.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Stethoscope className="size-4" />
+                )}
+                Test connection
+              </Button>
               <Button type="submit" disabled={updateSettings.isPending}>
                 {updateSettings.isPending && (
                   <Loader2 className="size-4 animate-spin" />
@@ -257,6 +291,37 @@ export function AgentsSection() {
                 Save settings
               </Button>
             </div>
+
+            {testResult && (
+              <Alert>
+                <CheckCircle2 className="size-4" />
+                <AlertTitle>Test passed</AlertTitle>
+                <AlertDescription className="space-y-1">
+                  <p>
+                    Auth ✓ {testResult.auth_mode} · Model {testResult.model}
+                    {" · "}
+                    {testResult.duration_ms}ms · $
+                    {testResult.total_cost_usd.toFixed(6)} (
+                    {testResult.input_tokens} in / {testResult.output_tokens} out)
+                  </p>
+                  {testResult.response && (
+                    <p className="text-muted-foreground">
+                      Response:{" "}
+                      <code className="bg-muted rounded px-1">
+                        {testResult.response}
+                      </code>
+                    </p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+            {testError && (
+              <Alert variant="destructive">
+                <XCircle className="size-4" />
+                <AlertTitle>Test failed — {testError.code}</AlertTitle>
+                <AlertDescription>{testError.message}</AlertDescription>
+              </Alert>
+            )}
           </form>
         </Form>
       ) : (

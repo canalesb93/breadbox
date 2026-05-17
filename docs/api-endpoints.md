@@ -265,6 +265,7 @@ Agent definitions are scheduled Claude Agent SDK runs that call breadbox MCP to 
 | POST | `/agents/{slug}/enable` | W | Flip enabled=true |
 | POST | `/agents/{slug}/disable` | W | Flip enabled=false |
 | POST | `/agents/{slug}/run` | W | Trigger an immediate synchronous run; 503 `CONCURRENCY_LOCKED` when another run is in progress |
+| POST | `/agents/test` | W | Run the diagnostic smoke test (tiny "say OK" prompt, no MCP servers, ~5¢ cap); 422 `AUTH_NOT_CONFIGURED` / `AGENT_BINARY_NOT_FOUND` |
 | GET | `/agents/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200) |
 | GET | `/agents/runs/{shortId}` | R | One run detail (by short_id or UUID) |
 | GET | `/agents/runs/{shortId}/transcript` | R | Streams the NDJSON transcript; 404 when not yet written |

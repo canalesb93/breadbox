@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"breadbox/internal/agent"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/pgconv"
 )
 
@@ -53,6 +54,15 @@ func (o *Orchestrator) NotifyDefinitionChanged() {
 	if o.sched != nil {
 		o.sched.Reload(context.Background())
 	}
+}
+
+// SmokeTest runs the diagnostic round-trip via the orchestrator's existing
+// runner. Bypasses the concurrency semaphore (diagnostic, not a real run)
+// and never touches agent_runs / api_keys. Used by the v2 SPA settings
+// "Test connection" button and the `breadbox agent test` CLI alike.
+func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error) {
+	binaryPath := appconfig.String(ctx, o.svc.Queries, appconfig.KeyAgentRuntimePath, "")
+	return agent.SmokeTest(ctx, o.svc.Queries, o.encKey, o.runner, binaryPath)
 }
 
 // RunNow executes one agent run synchronously, for "run now" requests.

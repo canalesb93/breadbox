@@ -2532,6 +2532,24 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/test:
+    post:
+      tags: [Agents]
+      summary: Run the agent diagnostic smoke test
+      description: |
+        Spawns the breadbox-agent sidecar with a tiny "say OK" prompt and
+        returns the result. Bypasses agent_definitions, mints no API key,
+        writes no agent_runs row. Cost-bounded to ~5¢. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Diagnostic result.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422":
+          description: Auth or binary not configured.
+        "500":
+          description: Test ran but the sidecar / model returned an error.
   /api/v1/agents/{slug}/run:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
