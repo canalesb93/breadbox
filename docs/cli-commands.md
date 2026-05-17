@@ -44,6 +44,7 @@ These commands operate on the local box (filesystem, DB, embedded migrations) �
 | `breadbox migrate [--down] [--to N]` | L | Run goose migrations against `DATABASE_URL` (local-only — there is no remote migration endpoint by design) |
 | `breadbox doctor [--skip-external]` | R/L | Remote mode (when a host is configured) consumes `GET /api/v1/headless/bootstrap`; local mode (no host) keeps the env/DB/provider preflight checks |
 | `breadbox agent test` | L | End-to-end smoke test of the Claude Agent SDK subsystem — verifies credential is configured, sidecar binary is discoverable, and a tiny "say OK" prompt round-trips through the SDK. Cost-bounded to ~5¢. Exit 3 = no auth; exit 5 = no binary |
+| `breadbox agent run <slug> [--json]` | L | Trigger an immediate run of the named agent — same path as the v2 SPA "Run now" button. Mints a scoped API key, spawns the sidecar, persists the agent_runs row, revokes the key. Output is a human-readable summary; `--json` switches to the full AgentRunResponse JSON |
 | `breadbox version` | — | Print build version, commit, and upgrade check |
 | `breadbox completion [bash\|zsh\|fish]` | — | Print a shell-completion script (e.g. `breadbox completion zsh > _breadbox`) for tab-completion of nouns/verbs/flags — same pattern as `gh`, `kubectl` |
 
