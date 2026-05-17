@@ -231,7 +231,7 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	}
 	result, runErr := o.runner.Run(ctx, *spec, handler)
 
-	completedRow, completeErr := o.svc.CompleteAgentRunDB(ctx, runRow.ID, result)
+	completedRow, completeErr := o.svc.CompleteAgentRunDB(ctx, runRow.ID, result, def.MaxTurns)
 	if completeErr != nil {
 		o.logger.Error("orchestrator: persist completed run failed",
 			"agent", def.Slug, "run", runResp.ShortID, "error", completeErr)
