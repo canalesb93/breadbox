@@ -32,6 +32,7 @@ import {
   Tag,
   Trash2,
   Unplug,
+  UserPlus,
   Users,
   Wallet,
   Wand2,
@@ -81,7 +82,9 @@ import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { PageError } from "@/components/page-error";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
+import { DetailDialogHeader } from "@/components/detail-dialog-header";
 import { Sheet } from "@/components/ui/sheet";
+import { Dialog } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
@@ -840,6 +843,42 @@ export function ComponentsSection() {
                 trailing={<Badge variant="secondary">Plaid</Badge>}
               />
             </Sheet>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DetailDialogHeader"
+        code="components/detail-dialog-header"
+        description="Sibling of `<DetailSheetHeader>` for centered Dialogs that host a form or multi-step payload (Add member, Create login, Share setup link). Same leading rounded-lg icon tile + optional eyebrow + title + description + optional trailing slot — just routed through `<DialogTitle>` / `<DialogDescription>` so it composes with shadcn `<Dialog>` instead of `<Sheet>`. Promoted in iter 101 to retire the four open-coded `<DialogHeader>` lockups in household-section onto a shared primitive. Wrapped in a hidden `<Dialog open>` here so the radix Dialog context is available."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border bg-card p-4">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              add-member · title + description
+            </div>
+            <Dialog open onOpenChange={() => {}}>
+              <DetailDialogHeader
+                icon={UserPlus}
+                title="Add a household member"
+                description="New members are added without a login by default. Invite them to sign in to share read or edit access."
+              />
+            </Dialog>
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-card p-4">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              share-link · with eyebrow + trailing
+            </div>
+            <Dialog open onOpenChange={() => {}}>
+              <DetailDialogHeader
+                icon={Link2}
+                eyebrow="Household"
+                title="Share their setup link"
+                description="Alex can use this one-time link to set their password. It expires in 7 days."
+                trailing={<Badge variant="secondary">7d</Badge>}
+              />
+            </Dialog>
           </div>
         </div>
       </Specimen>
