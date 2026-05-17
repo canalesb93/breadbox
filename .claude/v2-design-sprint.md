@@ -3021,3 +3021,37 @@ Cross-cutting components:
     is mandatory or `bun run lint` will fail (`tsc --noEmit` flags
     unused imports under the project's `noUnusedLocals` config).
     Caught both removals in the same diff to keep the tip green.
+
+- **Iter 103 — Pending vocabulary for TransactionAmount + TransactionPrimary** ([#1220](https://github.com/canalesb93/breadbox/pull/1220))
+  - Pairs the two reusable transaction-row blocks so a row reads as
+    tentative until it settles. `TransactionAmount` renders italic +
+    `opacity-70` when `t.pending`, with a `title` attribute carrying
+    "Pending — amount may change once posted" for hover/keyboard;
+    `TransactionPrimary` upgrades the bare `text-muted-foreground
+    text-xs` "Pending" span to `<MetaBadge muted icon={Clock}>
+    Pending</MetaBadge>` so the chip lands inside the v2 secondary-
+    state chip family (System / Hidden / Excluded / Linked / Re-auth)
+    instead of being an orphan text fragment.
+  - No new primitive — both blocks already existed, `<MetaBadge>` is
+    the canonical low-emphasis chip. Pure consumer migration. The
+    primitive count stays at 28. The win is that every transaction
+    list (Transactions page, Home recent activity, Account-detail
+    recent transactions) picks up the pending treatment for free
+    because they all route through these two shared blocks.
+  - Visual contract: settled rows render exactly as before; pending
+    rows now have **two** synchronised cues (italic+dim amount on the
+    right, muted chip with leading Clock glyph in the description on
+    the left) so a scanning eye spots them without reading either
+    column in full. Inflow `text-success` tinting still wins on the
+    tone axis, so a pending inflow stays green-but-italic.
+  - Sandbox `Amounts` specimen description updated to document the
+    pending treatment; the existing fixture at
+    `web/src/sandbox/fixtures.ts` already includes a pending row
+    (`pending: true` on one of the three demo transactions) so the
+    live `TransactionAmount` specimen picks up the new vocabulary
+    without a fixture edit.
+  - **Existing `<TransactionPrimary>`/`<TransactionAmount>` doc
+    comments updated** to spell out the pending vocabulary so future
+    edits don't drift apart. Both files now reference each other in
+    the comment so a change to one prompts a review of the other —
+    they're a pair, not two independent components.
