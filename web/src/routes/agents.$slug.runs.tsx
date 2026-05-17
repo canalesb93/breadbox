@@ -315,6 +315,10 @@ function OperatorNoteEditor({
 }
 
 function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
+  const hasNote = Boolean(run.operator_note && run.operator_note.trim() !== "");
+  const notePreview = hasNote
+    ? (run.operator_note ?? "").trim().slice(0, 80)
+    : "";
   return (
     <button
       type="button"
@@ -328,6 +332,16 @@ function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
       <span className="flex-1 text-xs">
         {formatRelativeTime(run.started_at)}
       </span>
+      {hasNote && (
+        <span
+          className="text-muted-foreground inline-flex items-center gap-1 text-xs"
+          title={notePreview}
+          aria-label={`Operator note: ${notePreview}`}
+        >
+          <StickyNote className="size-3.5" />
+          note
+        </span>
+      )}
       <span className="text-muted-foreground text-xs">
         {formatDuration(run.duration_ms)}
       </span>
