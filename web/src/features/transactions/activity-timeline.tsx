@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { PageError } from "@/components/page-error";
 import { TimelineRail } from "@/components/timeline-rail";
 import { useAnnotations } from "@/api/queries/annotations";
 import { formatRelativeTime } from "@/lib/format";
@@ -67,7 +68,8 @@ function groupByDay(annotations: Annotation[]): DayGroup[] {
 // server hands back ready-to-render `summary` lines, so this stays a pure
 // layout component on top of the shared <TimelineRail> primitive (iter 26).
 export function ActivityTimeline({ transactionId }: { transactionId: string }) {
-  const { data, isLoading, isError } = useAnnotations(transactionId);
+  const { data, isLoading, isError, isFetching, error, refetch } =
+    useAnnotations(transactionId);
   const groups = useMemo(() => groupByDay(data ?? []), [data]);
 
   if (isLoading) {
@@ -88,10 +90,19 @@ export function ActivityTimeline({ transactionId }: { transactionId: string }) {
   }
 
   if (isError) {
+    // PageError `inline` variant (iter 88) drops the bordered StatusPanel
+    // chrome so this error sits flush inside the parent <SectionCard
+    // title="Activity"> without doubling up borders. Same destructive icon
+    // tile + heading + body + retry vocabulary as every other v2 error
+    // surface.
     return (
-      <p className="text-muted-foreground text-sm">
-        Couldn't load the activity timeline.
-      </p>
+      <PageError
+        variant="inline"
+        resource="the activity timeline"
+        error={error}
+        onRetry={() => refetch()}
+        retrying={isFetching}
+      />
     );
   }
 
