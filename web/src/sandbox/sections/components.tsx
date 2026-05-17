@@ -28,6 +28,7 @@ import {
   Search,
   Shapes,
   ShieldAlert,
+  Sparkles,
   Sun,
   Tag,
   Trash2,
@@ -71,6 +72,7 @@ import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
 import { ActionPill } from "@/components/action-pill";
+import { ComingSoonPill } from "@/components/coming-soon-pill";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import {
@@ -600,6 +602,25 @@ export function ComponentsSection() {
               Re-authenticate
             </ActionPill>
           </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ComingSoonPill"
+        code="components/coming-soon-pill"
+        description="The canonical muted 'Coming soon' status pill rendered in the trailing slot of a `<StatusPanel tone='info'>` for unbuilt surfaces. Fully-rounded pill (`rounded-full`) with muted background + muted-foreground label, `px-2.5 py-1 text-[11px]` uppercase + wide tracking, leading `Clock` icon at `size-3`. Two consumers today: `routes/placeholder.tsx` (the unbuilt-nav-leaf shell, iter 21) and `components/settings-shell.tsx` (the in-the-works settings panel, iter 78) — both previously hand-rolled the 10-class span. Distinct from `<Eyebrow>` (no chip; section/page micro-label) and shadcn `<Badge>` (rectangular, semantic-tone variants). Pass a different `icon` to swap the leading glyph without losing the rhythm; pass `children` to override the label. Promoted in iter 102."
+        className="block"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <ComingSoonPill />
+            <ComingSoonPill icon={Sparkles}>Beta</ComingSoonPill>
+            <ComingSoonPill icon={Wand2}>In review</ComingSoonPill>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Default leading icon is <code>Clock</code>. Override with the
+            <code> icon</code> prop and the label via <code>children</code>.
+          </p>
         </div>
       </Specimen>
 

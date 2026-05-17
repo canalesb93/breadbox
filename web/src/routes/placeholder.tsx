@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  Clock,
   FileText,
   Hammer,
   type LucideIcon,
@@ -8,6 +7,7 @@ import {
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { ComingSoonPill } from "@/components/coming-soon-pill";
 import { JumpToPill } from "@/components/jump-to-pill";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
@@ -168,12 +168,7 @@ export function Placeholder({ title }: { title: string }) {
               ? "We're still building this surface. The plan below sketches the shape it'll take — follow the related pages for the data that's live today."
               : "This page is part of the v2 admin shell. The full implementation lands in a follow-up PR."
           }
-          trailing={
-            <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide uppercase">
-              <Clock className="size-3" />
-              Coming soon
-            </span>
-          }
+          trailing={<ComingSoonPill />}
         />
 
         {hasPlan && (
