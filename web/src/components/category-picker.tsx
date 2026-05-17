@@ -69,7 +69,12 @@ export function CategoryPicker({
   // overlaps the label. Falls back to a no-op when the category has no
   // icon — the hover ring alone carries the affordance there.
   const chevronClass = size === "sm" ? "size-2.5" : "size-3";
-  const chevronLeftClass = size === "sm" ? "left-1.5" : "left-2";
+  // Mask is intentionally bigger than the icon — and wider than tall —
+  // so stroke/edge bleed and per-icon viewBox variance on the underlying
+  // svg are fully covered (some lucide icons render a px or two past
+  // their nominal width).
+  const maskClass = size === "sm" ? "h-3 w-4" : "h-4 w-5";
+  const chevronLeftClass = size === "sm" ? "left-1" : "left-1";
   const hasIcon = !!category?.icon;
 
   return (
@@ -115,7 +120,7 @@ export function CategoryPicker({
               className={cn(
                 "bg-secondary pointer-events-none absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-[2px] opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
                 chevronLeftClass,
-                chevronClass,
+                maskClass,
               )}
             >
               <Pencil className={cn("text-muted-foreground", chevronClass)} />
