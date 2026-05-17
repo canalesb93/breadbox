@@ -71,6 +71,8 @@ import { ActionPill } from "@/components/action-pill";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
+import { PageError } from "@/components/page-error";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { Sheet } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +136,7 @@ export function ComponentsSection() {
   const [confirmPending, setConfirmPending] = useState(false);
   const [dangerPending, setDangerPending] = useState(false);
   const [paginationPage, setPaginationPage] = useState(3);
+  const [pageErrorRetrying, setPageErrorRetrying] = useState(false);
 
   return (
     <SandboxSection
@@ -857,6 +860,71 @@ export function ComponentsSection() {
               title="No sync history yet"
               description="Each sync will appear here with timing and result."
             />
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="PageError"
+        code="components/page-error"
+        description="The canonical page-level 'this page couldn't fetch its data' state. Composition on top of `<StatusPanel tone='destructive'>` — AlertTriangle icon, `Couldn't load {resource}` heading, the error's `message` (or a fallback) as body, and an outline `RefreshCw` Retry button in the trailing slot that swaps to a spinning icon + `Retrying…` label while in-flight. Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading) — three states, three vocabularies, one visual system. Six pages share it today: accounts, connections, providers, rules, rule-form, rule-detail. Don't fork — extend this primitive."
+        className="block"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+              with retry handler
+            </div>
+            <PageError
+              resource="accounts"
+              error={new Error("Network request failed (ECONNRESET).")}
+              onRetry={() => {
+                setPageErrorRetrying(true);
+                window.setTimeout(() => setPageErrorRetrying(false), 1200);
+              }}
+              retrying={pageErrorRetrying}
+            />
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+              without retry · fallback message
+            </div>
+            <PageError resource="rules" />
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DetailPageSkeleton"
+        code="components/detail-page-skeleton"
+        description="The canonical page-level loading shell for every v2 detail page (transaction, account, category, connection). Composes the iter-10 `<ColorRailCardSkeleton>` hero + a `<JumpToRow>`-shaped pill strip + a 2-column grid of `rounded-xl` block placeholders matching `<SectionCard>` / `<ListCard>` chrome. Sibling of `<PageError>` (error) and `<EmptyState>` (empty) — three states, three vocabularies, one visual system. `hero` forwards `tileShape` / `withFooter` / `body` to `<ColorRailCardSkeleton>`; `jumpPills` counts the lateral-nav pill row (`0` to omit); `main` / `sidebar` are arrays of Tailwind height classes for the stacked block placeholders. Pass an empty `sidebar` to collapse the grid to a single column. Don't fork — extend this primitive."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              transaction · hero rounded-md · 3 pills · 1+2
+            </div>
+            <div className="p-4">
+              <DetailPageSkeleton
+                hero={{ tileShape: "rounded-md" }}
+                jumpPills={3}
+                main={["h-64"]}
+                sidebar={["h-32", "h-40"]}
+              />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              connection · hero withFooter · no pills · 3+0
+            </div>
+            <div className="p-4">
+              <DetailPageSkeleton
+                hero={{ tileShape: "rounded-lg", withFooter: true }}
+                jumpPills={0}
+                main={["h-32", "h-48", "h-56"]}
+              />
+            </div>
           </div>
         </div>
       </Specimen>
