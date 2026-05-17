@@ -9,8 +9,28 @@
  * when both are set. We scrub the unused var before invoking the SDK.
  */
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import cliAsset from "@anthropic-ai/claude-agent-sdk/cli.js" with { type: "file" };
+import { existsSync, mkdirSync, writeFileSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { JobSpecSchema, type JobSpec } from "./spec";
 import { emit, emitError } from "./events";
+
+// resolveCliPath extracts the bundled cli.js to a real path on disk so the
+// SDK's fs.existsSync check can see it. Inside a `bun build --compile`
+// binary, cliAsset resolves to a bunfs path that the SDK's spawn helper
+// cannot read. We materialize once per process startup, cached by mtime+
+// size so repeated cold-starts on the same binary reuse the extracted copy.
+async function resolveCliPath(): Promise<string> {
+  const dir = join(tmpdir(), "breadbox-agent-sidecar");
+  mkdirSync(dir, { recursive: true });
+  const bytes = await Bun.file(cliAsset).bytes();
+  const cached = join(dir, `cli-${bytes.length}.js`);
+  if (!existsSync(cached) || statSync(cached).size !== bytes.length) {
+    writeFileSync(cached, bytes);
+  }
+  return cached;
+}
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -59,6 +79,11 @@ async function main() {
   let turnCount = 0;
   let numToolCalls = 0;
 
+  // SDK spawns `node cli.js` under the hood and fs.existsSync's the path.
+  // bun --compile bundles cli.js into bunfs which fs.existsSync can't read,
+  // so we extract to a tmp file first. See resolveCliPath above.
+  const pathToClaudeCodeExecutable = await resolveCliPath();
+
   try {
     const stream = query({
       prompt: spec.prompt,
@@ -73,6 +98,7 @@ async function main() {
         mcpServers: spec.mcpServers,
         permissionMode: "dontAsk",
         resume: spec.sessionId,
+        pathToClaudeCodeExecutable,
       },
     });
 
