@@ -30,6 +30,7 @@ import {
 } from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
@@ -354,16 +355,15 @@ function QuickActions({ account: a }: { account: AccountDetail }) {
   const hasAny = !!(a.connection_short_id || a.short_id);
   if (!hasAny) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Eyebrow className="mr-1">Jump to</Eyebrow>
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link to="/transactions" search={{ account: a.short_id }}>
           <Wallet className="size-3" />
           All transactions
         </Link>
-      </Button>
+      </JumpToPill>
       {a.connection_short_id && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/connections/$id"
             params={{ id: a.connection_short_id }}
@@ -371,9 +371,9 @@ function QuickActions({ account: a }: { account: AccountDetail }) {
             <Landmark className="size-3" />
             {a.institution_name ?? "Connection"}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
-    </div>
+    </JumpToRow>
   );
 }
 
