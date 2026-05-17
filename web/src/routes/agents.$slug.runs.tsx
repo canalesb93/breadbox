@@ -57,6 +57,7 @@ export const agentRunsSearchSchema = z.object({
     .enum(["success", "error", "in_progress", "skipped", "timeout"])
     .optional(),
   trigger: z.enum(["cron", "manual", "webhook"]).optional(),
+  hit_cap: z.enum(["max_turns", "max_budget", "any"]).optional(),
   start: z.string().optional(),
   end: z.string().optional(),
 });
@@ -75,11 +76,12 @@ export function AgentRunsPage() {
   const filters: AgentRunsFilters = {
     status: search.status ?? "",
     trigger: search.trigger ?? "",
+    hit_cap: search.hit_cap ?? "",
     start: search.start,
     end: search.end,
   };
   const hasActiveFilters = Boolean(
-    search.status || search.trigger || search.start || search.end,
+    search.status || search.trigger || search.hit_cap || search.start || search.end,
   );
 
   const setFilter = (patch: Partial<AgentRunsSearch>) => {
@@ -99,6 +101,7 @@ export function AgentRunsPage() {
         ...prev,
         status: undefined,
         trigger: undefined,
+        hit_cap: undefined,
         start: undefined,
         end: undefined,
         page: undefined,
@@ -180,6 +183,23 @@ export function AgentRunsPage() {
             <SelectItem value="cron">Cron</SelectItem>
             <SelectItem value="manual">Manual</SelectItem>
             <SelectItem value="webhook">Webhook</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={search.hit_cap ?? ANY_VALUE}
+          onValueChange={(v) =>
+            setFilter({ hit_cap: v === ANY_VALUE ? undefined : (v as AgentRunsSearch["hit_cap"]) })
+          }
+        >
+          <SelectTrigger size="sm" className="w-40">
+            <SelectValue placeholder="All caps" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY_VALUE}>Any cap state</SelectItem>
+            <SelectItem value="any">Hit any cap</SelectItem>
+            <SelectItem value="max_turns">Hit max turns</SelectItem>
+            <SelectItem value="max_budget">Over budget</SelectItem>
           </SelectContent>
         </Select>
 
