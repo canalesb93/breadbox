@@ -33,12 +33,14 @@ next target, then updates this file at the end of the run.
 
 (Populated by iterations as drift is discovered.)
 
-- **Active-state vocabulary** (iter 1, established): primary-tinted 3px
-  left rail at row's outer edge + tinted icon + accent bg. Used in
-  `nav-main.tsx` and `settings-shell.tsx`. Any new nav/list with an
-  active row should reuse this language — pulling the rail into a
-  shared util in `web/src/components/` is worth doing once a third
-  surface needs it.
+- **Active-state vocabulary** (iter 1, established; timing parity
+  iter 73): primary-tinted 3px left rail at row's outer edge + tinted
+  icon + accent bg. Used in `nav-main.tsx` and `settings-shell.tsx`.
+  Both rails share the same in/out transition vocabulary:
+  `before:transition-(transform|all) before:duration-200 before:ease-out`.
+  Any new nav/list with an active row should reuse this language *and*
+  the 200ms ease-out timing — pulling the rail into a shared util in
+  `web/src/components/` is worth doing once a third surface needs it.
 - **Branch naming gotcha** (iter 1): the remote already holds
   `design/v2-shadcn` as a leaf ref, so a child branch named
   `design/v2-shadcn/<topic>` cannot be pushed (git refs can't be both a
@@ -1833,6 +1835,43 @@ Cross-cutting components:
     rules was the last list page without an eyebrow. No
     primitive count change (still 17 shared primitives) — pure
     copy + voice consistency on existing `<PageHeader>` calls.
+
+- **Iter 73 — Overlay + rail animation duration vocabulary unified** ([#1186](https://github.com/canalesb93/breadbox/pull/1186))
+  - Audit of `duration-*` utilities across the SPA found Sheet as
+    the lone overlay outlier: open 500ms / close 300ms, while
+    Dialog + AlertDialog both use a symmetric 200ms. Sheets felt
+    sluggish entering and rushed leaving compared to dialogs
+    (which read as siblings in the v2 vocabulary — both the
+    Connect-bank Sheet from iter 40 and the Shortcut Sheet from
+    iter 39 share the iter-41 `<DetailSheetHeader>` lockup with
+    the AlertDialog vocabulary, so animation parity was the last
+    missing piece).
+  - `ui/sheet.tsx`: collapsed `data-[state=closed]:duration-300
+    data-[state=open]:duration-500` → single `duration-200` so
+    both directions inherit the same timing. Matches
+    `ui/dialog.tsx` and `ui/alert-dialog.tsx`.
+  - `settings-shell.tsx` active rail: `before:transition-all`
+    (default ~150ms) → `before:transition-all before:duration-200
+    before:ease-out`. Matches the existing `nav-main.tsx` rail's
+    `before:duration-200 before:ease-out`. Both surfaces share
+    the iter-1 "primary-tinted 3px left rail" vocabulary; the
+    transition timing now matches too, so navigating between
+    sections inside settings feels indistinguishable from
+    navigating between top-level nav items.
+  - `routes/error.tsx` details disclosure: `transition-all` (=
+    default 150ms) → `transition-all duration-200 ease-out`. A
+    480px panel snapping open in 150ms felt abrupt; 200ms ease-out
+    matches the rest of the v2 expand vocabulary.
+  - No new primitive (still 17). Behavioral/timing change with
+    no static-frame screenshot evidence — diff is 3 lines, build
+    + lint green, sheets and rails feel like siblings of dialogs
+    now.
+  - Remaining drift to watch: Tooltip / Popover / Dropdown /
+    Select all use the tw-animate default (~150ms) with no
+    explicit duration. That's fine for tiny floating UI — leaving
+    them alone. If a fourth surface with a *page-level* sliding
+    panel lands (e.g. a Drawer), reach for `duration-200 ease-out`
+    by default to stay in the v2 vocabulary.
 
 ## Open observations / questions
 
