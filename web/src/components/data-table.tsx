@@ -285,6 +285,13 @@ export function DataTable<TData, TValue>({
                     // or compete with the row's selected/hover background.
                     focused &&
                       "bg-primary/[0.04] shadow-[inset_3px_0_0_0_var(--primary)] outline-none",
+                    // `scroll-mt-*` so the `scrollIntoView({ block: "nearest" })`
+                    // below clears the chrome stacked above the scroll
+                    // container: 56px shell header always, +36px when the
+                    // table's own header is sticky on top of it. Without
+                    // this, scrolling up via `k` lands the focused row
+                    // behind the sticky bands.
+                    stickyHeader ? "scroll-mt-24" : "scroll-mt-16",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
