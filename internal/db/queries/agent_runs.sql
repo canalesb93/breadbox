@@ -60,6 +60,30 @@ SET status        = 'skipped',
     error_message = $2
 WHERE id = $1;
 
+-- name: GetAgentRecentCapStats :many
+-- Per-definition "is this agent regularly hitting its safety ceilings?"
+-- signal: count of runs in the last 5 non-skipped that had hit_cap set
+-- (either max_turns OR max_budget). Mirrors GetAgentRecentErrorStats —
+-- the v2 SPA list page renders a warning pill at 2+ recent cap hits so
+-- the operator knows to raise max_turns / max_budget_usd or split the
+-- prompt.
+WITH ranked AS (
+    SELECT agent_definition_id, hit_cap,
+           ROW_NUMBER() OVER (
+               PARTITION BY agent_definition_id
+               ORDER BY started_at DESC
+           ) AS rn
+    FROM agent_runs
+    WHERE agent_definition_id IS NOT NULL
+      AND status != 'skipped'
+)
+SELECT agent_definition_id,
+       COUNT(*) FILTER (WHERE hit_cap IS NOT NULL)::int AS cap_count,
+       COUNT(*)::int                                     AS run_count
+FROM ranked
+WHERE rn <= 5
+GROUP BY agent_definition_id;
+
 -- name: GetAgentRecentErrorStats :many
 -- Per-definition "is this agent broken right now?" signal: error count
 -- in the last 5 non-skipped runs. Skipped runs (quiet hours, concurrency

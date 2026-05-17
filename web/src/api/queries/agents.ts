@@ -25,6 +25,11 @@ export interface AgentRecentErrorStats {
   run_count: number; // up to 5
 }
 
+export interface AgentRecentCapStats {
+  cap_count: number;
+  run_count: number; // up to 5
+}
+
 export interface AgentDefinition {
   id: string;
   short_id: string;
@@ -45,6 +50,7 @@ export interface AgentDefinition {
   cost_stats_30d?: AgentCostStats | null;
   next_fire_at?: string | null; // RFC3339; nil when no schedule, disabled, or unparseable
   recent_error_stats?: AgentRecentErrorStats | null;
+  recent_cap_stats?: AgentRecentCapStats | null;
   last_prompt_prefix?: string | null; // most recent non-null prompt_prefix; powers "Use last prefix"
   trigger_on_sync_complete: boolean; // fire after every successful sync
 

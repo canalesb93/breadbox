@@ -76,6 +76,10 @@ type AgentDefinitionResponse struct {
 	// was ever run with. Powers the "Use last prefix" affordance in the v2
 	// SPA's Run now dialog. List-only; nil when no prefixed run exists.
 	LastPromptPrefix *string `json:"last_prompt_prefix,omitempty"`
+	// RecentCapStats is the count of cap-exhausted runs among the last 5
+	// non-skipped runs. Used by the v2 SPA to surface a warning when 2+
+	// recent runs hit a safety ceiling. List-only; nil when no run history.
+	RecentCapStats *AgentRecentCapStats `json:"recent_cap_stats,omitempty"`
 	CreatedAt        string  `json:"created_at"`
 	UpdatedAt        string  `json:"updated_at"`
 }
@@ -85,6 +89,15 @@ type AgentDefinitionResponse struct {
 type AgentRecentErrorStats struct {
 	ErrorCount int `json:"error_count"`
 	RunCount   int `json:"run_count"` // up to 5; less when there's less history
+}
+
+// AgentRecentCapStats is the "is this agent regularly hitting its safety
+// ceilings?" signal — cap-exhausted (max_turns OR max_budget) runs among
+// the last 5 non-skipped. Surfaced as a warning pill on the v2 SPA list
+// when CapCount >= 2 (threshold tuned to avoid flagging one-off cap hits).
+type AgentRecentCapStats struct {
+	CapCount int `json:"cap_count"`
+	RunCount int `json:"run_count"` // up to 5
 }
 
 // AgentCostStats is the per-agent cost rollup over the last 30 days.
@@ -235,6 +248,21 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		}
 	}
 
+	// Recent cap rollup — count of cap-exhausted runs in the last 5
+	// non-skipped. Mirrors the error-rollup pattern.
+	capStatsRows, err := s.Queries.GetAgentRecentCapStats(ctx)
+	if err != nil {
+		s.Logger.Warn("list agent definitions: recent cap stats query failed", "error", err)
+		capStatsRows = nil
+	}
+	capStatsByID := make(map[string]AgentRecentCapStats, len(capStatsRows))
+	for _, r := range capStatsRows {
+		capStatsByID[pgconv.FormatUUID(r.AgentDefinitionID)] = AgentRecentCapStats{
+			CapCount: int(r.CapCount),
+			RunCount: int(r.RunCount),
+		}
+	}
+
 	// Last-prefix rollup — feeds the "Use last prefix" button in the v2 SPA's
 	// Run now dialog. One row per definition (the most recent non-null
 	// prompt_prefix); definitions that never had a prefixed run won't appear.
@@ -262,6 +290,9 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		}
 		if errStats, ok := errStatsByID[resp.ID]; ok {
 			resp.RecentErrorStats = &errStats
+		}
+		if capStats, ok := capStatsByID[resp.ID]; ok {
+			resp.RecentCapStats = &capStats
 		}
 		if prefix, ok := prefixByID[resp.ID]; ok {
 			p := prefix
