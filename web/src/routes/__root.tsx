@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Loader2, Search } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, Search } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { SettingsShell } from "@/components/settings-shell";
@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Toaster } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
+import { StatusPanel } from "@/components/status-panel";
 import { NAV_LEAVES, isNavMatch } from "@/lib/nav";
 import { useMe } from "@/api/queries/me";
 import { ApiError } from "@/api/client";
@@ -62,13 +64,18 @@ function AuthenticatedGate({ pathname }: { pathname: string }) {
   }, [is401, navigate, pathname]);
 
   // Gate: never render the authenticated shell until /me has resolved
-  // successfully. This kills the brief flash of sidebar + page content
-  // before the 401 redirect fires.
-  if (is401 || me.isPending || !me.data) {
+  // successfully. Splash covers the loading window AND the 401-redirect
+  // window (so the redirect fires from a calm loader instead of an error
+  // flash). Real non-401 failures (network drop, 500, malformed payload)
+  // surface as the AuthError panel with a Reload affordance.
+  if (is401 || me.isPending) {
     return <AuthSplash />;
   }
   if (me.error) {
     return <AuthError message={me.error.message} />;
+  }
+  if (!me.data) {
+    return <AuthSplash />;
   }
 
   return <AuthenticatedShell pathname={pathname} />;
@@ -82,19 +89,36 @@ function AuthSplash() {
   );
 }
 
+// AuthError is the gate's last-resort surface for `/me` failures that
+// aren't a 401 (network down, 500, malformed payload). Predates the v2
+// vocabulary; iter 91 routes it through `<StatusPanel tone="destructive">`
+// so the bordered + tone-tinted icon-tile lockup matches every other v2
+// error surface (PageError, providers env-locked notice, setup-account
+// invalid-link). The panel sits centered on a full-bleed background — we
+// can't reach for `<PageError>` here because the sidebar / page chrome
+// isn't mounted yet (the gate failed before `<AuthenticatedShell>` could
+// render), but the inner lockup is identical.
 function AuthError({ message }: { message: string }) {
   return (
     <div className="bg-background fixed inset-0 flex items-center justify-center p-6">
-      <div className="max-w-sm text-center">
-        <h1 className="text-base font-medium">Something went wrong</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{message}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="text-primary mt-4 text-sm underline-offset-2 hover:underline"
-        >
-          Reload
-        </button>
+      <div className="w-full max-w-md">
+        <StatusPanel
+          tone="destructive"
+          icon={AlertTriangle}
+          heading="Couldn't load your session"
+          body={message}
+          trailing={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="size-3.5" />
+              Reload
+            </Button>
+          }
+        />
       </div>
     </div>
   );
