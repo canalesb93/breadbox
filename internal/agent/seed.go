@@ -21,12 +21,24 @@ import (
 //
 // Adding a new entry here AND a matching `prompts/agents/strategy-<slug>.md`
 // is the entire workflow — the seed runs at startup on fresh installs only.
+// Model picks for the seeded starters are tuned per-agent on a
+// reasoning-cost tradeoff:
+//   - Opus 4.7 for the cold-start setup work (initial-setup, bulk-review) —
+//     these write rules + categorize hundreds of rows; reasoning matters
+//   - Sonnet 4.6 for the analytical recurring work (spending-report) —
+//     balances reasoning with cost-per-run for weekly fires
+//   - Haiku 4.5 for the quick-pass agents (quick-review, routine-review) —
+//     short prompts, mostly applying existing rules; speed + cost wins
+//
+// Operators can still edit Model on any agent's edit page; this is just
+// the starting point for self-hosters who don't manually tune.
 var DefaultSeed = []SeedDefinition{
 	{
 		Slug:         "initial-setup",
 		Name:         "Initial Setup",
 		Description:  "Establish rules and categories after connecting your first accounts.",
 		PromptFile:   "strategy-initial-setup",
+		Model:        "claude-opus-4-7",
 		MaxTurns:     30,
 		MaxBudgetUSD: 1.50,
 	},
@@ -35,6 +47,7 @@ var DefaultSeed = []SeedDefinition{
 		Name:         "Bulk Review",
 		Description:  "Thorough pass over a large pending-review queue with rule creation.",
 		PromptFile:   "strategy-bulk-review",
+		Model:        "claude-opus-4-7",
 		MaxTurns:     30,
 		MaxBudgetUSD: 1.50,
 	},
@@ -43,6 +56,7 @@ var DefaultSeed = []SeedDefinition{
 		Name:         "Quick Review",
 		Description:  "Fast batch-categorize over a backlog. Prioritizes speed over precision.",
 		PromptFile:   "strategy-quick-review",
+		Model:        "claude-haiku-4-5",
 		MaxTurns:     15,
 		MaxBudgetUSD: 0.50,
 	},
@@ -51,6 +65,7 @@ var DefaultSeed = []SeedDefinition{
 		Name:         "Routine Review",
 		Description:  "Daily or weekly pass over fresh transactions. Best paired with a cron schedule.",
 		PromptFile:   "strategy-routine-review",
+		Model:        "claude-haiku-4-5",
 		MaxTurns:     15,
 		MaxBudgetUSD: 0.50,
 	},
@@ -59,6 +74,7 @@ var DefaultSeed = []SeedDefinition{
 		Name:         "Spending Report",
 		Description:  "Weekly or monthly category-grouped summary with anomaly callouts.",
 		PromptFile:   "strategy-spending-report",
+		Model:        "claude-sonnet-4-6",
 		MaxTurns:     10,
 		MaxBudgetUSD: 0.30,
 	},
@@ -70,6 +86,7 @@ type SeedDefinition struct {
 	Name         string
 	Description  string  // short blurb for surfacing in seed logs / UI hints
 	PromptFile   string  // filename in prompts/agents/ without .md
+	Model        string  // exact model ID the SDK accepts (e.g. claude-haiku-4-5)
 	MaxTurns     int32
 	MaxBudgetUSD float64 // dollars
 }
@@ -112,6 +129,10 @@ func SeedDefaults(ctx context.Context, q SeederQueries, logger *slog.Logger) err
 		var bud pgtype.Numeric
 		_ = bud.Scan(fmt.Sprintf("%.4f", s.MaxBudgetUSD))
 
+		model := s.Model
+		if model == "" {
+			model = "claude-opus-4-7" // defensive default for hand-built test seeds
+		}
 		_, err = q.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
 			Name:         s.Name,
 			Slug:         s.Slug,
@@ -120,7 +141,7 @@ func SeedDefaults(ctx context.Context, q SeederQueries, logger *slog.Logger) err
 			ScheduleCron: pgtype.Text{},
 			ToolScope:    "read_write",
 			AllowedTools: []byte("[]"),
-			Model:        "claude-opus-4-7",
+			Model:        model,
 			MaxTurns:     s.MaxTurns,
 			MaxBudgetUsd: bud,
 			Enabled:      false,
