@@ -433,7 +433,7 @@ export function ComponentsSection() {
       <Specimen
         label="MetaBadge"
         code="components/meta-badge"
-        description="Tiny meta chip used in list rows and detail-page hero columns to label a row's secondary state — Hidden, Excluded, Linked, Re-auth, System, Paused, … Owns the v2 density vocabulary (`text-[10px]` + `gap-1` + `px-1.5 py-0` + `[&>svg]:size-2.5`) so the same chip never gets re-derived. Tone routes through the underlying `<Badge>` variant — `outline` by default because a meta label is intentionally calmer than the row's primary classification. `muted` opts into the `text-muted-foreground font-normal` shading the categories list uses so 'System' / 'Hidden' don't compete with the category name. For tone-specific chips (the amber Re-auth pill) pass `className` — the density tokens still apply, which is the whole point. Six surfaces share it: accounts list, accounts detail, categories list (parent + child rows), category detail, connection detail."
+        description="Tiny meta chip used in list rows and detail-page hero columns to label a row's secondary state — Hidden, Excluded, Linked, Re-auth, System, Paused, Primary, Dependent, Error, Disconnected, Disabled, … Owns the v2 density vocabulary (`text-[10px]` + `gap-1` + `px-1.5 py-0` + `[&>svg]:size-2.5`) so the same chip never gets re-derived. Tone routes through the underlying `<Badge>` variant — `outline` by default because a meta label is intentionally calmer than the row's primary classification. `muted` opts into the `text-muted-foreground font-normal` shading the categories list uses so 'System' / 'Hidden' don't compete with the category name. For tone-specific chips (the amber Re-auth pill) pass `className` — the density tokens still apply, which is the whole point. Seven surfaces share it: accounts list (statusBadge for error/disconnected, Linked pill, iter 104), accounts detail, account-links section (Primary/Dependent/Disabled, iter 104), categories list (parent + child rows), category detail, connection detail."
       >
         <MetaBadge icon={Lock} muted>
           System
@@ -448,6 +448,11 @@ export function ComponentsSection() {
         <MetaBadge icon={Pause} variant="secondary">
           Paused
         </MetaBadge>
+        <MetaBadge variant="default">Primary</MetaBadge>
+        <MetaBadge variant="secondary">Dependent</MetaBadge>
+        <MetaBadge variant="destructive">Error</MetaBadge>
+        <MetaBadge>Disconnected</MetaBadge>
+        <MetaBadge>Disabled</MetaBadge>
         <MetaBadge
           icon={AlertTriangle}
           className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
