@@ -69,6 +69,7 @@ import {
   PROMPT_PREFIX_MAX_LEN,
   type AgentCostStats,
   type AgentDefinition,
+  type AgentRecentCapStats,
   type AgentRecentErrorStats,
 } from "@/api/queries/agents";
 import { openModal } from "@/lib/modals";
@@ -417,6 +418,7 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
             <span>Max turns: {agent.max_turns}</span>
             <CostStatsPill stats={agent.cost_stats_30d} />
             <RecentErrorPill stats={agent.recent_error_stats} />
+            <RecentCapPill stats={agent.recent_cap_stats} />
             <LastRunPill run={agent.last_run} />
           </div>
         </div>
@@ -575,6 +577,31 @@ function RunNowDialog({
 // RECENT_ERROR_WARN_THRESHOLD is the number of errors in the last 5 runs
 // that triggers the warning pill. Bump if it turns out noisy.
 const RECENT_ERROR_WARN_THRESHOLD = 3;
+
+// RECENT_CAP_WARN_THRESHOLD is the number of cap-exhausted runs in the
+// last 5 that triggers the amber "caps hit" pill. Lower than the error
+// threshold because cap-hits indicate the agent's plan exceeds what was
+// budgeted for it — even occasional hits are worth noticing.
+const RECENT_CAP_WARN_THRESHOLD = 2;
+
+function RecentCapPill({
+  stats,
+}: {
+  stats?: AgentRecentCapStats | null;
+}) {
+  if (!stats || stats.cap_count < RECENT_CAP_WARN_THRESHOLD) {
+    return null;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+      title={`${stats.cap_count} of last ${stats.run_count} runs hit max_turns or max_budget — consider raising the caps or splitting the prompt`}
+    >
+      <AlertCircle className="size-3" />
+      {stats.cap_count}/{stats.run_count} hit cap
+    </span>
+  );
+}
 
 function RecentErrorPill({
   stats,
