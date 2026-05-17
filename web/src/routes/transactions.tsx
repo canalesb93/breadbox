@@ -454,6 +454,7 @@ export function TransactionsPage() {
         meta={tableMeta}
         focusedRowId={focusedRowId}
         onRowClick={handleRowClick}
+        pointerRows={selectMode}
         stickyHeader
         refinedHeader
         emptyState={
