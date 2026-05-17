@@ -161,6 +161,7 @@ export function ComponentsSection() {
 
   return (
     <SandboxSection
+      id="components"
       title="Components"
       description="Composed, reusable v2 components — the layer built on top of the primitives. Shared across the transactions list, detail page, and (soon) elsewhere."
     >

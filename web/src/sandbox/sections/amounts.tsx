@@ -51,6 +51,7 @@ const AMOUNT_ROWS = sampleTransactions.slice(0, 3);
 export function AmountsSection() {
   return (
     <SandboxSection
+      id="amounts"
       title="Amounts"
       description="How money is displayed in v2. One sign convention, one formatter, one component — applied everywhere a balance or transaction amount appears."
     >

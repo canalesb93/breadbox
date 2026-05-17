@@ -72,6 +72,7 @@ function Swatch({ cls, name }: { cls: string; name: string }) {
 export function FoundationsSection() {
   return (
     <SandboxSection
+      id="foundations"
       title="Foundations"
       description="Theme tokens, shape, type, and the icon system — the layer everything else is built on. Toggle the theme (top right) to check both modes."
     >

@@ -115,6 +115,7 @@ import { SandboxSection, Specimen } from "@/sandbox/kit";
 export function PrimitivesSection() {
   return (
     <SandboxSection
+      id="primitives"
       title="Primitives"
       description="shadcn/ui components as themed for v2. Generated into components/ui/* — never hand-edited; variants come from theme tokens."
     >

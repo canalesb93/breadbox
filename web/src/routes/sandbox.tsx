@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SandboxIsolationProvider } from "@/sandbox/kit";
 import { FoundationsSection } from "@/sandbox/sections/foundations";
 import { PrimitivesSection } from "@/sandbox/sections/primitives";
 import { ComponentsSection } from "@/sandbox/sections/components";
@@ -37,7 +38,23 @@ export function SandboxPage() {
     return null;
   });
 
-  const [active, setActive] = useState<SectionId>("foundations");
+  // `?only=<slug>` isolates a single specimen for clean before/after or
+  // variant screenshots. `?section=<id>` scopes which section's tree
+  // mounts in isolation mode — defaults to `components` since that's the
+  // bulk of the gallery. Scoping matters because mounting every section
+  // would mount every Specimen wrapper (and their lazy children), and
+  // some of those side-mount via popover triggers that can hit the API.
+  const { only, scopedSection } = useMemo(() => {
+    if (typeof window === "undefined")
+      return { only: null as string | null, scopedSection: null as SectionId | null };
+    const params = new URLSearchParams(window.location.search);
+    const onlyParam = params.get("only");
+    const sectionParam = params.get("section");
+    const matched = SECTIONS.find((s) => s.id === sectionParam)?.id ?? null;
+    return { only: onlyParam, scopedSection: matched };
+  }, []);
+
+  const [active, setActive] = useState<SectionId>("components");
   // The theme toggle is a scoped preview: it flips the global `.dark` class
   // so the whole gallery re-themes, but restores the original mode on
   // unmount so it never leaks out to the rest of the app.
@@ -61,7 +78,43 @@ export function SandboxPage() {
   const ActiveSection =
     SECTIONS.find((s) => s.id === active)?.Component ?? FoundationsSection;
 
+  // In isolation mode, drop the section nav + outline and mount ONLY the
+  // scoped section (default `components`). Specimen / SandboxGroup
+  // self-filter so only the matching specimen actually renders. We mount
+  // a single section (not all five) because Specimen wrappers + their lazy
+  // popover triggers can side-fetch live data — scoping keeps the page
+  // entirely fixture-backed.
+  if (only) {
+    const exitHref = window.location.pathname;
+    const sectionId = scopedSection ?? "components";
+    const Scoped =
+      SECTIONS.find((s) => s.id === sectionId)?.Component ?? ComponentsSection;
+    return (
+      <SandboxIsolationProvider only={only}>
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="text-muted-foreground mb-4 flex items-center justify-between text-xs">
+            <span>
+              Isolating <code className="font-mono">{only}</code>
+              <span className="text-muted-foreground/60 ml-2">
+                in <code className="font-mono">{sectionId}</code>
+              </span>
+            </span>
+            <a
+              href={exitHref}
+              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+            >
+              <X className="size-3" />
+              Exit isolation
+            </a>
+          </div>
+          <Scoped />
+        </div>
+      </SandboxIsolationProvider>
+    );
+  }
+
   return (
+    <SandboxIsolationProvider only={null}>
     <div className="w-full">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -126,6 +179,7 @@ export function SandboxPage() {
         </div>
       </div>
     </div>
+    </SandboxIsolationProvider>
   );
 }
 
