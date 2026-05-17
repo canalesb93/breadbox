@@ -202,11 +202,13 @@ export function RulesPage() {
               : "Create a rule to automatically categorize, tag, or comment on transactions as they sync in."
           }
           action={
-            <Button asChild>
-              <Link to="/rules/new">
-                <Plus className="size-4" /> Create rule
-              </Link>
-            </Button>
+            hasActiveFilters ? undefined : (
+              <Button asChild>
+                <Link to="/rules/new">
+                  <Plus className="size-4" /> Create rule
+                </Link>
+              </Button>
+            )
           }
         />
       ) : (
