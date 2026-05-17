@@ -685,6 +685,29 @@ Next iteration candidates (refreshed):
 
 Picking **#1 force-cleanup button** next iteration — tight scope, real operator value after lowering retention, naturally closes the iter-25 deferred item.
 
+## ITER 28 — 2026-05-17 05:50
+Shipped (PR #1254 squash-merged into sprint branch as efcf22dd):
+- Scheduler refactor: cleanupAgentRuns + cleanupTranscriptFiles return counts; new runCleanupAll is the shared body both cron tick and RunCleanupNow go through (cannot drift). logCleanupResult tagged source=scheduled vs source=on-demand.
+- New AgentScheduler.RunCleanupNow(ctx) returns AgentCleanupResult { runs_deleted, transcripts_deleted, transcripts_scanned, retention_days, transcript_dir }.
+- New POST /api/v1/agents/cleanup — full_access scope, 503 AGENTS_DISABLED when scheduler unwired.
+- SPA: useRunAgentCleanup hook + AgentCleanupResult type; "Run cleanup now" outline button on Settings → Agents next to "Test connection", with toast naming the counts + retention window. Native title hint explains use case.
+- 2 new integration tests: end-to-end seed+prune; retention=0 no-op.
+- openapi.yaml + docs/api-endpoints.md updated.
+- All 5 CI jobs green.
+- Screenshot captured via Chrome MCP, uploaded to img402.dev, embedded in PR body.
+
+Next iteration candidates (refreshed):
+1. **Multi-concurrent runs** — raise the v1 default cap (1 → 3); deferred from iter-3. Concurrency primitive already supports it; just need integration tests under contention + docs.
+2. **Aggregate "recent caps hit" pill on /v2/agents** — list-level signal like iter-21's error pill, leans on iter-27's hit_cap field.
+3. **Filter chip for hit_cap on run history page** — small UI add.
+4. **Empty/error state polish across agent pages** — UI sweep.
+5. **Mobile-responsive sweep on agent pages** — UI sweep.
+6. **Per-model cost breakdown** — needs model column on agent_runs.
+7. **Webhook trigger** — bigger.
+8. **Suggested rules agent** — bigger.
+
+Picking **#1 multi-concurrent runs** next iteration — real capability lift (deferred since iter-3), tests existing primitive under contention, lets self-hosters run 2-3 agents in parallel without re-configuring.
+
 
 
 
