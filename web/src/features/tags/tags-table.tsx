@@ -1,20 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Pencil, Trash2 } from "lucide-react";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
 import { RowActionsMenu } from "@/components/row-actions-menu";
@@ -156,39 +148,17 @@ export function TagsTable({
         renderSkeletonRow={() => <TagRowSkeleton />}
       />
 
-      <Dialog
+      <ConfirmDialog
         open={confirmDelete !== null}
-        onOpenChange={(o) => !o && !del.isPending && setConfirmDelete(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Delete tag "{confirmDelete?.display_name}"?
-            </DialogTitle>
-            <DialogDescription>
-              The tag will be removed from every transaction it's attached to.
-              Activity history is preserved. This can't be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setConfirmDelete(null)}
-              disabled={del.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirmDelete}
-              disabled={del.isPending}
-            >
-              {del.isPending && <Loader2 className="size-4 animate-spin" />}
-              Delete tag
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={(o) => !o && setConfirmDelete(null)}
+        icon={Trash2}
+        title={`Delete tag "${confirmDelete?.display_name ?? ""}"?`}
+        description="The tag will be removed from every transaction it's attached to. Activity history is preserved. This can't be undone."
+        confirmLabel="Delete tag"
+        pendingLabel="Deleting…"
+        pending={del.isPending}
+        onConfirm={onConfirmDelete}
+      />
     </>
   );
 }

@@ -1,16 +1,8 @@
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Ban, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Ban } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
 import { RowActionsMenu } from "@/components/row-actions-menu";
@@ -170,40 +162,17 @@ export function APIKeysTable({
         renderSkeletonRow={() => <APIKeyRowSkeleton revoked={revoked} />}
       />
 
-      <Dialog
+      <ConfirmDialog
         open={confirmRevoke !== null}
-        onOpenChange={(o) =>
-          !o && !revokeInFlight && setConfirmRevoke(null)
-        }
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Revoke "{confirmRevoke?.name}"?</DialogTitle>
-            <DialogDescription>
-              The next request using this key will be rejected. Existing
-              activity history is preserved, but the key can't be restored —
-              you'll need to mint a new one.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setConfirmRevoke(null)}
-              disabled={revokeInFlight}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirmRevoke}
-              disabled={revokeInFlight}
-            >
-              {revokeInFlight && <Loader2 className="size-4 animate-spin" />}
-              Revoke key
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={(o) => !o && setConfirmRevoke(null)}
+        icon={Ban}
+        title={`Revoke "${confirmRevoke?.name ?? ""}"?`}
+        description="The next request using this key will be rejected. Existing activity history is preserved, but the key can't be restored — you'll need to mint a new one."
+        confirmLabel="Revoke key"
+        pendingLabel="Revoking…"
+        pending={revokeInFlight}
+        onConfirm={onConfirmRevoke}
+      />
     </>
   );
 }
