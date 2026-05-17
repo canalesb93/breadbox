@@ -135,6 +135,9 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	agentOrch := service.NewOrchestrator(a.Service, agentSidecar, agentMaxConcurrent, cfg.EncryptionKey, logger)
 	agentSched := service.NewAgentScheduler(agentOrch, a.Service, logger)
 	agentOrch.AttachScheduler(agentSched)
+	if err := agent.SeedDefaults(ctx, a.Queries, logger); err != nil {
+		logger.Warn("agent seed failed", "error", err)
+	}
 	agentSched.Start(ctx)
 	a.AgentOrchestrator = agentOrch
 	a.AgentScheduler = agentSched
