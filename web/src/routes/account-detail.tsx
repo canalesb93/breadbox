@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ActionPill } from "@/components/action-pill";
 import {
   ColorRailCard,
   ColorRailCardSkeleton,
@@ -210,17 +211,17 @@ function Hero({
       footer={
         <>
           {!a.is_dependent_linked && (
-            <Button variant="ghost" size="sm" onClick={onAddLink} className="h-7 gap-1.5 text-xs">
+            <ActionPill onClick={onAddLink}>
               <Link2 className="size-3.5" />
               Link account
-            </Button>
+            </ActionPill>
           )}
-          <Button variant="ghost" size="sm" asChild className="h-7 gap-1.5 text-xs">
+          <ActionPill asChild>
             <Link to="/transactions" search={{ account: a.short_id }}>
               <Eye className="size-3.5" />
               View transactions
             </Link>
-          </Button>
+          </ActionPill>
         </>
       }
     >
@@ -435,12 +436,12 @@ function connectionStatusAlert(a: AccountDetail) {
   // `<AlertDescription>` flex-wrap row would wrap the CTA below the body
   // text in a half-aligned column.
   const openCta = a.connection_short_id ? (
-    <Button size="sm" variant="outline" asChild className="h-7 gap-1.5 text-xs">
+    <ActionPill variant="outline" asChild>
       <Link to="/connections/$id" params={{ id: a.connection_short_id }}>
         Open connection
         <ArrowRight className="size-3.5" />
       </Link>
-    </Button>
+    </ActionPill>
   ) : undefined;
 
   if (status === "pending_reauth") {

@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  Eye,
   EyeOff,
   Inbox,
   Info,
@@ -66,6 +67,7 @@ import {
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
+import { ActionPill } from "@/components/action-pill";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
@@ -440,6 +442,39 @@ export function ComponentsSection() {
               Dining out
             </JumpToPill>
           </JumpToRow>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ActionPill"
+        code="components/action-pill"
+        description="The canonical small action button used inside `<ColorRailCard footer>` strips (account-detail / connection-detail) and `<StatusPanel trailing>` slots. 28px-tall pill (`h-7`), `text-xs` label, `gap-1.5` between leading icon and label, `size-3.5` leading icon. Same height as `<JumpToPill>` but the action is a dispatched handler (`onClick`, or wraps a `<Link>` via `asChild`) rather than a lateral nav. Tone is governed by `variant`: `ghost` for action strips inside a card surface, `outline` for top-of-page `<StatusPanel trailing>` CTAs where the pill needs more visual weight. Don't fork the className triplet — extend this primitive."
+        className="block"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionPill onClick={() => toast.message("Sync started")}>
+              <RefreshCw className="size-3.5" />
+              Sync now
+            </ActionPill>
+            <ActionPill onClick={() => toast.message("Pause toggled")}>
+              <Pause className="size-3.5" />
+              Pause
+            </ActionPill>
+            <ActionPill onClick={() => toast.message("View transactions")}>
+              <Eye className="size-3.5" />
+              View transactions
+            </ActionPill>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionPill
+              variant="outline"
+              onClick={() => toast.message("Re-authenticate")}
+            >
+              <RefreshCw className="size-3.5" />
+              Re-authenticate
+            </ActionPill>
+          </div>
         </div>
       </Specimen>
 
