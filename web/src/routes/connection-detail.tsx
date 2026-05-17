@@ -723,7 +723,7 @@ function Hero({
 // Account detail — labelled lateral navigation that surfaces concrete
 // targets (the connection's accounts, the global sync-logs feed) rather
 // than just verbs.
-function QuickActions({ conn }: { conn: ConnectionDetail }) {
+function QuickActions(_props: { conn: ConnectionDetail }) {
   return (
     <JumpToRow>
       <JumpToPill asChild>

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-interface SectionCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   title: React.ReactNode;
   // Slot rendered on the right of the bordered header (button, badge, etc).
   action?: React.ReactNode;
