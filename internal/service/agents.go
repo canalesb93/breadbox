@@ -208,6 +208,7 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
 	}
+	s.notifyDefinitionChanged()
 	resp := agentDefinitionFromRow(row, nil)
 	return &resp, nil
 }
@@ -285,6 +286,7 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 	if err != nil {
 		return nil, fmt.Errorf("update agent definition: %w", err)
 	}
+	s.notifyDefinitionChanged()
 	resp := agentDefinitionFromRow(row, nil)
 	return &resp, nil
 }
@@ -303,6 +305,7 @@ func (s *Service) DeleteAgentDefinition(ctx context.Context, slugOrID string) er
 	if n == 0 {
 		return ErrNotFound
 	}
+	s.notifyDefinitionChanged()
 	return nil
 }
 
@@ -319,6 +322,7 @@ func (s *Service) SetAgentDefinitionEnabled(ctx context.Context, slugOrID string
 	if err != nil {
 		return nil, fmt.Errorf("set agent definition enabled: %w", err)
 	}
+	s.notifyDefinitionChanged()
 	resp := agentDefinitionFromRow(row, nil)
 	return &resp, nil
 }
@@ -367,6 +371,68 @@ func (s *Service) GetAgentRun(ctx context.Context, shortIDOrUUID string) (*Agent
 	}
 	resp := agentRunFromRow(row)
 	return &resp, nil
+}
+
+// notifyDefinitionChanged invokes the (optional) registered callback so the
+// agent scheduler can re-register cron entries after a CRUD mutation.
+func (s *Service) notifyDefinitionChanged() {
+	if s.OnDefinitionChanged != nil {
+		s.OnDefinitionChanged()
+	}
+}
+
+// --- Orchestrator-facing helpers (called by internal/service/agent_orchestrator.go) ---
+
+// CreateAgentRunDB inserts an in_progress run row.
+func (s *Service) CreateAgentRunDB(ctx context.Context, defID pgtype.UUID, trigger string) (db.AgentRun, error) {
+	return s.Queries.CreateAgentRun(ctx, db.CreateAgentRunParams{
+		AgentDefinitionID: defID,
+		Trigger:           trigger,
+	})
+}
+
+// MarkAgentRunErrorDB transitions a run row to status='error'.
+func (s *Service) MarkAgentRunErrorDB(ctx context.Context, runID pgtype.UUID, errMsg, transcriptPath string) error {
+	return s.Queries.MarkAgentRunError(ctx, db.MarkAgentRunErrorParams{
+		ID:             runID,
+		ErrorMessage:   pgtype.Text{String: errMsg, Valid: errMsg != ""},
+		TranscriptPath: pgtype.Text{String: transcriptPath, Valid: transcriptPath != ""},
+	})
+}
+
+// MarkAgentRunSkippedDB transitions a run row to status='skipped'.
+func (s *Service) MarkAgentRunSkippedDB(ctx context.Context, runID pgtype.UUID, reason string) error {
+	return s.Queries.MarkAgentRunSkipped(ctx, db.MarkAgentRunSkippedParams{
+		ID:           runID,
+		ErrorMessage: pgtype.Text{String: reason, Valid: reason != ""},
+	})
+}
+
+// CompleteAgentRunDB persists a terminal RunResult onto the run row.
+// Used by the orchestrator after Runner.Run returns.
+func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult) (db.AgentRun, error) {
+	costPtr := result.TotalCostUSD
+	return s.Queries.CompleteAgentRun(ctx, db.CompleteAgentRunParams{
+		ID:                  runID,
+		Status:              result.Status,
+		DurationMs:          pgtype.Int4{Int32: int32(result.DurationMs), Valid: true},
+		TotalCostUsd:        agentNumericFromFloat(&costPtr),
+		InputTokens:         pgtype.Int4{Int32: int32(result.InputTokens), Valid: true},
+		OutputTokens:        pgtype.Int4{Int32: int32(result.OutputTokens), Valid: true},
+		CacheReadTokens:     pgtype.Int4{Int32: int32(result.CacheReadTokens), Valid: true},
+		CacheCreationTokens: pgtype.Int4{Int32: int32(result.CacheCreationTokens), Valid: true},
+		TurnCount:           pgtype.Int4{Int32: int32(result.TurnCount), Valid: true},
+		MaxTurnsUsed:        pgtype.Int4{Int32: int32(result.TurnCount), Valid: true},
+		NumToolCalls:        pgtype.Int4{Int32: int32(result.NumToolCalls), Valid: true},
+		TranscriptPath:      pgtype.Text{String: result.TranscriptPath, Valid: result.TranscriptPath != ""},
+		SessionID:           pgtype.Text{String: result.SessionID, Valid: result.SessionID != ""},
+	})
+}
+
+// AgentRunFromRow is exported so the orchestrator (same package) can build
+// API responses from raw db rows.
+func AgentRunFromRow(row db.AgentRun) AgentRunResponse {
+	return agentRunFromRow(row)
 }
 
 // MintRunAPIKey mints a scoped API key for one agent run.

@@ -2532,6 +2532,25 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/{slug}/run:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Trigger an immediate agent run
+      description: |
+        Synchronously runs the named agent. Returns the resulting `agent_runs`
+        row. Status may be `success`, `error`, or `timeout`. **Requires `full_access` scope.**
+      responses:
+        "201":
+          description: Run completed (may be in error state — see `status` and `error_message`).
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422":
+          description: Auth or binary not configured.
+        "503":
+          description: Another run is in progress (CONCURRENCY_LOCKED).
 
 components:
   securitySchemes:

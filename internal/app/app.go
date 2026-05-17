@@ -31,6 +31,8 @@ type App struct {
 	SyncEngine            *sync.Engine
 	Service               *service.Service
 	Scheduler             *sync.Scheduler
+	AgentOrchestrator     *service.Orchestrator
+	AgentScheduler        *service.AgentScheduler
 	BackupService         *service.BackupService
 	VersionChecker        *version.Checker
 	DockerSocketAvailable bool
