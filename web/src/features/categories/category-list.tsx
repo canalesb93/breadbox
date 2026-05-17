@@ -166,7 +166,7 @@ function CategoryRow({
                 to="/categories/$id"
                 params={{ id: child.short_id }}
                 className={cn(
-                  "hover:bg-muted/40 flex items-center gap-3 py-2 pr-4 pl-12 transition-colors",
+                  "hover:bg-muted/40 group flex items-center gap-3 py-2 pr-4 pl-12 transition-colors",
                   child.hidden && "text-muted-foreground",
                 )}
               >
@@ -190,7 +190,7 @@ function CategoryRow({
                     <IdPill value={child.slug} />
                   </div>
                 </div>
-                <ChevronRight className="text-muted-foreground/60 size-3.5" />
+                <ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground size-3.5 transition-colors" />
               </Link>
             </li>
           ))}
