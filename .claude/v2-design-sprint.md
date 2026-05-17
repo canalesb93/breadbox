@@ -1990,23 +1990,28 @@ Cross-cutting components:
     promote to a `<SectionCardAction>` slot if a third surface
     adopts it.
 
+- **Iter 77 — TimelineRail line re-centred on icon disc centres** ([#1190](https://github.com/canalesb93/breadbox/pull/1190))
+  - Resolves the HIGH PRIORITY regression Ricardo flagged after iter
+    56 (#1169): the iter-56 swap from `<ol border-l>` to per-row
+    `::before` rails anchored the new pseudo at `before:left-0`,
+    which sat ~13.5px to the left of every icon disc centre. Disc
+    centre actually lives at x = 14px from the row's outer-left edge
+    (`pl-3.5` + `-ml-3.5` on a 28px disc), so the 1px line needs
+    `left = calc(0.875rem - 0.5px)` to centre on it.
+  - Single-file change in `web/src/components/timeline-rail.tsx`:
+    updated both `TimelineRailRow` and `TimelineRailRowSkeleton` so
+    the loading and loaded states share the same centred geometry.
+    Verified via `evaluate_script` on a real TX-detail timeline —
+    `before.left` reports `13.5px`, `liLeft + before.left + 0.5px`
+    matches `discCenter` exactly.
+  - Side note: the day-heading dot (in `TimelineRailGroup`) was
+    unaffected — it carries its own `marginLeft: -17px` math anchored
+    on the same x=14px disc-centre axis, so the heading dots already
+    sat on the new rail axis. Nothing else needed nudging.
+
 ## Open observations / questions
 
 (Populated by iterations.)
-
-- **HIGH PRIORITY — TimelineRail horizontal position regression** (Ricardo, 2026-05-17):
-  PR [#1169](https://github.com/canalesb93/breadbox/pull/1169) (iter 56,
-  the rail-tail fix that replaced `<ol border-l>` with per-row `::before`
-  rails clipped via `:first-of-type`/`:last-of-type`) appears to have
-  shifted the rail's horizontal position — **the rail is no longer
-  centered on the icon discs**. Likely the `::before` `left-*` offset
-  doesn't match the original `border-l`'s implicit position relative to
-  the disc's negative-margin inset (`-ml-[calc(0.875rem+1px)]`).
-  Next iteration: open `web/src/components/timeline-rail.tsx`, screenshot
-  the TX-detail activity timeline at 1440x900 to see the misalignment,
-  then nudge the `::before` `left-*` value so the rail line passes
-  through disc centres. Small targeted fix, single file, should ship in
-  a few tool calls.
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
