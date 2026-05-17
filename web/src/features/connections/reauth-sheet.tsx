@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldAlert } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { toast } from "sonner";
 import { ApiError } from "@/api/client";
 import {
@@ -164,99 +158,114 @@ export function ReauthSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleSheetChange}>
-      <SheetContent className="flex flex-col gap-6 p-6">
-        <SheetHeader className="p-0">
-          <SheetTitle>Re-authenticate</SheetTitle>
-          <SheetDescription>
-            Reconnect to the bank to resume syncing this connection.
-          </SheetDescription>
-        </SheetHeader>
+      <SheetContent className="flex flex-col gap-0 p-0">
+        <DetailSheetHeader
+          density="accent"
+          icon={ShieldAlert}
+          eyebrow="Re-authenticate"
+          title={conn ? institutionName : "Re-authenticate"}
+          description="Reconnect to the bank to resume syncing this connection."
+        />
 
-        {connQuery.isLoading ? (
-          <div className="text-muted-foreground flex flex-1 items-center justify-center gap-2 text-sm">
-            <Loader2 className="size-4 animate-spin" /> Loading connection…
-          </div>
-        ) : !conn ? (
-          <Alert variant="destructive">
-            <AlertTitle>Connection not found</AlertTitle>
-            <AlertDescription>
-              The connection may have been disconnected. Close this and refresh
-              the connections list.
-            </AlertDescription>
-          </Alert>
-        ) : stage.kind === "confirm" ? (
-          <ConfirmBody
-            institutionName={institutionName}
-            errorMessage={conn.error_message}
-            uiError={errorMessage}
-          />
-        ) : stage.kind === "plaid" || stage.kind === "teller" ? (
-          <LaunchingBody providerName={stage.kind} />
-        ) : stage.kind === "completing" ? (
-          <LaunchingBody providerName="completing" />
-        ) : (
-          <Alert>
-            <AlertTitle>Not available here</AlertTitle>
-            <AlertDescription>{stage.reason}</AlertDescription>
-          </Alert>
-        )}
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
+          {connQuery.isLoading ? (
+            <div className="text-muted-foreground flex flex-1 items-center justify-center gap-2 text-sm">
+              <Loader2 className="size-4 animate-spin" /> Loading connection…
+            </div>
+          ) : !conn ? (
+            <Alert variant="destructive">
+              <AlertTitle>Connection not found</AlertTitle>
+              <AlertDescription>
+                The connection may have been disconnected. Close this and
+                refresh the connections list.
+              </AlertDescription>
+            </Alert>
+          ) : stage.kind === "confirm" ? (
+            <ConfirmBody
+              institutionName={institutionName}
+              errorMessage={conn.error_message}
+              uiError={errorMessage}
+            />
+          ) : stage.kind === "plaid" || stage.kind === "teller" ? (
+            <LaunchingBody providerName={stage.kind} />
+          ) : stage.kind === "completing" ? (
+            <LaunchingBody providerName="completing" />
+          ) : (
+            <Alert>
+              <AlertTitle>Not available here</AlertTitle>
+              <AlertDescription>{stage.reason}</AlertDescription>
+            </Alert>
+          )}
 
-        {/* Plaid update-mode SDK — autoOpen drives the popup the moment the
-            launcher mounts. */}
-        {stage.kind === "plaid" && (
-          <PlaidLinkButton
-            linkToken={stage.linkToken}
-            onSuccess={() => completeReauth()}
-            onExit={(err) =>
-              onProviderExit(
-                err
-                  ? err.display_message ||
-                      err.error_message ||
-                      "Plaid Link exited with an error."
-                  : null,
-              )
-            }
-          />
-        )}
+          {/* Plaid update-mode SDK — autoOpen drives the popup the moment
+              the launcher mounts. Invisible button; lives inside the body
+              so portal placement stays consistent with the rest of the
+              Sheet. */}
+          {stage.kind === "plaid" && (
+            <PlaidLinkButton
+              linkToken={stage.linkToken}
+              onSuccess={() => completeReauth()}
+              onExit={(err) =>
+                onProviderExit(
+                  err
+                    ? err.display_message ||
+                        err.error_message ||
+                        "Plaid Link exited with an error."
+                    : null,
+                )
+              }
+            />
+          )}
 
-        {/* Teller reconnection-mode SDK — passing the existing enrollmentId
-            switches Connect into "reconnect" rather than "enroll". */}
-        {stage.kind === "teller" && (
-          <TellerConnectButton
-            applicationId={tellerAppId}
-            enrollmentId={stage.enrollmentId}
-            onSuccess={() => completeReauth()}
-            onExit={() => onProviderExit(null)}
-            onFailure={(f) =>
-              onProviderExit(f.message || "Teller Connect failed.")
-            }
-          />
-        )}
+          {/* Teller reconnection-mode SDK — passing the existing
+              enrollmentId switches Connect into "reconnect" rather than
+              "enroll". */}
+          {stage.kind === "teller" && (
+            <TellerConnectButton
+              applicationId={tellerAppId}
+              enrollmentId={stage.enrollmentId}
+              onSuccess={() => completeReauth()}
+              onExit={() => onProviderExit(null)}
+              onFailure={(f) =>
+                onProviderExit(f.message || "Teller Connect failed.")
+              }
+            />
+          )}
+        </div>
 
         {conn && stage.kind === "confirm" && (
-          <SheetFooter className="px-0">
+          <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => handleSheetChange(false)}
               disabled={reauthStart.isPending}
             >
               Cancel
             </Button>
-            <Button onClick={onReconnect} disabled={reauthStart.isPending}>
+            <Button
+              size="sm"
+              onClick={onReconnect}
+              disabled={reauthStart.isPending}
+            >
               {reauthStart.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : null}
               Reconnect
             </Button>
-          </SheetFooter>
+          </div>
         )}
 
         {conn && stage.kind === "unsupported" && (
-          <SheetFooter className="px-0">
-            <Button variant="outline" onClick={() => handleSheetChange(false)}>
+          <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSheetChange(false)}
+            >
               Close
             </Button>
-          </SheetFooter>
+          </div>
         )}
       </SheetContent>
     </Sheet>
