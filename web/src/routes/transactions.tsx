@@ -181,35 +181,12 @@ export function TransactionsPage() {
   }, []);
 
   // In select mode a click anywhere on the row toggles its selection — the
-  // checkbox cell stops propagation so it doesn't double-toggle.
+  // checkbox cell stops propagation so it doesn't double-toggle. Outside
+  // select mode, the row body navigates (same as a title click) — see
+  // `onRowClick` below.
   const toggleRowSelection = useCallback((t: Transaction) => {
     setRowSelection((prev) => ({ ...prev, [t.id]: !prev[t.id] }));
   }, []);
-
-  // Row click outside select mode is a two-stage interaction:
-  //   1st tap → focus the row (same affordance as j/k)
-  //   2nd tap on the already-focused row → enter select mode + select it
-  //     (same affordance as the `x` shortcut)
-  // The merchant title remains the dedicated open-detail target — its
-  // own onClick stops propagation so it never lands here.
-  const handleRowClick = useCallback(
-    (t: Transaction) => {
-      if (selectMode) {
-        toggleRowSelection(t);
-        return;
-      }
-      const idx = rows.findIndex((r) => r.id === t.id);
-      if (idx === -1) return;
-      if (focusedIndex === idx) {
-        setSelectMode(true);
-        setRowSelection((prev) => ({ ...prev, [t.id]: true }));
-        lastIndexRef.current = idx;
-        return;
-      }
-      setFocusedIndex(idx);
-    },
-    [selectMode, toggleRowSelection, rows, focusedIndex],
-  );
 
   const toggleSelectMode = useCallback(() => {
     if (selectMode) exitSelectMode();
@@ -453,8 +430,7 @@ export function TransactionsPage() {
         onRowSelectionChange={setRowSelection}
         meta={tableMeta}
         focusedRowId={focusedRowId}
-        onRowClick={handleRowClick}
-        pointerRows={selectMode}
+        onRowClick={selectMode ? toggleRowSelection : openTransaction}
         stickyHeader
         refinedHeader
         emptyState={

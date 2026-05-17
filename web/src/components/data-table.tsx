@@ -287,6 +287,10 @@ export function DataTable<TData, TValue>({
                     onRowClick ? () => onRowClick(row.original) : undefined
                   }
                   className={cn(
+                    // `group/row` lets row children opt into a hover state
+                    // driven by the whole row (e.g. underline a title when
+                    // the row is hovered) via `group-hover/row:*`.
+                    "group/row",
                     (pointerRows ?? !!onRowClick) && "cursor-pointer",
                     // Keyboard-focus indicator: a 3px primary accent bar on
                     // the left edge plus a faint primary tint, layered via

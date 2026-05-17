@@ -35,13 +35,13 @@ export function TransactionPrimary({
         e.stopPropagation();
         onTitleClick(t);
       }}
-      // Subtle hover hint that the title is the navigation affordance —
-      // doesn't dress it up as a full link. Pointer cursor sells the
-      // deeplink even though the surrounding row body uses the default
-      // cursor (it's a focus / select target, not a navigation CTA).
+      // Subtle navigation hint: title underlines on its own hover AND when
+      // the surrounding row is hovered (the whole row is a click target
+      // that navigates to detail, so the title is the visual anchor for
+      // that affordance). `group-hover/row:` is set up on TableRow.
       className={cn(
         titleClasses,
-        "cursor-pointer hover:underline underline-offset-2 decoration-muted-foreground/50 focus-visible:outline-none focus-visible:underline text-left",
+        "cursor-pointer underline-offset-2 decoration-muted-foreground/50 hover:underline group-hover/row:underline focus-visible:outline-none focus-visible:underline text-left",
       )}
     >
       {t.provider_name}
