@@ -117,30 +117,28 @@ export function DataTable<TData, TValue>({
 
   // Detect the sticky header's "stuck" state so the rounded top corners
   // (which match the card while at rest) flatten once the band is
-  // floating under the app shell header — at that point the card has
-  // scrolled past and the rounded ears would just clip the band into
-  // the bg of the shell behind it.
+  // floating under the app shell header, and the explicit bottom
+  // separator only renders while floating.
+  //
+  // Observe the `<thead>` directly with a `rootMargin` that excludes the
+  // 56px the shell header occupies: while the thead is below that line
+  // it's fully inside the (reduced) root → `ratio === 1` → not stuck.
+  // The moment it hits the line and `position:sticky` pins it at top:56,
+  // its top is above the root and `ratio < 1` → stuck. Sentinels don't
+  // work here — a `<div>` directly inside `<table>` gets relocated by
+  // the browser and ends up below the thead.
   const headerRef = useRef<HTMLTableSectionElement>(null);
   const [isStuck, setIsStuck] = useState(false);
   useEffect(() => {
     if (!stickyHeader) return;
     const el = headerRef.current;
     if (!el) return;
-    // Sentinel sits one px above the header. When it scrolls out of view
-    // (past the app shell's 56px top), the header is stuck.
-    const sentinel = document.createElement("div");
-    sentinel.style.height = "1px";
-    sentinel.setAttribute("aria-hidden", "true");
-    el.parentElement?.insertBefore(sentinel, el);
     const observer = new IntersectionObserver(
-      ([entry]) => setIsStuck(!entry.isIntersecting),
-      { rootMargin: "-56px 0px 0px 0px", threshold: 0 },
+      ([entry]) => setIsStuck(entry.intersectionRatio < 1),
+      { rootMargin: "-57px 0px 0px 0px", threshold: [1] },
     );
-    observer.observe(sentinel);
-    return () => {
-      observer.disconnect();
-      sentinel.remove();
-    };
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [stickyHeader]);
 
   const table = useReactTable({
