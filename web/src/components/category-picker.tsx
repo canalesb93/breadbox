@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -53,6 +53,12 @@ export function CategoryPicker({
     await apply(pick);
   };
 
+  // `group/picker` lets the chevron hint reveal only on hover/focus
+  // without taking layout space at rest, so a tx row's category column
+  // reads as a tidy badge until the user shows intent to edit.
+  const chevronClass =
+    size === "sm" ? "size-2.5 -mr-0.5" : "size-3 -mr-0.5";
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -61,7 +67,10 @@ export function CategoryPicker({
           disabled={isPending}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "hover:bg-accent focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
+            // Pickier hover state — bg + ring — than the previous
+            // `hover:bg-accent` alone, so the affordance reads at-a-glance
+            // even when the badge already carries its own coloured tint.
+            "group/picker focus-visible:ring-ring inline-flex items-center gap-1 rounded-md p-0.5 transition-colors hover:bg-accent hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
             className,
           )}
         >
@@ -74,7 +83,7 @@ export function CategoryPicker({
           ) : (
             <span
               className={cn(
-                "text-muted-foreground border-border hover:text-foreground inline-flex items-center rounded-md border border-dashed",
+                "text-muted-foreground border-border inline-flex items-center rounded-md border border-dashed group-hover/picker:text-foreground group-hover/picker:border-foreground/40",
                 emptyPillClass,
               )}
             >
@@ -82,6 +91,16 @@ export function CategoryPicker({
               Category
             </span>
           )}
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              // Hidden at rest, revealed on group hover or keyboard
+              // focus so the picker affordance is discoverable without
+              // adding weight to the badge.
+              "text-muted-foreground opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+              chevronClass,
+            )}
+          />
         </button>
       </PopoverTrigger>
       <PopoverContent
