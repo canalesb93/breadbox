@@ -434,6 +434,11 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
               </span>
             )}
             <NextFirePill at={agent.next_fire_at} />
+            <QuietHoursActivePill
+              start={agent.quiet_hours_start}
+              end={agent.quiet_hours_end}
+              enabled={agent.enabled}
+            />
             <span>Model: {agent.model}</span>
             <span>Max turns: {agent.max_turns}</span>
             <CostStatsPill stats={agent.cost_stats_30d} />
@@ -700,6 +705,64 @@ function RecentErrorPill({
       {stats.error_count}/{stats.run_count} errored
     </span>
   );
+}
+
+// QuietHoursActivePill renders an amber "Quiet now" indicator when the
+// agent has quiet hours set AND the user's current local time is inside
+// the window. Distinct from the iter-20 NextFirePill (which always shows
+// "next will fire at X" honoring quiet hours) — this is the real-time
+// "this agent is silent RIGHT NOW because of its quiet window" signal,
+// which explains why an enabled agent isn't firing even though a cron
+// slot just passed. Hidden when the agent is disabled or quiet hours
+// aren't configured.
+function QuietHoursActivePill({
+  start,
+  end,
+  enabled,
+}: {
+  start?: string | null;
+  end?: string | null;
+  enabled: boolean;
+}) {
+  if (!enabled || !start || !end || start === end) return null;
+  if (!isWithinQuietWindow(new Date(), start, end)) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+      title={`Quiet hours ${start}–${end} are active right now; cron fires in this window are skipped`}
+    >
+      <Clock className="size-3" />
+      Quiet now
+    </span>
+  );
+}
+
+// isWithinQuietWindow mirrors internal/service/IsWithinQuietHours on the
+// SPA side so we don't need a server round-trip for an at-a-glance check.
+// HH:MM 24-hour. Wrap-midnight windows (e.g. 22:00 → 07:00) handled.
+// Empty/equal bounds → never quiet (defensive — the caller already
+// short-circuits on those, but pin the contract here too).
+function isWithinQuietWindow(
+  now: Date,
+  startHHMM: string,
+  endHHMM: string,
+): boolean {
+  const start = parseHHMM(startHHMM);
+  const end = parseHHMM(endHHMM);
+  if (start === null || end === null || start === end) return false;
+  const cur = now.getHours() * 60 + now.getMinutes();
+  if (start < end) {
+    // Same-day window: [start, end)
+    return cur >= start && cur < end;
+  }
+  // Wrap-midnight window: [start, 24:00) ∪ [00:00, end)
+  return cur >= start || cur < end;
+}
+
+function parseHHMM(hhmm: string): number | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
 }
 
 function NextFirePill({ at }: { at?: string | null }) {
