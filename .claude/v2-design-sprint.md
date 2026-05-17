@@ -2603,3 +2603,38 @@ Cross-cutting components:
     iter 35 still applies; queue: pin vite's `cacheDir` per-worktree
     or set `optimizeDeps.force=true` in `web/vite.config.ts` for
     dev so the CLI flag isn't required.
+
+- **Iter 92 — Settings 'Coming soon' fallback onto StatusPanel** ([#1207](https://github.com/canalesb93/breadbox/pull/1207))
+  - The settings modal's unbuilt-section fallback (today: only
+    Security) was the last "naked text" empty-state surface in the
+    v2 SPA — a bare `<p className="text-muted-foreground text-sm">
+    Coming soon.</p>` paragraph that lived under the
+    `<SettingsSectionHeader>` with no icon, no rail, no structure.
+    Now routed through `<StatusPanel tone="info">` so it speaks the
+    same canonical "in the works" vocabulary as
+    `routes/placeholder.tsx`: `Hammer` icon tile + tone-tinted 3px
+    left rail + heading + body, uppercase `Coming soon` pill with
+    `Clock` glyph in the trailing slot.
+  - The heading interpolates the section title — today it reads as
+    `Security settings are in the works`, but any future entry
+    added to `lib/settings-sections.ts` without a real
+    implementation inherits the canonical lockup for free.
+  - Lockup matches the placeholder route's `<StatusPanel>`
+    precisely (same `Hammer` icon, same uppercase `Clock` pill
+    geometry) so a user clicking around v2 reads "this surface
+    isn't built yet" as one consistent affordance, whether they
+    got there via a sidebar leaf (Reports / Agents) or via the
+    settings modal.
+  - No new primitive (still 23). Closes the
+    "Settings shell desktop secondary states" candidate from the
+    iter-92 prompt — the secondary states the desktop nav can
+    drop you into (load failure surfaces are caught higher up,
+    "Coming soon" is the only remaining stub) now share the v2
+    visual vocabulary.
+  - Process note: vite's stale-transform-cache from iter 91
+    bit again on the same edited file. The 5601 port kept serving
+    the old `Coming soon.` paragraph after the edit landed on
+    disk — fresh-port 5701 with `--force` immediately served the
+    new code. Still chronic; queue: `optimizeDeps.force=true` in
+    `web/vite.config.ts` for dev so the CLI flag isn't required
+    (queued since iter 91, not yet picked up).
