@@ -9,9 +9,11 @@ import {
   CheckCircle2,
   Clock,
   History,
+  KeyRound,
   Pencil,
   Play,
   Plus,
+  Terminal,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -19,6 +21,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PageError } from "@/components/page-error";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -47,12 +50,15 @@ import { withMutationToast } from "@/lib/mutation-toast";
 import { formatRelativeTime } from "@/lib/format";
 import {
   useAgents,
+  useAgentSubsystemStatus,
   useCreateAgent,
   useDeleteAgent,
   useRunAgentNow,
   useToggleAgent,
   type AgentDefinition,
 } from "@/api/queries/agents";
+import { openModal } from "@/lib/modals";
+import { useNavigate } from "@tanstack/react-router";
 
 const createAgentSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
@@ -71,14 +77,18 @@ type CreateAgentForm = z.infer<typeof createAgentSchema>;
 
 export function AgentsPage() {
   const agentsQuery = useAgents();
+  const statusQuery = useAgentSubsystemStatus();
   const createAgent = useCreateAgent();
   const deleteAgent = useDeleteAgent();
+  const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<AgentDefinition | null>(
     null,
   );
 
   const agents = agentsQuery.data ?? [];
+  const status = statusQuery.data;
+  const showOnboardingBanner = Boolean(status) && !status?.ready;
 
   const form = useForm<CreateAgentForm>({
     resolver: zodResolver(createAgentSchema),
@@ -118,6 +128,67 @@ export function AgentsPage() {
           </Button>
         }
       />
+
+      {showOnboardingBanner && status && (
+        <Alert className="mb-4">
+          <Bot className="size-4" />
+          <AlertTitle>Finish setting up the agent subsystem</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p className="text-sm">
+              The seeded starter agents below won't fire until two pieces
+              are in place. Status checked without any API call:
+            </p>
+            <ul className="text-sm">
+              <li className="flex items-center gap-2">
+                {status.auth_configured ? (
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                ) : (
+                  <KeyRound className="text-muted-foreground size-4" />
+                )}
+                <span>
+                  Anthropic credential{" "}
+                  {status.auth_configured ? (
+                    <span className="text-muted-foreground">— configured</span>
+                  ) : (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                      onClick={() =>
+                        navigate({
+                          to: ".",
+                          search: openModal("settings", "agents"),
+                        })
+                      }
+                    >
+                      Open Settings → Agents
+                    </Button>
+                  )}
+                </span>
+              </li>
+              <li className="flex items-center gap-2">
+                {status.binary_present ? (
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                ) : (
+                  <Terminal className="text-muted-foreground size-4" />
+                )}
+                <span>
+                  breadbox-agent binary{" "}
+                  {status.binary_present ? (
+                    <span className="text-muted-foreground">
+                      — {status.binary_path}
+                    </span>
+                  ) : (
+                    <code className="bg-muted rounded px-1">
+                      make agent-sidecar
+                    </code>
+                  )}
+                </span>
+              </li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {agentsQuery.isError ? (
         <PageError

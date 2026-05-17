@@ -323,6 +323,16 @@ func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 
 // --- Handlers: settings ---
 
+// AgentSubsystemStatusHandler reports whether the agent subsystem is ready
+// to fire — same checks as `breadbox doctor`, side-effect-free. The v2 SPA
+// list page calls this to render onboarding hints before the user sees a
+// wall of seeded starter agents they can't run.
+func AgentSubsystemStatusHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeData(w, svc.GetAgentSubsystemStatus(r.Context()))
+	}
+}
+
 // GetAgentSettingsHandler returns the agent.* config with masked tokens.
 func GetAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
