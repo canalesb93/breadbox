@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCategories } from "@/api/queries/categories";
 import {
   ACTION_TYPES,
@@ -75,21 +76,30 @@ export function ActionRowFields({
         </SelectContent>
       </Select>
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 sm:order-last"
-        onClick={onRemove}
-        disabled={totalRows === 1}
-        title={
-          totalRows === 1
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0 sm:order-last"
+            onClick={onRemove}
+            disabled={totalRows === 1}
+            aria-label={
+              totalRows === 1
+                ? "A rule needs at least one action"
+                : "Remove this action"
+            }
+          >
+            <X className="text-muted-foreground/60 size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {totalRows === 1
             ? "A rule needs at least one action"
-            : "Remove this action"
-        }
-      >
-        <X className="text-muted-foreground/60 size-3.5" />
-      </Button>
+            : "Remove action"}
+        </TooltipContent>
+      </Tooltip>
 
       {/* Mobile row break — same trick as the condition row. */}
       <div className="order-3 h-0 w-full basis-full sm:hidden" aria-hidden />

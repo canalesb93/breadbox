@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SectionCard } from "@/components/section-card";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useUpdateAccount } from "@/api/queries/accounts";
@@ -84,30 +85,40 @@ export function AccountSettingsCard({ account: a }: AccountSettingsCardProps) {
                 disabled={update.isPending}
                 className="h-9"
               />
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={saveName}
-                disabled={update.isPending}
-                aria-label="Save display name"
-                className="size-9"
-              >
-                {update.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Check className="size-4" />
-                )}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={cancelName}
-                disabled={update.isPending}
-                aria-label="Cancel"
-                className="size-9"
-              >
-                <X className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={saveName}
+                    disabled={update.isPending}
+                    aria-label="Save display name"
+                    className="size-9"
+                  >
+                    {update.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Check className="size-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={cancelName}
+                    disabled={update.isPending}
+                    aria-label="Cancel"
+                    className="size-9"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Cancel</TooltipContent>
+              </Tooltip>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-2">

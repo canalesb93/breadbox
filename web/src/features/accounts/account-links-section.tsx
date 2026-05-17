@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SectionCard } from "@/components/section-card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -236,21 +237,26 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
         </div>
       </div>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            aria-label="Link actions"
-            disabled={reconcile.isPending || remove.isPending}
-          >
-            {reconcile.isPending || remove.isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <MoreHorizontal className="size-3.5" />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7"
+                aria-label="Link actions"
+                disabled={reconcile.isPending || remove.isPending}
+              >
+                {reconcile.isPending || remove.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="size-3.5" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Link actions</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onReconcile} disabled={reconcile.isPending}>
             <RotateCw className="size-3.5" /> Reconcile matches

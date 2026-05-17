@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { flattenCategories, useCategories } from "@/api/queries/categories";
 import {
   RULE_FIELDS,
@@ -106,20 +107,29 @@ export function ConditionRowFields({
         onChange={(v) => onChange({ ...value, value: v })}
       />
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0"
-        onClick={onRemove}
-        title={
-          totalRows === 1
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={onRemove}
+            aria-label={
+              totalRows === 1
+                ? "Remove (rule will match all transactions)"
+                : "Remove condition"
+            }
+          >
+            <X className="text-muted-foreground/60 size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {totalRows === 1
             ? "Remove (rule will match all transactions)"
-            : "Remove condition"
-        }
-      >
-        <X className="text-muted-foreground/60 size-3.5" />
-      </Button>
+            : "Remove condition"}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

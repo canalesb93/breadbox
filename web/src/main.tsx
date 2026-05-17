@@ -279,7 +279,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
+        <TooltipProvider delayDuration={200}>
           <RouterProvider router={router} />
         </TooltipProvider>
       </ThemeProvider>

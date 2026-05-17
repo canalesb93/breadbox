@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   setupAccountURL,
@@ -229,16 +230,21 @@ function MemberMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-foreground size-8"
-        >
-          <MoreVertical className="size-4" />
-          <span className="sr-only">Member actions</span>
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground size-8"
+            >
+              <MoreVertical className="size-4" />
+              <span className="sr-only">Member actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Member actions</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-52">
         {login ? (
           <>
