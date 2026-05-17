@@ -220,6 +220,7 @@ func ListAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 			Offset:  offset,
 			Status:  q.Get("status"),
 			Trigger: q.Get("trigger"),
+			HitCap:  q.Get("hit_cap"),
 		}
 		if s := q.Get("start"); s != "" {
 			t, perr := parseDateOrRFC3339(s)
@@ -252,6 +253,11 @@ func ListAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 				"trigger must be one of: cron, manual, webhook (empty = all)")
 			return
 		}
+		if !isAllowedRunHitCap(params.HitCap) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"hit_cap must be one of: max_turns, max_budget, any (empty = all)")
+			return
+		}
 		out, err := svc.ListAgentRuns(r.Context(), slug, params)
 		if err != nil {
 			writeAgentError(w, err, "agent not found")
@@ -271,6 +277,14 @@ func parseDateOrRFC3339(s string) (time.Time, error) {
 func isAllowedRunStatus(s string) bool {
 	switch s {
 	case "", "success", "error", "in_progress", "skipped", "timeout":
+		return true
+	}
+	return false
+}
+
+func isAllowedRunHitCap(s string) bool {
+	switch s {
+	case "", "max_turns", "max_budget", "any":
 		return true
 	}
 	return false

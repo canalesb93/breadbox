@@ -231,6 +231,7 @@ export function useRunAgentNow() {
 export interface AgentRunsFilters {
   status?: string; // "" | "success" | "error" | "in_progress" | "skipped" | "timeout"
   trigger?: string; // "" | "cron" | "manual" | "webhook"
+  hit_cap?: string; // "" | "max_turns" | "max_budget" | "any"
   start?: string; // YYYY-MM-DD or RFC3339
   end?: string;
 }
@@ -249,6 +250,7 @@ export function useAgentRuns(
       qs.set("offset", String(offset));
       if (filters.status) qs.set("status", filters.status);
       if (filters.trigger) qs.set("trigger", filters.trigger);
+      if (filters.hit_cap) qs.set("hit_cap", filters.hit_cap);
       if (filters.start) qs.set("start", filters.start);
       if (filters.end) qs.set("end", filters.end);
       return api<AgentRunListResult>(

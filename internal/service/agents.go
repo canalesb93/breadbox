@@ -483,6 +483,7 @@ type AgentRunListParams struct {
 	Offset  int
 	Status  string // "" | "success" | "error" | "in_progress" | "skipped" | "timeout"
 	Trigger string // "" | "cron" | "manual" | "webhook"
+	HitCap  string // "" | "max_turns" | "max_budget" | "any"
 	// Start / End are inclusive bounds on started_at. RFC3339 or YYYY-MM-DD
 	// values from the API layer get parsed at the handler boundary.
 	Start *time.Time
@@ -519,6 +520,16 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 		args = append(args, p.Trigger)
 		idx++
 	}
+	switch p.HitCap {
+	case "max_turns", "max_budget":
+		where = append(where, fmt.Sprintf("hit_cap = $%d", idx))
+		args = append(args, p.HitCap)
+		idx++
+	case "any":
+		where = append(where, "hit_cap IS NOT NULL")
+	case "":
+		// no-op
+	}
 	if p.Start != nil {
 		where = append(where, fmt.Sprintf("started_at >= $%d", idx))
 		args = append(args, *p.Start)
@@ -536,7 +547,8 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 		SELECT id, short_id, agent_definition_id, "trigger", status, started_at, completed_at,
 		       duration_ms, total_cost_usd, input_tokens, output_tokens, cache_read_tokens,
 		       cache_creation_tokens, turn_count, max_turns_used, num_tool_calls,
-		       error_message, transcript_path, session_id
+		       error_message, transcript_path, session_id,
+		       operator_note, prompt_prefix, hit_cap
 		FROM agent_runs
 		WHERE %s
 		ORDER BY started_at DESC
@@ -558,6 +570,7 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 			&r.InputTokens, &r.OutputTokens, &r.CacheReadTokens,
 			&r.CacheCreationTokens, &r.TurnCount, &r.MaxTurnsUsed,
 			&r.NumToolCalls, &r.ErrorMessage, &r.TranscriptPath, &r.SessionID,
+			&r.OperatorNote, &r.PromptPrefix, &r.HitCap,
 		); scanErr != nil {
 			return nil, fmt.Errorf("scan agent run: %w", scanErr)
 		}
