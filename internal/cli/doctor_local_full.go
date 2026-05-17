@@ -7,6 +7,7 @@ import (
 	"crypto/aes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,7 +28,7 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-func runDoctorLocal(ctx context.Context, jsonOut bool, skipExternal bool) error {
+func runDoctorLocal(ctx context.Context, jsonOut bool, skipExternal bool, withLive bool) error {
 	cfg, cfgErr := bbconfig.Load()
 	checks := []doctorCheck{}
 
@@ -79,7 +80,12 @@ func runDoctorLocal(ctx context.Context, jsonOut bool, skipExternal bool) error 
 	}
 	checks = append(checks, checkCronConfig(cfg))
 	checks = append(checks, checkPublicURL(skipExternal))
-	checks = append(checks, checkAgentSubsystem(ctx, pool))
+	subsystem := checkAgentSubsystem(ctx, pool)
+	checks = append(checks, subsystem)
+
+	if withLive {
+		checks = append(checks, runAgentSmokeCheck(ctx, pool, cfg, subsystem.Status))
+	}
 
 	return emitDoctor(checks, jsonOut)
 }
@@ -106,6 +112,96 @@ func checkAgentSubsystem(ctx context.Context, pool *pgxpool.Pool) doctorCheck {
 	binaryPath := appconfig.String(ctx, queries, appconfig.KeyAgentRuntimePath, "")
 	resolved, binErr := agent.LocateBinary(binaryPath)
 	return agentSubsystemCheck(authMode, stored != "", resolved, binErr == nil)
+}
+
+// runAgentSmokeCheck fires the agent smoke test through the same Sidecar
+// path the orchestrator uses, surfacing the result as a doctor row. When the
+// cheap subsystem check already reported warn/skip, this short-circuits to
+// a skip row so the operator sees one clear message instead of a duplicate
+// failure pair.
+func runAgentSmokeCheck(ctx context.Context, pool *pgxpool.Pool, cfg *bbconfig.Config, subsystemStatus string) doctorCheck {
+	if subsystemStatus != doctorStatusPass {
+		return doctorCheck{
+			Name:    "agent smoke test",
+			Status:  doctorStatusSkip,
+			Message: "skipped — agent subsystem check did not pass",
+		}
+	}
+	if pool == nil {
+		return doctorCheck{
+			Name:    "agent smoke test",
+			Status:  doctorStatusSkip,
+			Message: "skipped — no database connection",
+		}
+	}
+	if cfg.EncryptionKey == nil {
+		return doctorCheck{
+			Name:        "agent smoke test",
+			Status:      doctorStatusWarn,
+			Message:     "skipped — ENCRYPTION_KEY not set, cannot decrypt stored credential",
+			Remediation: "export ENCRYPTION_KEY before running with --with-live",
+		}
+	}
+	queries := db.New(pool)
+	binaryPath := appconfig.String(ctx, queries, appconfig.KeyAgentRuntimePath, "")
+	resolved, err := agent.LocateBinary(binaryPath)
+	if err != nil {
+		return doctorCheck{
+			Name:        "agent smoke test",
+			Status:      doctorStatusFail,
+			Message:     "binary lookup failed: " + err.Error(),
+			Remediation: "build with `make agent-sidecar` or set agent.runtime_path in Settings → Agents",
+		}
+	}
+	runCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	result, runErr := agent.SmokeTest(runCtx, queries, cfg.EncryptionKey, &agent.Sidecar{}, resolved)
+	return liveSmokeCheck(result, runErr)
+}
+
+// liveSmokeCheck is the pure decision logic separated for testability. The
+// result/err pair mirrors what agent.SmokeTest returns; producing a one-line
+// pass/fail row keyed off the error category.
+func liveSmokeCheck(result *agent.SmokeResult, err error) doctorCheck {
+	if err != nil {
+		switch {
+		case errors.Is(err, agent.ErrAuthNotConfigured):
+			return doctorCheck{
+				Name:        "agent smoke test",
+				Status:      doctorStatusFail,
+				Message:     "auth not configured: " + err.Error(),
+				Remediation: "paste a credential in Settings → Agents",
+			}
+		case errors.Is(err, agent.ErrBinaryNotFound):
+			return doctorCheck{
+				Name:        "agent smoke test",
+				Status:      doctorStatusFail,
+				Message:     "binary not found: " + err.Error(),
+				Remediation: "build with `make agent-sidecar` or set agent.runtime_path",
+			}
+		default:
+			return doctorCheck{
+				Name:        "agent smoke test",
+				Status:      doctorStatusFail,
+				Message:     "live run failed: " + err.Error(),
+				Remediation: "verify the auth token is still valid and api.anthropic.com is reachable",
+			}
+		}
+	}
+	if result == nil {
+		return doctorCheck{
+			Name:    "agent smoke test",
+			Status:  doctorStatusFail,
+			Message: "no result returned (runner produced nil with no error)",
+		}
+	}
+	return doctorCheck{
+		Name: "agent smoke test",
+		Status: doctorStatusPass,
+		Message: fmt.Sprintf("OK — %s in %dms (cost $%.4f, %d→%d tokens, auth=%s)",
+			result.Model, result.DurationMs, result.TotalCostUSD,
+			result.InputTokens, result.OutputTokens, result.AuthMode),
+	}
 }
 
 // agentSubsystemCheck is the pure decision logic separated for testability.

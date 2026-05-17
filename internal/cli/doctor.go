@@ -44,6 +44,7 @@ type doctorReport struct {
 //     `GET /api/v1/headless/bootstrap` and renders a readable report.
 func AddDoctorCmd(root *cobra.Command) {
 	var skipExternal bool
+	var withLive bool
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Health check: local environment or remote /headless/bootstrap",
@@ -52,10 +53,11 @@ func AddDoctorCmd(root *cobra.Command) {
 			if flags.Host != "" || hostConfigured() {
 				return runDoctorRemote(cmd.Context(), flags)
 			}
-			return runDoctorLocal(cmd.Context(), flags.JSON, skipExternal)
+			return runDoctorLocal(cmd.Context(), flags.JSON, skipExternal, withLive)
 		},
 	}
 	cmd.Flags().BoolVar(&skipExternal, "skip-external", false, "skip DNS/HTTP reachability checks (local-mode only)")
+	cmd.Flags().BoolVar(&withLive, "with-live", false, "additionally run a live agent smoke test (~$0.01, local-mode only)")
 	root.AddCommand(cmd)
 }
 
