@@ -104,16 +104,25 @@ export function CategoryPicker({
               Category
             </span>
           )}
-          <ChevronDown
+          {/* Chevron on a left-fading gradient strip. The gradient
+              softly masks any badge content underneath so the chevron
+              reads cleanly even when it overlaps a label edge, without
+              having to know the badge's tint. Both fade in together on
+              hover/focus. */}
+          <span
             aria-hidden
             className={cn(
-              // Layered INSIDE the trigger's right edge, overlapping the
-              // badge's natural right padding so we don't reserve any
-              // width at rest. Fades in on hover/focus.
-              "text-muted-foreground pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
-              chevronClass,
+              "pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-md bg-gradient-to-l from-card via-card/85 to-transparent opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+              size === "sm" ? "w-6 pr-1" : "w-7 pr-1.5",
             )}
-          />
+          >
+            <ChevronDown
+              className={cn(
+                "text-muted-foreground ml-auto drop-shadow-sm",
+                chevronClass,
+              )}
+            />
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent
