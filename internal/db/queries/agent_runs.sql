@@ -127,6 +127,26 @@ SET operator_note = $2
 WHERE id = $1
 RETURNING *;
 
+-- name: ListRecentErroredAgentRuns :many
+-- Surfaces the most recent errored runs across all agents in the last
+-- N hours, joined with agent slug + name for the v2 SPA "Run-failed
+-- banner" on /v2/agents. Bounded by the LIMIT — the banner shows at
+-- most 5 entries, but we ask for a few extras so the UI can say
+-- "showing 5 of N most recent errors" without a second query.
+SELECT r.short_id      AS run_short_id,
+       r.started_at    AS started_at,
+       r.error_message AS error_message,
+       r.duration_ms   AS duration_ms,
+       r.hit_cap       AS hit_cap,
+       d.slug          AS agent_slug,
+       d.name          AS agent_name
+FROM agent_runs r
+JOIN agent_definitions d ON d.id = r.agent_definition_id
+WHERE r.status = 'error'
+  AND r.started_at >= NOW() - ($1::int * INTERVAL '1 hour')
+ORDER BY r.started_at DESC
+LIMIT $2::int;
+
 -- name: SetAgentRunPromptPrefix :exec
 -- Set the operator-supplied prompt prefix for a "run now" trigger. Called
 -- immediately after CreateAgentRun + before AssembleJobSpec so the prefix

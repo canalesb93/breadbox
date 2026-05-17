@@ -119,6 +119,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/agents", ListAgentDefinitionsHandler(svc))
 		r.Get("/agents/settings", GetAgentSettingsHandler(svc, a))
 		r.Get("/agents/status", AgentSubsystemStatusHandler(svc))
+		r.Get("/agents/runs/recent-errors", ListRecentErroredAgentRunsHandler(svc))
 		r.Get("/agents/runs/{shortId}", GetAgentRunHandler(svc))
 		r.Get("/agents/runs/{shortId}/transcript", GetAgentRunTranscriptHandler(svc))
 		r.Get("/agents/{slug}", GetAgentDefinitionHandler(svc))

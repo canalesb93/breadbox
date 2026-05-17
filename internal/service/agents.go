@@ -198,6 +198,53 @@ type UpdateAgentDefinitionParams struct {
 	TriggerOnSyncComplete *bool
 }
 
+// RecentErroredAgentRun is one entry in the v2 SPA's run-failed banner
+// surfaced on /v2/agents. Carries the agent slug + name so the row can
+// deep-link to the run's transcript drawer without an extra fetch.
+type RecentErroredAgentRun struct {
+	AgentSlug    string  `json:"agent_slug"`
+	AgentName    string  `json:"agent_name"`
+	RunShortID   string  `json:"run_short_id"`
+	StartedAt    string  `json:"started_at"`
+	ErrorMessage *string `json:"error_message,omitempty"`
+	DurationMs   *int    `json:"duration_ms,omitempty"`
+	HitCap       *string `json:"hit_cap,omitempty"`
+}
+
+// ListRecentErroredAgentRuns returns the most recent errored runs across
+// all agents in the last `windowHours` hours, capped at `limit`. Powers
+// the v2 SPA banner that catches operators who only open the dashboard
+// every few days. Backed by ListRecentErroredAgentRuns sqlc query.
+func (s *Service) ListRecentErroredAgentRuns(ctx context.Context, windowHours, limit int) ([]RecentErroredAgentRun, error) {
+	if windowHours <= 0 {
+		windowHours = 24
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 5
+	}
+	rows, err := s.Queries.ListRecentErroredAgentRuns(ctx, db.ListRecentErroredAgentRunsParams{
+		Column1: int32(windowHours),
+		Column2: int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list recent errored agent runs: %w", err)
+	}
+	out := make([]RecentErroredAgentRun, 0, len(rows))
+	for _, r := range rows {
+		entry := RecentErroredAgentRun{
+			AgentSlug:    r.AgentSlug,
+			AgentName:    r.AgentName,
+			RunShortID:   r.RunShortID,
+			StartedAt:    pgconv.TimestampStr(r.StartedAt),
+			ErrorMessage: pgconv.TextPtr(r.ErrorMessage),
+			DurationMs:   agentIntFromInt4(r.DurationMs),
+			HitCap:       pgconv.TextPtr(r.HitCap),
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}
+
 // ListAgentDefinitionsForSyncWebhook returns enabled definitions with
 // trigger_on_sync_complete=true. Used by the post-sync hook in the
 // orchestrator to dispatch webhook-triggered runs.

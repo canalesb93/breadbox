@@ -610,3 +610,31 @@ func RunAgentCleanupHandler(sched *service.AgentScheduler) http.HandlerFunc {
 		writeData(w, result)
 	}
 }
+
+// ListRecentErroredAgentRunsHandler returns the most recent errored runs
+// across all agents in the last `hours` hours (default 24, max 168),
+// capped at `limit` (default 5, max 50). Powers the v2 SPA "Run-failed
+// banner" on /v2/agents — catches operators who don't drill into each
+// agent's history daily. Read-only; no scope upgrade required.
+func ListRecentErroredAgentRunsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		hours, err := parseIntParam(q, "hours", 24, 1, 168)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+		limit, err := parseIntParam(q, "limit", 5, 1, 50)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+		out, err := svc.ListRecentErroredAgentRuns(r.Context(), hours, limit)
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR",
+				"Failed to list recent errored runs")
+			return
+		}
+		writeData(w, out)
+	}
+}

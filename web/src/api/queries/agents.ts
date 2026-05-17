@@ -30,6 +30,16 @@ export interface AgentRecentCapStats {
   run_count: number; // up to 5
 }
 
+export interface RecentErroredAgentRun {
+  agent_slug: string;
+  agent_name: string;
+  run_short_id: string;
+  started_at: string;
+  error_message?: string | null;
+  duration_ms?: number | null;
+  hit_cap?: "max_turns" | "max_budget" | null;
+}
+
 export interface AgentDefinition {
   id: string;
   short_id: string;
@@ -144,6 +154,20 @@ export function useAgents() {
   return useQuery({
     queryKey: ["agents"],
     queryFn: () => api<AgentDefinition[]>("/api/v1/agents"),
+  });
+}
+
+// useRecentErroredAgentRuns powers the run-failed banner on /v2/agents.
+// 24h window + 5-row limit by default; refetches every 60s so a recent
+// error surfaces without a manual page refresh.
+export function useRecentErroredAgentRuns(hours = 24, limit = 5) {
+  return useQuery({
+    queryKey: ["agents", "recent-errors", hours, limit],
+    queryFn: () =>
+      api<RecentErroredAgentRun[]>(
+        `/api/v1/agents/runs/recent-errors?hours=${hours}&limit=${limit}`,
+      ),
+    refetchInterval: 60_000,
   });
 }
 
