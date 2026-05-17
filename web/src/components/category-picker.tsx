@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -109,11 +109,12 @@ export function CategoryPicker({
               Category
             </span>
           )}
-          {/* Chevron swap-in: overlays the category icon spot. Visible
-              only when the badge has an icon to replace; otherwise the
-              hover ring alone signals the affordance. */}
+          {/* Pencil swap-in: overlays the category icon spot to signal
+              "edit this category". Visible only when the badge has an
+              icon to replace; otherwise the hover ring alone carries
+              the affordance. */}
           {hasIcon && (
-            <ChevronDown
+            <Pencil
               aria-hidden
               className={cn(
                 "text-muted-foreground pointer-events-none absolute top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
