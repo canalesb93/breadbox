@@ -94,6 +94,30 @@ Exit codes:
 	run.Flags().String("prefix", "", "optional operator prompt prefix to prepend for this run only")
 	parent.AddCommand(run)
 
+	list := &cobra.Command{
+		Use:   "list",
+		Short: "List configured agents",
+		Long: `Print every agent definition with status, schedule, model, and
+last-run info. Useful for SSH-based ops without the v2 SPA.
+
+  breadbox agent list           # human-readable table
+  breadbox agent list --json    # full JSON for piping into jq
+
+Exit codes:
+  0  success
+  1  failed to load config or query DB
+`,
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			jsonOut, _ := cmd.Flags().GetBool("json")
+			return runAgentList(cmd.Context(), jsonOut)
+		},
+	}
+	list.Flags().Bool("json", false, "emit the full agent definitions as JSON instead of a table")
+	parent.AddCommand(list)
+
 	root.AddCommand(parent)
 }
 
@@ -254,4 +278,79 @@ func runAgentTest(parent context.Context) error {
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "Smoke test passed. The agent subsystem is ready to run real definitions.")
 	return nil
+}
+
+func runAgentList(parent context.Context, jsonOut bool) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+
+	a, err := app.New(ctx, cfg, logger)
+	if err != nil {
+		return fmt.Errorf("init app: %w", err)
+	}
+	defer a.DB.Close()
+
+	defs, err := a.Service.ListAgentDefinitions(ctx)
+	if err != nil {
+		return fmt.Errorf("list agents: %w", err)
+	}
+
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(defs)
+	}
+
+	if len(defs) == 0 {
+		fmt.Fprintln(os.Stdout, "No agents configured. The fresh-install seed should have added 5 starters — run `breadbox migrate` if you skipped it, or check the v2 SPA at /v2/agents to confirm.")
+		return nil
+	}
+
+	// Compute column widths from data so the table breathes.
+	slugW, nameW := len("slug"), len("name")
+	for _, d := range defs {
+		if len(d.Slug) > slugW {
+			slugW = len(d.Slug)
+		}
+		if len(d.Name) > nameW {
+			nameW = len(d.Name)
+		}
+	}
+
+	fmt.Fprintf(os.Stdout, "  %-*s  %-*s  %-9s  %-22s  %-21s  %s\n",
+		slugW, "slug", nameW, "name", "enabled", "model", "schedule", "next fire")
+	fmt.Fprintf(os.Stdout, "  %s\n",
+		dashes(slugW+nameW+9+22+21+25+12))
+	for _, d := range defs {
+		schedule := "manual"
+		if d.ScheduleCron != nil && *d.ScheduleCron != "" {
+			schedule = *d.ScheduleCron
+		}
+		enabled := "no"
+		if d.Enabled {
+			enabled = "yes"
+		}
+		nextFire := "—"
+		if d.NextFireAt != nil {
+			nextFire = *d.NextFireAt
+		}
+		fmt.Fprintf(os.Stdout, "  %-*s  %-*s  %-9s  %-22s  %-21s  %s\n",
+			slugW, d.Slug, nameW, d.Name, enabled, d.Model, schedule, nextFire)
+	}
+	fmt.Fprintf(os.Stdout, "\n%d agent(s). Tip: `breadbox agent run <slug>` to fire one now.\n", len(defs))
+	return nil
+}
+
+func dashes(n int) string {
+	out := make([]byte, n)
+	for i := range out {
+		out[i] = '-'
+	}
+	return string(out)
 }
