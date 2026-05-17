@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import {
+  AlertTriangle,
   ArrowLeft,
   Clock,
   FilterX,
@@ -337,6 +338,34 @@ function PromptPrefixBlock({ prefix }: { prefix: string }) {
   );
 }
 
+// HitCapPill flags runs that bumped into a safety ceiling. max_turns is
+// amber (clean termination but probably incomplete work — operator may
+// want to raise the cap or split the prompt); max_budget is red (mid-run
+// abort — the agent's plan exceeded what was budgeted).
+function HitCapPill({ cap }: { cap: "max_turns" | "max_budget" | null }) {
+  if (!cap) return null;
+  if (cap === "max_turns") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+        title="Run hit max_turns — work may be incomplete. Consider raising max_turns or splitting the prompt."
+      >
+        <AlertTriangle className="size-3" />
+        max turns
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300"
+      title="Run exceeded max_budget_usd — terminated mid-task. Consider raising the budget cap or narrowing the agent's scope."
+    >
+      <AlertTriangle className="size-3" />
+      over budget
+    </span>
+  );
+}
+
 function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
   const hasNote = Boolean(run.operator_note && run.operator_note.trim() !== "");
   const notePreview = hasNote
@@ -371,6 +400,7 @@ function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
           prefix
         </span>
       )}
+      <HitCapPill cap={run.hit_cap ?? null} />
       {hasNote && (
         <span
           className="text-muted-foreground inline-flex items-center gap-1 text-xs"

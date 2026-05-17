@@ -308,3 +308,95 @@ func TestOrchestratorRunNow_EmptyPrefix_LeavesPromptUnchanged(t *testing.T) {
 		t.Errorf("PromptPrefix should be nil when none supplied, got %v", *runResp.PromptPrefix)
 	}
 }
+
+func TestOrchestratorRunNow_MaxTurnsHit_PersistedAsHitCap(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-cap-turns", true)
+
+	fake := agent.RunnerFunc(func(_ context.Context, _ agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		// Sidecar's contract: max_turns → success status + ErrMaxTurnsReached on err.
+		return agent.RunResult{
+			Status:     agent.StatusSuccess,
+			TurnCount:  10,
+			DurationMs: 50,
+		}, agent.ErrMaxTurnsReached
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	runResp, runErr := orch.RunNow(context.Background(), def, "")
+	// Orchestrator returns the runner's error untouched — but the row should
+	// be persisted with hit_cap set.
+	if !errors.Is(runErr, agent.ErrMaxTurnsReached) {
+		t.Fatalf("RunNow err = %v, want ErrMaxTurnsReached", runErr)
+	}
+	if runResp == nil {
+		t.Fatal("expected run row")
+	}
+	if runResp.HitCap == nil || *runResp.HitCap != "max_turns" {
+		t.Errorf("HitCap = %v, want max_turns", runResp.HitCap)
+	}
+	// Status stays success — the sidecar terminated cleanly within bounds.
+	if runResp.Status != agent.StatusSuccess {
+		t.Errorf("Status = %q, want success", runResp.Status)
+	}
+
+	// Verify the row was actually persisted.
+	persisted, err := svc.GetAgentRun(context.Background(), runResp.ShortID)
+	if err != nil {
+		t.Fatalf("GetAgentRun: %v", err)
+	}
+	if persisted.HitCap == nil || *persisted.HitCap != "max_turns" {
+		t.Errorf("persisted HitCap = %v, want max_turns", persisted.HitCap)
+	}
+}
+
+func TestOrchestratorRunNow_BudgetHit_PersistedAsHitCap(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-cap-budget", true)
+
+	fake := agent.RunnerFunc(func(_ context.Context, _ agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		// Sidecar's contract: budget_exceeded → error status + ErrBudgetExceeded.
+		return agent.RunResult{
+			Status:       agent.StatusError,
+			TotalCostUSD: 1.5,
+			DurationMs:   30,
+		}, agent.ErrBudgetExceeded
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	runResp, runErr := orch.RunNow(context.Background(), def, "")
+	if !errors.Is(runErr, agent.ErrBudgetExceeded) {
+		t.Fatalf("RunNow err = %v, want ErrBudgetExceeded", runErr)
+	}
+	if runResp == nil {
+		t.Fatal("expected run row")
+	}
+	if runResp.HitCap == nil || *runResp.HitCap != "max_budget" {
+		t.Errorf("HitCap = %v, want max_budget", runResp.HitCap)
+	}
+	// Status is error — the cap aborted the run mid-way.
+	if runResp.Status != agent.StatusError {
+		t.Errorf("Status = %q, want error", runResp.Status)
+	}
+}
+
+func TestOrchestratorRunNow_CleanSuccess_LeavesHitCapNil(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-no-cap", true)
+
+	fake := agent.RunnerFunc(func(_ context.Context, _ agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		return agent.RunResult{Status: agent.StatusSuccess, TurnCount: 3, DurationMs: 12}, nil
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	runResp, err := orch.RunNow(context.Background(), def, "")
+	if err != nil {
+		t.Fatalf("RunNow: %v", err)
+	}
+	if runResp.HitCap != nil {
+		t.Errorf("HitCap should be nil on clean success, got %q", *runResp.HitCap)
+	}
+}

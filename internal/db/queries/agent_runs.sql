@@ -111,6 +111,17 @@ UPDATE agent_runs
 SET prompt_prefix = $2
 WHERE id = $1;
 
+-- name: SetAgentRunHitCap :one
+-- Record which safety cap (if any) terminated the run. Called by the
+-- orchestrator immediately after CompleteAgentRun when the sidecar signaled
+-- max_turns or budget_exceeded via the returned RunResult error. Returns
+-- the updated row so AgentRunFromRow can rebuild the response with the
+-- new field populated.
+UPDATE agent_runs
+SET hit_cap = $2
+WHERE id = $1
+RETURNING *;
+
 -- name: GetAgentLastPromptPrefixes :many
 -- Per-definition most recent non-null prompt_prefix. Skipped + null-prefix
 -- rows don't shadow earlier prefixes — only runs that actually carried a

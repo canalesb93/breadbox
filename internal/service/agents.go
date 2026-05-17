@@ -125,6 +125,10 @@ type AgentRunResponse struct {
 	SessionID           *string  `json:"session_id,omitempty"`
 	OperatorNote        *string  `json:"operator_note,omitempty"`
 	PromptPrefix        *string  `json:"prompt_prefix,omitempty"`
+	// HitCap names the safety ceiling this run bumped into when it
+	// terminated, if any: "max_turns" | "max_budget" | nil. Lets the v2
+	// SPA flag "ran into the ceiling" runs separately from clean successes.
+	HitCap *string `json:"hit_cap,omitempty"`
 }
 
 // AgentRunListResult is the paginated envelope for run lists.
@@ -634,6 +638,17 @@ func (s *Service) SetAgentRunPromptPrefixDB(ctx context.Context, runID pgtype.UU
 	})
 }
 
+// SetAgentRunHitCapDB records which safety ceiling terminated the run.
+// Called by the orchestrator after CompleteAgentRunDB when the runner
+// surfaces ErrMaxTurnsReached / ErrBudgetExceeded. cap must be one of
+// "max_turns", "max_budget" — the DB CHECK rejects others.
+func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, cap string) (db.AgentRun, error) {
+	return s.Queries.SetAgentRunHitCap(ctx, db.SetAgentRunHitCapParams{
+		ID:     runID,
+		HitCap: pgtype.Text{String: cap, Valid: cap != ""},
+	})
+}
+
 // CompleteAgentRunDB persists a terminal RunResult onto the run row.
 // Used by the orchestrator after Runner.Run returns.
 func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult) (db.AgentRun, error) {
@@ -942,6 +957,7 @@ func agentRunFromRow(row db.AgentRun) AgentRunResponse {
 		SessionID:           pgconv.TextPtr(row.SessionID),
 		OperatorNote:        pgconv.TextPtr(row.OperatorNote),
 		PromptPrefix:        pgconv.TextPtr(row.PromptPrefix),
+		HitCap:              pgconv.TextPtr(row.HitCap),
 	}
 }
 
