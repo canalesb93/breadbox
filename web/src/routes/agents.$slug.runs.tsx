@@ -1,9 +1,16 @@
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { ArrowLeft, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, FilterX, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -15,10 +22,15 @@ import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
 import { EmptyState } from "@/components/empty-state";
 import {
+  DateRangeFilter,
+  type DateRangeValue,
+} from "@/components/date-range-filter";
+import {
   useAgent,
   useAgentRuns,
   useTranscript,
   type AgentRun,
+  type AgentRunsFilters,
 } from "@/api/queries/agents";
 import { formatDuration, formatRelativeTime } from "@/lib/format";
 import { RunStatusPill } from "@/features/agents/run-status-pill";
@@ -27,10 +39,18 @@ import { TranscriptViewer } from "@/features/agents/transcript-viewer";
 export const agentRunsSearchSchema = z.object({
   run: z.string().optional(),
   page: z.number().int().positive().optional(),
+  status: z
+    .enum(["success", "error", "in_progress", "skipped", "timeout"])
+    .optional(),
+  trigger: z.enum(["cron", "manual", "webhook"]).optional(),
+  start: z.string().optional(),
+  end: z.string().optional(),
 });
 type AgentRunsSearch = z.infer<typeof agentRunsSearchSchema>;
 
 const PAGE_SIZE = 25;
+
+const ANY_VALUE = "__any__";
 
 export function AgentRunsPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
@@ -38,8 +58,42 @@ export function AgentRunsPage() {
   const navigate = useNavigate();
   const page = search.page ?? 1;
 
+  const filters: AgentRunsFilters = {
+    status: search.status ?? "",
+    trigger: search.trigger ?? "",
+    start: search.start,
+    end: search.end,
+  };
+  const hasActiveFilters = Boolean(
+    search.status || search.trigger || search.start || search.end,
+  );
+
+  const setFilter = (patch: Partial<AgentRunsSearch>) => {
+    navigate({
+      to: ".",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        ...patch,
+        page: undefined, // reset pagination on filter change
+      }),
+    });
+  };
+  const clearFilters = () => {
+    navigate({
+      to: ".",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        status: undefined,
+        trigger: undefined,
+        start: undefined,
+        end: undefined,
+        page: undefined,
+      }),
+    });
+  };
+
   const agentQuery = useAgent(slug);
-  const runsQuery = useAgentRuns(slug, PAGE_SIZE, (page - 1) * PAGE_SIZE);
+  const runsQuery = useAgentRuns(slug, filters, PAGE_SIZE, (page - 1) * PAGE_SIZE);
 
   const openRunShortId = search.run ?? null;
 
@@ -77,6 +131,57 @@ export function AgentRunsPage() {
         title={agentQuery.data ? `${agentQuery.data.name} — runs` : "Run history"}
         description="Every fire of this agent (cron or manual). Click any row to view its transcript."
       />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Select
+          value={search.status ?? ANY_VALUE}
+          onValueChange={(v) =>
+            setFilter({ status: v === ANY_VALUE ? undefined : (v as AgentRunsSearch["status"]) })
+          }
+        >
+          <SelectTrigger size="sm" className="w-40">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY_VALUE}>All statuses</SelectItem>
+            <SelectItem value="success">Success</SelectItem>
+            <SelectItem value="error">Error</SelectItem>
+            <SelectItem value="in_progress">Running</SelectItem>
+            <SelectItem value="skipped">Skipped</SelectItem>
+            <SelectItem value="timeout">Timeout</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={search.trigger ?? ANY_VALUE}
+          onValueChange={(v) =>
+            setFilter({ trigger: v === ANY_VALUE ? undefined : (v as AgentRunsSearch["trigger"]) })
+          }
+        >
+          <SelectTrigger size="sm" className="w-40">
+            <SelectValue placeholder="All triggers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY_VALUE}>All triggers</SelectItem>
+            <SelectItem value="cron">Cron</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+            <SelectItem value="webhook">Webhook</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <DateRangeFilter
+          value={{ start: search.start, end: search.end } as DateRangeValue}
+          onChange={(v) => setFilter({ start: v.start, end: v.end })}
+          label="Started"
+        />
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <FilterX className="size-3.5" />
+            Clear filters
+          </Button>
+        )}
+      </div>
 
       {runsQuery.isError ? (
         <PageError

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"breadbox/internal/agent"
 	"breadbox/internal/appconfig"
@@ -327,11 +328,28 @@ func (s *Service) SetAgentDefinitionEnabled(ctx context.Context, slugOrID string
 	return &resp, nil
 }
 
-// ListAgentRuns returns offset-paginated runs for one definition.
-func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, limit, offset int) (*AgentRunListResult, error) {
+// AgentRunListParams carries the optional filters for ListAgentRuns. Empty
+// fields mean "don't filter on this dimension."
+type AgentRunListParams struct {
+	Limit   int
+	Offset  int
+	Status  string // "" | "success" | "error" | "in_progress" | "skipped" | "timeout"
+	Trigger string // "" | "cron" | "manual" | "webhook"
+	// Start / End are inclusive bounds on started_at. RFC3339 or YYYY-MM-DD
+	// values from the API layer get parsed at the handler boundary.
+	Start *time.Time
+	End   *time.Time
+}
+
+// ListAgentRuns returns offset-paginated runs for one definition with
+// optional status / trigger / date-range filters. Hand-rolled SQL keeps
+// the conditional WHERE clauses composable.
+func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p AgentRunListParams) (*AgentRunListResult, error) {
+	limit := p.Limit
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
+	offset := p.Offset
 	if offset < 0 {
 		offset = 0
 	}
@@ -339,21 +357,74 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, limit
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.Queries.ListAgentRuns(ctx, db.ListAgentRunsParams{
-		AgentDefinitionID: def.ID,
-		Limit:             int32(limit + 1), // peek for has_more
-		Offset:            int32(offset),
-	})
+
+	args := []any{def.ID}
+	where := []string{"agent_definition_id = $1"}
+	idx := 2
+	if p.Status != "" {
+		where = append(where, fmt.Sprintf("status = $%d", idx))
+		args = append(args, p.Status)
+		idx++
+	}
+	if p.Trigger != "" {
+		where = append(where, fmt.Sprintf(`"trigger" = $%d`, idx))
+		args = append(args, p.Trigger)
+		idx++
+	}
+	if p.Start != nil {
+		where = append(where, fmt.Sprintf("started_at >= $%d", idx))
+		args = append(args, *p.Start)
+		idx++
+	}
+	if p.End != nil {
+		where = append(where, fmt.Sprintf("started_at <= $%d", idx))
+		args = append(args, *p.End)
+		idx++
+	}
+
+	// Peek for has_more by asking for limit+1.
+	args = append(args, limit+1, offset)
+	query := fmt.Sprintf(`
+		SELECT id, short_id, agent_definition_id, "trigger", status, started_at, completed_at,
+		       duration_ms, total_cost_usd, input_tokens, output_tokens, cache_read_tokens,
+		       cache_creation_tokens, turn_count, max_turns_used, num_tool_calls,
+		       error_message, transcript_path, session_id
+		FROM agent_runs
+		WHERE %s
+		ORDER BY started_at DESC
+		LIMIT $%d OFFSET $%d`,
+		strings.Join(where, " AND "), idx, idx+1)
+
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list agent runs: %w", err)
 	}
-	hasMore := len(rows) > limit
-	if hasMore {
-		rows = rows[:limit]
-	}
-	out := make([]AgentRunResponse, 0, len(rows))
-	for _, r := range rows {
+	defer rows.Close()
+
+	var out []AgentRunResponse
+	for rows.Next() {
+		var r db.AgentRun
+		if scanErr := rows.Scan(
+			&r.ID, &r.ShortID, &r.AgentDefinitionID, &r.Trigger, &r.Status,
+			&r.StartedAt, &r.CompletedAt, &r.DurationMs, &r.TotalCostUsd,
+			&r.InputTokens, &r.OutputTokens, &r.CacheReadTokens,
+			&r.CacheCreationTokens, &r.TurnCount, &r.MaxTurnsUsed,
+			&r.NumToolCalls, &r.ErrorMessage, &r.TranscriptPath, &r.SessionID,
+		); scanErr != nil {
+			return nil, fmt.Errorf("scan agent run: %w", scanErr)
+		}
 		out = append(out, agentRunFromRow(r))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate agent runs: %w", err)
+	}
+
+	hasMore := len(out) > limit
+	if hasMore {
+		out = out[:limit]
+	}
+	if out == nil {
+		out = []AgentRunResponse{}
 	}
 	return &AgentRunListResult{
 		Runs:    out,
