@@ -2368,6 +2368,171 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderConfig" }
 
+  # -- Agents --
+  /api/v1/agents:
+    get:
+      tags: [Agents]
+      summary: List agent definitions
+      description: Returns all agent definitions with `last_run` inlined per definition.
+      responses:
+        "200":
+          description: Bare JSON array of agent definitions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+    post:
+      tags: [Agents]
+      summary: Create agent definition
+      description: Creates a Claude Agent SDK definition. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201":
+          description: Created definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/settings:
+    get:
+      tags: [Agents]
+      summary: Get agent subsystem settings
+      description: |
+        Returns agent.* config from `app_config`. Token fields are masked
+        (e.g. `"sk-ant-oat01-XXXXXXXX••••wxyz"`); the full plaintext never
+        leaves the server.
+      responses:
+        "200":
+          description: Masked settings.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    put:
+      tags: [Agents]
+      summary: Update agent subsystem settings
+      description: |
+        PATCH-style update of agent.* config. Nil fields are unchanged;
+        empty-string for token fields clears the stored encrypted value.
+        Token values are AES-256-GCM encrypted at rest. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: New masked settings state.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/{shortId}:
+    parameters:
+      - { name: shortId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Agents]
+      summary: Get one agent run
+      description: Resolves by short_id or UUID.
+      responses:
+        "200":
+          description: Agent run detail.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/{shortId}/transcript:
+    parameters:
+      - { name: shortId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Agents]
+      summary: Stream agent run transcript
+      description: Returns the NDJSON transcript file. 404 when not yet written.
+      responses:
+        "200":
+          description: NDJSON stream.
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        "404":
+          description: Transcript not available.
+  /api/v1/agents/{slug}:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string }, description: "slug, short_id, or UUID" }
+    get:
+      tags: [Agents]
+      summary: Get one agent definition
+      responses:
+        "200":
+          description: Agent definition with last_run inlined.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    patch:
+      tags: [Agents]
+      summary: Partial update of an agent definition
+      description: Omitted fields are unchanged. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Updated definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    delete:
+      tags: [Agents]
+      summary: Delete an agent definition
+      description: Historical runs preserved (FK SET NULL). **Requires `full_access` scope.**
+      responses:
+        "204":
+          description: Deleted.
+  /api/v1/agents/{slug}/runs:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+      - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      - { name: offset, in: query, schema: { type: integer, default: 0 } }
+    get:
+      tags: [Agents]
+      summary: List runs for one agent
+      description: Offset-paginated run history.
+      responses:
+        "200":
+          description: Paginated runs.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/{slug}/enable:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Enable an agent
+      description: Sets enabled=true. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/{slug}/disable:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Disable an agent
+      description: Sets enabled=false. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
 components:
   securitySchemes:
     apiKeyAuth:

@@ -1,0 +1,669 @@
+//go:build !lite
+
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"breadbox/internal/agent"
+	"breadbox/internal/appconfig"
+	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+// DefaultAgentModel is the model used when a definition omits one.
+// claude-opus-4-7 is the latest Opus (matches the agent_definitions
+// migration default).
+const DefaultAgentModel = "claude-opus-4-7"
+
+// DefaultAgentMaxTurns is the per-run turn cap when a definition omits one.
+const DefaultAgentMaxTurns = 10
+
+// DefaultAgentMaxBudgetUSD mirrors the agent_definitions migration default.
+// The column is NOT NULL, so we always send a value to sqlc.
+const DefaultAgentMaxBudgetUSD = 1.0
+
+// validAgentSlug is the canonical kebab-case format: lowercase letters,
+// digits, and dashes; 2-64 chars. Matches the slug pattern used elsewhere
+// in the codebase (rules, tags) for consistency.
+var validAgentSlug = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`)
+
+// AgentDefinitionResponse is the API shape for an agent_definition row.
+type AgentDefinitionResponse struct {
+	ID           string           `json:"id"`
+	ShortID      string           `json:"short_id"`
+	Name         string           `json:"name"`
+	Slug         string           `json:"slug"`
+	Prompt       string           `json:"prompt"`
+	SystemPrompt *string          `json:"system_prompt,omitempty"`
+	ScheduleCron *string          `json:"schedule_cron,omitempty"`
+	ToolScope    string           `json:"tool_scope"`
+	AllowedTools []string         `json:"allowed_tools"`
+	Model        string           `json:"model"`
+	MaxTurns     int              `json:"max_turns"`
+	MaxBudgetUSD *float64         `json:"max_budget_usd,omitempty"`
+	Enabled      bool             `json:"enabled"`
+	LastRun      *AgentRunSummary `json:"last_run,omitempty"`
+	CreatedAt    string           `json:"created_at"`
+	UpdatedAt    string           `json:"updated_at"`
+}
+
+// AgentRunSummary is the inline last-run shape on list/detail responses.
+type AgentRunSummary struct {
+	ShortID      string   `json:"short_id"`
+	Status       string   `json:"status"`
+	Trigger      string   `json:"trigger"`
+	StartedAt    string   `json:"started_at"`
+	CompletedAt  *string  `json:"completed_at,omitempty"`
+	DurationMs   *int     `json:"duration_ms,omitempty"`
+	TotalCostUSD *float64 `json:"total_cost_usd,omitempty"`
+}
+
+// AgentRunResponse is the full shape for one agent run.
+type AgentRunResponse struct {
+	ID                  string   `json:"id"`
+	ShortID             string   `json:"short_id"`
+	AgentDefinitionID   *string  `json:"agent_definition_id,omitempty"`
+	Trigger             string   `json:"trigger"`
+	Status              string   `json:"status"`
+	StartedAt           string   `json:"started_at"`
+	CompletedAt         *string  `json:"completed_at,omitempty"`
+	DurationMs          *int     `json:"duration_ms,omitempty"`
+	TotalCostUSD        *float64 `json:"total_cost_usd,omitempty"`
+	InputTokens         *int     `json:"input_tokens,omitempty"`
+	OutputTokens        *int     `json:"output_tokens,omitempty"`
+	CacheReadTokens     *int     `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int     `json:"cache_creation_tokens,omitempty"`
+	TurnCount           *int     `json:"turn_count,omitempty"`
+	MaxTurnsUsed        *int     `json:"max_turns_used,omitempty"`
+	NumToolCalls        *int     `json:"num_tool_calls,omitempty"`
+	ErrorMessage        *string  `json:"error_message,omitempty"`
+	TranscriptPath      *string  `json:"transcript_path,omitempty"`
+	SessionID           *string  `json:"session_id,omitempty"`
+}
+
+// AgentRunListResult is the paginated envelope for run lists.
+type AgentRunListResult struct {
+	Runs    []AgentRunResponse `json:"runs"`
+	Limit   int                `json:"limit"`
+	Offset  int                `json:"offset"`
+	HasMore bool               `json:"has_more"`
+}
+
+// CreateAgentDefinitionParams holds validated inputs for definition creation.
+type CreateAgentDefinitionParams struct {
+	Name         string
+	Slug         string
+	Prompt       string
+	SystemPrompt *string
+	ScheduleCron *string
+	ToolScope    string
+	AllowedTools []string
+	Model        string
+	MaxTurns     int
+	MaxBudgetUSD *float64
+	Enabled      bool
+}
+
+// UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
+// nil = don't touch; non-nil = replace. Slug is mutable here; if you want
+// it pinned, omit Slug from your PATCH body.
+type UpdateAgentDefinitionParams struct {
+	Name         *string
+	Slug         *string
+	Prompt       *string
+	SystemPrompt *string
+	ScheduleCron *string
+	ToolScope    *string
+	AllowedTools *[]string
+	Model        *string
+	MaxTurns     *int
+	MaxBudgetUSD *float64
+	Enabled      *bool
+}
+
+// ListAgentDefinitions returns all definitions ordered by created_at DESC,
+// each with last_run inlined. N+1 is acceptable here — definition count
+// is small (O(10s)).
+func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionResponse, error) {
+	rows, err := s.Queries.ListAgentDefinitions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list agent definitions: %w", err)
+	}
+	out := make([]AgentDefinitionResponse, 0, len(rows))
+	for _, row := range rows {
+		last, err := s.lastRunSummary(ctx, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, agentDefinitionFromRow(row, last))
+	}
+	return out, nil
+}
+
+// GetAgentDefinition resolves by slug (most common), then short_id, then UUID.
+func (s *Service) GetAgentDefinition(ctx context.Context, slugOrID string) (*AgentDefinitionResponse, error) {
+	row, err := s.resolveAgentDefinition(ctx, slugOrID)
+	if err != nil {
+		return nil, err
+	}
+	last, err := s.lastRunSummary(ctx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	resp := agentDefinitionFromRow(row, last)
+	return &resp, nil
+}
+
+// CreateAgentDefinition validates, marshals, persists, returns the new row.
+func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefinitionParams) (*AgentDefinitionResponse, error) {
+	if err := validateAgentDefinitionFields(p.Name, p.Slug, p.Prompt, p.ToolScope, p.Model, p.MaxTurns, p.MaxBudgetUSD, p.ScheduleCron); err != nil {
+		return nil, err
+	}
+	allowedJSON, err := agentAllowedToolsToBytes(p.AllowedTools)
+	if err != nil {
+		return nil, fmt.Errorf("marshal allowed_tools: %w", err)
+	}
+	model := p.Model
+	if model == "" {
+		model = DefaultAgentModel
+	}
+	maxTurns := p.MaxTurns
+	if maxTurns <= 0 {
+		maxTurns = DefaultAgentMaxTurns
+	}
+	toolScope := p.ToolScope
+	if toolScope == "" {
+		toolScope = "read_write"
+	}
+	budget := p.MaxBudgetUSD
+	if budget == nil {
+		// Mirror the migration's DEFAULT 1.0000 — column is NOT NULL.
+		def := DefaultAgentMaxBudgetUSD
+		budget = &def
+	}
+
+	row, err := s.Queries.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
+		Name:         p.Name,
+		Slug:         p.Slug,
+		Prompt:       p.Prompt,
+		SystemPrompt: pgconv.TextPtrIfNotEmpty(p.SystemPrompt),
+		ScheduleCron: pgconv.TextPtrIfNotEmpty(p.ScheduleCron),
+		ToolScope:    toolScope,
+		AllowedTools: allowedJSON,
+		Model:        model,
+		MaxTurns:     int32(maxTurns),
+		MaxBudgetUsd: agentNumericFromFloat(budget),
+		Enabled:      p.Enabled,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create agent definition: %w", err)
+	}
+	resp := agentDefinitionFromRow(row, nil)
+	return &resp, nil
+}
+
+// UpdateAgentDefinition applies PATCH semantics: fetch, merge non-nil
+// fields, validate, persist.
+func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p UpdateAgentDefinitionParams) (*AgentDefinitionResponse, error) {
+	existing, err := s.resolveAgentDefinition(ctx, slugOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	merged := agentDefinitionFromRow(existing, nil)
+	if p.Name != nil {
+		merged.Name = *p.Name
+	}
+	if p.Slug != nil {
+		merged.Slug = *p.Slug
+	}
+	if p.Prompt != nil {
+		merged.Prompt = *p.Prompt
+	}
+	if p.SystemPrompt != nil {
+		merged.SystemPrompt = p.SystemPrompt
+	}
+	if p.ScheduleCron != nil {
+		merged.ScheduleCron = p.ScheduleCron
+	}
+	if p.ToolScope != nil {
+		merged.ToolScope = *p.ToolScope
+	}
+	if p.AllowedTools != nil {
+		merged.AllowedTools = *p.AllowedTools
+	}
+	if p.Model != nil {
+		merged.Model = *p.Model
+	}
+	if p.MaxTurns != nil {
+		merged.MaxTurns = *p.MaxTurns
+	}
+	if p.MaxBudgetUSD != nil {
+		merged.MaxBudgetUSD = p.MaxBudgetUSD
+	}
+	if p.Enabled != nil {
+		merged.Enabled = *p.Enabled
+	}
+
+	if err := validateAgentDefinitionFields(merged.Name, merged.Slug, merged.Prompt, merged.ToolScope, merged.Model, merged.MaxTurns, merged.MaxBudgetUSD, merged.ScheduleCron); err != nil {
+		return nil, err
+	}
+	allowedJSON, err := agentAllowedToolsToBytes(merged.AllowedTools)
+	if err != nil {
+		return nil, fmt.Errorf("marshal allowed_tools: %w", err)
+	}
+	budget := merged.MaxBudgetUSD
+	if budget == nil {
+		def := DefaultAgentMaxBudgetUSD
+		budget = &def
+	}
+
+	row, err := s.Queries.UpdateAgentDefinition(ctx, db.UpdateAgentDefinitionParams{
+		ID:           existing.ID,
+		Name:         merged.Name,
+		Slug:         merged.Slug,
+		Prompt:       merged.Prompt,
+		SystemPrompt: pgconv.TextPtrIfNotEmpty(merged.SystemPrompt),
+		ScheduleCron: pgconv.TextPtrIfNotEmpty(merged.ScheduleCron),
+		ToolScope:    merged.ToolScope,
+		AllowedTools: allowedJSON,
+		Model:        merged.Model,
+		MaxTurns:     int32(merged.MaxTurns),
+		MaxBudgetUsd: agentNumericFromFloat(budget),
+		Enabled:      merged.Enabled,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update agent definition: %w", err)
+	}
+	resp := agentDefinitionFromRow(row, nil)
+	return &resp, nil
+}
+
+// DeleteAgentDefinition removes a definition by slug/short_id/UUID.
+// Historical runs are preserved (FK set null).
+func (s *Service) DeleteAgentDefinition(ctx context.Context, slugOrID string) error {
+	existing, err := s.resolveAgentDefinition(ctx, slugOrID)
+	if err != nil {
+		return err
+	}
+	n, err := s.Queries.DeleteAgentDefinition(ctx, existing.ID)
+	if err != nil {
+		return fmt.Errorf("delete agent definition: %w", err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SetAgentDefinitionEnabled flips the enabled flag.
+func (s *Service) SetAgentDefinitionEnabled(ctx context.Context, slugOrID string, enabled bool) (*AgentDefinitionResponse, error) {
+	existing, err := s.resolveAgentDefinition(ctx, slugOrID)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.SetAgentDefinitionEnabled(ctx, db.SetAgentDefinitionEnabledParams{
+		ID:      existing.ID,
+		Enabled: enabled,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("set agent definition enabled: %w", err)
+	}
+	resp := agentDefinitionFromRow(row, nil)
+	return &resp, nil
+}
+
+// ListAgentRuns returns offset-paginated runs for one definition.
+func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, limit, offset int) (*AgentRunListResult, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	def, err := s.resolveAgentDefinition(ctx, agentSlugOrID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.Queries.ListAgentRuns(ctx, db.ListAgentRunsParams{
+		AgentDefinitionID: def.ID,
+		Limit:             int32(limit + 1), // peek for has_more
+		Offset:            int32(offset),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list agent runs: %w", err)
+	}
+	hasMore := len(rows) > limit
+	if hasMore {
+		rows = rows[:limit]
+	}
+	out := make([]AgentRunResponse, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, agentRunFromRow(r))
+	}
+	return &AgentRunListResult{
+		Runs:    out,
+		Limit:   limit,
+		Offset:  offset,
+		HasMore: hasMore,
+	}, nil
+}
+
+// GetAgentRun resolves by short_id or UUID.
+func (s *Service) GetAgentRun(ctx context.Context, shortIDOrUUID string) (*AgentRunResponse, error) {
+	row, err := s.resolveAgentRun(ctx, shortIDOrUUID)
+	if err != nil {
+		return nil, err
+	}
+	resp := agentRunFromRow(row)
+	return &resp, nil
+}
+
+// MintRunAPIKey mints a scoped API key for one agent run.
+// Returns the plaintext + the created record. The orchestrator (iter 3)
+// is responsible for revocation via RevokeAPIKey on completion.
+func (s *Service) MintRunAPIKey(ctx context.Context, def *AgentDefinitionResponse, runShortID string) (*CreateAPIKeyResult, error) {
+	scope := "full_access"
+	if def.ToolScope == "read_only" {
+		scope = "read_only"
+	}
+	return s.CreateAPIKey(ctx, CreateAPIKeyParams{
+		Name:      fmt.Sprintf("agent:%s:%s", def.Slug, runShortID),
+		Scope:     scope,
+		ActorType: "agent",
+		ActorName: def.Slug,
+	})
+}
+
+// AssembleJobSpec builds the agent.JobSpec the runner needs.
+// Reads encrypted auth tokens from app_config and assembles MCP config.
+// Does NOT start the run — the orchestrator (iter 3) calls Runner.Run.
+func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionResponse, run *AgentRunResponse, apiKeyPlaintext string, encKey []byte) (*agent.JobSpec, error) {
+	authMode := appconfig.String(ctx, s.Queries, appconfig.KeyAgentAuthMode, appconfig.AuthModeSubscription)
+
+	var token string
+	switch authMode {
+	case appconfig.AuthModeSubscription:
+		t, ok, err := appconfig.ReadEncrypted(ctx, s.Queries, appconfig.KeyAgentSubscriptionToken, encKey)
+		if err != nil {
+			return nil, fmt.Errorf("read subscription token: %w", err)
+		}
+		if !ok {
+			return nil, agent.ErrAuthNotConfigured
+		}
+		token = t
+	case appconfig.AuthModeAPIKey:
+		t, ok, err := appconfig.ReadEncrypted(ctx, s.Queries, appconfig.KeyAgentAnthropicAPIKey, encKey)
+		if err != nil {
+			return nil, fmt.Errorf("read anthropic api key: %w", err)
+		}
+		if !ok {
+			return nil, agent.ErrAuthNotConfigured
+		}
+		token = t
+	default:
+		return nil, fmt.Errorf("agent: unknown auth_mode %q", authMode)
+	}
+
+	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, "")
+
+	mcpServers := map[string]agent.MCPServerConfig{
+		"breadbox": {
+			Command: "breadbox",
+			Args:    []string{"mcp"},
+			Env: map[string]string{
+				"BREADBOX_API_KEY": apiKeyPlaintext,
+			},
+		},
+	}
+
+	maxBudget := 1.0
+	if def.MaxBudgetUSD != nil {
+		maxBudget = *def.MaxBudgetUSD
+	}
+
+	spec := &agent.JobSpec{
+		RunID:             run.ID,
+		AgentDefinitionID: def.ID,
+		Prompt:            def.Prompt,
+		SystemPrompt:      derefString(def.SystemPrompt),
+		Model:             def.Model,
+		MaxTurns:          def.MaxTurns,
+		MaxBudgetUsd:      maxBudget,
+		ToolScope:         def.ToolScope,
+		AllowedTools:      def.AllowedTools,
+		MCPServers:        mcpServers,
+		Auth: agent.AuthConfig{
+			Mode:  authMode,
+			Token: token,
+		},
+	}
+	if run.SessionID != nil {
+		spec.SessionID = *run.SessionID
+	}
+	if transcriptDir != "" {
+		spec.TranscriptPath = transcriptDir + "/" + run.ShortID + ".ndjson"
+	}
+	return spec, nil
+}
+
+// --- internal helpers ---
+
+func (s *Service) resolveAgentDefinition(ctx context.Context, slugOrID string) (db.AgentDefinition, error) {
+	if slugOrID == "" {
+		return db.AgentDefinition{}, ErrNotFound
+	}
+	// Try slug first.
+	if row, err := s.Queries.GetAgentDefinitionBySlug(ctx, slugOrID); err == nil {
+		return row, nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return db.AgentDefinition{}, fmt.Errorf("get by slug: %w", err)
+	}
+	// Try short_id (8 chars).
+	if len(slugOrID) == 8 {
+		if row, err := s.Queries.GetAgentDefinitionByShortID(ctx, slugOrID); err == nil {
+			return row, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return db.AgentDefinition{}, fmt.Errorf("get by short_id: %w", err)
+		}
+	}
+	// Try UUID.
+	if u, err := pgconv.ParseUUID(slugOrID); err == nil {
+		if row, err := s.Queries.GetAgentDefinition(ctx, u); err == nil {
+			return row, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return db.AgentDefinition{}, fmt.Errorf("get by uuid: %w", err)
+		}
+	}
+	return db.AgentDefinition{}, ErrNotFound
+}
+
+func (s *Service) resolveAgentRun(ctx context.Context, shortIDOrUUID string) (db.AgentRun, error) {
+	if shortIDOrUUID == "" {
+		return db.AgentRun{}, ErrNotFound
+	}
+	if len(shortIDOrUUID) == 8 {
+		if row, err := s.Queries.GetAgentRunByShortID(ctx, shortIDOrUUID); err == nil {
+			return row, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return db.AgentRun{}, fmt.Errorf("get run by short_id: %w", err)
+		}
+	}
+	if u, err := pgconv.ParseUUID(shortIDOrUUID); err == nil {
+		if row, err := s.Queries.GetAgentRun(ctx, u); err == nil {
+			return row, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return db.AgentRun{}, fmt.Errorf("get run by uuid: %w", err)
+		}
+	}
+	return db.AgentRun{}, ErrNotFound
+}
+
+func (s *Service) lastRunSummary(ctx context.Context, defID pgtype.UUID) (*AgentRunSummary, error) {
+	row, err := s.Queries.GetLatestAgentRun(ctx, defID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get latest agent run: %w", err)
+	}
+	sum := agentRunSummaryFromRow(row)
+	return &sum, nil
+}
+
+func validateAgentDefinitionFields(name, slug, prompt, toolScope, model string, maxTurns int, maxBudget *float64, scheduleCron *string) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("%w: name is required", ErrInvalidParameter)
+	}
+	if !validAgentSlug.MatchString(slug) {
+		return fmt.Errorf("%w: slug must be kebab-case (lowercase letters, digits, dashes; 2-64 chars)", ErrInvalidParameter)
+	}
+	if strings.TrimSpace(prompt) == "" {
+		return fmt.Errorf("%w: prompt is required", ErrInvalidParameter)
+	}
+	if toolScope != "" && toolScope != "read_only" && toolScope != "read_write" {
+		return fmt.Errorf("%w: tool_scope must be read_only or read_write", ErrInvalidParameter)
+	}
+	if model != "" && strings.TrimSpace(model) == "" {
+		return fmt.Errorf("%w: model cannot be blank", ErrInvalidParameter)
+	}
+	if maxTurns < 0 || maxTurns > 100 {
+		return fmt.Errorf("%w: max_turns must be 1-100", ErrInvalidParameter)
+	}
+	if maxBudget != nil && (*maxBudget < 0 || *maxBudget > 1000) {
+		return fmt.Errorf("%w: max_budget_usd must be 0-1000", ErrInvalidParameter)
+	}
+	if scheduleCron != nil && *scheduleCron != "" {
+		// Light validation: 5 fields. robfig/cron does full parsing at registration.
+		fields := strings.Fields(*scheduleCron)
+		if len(fields) != 5 {
+			return fmt.Errorf("%w: schedule_cron must be a 5-field cron expression", ErrInvalidParameter)
+		}
+	}
+	return nil
+}
+
+func agentAllowedToolsToBytes(tools []string) ([]byte, error) {
+	if len(tools) == 0 {
+		return []byte("[]"), nil
+	}
+	return json.Marshal(tools)
+}
+
+func agentAllowedToolsFromBytes(b []byte) []string {
+	if len(b) == 0 {
+		return []string{}
+	}
+	var out []string
+	if err := json.Unmarshal(b, &out); err != nil {
+		return []string{}
+	}
+	if out == nil {
+		return []string{}
+	}
+	return out
+}
+
+func agentNumericFromFloat(f *float64) pgtype.Numeric {
+	if f == nil {
+		return pgtype.Numeric{}
+	}
+	var n pgtype.Numeric
+	_ = n.Scan(strconv.FormatFloat(*f, 'f', 4, 64))
+	return n
+}
+
+func agentFloatFromNumeric(n pgtype.Numeric) *float64 {
+	v, ok := pgconv.NumericToFloat(n)
+	if !ok {
+		return nil
+	}
+	return &v
+}
+
+func agentIntFromInt4(n pgtype.Int4) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int32)
+	return &v
+}
+
+func agentDefinitionFromRow(row db.AgentDefinition, lastRun *AgentRunSummary) AgentDefinitionResponse {
+	return AgentDefinitionResponse{
+		ID:           pgconv.FormatUUID(row.ID),
+		ShortID:      row.ShortID,
+		Name:         row.Name,
+		Slug:         row.Slug,
+		Prompt:       row.Prompt,
+		SystemPrompt: pgconv.TextPtr(row.SystemPrompt),
+		ScheduleCron: pgconv.TextPtr(row.ScheduleCron),
+		ToolScope:    row.ToolScope,
+		AllowedTools: agentAllowedToolsFromBytes(row.AllowedTools),
+		Model:        row.Model,
+		MaxTurns:     int(row.MaxTurns),
+		MaxBudgetUSD: agentFloatFromNumeric(row.MaxBudgetUsd),
+		Enabled:      row.Enabled,
+		LastRun:      lastRun,
+		CreatedAt:    pgconv.TimestampStr(row.CreatedAt),
+		UpdatedAt:    pgconv.TimestampStr(row.UpdatedAt),
+	}
+}
+
+func agentRunFromRow(row db.AgentRun) AgentRunResponse {
+	var defID *string
+	if row.AgentDefinitionID.Valid {
+		s := pgconv.FormatUUID(row.AgentDefinitionID)
+		defID = &s
+	}
+	return AgentRunResponse{
+		ID:                  pgconv.FormatUUID(row.ID),
+		ShortID:             row.ShortID,
+		AgentDefinitionID:   defID,
+		Trigger:             row.Trigger,
+		Status:              row.Status,
+		StartedAt:           pgconv.TimestampStr(row.StartedAt),
+		CompletedAt:         pgconv.TimestampStrPtr(row.CompletedAt),
+		DurationMs:          agentIntFromInt4(row.DurationMs),
+		TotalCostUSD:        agentFloatFromNumeric(row.TotalCostUsd),
+		InputTokens:         agentIntFromInt4(row.InputTokens),
+		OutputTokens:        agentIntFromInt4(row.OutputTokens),
+		CacheReadTokens:     agentIntFromInt4(row.CacheReadTokens),
+		CacheCreationTokens: agentIntFromInt4(row.CacheCreationTokens),
+		TurnCount:           agentIntFromInt4(row.TurnCount),
+		MaxTurnsUsed:        agentIntFromInt4(row.MaxTurnsUsed),
+		NumToolCalls:        agentIntFromInt4(row.NumToolCalls),
+		ErrorMessage:        pgconv.TextPtr(row.ErrorMessage),
+		TranscriptPath:      pgconv.TextPtr(row.TranscriptPath),
+		SessionID:           pgconv.TextPtr(row.SessionID),
+	}
+}
+
+func agentRunSummaryFromRow(row db.AgentRun) AgentRunSummary {
+	return AgentRunSummary{
+		ShortID:      row.ShortID,
+		Status:       row.Status,
+		Trigger:      row.Trigger,
+		StartedAt:    pgconv.TimestampStr(row.StartedAt),
+		CompletedAt:  pgconv.TimestampStrPtr(row.CompletedAt),
+		DurationMs:   agentIntFromInt4(row.DurationMs),
+		TotalCostUSD: agentFloatFromNumeric(row.TotalCostUsd),
+	}
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
