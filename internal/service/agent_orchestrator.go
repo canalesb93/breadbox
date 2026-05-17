@@ -12,7 +12,19 @@ import (
 	"breadbox/internal/agent"
 	"breadbox/internal/appconfig"
 	"breadbox/internal/pgconv"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// applyPromptPrefix renders the operator-supplied prefix in front of the
+// agent's stored prompt. Split out so tests can pin the exact format and
+// the orchestrator stays readable.
+func applyPromptPrefix(prefix, original string) string {
+	if prefix == "" {
+		return original
+	}
+	return "Operator note for this run:\n" + prefix + "\n\n" + original
+}
 
 // Orchestrator drives one agent run end-to-end: acquires concurrency,
 // mints a scoped API key, assembles the JobSpec, runs the sidecar, persists
@@ -69,12 +81,16 @@ func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error
 // Returns ErrConcurrencyLocked WITHOUT creating a run row when the semaphore
 // is full — the caller (HTTP handler) maps to 503 and the user retries.
 // Returns the resulting agent_runs row on any other outcome (success or error).
-func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse) (*AgentRunResponse, error) {
+//
+// promptPrefix is the operator-supplied per-run prefix that gets prepended to
+// the agent's stored prompt for this fire only. Empty string disables the
+// prefix; cron callers always pass "".
+func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse, promptPrefix string) (*AgentRunResponse, error) {
 	if err := o.sem.Acquire(ctx); err != nil {
 		return nil, err
 	}
 	defer o.sem.Release()
-	return o.runLocked(ctx, def, "manual")
+	return o.runLocked(ctx, def, "manual", promptPrefix)
 }
 
 // RunOrSkip is the entry point for scheduled (cron) runs. Always leaves
@@ -98,11 +114,11 @@ func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionRespon
 		return &resp, err
 	}
 	defer o.sem.Release()
-	return o.runLocked(ctx, def, trigger)
+	return o.runLocked(ctx, def, trigger, "")
 }
 
 // runLocked assumes the caller holds the semaphore.
-func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionResponse, trigger string) (*AgentRunResponse, error) {
+func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionResponse, trigger, promptPrefix string) (*AgentRunResponse, error) {
 	defUUID, err := pgconv.ParseUUID(def.ID)
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: parse def id: %w", err)
@@ -111,6 +127,14 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	runRow, err := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: create run row: %w", err)
+	}
+	if promptPrefix != "" {
+		if perr := o.svc.SetAgentRunPromptPrefixDB(ctx, runRow.ID, promptPrefix); perr != nil {
+			o.logger.Warn("orchestrator: persist prompt prefix failed",
+				"agent", def.Slug, "run", runRow.ShortID, "error", perr)
+		} else {
+			runRow.PromptPrefix = pgtype.Text{String: promptPrefix, Valid: true}
+		}
 	}
 	runResp := AgentRunFromRow(runRow)
 
@@ -134,6 +158,9 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	}()
 
 	spec, err := o.svc.AssembleJobSpec(ctx, def, &runResp, keyResult.PlaintextKey, o.encKey)
+	if err == nil && promptPrefix != "" {
+		spec.Prompt = applyPromptPrefix(promptPrefix, spec.Prompt)
+	}
 	if err != nil {
 		o.logger.Warn("orchestrator: assemble spec failed",
 			"agent", def.Slug, "run", runResp.ShortID, "error", err)

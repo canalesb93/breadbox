@@ -70,9 +70,14 @@ export interface AgentRun {
   transcript_path?: string | null;
   session_id?: string | null;
   operator_note?: string | null;
+  prompt_prefix?: string | null;
 }
 
 export const AGENT_RUN_NOTE_MAX_LEN = 2000;
+
+// PROMPT_PREFIX_MAX_LEN matches the server-side cap in
+// internal/api/agents.go::PromptPrefixMaxLen. Bump both together.
+export const PROMPT_PREFIX_MAX_LEN = 2000;
 
 export interface AgentRunListResult {
   runs: AgentRun[];
@@ -191,11 +196,22 @@ export function useToggleAgent() {
   });
 }
 
+export interface RunAgentNowParams {
+  slug: string;
+  promptPrefix?: string; // operator-supplied per-run prefix; max 2000 chars
+}
+
 export function useRunAgentNow() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (slug: string) =>
-      api<AgentRun>(`/api/v1/agents/${slug}/run`, { method: "POST" }),
+    mutationFn: ({ slug, promptPrefix }: RunAgentNowParams) =>
+      api<AgentRun>(`/api/v1/agents/${slug}/run`, {
+        method: "POST",
+        body:
+          promptPrefix && promptPrefix.length > 0
+            ? JSON.stringify({ prompt_prefix: promptPrefix })
+            : undefined,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents"] });
     },

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestOrchestratorRunNow_Success(t *testing.T) {
 	})
 
 	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
-	runResp, err := orch.RunNow(context.Background(), def)
+	runResp, err := orch.RunNow(context.Background(), def, "")
 	if err != nil {
 		t.Fatalf("RunNow: %v", err)
 	}
@@ -92,12 +93,12 @@ func TestOrchestratorRunNow_ConcurrencyLocked(t *testing.T) {
 	var firstErr error
 	go func() {
 		defer wg.Done()
-		firstRun, firstErr = orch.RunNow(context.Background(), def)
+		firstRun, firstErr = orch.RunNow(context.Background(), def, "")
 	}()
 
 	<-started // first goroutine holds the slot
 
-	_, secondErr := orch.RunNow(context.Background(), def)
+	_, secondErr := orch.RunNow(context.Background(), def, "")
 	if !errors.Is(secondErr, agent.ErrConcurrencyLocked) {
 		t.Errorf("second RunNow err = %v, want ErrConcurrencyLocked", secondErr)
 	}
@@ -132,7 +133,7 @@ func TestOrchestratorRunOrSkip_LeavesSkippedRow(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, _ = orch.RunNow(context.Background(), def)
+		_, _ = orch.RunNow(context.Background(), def, "")
 	}()
 	<-started
 
@@ -172,7 +173,7 @@ func TestOrchestratorRunNow_AuthNotConfigured(t *testing.T) {
 		return agent.RunResult{}, nil
 	})
 	orch := service.NewOrchestrator(svc, fake, 1, devEncKey, slog.Default())
-	_, err := orch.RunNow(context.Background(), def)
+	_, err := orch.RunNow(context.Background(), def, "")
 	if !errors.Is(err, agent.ErrAuthNotConfigured) {
 		t.Errorf("err = %v, want ErrAuthNotConfigured", err)
 	}
@@ -192,7 +193,7 @@ func TestOrchestratorRunNow_RunnerErrorPersisted(t *testing.T) {
 	})
 	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
 
-	runResp, err := orch.RunNow(context.Background(), def)
+	runResp, err := orch.RunNow(context.Background(), def, "")
 	if err == nil {
 		t.Fatal("expected error from RunNow on runner failure")
 	}
@@ -216,7 +217,7 @@ func TestOrchestratorRunNow_MintRevokeRoundTrip(t *testing.T) {
 	})
 	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
 
-	runResp, err := orch.RunNow(context.Background(), def)
+	runResp, err := orch.RunNow(context.Background(), def, "")
 	if err != nil {
 		t.Fatalf("RunNow: %v", err)
 	}
@@ -238,4 +239,72 @@ func TestOrchestratorRunNow_MintRevokeRoundTrip(t *testing.T) {
 	// Touch the unused appconfig reader to keep the import live in case
 	// the test file evolves to read settings directly.
 	_ = appconfig.String(context.Background(), svc.Queries, appconfig.KeyAgentAuthMode, "")
+}
+
+func TestOrchestratorRunNow_PromptPrefix_PrependsToSpecAndPersists(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-prefix", true)
+	const prefix = "Focus on Amazon Prime transactions only — ignore the rest."
+
+	var capturedPrompt string
+	fake := agent.RunnerFunc(func(_ context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		capturedPrompt = spec.Prompt
+		return agent.RunResult{
+			Status:       agent.StatusSuccess,
+			TotalCostUSD: 0.01,
+			TurnCount:    1,
+			DurationMs:   10,
+		}, nil
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	runResp, err := orch.RunNow(context.Background(), def, prefix)
+	if err != nil {
+		t.Fatalf("RunNow: %v", err)
+	}
+
+	// The sidecar saw a prompt with our prefix at the top.
+	if !strings.HasPrefix(capturedPrompt, "Operator note for this run:\n"+prefix+"\n\n") {
+		t.Errorf("spec.Prompt missing expected operator-note header:\n%s", capturedPrompt)
+	}
+	if !strings.Contains(capturedPrompt, def.Prompt) {
+		t.Errorf("spec.Prompt should still contain the agent's stored prompt; got:\n%s", capturedPrompt)
+	}
+
+	// The run row carries the prefix for the audit trail.
+	if runResp.PromptPrefix == nil || *runResp.PromptPrefix != prefix {
+		t.Errorf("response PromptPrefix = %v, want %q", runResp.PromptPrefix, prefix)
+	}
+	persisted, err := svc.GetAgentRun(context.Background(), runResp.ShortID)
+	if err != nil {
+		t.Fatalf("GetAgentRun: %v", err)
+	}
+	if persisted.PromptPrefix == nil || *persisted.PromptPrefix != prefix {
+		t.Errorf("persisted PromptPrefix = %v, want %q", persisted.PromptPrefix, prefix)
+	}
+}
+
+func TestOrchestratorRunNow_EmptyPrefix_LeavesPromptUnchanged(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-no-prefix", true)
+
+	var capturedPrompt string
+	fake := agent.RunnerFunc(func(_ context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		capturedPrompt = spec.Prompt
+		return agent.RunResult{Status: agent.StatusSuccess, TurnCount: 1, DurationMs: 5}, nil
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	runResp, err := orch.RunNow(context.Background(), def, "")
+	if err != nil {
+		t.Fatalf("RunNow: %v", err)
+	}
+	if capturedPrompt != def.Prompt {
+		t.Errorf("empty prefix should leave prompt untouched; got %q, want %q", capturedPrompt, def.Prompt)
+	}
+	if runResp.PromptPrefix != nil {
+		t.Errorf("PromptPrefix should be nil when none supplied, got %v", *runResp.PromptPrefix)
+	}
 }

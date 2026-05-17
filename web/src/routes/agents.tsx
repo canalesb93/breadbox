@@ -37,6 +37,15 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -56,6 +65,7 @@ import {
   useDeleteAgent,
   useRunAgentNow,
   useToggleAgent,
+  PROMPT_PREFIX_MAX_LEN,
   type AgentCostStats,
   type AgentDefinition,
   type AgentRecentErrorStats,
@@ -362,7 +372,6 @@ interface AgentRowProps {
 
 function AgentRow({ agent, onDelete }: AgentRowProps) {
   const toggle = useToggleAgent();
-  const runNow = useRunAgentNow();
 
   const handleToggle = (enable: boolean) => {
     void withMutationToast(
@@ -372,14 +381,6 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
         error: "Toggle failed",
       },
     );
-  };
-
-  const handleRunNow = () => {
-    void withMutationToast(() => runNow.mutateAsync(agent.slug), {
-      success: `Run started for ${agent.name}`,
-      error:
-        "Run failed — check Settings → Agents for auth, or `make agent-sidecar` for the binary",
-    });
   };
 
   return (
@@ -430,15 +431,7 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
               {agent.enabled ? "Enabled" : "Disabled"}
             </span>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={runNow.isPending}
-            onClick={handleRunNow}
-          >
-            <Play className="size-3.5" />
-            Run now
-          </Button>
+          <RunNowDialog slug={agent.slug} name={agent.name} />
           <Button asChild variant="ghost" size="icon" aria-label="Run history">
             <Link to="/agents/$slug/runs" params={{ slug: agent.slug }}>
               <History className="size-4" />
@@ -460,6 +453,92 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
         </div>
       </div>
     </Card>
+  );
+}
+
+function RunNowDialog({ slug, name }: { slug: string; name: string }) {
+  const [open, setOpen] = useState(false);
+  const [prefix, setPrefix] = useState("");
+  const runNow = useRunAgentNow();
+
+  const submit = async () => {
+    const ok = await withMutationToast(
+      () => runNow.mutateAsync({ slug, promptPrefix: prefix }),
+      {
+        success: prefix
+          ? `Run started for ${name} (with prefix)`
+          : `Run started for ${name}`,
+        error:
+          "Run failed — check Settings → Agents for auth, or `make agent-sidecar` for the binary",
+      },
+    );
+    if (ok) {
+      setOpen(false);
+      setPrefix("");
+    }
+  };
+
+  const tooLong = prefix.length > PROMPT_PREFIX_MAX_LEN;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!runNow.isPending) setOpen(next);
+        if (!next) setPrefix("");
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="sm" disabled={runNow.isPending}>
+          <Play className="size-3.5" />
+          Run now
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Run {name} now</DialogTitle>
+          <DialogDescription>
+            Fires the agent synchronously. Optionally prepend a one-off note —
+            useful for scoped runs like "focus on Amazon Prime transactions
+            only".
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <label className="text-sm font-medium" htmlFor="run-now-prefix">
+            Prompt prefix{" "}
+            <span className="text-muted-foreground font-normal">(optional)</span>
+          </label>
+          <Textarea
+            id="run-now-prefix"
+            placeholder="Leave blank to use the agent's stored prompt as-is."
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+            rows={4}
+            disabled={runNow.isPending}
+          />
+          <p
+            className={`text-xs ${
+              tooLong ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {prefix.length} / {PROMPT_PREFIX_MAX_LEN} characters
+          </p>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={runNow.isPending}
+          >
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={runNow.isPending || tooLong}>
+            <Play className="size-3.5" />
+            Run now
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

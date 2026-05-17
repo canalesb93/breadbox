@@ -2599,13 +2599,28 @@ paths:
       summary: Trigger an immediate agent run
       description: |
         Synchronously runs the named agent. Returns the resulting `agent_runs`
-        row. Status may be `success`, `error`, or `timeout`. **Requires `full_access` scope.**
+        row. Status may be `success`, `error`, or `timeout`. Optional body
+        `{ "prompt_prefix": "..." }` prepends operator-supplied context to
+        the agent's stored prompt for this fire only. **Requires `full_access` scope.**
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt_prefix:
+                  type: string
+                  maxLength: 2000
+                  description: Optional per-run prefix prepended to the agent's prompt; cron runs leave it unset.
       responses:
         "201":
           description: Run completed (may be in error state — see `status` and `error_message`).
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+        "400":
+          description: PROMPT_PREFIX_TOO_LONG when prompt_prefix exceeds 2000 chars.
         "422":
           description: Auth or binary not configured.
         "503":

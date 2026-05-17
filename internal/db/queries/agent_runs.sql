@@ -103,6 +103,14 @@ SET operator_note = $2
 WHERE id = $1
 RETURNING *;
 
+-- name: SetAgentRunPromptPrefix :exec
+-- Set the operator-supplied prompt prefix for a "run now" trigger. Called
+-- immediately after CreateAgentRun + before AssembleJobSpec so the prefix
+-- is captured in the audit trail even if the run fails to assemble.
+UPDATE agent_runs
+SET prompt_prefix = $2
+WHERE id = $1;
+
 -- name: CleanupOrphanedAgentRuns :execresult
 UPDATE agent_runs
 SET status        = 'error',

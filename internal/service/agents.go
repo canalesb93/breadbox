@@ -120,6 +120,7 @@ type AgentRunResponse struct {
 	TranscriptPath      *string  `json:"transcript_path,omitempty"`
 	SessionID           *string  `json:"session_id,omitempty"`
 	OperatorNote        *string  `json:"operator_note,omitempty"`
+	PromptPrefix        *string  `json:"prompt_prefix,omitempty"`
 }
 
 // AgentRunListResult is the paginated envelope for run lists.
@@ -600,6 +601,16 @@ func (s *Service) MarkAgentRunSkippedDB(ctx context.Context, runID pgtype.UUID, 
 	})
 }
 
+// SetAgentRunPromptPrefixDB stores the operator-supplied per-run prompt prefix
+// alongside an existing in_progress run row. Called right after CreateAgentRunDB
+// so the audit trail captures the prefix even when AssembleJobSpec fails.
+func (s *Service) SetAgentRunPromptPrefixDB(ctx context.Context, runID pgtype.UUID, prefix string) error {
+	return s.Queries.SetAgentRunPromptPrefix(ctx, db.SetAgentRunPromptPrefixParams{
+		ID:           runID,
+		PromptPrefix: pgtype.Text{String: prefix, Valid: prefix != ""},
+	})
+}
+
 // CompleteAgentRunDB persists a terminal RunResult onto the run row.
 // Used by the orchestrator after Runner.Run returns.
 func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult) (db.AgentRun, error) {
@@ -907,6 +918,7 @@ func agentRunFromRow(row db.AgentRun) AgentRunResponse {
 		TranscriptPath:      pgconv.TextPtr(row.TranscriptPath),
 		SessionID:           pgconv.TextPtr(row.SessionID),
 		OperatorNote:        pgconv.TextPtr(row.OperatorNote),
+		PromptPrefix:        pgconv.TextPtr(row.PromptPrefix),
 	}
 }
 
