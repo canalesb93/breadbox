@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageError } from "@/components/page-error";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -175,14 +175,12 @@ export function RulesPage() {
       )}
 
       {isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Couldn't load rules</AlertTitle>
-          <AlertDescription>
-            {rulesQuery.error instanceof Error
-              ? rulesQuery.error.message
-              : "Try refreshing the page."}
-          </AlertDescription>
-        </Alert>
+        <PageError
+          resource="rules"
+          error={rulesQuery.error}
+          onRetry={() => rulesQuery.refetch()}
+          retrying={isFetching}
+        />
       ) : isLoading ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
