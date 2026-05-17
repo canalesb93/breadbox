@@ -1,5 +1,6 @@
-import { Tag as TagIcon } from "lucide-react";
+import { Clock, Tag as TagIcon } from "lucide-react";
 import { CategoryIconTile } from "@/components/category-icon-tile";
+import { MetaBadge } from "@/components/meta-badge";
 import { TagList } from "@/components/tag-chip";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
@@ -13,6 +14,13 @@ interface TransactionPrimaryProps {
 // category icon tile, the bank description as the title with an inline
 // "Pending" marker, and a secondary line of metadata (account · member · tags).
 // Shared by the transactions table and any future transaction list.
+//
+// Pending vocabulary (iter 103): the inline "Pending" marker now rides
+// `<MetaBadge muted icon={Clock}>` so it reads as part of the v2
+// secondary-state chip family (System / Hidden / Excluded / Linked / Re-auth)
+// instead of an orphan muted span. Pairs with the italic + opacity
+// treatment in `<TransactionAmount>` so both columns communicate
+// "not yet settled" at a glance.
 export function TransactionPrimary({
   transaction: t,
   className,
@@ -28,9 +36,9 @@ export function TransactionPrimary({
         <div className="flex items-center gap-1.5">
           <span className="truncate font-medium">{t.provider_name}</span>
           {t.pending && (
-            <span className="text-muted-foreground shrink-0 text-xs">
+            <MetaBadge muted icon={Clock} className="shrink-0">
               Pending
-            </span>
+            </MetaBadge>
           )}
         </div>
         <TransactionMeta transaction={t} />

@@ -134,11 +134,22 @@ export function DataTable<TData, TValue>({
   const colCount = columns.length;
 
   return (
-    // The shadcn Table primitive already wraps the <table> in its own
-    // overflow-x-auto container, so narrow viewports scroll horizontally
-    // without a second scroll container here.
-    <div className="bg-card overflow-hidden rounded-lg border">
-      <Table>
+    // The shadcn Table primitive normally wraps the <table> in an
+    // `overflow-x-auto` container for narrow-viewport horizontal scrolling.
+    // That wrapper (plus our own `overflow-hidden` container) creates a
+    // scrolling containing block that traps `position: sticky` inside the
+    // table — `top-14` is then measured from the inner box, not the
+    // viewport, and the header floats inside the table card instead of
+    // pinning under the app shell header. When `stickyHeader` is on we
+    // suppress both overflow layers so the page itself becomes the sticky
+    // ancestor and `top-14` lands flush under the `h-14` app header.
+    <div
+      className={cn(
+        "bg-card rounded-lg border",
+        !stickyHeader && "overflow-hidden",
+      )}
+    >
+      <Table containerClassName={stickyHeader ? "overflow-visible" : undefined}>
         <TableHeader
           className={cn(
             stickyHeader &&

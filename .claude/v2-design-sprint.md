@@ -2920,3 +2920,309 @@ Cross-cutting components:
     `optimizeDeps.force=true` queue item in iter 91 is still the
     right durable fix; logged here so the next iteration that hits
     this pain has more evidence to motivate the change.
+
+- **Iter 101 — DetailDialogHeader primitive (4 household-section dialogs)** ([#1217](https://github.com/canalesb93/breadbox/pull/1217))
+  - Closed the gap iter 100 explicitly flagged. The four form-bearing
+    `<Dialog>` consumers in `household-section` (AddMember,
+    CreateLogin, ShareLink inline, ShareLink standalone) all
+    hand-rolled `<DialogHeader>` + `<DialogTitle>` +
+    `<DialogDescription>` with no icon affordance — sibling sheets
+    have ridden `<DetailSheetHeader>` (iter 41) since they grew a
+    second consumer. Four sites is above the "third consumer"
+    promotion gate, so promoted to a primitive.
+  - New `<DetailDialogHeader>` at
+    `web/src/components/detail-dialog-header.tsx` — sibling of
+    `<DetailSheetHeader>`. Same icon-tile (`bg-muted
+    text-muted-foreground rounded-lg border size-9`) + optional
+    eyebrow + title + description + optional trailing slot lockup,
+    just routed through `<DialogTitle>` / `<DialogDescription>` so
+    it composes with shadcn `<Dialog>` instead of `<Sheet>`. 27th
+    shared primitive in the v2 vocabulary.
+  - Visual win: each form-bearing dialog now leads with a
+    rounded-lg icon tile (UserPlus for member-add flows, Link2 for
+    share-link flows) — matches the iter 41 sheet header vocabulary
+    exactly so the system reads as a coherent family across both
+    surface modes (slide-in Sheet vs centered Dialog) instead of
+    sheets feeling "designed" and dialogs feeling "stock shadcn".
+  - Sandbox specimen at `/v2/sandbox?section=components` right
+    after `<DetailSheetHeader>` so the sibling pair reads
+    top-to-bottom (default density + with-eyebrow-and-trailing
+    presets, matching the live consumers).
+  - No `density` variant yet — the four live consumers all want
+    the default rhythm. If a future surface needs the heavier
+    `accent` rhythm (the iter 41 sheet header's `size-10 + p-6 +
+    text-lg` shape), add a `density` prop here mirroring that API
+    rather than re-opening `<DialogHeader>`. The two primitives
+    should keep their props in lockstep.
+  - Remaining centered `<Dialog>` consumers in `web/src/`:
+    `settings-shell` (sr-only chrome on the settings modal itself —
+    intentionally not a candidate; the modal *is* the chrome),
+    `confirm-dialog` (composes `AlertDialog` for yes/no
+    confirmations). The form-bearing gap iter 100 left open is now
+    fully closed.
+  - Process note: stomped the sprint state on first push attempt by
+    redirecting python output to the temp file *after* `cat >>`
+    appended to it (the python `open(...).write(...)` ran in the
+    same subshell as the curl pipe and clobbered the appended
+    file before the base64 step). Always (a) keep fetch output in
+    a distinct path from the working file, (b) verify with
+    `wc -c` immediately before piping through `base64`, and (c)
+    if the base64 is over ~100k, build a JSON payload and
+    `curl -d @payload.json` instead of passing through `gh api -f
+    content=...` which can silently truncate.
+
+- **Iter 102 — ComingSoonPill primitive (2 in-the-works surfaces unified)** ([#1218](https://github.com/canalesb93/breadbox/pull/1218))
+  - Pure drift retirement on a small but byte-identical lockup.
+    `routes/placeholder.tsx` (iter 21 unbuilt-nav-leaf shell) and
+    `components/settings-shell.tsx` (iter 78 in-the-works settings
+    panel) both hand-rolled the same 10-class span for the muted
+    "Coming soon" status pill that rides the `<StatusPanel
+    tone="info">` trailing slot. Promoted to `<ComingSoonPill>`
+    at `web/src/components/coming-soon-pill.tsx` — 28th shared
+    primitive in the v2 vocabulary.
+  - Visual contract preserved exactly: `bg-muted text-muted-foreground
+    rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide
+    uppercase` + leading `Clock size-3`. The two consumer surfaces
+    render byte-equivalent pixels after the migration — the win is
+    in the code: one place to evolve the chip's rounding / padding
+    / rhythm instead of two, and a clear name for the "not yet"
+    vocabulary that distinguishes it from sibling primitives
+    (`<Eyebrow>` for section/page micro-labels, `<Badge>` for
+    semantic-tone rectangular chips, `<JumpToPill>` / `<ActionPill>`
+    for the labelled-lateral-nav / labelled-action vocabulary).
+  - API: `icon` defaults to `Clock` (matches both live consumers);
+    pass a different `LucideIcon` for a future caller without losing
+    the chip rhythm. `children` defaults to `"Coming soon"` and is
+    the label. Sandbox specimen at `/v2/sandbox?section=components`
+    right after `<ActionPill>` shows the default + an icon override
+    (`Sparkles` + "Beta") + a label override ("In review").
+  - **Two consumers is below the iter-30-style "third surface" gate**
+    on principle, but this case is byte-identical lockup duplication
+    rather than a recipe convergence — when the *next* StatusPanel
+    surface (or any new "not yet" caption) lands, it'll reach for
+    this primitive instead of accreting a third hand-rolled site.
+    Promote-on-duplication is the right call when the duplicated
+    chunk is a literal 10-class string with a leading icon.
+  - **Iter-30 drift note "primary-tinted pill triad" is still open.**
+    The *primary*-tinted recipe (`bg-primary/15 text-primary`) lives
+    in three surfaces: `auth-shell` ("V2" chip), `brand-header` ("V2"
+    chip, byte-identical), `nav-user` (admin RoleBadge in
+    `ROLE_TONE`). When a fourth surface adopts the primary recipe,
+    promote to a `<PrimaryPill>` / `<VersionPill>` mirroring this
+    primitive's API. The muted variant (this PR) and the primary
+    variant carry different signal (muted = "not yet" status caption;
+    primary = brand/version/role chrome) so they belong in separate
+    primitives, not a single tone-prop'd one.
+  - Process note: sandbox needed a fresh icon import (`Sparkles`)
+    alongside the existing `Clock` / `Wand2`. The
+    `coming-soon-pill.tsx` primitive itself imports `Clock` from
+    `lucide-react` as its default value — when migrating each
+    consumer, the local `Clock` import becomes unused, so dropping it
+    is mandatory or `bun run lint` will fail (`tsc --noEmit` flags
+    unused imports under the project's `noUnusedLocals` config).
+    Caught both removals in the same diff to keep the tip green.
+
+- **Iter 103 — Pending vocabulary for TransactionAmount + TransactionPrimary** ([#1220](https://github.com/canalesb93/breadbox/pull/1220))
+  - Pairs the two reusable transaction-row blocks so a row reads as
+    tentative until it settles. `TransactionAmount` renders italic +
+    `opacity-70` when `t.pending`, with a `title` attribute carrying
+    "Pending — amount may change once posted" for hover/keyboard;
+    `TransactionPrimary` upgrades the bare `text-muted-foreground
+    text-xs` "Pending" span to `<MetaBadge muted icon={Clock}>
+    Pending</MetaBadge>` so the chip lands inside the v2 secondary-
+    state chip family (System / Hidden / Excluded / Linked / Re-auth)
+    instead of being an orphan text fragment.
+  - No new primitive — both blocks already existed, `<MetaBadge>` is
+    the canonical low-emphasis chip. Pure consumer migration. The
+    primitive count stays at 28. The win is that every transaction
+    list (Transactions page, Home recent activity, Account-detail
+    recent transactions) picks up the pending treatment for free
+    because they all route through these two shared blocks.
+  - Visual contract: settled rows render exactly as before; pending
+    rows now have **two** synchronised cues (italic+dim amount on the
+    right, muted chip with leading Clock glyph in the description on
+    the left) so a scanning eye spots them without reading either
+    column in full. Inflow `text-success` tinting still wins on the
+    tone axis, so a pending inflow stays green-but-italic.
+  - Sandbox `Amounts` specimen description updated to document the
+    pending treatment; the existing fixture at
+    `web/src/sandbox/fixtures.ts` already includes a pending row
+    (`pending: true` on one of the three demo transactions) so the
+    live `TransactionAmount` specimen picks up the new vocabulary
+    without a fixture edit.
+  - **Existing `<TransactionPrimary>`/`<TransactionAmount>` doc
+    comments updated** to spell out the pending vocabulary so future
+    edits don't drift apart. Both files now reference each other in
+    the comment so a change to one prompts a review of the other —
+    they're a pair, not two independent components.
+
+- **Iter 104 — MetaBadge sweep across accounts family** ([#1221](https://github.com/canalesb93/breadbox/pull/1221))
+  - Pure drift retirement on the v2 tiny-chip vocabulary. Five
+    hand-rolled `<Badge text-[10px] px-1.5 py-0>` sites in the
+    accounts family now route through `<MetaBadge>` (iter 17
+    primitive). Two surfaces touched: `account-row.tsx`
+    (statusBadge for `error` → destructive, `disconnected` →
+    outline) and `account-links-section.tsx` (Primary/Dependent
+    role chip + Disabled marker on the link rows).
+  - **Zero-pixel refactor.** MetaBadge already owned the exact
+    density tokens (`text-[10px]` + `gap-1` + `px-1.5 py-0` +
+    `[&>svg]:size-2.5`); the hand-rolled sites carried the same
+    classes inline. The win is single-source-of-truth — extending
+    `MetaBadge` now flows to all seven sharing surfaces (was six),
+    instead of skipping these two callsites.
+  - Sandbox specimen extended with the three new tones now in use
+    (`default` for Primary, `secondary` for Dependent / pre-existing,
+    `destructive` for Error, plain outline for Disconnected + Disabled).
+    Description updated to enumerate the closed tone set:
+    `System` · `Hidden` (muted) · `Excluded` · `Linked` · `Paused` ·
+    **`Primary`** · **`Dependent`** · **`Error`** · **`Disconnected`** ·
+    **`Disabled`** · `Re-auth`. Same Specimen position as before
+    (next to IdPill / DetailList) — readers see the full chip
+    vocabulary at a glance.
+  - Two `Badge` imports dropped from the accounts feature; one
+    `MetaBadge` import added to `account-links-section.tsx`. The
+    primitive count stays at 28.
+  - **Drift status: tiny-chip vocabulary is now closed.** One
+    legitimate `Badge text-[10px]` site stays in `category-detail.tsx`
+    as a `SectionCard` action count (`{children.length}`) — that's
+    a count chip in a header action slot, not a meta status, so it
+    correctly stays on `Badge` directly. Same shape lives in
+    `transactions-toolbar.tsx` line 458 (count chip inside a filter
+    button trigger). Any new tiny *status* chip should reach for
+    `<MetaBadge>` first; if it carries a count or lives inside a
+    button trigger, `<Badge>` direct is still right.
+
+
+- **Iter 105 — SyncHistoryList onto TimelineRail (+ destructive tone)** ([#1222](https://github.com/canalesb93/breadbox/pull/1222))
+  - The per-connection Sync history feed was the only timeline-shaped
+    surface in v2 still hand-rolling its own row geometry (size-6 chip +
+    custom status tiles + flat `divide-y` list) — the iter-26 promotion of
+    `<TimelineRail>` originally queued sync logs as the second consumer,
+    iter 93 added the semantic-tone vocabulary the migration depended on,
+    and this iteration finally closes the loop. Now routes through
+    `<TimelineRail>` with day-group headings ("Today" / "Yesterday" /
+    weekday-month-day) so the per-connection sync feed reads as the same
+    temporal vocabulary as the transaction-detail Activity feed.
+  - **`destructive` tone added to `TimelineRailTone`** (parity with
+    StatusPanel / ColorRailCard / Sonner). Status → tone mapping:
+    `success` → `success` (emerald), `error` → **`destructive`** (red),
+    `in_progress` → `primary` (spinner). The iter-93 vocabulary missed a
+    destructive tier — the nearest semantic match was `warning` (amber),
+    which already encoded "soft / removed" (`tag_removed`). Errored sync
+    runs deserve the same destructive-red that StatusPanel and
+    ColorRailCard use for hard-failure surfaces. Token uses the standard
+    `border-destructive/40` + `text-destructive` shadcn pair so the v2
+    visual system reads as one across rail / panel / card / toast.
+  - **In-progress rows** route the spin animation via
+    `iconClassName="[&>svg]:animate-spin"` — the disc target the Lucide
+    svg child without forking the primitive. The previous open-coded row
+    threaded `animate-spin` directly on `<Loader2>` because it didn't go
+    through `<TimelineRail.Row>`; the new flow needed the indirection
+    because the primitive renders the icon itself. Clean enough — a
+    `spin` prop on the primitive would be over-fitting (one consumer,
+    one usage).
+  - Loading skeleton in `connection-detail.tsx` swapped from four
+    `h-12` `<Skeleton>` blocks to `<TimelineRail.RowSkeleton>`s — disc +
+    rail visible in the loading state too, so the loaded data lands
+    without a layout jump. Same vocabulary as the transaction-detail
+    Activity feed's loading state.
+  - Sandbox specimen extended with a destructive-tone row alongside the
+    existing success/primary/info/warning rows so the full tone
+    vocabulary is browseable; description updated to enumerate the seven
+    tones (`neutral` · `primary` · `success` · `warning` ·
+    **`destructive`** · `info` · `muted`) and to drop the "queued for
+    per-connection sync logs" note (this PR ships that consumer).
+  - **TimelineRail is now used by two consumers** — TX-detail Activity
+    feed (iter 26 / iter 93) + Connection-detail Sync history (this
+    iter). The remaining queued consumer from iter 26 ("rule run
+    history") still hasn't landed as a surface yet; when it does, it'll
+    inherit the same vocabulary. The primitive count stays at 28 — this
+    is a consumer migration plus a richer tone prop, not a new component.
+  - Tiny day-grouping helper (`dayLabel` / `groupByDay`) duplicates the
+    one in `activity-timeline.tsx` because the two feeds shouldn't yet
+    share a `lib/format` export — a third timeline consumer is the right
+    promotion gate. Until then, copy is cheaper than a one-call-site
+    shared util.
+
+
+- **Iter 106 — SectionCard + ListCard header baseline polish** ([#1225](https://github.com/canalesb93/breadbox/pull/1225))
+  - Detail-attention iteration in response to Ricardo's "the cards still
+    feel wrong-ish" call: title looked too small, the action button
+    (`ViewAllPill` / `Button size="sm"`) on the right looked too big,
+    visible baseline mismatch, and the gap between header-bottom and
+    body-top was asymmetric vs the side padding. Diagnosed against the
+    sandbox specimens and the live Home / Account-detail consumers with
+    Chrome DevTools measurements.
+  - **Three targeted fixes to the canonical card-header recipe** —
+    nothing more, nothing less:
+    1. **`ListCard` was missing the `\!pb-4` override** that `SectionCard`
+       has carried since iter 33. Without it, the shadcn primitive's
+       `[.border-b]:pb-6` rule injected 24px of bottom padding (vs the
+       intentional 16px top padding) whenever the header had a divider.
+       Measured on Home: header padding `16px / 24px` before, `16px /
+       16px` after — the asymmetric gap Ricardo flagged was real and
+       traceable to one line.
+    2. **Header alignment `items-start` → `items-center`** (plus
+       `CardAction self-center`). The shadcn `CardHeader` grid defaults
+       to `items-start` and `CardAction` carries `self-start`. With a
+       20px title and a 28px `ViewAllPill` / 32px `Button size="sm"`,
+       the title got pinned to the top of the row while the action
+       protruded 8-12px below — title baseline visibly higher than the
+       action's vertical center, exactly the "crooked" feel.
+    3. **Title weight `text-sm font-medium` → `text-sm font-semibold`**
+       so the title carries enough anchor next to a real action button
+       instead of reading as a caption. Same `text-sm` size — the bump
+       is weight-only, the eye picks up the difference because the
+       action button stays at `text-xs font-medium`.
+  - **What I left alone (with rationale):** card body padding (`px-5
+    py-5`) and footer rhythm (`px-5 py-3`) — iter 33's tightening is
+    right; this was a header-row issue. `ColorRailCard` (footer already
+    `flex items-center justify-end`), `StatusPanel` (no title+action
+    header row; trailing slot is already `flex items-center`),
+    `FormFooter` (already `flex items-center`), `EmptyState`,
+    `PageHeader`, the five other header primitives — none of them
+    surface the same shadcn-grid `self-start` mismatch. Resisted
+    touching `CardTitle` in `ui/card.tsx` (would propagate the
+    semibold + alignment to non-header callers we haven't audited).
+  - **Zero new primitives, no consumer changes.** The fixes are
+    contained to `section-card.tsx` (already had `\!pb-4`; added
+    `items-center` + `self-center` + `font-semibold`) and
+    `list-card.tsx` (added all four: `\!pb-4`, `items-center`,
+    `self-center`, `font-semibold`). Primitive count stays at 28.
+  - **Drift status:** the canonical card-header pattern now has one
+    settled recipe — `border-b px-5 py-4 \!pb-4 items-center` on the
+    header div, `text-sm font-semibold` on the title, `self-center` on
+    the action. Any new card-header surface should reach for
+    `<SectionCard>` or `<ListCard>` and inherit the recipe; if a future
+    consumer needs a taller / shorter header, extend the primitive
+    rather than open-coding `<CardHeader>` directly.
+
+
+- **Iter 107 — SettingsSectionHeader baseline polish ripple** ([#1226](https://github.com/canalesb93/breadbox/pull/1226))
+  - Ripple from iter 106's `SectionCard` + `ListCard` header polish.
+    The settings shell uses `SettingsSectionHeader` for every section
+    title (Account / Household / Backups, plus the inline sub-sections
+    like Change password / Actions / Stored backups / Automatic
+    schedule). It was the next-most-visible title+action lockup in the
+    v2 vocabulary that hadn't picked up the iter 106 recipe.
+  - **Two targeted fixes:**
+    1. **Heading weight `font-medium` → `font-semibold`** for both
+       `section` (h2 `text-lg`) and `sub` (h3 `text-sm`) tokens.
+       Now matches `PageHeader` (`text-2xl font-semibold`) and the
+       iter 106 card-header recipe (`text-sm font-semibold`) — every
+       page-/section-/card-level title in the v2 shell is one weight.
+    2. **Action alignment `sm:items-end` → `sm:items-center`** so a
+       `Button size="sm"` (Add member CTA, etc.) sits centered to
+       the title row instead of bottom-docking under the description.
+       Same 8-12px baseline mismatch as iter 106; same fix.
+  - **Zero new primitives, no consumer changes.** Contained to
+    `settings-section-header.tsx` (5 lines changed) + the sandbox
+    specimen description. Four consumers benefit immediately:
+    `AccountSection`, `HouseholdSection`, `BackupsSection`, and
+    the settings-shell placeholder fallback. Primitive count stays at 28.
+  - **Drift status:** page-level / section-level / card-header title
+    weights are now all `font-semibold` across the SPA. The iter 106
+    recipe ripple is complete for shared primitives. If a future
+    surface needs a lighter caption-weight title, add it as a new
+    `SettingsSectionHeader` token (e.g. `field`) rather than
+    forking the rhythm again.

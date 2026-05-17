@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronRight, Link2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { MetaBadge } from "@/components/meta-badge";
 import { formatBalance } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -121,18 +120,10 @@ function statusBadge(status: string | null) {
     );
   }
   if (status === "error") {
-    return (
-      <Badge variant="destructive" className="px-1.5 py-0 text-[10px]">
-        Error
-      </Badge>
-    );
+    return <MetaBadge variant="destructive">Error</MetaBadge>;
   }
   if (status === "disconnected") {
-    return (
-      <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-        Disconnected
-      </Badge>
-    );
+    return <MetaBadge>Disconnected</MetaBadge>;
   }
   return null;
 }
