@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Eyebrow } from "@/components/eyebrow";
 import { IdPill } from "@/components/id-pill";
 import { cn } from "@/lib/utils";
