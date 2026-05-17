@@ -64,12 +64,13 @@ export function CategoryPicker({
     await apply(pick);
   };
 
-  // Chevron sits OUTSIDE the trigger bounds (absolute-positioned just to
-  // its right) so the badge stays flush at rest. It fades in only on
-  // hover / keyboard focus. `relative` on the trigger + a tiny `mr` on
-  // the parent cell aren't needed because the chevron escapes via
-  // negative right offset.
+  // Chevron swaps in for the category icon on hover (cross-fade in the
+  // same spot) so the badge surface stays the same width and nothing
+  // overlaps the label. Falls back to a no-op when the category has no
+  // icon — the hover ring alone carries the affordance there.
   const chevronClass = size === "sm" ? "size-2.5" : "size-3";
+  const chevronLeftClass = size === "sm" ? "left-1.5" : "left-2";
+  const hasIcon = !!category?.icon;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -80,13 +81,14 @@ export function CategoryPicker({
           onClick={(e) => e.stopPropagation()}
           className={cn(
             // Trigger wraps the badge with no extra padding so every hover
-            // signal (ring + chevron) is confined to the badge's exact
-            // bounds. The ring sits flush around the badge edge; the
-            // chevron floats inside the badge's right padding.
+            // signal stays inside the badge bounds.
             // `[&_[data-slot=badge]]:hover:!ring-0` suppresses CategoryBadge's
-            // own override ring during hover so the hover-state stroke wins
-            // — without this the two rings would stack on overridden rows.
+            // own override ring during hover so the hover-state stroke wins.
+            // When the category has an icon, fade it out on hover so the
+            // chevron swap reads as a single-icon replacement (no overlap).
             "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 hover:[&_[data-slot=badge]]:!ring-0 focus-visible:[&_[data-slot=badge]]:!ring-0",
+            hasIcon &&
+              "[&_[data-slot=badge]>svg:first-child]:transition-opacity group-hover/picker:[&_[data-slot=badge]>svg:first-child]:opacity-0 group-focus-visible/picker:[&_[data-slot=badge]>svg:first-child]:opacity-0",
             className,
           )}
         >
@@ -107,23 +109,18 @@ export function CategoryPicker({
               Category
             </span>
           )}
-          {/* Chevron only on the assigned state — the empty-state pill
-              already carries "+ Category" which is its own affordance.
-              The scrim matches `bg-secondary` (CategoryBadge's bg) so
-              the chevron sits cleanly even when it overlaps a label
-              edge. */}
-          {category?.display_name && (
-            <span
+          {/* Chevron swap-in: overlays the category icon spot. Visible
+              only when the badge has an icon to replace; otherwise the
+              hover ring alone signals the affordance. */}
+          {hasIcon && (
+            <ChevronDown
               aria-hidden
               className={cn(
-                "pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-md bg-gradient-to-l from-secondary via-secondary/85 to-transparent opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
-                size === "sm" ? "w-6 pr-1" : "w-7 pr-1.5",
+                "text-muted-foreground pointer-events-none absolute top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+                chevronLeftClass,
+                chevronClass,
               )}
-            >
-              <ChevronDown
-                className={cn("text-muted-foreground ml-auto", chevronClass)}
-              />
-            </span>
+            />
           )}
         </button>
       </PopoverTrigger>
