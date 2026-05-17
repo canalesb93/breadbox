@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-interface ListCardProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
+interface ListCardProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "children" | "title"> {
   // Optional bordered header — matches the SectionCard vocabulary. Omit for
   // a header-less list (just a card holding rows).
   title?: React.ReactNode;

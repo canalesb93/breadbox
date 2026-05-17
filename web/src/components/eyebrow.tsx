@@ -5,11 +5,17 @@ interface EyebrowProps extends React.HTMLAttributes<HTMLElement> {
   /**
    * Element to render. Defaults to `span` so the primitive composes inside
    * inline contexts; pass `"p"`, `"h3"`, etc. when the eyebrow is a block
-   * label (section headers, hero eyebrows). Avoid heading levels that
-   * conflict with the document outline — pick `"div"` or `"span"` for
-   * non-semantic decoration.
+   * label (section headers, hero eyebrows). Pass `"label"` (paired with
+   * `htmlFor`) when the eyebrow doubles as a form-control label. Avoid
+   * heading levels that conflict with the document outline — pick `"div"`
+   * or `"span"` for non-semantic decoration.
    */
-  as?: "span" | "p" | "div" | "h3" | "h4";
+  as?: "span" | "p" | "div" | "h3" | "h4" | "label";
+  /**
+   * Forwarded to the underlying element when `as="label"`. Ignored
+   * otherwise (React will warn if you pass it to a non-label element).
+   */
+  htmlFor?: string;
   /**
    * Visual emphasis. `default` is the standard `text-[10px]
    * tracking-[0.1em]` muted eyebrow used on detail-page section headers,
