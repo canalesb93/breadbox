@@ -427,6 +427,29 @@ Next iteration candidates (in rough impact order):
 
 Picking **#1 per-agent quiet hours** next iteration — mid-size, touches schema + scheduler + edit form which is the agent system's "main control loop" and worth strengthening before more peripheral features land.
 
+## ITER 15 — 2026-05-17 02:42
+Shipped (PR #1241 squash-merged into sprint branch as 9970d30c):
+- Migration: agent_definitions.quiet_hours_start / quiet_hours_end (HH:MM 24-hour text, additive).
+- IsWithinQuietHours pure function: same-day windows + wraps-midnight; 13 unit-test sub-cases all pass.
+- Scheduler.fireCronJob checks quiet hours BEFORE RunOrSkip — silent log+return inside the window. Manual + webhook ignore the window by design.
+- Service + handler params + SPA edit form (`<Input type="time">`) plumbed through.
+- All 5 CI jobs green; drift test green (no new routes).
+
+Two recurring lessons recovered this iter:
+- Multiple silent Edit failures on agents.go because I hadn't Read it this session. Re-read fixed it. The lesson is documented in iter-4 + iter-12 logs and keeps coming up — the runtime hint catches it consistently.
+- Same web/dist/.gitkeep get-deleted-on-build pattern: caught + amended like prior iters. .gitignore already excludes the binary; the .gitkeep race needs a follow-up.
+
+Next iteration candidates (in rough impact order):
+1. **Cost dashboard** in /v2/agents — sparkline on list page or /v2/agents/cost. Bigger UI work.
+2. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine + agent_definitions schema.
+3. **Suggested rules agent** — scans recent transactions, proposes new transaction_rules, queues for human review. Bigger.
+4. **Inline run notes** — operator-editable note field on each agent_run row. Small.
+5. **"Next fire" preview honoring quiet hours** — small follow-up to iter 15; show "next: tomorrow 8am" instead of raw cron on list page.
+6. **`make web` post-step that re-creates web/dist/.gitkeep** — kills the recurring gitkeep race in iter commits. Tiny infra fix.
+
+Picking **#6 + #4 bundled** for iter 16 — both are tiny; combining keeps the PR count linear without overloading any single PR. Actually, the operating instructions say "one iteration's worth of work" per PR. Splitting: pick #4 (inline run notes — small backend + small UI, makes runs more useful for human-in-the-loop debugging); push #6 to iter 17. The gitkeep race is annoying but each iter's amend handles it locally.
+
+
 
 
 
