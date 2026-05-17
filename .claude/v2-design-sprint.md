@@ -2611,6 +2611,58 @@ Cross-cutting components:
     or set `optimizeDeps.force=true` in `web/vite.config.ts` for
     dev so the CLI flag isn't required.
 
+- **Iter 95 — Eyebrow `nav` variant retires 3 sidebar-label drift sites** ([#1210](https://github.com/canalesb93/breadbox/pull/1210))
+  - Iter 94 closed the page-scale Eyebrow drift; the remaining
+    eyebrow-shaped uppercase markup in the v2 SPA was the
+    `text-[10px] font-semibold tracking-[0.08em] uppercase` rhythm
+    used by sidebar / menu group labels. Three surfaces hand-rolled
+    that class triplet: `<NavMain>`'s `<SidebarGroupLabel>` (Money /
+    Library / System group headers in the app sidebar), the
+    `settings-shell` desktop sidebar's "Settings" caption, and the
+    `<ShortcutSheet>` group section headers. The two nav ones used
+    `text-muted-foreground/80` and `tracking-[0.08em]`; the shortcut
+    sheet used `text-muted-foreground` and `tracking-wider` (slightly
+    different but the same intent).
+  - Added a fourth `"nav"` variant to `<Eyebrow>` —
+    `font-semibold text-[10px] tracking-[0.08em]` — the only existing
+    variant family with a different `font-weight` from `default`,
+    deliberately so: nav labels sit against `bg-sidebar` chrome and
+    need the heavier weight to read. The variant switch flows through
+    `cn`: `variant === "nav" ? "font-semibold" : "font-medium"` so the
+    other three variants keep their `font-medium` rhythm. Routed all
+    three call sites through the primitive. The shortcut-sheet
+    consumer drops the slightly-off `tracking-wider` and lands on
+    `tracking-[0.08em]` for consistency.
+  - `<NavMain>` keeps `<SidebarGroupLabel asChild>` as the host so the
+    shadcn chrome (`flex h-8 items-center px-2`, ring/focus,
+    collapsible-icon transitions) survives; Eyebrow becomes the
+    underlying element and only owns the type rhythm. The
+    `text-muted-foreground/80` override lives on the className prop
+    (the nav-only "softer than the default eyebrow mute" choice that
+    Ricardo's settings-shell desktop sidebar matches).
+  - Sandbox showcase grows a fourth specimen tile so all four
+    variants (`default` · `hero` · `page` · `nav`) live side-by-side
+    in a `lg:grid-cols-4` layout; the `nav` tile renders against
+    `bg-sidebar text-sidebar-foreground` so reviewers see the rhythm
+    against the surface it was designed for. Description spells out
+    the new variant + its consumers + the iter-95 retirement note.
+  - Pre-merge audit confirms zero stragglers: `grep -rn
+    'text-\[10px\] font-semibold tracking' web/src --include="*.tsx" |
+    grep -v sandbox | grep -v eyebrow.tsx` returns only intentional
+    *non-eyebrow* weights (brand-header version chip, nav-user role
+    pill — both coloured chips, not labels). The iter-37 invariant
+    ("raw `text-[10-11px] font-medium/semibold tracking-* uppercase`
+    markup never appears outside `<Eyebrow>`") now holds across every
+    weight tier — `default` (`font-medium`, 0.1em), `hero`
+    (`font-medium`, 0.12em), `page` (`font-medium`, 11px/0.08em), and
+    `nav` (`font-semibold`, 10px/0.08em).
+  - Four variants is the new natural ceiling. Don't add a fifth
+    without a concrete fifth host requirement — the four currently
+    encode "section · hero · page · nav" tiers; further sub-variants
+    would muddy that signal. If a new context needs slightly
+    different geometry, prefer overriding the className over coining
+    a variant.
+
 - **Iter 94 — Eyebrow `page` variant retires 8 hand-rolled call sites** ([#1209](https://github.com/canalesb93/breadbox/pull/1209))
   - Audited the v2 SPA for stray uppercase tracked labels (`uppercase
     tracking-[…]`) markup blocks and found eight surfaces hand-rolling
