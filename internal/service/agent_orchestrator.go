@@ -119,7 +119,15 @@ func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse,
 // immediately. Concurrency is bounded by the orchestrator's existing
 // semaphore (iter-29 default: 3) — excess fires roll into skipped rows.
 func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
-	defs, err := o.svc.ListAgentDefinitionsForSyncWebhook(ctx)
+	// Use a fresh context for the lookup — the incoming ctx is the sync
+	// engine's, and a cancelled webhook request or timed-out sync would
+	// silently no-op the entire webhook trigger here (audit HIGH #3 from
+	// iter-32). Per-dispatched goroutine below ALSO uses a fresh ctx for
+	// the same reason. 30s is plenty for the unindexed-by-default lookup
+	// even with a few dozen agents.
+	lookupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	defs, err := o.svc.ListAgentDefinitionsForSyncWebhook(lookupCtx)
 	if err != nil {
 		o.logger.Warn("orchestrator: list sync-webhook agents failed", "error", err)
 		return

@@ -115,16 +115,9 @@ func CreateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			TriggerOnSyncComplete: req.TriggerOnSyncComplete,
 		})
 		if err != nil {
-			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			if writeAgentDefinitionMutationError(w, err, "Failed to create agent") {
 				return
 			}
-			if strings.Contains(strings.ToLower(err.Error()), "duplicate key") || strings.Contains(strings.ToLower(err.Error()), "unique constraint") {
-				mw.WriteError(w, http.StatusConflict, "CONFLICT", "An agent with this slug already exists")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create agent")
-			return
 		}
 		w.WriteHeader(http.StatusCreated)
 		writeData(w, out)
@@ -156,11 +149,39 @@ func UpdateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			TriggerOnSyncComplete: req.TriggerOnSyncComplete,
 		})
 		if err != nil {
-			writeAgentError(w, err, "agent not found")
-			return
+			// Try not-found / validation first, then mutation-shaped errors
+			// (duplicate slug from a rename → 409 CONFLICT, otherwise 500).
+			// Before iter-35 the dup-slug branch only existed on Create;
+			// Update fell through to a generic 500.
+			if errors.Is(err, service.ErrNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "agent not found")
+				return
+			}
+			if writeAgentDefinitionMutationError(w, err, "Failed to update agent") {
+				return
+			}
 		}
 		writeData(w, out)
 	}
+}
+
+// writeAgentDefinitionMutationError maps the shared shape of Create +
+// Update errors: ErrInvalidParameter → 400 VALIDATION_ERROR, Postgres
+// unique-constraint failure → 409 CONFLICT (the slug column is the only
+// unique field), everything else → 500 with the supplied message.
+// Returns true if a response was written (caller should `return`).
+func writeAgentDefinitionMutationError(w http.ResponseWriter, err error, fallbackMsg string) bool {
+	if errors.Is(err, service.ErrInvalidParameter) {
+		mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		return true
+	}
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "duplicate key") || strings.Contains(lower, "unique constraint") {
+		mw.WriteError(w, http.StatusConflict, "CONFLICT", "An agent with this slug already exists")
+		return true
+	}
+	mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", fallbackMsg)
+	return true
 }
 
 // DeleteAgentDefinitionHandler deletes an agent (runs preserved).
