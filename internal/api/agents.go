@@ -4,6 +4,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -381,12 +382,30 @@ func UpdateAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFu
 	}
 }
 
+// runAgentNowRequest is the optional JSON body for "run now". An empty
+// body — common for the v2 SPA's bare-button click — leaves prompt_prefix
+// unset, which the orchestrator treats as no prefix.
+type runAgentNowRequest struct {
+	PromptPrefix string `json:"prompt_prefix,omitempty"`
+}
+
+// PromptPrefixMaxLen caps operator-supplied prefixes so a runaway paste
+// can't bloat the prompt past the model's effective context. Matches the
+// 2000-char ceiling used for operator notes — the two surfaces feel
+// related from the operator's POV.
+const PromptPrefixMaxLen = 2000
+
 // RunAgentNowHandler triggers an immediate synchronous run of the named agent.
 // 503 CONCURRENCY_LOCKED when another run is in progress (no DB row written).
 // 422 AUTH_NOT_CONFIGURED when no Anthropic credentials are set.
 // 422 AGENT_BINARY_NOT_FOUND when the sidecar binary can't be located.
+// 400 PROMPT_PREFIX_TOO_LONG when prompt_prefix exceeds PromptPrefixMaxLen.
 // 200 with the agent_runs row otherwise (status may be 'error' if the run
 // itself failed — the row contains error_message).
+//
+// Body is optional: { "prompt_prefix": "Focus on …" } prepends the supplied
+// text to the agent's stored prompt for this fire only. An empty body or an
+// empty prefix is equivalent to the v1 bare-button behavior.
 func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if orch == nil {
@@ -400,7 +419,18 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 			writeAgentError(w, err, "agent not found")
 			return
 		}
-		runResp, runErr := orch.RunNow(r.Context(), def)
+		var req runAgentNowRequest
+		if r.ContentLength > 0 {
+			if !decodeJSON(w, r, &req) {
+				return
+			}
+		}
+		if len(req.PromptPrefix) > PromptPrefixMaxLen {
+			mw.WriteError(w, http.StatusBadRequest, "PROMPT_PREFIX_TOO_LONG",
+				fmt.Sprintf("prompt_prefix must be at most %d characters", PromptPrefixMaxLen))
+			return
+		}
+		runResp, runErr := orch.RunNow(r.Context(), def, req.PromptPrefix)
 		if errors.Is(runErr, agent.ErrConcurrencyLocked) {
 			mw.WriteError(w, http.StatusServiceUnavailable,
 				"CONCURRENCY_LOCKED",

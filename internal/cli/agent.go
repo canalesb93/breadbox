@@ -86,16 +86,18 @@ Exit codes:
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOut, _ := cmd.Flags().GetBool("json")
-			return runAgentRun(cmd.Context(), args[0], jsonOut)
+			prefix, _ := cmd.Flags().GetString("prefix")
+			return runAgentRun(cmd.Context(), args[0], jsonOut, prefix)
 		},
 	}
 	run.Flags().Bool("json", false, "emit the run result as JSON instead of human-readable")
+	run.Flags().String("prefix", "", "optional operator prompt prefix to prepend for this run only")
 	parent.AddCommand(run)
 
 	root.AddCommand(parent)
 }
 
-func runAgentRun(parent context.Context, slug string, jsonOut bool) error {
+func runAgentRun(parent context.Context, slug string, jsonOut bool, promptPrefix string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -131,7 +133,7 @@ func runAgentRun(parent context.Context, slug string, jsonOut bool) error {
 	if !jsonOut {
 		fmt.Fprintf(os.Stdout, "▶  Running %s (%s)…\n", def.Name, def.Slug)
 	}
-	runResp, runErr := orch.RunNow(ctx, def)
+	runResp, runErr := orch.RunNow(ctx, def, promptPrefix)
 	if runErr != nil {
 		switch {
 		case errors.Is(runErr, agent.ErrAuthNotConfigured):

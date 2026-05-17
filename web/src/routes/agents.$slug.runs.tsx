@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { ArrowLeft, Clock, FilterX, Loader2, StickyNote } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  FilterX,
+  Loader2,
+  StickyNote,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -314,10 +321,32 @@ function OperatorNoteEditor({
   );
 }
 
+// PromptPrefixBlock surfaces the operator-supplied per-run prefix as a
+// read-only blockquote at the top of the transcript drawer. Unlike the
+// operator note, the prefix can't be edited after the fact — it's an
+// audit-trail item showing what the operator actually sent to the model.
+function PromptPrefixBlock({ prefix }: { prefix: string }) {
+  return (
+    <div className="mb-4 rounded-md border border-dashed bg-muted/40 p-3">
+      <div className="text-muted-foreground mb-1 inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide">
+        <Sparkles className="size-3.5" />
+        Prompt prefix (this run only)
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-relaxed">{prefix}</p>
+    </div>
+  );
+}
+
 function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
   const hasNote = Boolean(run.operator_note && run.operator_note.trim() !== "");
   const notePreview = hasNote
     ? (run.operator_note ?? "").trim().slice(0, 80)
+    : "";
+  const hasPrefix = Boolean(
+    run.prompt_prefix && run.prompt_prefix.trim() !== "",
+  );
+  const prefixPreview = hasPrefix
+    ? (run.prompt_prefix ?? "").trim().slice(0, 80)
     : "";
   return (
     <button
@@ -332,6 +361,16 @@ function RunRow({ run, onClick }: { run: AgentRun; onClick: () => void }) {
       <span className="flex-1 text-xs">
         {formatRelativeTime(run.started_at)}
       </span>
+      {hasPrefix && (
+        <span
+          className="text-muted-foreground inline-flex items-center gap-1 text-xs"
+          title={prefixPreview}
+          aria-label={`Prompt prefix: ${prefixPreview}`}
+        >
+          <Sparkles className="size-3.5" />
+          prefix
+        </span>
+      )}
       {hasNote && (
         <span
           className="text-muted-foreground inline-flex items-center gap-1 text-xs"
@@ -377,6 +416,9 @@ function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {runDetail.data?.prompt_prefix && (
+            <PromptPrefixBlock prefix={runDetail.data.prompt_prefix} />
+          )}
           {shortId && (
             <OperatorNoteEditor
               shortId={shortId}
