@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +27,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
 import { withMutationToast } from "@/lib/mutation-toast";
-import { useAgent, useRunAgentNow, useUpdateAgent } from "@/api/queries/agents";
+import {
+  useAgent,
+  useRunAgentNow,
+  useUpdateAgent,
+  type AgentDefinition,
+} from "@/api/queries/agents";
 import {
   AGENT_MODELS,
   TOOL_SCOPES,
@@ -71,39 +75,66 @@ type AgentEditForm = z.input<typeof agentEditSchema>;
 
 export function AgentEditPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
-  const navigate = useNavigate();
   const agentQuery = useAgent(slug);
-  const updateAgent = useUpdateAgent(slug);
 
+  if (agentQuery.isError) {
+    return (
+      <PageError
+        resource="agent"
+        error={agentQuery.error}
+        onRetry={() => agentQuery.refetch()}
+        retrying={agentQuery.isFetching}
+      />
+    );
+  }
+  if (agentQuery.isLoading || !agentQuery.data) {
+    return (
+      <>
+        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
+          <Link to="/agents">
+            <ArrowLeft className="size-4" /> Back to agents
+          </Link>
+        </Button>
+        <PageHeader
+          eyebrow="Agent"
+          title="Edit agent"
+          description="Update prompt, schedule, model, and safety caps."
+        />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-1/2" />
+        </div>
+      </>
+    );
+  }
+  return <AgentEditFormView agent={agentQuery.data} slug={slug} />;
+}
+
+// AgentEditFormView mounts useForm with the loaded agent's values as the
+// actual defaultValues — no post-mount resync, no race with shadcn's
+// controlled Select. Earlier shapes (defaultValues + useEffect form.reset,
+// or `values` prop syncing) reliably left the Model field rendering empty
+// for any agent whose stored model differed from the form's placeholder
+// default (tool_scope was lucky because "read_write" already matched).
+function AgentEditFormView({
+  agent,
+  slug,
+}: {
+  agent: AgentDefinition;
+  slug: string;
+}) {
+  const navigate = useNavigate();
+  const updateAgent = useUpdateAgent(slug);
   const form = useForm<AgentEditForm>({
     resolver: zodResolver(agentEditSchema),
     defaultValues: {
-      name: "",
-      prompt: "",
-      system_prompt: "",
-      schedule_cron: "",
-      tool_scope: "read_write",
-      allowed_tools_raw: "",
-      model: "claude-opus-4-7",
-      max_turns: 10,
-      max_budget_usd: null,
-      quiet_hours_start: "",
-      quiet_hours_end: "",
-      trigger_on_sync_complete: false,
-    },
-  });
-
-  // Hydrate the form once the agent loads. Depend on short_id (immutable)
-  // not the whole object, so a cache refetch doesn't wipe in-flight edits.
-  useEffect(() => {
-    const agent = agentQuery.data;
-    if (!agent) return;
-    form.reset({
       name: agent.name,
       prompt: agent.prompt,
       system_prompt: agent.system_prompt ?? "",
       schedule_cron: agent.schedule_cron ?? "",
-      tool_scope: agent.tool_scope,
+      tool_scope: agent.tool_scope as AgentEditForm["tool_scope"],
       allowed_tools_raw: (agent.allowed_tools ?? []).join(", "),
       model: agent.model,
       max_turns: agent.max_turns,
@@ -111,9 +142,8 @@ export function AgentEditPage() {
       quiet_hours_start: agent.quiet_hours_start ?? "",
       quiet_hours_end: agent.quiet_hours_end ?? "",
       trigger_on_sync_complete: agent.trigger_on_sync_complete,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentQuery.data?.short_id]);
+    },
+  });
 
   const onSubmit = form.handleSubmit(async (values) => {
     const tools = (values.allowed_tools_raw ?? "")
@@ -148,17 +178,6 @@ export function AgentEditPage() {
     if (ok) navigate({ to: "/agents" });
   });
 
-  if (agentQuery.isError) {
-    return (
-      <PageError
-        resource="agent"
-        error={agentQuery.error}
-        onRetry={() => agentQuery.refetch()}
-        retrying={agentQuery.isFetching}
-      />
-    );
-  }
-
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
@@ -168,19 +187,11 @@ export function AgentEditPage() {
       </Button>
       <PageHeader
         eyebrow="Agent"
-        title={agentQuery.data?.name ?? "Edit agent"}
+        title={agent.name}
         description="Update prompt, schedule, model, and safety caps. Changes take effect on the next scheduled fire or manual run."
       />
 
-      {agentQuery.isLoading ? (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-1/2" />
-        </div>
-      ) : (
-        <Form {...form}>
+      <Form {...form}>
           <form onSubmit={onSubmit} className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="space-y-4 md:col-span-2">
               <Card className="space-y-4 p-4">
@@ -474,7 +485,6 @@ export function AgentEditPage() {
             </div>
           </form>
         </Form>
-      )}
     </>
   );
 }
