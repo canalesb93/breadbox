@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowUpRight,
   Check,
@@ -1247,7 +1248,7 @@ export function ComponentsSection() {
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
-        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Each row accepts a semantic `tone` (`neutral` · `primary` · `success` · `warning` · `info` · `muted`, iter 93) that tints the disc border + icon so the eye can pick out rule fires, classification changes, and sync events without parsing the summary line. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Each row accepts a semantic `tone` (`neutral` · `primary` · `success` · `warning` · `destructive` · `info` · `muted`, iter 93; `destructive` added iter 105 for sync-history errored runs) that tints the disc border + icon so the eye can pick out rule fires, classification changes, and sync events without parsing the summary line. Used by the transaction-detail activity feed and the per-connection sync-history feed."
         className="block"
       >
         <div className="grid gap-6 max-w-3xl sm:grid-cols-2">
@@ -1308,6 +1309,14 @@ export function ComponentsSection() {
                 </p>
                 <p className="text-muted-foreground mt-1 text-[11px]">
                   Yesterday at 4:00 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={AlertCircle} tone="destructive">
+                <p className="text-sm leading-snug">
+                  Sync from Chase failed — credentials expired
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 3:58 PM
                 </p>
               </TimelineRail.Row>
               <TimelineRail.Row icon={MessageSquare} muted>
