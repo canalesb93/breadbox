@@ -449,6 +449,26 @@ Next iteration candidates (in rough impact order):
 
 Picking **#6 + #4 bundled** for iter 16 — both are tiny; combining keeps the PR count linear without overloading any single PR. Actually, the operating instructions say "one iteration's worth of work" per PR. Splitting: pick #4 (inline run notes — small backend + small UI, makes runs more useful for human-in-the-loop debugging); push #6 to iter 17. The gitkeep race is annoying but each iter's amend handles it locally.
 
+## ITER 16 — 2026-05-17 02:55
+Shipped (PR #1242 squash-merged into sprint branch as 3fa2452d):
+- Migration: agent_runs.operator_note TEXT NULL (additive).
+- Service.SetAgentRunNote with 2000-char cap; OperatorNote threaded through AgentRunResponse + agentRunFromRow.
+- PATCH /api/v1/agents/runs/{shortId} handler; openapi/docs updated; drift green.
+- SPA: useUpdateAgentRunNote + AGENT_RUN_NOTE_MAX_LEN; OperatorNoteEditor at top of transcript drawer (Textarea with char counter, smart Save/Clear button, mutation-toast).
+- All 5 CI jobs green.
+
+Next iteration candidates (in rough impact order):
+1. **Cost dashboard** in /v2/agents — sparkline on list page or /v2/agents/cost. Bigger UI work, high impact for self-hosters worried about API spend.
+2. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger.
+3. **Suggested rules agent** — scans recent transactions, proposes new transaction_rules, queues for human review. Bigger.
+4. **"Next fire" preview honoring quiet hours** — small follow-up to iter 15.
+5. **📝 indicator on run-history rows that have a note** — tiny follow-up to iter 16.
+6. **make web post-step that re-creates web/dist/.gitkeep** — kill the recurring gitkeep race.
+7. **breadbox doctor "agent run X" smoke** — extend agent test with the option to fire a real definition.
+
+Picking **#5 note indicator** next iteration — tiny polish that lands the iter-16 notes feature on the run-history surface (where most users will see them); 30-min iteration.
+
+
 
 
 
