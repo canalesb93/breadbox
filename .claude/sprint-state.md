@@ -547,8 +547,24 @@ Next iteration candidates (in rough impact order):
 
 Picking **#5 run-rate error alert** next iteration — small, leans on the iter-19 stats infra (add `error_count_30d` alongside `run_count`), surfaces a destructive-tone Alert on the agent row when ≥3 of the last 5 runs errored. High signal for "is this agent broken?"
 
+## ITER 21 — 2026-05-17 04:00
+Shipped (PR #1247 squash-merged into sprint branch as e1c19080):
+- New `GetAgentRecentErrorStats` sqlc query — ROW_NUMBER window over the last 5 non-skipped runs per agent, returns (error_count, run_count).
+- Service: `AgentRecentErrorStats` type + `AgentDefinitionResponse.RecentErrorStats` (list-only, omitempty). `ListAgentDefinitions` zips the rollup in; soft-fails on query error so the page keeps rendering.
+- SPA: `AgentRecentErrorStats` TS type + `recent_error_stats` field. New `RecentErrorPill` renders only when `error_count >= 3` (constant `RECENT_ERROR_WARN_THRESHOLD`); red palette + AlertCircle icon + native title with full context; slots between cost pill and last-run pill.
+- All 5 CI jobs green.
 
+Screenshots intentionally omitted from PR body — the pill only renders once an agent has accumulated 3+ errors in last 5 runs, and seeding that state requires real API calls. Will appear naturally once an agent misbehaves in dogfooding.
 
+Next iteration candidates (in rough impact order):
+1. **Settings page "Test connection" button** — leverage existing SmokeTest infra to validate auth before save. Small UX win, immediate self-hoster value.
+2. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine + agent_definitions schema. Bigger.
+3. **Suggested rules agent** — proposes new transaction_rules from recent transactions, queues for review. Bigger.
+4. **breadbox doctor --with-live** — option to also run smoke test (not just check prereqs).
+5. **Per-model cost breakdown** — extend iter-19 stats with model-by-model spend.
+6. **"Run now" with custom prompt prefix** — operator can prepend ad-hoc context to a manual fire.
+
+Picking **#1 settings test-connection button** next iteration — small, leverages SmokeTest infra (already exists on per-agent settings page per useSmokeTestAgent hook), adds a global "Test auth" affordance on Settings → Agents that validates the saved subscription_token / api_key before the operator schedules any real runs. Most-onboarding-friendly next step.
 
 
 
