@@ -107,7 +107,7 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                     data-active={isActive ? "true" : undefined}
                     className={cn(
                       "group relative flex w-full items-center gap-2 rounded-md py-2 pr-3 pl-3.5 text-left text-sm transition-colors",
-                      "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r-full before:bg-transparent before:transition-all",
+                      "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r-full before:bg-transparent before:transition-all before:duration-200 before:ease-out",
                       // Shared focus-visible vocabulary (matches Button +
                       // SidebarMenuButton) so keyboard users can see which
                       // section is focused before pressing Enter.
