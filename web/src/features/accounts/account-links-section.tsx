@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Link2,
   Loader2,
-  MoreHorizontal,
   Plus,
   RotateCw,
   Unlink,
@@ -14,14 +13,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { SectionCard } from "@/components/section-card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -236,41 +232,23 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
           {!link.enabled && <Badge variant="outline" className="text-[10px]">Disabled</Badge>}
         </div>
       </div>
-      <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                aria-label="Link actions"
-                disabled={reconcile.isPending || remove.isPending}
-              >
-                {reconcile.isPending || remove.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <MoreHorizontal className="size-3.5" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Link actions</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onReconcile} disabled={reconcile.isPending}>
-            <RotateCw className="size-3.5" /> Reconcile matches
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => setConfirmUnlink(true)}
-            disabled={remove.isPending}
-          >
-            <Unlink className="size-3.5" /> Unlink
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowActionsMenu
+        label="Link actions"
+        size="xs"
+        loading={reconcile.isPending || remove.isPending}
+      >
+        <DropdownMenuItem onClick={onReconcile} disabled={reconcile.isPending}>
+          <RotateCw className="size-3.5" /> Reconcile matches
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => setConfirmUnlink(true)}
+          disabled={remove.isPending}
+        >
+          <Unlink className="size-3.5" /> Unlink
+        </DropdownMenuItem>
+      </RowActionsMenu>
 
       <ConfirmDialog
         open={confirmUnlink}

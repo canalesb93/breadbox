@@ -19,6 +19,7 @@ import {
   Monitor,
   Moon,
   Pause,
+  Pencil,
   Plus,
   Receipt,
   RefreshCw,
@@ -30,6 +31,7 @@ import {
   Sun,
   Tag,
   Trash2,
+  Unplug,
   Users,
   Wallet,
   Wand2,
@@ -69,6 +71,11 @@ import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
 import { ActionPill } from "@/components/action-pill";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { PageError } from "@/components/page-error";
@@ -475,6 +482,72 @@ export function ComponentsSection() {
               <RefreshCw className="size-3.5" />
               Re-authenticate
             </ActionPill>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="RowActionsMenu"
+        code="components/row-actions-menu"
+        description="The canonical row-actions kebab — `Tooltip` + `DropdownMenuTrigger` + `Button` lockup that every list row, hero footer, and inline action cluster shares so trigger geometry, icon glyph (`MoreHorizontal size-4`), and aria vocabulary stay consistent across the SPA. `size='sm'` (default) is the dominant size-8 ghost square (connection-row, household-section, tags-table, api-keys-table). `size='xs'` is the tighter size-7 variant for hero footers and nested list rows (account-links, rule-row, connection-detail hero). `loading` swaps the icon for a spinning Loader2 and disables the trigger. `triggerClassName` is the escape hatch (only connection-detail's hero footer uses it today for `rounded-full` to pair with surrounding pills). Sibling of `<ActionPill>` (labelled inline action) — same `text-muted-foreground → hover:text-foreground` icon-button vocabulary, but RowActionsMenu opens a menu rather than dispatching."
+        className="block"
+      >
+        <div className="flex flex-col gap-4 rounded-lg border p-4">
+          <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+            <div className="text-sm">
+              <div className="font-medium">Tag actions (size sm)</div>
+              <div className="text-muted-foreground text-xs">
+                Dominant row-actions trigger — size-8 ghost square
+              </div>
+            </div>
+            <RowActionsMenu label="Tag actions">
+              <DropdownMenuItem onSelect={() => toast.message("Edit tag")}>
+                <Pencil className="size-4" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => toast.error("Delete tag")}
+              >
+                <Trash2 className="size-4" /> Delete
+              </DropdownMenuItem>
+            </RowActionsMenu>
+          </div>
+          <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+            <div className="text-sm">
+              <div className="font-medium">Rule actions (size xs)</div>
+              <div className="text-muted-foreground text-xs">
+                Tighter variant for hero footers + nested rows — size-7 ghost square
+              </div>
+            </div>
+            <RowActionsMenu
+              label="Rule actions"
+              size="xs"
+              contentClassName="w-44"
+            >
+              <DropdownMenuItem onSelect={() => toast.message("Disable rule")}>
+                <Pause className="size-3.5" /> Disable
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => toast.error("Delete rule")}
+              >
+                <Trash2 className="size-3.5" /> Delete
+              </DropdownMenuItem>
+            </RowActionsMenu>
+          </div>
+          <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+            <div className="text-sm">
+              <div className="font-medium">Link actions (loading)</div>
+              <div className="text-muted-foreground text-xs">
+                `loading` swaps the kebab icon for a spinning Loader2
+              </div>
+            </div>
+            <RowActionsMenu label="Link actions" size="xs" loading>
+              <DropdownMenuItem>
+                <Unplug className="size-3.5" /> Unlink
+              </DropdownMenuItem>
+            </RowActionsMenu>
           </div>
         </div>
       </Specimen>

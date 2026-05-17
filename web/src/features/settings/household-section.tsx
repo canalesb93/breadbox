@@ -7,7 +7,6 @@ import {
   Copy,
   Link2,
   Loader2,
-  MoreVertical,
   RefreshCw,
   Trash2,
   UserPlus,
@@ -27,12 +26,10 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import {
   Form,
   FormControl,
@@ -52,7 +49,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   setupAccountURL,
@@ -229,82 +225,65 @@ function MemberMenu({
   };
 
   return (
-    <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground size-8"
-            >
-              <MoreVertical className="size-4" />
-              <span className="sr-only">Member actions</span>
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Member actions</TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent align="end" className="w-52">
-        {login ? (
-          <>
-            {!login.has_password && (
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  onRegenerateClick();
-                }}
-              >
-                <Link2 className="size-4" />
-                Get setup link
-              </DropdownMenuItem>
-            )}
+    <RowActionsMenu label="Member actions" contentClassName="w-52">
+      {login ? (
+        <>
+          {!login.has_password && (
             <DropdownMenuItem
               onSelect={(e) => {
                 e.preventDefault();
                 onRegenerateClick();
               }}
             >
-              <RefreshCw className="size-4" />
-              Reset password
+              <Link2 className="size-4" />
+              Get setup link
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                onUnlinkLogin();
-              }}
-            >
-              <Trash2 className="size-4" />
-              Remove login
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        ) : (
-          <>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                onCreateLogin();
-              }}
-            >
-              <UserPlus className="size-4" />
-              Invite to sign in
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuItem
-          variant="destructive"
-          onSelect={(e) => {
-            e.preventDefault();
-            onDelete();
-          }}
-        >
-          <Trash2 className="size-4" />
-          Delete member
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          )}
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onRegenerateClick();
+            }}
+          >
+            <RefreshCw className="size-4" />
+            Reset password
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onUnlinkLogin();
+            }}
+          >
+            <Trash2 className="size-4" />
+            Remove login
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>
+      ) : (
+        <>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onCreateLogin();
+            }}
+          >
+            <UserPlus className="size-4" />
+            Invite to sign in
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>
+      )}
+      <DropdownMenuItem
+        variant="destructive"
+        onSelect={(e) => {
+          e.preventDefault();
+          onDelete();
+        }}
+      >
+        <Trash2 className="size-4" />
+        Delete member
+      </DropdownMenuItem>
+    </RowActionsMenu>
   );
 }
 

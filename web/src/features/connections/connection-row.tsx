@@ -5,7 +5,6 @@ import {
   FileSpreadsheet,
   Landmark,
   Loader2,
-  MoreHorizontal,
   Pause,
   Plug,
   Unplug,
@@ -13,13 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { formatBalance } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
@@ -174,45 +170,28 @@ export function ConnectionRow({
             </div>
           </div>
 
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-foreground size-8"
-                    aria-label="Connection actions"
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Connection actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              {showReauthBanner && (
-                <DropdownMenuItem onClick={() => onReauth(connection)}>
-                  <Plug className="size-4" /> Re-authenticate
-                </DropdownMenuItem>
-              )}
-              {connection.status === "active" && (
-                <DropdownMenuItem
-                  onClick={onTogglePause}
-                  disabled={pause.isPending}
-                >
-                  <Pause className="size-4" /> Pause syncing
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => setConfirmingDisconnect(true)}
-              >
-                <Unplug className="size-4" /> Disconnect…
+          <RowActionsMenu label="Connection actions">
+            {showReauthBanner && (
+              <DropdownMenuItem onClick={() => onReauth(connection)}>
+                <Plug className="size-4" /> Re-authenticate
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            {connection.status === "active" && (
+              <DropdownMenuItem
+                onClick={onTogglePause}
+                disabled={pause.isPending}
+              >
+                <Pause className="size-4" /> Pause syncing
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setConfirmingDisconnect(true)}
+            >
+              <Unplug className="size-4" /> Disconnect…
+            </DropdownMenuItem>
+          </RowActionsMenu>
         </div>
       </div>
 
