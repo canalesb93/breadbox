@@ -757,12 +757,9 @@ function SettingsCard({
   return (
     <SectionCard title="Settings" bodyClassName="space-y-4 px-5 py-5 text-sm">
       <div className="space-y-1.5">
-        <label
-          htmlFor="sync-interval"
-          className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase"
-        >
+        <Eyebrow as="label" htmlFor="sync-interval">
           Sync interval
-        </label>
+        </Eyebrow>
         <Select
           value={intervalValue}
           onValueChange={onIntervalChange}

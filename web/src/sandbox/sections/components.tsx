@@ -405,14 +405,17 @@ export function ComponentsSection() {
       <Specimen
         label="Eyebrow"
         code="components/eyebrow"
-        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, and timeline-rail day headings. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them. Two variants — `default` (text-[10px] tracking-[0.1em]) is the everyday eyebrow; `hero` (tracking-[0.12em]) gets extra letter air for spots where it sits directly under a large display title. Don't reach for raw `text-[10px] font-medium tracking-* uppercase` markup — extend this primitive."
+        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, and timeline-rail day headings. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them. Three variants — `default` (`text-[10px] tracking-[0.1em]`) is the everyday eyebrow; `hero` (`tracking-[0.12em]`) gets extra letter air for spots where it sits directly under a large display title; `page` (`text-[11px] tracking-[0.08em]`) is the slightly heavier rhythm reserved for *page*-scale framing — `<PageHeader>` eyebrow, home-stats KPI cell labels, provider-card 'Provider' caption — where the eyebrow has to hold its own next to a 2xl–3xl title without disappearing (iter 94, retiring six hand-rolled call sites). Don't reach for raw `text-[10-11px] font-medium tracking-* uppercase` markup — extend this primitive."
         className="block"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-lg border p-4">
             <Eyebrow>Default · in a card header</Eyebrow>
             <p className="text-foreground mt-1 text-sm">
-              "Showing 24 of 879" / "Synced 4 minutes ago" / "Reference"
+              "Showing 24 of 879" / "Reference"
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              text-[10px] · tracking-[0.1em]
             </p>
           </div>
           <div className="bg-card rounded-lg border p-4">
@@ -423,7 +426,18 @@ export function ComponentsSection() {
               Chase Sapphire ····2890
             </h4>
             <p className="text-muted-foreground mt-1 text-xs">
-              hero variant — sits under a display title with extra letter air
+              hero · tracking-[0.12em]
+            </p>
+          </div>
+          <div className="rounded-lg border p-4">
+            <Eyebrow variant="page" as="p">
+              Synced 4 minutes ago
+            </Eyebrow>
+            <h1 className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+              Connections
+            </h1>
+            <p className="text-muted-foreground mt-1 text-xs">
+              page · text-[11px] · tracking-[0.08em]
             </p>
           </div>
         </div>

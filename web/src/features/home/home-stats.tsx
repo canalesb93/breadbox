@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { Eyebrow } from "@/components/eyebrow";
 import { formatCompactAmount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account, Connection } from "@/api/types";
@@ -164,9 +165,9 @@ const TONE_CLASS: Record<NonNullable<CellProps["valueTone"]>, string> = {
 function HeroCell({ eyebrow, value, hint, valueTone = "neutral", className }: CellProps) {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.08em] uppercase">
+      <Eyebrow variant="page" className="inline-flex items-center gap-1.5">
         {eyebrow}
-      </div>
+      </Eyebrow>
       <div
         className={cn(
           "text-3xl font-semibold tracking-tight tabular-nums sm:text-[2rem] sm:leading-tight",
@@ -193,9 +194,9 @@ function SecondaryCell({
 }: CellProps) {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.08em] uppercase">
+      <Eyebrow variant="page" className="inline-flex items-center gap-1.5">
         {eyebrow}
-      </div>
+      </Eyebrow>
       <div
         className={cn(
           "text-xl font-semibold tracking-tight tabular-nums",

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { Eyebrow } from "@/components/eyebrow";
 import { SectionCard } from "@/components/section-card";
 import { FormFooter } from "@/components/form-footer";
 import { IdPill } from "@/components/id-pill";
@@ -145,9 +146,9 @@ export function TellerCard({ config, health, hasEncryptionKey }: TellerCardProps
               <Landmark className="size-5" />
             </div>
             <div className="min-w-0 space-y-1">
-              <div className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
+              <Eyebrow as="p" variant="page">
                 Provider
-              </div>
+              </Eyebrow>
               <div className="flex items-center gap-2">
                 <h2 className="text-foreground text-lg font-semibold tracking-tight">
                   Teller
