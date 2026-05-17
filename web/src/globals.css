@@ -142,3 +142,14 @@
   grid-row: auto;
   align-self: center;
 }
+
+/* shadcn's Button primitive deliberately ships no cursor class, so it
+   inherits the underlying element's native cursor — `<button>` is
+   `default` in modern Chromium, which is what shadcn's docs assume. But
+   `asChild` swaps in `<a>` (e.g. `<Button asChild><Link/></Button>`),
+   which inherits the anchor's `pointer` and breaks the convention.
+   Pin the cursor on the slot itself so SoftBackButton, JumpToPill,
+   Button-as-Link, etc. all stay consistent with the rest of the app. */
+[data-slot="button"] {
+  cursor: default;
+}
