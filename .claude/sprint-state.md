@@ -592,6 +592,32 @@ Next iteration candidates (refreshed):
 
 Picking **#1 "Run now" with custom prompt prefix** next iteration — small (one backend field + one dialog), high operator value during dogfooding, touches both layers, UI evidence opportunity.
 
+## ITER 23 — 2026-05-17 04:35
+Shipped (PR #1249 squash-merged into sprint branch as 4837b515):
+- Migration 20260517110629: agent_runs.prompt_prefix TEXT NULL (additive — applied cleanly to shared dev DB).
+- sqlc SetAgentRunPromptPrefix called right after CreateAgentRun so audit trail captures the prefix even if AssembleJobSpec fails.
+- Orchestrator.RunNow signature gains promptPrefix arg (third position). RunOrSkip always passes "". applyPromptPrefix helper formats the prepend ("Operator note for this run:\n<prefix>\n\n<original>") in one testable place.
+- AgentRunResponse.PromptPrefix on every run row (omitempty).
+- API: POST /api/v1/agents/{slug}/run optional { prompt_prefix } body, capped at 2000 chars (PROMPT_PREFIX_TOO_LONG 400).
+- CLI: breadbox agent run <slug> --prefix "..." mirrors the HTTP flag.
+- SPA: "Run now" Button → Dialog with optional Textarea + live char counter; Sparkles "prefix" pill on history rows; read-only PromptPrefixBlock at top of TranscriptSheet for any run that carried a prefix.
+- openapi.yaml + docs/api-endpoints.md updated.
+- 2 new prefix-specific orchestrator integration tests pass; 7 existing tests updated to pass "" through new arg position.
+- All 5 CI jobs green.
+- Desktop + mobile screenshots captured via Chrome DevTools MCP, uploaded to img402.dev (back online after the iter-19 outage), embedded in PR body.
+
+Next iteration candidates (refreshed):
+1. **"Use last prefix" affordance** — tiny follow-up to iter-23. Surface AgentRunSummary.PromptPrefix and add a "Use last prefix" button on the Run now dialog when the agent has a prior prefix on record. UI-only on top of existing iter-23 infra.
+2. **Per-model cost breakdown** — would need a model column on agent_runs to get historically-accurate attribution. Bigger.
+3. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger.
+4. **Suggested rules agent** — bigger.
+5. **Empty/error state polish across all agent pages** — UI sweep.
+6. **Mobile-responsive sweep on agent pages** — UI sweep.
+7. **Inline rule-engine docs in the prompt builder** — link/preview to docs/rule-dsl.md.
+8. **Transcript file GC** — orchestrator writes NDJSON forever; deferred from iter-7. Daily cleanup + retention setting.
+
+Picking **#1 "Use last prefix" affordance** next iteration — tiniest follow-up that compounds iter-23's value; no schema or behavior change, pure UX win for operators iterating on a prefix.
+
 
 
 
