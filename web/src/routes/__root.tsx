@@ -64,13 +64,18 @@ function AuthenticatedGate({ pathname }: { pathname: string }) {
   }, [is401, navigate, pathname]);
 
   // Gate: never render the authenticated shell until /me has resolved
-  // successfully. This kills the brief flash of sidebar + page content
-  // before the 401 redirect fires.
-  if (is401 || me.isPending || !me.data) {
+  // successfully. Splash covers the loading window AND the 401-redirect
+  // window (so the redirect fires from a calm loader instead of an error
+  // flash). Real non-401 failures (network drop, 500, malformed payload)
+  // surface as the AuthError panel with a Reload affordance.
+  if (is401 || me.isPending) {
     return <AuthSplash />;
   }
   if (me.error) {
     return <AuthError message={me.error.message} />;
+  }
+  if (!me.data) {
+    return <AuthSplash />;
   }
 
   return <AuthenticatedShell pathname={pathname} />;
