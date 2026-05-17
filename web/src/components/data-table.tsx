@@ -191,15 +191,18 @@ export function DataTable<TData, TValue>({
               // the card's `rounded-lg` at rest, AND so the bottom
               // separator stays visible while stickied (`<tr>` border-b
               // is unreliable in default table-collapse mode).
-              // `shadow-[inset_0_-1px_0_0_var(--border)]` on each cell
-              // gives an always-visible bottom separator that survives
-              // border-collapse merging with the body row below it.
-              "sticky top-14 z-10 [&>tr>th]:bg-muted/40 supports-[backdrop-filter]:[&>tr>th]:bg-muted/30 [&>tr>th]:backdrop-blur-sm [&>tr>th]:shadow-[inset_0_-1px_0_0_var(--border)] [&>tr>th]:transition-[border-radius]",
+              "sticky top-14 z-10 [&>tr>th]:bg-muted/40 supports-[backdrop-filter]:[&>tr>th]:bg-muted/30 [&>tr>th]:backdrop-blur-sm [&>tr>th]:transition-[border-radius]",
             // Flat top corners while stuck — the card has scrolled past
             // so rounded ears would just clip into the shell-header bg.
             stickyHeader &&
               !isStuck &&
               "[&>tr>th:first-child]:rounded-tl-lg [&>tr>th:last-child]:rounded-tr-lg",
+            // Add an explicit bottom separator only while stuck — at
+            // rest the inherited `<tr>` border-b renders fine, and
+            // doubling it produced a visibly heavier line.
+            stickyHeader &&
+              isStuck &&
+              "[&>tr>th]:shadow-[inset_0_-1px_0_0_var(--border)]",
           )}
         >
           {table.getHeaderGroups().map((headerGroup) => (
