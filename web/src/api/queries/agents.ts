@@ -184,13 +184,33 @@ export function useRunAgentNow() {
 
 // --- Run queries ---
 
-export function useAgentRuns(slug: string | undefined, limit = 50, offset = 0) {
+export interface AgentRunsFilters {
+  status?: string; // "" | "success" | "error" | "in_progress" | "skipped" | "timeout"
+  trigger?: string; // "" | "cron" | "manual" | "webhook"
+  start?: string; // YYYY-MM-DD or RFC3339
+  end?: string;
+}
+
+export function useAgentRuns(
+  slug: string | undefined,
+  filters: AgentRunsFilters = {},
+  limit = 50,
+  offset = 0,
+) {
   return useQuery({
-    queryKey: ["agents", slug, "runs", { limit, offset }],
-    queryFn: () =>
-      api<AgentRunListResult>(
-        `/api/v1/agents/${slug}/runs?limit=${limit}&offset=${offset}`,
-      ),
+    queryKey: ["agents", slug, "runs", { limit, offset, ...filters }],
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(limit));
+      qs.set("offset", String(offset));
+      if (filters.status) qs.set("status", filters.status);
+      if (filters.trigger) qs.set("trigger", filters.trigger);
+      if (filters.start) qs.set("start", filters.start);
+      if (filters.end) qs.set("end", filters.end);
+      return api<AgentRunListResult>(
+        `/api/v1/agents/${slug}/runs?${qs.toString()}`,
+      );
+    },
     enabled: Boolean(slug),
   });
 }

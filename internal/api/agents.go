@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"breadbox/internal/agent"
 	"breadbox/internal/app"
@@ -185,7 +186,8 @@ func setAgentEnabled(svc *service.Service, enabled bool) http.HandlerFunc {
 
 // --- Handlers: runs ---
 
-// ListAgentRunsHandler returns paginated runs for one agent.
+// ListAgentRunsHandler returns paginated runs for one agent. Supports
+// optional status / trigger / date-range filters via query params.
 func ListAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
@@ -200,13 +202,73 @@ func ListAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
-		out, err := svc.ListAgentRuns(r.Context(), slug, limit, offset)
+		params := service.AgentRunListParams{
+			Limit:   limit,
+			Offset:  offset,
+			Status:  q.Get("status"),
+			Trigger: q.Get("trigger"),
+		}
+		if s := q.Get("start"); s != "" {
+			t, perr := parseDateOrRFC3339(s)
+			if perr != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start must be YYYY-MM-DD or RFC3339")
+				return
+			}
+			params.Start = &t
+		}
+		if s := q.Get("end"); s != "" {
+			t, perr := parseDateOrRFC3339(s)
+			if perr != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end must be YYYY-MM-DD or RFC3339")
+				return
+			}
+			// YYYY-MM-DD inputs land at 00:00; bump to end-of-day so the
+			// inclusive bound matches user expectation ("through Friday").
+			if len(s) == 10 {
+				t = t.Add(24*time.Hour - time.Second)
+			}
+			params.End = &t
+		}
+		if !isAllowedRunStatus(params.Status) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"status must be one of: success, error, in_progress, skipped, timeout (empty = all)")
+			return
+		}
+		if !isAllowedRunTrigger(params.Trigger) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"trigger must be one of: cron, manual, webhook (empty = all)")
+			return
+		}
+		out, err := svc.ListAgentRuns(r.Context(), slug, params)
 		if err != nil {
 			writeAgentError(w, err, "agent not found")
 			return
 		}
 		writeData(w, out)
 	}
+}
+
+func parseDateOrRFC3339(s string) (time.Time, error) {
+	if len(s) == 10 { // YYYY-MM-DD
+		return time.Parse("2006-01-02", s)
+	}
+	return time.Parse(time.RFC3339, s)
+}
+
+func isAllowedRunStatus(s string) bool {
+	switch s {
+	case "", "success", "error", "in_progress", "skipped", "timeout":
+		return true
+	}
+	return false
+}
+
+func isAllowedRunTrigger(s string) bool {
+	switch s {
+	case "", "cron", "manual", "webhook":
+		return true
+	}
+	return false
 }
 
 // GetAgentRunHandler resolves by short_id or UUID.
