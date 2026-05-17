@@ -97,6 +97,12 @@ export function TransactionsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Gate on the live URL: if the user already navigated away (e.g. j/k +
+    // Enter into a transaction detail before the 300ms debounce fires),
+    // skip. Without this, `navigate({ to: "." })` resolves to this
+    // component's matched route (`/transactions`) and pushes us back to
+    // the list, flashing the URL away from the detail page we just opened.
+    if (!window.location.pathname.endsWith("/transactions")) return;
     const q = debounced.trim() || undefined;
     navigate({
       to: ".",
