@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,6 +8,8 @@ import {
   Bot,
   CheckCircle2,
   Clock,
+  History,
+  Pencil,
   Play,
   Plus,
   Trash2,
@@ -358,6 +361,16 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
           >
             <Play className="size-3.5" />
             Run now
+          </Button>
+          <Button asChild variant="ghost" size="icon" aria-label="Run history">
+            <Link to="/agents/$slug/runs" params={{ slug: agent.slug }}>
+              <History className="size-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="icon" aria-label="Edit agent">
+            <Link to="/agents/$slug/edit" params={{ slug: agent.slug }}>
+              <Pencil className="size-4" />
+            </Link>
           </Button>
           <Button
             variant="ghost"

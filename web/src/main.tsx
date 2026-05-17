@@ -46,6 +46,8 @@ import {
 } from "@/routes/account-detail";
 import { RulesPage, rulesSearchSchema } from "@/routes/rules";
 import { AgentsPage } from "@/routes/agents";
+import { AgentEditPage } from "@/routes/agents.$slug.edit";
+import { AgentRunsPage, agentRunsSearchSchema } from "@/routes/agents.$slug.runs";
 import { RuleDetailPage } from "@/routes/rule-detail";
 import { RuleFormPage } from "@/routes/rule-form";
 import { NAV_LEAVES } from "@/lib/nav";
@@ -218,6 +220,21 @@ const ruleDetailRoute = createRoute({
   component: RuleDetailPage,
 });
 
+// /agents/$slug/edit and /agents/$slug/runs — declared before the more
+// general /agents nav-leaf route so chi-style longest-match prevails.
+const agentEditRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/$slug/edit",
+  component: AgentEditPage,
+});
+
+const agentRunsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/$slug/runs",
+  component: AgentRunsPage,
+  validateSearch: agentRunsSearchSchema,
+});
+
 const pageRoutes = NAV_LEAVES.flatMap(({ leaf }) => {
   if (leaf.kind !== "link" || leaf.to === "/") return [];
   const override = PAGE_OVERRIDES[leaf.to];
@@ -250,6 +267,8 @@ const routeTree = rootRoute.addChildren([
   ruleNewRoute,
   ruleEditRoute,
   ruleDetailRoute,
+  agentEditRoute,
+  agentRunsRoute,
   ...pageRoutes,
 ]);
 
