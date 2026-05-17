@@ -100,6 +100,15 @@ next target, then updates this file at the end of the run.
   bordered card wrapper) — don't force those onto ListCard.
 - **ColorRailCard primitive** — extracted to
   `web/src/components/color-rail-card.tsx` in iter 10 (#1123).
+  Sibling `<ColorRailCardSkeleton>` lifted in iter 67 (#1180) into
+  the same file — mirrors the wrapper + rail for loading states so
+  the skeleton stays in lockstep when the card's radius / rail
+  width / padding change. Three detail-page DetailSkeletons
+  (transaction, account, category) now route through it; `tileShape`
+  prop matches the loaded tile (`rounded-md` for TX-detail's
+  `CategoryIconTile`, `rounded-lg` for accounts/categories),
+  `withFooter` toggles the bordered action strip, `body` slot covers
+  TX-detail's secondary details grid below the identity row.
   Four surfaces now share it (iter 11 added Connection detail):
   TX-detail hero (category color, neutral when uncategorised),
   Account-detail hero (success for assets, destructive for
@@ -1646,6 +1655,30 @@ Cross-cutting components:
     longer accepted by the active seed). The diff is mechanical
     and small enough that the code review is the visual review.
 
+- **Iter 67 — `<ColorRailCardSkeleton>` lifts the detail-page hero loading state** ([#1180](https://github.com/canalesb93/breadbox/pull/1180))
+  - Three detail-page DetailSkeletons (`transaction-detail`,
+    `account-detail`, `category-detail`) hand-rolled the same
+    `bg-card rounded-xl border` + 4px muted left rail wrapper +
+    near-identical identity column (size-12 tile + eyebrow +
+    title + meta) and trailing metric column. Lifted the shared
+    shape into `<ColorRailCardSkeleton>` sibling of
+    `<ColorRailCard>` so the loading state mirrors the loaded
+    hero from one source.
+  - Tokens: `tileShape` (`rounded-md` for transactions /
+    `CategoryIconTile`, `rounded-lg` for accounts + categories)
+    keeps the loading tile flush with the loaded one;
+    `withFooter` toggles the bordered action strip used by
+    account-detail; optional `body` slot accepts the extra hero
+    rows TX-detail needs (Separator + 2-col field grid).
+  - Sandbox showcase updated alongside the live `ColorRailCard`
+    specimen so future tweaks to the wrapper land in one place.
+  - Three detail pages remain on bespoke skeletons (`tag`,
+    `rule`, `connection`) because they don't host a
+    `<ColorRailCard>` hero. A leaner shared shell for the
+    "no hero" detail pages stays a follow-up — the three shapes
+    are different enough today that forcing them onto one
+    primitive would distort the loaded view.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1752,6 +1785,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
