@@ -753,6 +753,36 @@ Shipped PR #1262 (00a54bed): audit HIGH #5 + LOW #6 + LOW #7. Removed dead `spec
 ## ITER 37 (in progress) — 2026-05-17 07:35
 In parallel: spawned `feature-dev` general-purpose subagent to propose 3-5 high-impact extension ideas. Will queue top finding for iter-38.
 
+## ITERS 37-46 (Ricardo away) — 2026-05-17 07:35 → 08:25
+Sprint continued autonomously through one full subagent cycle (gap audit done iter-32; feature-extension iter-37; end-user journey iter-40; comparable-product iter-42). 10 merged iters in 50 minutes:
+
+- **iter 37** PR #1263 — cron→prose label + "After sync" indicator on /v2/agents rows
+- **iter 38** PR #1264 — "Run failed" banner on /v2/agents (feature-ext #2: errored runs from last 24h surface at the top of the list, deep-link to transcript drawer)
+- **iter 39** PR #1265 — "Quiet now" pill when local time is inside an enabled agent's quiet window (SPA mirror of internal/service/IsWithinQuietHours)
+- **iter 40** PR #1266 — `breadbox agent list [--json]` CLI for SSH-based ops
+- **iter 41** PR #1267 — docs: 3 BLOCKING journey-audit findings (bun prerequisite, breadbox init in README, exit-code reference table)
+- **iter 42** PR #1268 — docs+ui: 4 ANNOYING journey-audit findings (onboarding banner recommendation, auth-precedence env-var guidance, retention disk-sizing note, runtime_path placeholder fix)
+- **iter 43** PR #1270 — "Tools only" / "Errors only" filter chips on the transcript drawer
+- **iter 44** PR #1271 — docs+ui: 3 PAPER-CUT journey-audit findings (smoke-test failure deep-debug CTA, seed-agent model edit note, docs↔cli-commands cross-link). **All 10 of 10 journey findings closed.**
+- **iter 45** PR #1272 — "Test this prompt" button on edit form + `prompt_override` body field on POST /run; new RunOverrides struct, RunNowWith method, RunNow preserved as wrapper. Hit a one-time `tailwindcss-extra` CI flake; rerun landed clean.
+- **iter 46** PR #1273 — per-workload model tuning in seed agents (Opus for cold-start work, Sonnet for analytical pass, Haiku for routine batches) for a meaningful steady-state cost drop without manual tuning.
+
+**Sprint state at handoff:**
+- 46 iters merged into the sprint branch `agents/claude-agent-sdk-sprint`
+- All 7 code-reviewer audit findings closed (BLOCKER #1 max_turns_used in iter-33, BLOCKER #2 scheduler.Reload race in iter-34, HIGH #3 ctx + HIGH #4 dup-slug in iter-35, HIGH #5 transcript-path + LOWs in iter-36)
+- All 10 end-user-journey audit findings closed (iters 41 / 42 / 44)
+- All 3 feature-extension subagent picks shipped or deferred (#2 + #3 shipped; #1 audit page deferred as M-effort)
+- All 3 comparable-product subagent picks shipped, deferred, or pivoted (#1 redundant; #2 PII guardrails deferred as M-effort; #3 multi-agent workflows deferred as L-effort)
+- One CI flake encountered (iter-45, tailwindcss-extra download); cleared on rerun
+
+**Deferred for Ricardo's review** (not picked up because they're M-L effort and the sprint felt close to done):
+- Audit page: link each agent_run to the DB changes it produced via the MCP audit-session join (`agent_runs.minted_key.name` → `api_keys.name` → `mcp_session_calls` → `transactions/rules/tags` writes). Largest remaining trust gap per the feature-ext subagent.
+- PII / prompt-injection guardrails: pre-MCP-write hook that rejects payloads with high-risk patterns. Comparable-product subagent.
+- Multi-agent workflows: DAG executor where one agent's output feeds the next. Comparable-product subagent.
+
+**Awaiting Ricardo's "we're good to merge" signal** to open the sprint→main PR. The branch is clean (all 5 CI jobs green on the merge HEAD).
+
+
 
 
 
