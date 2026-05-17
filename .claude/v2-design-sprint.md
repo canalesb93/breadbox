@@ -2069,20 +2069,49 @@ Cross-cutting components:
     instead of `tsc --noEmit` so this class of regression catches in
     iteration-level lint, not just CI build.
 
+- **Iter 81 — Lint script actually type-checks now (+ surfaced-error cleanup)** ([#1195](https://github.com/canalesb93/breadbox/pull/1195))
+  - Followed up on iter 80's open observation: `web/`'s `bun run lint`
+    was running `tsc --noEmit` with no `-p`, falling through to the
+    root `tsconfig.json` which has `files: []` and `references: [...]`
+    — so it compiled zero files and exited 0 unconditionally. That's
+    why iter 79's PR #1193 landed with a duplicate `referenceRows`
+    declaration + unescaped JSX text that real type-checking would
+    have caught.
+  - Switched the script to `tsc -b --noEmit` (build mode walks project
+    references). Verified end-to-end: injecting `const x: string = 123`
+    in `main.tsx` now exits 2 with the expected TS2322 (plus the
+    `noUnusedLocals` rule for free).
+  - Fixed the 8 pre-existing type errors that surfaced so the PR could
+    merge clean, scoped tight: `list-card` and `section-card` both
+    needed `Omit<HTMLAttributes, "title">` so the `ReactNode` title
+    prop doesn't collide with the DOM string `title`; `detail-list`
+    dropped an unused `import * as React`; `eyebrow` gained `"label"`
+    in its `as` union (and `htmlFor`) — pattern was already in use on
+    `connect-bank-sheet` and `csv-import-form`; `backups-section`
+    dropped unused `CheckCircle2`; `accounts.tsx` dropped a missing
+    `formatCurrency` import (no such export — would've been a real
+    bug at runtime); `connection-detail`'s `QuickActions` renamed
+    unused `conn` prop to `_props`.
+  - No visual change. Future design iterations now have a real
+    type-check gate before merge.
+
 ## Open observations / questions
 
 (Populated by iterations.)
 
-- **`bun run lint` doesn't catch real TS errors** (iter 80): the
-  script runs `tsc --noEmit` against the root `tsconfig.json` which
-  has `files: []` — it type-checks nothing. The actual project graph
-  is only walked by `tsc -b` (the script run by `bun run build`).
-  Net effect: a duplicate variable declaration and a JSX parse
-  error both landed on `design/v2-shadcn` (#1193) and blocked
-  `vite dev` for the next iteration. Fix: point `lint` at the
-  project references (`tsc -b --noEmit`) so the same graph runs in
-  both lint and build. Filed as a follow-up; iter 80 swept the
-  immediate parse errors but the lint config drift remains.
+- **`bun run lint` doesn't catch real TS errors** (iter 80, closed
+  iter 81 [#1195](https://github.com/canalesb93/breadbox/pull/1195)):
+  the script ran `tsc --noEmit` against the root `tsconfig.json`
+  which has `files: []` — it type-checked nothing. Iter 81 changed
+  the script to `tsc -b --noEmit` (build mode honors project
+  references) and fixed the 8 pre-existing type errors the change
+  surfaced (HTMLAttributes/title collisions on `list-card` and
+  `section-card`, unused React/icon/util imports, `Eyebrow` needing
+  `as="label"` for the pattern already in use on
+  `connect-bank-sheet` + `csv-import-form`, unused `conn` prop on
+  `connection-detail`'s `QuickActions`). Verified with an injected
+  `const x: string = 123` test — lint now exits 2 with the expected
+  TS2322. Observation closed.
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
@@ -2186,6 +2215,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
