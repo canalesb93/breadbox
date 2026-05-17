@@ -42,6 +42,7 @@ import { ActionPill } from "@/components/action-pill";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
+import { PageError } from "@/components/page-error";
 import {
   DetailList,
   compactDetailRows,
@@ -65,6 +66,7 @@ import {
 } from "@/api/queries/connections";
 import { useAccounts } from "@/api/queries/accounts";
 import { useSyncLogs } from "@/api/queries/sync-logs";
+import { ApiError } from "@/api/client";
 import type { Account, ConnectionDetail } from "@/api/types";
 import type { SyncLog } from "@/api/queries/sync-logs";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
@@ -209,8 +211,19 @@ export function ConnectionDetailPage() {
 
       {connQuery.isLoading ? (
         <DetailSkeleton />
-      ) : connQuery.isError || !connQuery.data ? (
+      ) : connQuery.isError &&
+        !(
+          connQuery.error instanceof ApiError && connQuery.error.status === 404
+        ) ? (
+        <PageError
+          resource="this connection"
+          error={connQuery.error}
+          onRetry={() => connQuery.refetch()}
+          retrying={connQuery.isFetching}
+        />
+      ) : !connQuery.data ? (
         <EmptyState
+          variant="card"
           icon={Plug}
           title="Connection not found"
           description="This connection may have been removed, or the link is out of date. Head back to the connections list to pick another."

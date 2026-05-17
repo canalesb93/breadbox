@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { PageError } from "@/components/page-error";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
 import {
@@ -29,13 +30,20 @@ import { TagManager } from "@/features/transactions/tag-manager";
 import { ActivityTimeline } from "@/features/transactions/activity-timeline";
 import { CommentComposer } from "@/features/transactions/comment-composer";
 import { useTransaction } from "@/api/queries/transactions";
+import { ApiError } from "@/api/client";
 import { formatAmount, formatLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
 
 export function TransactionDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
-  const { data, isLoading, isError } = useTransaction(id);
+  const query = useTransaction(id);
+  const { data, isLoading, isError, error } = query;
+  // 404 means the URL is stale (deleted or never existed) — show the
+  // "not found" empty state, which has a concrete back-to-list CTA.
+  // Every other failure (network drop, 500, dropped session) is a real
+  // load error — show PageError with Retry. Three states, three vocabularies.
+  const notFound = isError && error instanceof ApiError && error.status === 404;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -43,8 +51,16 @@ export function TransactionDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError || !data ? (
+      ) : isError && !notFound ? (
+        <PageError
+          resource="this transaction"
+          error={error}
+          onRetry={() => query.refetch()}
+          retrying={query.isFetching}
+        />
+      ) : !data ? (
         <EmptyState
+          variant="card"
           icon={Receipt}
           title="Transaction not found"
           description="This transaction may have been deleted, or the link is out of date. Head back to the transactions list to pick another."
