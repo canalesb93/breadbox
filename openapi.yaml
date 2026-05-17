@@ -2642,8 +2642,11 @@ paths:
       description: |
         Synchronously runs the named agent. Returns the resulting `agent_runs`
         row. Status may be `success`, `error`, or `timeout`. Optional body
-        `{ "prompt_prefix": "..." }` prepends operator-supplied context to
-        the agent's stored prompt for this fire only. **Requires `full_access` scope.**
+        accepts `prompt_prefix` (prepends operator context to the saved
+        prompt for this fire only) and `prompt` (replaces the saved prompt
+        entirely for this fire — powers the iter-45 "Test this prompt"
+        button on the edit page). When both are set, `prompt` wins.
+        **Requires `full_access` scope.**
       requestBody:
         required: false
         content:
@@ -2655,6 +2658,10 @@ paths:
                   type: string
                   maxLength: 2000
                   description: Optional per-run prefix prepended to the agent's prompt; cron runs leave it unset.
+                prompt:
+                  type: string
+                  maxLength: 40000
+                  description: Optional full-prompt override for this fire only. Takes precedence over `prompt_prefix` when both are set.
       responses:
         "201":
           description: Run completed (may be in error state — see `status` and `error_message`).
@@ -2662,7 +2669,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
         "400":
-          description: PROMPT_PREFIX_TOO_LONG when prompt_prefix exceeds 2000 chars.
+          description: PROMPT_PREFIX_TOO_LONG / PROMPT_TOO_LONG when the body exceeds the cap.
         "422":
           description: Auth or binary not configured.
         "503":

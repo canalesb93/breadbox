@@ -237,19 +237,24 @@ export function useToggleAgent() {
 export interface RunAgentNowParams {
   slug: string;
   promptPrefix?: string; // operator-supplied per-run prefix; max 2000 chars
+  // promptOverride replaces def.Prompt entirely for this fire; max 40000 chars.
+  // Powers the iter-45 "Test this prompt" button on the edit page. When both
+  // promptPrefix and promptOverride are set, override wins on the server.
+  promptOverride?: string;
 }
 
 export function useRunAgentNow() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ slug, promptPrefix }: RunAgentNowParams) =>
-      api<AgentRun>(`/api/v1/agents/${slug}/run`, {
+    mutationFn: ({ slug, promptPrefix, promptOverride }: RunAgentNowParams) => {
+      const body: Record<string, string> = {};
+      if (promptPrefix && promptPrefix.length > 0) body.prompt_prefix = promptPrefix;
+      if (promptOverride && promptOverride.length > 0) body.prompt = promptOverride;
+      return api<AgentRun>(`/api/v1/agents/${slug}/run`, {
         method: "POST",
-        body:
-          promptPrefix && promptPrefix.length > 0
-            ? JSON.stringify({ prompt_prefix: promptPrefix })
-            : undefined,
-      }),
+        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents"] });
     },

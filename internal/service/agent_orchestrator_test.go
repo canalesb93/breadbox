@@ -482,3 +482,63 @@ func TestOrchestratorRunNow_TripleConcurrency(t *testing.T) {
 		}
 	}
 }
+
+// TestOrchestratorRunNowWith_PromptOverride_ReplacesDefPrompt pins the
+// iter-45 "Test this prompt" flow: when an operator passes
+// RunOverrides.PromptOverride, the sidecar receives THAT text as
+// spec.Prompt instead of def.Prompt. Operator can dry-fire an unsaved
+// edit-form prompt without round-tripping through Save.
+func TestOrchestratorRunNowWith_PromptOverride_ReplacesDefPrompt(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-prompt-override", true)
+	const override = "Operator's unsaved test prompt — definitely not the stored one, used for dry-fire only."
+
+	var capturedPrompt string
+	fake := agent.RunnerFunc(func(_ context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		capturedPrompt = spec.Prompt
+		return agent.RunResult{Status: agent.StatusSuccess, TurnCount: 1, DurationMs: 10}, nil
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	_, err := orch.RunNowWith(context.Background(), def, service.RunOverrides{
+		PromptOverride: override,
+	})
+	if err != nil {
+		t.Fatalf("RunNowWith: %v", err)
+	}
+	if capturedPrompt != override {
+		t.Errorf("spec.Prompt = %q, want override exactly (no prefix wrapping)", capturedPrompt)
+	}
+}
+
+// TestOrchestratorRunNowWith_OverrideBeatsPrefix verifies the precedence
+// rule: when both PromptOverride AND PromptPrefix are set, the override
+// wins (the operator is testing a freshly-typed prompt, prepending a
+// prefix wouldn't match what they actually want to test).
+func TestOrchestratorRunNowWith_OverrideBeatsPrefix(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-prompt-prec", true)
+
+	var capturedPrompt string
+	fake := agent.RunnerFunc(func(_ context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		capturedPrompt = spec.Prompt
+		return agent.RunResult{Status: agent.StatusSuccess, TurnCount: 1, DurationMs: 5}, nil
+	})
+
+	orch := service.NewOrchestrator(svc, fake, 1, encKey, slog.Default())
+	_, err := orch.RunNowWith(context.Background(), def, service.RunOverrides{
+		PromptPrefix:   "this prefix should be ignored",
+		PromptOverride: "and the override should win clean",
+	})
+	if err != nil {
+		t.Fatalf("RunNowWith: %v", err)
+	}
+	if capturedPrompt != "and the override should win clean" {
+		t.Errorf("override should win exactly; got %q", capturedPrompt)
+	}
+	if strings.Contains(capturedPrompt, "this prefix should be ignored") {
+		t.Errorf("prefix leaked through despite override being set: %q", capturedPrompt)
+	}
+}
