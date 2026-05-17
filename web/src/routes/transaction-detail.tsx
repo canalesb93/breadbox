@@ -329,10 +329,6 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
     { label: "ID", value: t.short_id, mono: true },
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
-    { label: "ID", value: t.short_id, mono: true },
-  ]);
-
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
       <DetailList label="Account" rows={accountRows} />

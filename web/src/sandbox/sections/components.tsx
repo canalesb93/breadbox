@@ -196,9 +196,9 @@ export function ComponentsSection() {
             }
           >
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Reach for `SectionCard` for any non-list section. The footer slot
-              renders a flush bordered strip — typically a `<ViewAllPill>`
-              link to a fuller index.
+              Reach for <code>SectionCard</code> for any non-list section. The
+              footer slot renders a flush bordered strip — typically a{" "}
+              <code>&lt;ViewAllPill&gt;</code> link to a fuller index.
             </p>
           </SectionCard>
         </div>
