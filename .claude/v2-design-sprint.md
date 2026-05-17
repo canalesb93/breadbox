@@ -2872,3 +2872,51 @@ Cross-cutting components:
     sm:flex-row sm:items-center sm:justify-between sm:px-7` bar
     shared by plaid-card, teller-card, csv-card. Next iteration if
     no higher-priority target appears.
+
+
+
+- **Iter 100 — Retire 2 destructive Dialogs onto ConfirmDialog** ([#1215](https://github.com/canalesb93/breadbox/pull/1215))
+  - Triple-digit-milestone iteration. Pure drift retirement on the
+    cross-cutting destructive-confirmation vocabulary. Tags
+    (`tags-table`, delete tag) and API keys (`api-keys-table`, revoke
+    key) both hand-rolled a plain `<Dialog>` + `<DialogHeader/Footer>`
+    + destructive `<Button>` with a `<Loader2>` spinner — when
+    `<ConfirmDialog>` (iter 18) already existed and 8 other surfaces
+    (backups x3, household delete-member, plaid/teller cards) already
+    spoke its vocabulary. Both now route through `<ConfirmDialog>` —
+    10th and 11th consumers.
+  - Wins: the tone-tinted destructive icon tile (`Trash2` for the
+    tag delete; `Ban` for the api-key revoke — distinct icons,
+    intentional, "trash this" vs "stop honouring this") now reads
+    the dialog's intent at a glance instead of relying on the red
+    "Revoke key" / "Delete tag" button text alone. Both surfaces
+    also inherit the canonical pending-state behaviour
+    (`block-close-during-mutation` + spinner) for free, instead of
+    threading `disabled={pending}` through three Button instances.
+    Net diff: ~40 LOC removed across the two files.
+  - Visual contract is now consistent across every v2 destructive
+    confirmation surface: 16-square tone-tinted icon tile + title
+    + description + Cancel (outline) left + destructive primary
+    right. The previous bare-text destructive Dialogs were the only
+    two surfaces that didn't speak this vocabulary.
+  - No primitive changes. Visual difference is loud (the icon tile
+    is the headline change), but the system itself didn't grow —
+    this is a pure consumer migration on a tested primitive.
+  - **Remaining centered-modal `<Dialog>` consumers in `web/src/`**
+    are intentionally *not* candidates for this primitive:
+    `household-section` (Add member, Create login, Share setup
+    link), `settings-shell` (sr-only header on the settings modal
+    chrome itself), `confirm-dialog` (composes `AlertDialog`).
+    Those four are form-bearing modals (multi-field inputs +
+    submit handlers), not yes/no confirmations — they belong to a
+    future `DetailDialogHeader` primitive (sibling of
+    `DetailSheetHeader`) if/when the form-modal lockup grows a
+    third consumer. For now, the gap is documented and won't
+    accidentally get folded into `ConfirmDialog`.
+  - Process note: vite's transform-cache staleness reappeared (per
+    iter 35 + iter 91 observations) — capturing the BEFORE
+    screenshot after the commit required tearing down the dev
+    server, restarting on a fresh port with `--force`. The
+    `optimizeDeps.force=true` queue item in iter 91 is still the
+    right durable fix; logged here so the next iteration that hits
+    this pain has more evidence to motivate the change.
