@@ -104,23 +104,24 @@ export function CategoryPicker({
               Category
             </span>
           )}
-          {/* Chevron on a left-fading gradient strip. The gradient
-              softly masks any badge content underneath so the chevron
-              reads cleanly even when it overlaps a label edge, without
-              having to know the badge's tint. Both fade in together on
-              hover/focus. */}
+          {/* Chevron on a left-fading gradient strip that matches the
+              surface beneath it (badge `bg-secondary` when assigned;
+              the empty-state pill is transparent so the row's `bg-card`
+              shows through). The scrim softly masks any label content
+              under the chevron so it reads cleanly. Both fade in
+              together on hover/focus. */}
           <span
             aria-hidden
             className={cn(
-              "pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-md bg-gradient-to-l from-card via-card/85 to-transparent opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+              "pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-md bg-gradient-to-l to-transparent opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+              category?.display_name
+                ? "from-secondary via-secondary/85"
+                : "from-card via-card/85",
               size === "sm" ? "w-6 pr-1" : "w-7 pr-1.5",
             )}
           >
             <ChevronDown
-              className={cn(
-                "text-muted-foreground ml-auto drop-shadow-sm",
-                chevronClass,
-              )}
+              className={cn("text-muted-foreground ml-auto", chevronClass)}
             />
           </span>
         </button>
