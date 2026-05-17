@@ -313,9 +313,20 @@ next target, then updates this file at the end of the run.
   the abstraction would weigh more than the duplication.
 - **ListRowSkeleton primitive** — extracted to
   `web/src/components/list-row-skeleton.tsx` in iter 36 (#1150).
-  Five surfaces now share the canonical loading-row shape:
+  Five surfaces share the canonical loading-row shape:
   Connections list, Accounts list, Categories list, Home
-  connections panel, Home recent activity. Vocabulary tokens:
+  connections panel, Home recent activity. DataTable lists
+  (Transactions, Tags, API keys — and Rules' bespoke card-list)
+  ride a sibling family of co-located row-skeletons in their
+  features directory (`transaction-row-skeleton`,
+  `tag-row-skeleton`, `api-key-row-skeleton`, `rule-row-skeleton`,
+  added across iters 4, 67, and 84) because each renders
+  `<TableCell>`s that mirror the consumer's specific column shape.
+  If a fourth or fifth such per-cell skeleton lands, lift the
+  shapes (`badge`, `value-stack`, `text`, `chip`, `pill`) into
+  a `<TableRowSkeleton>` primitive sibling of `<ListRowSkeleton>`
+  with a `cells` prop. Until then, co-location stays cheaper than
+  the abstraction. Vocabulary tokens:
   `density` (`compact`/`regular`/`comfortable`), `leading`
   (`sm-square`/`md-square`/`lg-square` matching CategoryIconTile
   sizes), `trailing` (`none`/`badge`/`value-stack`). Every
@@ -2316,3 +2327,37 @@ Cross-cutting components:
     primitive — four nearly-identical `DetailSkeleton` functions
     that hand-rolled `space-y-6` + `grid lg:grid-cols-[minmax(0,1fr)_18rem]`
     + `flex gap-2` etc. — is gone.
+
+- **Iter 84 — Row-shape loading skeletons for Rules / Tags / API keys lists** ([#1198](https://github.com/canalesb93/breadbox/pull/1198))
+  - Parallel to iter 83's `<DetailPageSkeleton>` sweep on detail
+    pages — every v2 detail page now loads through a real-shape
+    skeleton, but three list pages still fell back to generic
+    `<Skeleton>` blocks while the rest of the list family
+    (Connections, Accounts, Categories, Transactions) ship a
+    row-shape skeleton via `<ListRowSkeleton>` or a co-located
+    feature-folder sibling.
+  - New `RuleRowSkeleton`
+    (`features/rules/rule-row-skeleton.tsx`) — mirrors the
+    `rounded-xl border` card, `size-9 rounded-xl` avatar tile,
+    title + meta-line stack, lg-only stage / last-active stat
+    columns, and the absolute action cluster. Title widths rotate
+    per-row (`SKELETON_TITLE_WIDTHS = ["w-52", "w-40", "w-64",
+    "w-44", "w-48"]`) so the loading stack reads varied instead
+    of metronomic. Rules page swaps its inline `Skeleton
+    h-[72px] rounded-xl` strip for five `<RuleRowSkeleton>` rows.
+  - New `TagRowSkeleton`
+    (`features/tags/tag-row-skeleton.tsx`) — mirrors the four
+    columns of the Tags table (chip + name, mono slug pill,
+    description, action button). Wired through
+    `DataTable.renderSkeletonRow`.
+  - New `APIKeyRowSkeleton`
+    (`features/api-keys/api-key-row-skeleton.tsx`) — mirrors the
+    six columns of the API-keys table (name + prefix pill stack,
+    scope badge, actor badge, last-used / revoked-at text,
+    created date, action button). Respects the revoked tab's
+    no-actions-column shape via a `revoked` prop.
+  - No new shared primitive — these live alongside their consumers
+    matching the iter-4 `TransactionRowSkeleton` pattern. The
+    `ListRowSkeleton` drift note now documents the per-cell
+    sibling family + the rule for when to lift them into a
+    `<TableRowSkeleton>` primitive (fourth or fifth consumer).
