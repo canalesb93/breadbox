@@ -45,6 +45,7 @@ export interface AgentDefinition {
   cost_stats_30d?: AgentCostStats | null;
   next_fire_at?: string | null; // RFC3339; nil when no schedule, disabled, or unparseable
   recent_error_stats?: AgentRecentErrorStats | null;
+  last_prompt_prefix?: string | null; // most recent non-null prompt_prefix; powers "Use last prefix"
   created_at: string;
   updated_at: string;
 }

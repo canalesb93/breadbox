@@ -69,8 +69,12 @@ type AgentDefinitionResponse struct {
 	// runs. Used by the v2 SPA to surface a warning when 3+ recent runs
 	// failed. List-only; nil when the agent has no run history.
 	RecentErrorStats *AgentRecentErrorStats `json:"recent_error_stats,omitempty"`
-	CreatedAt        string                 `json:"created_at"`
-	UpdatedAt        string                 `json:"updated_at"`
+	// LastPromptPrefix is the most recent non-null prompt_prefix this agent
+	// was ever run with. Powers the "Use last prefix" affordance in the v2
+	// SPA's Run now dialog. List-only; nil when no prefixed run exists.
+	LastPromptPrefix *string `json:"last_prompt_prefix,omitempty"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
 // AgentRecentErrorStats is the "is this agent broken right now?" signal —
@@ -207,6 +211,21 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		}
 	}
 
+	// Last-prefix rollup — feeds the "Use last prefix" button in the v2 SPA's
+	// Run now dialog. One row per definition (the most recent non-null
+	// prompt_prefix); definitions that never had a prefixed run won't appear.
+	prefixRows, err := s.Queries.GetAgentLastPromptPrefixes(ctx)
+	if err != nil {
+		s.Logger.Warn("list agent definitions: last prefix query failed", "error", err)
+		prefixRows = nil
+	}
+	prefixByID := make(map[string]string, len(prefixRows))
+	for _, r := range prefixRows {
+		if r.PromptPrefix.Valid && r.PromptPrefix.String != "" {
+			prefixByID[pgconv.FormatUUID(r.AgentDefinitionID)] = r.PromptPrefix.String
+		}
+	}
+
 	out := make([]AgentDefinitionResponse, 0, len(rows))
 	for _, row := range rows {
 		last, err := s.lastRunSummary(ctx, row.ID)
@@ -219,6 +238,10 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		}
 		if errStats, ok := errStatsByID[resp.ID]; ok {
 			resp.RecentErrorStats = &errStats
+		}
+		if prefix, ok := prefixByID[resp.ID]; ok {
+			p := prefix
+			resp.LastPromptPrefix = &p
 		}
 		if resp.Enabled {
 			if nextFire := ComputeNextFire(&resp, time.Now()); nextFire != nil {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -386,4 +387,95 @@ func TestUpdateAgentSettings_RejectsInvalidAuthMode(t *testing.T) {
 	if !errors.Is(err, service.ErrInvalidParameter) {
 		t.Errorf("err = %v, want ErrInvalidParameter", err)
 	}
+}
+
+func TestListAgentDefinitions_PopulatesLastPromptPrefix(t *testing.T) {
+	svc, q, _ := newService(t)
+	ctx := context.Background()
+
+	def := mustCreateAgentDefinition(t, svc, "svc-last-prefix", true)
+	defUUID, err := pgconv.ParseUUID(def.ID)
+	if err != nil {
+		t.Fatalf("parse uuid: %v", err)
+	}
+
+	// Insert three runs: one with an older prefix, one with no prefix (the
+	// most recent overall), one with the prefix we expect to surface.
+	mustInsertRunWithPrefix(t, q, defUUID, "older context — pre-Christmas")
+	mustInsertRunWithPrefix(t, q, defUUID, "focus on Amazon Prime Jan only")
+	mustInsertRunWithPrefix(t, q, defUUID, "") // no prefix → should not shadow
+
+	list, err := svc.ListAgentDefinitions(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	var got *service.AgentDefinitionResponse
+	for i := range list {
+		if list[i].Slug == def.Slug {
+			got = &list[i]
+			break
+		}
+	}
+	if got == nil {
+		t.Fatal("created agent missing from list response")
+	}
+	if got.LastPromptPrefix == nil {
+		t.Fatal("expected LastPromptPrefix on response, got nil")
+	}
+	// The most recent NON-EMPTY prefix wins, regardless of any newer empty run.
+	if *got.LastPromptPrefix != "focus on Amazon Prime Jan only" {
+		t.Errorf("LastPromptPrefix = %q, want the most recent non-empty value",
+			*got.LastPromptPrefix)
+	}
+}
+
+func TestListAgentDefinitions_NoPrefixedRuns_LeavesLastPromptPrefixNil(t *testing.T) {
+	svc, q, _ := newService(t)
+	ctx := context.Background()
+
+	def := mustCreateAgentDefinition(t, svc, "svc-no-prefix-ever", true)
+	defUUID, err := pgconv.ParseUUID(def.ID)
+	if err != nil {
+		t.Fatalf("parse uuid: %v", err)
+	}
+	// One un-prefixed run — list should still set LastPromptPrefix=nil.
+	mustInsertRunWithPrefix(t, q, defUUID, "")
+
+	list, err := svc.ListAgentDefinitions(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	for i := range list {
+		if list[i].Slug == def.Slug {
+			if list[i].LastPromptPrefix != nil {
+				t.Errorf("LastPromptPrefix should be nil, got %q",
+					*list[i].LastPromptPrefix)
+			}
+			return
+		}
+	}
+	t.Fatal("created agent missing from list response")
+}
+
+func mustInsertRunWithPrefix(t *testing.T, q *db.Queries, defID pgtype.UUID, prefix string) {
+	t.Helper()
+	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
+		AgentDefinitionID: defID,
+		Trigger:           "manual",
+	})
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	if prefix != "" {
+		if err := q.SetAgentRunPromptPrefix(context.Background(), db.SetAgentRunPromptPrefixParams{
+			ID:           run.ID,
+			PromptPrefix: pgtype.Text{String: prefix, Valid: true},
+		}); err != nil {
+			t.Fatalf("set prefix: %v", err)
+		}
+	}
+	// Tiny sleep to ensure started_at ordering is deterministic across the
+	// three rows even when the test runs fast — the GetAgentLastPromptPrefixes
+	// query uses started_at DESC to pick the most recent.
+	time.Sleep(10 * time.Millisecond)
 }

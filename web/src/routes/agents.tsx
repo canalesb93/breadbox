@@ -14,6 +14,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Sparkles,
   Terminal,
   Trash2,
   XCircle,
@@ -431,7 +432,11 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
               {agent.enabled ? "Enabled" : "Disabled"}
             </span>
           </div>
-          <RunNowDialog slug={agent.slug} name={agent.name} />
+          <RunNowDialog
+            slug={agent.slug}
+            name={agent.name}
+            lastPrefix={agent.last_prompt_prefix ?? null}
+          />
           <Button asChild variant="ghost" size="icon" aria-label="Run history">
             <Link to="/agents/$slug/runs" params={{ slug: agent.slug }}>
               <History className="size-4" />
@@ -456,10 +461,19 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
   );
 }
 
-function RunNowDialog({ slug, name }: { slug: string; name: string }) {
+function RunNowDialog({
+  slug,
+  name,
+  lastPrefix,
+}: {
+  slug: string;
+  name: string;
+  lastPrefix: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [prefix, setPrefix] = useState("");
   const runNow = useRunAgentNow();
+  const hasLastPrefix = Boolean(lastPrefix && lastPrefix.length > 0);
 
   const submit = async () => {
     const ok = await withMutationToast(
@@ -516,13 +530,29 @@ function RunNowDialog({ slug, name }: { slug: string; name: string }) {
             rows={4}
             disabled={runNow.isPending}
           />
-          <p
-            className={`text-xs ${
-              tooLong ? "text-destructive" : "text-muted-foreground"
-            }`}
-          >
-            {prefix.length} / {PROMPT_PREFIX_MAX_LEN} characters
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p
+              className={`text-xs ${
+                tooLong ? "text-destructive" : "text-muted-foreground"
+              }`}
+            >
+              {prefix.length} / {PROMPT_PREFIX_MAX_LEN} characters
+            </p>
+            {hasLastPrefix && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setPrefix(lastPrefix ?? "")}
+                disabled={runNow.isPending || prefix === lastPrefix}
+                title={lastPrefix ?? ""}
+              >
+                <Sparkles className="size-3" />
+                Use last prefix
+              </Button>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button
