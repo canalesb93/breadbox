@@ -59,9 +59,9 @@ export function CategoryPicker({
   };
 
   const iconClass = CATEGORY_BADGE_ICON[size];
-  // Mask is wider than the icon so per-lucide-icon viewBox variance is
-  // fully covered (some render a px or two past their nominal width).
-  const maskClass = size === "sm" ? "h-3 w-4" : "h-4 w-5";
+  // Width tuned to end at the badge's text edge — wider eats into the
+  // label, narrower leaves the icon's right-side stroke peeking through.
+  const maskClass = size === "sm" ? "h-3 w-3.5" : "h-4 w-5";
   const hasIcon = !!category?.icon;
 
   return (
