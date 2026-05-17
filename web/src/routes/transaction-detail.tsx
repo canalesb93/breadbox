@@ -30,6 +30,7 @@ import { TagManager } from "@/features/transactions/tag-manager";
 import { ActivityTimeline } from "@/features/transactions/activity-timeline";
 import { CommentComposer } from "@/features/transactions/comment-composer";
 import { useTransaction } from "@/api/queries/transactions";
+import { ApiError } from "@/api/client";
 import { formatAmount, formatLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
@@ -37,7 +38,12 @@ import type { Transaction } from "@/api/types";
 export function TransactionDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
   const query = useTransaction(id);
-  const { data, isLoading, isError } = query;
+  const { data, isLoading, isError, error } = query;
+  // 404 means the URL is stale (deleted or never existed) — show the
+  // "not found" empty state, which has a concrete back-to-list CTA.
+  // Every other failure (network drop, 500, dropped session) is a real
+  // load error — show PageError with Retry. Three states, three vocabularies.
+  const notFound = isError && error instanceof ApiError && error.status === 404;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -45,10 +51,10 @@ export function TransactionDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError ? (
+      ) : isError && !notFound ? (
         <PageError
           resource="this transaction"
-          error={query.error}
+          error={error}
           onRetry={() => query.refetch()}
           retrying={query.isFetching}
         />

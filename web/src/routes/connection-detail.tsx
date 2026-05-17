@@ -66,6 +66,7 @@ import {
 } from "@/api/queries/connections";
 import { useAccounts } from "@/api/queries/accounts";
 import { useSyncLogs } from "@/api/queries/sync-logs";
+import { ApiError } from "@/api/client";
 import type { Account, ConnectionDetail } from "@/api/types";
 import type { SyncLog } from "@/api/queries/sync-logs";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
@@ -210,7 +211,10 @@ export function ConnectionDetailPage() {
 
       {connQuery.isLoading ? (
         <DetailSkeleton />
-      ) : connQuery.isError ? (
+      ) : connQuery.isError &&
+        !(
+          connQuery.error instanceof ApiError && connQuery.error.status === 404
+        ) ? (
         <PageError
           resource="this connection"
           error={connQuery.error}

@@ -35,6 +35,7 @@ import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
 import { useAccount, useAccounts } from "@/api/queries/accounts";
+import { ApiError } from "@/api/client";
 import type { AccountDetail } from "@/api/types";
 import {
   accountLabel,
@@ -95,7 +96,10 @@ export function AccountDetailPage() {
 
       {acctQuery.isLoading ? (
         <DetailSkeleton />
-      ) : acctQuery.isError ? (
+      ) : acctQuery.isError &&
+        !(
+          acctQuery.error instanceof ApiError && acctQuery.error.status === 404
+        ) ? (
         <PageError
           resource="this account"
           error={acctQuery.error}
