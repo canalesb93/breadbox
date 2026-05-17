@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -115,6 +115,34 @@ export function DataTable<TData, TValue>({
     focusedRowRef.current?.scrollIntoView({ block: "nearest" });
   }, [focusedRowId]);
 
+  // Detect the sticky header's "stuck" state so the rounded top corners
+  // (which match the card while at rest) flatten once the band is
+  // floating under the app shell header — at that point the card has
+  // scrolled past and the rounded ears would just clip the band into
+  // the bg of the shell behind it.
+  const headerRef = useRef<HTMLTableSectionElement>(null);
+  const [isStuck, setIsStuck] = useState(false);
+  useEffect(() => {
+    if (!stickyHeader) return;
+    const el = headerRef.current;
+    if (!el) return;
+    // Sentinel sits one px above the header. When it scrolls out of view
+    // (past the app shell's 56px top), the header is stuck.
+    const sentinel = document.createElement("div");
+    sentinel.style.height = "1px";
+    sentinel.setAttribute("aria-hidden", "true");
+    el.parentElement?.insertBefore(sentinel, el);
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsStuck(!entry.isIntersecting),
+      { rootMargin: "-56px 0px 0px 0px", threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+      sentinel.remove();
+    };
+  }, [stickyHeader]);
+
   const table = useReactTable({
     data,
     columns,
@@ -151,13 +179,27 @@ export function DataTable<TData, TValue>({
     >
       <Table containerClassName={stickyHeader ? "overflow-visible" : undefined}>
         <TableHeader
+          ref={headerRef}
           className={cn(
             stickyHeader &&
               // top-14 sits the band flush under the app shell's sticky
               // header (`h-14` in `__root.tsx`) so the column labels stay
               // visible without being obscured. z-10 keeps the band above
               // the table body but well below the app header (z-30).
-              "bg-muted/40 supports-[backdrop-filter]:bg-muted/30 sticky top-14 z-10 backdrop-blur-sm",
+              // Background + border are on the cells (not `<thead>`) so
+              // we can round the first/last cell's top corner to match
+              // the card's `rounded-lg` at rest, AND so the bottom
+              // separator stays visible while stickied (`<tr>` border-b
+              // is unreliable in default table-collapse mode).
+              // `shadow-[inset_0_-1px_0_0_var(--border)]` on each cell
+              // gives an always-visible bottom separator that survives
+              // border-collapse merging with the body row below it.
+              "sticky top-14 z-10 [&>tr>th]:bg-muted/40 supports-[backdrop-filter]:[&>tr>th]:bg-muted/30 [&>tr>th]:backdrop-blur-sm [&>tr>th]:shadow-[inset_0_-1px_0_0_var(--border)] [&>tr>th]:transition-[border-radius]",
+            // Flat top corners while stuck — the card has scrolled past
+            // so rounded ears would just clip into the shell-header bg.
+            stickyHeader &&
+              !isStuck &&
+              "[&>tr>th:first-child]:rounded-tl-lg [&>tr>th:last-child]:rounded-tr-lg",
           )}
         >
           {table.getHeaderGroups().map((headerGroup) => (
