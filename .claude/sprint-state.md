@@ -335,6 +335,25 @@ Next iteration candidates (in rough impact order):
 
 Picking #1 next iteration — small parallel CLI to iter-8's agent test, useful for cron-driven sysadmins.
 
+## ITER 10 — 2026-05-17 01:46
+Shipped (PR #1236 squash-merged into sprint branch as d6cacfc5):
+- `breadbox agent run <slug>` CLI with --json flag, mirrors v2 SPA "Run now" path via Orchestrator.RunNow.
+- Exit codes match `agent test` (0/3/5/1) for scriptable behavior.
+- docs/cli-commands.md + CHANGELOG updated.
+- All 5 CI jobs green.
+
+The `breadbox agent` parent now has two subcommands (`test` + `run`). Sysadmins have full CLI parity for diagnostics + actual runs — no v2 SPA required for cron-driven workflows.
+
+Next iteration candidates (in rough impact order):
+1. **Run-history filtering** (status / date range / trigger) on /v2/agents/$slug/runs — polish bucket, mid-size UI work.
+2. **Per-agent quiet hours** — schema column + scheduler tweak + UI control. Mid.
+3. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger, touches sync engine + agent_definitions schema.
+4. **Cost dashboard** in /v2/agents — sum per-agent total_cost_usd over time, surface in a small chart on the list page or as a separate /v2/agents/cost page. Bigger.
+5. **Inline transcript search** in the TranscriptViewer drawer — small UI improvement (text input, filter event list).
+
+Picking #1 next iteration — filtering is the highest-impact polish item with the most-used surface (run history page).
+
+
 
 
 
