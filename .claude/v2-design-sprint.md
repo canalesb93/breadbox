@@ -1759,6 +1759,36 @@ Cross-cutting components:
     arrives with the same shape, promote to a
     `<RowTrailingChevron>` then.
 
+- **Iter 71 — Tooltip presence on icon-only action buttons** ([#1184](https://github.com/canalesb93/breadbox/pull/1184))
+  - Sweeps every icon-only `<Button>` in the SPA that
+    previously carried only an `aria-label` / `sr-only` and
+    wraps it in a `Tooltip` so mouse users get the same
+    discoverability screen readers already had. Twelve sites:
+    `account-settings-card` (Save/Cancel inline rename),
+    `account-links-section` (Link actions trigger),
+    `connection-row` + `connection-detail` (Connection
+    actions trigger), `tags-table` + `api-keys-table` (row
+    Actions trigger), `rule-row` (Edit link + Rule actions
+    trigger), `category-list` (Edit), `rules/condition-row`
+    + `rules/action-row` (Remove — upgraded from the native
+    `title=` attribute to a real shadcn Tooltip), and
+    `settings/household-section` (Member actions).
+  - Bumps the global `TooltipProvider` `delayDuration` from
+    `0` to `200ms` so hovers feel deliberate without
+    flickering during transient cursor passes — same value
+    `backups-section` was already using locally, which means
+    we could also drop its redundant local `TooltipProvider`.
+  - Canonical composition for a dropdown trigger:
+    `<DropdownMenu><Tooltip><TooltipTrigger asChild>
+    <DropdownMenuTrigger asChild><Button …`. Hover reveals
+    the label; click opens the menu. Matches the pattern
+    `backups-section` had been using in isolation.
+  - The `condition-row` / `action-row` upgrade replaces the
+    OS-styled, slow-to-appear browser `title=` tooltip with
+    the themed shadcn one. Now any new icon-only button
+    should follow the same pattern; greenfield "naked"
+    icon-only `size="icon"` buttons are a backlog smell.
+
 ## Open observations / questions
 
 (Populated by iterations.)
