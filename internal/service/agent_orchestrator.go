@@ -134,7 +134,15 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	o.logger.Info("orchestrator: run starting",
 		"agent", def.Slug, "run", runResp.ShortID, "trigger", trigger, "model", def.Model)
 
-	result, runErr := o.runner.Run(ctx, *spec, nil)
+	// Event handler emits one structured slog line per sidecar NDJSON event.
+	// Useful for tracing without OTel; cheap (Debug level by default — the
+	// transcript file on disk is the canonical replay surface).
+	handler := func(ev agent.Event) error {
+		o.logger.Debug("orchestrator: sidecar event",
+			"agent", def.Slug, "run", runResp.ShortID, "event_type", ev.Type)
+		return nil
+	}
+	result, runErr := o.runner.Run(ctx, *spec, handler)
 
 	completedRow, completeErr := o.svc.CompleteAgentRunDB(ctx, runRow.ID, result)
 	if completeErr != nil {

@@ -9,6 +9,7 @@ import type {
   Transaction,
   TransactionCategory,
 } from "@/api/types";
+import type { TranscriptEvent } from "@/api/queries/agents";
 
 const NOW = "2026-05-14T12:00:00Z";
 
@@ -297,5 +298,128 @@ export const sampleAccounts: Account[] = [
     balance_limit: 5000,
     iso_currency_code: "USD",
     is_dependent_linked: false,
+  },
+];
+
+// --- Agent SDK transcript fixtures ---
+//
+// Used by the TranscriptViewer specimen in sandbox/sections/components.tsx.
+// Mirrors the NDJSON event shapes the breadbox-agent sidecar emits (see
+// agent/sidecar/index.ts + the TranscriptEvent union in
+// api/queries/agents.ts).
+
+export const sampleTranscriptEvents: TranscriptEvent[] = [
+  {
+    type: "assistant_message",
+    ts: 1747440001000,
+    data: {
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text: "Starting routine review. Let me pull this week's uncategorized transactions and see what needs attention.",
+          },
+        ],
+      },
+    },
+  },
+  {
+    type: "tool_use",
+    ts: 1747440002000,
+    data: {
+      type: "tool_use",
+      id: "toolu_01ABCXYZ",
+      name: "list_transactions",
+      input: { limit: 20, uncategorized_only: true, since: "2026-05-08" },
+    },
+  },
+  {
+    type: "tool_result",
+    ts: 1747440003200,
+    data: {
+      type: "tool_result",
+      tool_use_id: "toolu_01ABCXYZ",
+      content:
+        '[{"short_id":"abc12345","provider_name":"SQ *BLUE BOTTLE COFFEE","amount":6.75},{"short_id":"def67890","provider_name":"WHOLE FOODS MARKET","amount":54.12}]',
+    },
+  },
+  {
+    type: "assistant_message",
+    ts: 1747440004000,
+    data: {
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text: "Found two clear matches. SQ *BLUE BOTTLE is coffee (Food & Drink → Coffee Shops). WHOLE FOODS is groceries. Applying both.",
+          },
+        ],
+      },
+    },
+  },
+  {
+    type: "tool_use",
+    ts: 1747440005000,
+    data: {
+      type: "tool_use",
+      id: "toolu_02ABC",
+      name: "update_transactions",
+      input: {
+        operations: [
+          { transaction_id: "abc12345", category_slug: "food_and_drink_coffee" },
+          { transaction_id: "def67890", category_slug: "food_and_drink_groceries" },
+        ],
+      },
+    },
+  },
+  {
+    type: "tool_result",
+    ts: 1747440006500,
+    data: {
+      type: "tool_result",
+      tool_use_id: "toolu_02ABC",
+      content: '{"updated":2,"skipped":0}',
+      is_error: false,
+    },
+  },
+  {
+    type: "result",
+    ts: 1747440007000,
+    data: {
+      totalCostUsd: 0.0042,
+      inputTokens: 1204,
+      outputTokens: 287,
+      cacheReadTokens: 450,
+      cacheCreationTokens: 0,
+      turnCount: 2,
+      numToolCalls: 2,
+      sessionId: "sess-sandbox-1",
+      stopReason: "end_turn",
+    },
+  },
+];
+
+export const sampleTranscriptEventsError: TranscriptEvent[] = [
+  {
+    type: "assistant_message",
+    ts: 1747440001000,
+    data: {
+      message: {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Pulling uncategorized transactions…" },
+        ],
+      },
+    },
+  },
+  {
+    type: "error",
+    ts: 1747440002000,
+    data: {
+      code: "MCP_CONNECT_ERROR",
+      message: "MCP connection refused: dial tcp 127.0.0.1:8080",
+    },
   },
 ];
