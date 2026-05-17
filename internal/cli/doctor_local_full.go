@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/agent"
+	"breadbox/internal/appconfig"
 	bbconfig "breadbox/internal/config"
 	"breadbox/internal/crypto"
 	"breadbox/internal/db"
@@ -77,8 +79,68 @@ func runDoctorLocal(ctx context.Context, jsonOut bool, skipExternal bool) error 
 	}
 	checks = append(checks, checkCronConfig(cfg))
 	checks = append(checks, checkPublicURL(skipExternal))
+	checks = append(checks, checkAgentSubsystem(ctx, pool))
 
 	return emitDoctor(checks, jsonOut)
+}
+
+// checkAgentSubsystem reports whether the Claude Agent SDK integration is
+// ready to run. Cheap + side-effect free: looks up the credential presence
+// in app_config and locates the sidecar binary on disk — does NOT spawn
+// the sidecar. Use `breadbox agent test` for the live round-trip.
+func checkAgentSubsystem(ctx context.Context, pool *pgxpool.Pool) doctorCheck {
+	if pool == nil {
+		return doctorCheck{
+			Name:    "agent subsystem",
+			Status:  doctorStatusSkip,
+			Message: "skipped — no database connection",
+		}
+	}
+	queries := db.New(pool)
+	authMode := appconfig.String(ctx, queries, appconfig.KeyAgentAuthMode, appconfig.AuthModeSubscription)
+	tokenKey := appconfig.KeyAgentSubscriptionToken
+	if authMode == appconfig.AuthModeAPIKey {
+		tokenKey = appconfig.KeyAgentAnthropicAPIKey
+	}
+	stored, _ := appconfig.Read(ctx, queries, tokenKey)
+	binaryPath := appconfig.String(ctx, queries, appconfig.KeyAgentRuntimePath, "")
+	resolved, binErr := agent.LocateBinary(binaryPath)
+	return agentSubsystemCheck(authMode, stored != "", resolved, binErr == nil)
+}
+
+// agentSubsystemCheck is the pure decision logic separated for testability.
+// authMode is the resolved app_config.agent.auth_mode value; authPresent is
+// whether a non-empty value sits at the matching token key; binaryPath +
+// binaryReady are the result of agent.LocateBinary.
+func agentSubsystemCheck(authMode string, authPresent bool, binaryPath string, binaryReady bool) doctorCheck {
+	switch {
+	case authPresent && binaryReady:
+		return doctorCheck{
+			Name:    "agent subsystem",
+			Status:  doctorStatusPass,
+			Message: fmt.Sprintf("ready (auth=%s, binary=%s) — `breadbox agent test` for live diagnostic", authMode, binaryPath),
+		}
+	case authPresent && !binaryReady:
+		return doctorCheck{
+			Name:        "agent subsystem",
+			Status:      doctorStatusWarn,
+			Message:     "auth configured but breadbox-agent binary not found",
+			Remediation: "build with `make agent-sidecar` or set `agent.runtime_path` in Settings → Agents",
+		}
+	case !authPresent && binaryReady:
+		return doctorCheck{
+			Name:        "agent subsystem",
+			Status:      doctorStatusWarn,
+			Message:     fmt.Sprintf("binary at %s but no Anthropic credential configured (auth_mode=%s)", binaryPath, authMode),
+			Remediation: "paste a credential in Settings → Agents — or run `claude setup-token` and use the result for subscription mode",
+		}
+	default:
+		return doctorCheck{
+			Name:    "agent subsystem",
+			Status:  doctorStatusSkip,
+			Message: "not configured (optional — see docs/agents.md)",
+		}
+	}
 }
 
 func emitDoctor(checks []doctorCheck, asJSON bool) error {
