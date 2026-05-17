@@ -97,13 +97,18 @@ function TimelineRailGroup({
 // look — switch to a tinted variant when the event carries a clear
 // semantic role (sync, rule fire, classification change, etc.). Tones
 // adapt to light/dark themes via the standard shadcn vocabulary
-// (primary / emerald / amber / sky) used elsewhere in v2 (StatusPanel,
-// ColorRailCard, MetaBadge). Iter 93.
+// (primary / emerald / amber / sky / destructive) used elsewhere in v2
+// (StatusPanel, ColorRailCard, MetaBadge). Iter 93; `destructive` added
+// in iter 105 to give sync-history rows a "this run failed" disc accent
+// that matches StatusPanel's destructive vocabulary — `warning` (amber)
+// is the wrong colour for an *errored* sync run; it belongs to "tag
+// removed" / "soft warning" semantics.
 type TimelineRailTone =
   | "neutral"
   | "primary"
   | "success"
   | "warning"
+  | "destructive"
   | "info"
   | "muted";
 
@@ -118,6 +123,10 @@ const TONE_CLASSES: Record<TimelineRailTone, string> = {
   primary: "border-primary/40 text-primary",
   success: "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
   warning: "border-amber-500/40 text-amber-600 dark:text-amber-400",
+  // `destructive` matches StatusPanel / ColorRailCard's destructive tone
+  // (failed-state vocabulary). Use for hard failure rows (errored sync
+  // runs, failed rule runs) — distinct from `warning` (soft / removed).
+  destructive: "border-destructive/40 text-destructive",
   info: "border-sky-500/40 text-sky-600 dark:text-sky-400",
   muted: "border-border/60 text-muted-foreground/70",
 };

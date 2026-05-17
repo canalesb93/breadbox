@@ -202,6 +202,153 @@ func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionRespon
 	return o.runLocked(ctx, def, trigger, RunOverrides{})
 }
 
+// RunNowAsyncWith is the non-blocking variant of RunNowWith for the v2 SPA's
+// "Run now" button. It does enough work synchronously to fail fast for
+// operator-visible mistakes (auth missing, binary missing, concurrency locked),
+// then spawns a goroutine for the sidecar invocation + completion + revoke.
+// The caller gets back the in_progress agent_runs row right away so the UI
+// can close the dialog and stream the live transcript.
+//
+// Returned errors mirror RunNowWith's: ErrConcurrencyLocked, ErrAuthNotConfigured,
+// ErrBinaryNotFound, or a generic spec-assembly failure. Any post-spawn
+// failure (sidecar crash, model error, hit-cap) lands on the agent_runs row
+// instead — the HTTP request has already returned 201.
+func (o *Orchestrator) RunNowAsyncWith(ctx context.Context, def *AgentDefinitionResponse, ov RunOverrides) (*AgentRunResponse, error) {
+	// Preflight: surface the obvious operator misconfigurations (no token,
+	// no binary) as a typed error here so the HTTP handler can map to 422
+	// instead of returning an in_progress row that's destined to fail.
+	binaryPath := appconfig.String(ctx, o.svc.Queries, appconfig.KeyAgentRuntimePath, "")
+	if _, err := agent.LocateBinary(binaryPath); err != nil {
+		return nil, err
+	}
+
+	if err := o.sem.Acquire(ctx); err != nil {
+		return nil, err
+	}
+
+	resp, prepErr, runFn := o.prepareRun(ctx, def, "manual", ov)
+	if prepErr != nil {
+		// Prep failed before we handed control to the goroutine — release
+		// the semaphore inline so we don't deadlock subsequent runs.
+		o.sem.Release()
+		return resp, prepErr
+	}
+
+	// Hand the slow work off. The goroutine owns: sidecar invocation,
+	// row completion, semaphore release, key revoke. A fresh context with
+	// a generous timeout decouples the run from the HTTP request lifecycle
+	// (the SPA closes the dialog and starts polling the transcript).
+	go func() {
+		runCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		defer o.sem.Release()
+		runFn(runCtx)
+	}()
+	return resp, nil
+}
+
+// prepareRun does the synchronous prep portion of runLocked and returns a
+// closure that does the slow work. Used by RunNowAsyncWith so the HTTP
+// request can return as soon as the run row exists.
+//
+// The returned closure assumes the orchestrator already holds the semaphore;
+// it does NOT release it (the caller wraps the goroutine with the release).
+func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionResponse, trigger string, ov RunOverrides) (*AgentRunResponse, error, func(context.Context)) {
+	promptPrefix := ov.PromptPrefix
+	defUUID, err := pgconv.ParseUUID(def.ID)
+	if err != nil {
+		return nil, fmt.Errorf("orchestrator: parse def id: %w", err), nil
+	}
+
+	runRow, err := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
+	if err != nil {
+		return nil, fmt.Errorf("orchestrator: create run row: %w", err), nil
+	}
+	if promptPrefix != "" {
+		if perr := o.svc.SetAgentRunPromptPrefixDB(ctx, runRow.ID, promptPrefix); perr != nil {
+			o.logger.Warn("orchestrator: persist prompt prefix failed",
+				"agent", def.Slug, "run", runRow.ShortID, "error", perr)
+		} else {
+			runRow.PromptPrefix = pgtype.Text{String: promptPrefix, Valid: true}
+		}
+	}
+	runResp := AgentRunFromRow(runRow)
+
+	keyResult, err := o.svc.MintRunAPIKey(ctx, def, runResp.ShortID)
+	if err != nil {
+		o.logger.Warn("orchestrator: mint api key failed",
+			"agent", def.Slug, "run", runResp.ShortID, "error", err)
+		_ = o.svc.MarkAgentRunErrorDB(ctx, runRow.ID, fmt.Sprintf("mint api key: %v", err), "")
+		return &runResp, fmt.Errorf("orchestrator: mint api key: %w", err), nil
+	}
+
+	spec, err := o.svc.AssembleJobSpec(ctx, def, &runResp, keyResult.PlaintextKey, o.encKey)
+	if err != nil {
+		o.logger.Warn("orchestrator: assemble spec failed",
+			"agent", def.Slug, "run", runResp.ShortID, "error", err)
+		_ = o.svc.MarkAgentRunErrorDB(ctx, runRow.ID, fmt.Sprintf("assemble spec: %v", err), "")
+		// Revoke the key we just minted before bailing.
+		revokeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = o.svc.RevokeAPIKey(revokeCtx, keyResult.ID)
+		return &runResp, fmt.Errorf("orchestrator: assemble spec: %w", err), nil
+	}
+
+	switch {
+	case ov.PromptOverride != "":
+		spec.Prompt = ov.PromptOverride
+	case promptPrefix != "":
+		spec.Prompt = applyPromptPrefix(promptPrefix, spec.Prompt)
+	}
+
+	run := func(runCtx context.Context) {
+		defer func() {
+			revokeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if rerr := o.svc.RevokeAPIKey(revokeCtx, keyResult.ID); rerr != nil {
+				o.logger.Warn("orchestrator: revoke api key failed",
+					"agent", def.Slug, "run", runResp.ShortID,
+					"key_id", keyResult.ID, "error", rerr)
+			}
+		}()
+
+		o.logger.Info("orchestrator: run starting",
+			"agent", def.Slug, "run", runResp.ShortID, "trigger", trigger, "model", def.Model)
+
+		handler := func(ev agent.Event) error {
+			o.logger.Debug("orchestrator: sidecar event",
+				"agent", def.Slug, "run", runResp.ShortID, "event_type", ev.Type)
+			return nil
+		}
+		result, runErr := o.runner.Run(runCtx, *spec, handler)
+
+		completedRow, completeErr := o.svc.CompleteAgentRunDB(runCtx, runRow.ID, result, def.MaxTurns)
+		if completeErr != nil {
+			o.logger.Error("orchestrator: persist completed run failed",
+				"agent", def.Slug, "run", runResp.ShortID, "error", completeErr)
+			return
+		}
+		if cap := capFromRunErr(runErr); cap != "" {
+			if _, err := o.svc.SetAgentRunHitCapDB(runCtx, runRow.ID, cap); err != nil {
+				o.logger.Warn("orchestrator: persist hit_cap failed",
+					"agent", def.Slug, "run", runResp.ShortID, "cap", cap, "error", err)
+			}
+		}
+		_ = completedRow
+		if runErr != nil {
+			o.logger.Warn("orchestrator: run finished with error",
+				"agent", def.Slug, "run", runResp.ShortID,
+				"status", result.Status, "error", runErr)
+			return
+		}
+		o.logger.Info("orchestrator: run finished",
+			"agent", def.Slug, "run", runResp.ShortID,
+			"status", result.Status, "cost_usd", result.TotalCostUSD,
+			"duration_ms", result.DurationMs, "turns", result.TurnCount)
+	}
+	return &runResp, nil, run
+}
+
 // runLocked assumes the caller holds the semaphore.
 func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionResponse, trigger string, ov RunOverrides) (*AgentRunResponse, error) {
 	promptPrefix := ov.PromptPrefix

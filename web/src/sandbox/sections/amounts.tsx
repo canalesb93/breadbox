@@ -178,7 +178,7 @@ export function AmountsSection() {
       <Specimen
         label="TransactionAmount"
         code="components/transaction-amount"
-        description="The reusable amount block — signed amount over its date, right-aligned, tabular figures. Inflows pick up the success color automatically."
+        description="The reusable amount block — signed amount over its date, right-aligned, tabular figures. Inflows pick up the success color automatically. Pending transactions render italic at 70% opacity so the column reads as tentative until the row settles (pairs with the `Pending` `MetaBadge` chip in `TransactionPrimary`)."
         className="block divide-y"
       >
         {AMOUNT_ROWS.map((t) => (

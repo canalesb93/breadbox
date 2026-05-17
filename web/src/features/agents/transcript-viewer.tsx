@@ -23,12 +23,12 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format";
 import type {
-  AssistantContent,
   AssistantMessageData,
   ResultData,
   ToolResultData,
   ToolUseData,
   TranscriptEvent,
+  UserContent,
 } from "@/api/queries/agents";
 
 interface TranscriptViewerProps {
@@ -38,34 +38,113 @@ interface TranscriptViewerProps {
   shortId: string;
 }
 
-// Grouped representation of one assistant turn: the assistant's message
-// plus any tool_use blocks and matching tool_result blocks before the next
-// assistant_message.
+// Grouped representation of one model turn. The SDK splits a single model
+// turn into MULTIPLE assistant_message events — typically one with the text
+// (reasoning) block and a separate one with the tool_use block. The viewer
+// groups consecutive assistant_messages together so one turn = one card,
+// matching the SDK's `num_turns` count in the footer.
 interface TurnGroup {
-  assistant: (AssistantMessageData & { ts: number }) | null;
+  ts: number;
+  text: string;
   toolUses: Array<ToolUseData & { ts: number }>;
   toolResults: Array<ToolResultData & { ts: number }>;
 }
 
+function emptyTurn(ts: number): TurnGroup {
+  return { ts, text: "", toolUses: [], toolResults: [] };
+}
+
+function turnHasContent(t: TurnGroup): boolean {
+  return (
+    t.text.length > 0 ||
+    t.toolUses.length > 0 ||
+    t.toolResults.length > 0
+  );
+}
+
+// extractToolUses pulls tool_use content blocks out of an assistant message.
+// The SDK nests them inside `message.content[]`; earlier viewer iterations
+// expected standalone top-level "tool_use" events that never actually
+// appeared on the wire (iter-46 finding, fixed in iter-48).
+function extractToolUses(
+  data: AssistantMessageData,
+  ts: number,
+): Array<ToolUseData & { ts: number }> {
+  const out: Array<ToolUseData & { ts: number }> = [];
+  for (const block of data.message?.content ?? []) {
+    if (block.type === "tool_use") {
+      out.push({
+        ts,
+        type: "tool_use",
+        id: block.id,
+        name: block.name,
+        input: (block.input ?? {}) as Record<string, unknown>,
+      });
+    }
+  }
+  return out;
+}
+
+// extractToolResults pulls tool_result content blocks out of a user message.
+// Same nesting story as extractToolUses.
+function extractToolResults(
+  content: UserContent[] | undefined,
+  ts: number,
+): Array<ToolResultData & { ts: number }> {
+  const out: Array<ToolResultData & { ts: number }> = [];
+  for (const block of content ?? []) {
+    if (block.type === "tool_result") {
+      out.push({
+        ts,
+        type: "tool_result",
+        tool_use_id: block.tool_use_id,
+        content: block.content,
+        is_error: block.is_error,
+      });
+    }
+  }
+  return out;
+}
+
+function extractText(data: AssistantMessageData): string {
+  const parts: string[] = [];
+  for (const block of data.message?.content ?? []) {
+    if (block.type === "text" && block.text) parts.push(block.text);
+  }
+  return parts.join("\n\n");
+}
+
 function groupIntoTurns(events: TranscriptEvent[]): TurnGroup[] {
   const turns: TurnGroup[] = [];
-  let current: TurnGroup = { assistant: null, toolUses: [], toolResults: [] };
+  let current = emptyTurn(0);
+  // sawUserSinceLastAssistant tracks whether the next assistant_message
+  // should open a new turn. The SDK splits one model turn into multiple
+  // assistant_message events (text + tool_use as separate messages); only
+  // a user_message (tool_results coming back) marks the end of a turn.
+  let sawUserSinceLastAssistant = true;
   for (const ev of events) {
     if (ev.type === "assistant_message") {
-      if (current.assistant !== null || current.toolUses.length > 0) {
-        turns.push(current);
-        current = { assistant: null, toolUses: [], toolResults: [] };
+      if (sawUserSinceLastAssistant) {
+        if (turnHasContent(current)) turns.push(current);
+        current = emptyTurn(ev.ts);
+        sawUserSinceLastAssistant = false;
       }
-      current.assistant = { ...ev.data, ts: ev.ts };
+      const text = extractText(ev.data);
+      if (text) current.text = current.text ? `${current.text}\n\n${text}` : text;
+      current.toolUses.push(...extractToolUses(ev.data, ev.ts));
+    } else if (ev.type === "user_message") {
+      current.toolResults.push(
+        ...extractToolResults(ev.data.message?.content, ev.ts),
+      );
+      sawUserSinceLastAssistant = true;
     } else if (ev.type === "tool_use") {
       current.toolUses.push({ ...ev.data, ts: ev.ts });
     } else if (ev.type === "tool_result") {
       current.toolResults.push({ ...ev.data, ts: ev.ts });
+      sawUserSinceLastAssistant = true;
     }
   }
-  if (current.assistant !== null || current.toolUses.length > 0) {
-    turns.push(current);
-  }
+  if (turnHasContent(current)) turns.push(current);
   return turns;
 }
 
@@ -79,10 +158,31 @@ function eventMatchesQuery(ev: TranscriptEvent, q: string): boolean {
   switch (ev.type) {
     case "assistant_message": {
       const blocks = ev.data.message?.content ?? [];
-      return blocks.some(
-        (b) =>
-          b.type === "text" && b.text.toLowerCase().includes(needle),
-      );
+      return blocks.some((b) => {
+        if (b.type === "text") return b.text.toLowerCase().includes(needle);
+        if (b.type === "tool_use") {
+          if (b.name?.toLowerCase().includes(needle)) return true;
+          try {
+            return JSON.stringify(b.input).toLowerCase().includes(needle);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+    }
+    case "user_message": {
+      const blocks = ev.data.message?.content ?? [];
+      return blocks.some((b) => {
+        if (b.type === "tool_result") {
+          try {
+            return JSON.stringify(b.content).toLowerCase().includes(needle);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
     }
     case "tool_use":
       if (ev.data.name?.toLowerCase().includes(needle)) return true;
@@ -123,30 +223,59 @@ export function TranscriptViewer({
       filtered = filtered.filter((ev) => eventMatchesQuery(ev, trimmed));
     }
     if (toolsOnly) {
-      // Keep tool_use + tool_result so input/output pairs render together;
-      // also keep error/cost_cap_hit so the headline Alerts up top still
-      // fire — those aren't part of the noise the chip suppresses.
-      filtered = filtered.filter(
-        (ev) =>
-          ev.type === "tool_use" ||
-          ev.type === "tool_result" ||
-          ev.type === "error" ||
-          ev.type === "cost_cap_hit",
-      );
+      // Tool-use lives in assistant_message.content; tool_result lives in
+      // user_message.content. Keep those messages when they carry any tool
+      // block (a text-only assistant_message gets dropped). Also keep
+      // standalone tool_use/tool_result (forward compat) and the headline
+      // error/cost_cap_hit events so the Alerts up top still fire.
+      filtered = filtered.filter((ev) => {
+        if (ev.type === "tool_use" || ev.type === "tool_result") return true;
+        if (ev.type === "error" || ev.type === "cost_cap_hit") return true;
+        if (ev.type === "assistant_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_use",
+          );
+        }
+        if (ev.type === "user_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_result",
+          );
+        }
+        return false;
+      });
     }
     if (errorsOnly) {
-      // Keep errored tool_results + the error/cost_cap_hit events. Skip
-      // tool_use entries whose matching result didn't error (they'd render
-      // as orphan "pending" badges).
-      const errResultIds = new Set(
-        filtered
-          .filter((ev) => ev.type === "tool_result" && ev.data.is_error === true)
-          .map((ev) => (ev.type === "tool_result" ? ev.data.tool_use_id : "")),
-      );
+      // Collect erroring tool_result block IDs (nested in user_message
+      // content, plus any legacy top-level events). Then keep assistant_
+      // messages that fired any of those IDs, the user_messages that carry
+      // the errors, and the headline error/cost_cap_hit alerts.
+      const errResultIds = new Set<string>();
+      for (const ev of filtered) {
+        if (ev.type === "tool_result" && ev.data.is_error) {
+          errResultIds.add(ev.data.tool_use_id);
+        }
+        if (ev.type === "user_message") {
+          for (const b of ev.data.message?.content ?? []) {
+            if (b.type === "tool_result" && b.is_error) {
+              errResultIds.add(b.tool_use_id);
+            }
+          }
+        }
+      }
       filtered = filtered.filter((ev) => {
         if (ev.type === "error" || ev.type === "cost_cap_hit") return true;
         if (ev.type === "tool_result") return ev.data.is_error === true;
         if (ev.type === "tool_use") return errResultIds.has(ev.data.id);
+        if (ev.type === "user_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_result" && b.is_error === true,
+          );
+        }
+        if (ev.type === "assistant_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_use" && errResultIds.has(b.id),
+          );
+        }
         return false;
       });
     }
@@ -157,10 +286,20 @@ export function TranscriptViewer({
     () => groupIntoTurns(matchingEvents),
     [matchingEvents],
   );
-  const resultEvent = useMemo(
-    () => events.find((e) => e.type === "result"),
-    [events],
-  );
+  const resultEvent = useMemo(() => {
+    // The sidecar emits two `result` events per run: the raw SDK message
+    // (snake_case fields, nested `usage`) plus a normalized breadbox-shape
+    // event with camelCase fields. We always want the normalized one — pick
+    // the first event whose `data` has the expected `totalCostUsd` field,
+    // falling back to the last `result` event for forward compatibility.
+    const resultEvents = events.filter((e) => e.type === "result");
+    const normalized = resultEvents.find(
+      (e) =>
+        e.type === "result" &&
+        typeof (e.data as Partial<ResultData>).totalCostUsd === "number",
+    );
+    return normalized ?? resultEvents[resultEvents.length - 1];
+  }, [events]);
   const errorEvent = useMemo(
     () => events.find((e) => e.type === "error"),
     [events],
@@ -277,7 +416,7 @@ function TurnBlock({ turn, index }: { turn: TurnGroup; index: number }) {
       <div className="text-muted-foreground text-[10px] uppercase tracking-wider">
         Turn {index + 1}
       </div>
-      {turn.assistant && <MessageBubble data={turn.assistant} />}
+      {turn.text && <MessageBubble text={turn.text} />}
       {turn.toolUses.map((tu) => {
         const result = turn.toolResults.find(
           (tr) => tr.tool_use_id === tu.id,
@@ -290,8 +429,7 @@ function TurnBlock({ turn, index }: { turn: TurnGroup; index: number }) {
   );
 }
 
-function MessageBubble({ data }: { data: AssistantMessageData }) {
-  const text = useMemo(() => extractText(data.message.content), [data]);
+function MessageBubble({ text }: { text: string }) {
   if (!text) return null;
   return (
     <div className="bg-muted/40 rounded-md p-3">
@@ -300,13 +438,6 @@ function MessageBubble({ data }: { data: AssistantMessageData }) {
       </pre>
     </div>
   );
-}
-
-function extractText(content: AssistantContent[]): string {
-  return content
-    .filter((b): b is { type: "text"; text: string } => b.type === "text")
-    .map((b) => b.text)
-    .join("\n\n");
 }
 
 interface ToolCallPairProps {
@@ -462,21 +593,29 @@ function ResultFooter({ data }: { data: ResultData }) {
         <FooterStat
           icon={Coins}
           label="Cost"
-          value={`$${data.totalCostUsd.toFixed(4)}`}
+          value={
+            typeof data.totalCostUsd === "number"
+              ? `$${data.totalCostUsd.toFixed(4)}`
+              : "—"
+          }
         />
-        <FooterStat icon={Cpu} label="Turns" value={String(data.turnCount)} />
+        <FooterStat
+          icon={Cpu}
+          label="Turns"
+          value={data.turnCount != null ? String(data.turnCount) : "—"}
+        />
         <FooterStat
           icon={Wrench}
           label="Tool calls"
-          value={String(data.numToolCalls)}
+          value={data.numToolCalls != null ? String(data.numToolCalls) : "—"}
         />
         <FooterStat
           icon={Cpu}
           label="Tokens"
-          value={`${data.inputTokens.toLocaleString()} in / ${data.outputTokens.toLocaleString()} out`}
+          value={`${(data.inputTokens ?? 0).toLocaleString()} in / ${(data.outputTokens ?? 0).toLocaleString()} out`}
           sub={
-            data.cacheReadTokens + data.cacheCreationTokens > 0
-              ? `cache: ${(data.cacheReadTokens + data.cacheCreationTokens).toLocaleString()}`
+            (data.cacheReadTokens ?? 0) + (data.cacheCreationTokens ?? 0) > 0
+              ? `cache: ${((data.cacheReadTokens ?? 0) + (data.cacheCreationTokens ?? 0)).toLocaleString()}`
               : undefined
           }
         />

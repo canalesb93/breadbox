@@ -24,6 +24,7 @@ import {
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TimelineRail } from "@/components/timeline-rail";
 import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusPanel } from "@/components/status-panel";
@@ -508,11 +509,18 @@ function DetailBody({
             }
           >
             {syncLogsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
+              // Skeleton mirrors the TimelineRail geometry the loaded
+              // state renders into — disc punched through the rail line,
+              // headline + timestamp lines to the right — so the layout
+              // doesn't shift when sync logs land. Iter 105.
+              <TimelineRail>
+                <TimelineRail.Group>
+                  <TimelineRail.RowSkeleton />
+                  <TimelineRail.RowSkeleton />
+                  <TimelineRail.RowSkeleton />
+                  <TimelineRail.RowSkeleton />
+                </TimelineRail.Group>
+              </TimelineRail>
             ) : (
               <SyncHistoryList logs={syncLogs} />
             )}

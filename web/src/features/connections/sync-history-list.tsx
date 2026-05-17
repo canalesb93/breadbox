@@ -1,6 +1,16 @@
-import { Check, Loader2, RefreshCw, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useMemo } from "react";
+import {
+  AlertCircle,
+  Check,
+  Loader2,
+  RefreshCw,
+  type LucideIcon,
+} from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import {
+  TimelineRail,
+  type TimelineRailTone,
+} from "@/components/timeline-rail";
 import { relativeTime } from "./connection-utils";
 import type { SyncLog } from "@/api/queries/sync-logs";
 
@@ -8,13 +18,73 @@ interface SyncHistoryListProps {
   logs: SyncLog[];
 }
 
-const STATUS_TILE: Record<string, string> = {
-  success: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  error: "bg-destructive/10 text-destructive",
-  in_progress: "bg-primary/10 text-primary",
+// Sync-history rows speak the same TimelineRail vocabulary as the
+// transaction-detail activity feed (iter 26 + iter 93). Status maps to
+// tone so the disc accent reads at a glance — no need to parse the
+// status text to find the failed runs.
+//   - success     → success    (emerald — run landed cleanly)
+//   - error       → destructive(red    — hard failure, demands action)
+//   - in_progress → primary    (run is mid-flight; spinner reinforces)
+// Iter 105 added the `destructive` tone to TimelineRail specifically so
+// errored sync runs don't have to fall back to the softer amber/warning
+// tint used for "tag removed" / soft-warning vocabulary.
+const STATUS_TONE: Record<string, TimelineRailTone> = {
+  success: "success",
+  error: "destructive",
+  in_progress: "primary",
 };
 
+const STATUS_ICON: Record<string, LucideIcon> = {
+  success: Check,
+  error: AlertCircle,
+  in_progress: Loader2,
+};
+
+const dayHeadingFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return dayHeadingFormatter.format(d);
+}
+
+interface DayGroup {
+  label: string;
+  rows: SyncLog[];
+}
+
+// Buckets newest-first sync logs into calendar days, preserving order
+// within each day. Logs without any timestamp fall under an "Unknown
+// time" group so they don't silently drop. Mirrors the
+// activity-timeline `groupByDay` shape so the two feeds read as one
+// system.
+function groupByDay(logs: SyncLog[]): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const log of logs) {
+    const ts = log.completed_at ?? log.started_at ?? null;
+    const label = ts ? dayLabel(ts) : "Unknown time";
+    const tail = groups[groups.length - 1];
+    if (tail && tail.label === label) {
+      tail.rows.push(log);
+    } else {
+      groups.push({ label, rows: [log] });
+    }
+  }
+  return groups;
+}
+
 export function SyncHistoryList({ logs }: SyncHistoryListProps) {
+  const groups = useMemo(() => groupByDay(logs), [logs]);
+
   if (logs.length === 0) {
     return (
       <EmptyState
@@ -27,17 +97,23 @@ export function SyncHistoryList({ logs }: SyncHistoryListProps) {
   }
 
   return (
-    <div className="divide-border/40 divide-y">
-      {logs.map((log) => (
-        <SyncHistoryRow key={log.id} log={log} />
+    <TimelineRail>
+      {groups.map((group) => (
+        <TimelineRail.Group key={group.label} label={group.label}>
+          {group.rows.map((log) => (
+            <SyncHistoryRow key={log.id} log={log} />
+          ))}
+        </TimelineRail.Group>
       ))}
-    </div>
+    </TimelineRail>
   );
 }
 
 function SyncHistoryRow({ log }: { log: SyncLog }) {
   const ts = log.completed_at ?? log.started_at ?? null;
-  const tile = STATUS_TILE[log.status] ?? STATUS_TILE.in_progress;
+  const tone = STATUS_TONE[log.status] ?? "neutral";
+  const Icon = STATUS_ICON[log.status] ?? RefreshCw;
+  const spin = log.status === "in_progress";
   const counts = formatCounts(log);
   const errorMessage =
     log.status === "error"
@@ -45,42 +121,42 @@ function SyncHistoryRow({ log }: { log: SyncLog }) {
       : null;
 
   return (
-    <div className="flex gap-3 py-3">
-      <div className={cn("flex size-6 shrink-0 items-center justify-center rounded-full", tile)}>
-        {log.status === "success" ? (
-          <Check className="size-3" />
-        ) : log.status === "error" ? (
-          <X className="size-3" />
-        ) : (
-          <Loader2 className="size-3 animate-spin" />
-        )}
-      </div>
-      <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-        <div className="min-w-0">
+    <TimelineRail.Row
+      icon={Icon}
+      tone={tone}
+      iconClassName={spin ? "[&>svg]:animate-spin" : undefined}
+    >
+      <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+        <div className="min-w-0 space-y-0.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium capitalize">{log.trigger}</span>
-            <span className="text-muted-foreground text-xs tabular-nums">
-              {ts ? relativeTime(ts) : ""}
+            <span className="text-sm font-medium capitalize">
+              {log.trigger}
             </span>
             {log.duration && (
-              <span className="text-muted-foreground bg-muted/60 rounded-full px-1.5 py-0.5 text-[0.6rem] tabular-nums">
+              <span className="text-muted-foreground bg-muted/60 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums">
                 {log.duration}
               </span>
             )}
           </div>
+          <p className="text-muted-foreground text-xs tabular-nums">
+            {ts ? relativeTime(ts) : "Unknown time"}
+          </p>
           {errorMessage && (
-            <p className="text-destructive/80 mt-0.5 truncate text-xs" title={log.error_message ?? errorMessage}>
+            <p
+              className="text-destructive/80 mt-1 text-xs"
+              title={log.error_message ?? errorMessage}
+            >
               {errorMessage}
             </p>
           )}
         </div>
         {counts && (
-          <div className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          <div className="text-muted-foreground shrink-0 pt-0.5 text-xs tabular-nums">
             {counts}
           </div>
         )}
       </div>
-    </div>
+    </TimelineRail.Row>
   );
 }
 

@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"breadbox/internal/agent"
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
@@ -333,6 +335,13 @@ func GetAgentRunHandler(svc *service.Service) http.HandlerFunc {
 }
 
 // GetAgentRunTranscriptHandler streams the NDJSON transcript file.
+//
+// Falls back to the deterministic path (<transcript_dir>/<run.ID>.ndjson) when
+// agent_runs.transcript_path is still NULL — that column is only persisted on
+// CompleteAgentRunDB, so without the fallback an in-progress run's transcript
+// 404s the whole way to completion. The SPA then sits on "Run starting…"
+// until the run finishes and shows the whole thing at once instead of
+// streaming. The fallback gives the polling loop something to read live.
 func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "shortId")
@@ -341,17 +350,28 @@ func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 			writeAgentError(w, err, "run not found")
 			return
 		}
-		if run.TranscriptPath == nil || *run.TranscriptPath == "" {
+		path := ""
+		if run.TranscriptPath != nil {
+			path = *run.TranscriptPath
+		}
+		if path == "" && run.ID != "" {
+			dir := appconfig.String(r.Context(), svc.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
+			if dir != "" {
+				path = filepath.Join(dir, run.ID+".ndjson")
+			}
+		}
+		if path == "" {
 			mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transcript not available for this run")
 			return
 		}
-		f, err := os.Open(*run.TranscriptPath)
+		f, err := os.Open(path)
 		if err != nil {
 			mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transcript file missing on disk")
 			return
 		}
 		defer f.Close()
 		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
 		// Best-effort copy; partial reads are OK for a viewer.
 		buf := make([]byte, 32*1024)
@@ -487,7 +507,7 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 				fmt.Sprintf("prompt must be at most %d characters", PromptOverrideMaxLen))
 			return
 		}
-		runResp, runErr := orch.RunNowWith(r.Context(), def, service.RunOverrides{
+		runResp, runErr := orch.RunNowAsyncWith(r.Context(), def, service.RunOverrides{
 			PromptPrefix:   req.PromptPrefix,
 			PromptOverride: req.PromptOverride,
 		})

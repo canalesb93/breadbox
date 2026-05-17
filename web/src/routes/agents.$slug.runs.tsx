@@ -451,8 +451,9 @@ interface TranscriptSheetProps {
 
 function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
   const open = Boolean(shortId);
-  const transcript = useTranscript(shortId ?? undefined);
   const runDetail = useAgentRun(shortId ?? undefined);
+  const inProgress = runDetail.data?.status === "in_progress";
+  const transcript = useTranscript(shortId ?? undefined, { inProgress });
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -482,6 +483,8 @@ function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-20 w-full" />
             </div>
+          ) : transcript.isError && inProgress ? (
+            <InProgressTranscriptPlaceholder />
           ) : transcript.isError ? (
             <PageError
               resource="transcript"
@@ -490,15 +493,41 @@ function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
               retrying={transcript.isFetching}
             />
           ) : transcript.data && shortId ? (
-            <TranscriptViewer
-              events={transcript.data.events}
-              rawLength={transcript.data.rawLength}
-              truncated={transcript.data.truncated}
-              shortId={shortId}
-            />
+            <>
+              {inProgress && <InProgressBanner />}
+              <TranscriptViewer
+                events={transcript.data.events}
+                rawLength={transcript.data.rawLength}
+                truncated={transcript.data.truncated}
+                shortId={shortId}
+              />
+            </>
           ) : null}
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function InProgressTranscriptPlaceholder() {
+  return (
+    <div className="text-muted-foreground flex flex-col items-center gap-3 py-12 text-center text-sm">
+      <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+      <div className="space-y-1">
+        <div className="text-foreground font-medium">Run starting…</div>
+        <p className="max-w-xs">
+          Transcript will appear here as the agent begins streaming events.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function InProgressBanner() {
+  return (
+    <div className="bg-muted/40 text-muted-foreground mb-4 flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
+      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      <span>Run in progress — events will keep arriving below.</span>
+    </div>
   );
 }

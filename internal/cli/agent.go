@@ -150,7 +150,7 @@ func runAgentRun(parent context.Context, slug string, jsonOut bool, promptPrefix
 	// process; the in-memory semaphore is just belt-and-suspenders).
 	sidecar := &agent.Sidecar{
 		BinaryPath:    appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, ""),
-		TranscriptDir: appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, ""),
+		TranscriptDir: appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents"),
 	}
 	orch := service.NewOrchestrator(a.Service, sidecar, 1, cfg.EncryptionKey, logger)
 
@@ -232,7 +232,7 @@ func runAgentTest(parent context.Context) error {
 	defer a.DB.Close()
 
 	binaryPath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
-	transcriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "")
+	transcriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
 	sidecar := &agent.Sidecar{
 		BinaryPath:    binaryPath,
 		TranscriptDir: transcriptDir,

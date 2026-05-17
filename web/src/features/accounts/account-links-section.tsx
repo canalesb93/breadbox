@@ -10,13 +10,13 @@ import {
   RotateCw,
   Unlink,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MetaBadge } from "@/components/meta-badge";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import { SectionCard } from "@/components/section-card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -199,9 +199,9 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
     <li className="bg-muted/30 flex items-start gap-3 rounded-md border p-3 text-sm">
       <div className="flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={isPrimary ? "default" : "secondary"} className="text-[10px]">
+          <MetaBadge variant={isPrimary ? "default" : "secondary"}>
             {isPrimary ? "Primary" : "Dependent"}
-          </Badge>
+          </MetaBadge>
           <span className="text-muted-foreground text-xs">
             {isPrimary ? "Covers" : "Attributed to"}
           </span>
@@ -229,7 +229,7 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
             </span>
           )}
           <span>± {link.match_tolerance_days}d tolerance</span>
-          {!link.enabled && <Badge variant="outline" className="text-[10px]">Disabled</Badge>}
+          {!link.enabled && <MetaBadge>Disabled</MetaBadge>}
         </div>
       </div>
       <RowActionsMenu
