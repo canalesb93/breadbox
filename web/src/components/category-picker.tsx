@@ -19,6 +19,12 @@ interface CategoryPickerProps {
   category: TransactionCategory | null | undefined;
   /** True when the current category was set by a manual override. */
   overridden?: boolean;
+  /**
+   * Badge density. Defaults to `md` (h-6) — the picker only renders inside
+   * the transactions row's category column which is `hidden sm:table-cell`,
+   * so there's room for the comfier size. Pass `sm` for tighter rails.
+   */
+  size?: "sm" | "md";
   className?: string;
 }
 
@@ -30,8 +36,15 @@ export function CategoryPicker({
   transactionId,
   category,
   overridden,
+  size = "md",
   className,
 }: CategoryPickerProps) {
+  // Match the empty-state pill's geometry to the active badge so the column
+  // doesn't shift when the user assigns or clears a category from the row.
+  const emptyPillClass =
+    size === "sm"
+      ? "h-5 px-1.5 text-[11px] gap-0.5"
+      : "h-6 px-2 text-xs gap-1";
   const [open, setOpen] = useState(false);
   const { apply, isPending } = useCategoryEditor(transactionId);
 
@@ -56,14 +69,16 @@ export function CategoryPicker({
             <CategoryBadge
               category={category}
               overridden={overridden}
-              size="sm"
+              size={size}
             />
           ) : (
-            // Empty-state pill mirrors the sm CategoryBadge geometry (h-5,
-            // text-[11px], rounded-md) so the column doesn't shift when the
-            // user assigns or clears a category from the row.
-            <span className="text-muted-foreground border-border hover:text-foreground inline-flex h-5 items-center gap-0.5 rounded-md border border-dashed px-1.5 text-[11px]">
-              <Plus className="size-2.5" />
+            <span
+              className={cn(
+                "text-muted-foreground border-border hover:text-foreground inline-flex items-center rounded-md border border-dashed",
+                emptyPillClass,
+              )}
+            >
+              <Plus className={size === "sm" ? "size-2.5" : "size-3"} />
               Category
             </span>
           )}
