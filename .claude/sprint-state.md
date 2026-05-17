@@ -486,6 +486,25 @@ Next iteration candidates (in rough impact order):
 
 Picking **#5 gitkeep infra fix** next iteration — smallest possible, kills a recurring footgun across all future iters (have hit it 4+ times now). Then #1 (cost dashboard) is the next high-impact item.
 
+## ITER 18 — 2026-05-17 03:08
+Shipped (PR #1244 squash-merged into sprint branch as af73e6b5):
+- web/package.json: append `&& touch dist/.gitkeep` to the build script. Sentinel now survives every entrypoint (make web, CI, ad-hoc).
+- Verified: rm + bun run build → .gitkeep restored.
+- All 5 CI jobs green.
+
+The amend-after-build footgun is dead. Future iters can `bun run build` freely without staging a deletion.
+
+Next iteration candidates (in rough impact order):
+1. **Cost dashboard** in /v2/agents — sparkline on list page or /v2/agents/cost page. Bigger UI work; high impact for self-hosters worried about API spend over time.
+2. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine + agent_definitions schema.
+3. **Suggested rules agent** — proposes new transaction_rules from recent transactions, queues for human-approval review row.
+4. **"Next fire" preview honoring quiet hours** — small iter-15 follow-up.
+5. **breadbox doctor extension** — add live smoke test option (--with-live or similar).
+6. **Per-agent cost cumulative on list page** — show total $ spent in lifetime / last 30 days next to each agent.
+
+Picking **#1 cost dashboard** next iteration — high-impact, becomes load-bearing once a self-hoster has been running real agents for a few weeks. Aiming for the smallest useful version: a sparkline or single-column total on the existing list page, NOT a new page. Can expand later.
+
+
 
 
 
