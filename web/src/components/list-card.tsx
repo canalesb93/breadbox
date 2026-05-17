@@ -51,7 +51,7 @@ interface ListCardProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "c
 // Visual contract — identical to SectionCard but the body is always a
 // `<ul className="divide-y">`:
 //   `<Card className="gap-0 py-0">`
-//     optional `<CardHeader className="border-b px-5 py-4">` title + action
+//     optional `<CardHeader className="border-b px-5 py-4 items-center">` title + action
 //     optional `<div className="border-b px-5 py-2">` toolbar slot
 //     `<ul className="divide-y">` rows (each `renderRow` result wrapped in `<li>`)
 //     optional `<div className="border-t px-5 py-3 text-right">` footer
@@ -60,6 +60,17 @@ interface ListCardProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "c
 // primitives must share vertical rhythm or pages that stack them feel
 // off. Row padding is consumer-supplied (typically `px-5 py-3` or
 // `px-5 py-3.5`), one stride below the header.
+//
+// Header alignment (iter 105): same fix as `SectionCard`. The shadcn
+// `CardHeader` grid defaults to `items-start` plus a `[.border-b]:pb-6`
+// rule that injects 24px of bottom padding when the header has a divider.
+// On `ListCard`'s "Recent activity" / "Connections" headers — title on
+// the left, `ViewAllPill` / "Manage" pill on the right — the result was
+// a crooked baseline (title pinned to top, action protruding 8px below)
+// AND a too-tall header band (24px below the title instead of 16px,
+// breaking symmetry with the 20px row stride below). `!pb-4` matches
+// `SectionCard`'s long-standing override; `items-center` plus title
+// `font-semibold` cures the baseline.
 //
 // When `rows.length === 0`, the `empty` slot replaces the `<ul>`. Pass
 // `<EmptyState>` for first-class look + CTA, or a short muted string for a
@@ -94,14 +105,21 @@ export function ListCard<T>({
       {...rest}
     >
       {showHeader && (
-        <CardHeader className={cn("border-b px-5 py-4", headerClassName)}>
+        <CardHeader
+          className={cn(
+            "items-center border-b px-5 py-4 !pb-4",
+            headerClassName,
+          )}
+        >
           {title !== undefined && (
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
               {icon}
               {title}
             </CardTitle>
           )}
-          {action !== undefined && <CardAction>{action}</CardAction>}
+          {action !== undefined && (
+            <CardAction className="self-center">{action}</CardAction>
+          )}
         </CardHeader>
       )}
       {toolbar && (
