@@ -297,6 +297,25 @@ Per the End-of-sprint exit instructions: DO NOT open the sprint→main PR autono
 
 Next iteration: pick the next-most-valuable Iteration 8+ item. Lean toward **subscription auth smoke test** since it's the only item that can be developed in isolation right now without depending on something else, AND it unblocks Ricardo's first real live run.
 
+## ITER 8 — 2026-05-17 01:34
+Shipped (PR #1234 squash-merged into sprint branch as 92ab2fa7):
+- `internal/agent/smoketest.go` — diagnostic SmokeTest function (no DB writes, no API key mint, no run row, bounded ~5¢).
+- `breadbox agent test` cobra CLI command with ✓/✗ output + remediation messages.
+- Cross-tag plumbing (agent_errors_full.go / _lite.go) so the lite build still compiles when MapExitCode references the agent sentinels.
+- 3 unit tests cover no-auth / runner-error / unknown-auth-mode paths.
+- docs/cli-commands.md + docs/agents.md + CHANGELOG entries.
+
+PushNotification fired to Ricardo asking for a token whenever convenient. Fire-and-forget — loop continues without blocking.
+
+Next iteration candidates (in rough impact order):
+1. **POST /api/v1/agents/test + "Test connection" button in Settings → Agents** — surfaces the iter-8 CLI smoke test in the UI for non-CLI users. Reuses SmokeTest. Small + high UX value.
+2. **`breadbox agent run <slug>` CLI** — parallels `breadbox agent test`; lets users trigger real agent runs from cron/shell. Small.
+3. **Run-history filtering** (status, date range, trigger). Mid-size, polish-bucket.
+4. **Per-agent audit page** linking runs to DB changes via mcp_sessions. Bigger; needs the link query.
+
+Picking #1 next iteration — surfaces the smoke test in the UI is high-leverage with low cost.
+
+
 
 
 
