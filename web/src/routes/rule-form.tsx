@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/api/client";
@@ -108,23 +109,25 @@ export function RuleFormPage({ mode }: RuleFormPageProps) {
     );
   }
 
-  const title = isEdit ? `Edit rule` : "New rule";
+  // Match the canonical form-page shell — SoftBackButton + eyebrow +
+  // PageHeader description voice. Descriptions are full sentences with a
+  // trailing period, framing the page's intent the same way tag-new /
+  // category-new / api-key-new do.
+  const eyebrow = isEdit ? "Edit rule" : "New rule";
+  const title = isEdit && rule ? rule.name : "Create a rule";
   const description = isEdit
-    ? "Changes apply on the next sync. Use 'Apply retroactively' on the detail page to re-run against existing transactions."
-    : "When transactions match the conditions, the actions are applied automatically.";
+    ? "Changes apply on the next sync. Use Apply retroactively on the detail page to re-run against existing transactions."
+    : "Rules watch every incoming transaction during sync. When the conditions match, the actions fire automatically — categorize, tag, comment, or skip review.";
   const submitting = isEdit ? updateRule.isPending : createRule.isPending;
+  // SoftBackButton prefers history.back() on plain click, so /rules is a
+  // safe fallback for both create and edit (the latter usually navigated
+  // through /rules/$id, which has its own SoftBackButton to /rules).
+  const backLabel = isEdit ? "Back to rule" : "Back to rules";
 
   return (
     <>
-      <PageHeader
-        title={title}
-        description={description}
-        actions={
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/rules">Back</Link>
-          </Button>
-        }
-      />
+      <SoftBackButton to="/rules">{backLabel}</SoftBackButton>
+      <PageHeader eyebrow={eyebrow} title={title} description={description} />
       <RuleForm
         initialRule={rule}
         submitting={submitting}
