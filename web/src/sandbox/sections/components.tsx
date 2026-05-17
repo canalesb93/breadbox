@@ -940,29 +940,53 @@ export function ComponentsSection() {
       <Specimen
         label="PageError"
         code="components/page-error"
-        description="The canonical page-level 'this page couldn't fetch its data' state. Composition on top of `<StatusPanel tone='destructive'>` — AlertTriangle icon, `Couldn't load {resource}` heading, the error's `message` (or a fallback) as body, and an outline `RefreshCw` Retry button in the trailing slot that swaps to a spinning icon + `Retrying…` label while in-flight. Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading) — three states, three vocabularies, one visual system. Six pages share it today: accounts, connections, providers, rules, rule-form, rule-detail. Don't fork — extend this primitive."
+        description="The canonical page-level 'this page couldn't fetch its data' state. Two variants. `panel` (default) composes `<StatusPanel tone='destructive'>` — AlertTriangle icon, `Couldn't load {resource}` heading, the error's `message` (or a fallback) as body, and an outline `RefreshCw` Retry button in the trailing slot that swaps to a spinning icon + `Retrying…` label while in-flight. `inline` (iter 88) drops the bordered StatusPanel chrome so the same icon tile + heading + body + retry sits flush inside an already-bordered host (a SectionCard body, a ListCard slot) — used by the transaction-detail activity-timeline. Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading) — three states, three vocabularies, one visual system. Seven surfaces share it today: accounts, connections, providers, rules, rule-form, rule-detail, activity-timeline (inline). Don't fork — extend this primitive."
         className="block"
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
-              with retry handler
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+                panel · with retry handler
+              </div>
+              <PageError
+                resource="accounts"
+                error={new Error("Network request failed (ECONNRESET).")}
+                onRetry={() => {
+                  setPageErrorRetrying(true);
+                  window.setTimeout(() => setPageErrorRetrying(false), 1200);
+                }}
+                retrying={pageErrorRetrying}
+              />
             </div>
-            <PageError
-              resource="accounts"
-              error={new Error("Network request failed (ECONNRESET).")}
-              onRetry={() => {
-                setPageErrorRetrying(true);
-                window.setTimeout(() => setPageErrorRetrying(false), 1200);
-              }}
-              retrying={pageErrorRetrying}
-            />
+            <div>
+              <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+                panel · without retry · fallback message
+              </div>
+              <PageError resource="rules" />
+            </div>
           </div>
           <div>
             <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
-              without retry · fallback message
+              inline · nested inside a bordered host (SectionCard / ListCard)
             </div>
-            <PageError resource="rules" />
+            <div className="bg-card rounded-lg border">
+              <div className="border-b px-5 py-3 text-sm font-medium">
+                Activity
+              </div>
+              <div className="p-5">
+                <PageError
+                  variant="inline"
+                  resource="the activity timeline"
+                  error={new Error("Request failed with status 500.")}
+                  onRetry={() => {
+                    setPageErrorRetrying(true);
+                    window.setTimeout(() => setPageErrorRetrying(false), 1200);
+                  }}
+                  retrying={pageErrorRetrying}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Specimen>
