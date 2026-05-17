@@ -2045,9 +2045,44 @@ Cross-cutting components:
     and the dialog's no-overflow context. Two inline class blocks
     sharing the same vocabulary is the right size today.
 
+- **Iter 80 — Sticky table header pinned below the app shell header (+ build unblock)** ([#1194](https://github.com/canalesb93/breadbox/pull/1194))
+  - `DataTable`'s `stickyHeader` opt-in pinned the column band to
+    `top-0`, which on the v2 SPA lands behind the app shell's own
+    sticky header (`h-14` in `__root.tsx`) — column labels disappeared
+    under the chrome as soon as the page scrolled. Bumped the offset
+    to `top-14` so the band sits flush under the app header and stays
+    legible.
+  - Three consumers benefit immediately:
+    `transactions.tsx`, `tags-table.tsx`, `api-keys-table.tsx`.
+    z-index left at `z-10` (above table body, well below the app
+    header's `z-30`).
+  - Tightened the JSDoc on `stickyHeader` to call out the shell
+    coupling so future surfaces don't reintroduce the regression.
+  - Same PR also unblocks the design-branch dev build: a stray
+    duplicate `const referenceRows` in `transaction-detail.tsx` and a
+    literal `<ViewAllPill>` token sitting inside JSX prose in
+    `sandbox/sections/components.tsx` were both crashing
+    `vite` / `tsc -b`. Neither shows up in `bun run lint` because
+    the repo's root `tsconfig.json` ships `files: []` — only
+    `tsc -b` (the script run by `bun run build`) walks the actual
+    project graph. Worth tightening `bun run lint` to run `tsc -b`
+    instead of `tsc --noEmit` so this class of regression catches in
+    iteration-level lint, not just CI build.
+
 ## Open observations / questions
 
 (Populated by iterations.)
+
+- **`bun run lint` doesn't catch real TS errors** (iter 80): the
+  script runs `tsc --noEmit` against the root `tsconfig.json` which
+  has `files: []` — it type-checks nothing. The actual project graph
+  is only walked by `tsc -b` (the script run by `bun run build`).
+  Net effect: a duplicate variable declaration and a JSX parse
+  error both landed on `design/v2-shadcn` (#1193) and blocked
+  `vite dev` for the next iteration. Fix: point `lint` at the
+  project references (`tsc -b --noEmit`) so the same graph runs in
+  both lint and build. Filed as a follow-up; iter 80 swept the
+  immediate parse errors but the lint config drift remains.
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
