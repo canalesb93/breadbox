@@ -65,6 +65,7 @@ const agentEditSchema = z.object({
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM 24-hour")
     .optional()
     .or(z.literal("")),
+  trigger_on_sync_complete: z.boolean(),
 });
 type AgentEditForm = z.input<typeof agentEditSchema>;
 
@@ -88,6 +89,7 @@ export function AgentEditPage() {
       max_budget_usd: null,
       quiet_hours_start: "",
       quiet_hours_end: "",
+      trigger_on_sync_complete: false,
     },
   });
 
@@ -108,6 +110,7 @@ export function AgentEditPage() {
       max_budget_usd: agent.max_budget_usd ?? null,
       quiet_hours_start: agent.quiet_hours_start ?? "",
       quiet_hours_end: agent.quiet_hours_end ?? "",
+      trigger_on_sync_complete: agent.trigger_on_sync_complete,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentQuery.data?.short_id]);
@@ -135,6 +138,7 @@ export function AgentEditPage() {
           quiet_hours_end: values.quiet_hours_end
             ? values.quiet_hours_end
             : null,
+          trigger_on_sync_complete: values.trigger_on_sync_complete,
         }),
       {
         success: "Agent saved",
@@ -421,6 +425,34 @@ export function AgentEditPage() {
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="trigger_on_sync_complete"
+                  render={({ field }) => (
+                    <FormItem className="mt-4 flex items-start gap-3 rounded-md border p-3">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          className="mt-1 size-4"
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      </FormControl>
+                      <div className="space-y-1">
+                        <FormLabel className="font-medium">
+                          Run after every successful sync
+                        </FormLabel>
+                        <FormDescription>
+                          Fires this agent (trigger=webhook) whenever a bank
+                          sync completes. Useful for keep-up agents like
+                          "re-categorize freshly synced transactions" — pairs
+                          with cron OR replaces it.
+                        </FormDescription>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </Card>
 
               <div className="flex justify-end gap-2">

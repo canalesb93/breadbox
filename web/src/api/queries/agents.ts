@@ -46,6 +46,8 @@ export interface AgentDefinition {
   next_fire_at?: string | null; // RFC3339; nil when no schedule, disabled, or unparseable
   recent_error_stats?: AgentRecentErrorStats | null;
   last_prompt_prefix?: string | null; // most recent non-null prompt_prefix; powers "Use last prefix"
+  trigger_on_sync_complete: boolean; // fire after every successful sync
+
   created_at: string;
   updated_at: string;
 }
@@ -115,6 +117,7 @@ export interface CreateAgentInput {
   enabled?: boolean;
   quiet_hours_start?: string | null;
   quiet_hours_end?: string | null;
+  trigger_on_sync_complete?: boolean;
 }
 
 export type UpdateAgentInput = Partial<CreateAgentInput>;

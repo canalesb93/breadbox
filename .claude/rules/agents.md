@@ -40,6 +40,10 @@ If both `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` are set in the sidecar
 
 Every run mints a scoped `actor_type='agent'` API key (name format `agent:<slug>:<runShortID>`) and revokes it in a `defer` with a fresh context. Never leave a key valid past the run that minted it. If you add a new entry point that runs an agent, wrap it in `Orchestrator.RunNow` or `Orchestrator.RunOrSkip` — don't reimplement the mint-revoke dance.
 
+### Sync-completion webhook is a hook, not a dependency
+
+`sync.Engine.OnSyncComplete` is a function pointer the engine fires after each successful sync. The agent orchestrator wires itself up in `serve.go` — the engine itself has no knowledge of agents (no import cycle, no agents-subsystem coupling). When you add another post-sync responsibility, prefer extending the hook (or stacking another one) over importing the agent package into `internal/sync/`.
+
 ### Concurrency split
 
 - `RunNow` (manual trigger from HTTP): `ErrConcurrencyLocked` returns WITHOUT creating an `agent_runs` row. Caller maps to 503; user can retry without polluting history.

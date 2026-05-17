@@ -60,6 +60,13 @@ type Engine struct {
 	locks             gosync.Map // connection ID string -> *gosync.Mutex
 	matcher           *Matcher
 	balanceRetryDelay time.Duration // delay between balance fetch retries (default 2s)
+
+	// OnSyncComplete fires after each SUCCESSFUL sync. Wired by the app
+	// layer to dispatch agent-runs that have trigger_on_sync_complete=true.
+	// Nil-safe — engine ignores when unset. Called with the connection's UUID
+	// so the hook can correlate; runs in the same goroutine as Sync so the
+	// hook should hand off async if it might block.
+	OnSyncComplete func(ctx context.Context, connectionID pgtype.UUID)
 }
 
 // NewEngine creates a new sync engine.
@@ -155,6 +162,13 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	logger.Info("sync completed", "added", added, "modified", modified, "removed", removed, "unchanged", unchanged)
+
+	// Post-sync hook: agent webhook triggers, matcher reconciliation, etc.
+	// Engine doesn't know what's wired here — it's the app layer's job to
+	// keep the hook fast (or hand off to a goroutine).
+	if e.OnSyncComplete != nil {
+		e.OnSyncComplete(ctx, connectionID)
+	}
 	return nil
 }
 
