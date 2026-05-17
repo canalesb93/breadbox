@@ -121,14 +121,18 @@ function TimelineRailRow({
     <li
       className={cn(
         // `relative` so the rail `::before` positions against the row;
-        // `pl-3.5` (14px) plus the disc's `-ml-3.5` lines the disc centre
-        // up with the rail x-position at the row's left edge (x=0).
+        // `pl-3.5` (14px) plus the disc's `-ml-3.5` (-14px) sits the
+        // disc's left edge at x=0 and its centre at x=14px (half of the
+        // 28px-wide disc) measured from the row's outer-left edge.
         "relative flex gap-3 pl-3.5",
-        // Rail line drawn via `::before`. 1px wide at the disc x-centre
-        // (left:0 of the row's padding-box, since the disc's negative
-        // margin pulls it back so its centre sits on x=0). The pseudo
-        // gets the same `border-border/60` token as the previous border.
-        "before:content-[''] before:absolute before:left-0 before:w-px before:bg-border/60",
+        // Rail line drawn via `::before`. 1px wide, centred on the disc
+        // centre at x=14px → left = 14px - 0.5px = calc(0.875rem - 0.5px).
+        // Iter 56 introduced this pseudo-element rail (replacing
+        // `<ol border-l>`) but anchored it at `left-0`, which sat the rail
+        // 13.5px to the left of the disc centre — a regression caught in
+        // iter 77 and fixed here. The pseudo gets the same
+        // `border-border/60` token as the previous border.
+        "before:content-[''] before:absolute before:left-[calc(0.875rem-0.5px)] before:w-px before:bg-border/60",
         // Middle rows: full height; the row's `space-y-3` (12px) gap with
         // the next sibling is bridged by `bottom: -12px` so the rail
         // appears unbroken between rows. `-top: 12px` mirrors that on the
@@ -202,7 +206,7 @@ function TimelineRailRowSkeleton({
         // rail x-axis and the rail pseudo-element clips identically — see the
         // long-form comment on TimelineRailRow for the math.
         "relative flex gap-3 pl-3.5",
-        "before:content-[''] before:absolute before:left-0 before:w-px before:bg-border/60",
+        "before:content-[''] before:absolute before:left-[calc(0.875rem-0.5px)] before:w-px before:bg-border/60",
         "before:-top-3 before:-bottom-3",
         "[&:first-of-type]:before:top-[14px]",
         "[&:last-of-type]:before:bottom-[calc(100%-14px)]",
