@@ -107,12 +107,15 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - [ ] **Deferred:** TagInput chip control for allowed_tools (currently a comma-separated Textarea)
 - [ ] **Deferred:** MCP tool registry endpoint to source allowed-tools picker from live data
 
-### Iteration 6 — seed defaults + retire v1
-- [ ] Seed migration: add the v1 prompt-wizard prompts as disabled `agent_definitions` rows (initial-setup, bulk-review, quick-review, routine-review, spending-report)
-- [ ] Redirect `/admin/agent-prompts`, `/agents`, `/agent-wizard` → `/v2/agents` (302 + banner)
-- [ ] Update `internal/admin/router.go` to mark old routes deprecated
-- [ ] User docs (in `breadbox-docs` if needed; otherwise inline `docs/agents.md`): how to enable, costs, safety
-- **PR title:** `feat(agents): seed default agents, retire v1 prompt wizard`
+### Iteration 6 — seed defaults + retire v1 ✅ MERGED #1232 (into sprint branch)
+- [x] DefaultSeed + SeedDefaults — 5 starter agents (initial-setup, bulk-review, quick-review, routine-review, spending-report), all disabled, mapped to existing prompts/agents/strategy-*.md files
+- [x] Wired at startup in serve.go after the agent scheduler is constructed
+- [x] All v1 admin agent paths 302 → /v2/agents (5 routes)
+- [x] AgentsPageHandler / PromptBuilderHandler / PromptCopyHandler symbols kept compiled (unwired) for one-line rollback
+- [x] docs/agents.md — canonical quick-start + architecture + safety + replaced-what doc
+- [x] 3 new seed integration tests pass (populates / idempotent / skips on existing rows)
+- [ ] **Deferred:** full deletion of v1 templ + handler files — belongs in the broader v1-admin retirement sweep
+- [ ] **Deferred:** removing the v1 sidebar "Agent Prompts" nav entry — staying as a discoverable bridge during transition
 
 ### Iteration 7 — polish + docs + observability
 - [ ] Structured logging on every agent event
@@ -263,6 +266,22 @@ Deferred (intentional polish):
 - MCP tool registry endpoint for live allowed-tools picker
 
 Next iteration: iter 6 — seed default agents (port v1 prompt-wizard prompts as disabled-by-default agent_definitions rows) + retire /admin/agent-prompts with a redirect.
+
+## ITER 6 — 2026-05-17 01:08
+Shipped (PR #1232 squash-merged into sprint branch as f4f06d64):
+- 5 starter agents seed on fresh installs only — user edits + custom agents survive every restart.
+- Every v1 admin agent URL 302s to /v2/agents (5 paths).
+- docs/agents.md as the canonical user-facing doc.
+- 3 new seed integration tests pass; all builds + drift green.
+
+Convenient side-effect: a fresh install now has 5 visible (disabled) agents in the v2 SPA the moment they hit /v2/agents, instead of an empty-state placeholder. Strong onboarding lever.
+
+Deferred:
+- Deleting the dead v1 templ + handler files — broader v1-admin retirement work.
+- Removing the v1 sidebar nav entry.
+
+Next iteration: iter 7 — observability + docs polish + final cleanup. Specifically: structured logging on every agent event, optional OTel export wired via SDK env vars (OTEL_*), CHANGELOG entry, .claude/rules/agents.md for future contributors, and the deferred sandbox specimens from iter 5 (TranscriptViewer + CronField).
+
 
 
 
