@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
 	"breadbox/internal/config"
+	"breadbox/internal/service"
 
 	"github.com/spf13/cobra"
 )
@@ -62,7 +64,129 @@ Exit codes:
 		},
 	}
 	parent.AddCommand(test)
+
+	run := &cobra.Command{
+		Use:   "run <slug>",
+		Short: "Trigger an immediate run of a named agent",
+		Long: `Run one agent end-to-end against the live system: mints a scoped API
+key, spawns the sidecar with the definition's prompt + schedule, calls
+the MCP server, persists the resulting agent_runs row, revokes the key.
+
+Equivalent to clicking "Run now" in the v2 SPA — useful for cron/shell
+automation or local debugging.
+
+Exit codes:
+  0  run completed (status may be success or error — see status field)
+  3  no Anthropic credential configured
+  5  agent slug not found / agent binary not found
+  1  runner crashed or model returned an unexpected error
+`,
+		Args:          cobra.ExactArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			jsonOut, _ := cmd.Flags().GetBool("json")
+			return runAgentRun(cmd.Context(), args[0], jsonOut)
+		},
+	}
+	run.Flags().Bool("json", false, "emit the run result as JSON instead of human-readable")
+	parent.AddCommand(run)
+
 	root.AddCommand(parent)
+}
+
+func runAgentRun(parent context.Context, slug string, jsonOut bool) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+
+	a, err := app.New(ctx, cfg, logger)
+	if err != nil {
+		return fmt.Errorf("init app: %w", err)
+	}
+	defer a.DB.Close()
+
+	def, err := a.Service.GetAgentDefinition(ctx, slug)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			fmt.Fprintf(os.Stderr, "agent %q not found\n", slug)
+			return silentlyFail(agent.ErrBinaryNotFound) // map to ExitValidation (5)
+		}
+		return fmt.Errorf("resolve agent: %w", err)
+	}
+
+	// Build a one-shot orchestrator with concurrency=1 (CLI is a single
+	// process; the in-memory semaphore is just belt-and-suspenders).
+	sidecar := &agent.Sidecar{
+		BinaryPath:    appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, ""),
+		TranscriptDir: appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, ""),
+	}
+	orch := service.NewOrchestrator(a.Service, sidecar, 1, cfg.EncryptionKey, logger)
+
+	if !jsonOut {
+		fmt.Fprintf(os.Stdout, "▶  Running %s (%s)…\n", def.Name, def.Slug)
+	}
+	runResp, runErr := orch.RunNow(ctx, def)
+	if runErr != nil {
+		switch {
+		case errors.Is(runErr, agent.ErrAuthNotConfigured):
+			fmt.Fprintln(os.Stderr, "auth not configured — paste a token in Settings → Agents or run `breadbox agent test` for diagnostic detail")
+			return silentlyFail(runErr)
+		case errors.Is(runErr, agent.ErrBinaryNotFound):
+			fmt.Fprintln(os.Stderr, "breadbox-agent binary not found — run `make agent-sidecar` or set agent.runtime_path")
+			return silentlyFail(runErr)
+		case errors.Is(runErr, agent.ErrConcurrencyLocked):
+			// Shouldn't happen with a fresh per-CLI orchestrator, but
+			// surface clearly if it does.
+			fmt.Fprintln(os.Stderr, "another agent run is in progress on this server — retry shortly")
+			return silentlyFail(runErr)
+		}
+		// Runner errored but the row was still written; print the result
+		// then bubble the error for non-zero exit.
+		if runResp != nil {
+			printAgentRunResult(runResp, jsonOut)
+		}
+		fmt.Fprintf(os.Stderr, "\nrun failed: %v\n", runErr)
+		return silentlyFail(runErr)
+	}
+	printAgentRunResult(runResp, jsonOut)
+	return nil
+}
+
+func printAgentRunResult(r *service.AgentRunResponse, jsonOut bool) {
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(r)
+		return
+	}
+	fmt.Fprintln(os.Stdout, "")
+	fmt.Fprintf(os.Stdout, "  status     %s\n", r.Status)
+	fmt.Fprintf(os.Stdout, "  trigger    %s\n", r.Trigger)
+	fmt.Fprintf(os.Stdout, "  short_id   %s\n", r.ShortID)
+	if r.DurationMs != nil {
+		fmt.Fprintf(os.Stdout, "  duration   %dms\n", *r.DurationMs)
+	}
+	if r.TotalCostUSD != nil {
+		fmt.Fprintf(os.Stdout, "  cost       $%.6f\n", *r.TotalCostUSD)
+	}
+	if r.TurnCount != nil {
+		fmt.Fprintf(os.Stdout, "  turns      %d\n", *r.TurnCount)
+	}
+	if r.NumToolCalls != nil {
+		fmt.Fprintf(os.Stdout, "  tool calls %d\n", *r.NumToolCalls)
+	}
+	if r.ErrorMessage != nil {
+		fmt.Fprintf(os.Stdout, "  error      %s\n", *r.ErrorMessage)
+	}
+	if r.TranscriptPath != nil {
+		fmt.Fprintf(os.Stdout, "  transcript %s\n", *r.TranscriptPath)
+	}
 }
 
 func runAgentTest(parent context.Context) error {
