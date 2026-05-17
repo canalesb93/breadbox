@@ -388,6 +388,26 @@ Next iteration candidates (in rough impact order):
 
 Picking **#4 breadbox doctor integration** next iteration — smallest follow-up, reuses iter-8 SmokeTest, valuable for first-run troubleshooting which is the most fragile moment of the self-hoster journey.
 
+## ITER 13 — 2026-05-17 02:14
+Shipped (PR #1239 squash-merged into sprint branch as 07839ed7):
+- `breadbox doctor` reports an `agent subsystem` line (PASS/WARN/SKIP) without spending money on a live API call.
+- Extracted `agent.LocateBinary` as the shared discovery helper used by both Sidecar.resolveBinary and the new doctor check.
+- 4 table-driven test cases on the pure decision logic (agentSubsystemCheck) cover all branches.
+- WARN states include one-line remediation; PASS message points at `breadbox agent test` for the live round-trip.
+- All 5 CI jobs green.
+
+The self-hoster's first-run troubleshooting flow is now: `breadbox doctor` shows what's missing → SettingsUI or CLI fixes it → `breadbox doctor` re-verifies → `breadbox agent test` confirms end-to-end. Each step has its own surface.
+
+Next iteration candidates (in rough impact order):
+1. **Per-agent quiet hours** — schema column + scheduler tweak + UI control. Mid.
+2. **Cost dashboard** in /v2/agents — sparkline on list page or /v2/agents/cost. Bigger.
+3. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine.
+4. **Suggested rules agent** — scans recent transactions, proposes new transaction_rules, queues for human review. Bigger.
+5. **Onboarding polish on /v2/agents list** — surface auth-not-configured / binary-missing state inline so a fresh install's first visit doesn't look like a confusing wall of disabled-looking starter agents. Reuses iter-13 doctor knowledge via the existing SmokeTest endpoint.
+
+Picking **#5 onboarding polish** next iteration — smallest UX win, leans on the iter-13 doctor knowledge surfaced as inline guidance, pairs well with the seeded starter agents from iter 6 (which look enabled-able but aren't usable until auth is configured).
+
+
 
 
 
