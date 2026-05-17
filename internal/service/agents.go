@@ -61,8 +61,12 @@ type AgentDefinitionResponse struct {
 	// GetAgentDefinition leaves it nil so the edit-page hot path doesn't
 	// pay for an extra aggregation query.
 	CostStats30d *AgentCostStats `json:"cost_stats_30d,omitempty"`
-	CreatedAt    string          `json:"created_at"`
-	UpdatedAt    string          `json:"updated_at"`
+	// NextFireAt is the next scheduled fire time accounting for quiet
+	// hours, populated by ListAgentDefinitions only (list-only like
+	// CostStats30d — single-row Get leaves nil). RFC3339 string when set.
+	NextFireAt *string `json:"next_fire_at,omitempty"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
 }
 
 // AgentCostStats is the per-agent cost rollup over the last 30 days.
@@ -186,6 +190,12 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		resp := agentDefinitionFromRow(row, last)
 		if stats, ok := statsByID[resp.ID]; ok {
 			resp.CostStats30d = &stats
+		}
+		if resp.Enabled {
+			if nextFire := ComputeNextFire(&resp, time.Now()); nextFire != nil {
+				s := nextFire.Format(time.RFC3339)
+				resp.NextFireAt = &s
+			}
 		}
 		out = append(out, resp)
 	}

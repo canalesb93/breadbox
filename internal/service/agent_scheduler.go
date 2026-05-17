@@ -135,6 +135,56 @@ func (s *AgentScheduler) fireCronJob(defID pgtype.UUID, slug string) {
 	}
 }
 
+// ComputeNextFire returns the next time the scheduler would fire `def`
+// after `now`, accounting for quiet hours. Returns nil when the schedule
+// is absent (manual-only), unparseable, or no non-quiet slot is found
+// within the safety-limit window.
+func ComputeNextFire(def *AgentDefinitionResponse, now time.Time) *time.Time {
+	if def == nil || def.ScheduleCron == nil || *def.ScheduleCron == "" {
+		return nil
+	}
+	schedule, err := cron.ParseStandard(*def.ScheduleCron)
+	if err != nil {
+		return nil
+	}
+	next := schedule.Next(now)
+	// Up to 100 iterations of "next fire lands in quiet hours → advance
+	// past the quiet window → re-ask cron." Bounded so a misconfigured
+	// 24-hour quiet window can't infinite-loop.
+	for i := 0; i < 100; i++ {
+		if !IsWithinQuietHours(next, def.QuietHoursStart, def.QuietHoursEnd) {
+			return &next
+		}
+		// Subtract one second so a cron that fires AT the quiet-end
+		// minute still gets returned by schedule.Next (which excludes
+		// the supplied time). Otherwise we'd skip past a valid first
+		// fire — e.g. quiet 22-07 + hourly cron should report 07:00,
+		// not 08:00.
+		jumped := nextMinuteAfterQuietEnd(next, *def.QuietHoursEnd).Add(-time.Second)
+		next = schedule.Next(jumped)
+	}
+	return nil
+}
+
+// nextMinuteAfterQuietEnd returns the first concrete time >= `now` that
+// lands at the end of the quiet window. Used by ComputeNextFire to skip
+// past the quiet period and resume cron evaluation.
+func nextMinuteAfterQuietEnd(now time.Time, end string) time.Time {
+	endMin, ok := parseHHMM(end)
+	if !ok {
+		// Fallback so the outer loop's bound prevents infinite recursion.
+		return now.Add(time.Hour)
+	}
+	endHour := endMin / 60
+	endMinute := endMin % 60
+	candidate := time.Date(now.Year(), now.Month(), now.Day(),
+		endHour, endMinute, 0, 0, now.Location())
+	if !candidate.After(now) {
+		candidate = candidate.Add(24 * time.Hour)
+	}
+	return candidate
+}
+
 // cleanupAgentRuns prunes completed agent_runs older than the retention
 // period (default 30 days; 0 disables). Transcript file GC is deferred
 // to a later iteration.
