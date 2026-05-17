@@ -159,6 +159,66 @@ func TestCheckCronConfig(t *testing.T) {
 	})
 }
 
+func TestAgentSubsystemCheck(t *testing.T) {
+	tests := []struct {
+		name        string
+		authMode    string
+		authPresent bool
+		binPath     string
+		binReady    bool
+		wantStatus  string
+		wantMsgPart string
+	}{
+		{
+			name:        "both present",
+			authMode:    "subscription",
+			authPresent: true,
+			binPath:     "/usr/local/bin/breadbox-agent",
+			binReady:    true,
+			wantStatus:  doctorStatusPass,
+			wantMsgPart: "ready",
+		},
+		{
+			name:        "auth present, binary missing",
+			authMode:    "api_key",
+			authPresent: true,
+			binPath:     "",
+			binReady:    false,
+			wantStatus:  doctorStatusWarn,
+			wantMsgPart: "binary not found",
+		},
+		{
+			name:        "auth missing, binary present",
+			authMode:    "subscription",
+			authPresent: false,
+			binPath:     "/bin/breadbox-agent",
+			binReady:    true,
+			wantStatus:  doctorStatusWarn,
+			wantMsgPart: "no Anthropic credential",
+		},
+		{
+			name:        "neither configured",
+			authMode:    "subscription",
+			authPresent: false,
+			binPath:     "",
+			binReady:    false,
+			wantStatus:  doctorStatusSkip,
+			wantMsgPart: "not configured",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := agentSubsystemCheck(tc.authMode, tc.authPresent, tc.binPath, tc.binReady)
+			if got.Status != tc.wantStatus {
+				t.Errorf("status = %q, want %q", got.Status, tc.wantStatus)
+			}
+			if !strings.Contains(got.Message, tc.wantMsgPart) {
+				t.Errorf("message %q should contain %q", got.Message, tc.wantMsgPart)
+			}
+		})
+	}
+}
+
 func TestCheckPublicURL(t *testing.T) {
 	t.Run("unset skips", func(t *testing.T) {
 		t.Setenv("PUBLIC_URL", "")

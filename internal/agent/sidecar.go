@@ -32,14 +32,24 @@ type Sidecar struct {
 	mu sync.Mutex
 }
 
-// resolveBinary finds the sidecar binary in priority order:
-//  1. s.BinaryPath
-//  2. $BREADBOX_AGENT_BIN
-//  3. ./bin/breadbox-agent (process cwd)
-//  4. PATH lookup (`breadbox-agent`)
+// resolveBinary finds the sidecar binary via the shared LocateBinary helper.
 func (s *Sidecar) resolveBinary() (string, error) {
-	if s.BinaryPath != "" {
-		return s.BinaryPath, nil
+	return LocateBinary(s.BinaryPath)
+}
+
+// LocateBinary finds the breadbox-agent sidecar binary using the same
+// priority order Sidecar.Run uses at exec time. Exported so the `breadbox
+// doctor` check + the v2 SPA settings can share the discovery semantics.
+//
+//	1. explicit path (e.g. app_config.agent.runtime_path)
+//	2. $BREADBOX_AGENT_BIN
+//	3. ./bin/breadbox-agent (process cwd)
+//	4. PATH lookup (`breadbox-agent`)
+//
+// Returns ErrBinaryNotFound when none of the above hit.
+func LocateBinary(explicitPath string) (string, error) {
+	if explicitPath != "" {
+		return explicitPath, nil
 	}
 	if v := os.Getenv("BREADBOX_AGENT_BIN"); v != "" {
 		return v, nil
