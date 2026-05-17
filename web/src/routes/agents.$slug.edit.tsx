@@ -34,6 +34,7 @@ import {
   TOOL_SCOPES,
 } from "@/features/agents/agent-constants";
 import { CronField } from "@/features/agents/cron-field";
+import { RuleDslHelp } from "@/features/agents/rule-dsl-help";
 
 // Use z.preprocess (not z.coerce) for numerics to dodge the iter-4 resolver
 // bug where coerce.number leaves the input type as `unknown`. Preprocess
@@ -210,6 +211,7 @@ export function AgentEditPage() {
                     </FormItem>
                   )}
                 />
+                <RuleDslHelp />
                 <FormField
                   control={form.control}
                   name="system_prompt"
