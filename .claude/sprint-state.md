@@ -315,6 +315,27 @@ Next iteration candidates (in rough impact order):
 
 Picking #1 next iteration — surfaces the smoke test in the UI is high-leverage with low cost.
 
+## ITER 9 — 2026-05-17 01:40
+Shipped (PR #1235 squash-merged into sprint branch as dadd435e):
+- POST /api/v1/agents/test endpoint wrapping the iter-8 SmokeTest.
+- Orchestrator.SmokeTest(ctx) method on *Orchestrator; reuses the existing runner; bypasses concurrency semaphore.
+- v2 SPA: useSmokeTestAgent mutation hook + "Test connection" button in Settings → Agents with inline pass/fail Alert.
+- docs/api-endpoints.md + openapi.yaml updated; drift green.
+- All 5 CI jobs green.
+
+Two iter-8/9 self-service flows now reach Ricardo by paths he prefers:
+- CLI users: `breadbox agent test`
+- UI users: Settings → Agents → "Test connection" button
+
+Next iteration candidates (in rough impact order):
+1. **`breadbox agent run <slug>` CLI** — parallels `breadbox agent test`; lets users trigger real agent runs from cron/shell. Reuses Orchestrator.RunNow. Small.
+2. **Run-history filtering** (status, date range, trigger) on /v2/agents/$slug/runs. Mid-size, polish-bucket.
+3. **Per-agent quiet hours** (don't fire between configured hours) — schema + scheduler tweak + UI control. Mid.
+4. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger, touches sync engine.
+
+Picking #1 next iteration — small parallel CLI to iter-8's agent test, useful for cron-driven sysadmins.
+
+
 
 
 
