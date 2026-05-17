@@ -94,15 +94,18 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - [x] Screenshots captured (desktop+tablet+mobile composite) and embedded in PR body via img402.dev
 - [ ] **Deferred to iter 5:** sandbox specimens (agent row is feature-scoped today; promote in iter 5 once edit/transcript components emerge)
 
-### Iteration 5 — prompt builder + run history viewer
-- [ ] `web/src/routes/agents.$slug.edit.tsx`: prompt textarea with token counter, model picker (claude-opus-4-7 default), schedule picker (cron expression with friendly presets), tool-scope dropdown, allowed-tools multi-select sourced from MCP tool registry, max_turns + max_budget_usd inputs
-- [ ] Cron expression validator + human-readable preview
-- [ ] `web/src/routes/agents.$slug.runs.tsx`: run history table, click into transcript drawer
-- [ ] Transcript viewer: message-by-message rendering of assistant text, tool calls, tool results, with cost/usage footer
-- [ ] Sandbox specimens for the cron picker, the transcript viewer
-- [ ] Use `frontend-design` skill to polish the prompt-builder and transcript surfaces
-- **Tests:** form validation tests; transcript viewer renders sample fixture
-- **PR title:** `feat(agents): prompt builder + run history viewer`
+### Iteration 5 — prompt builder + run history viewer ✅ MERGED #1231 (into sprint branch)
+- [x] Edit page at /v2/agents/$slug/edit with all 9 fields (RHF + zod via z.preprocess to avoid the iter-4 coerce bug)
+- [x] CronField with live human-readable preview + 12-preset Popover picker
+- [x] Run history page at /v2/agents/$slug/runs with status pills + Load more pagination
+- [x] TranscriptViewer parsing NDJSON into turn-grouped chat blocks (assistant + tool_use/tool_result pairs) + ResultFooter (cost/tokens/stop-reason)
+- [x] apiText() + useTranscript hook + TranscriptEvent discriminated union
+- [x] formatDuration() helper
+- [x] Edit + History icon links on the agents list AgentRow
+- [x] .gitignore excludes /breadbox-iter* so local test binaries can't be staged
+- [ ] **Deferred to iter 7 polish:** sandbox specimens for TranscriptViewer + CronField (promote when reuse outside agents area appears)
+- [ ] **Deferred:** TagInput chip control for allowed_tools (currently a comma-separated Textarea)
+- [ ] **Deferred:** MCP tool registry endpoint to source allowed-tools picker from live data
 
 ### Iteration 6 — seed defaults + retire v1
 - [ ] Seed migration: add the v1 prompt-wizard prompts as disabled `agent_definitions` rows (initial-setup, bulk-review, quick-review, routine-review, spending-report)
@@ -240,6 +243,27 @@ Deferred to iter 5:
 - Sandbox specimens (promote agent row to components/ when iter-5 reuse appears)
 
 Next iteration: iter 5 — prompt builder + run history viewer. The agent row will likely move from features/ to components/ once the edit page reuses it.
+
+## ITER 5 — 2026-05-17 01:02
+Shipped (PR #1231 squash-merged into sprint branch as 7209ac21):
+- Full agent management UI: edit page, run history, transcript viewer.
+- CronField with live human-readable preview ("Mondays at 9 AM") + 12-preset Popover picker.
+- TranscriptViewer parses NDJSON into turn-grouped chat blocks with collapsible tool calls + a result footer (cost/tokens/stop-reason).
+- apiText() sibling of api<T> for non-JSON endpoints.
+- TranscriptEvent discriminated union mirroring Go-side event types.
+- Three screenshots captured (list with edit/history buttons, edit page, runs page) at desktop+tablet+mobile, uploaded to img402.dev, embedded in PR.
+- All 5 CI jobs green.
+- .gitignore excludes /breadbox-iter* — applied the iter-4 lesson properly this time.
+
+Note on the iter-4 binary cleanup: the iter-4 binary survived on disk because I never `rm`'d it after the iter-4 merge — only the index was fixed via --cached. The iter-5 commit caught it via git status before push, but the cleaner fix is the .gitignore pattern (applied above). Future loops: the .gitignore already handles it.
+
+Deferred (intentional polish):
+- Sandbox specimens for TranscriptViewer + CronField (iter 7 polish)
+- TagInput chip control for allowed_tools
+- MCP tool registry endpoint for live allowed-tools picker
+
+Next iteration: iter 6 — seed default agents (port v1 prompt-wizard prompts as disabled-by-default agent_definitions rows) + retire /admin/agent-prompts with a redirect.
+
 
 
 
