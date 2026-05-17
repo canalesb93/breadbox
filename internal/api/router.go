@@ -195,6 +195,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/agents/{slug}/disable", DisableAgentHandler(svc))
 			r.Post("/agents/{slug}/run", RunAgentNowHandler(svc, a.AgentOrchestrator))
 			r.Post("/agents/test", SmokeTestAgentHandler(a.AgentOrchestrator))
+			r.Post("/agents/cleanup", RunAgentCleanupHandler(a.AgentScheduler))
 			r.Patch("/agents/runs/{shortId}", UpdateAgentRunNoteHandler(svc))
 			r.Post("/providers/{name}/test", TestProviderHandler(a))
 			r.Delete("/providers/{name}", DisableProviderHandler(a))
