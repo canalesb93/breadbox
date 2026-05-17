@@ -7,17 +7,10 @@ interface TransactionAmountProps {
   className?: string;
 }
 
-// TransactionAmount is the reusable right-aligned amount block — the signed
-// amount with the transaction date beneath it.
-//
-// Sign vocabulary: inflows (negative amounts) render in the success color.
-//
-// Pending vocabulary (iter 103): when the transaction has not posted yet
-// (`t.pending`), the amount renders italic + at 70% opacity so a scanning eye
-// reads the row as tentative. Pairs with the `Pending` `<MetaBadge>` in
-// `<TransactionPrimary>` — once a row is settled the visual settles down too.
-// Title attribute carries the contract for keyboard/sighted hover; the badge
-// alongside the description carries the screen-reader text.
+// Inflows (negative amounts) render in the success color. Pending rows
+// (`t.pending`) render italic + 70% opacity to read as tentative; the
+// matching `Pending` MetaBadge in <TransactionPrimary> carries the
+// screen-reader text.
 export function TransactionAmount({
   transaction: t,
   className,

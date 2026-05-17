@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, CheckCircle2, CircleDashed, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow } from "@/components/eyebrow";
 import { cn } from "@/lib/utils";
@@ -85,51 +85,6 @@ export function ProviderStatusBadge({ health, configured }: ProviderStatusBadgeP
   );
 }
 
-interface ProviderStatsProps {
-  health: ProviderHealthResponse | undefined;
-}
-
-// ProviderStats renders the connections / accounts / last-sync row under the
-// card header. Hides itself entirely if there's no data — empty stats look
-// like a loading state and confuse users.
-export function ProviderStats({ health }: ProviderStatsProps) {
-  if (!health) return null;
-  const inProgress = health.last_sync_status === "in_progress";
-  return (
-    <dl className="text-muted-foreground flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
-      <Stat label="Connections" value={String(health.connection_count)} />
-      <Stat label="Accounts" value={String(health.account_count)} />
-      {health.last_sync_time && (
-        <div className="flex items-center gap-1.5">
-          <Activity className="size-3" />
-          <dt>Last sync</dt>
-          <dd
-            className={cn(
-              "text-foreground font-medium",
-              health.last_sync_status === "success" && "text-emerald-600 dark:text-emerald-400",
-              health.last_sync_status === "error" && "text-destructive",
-            )}
-          >
-            {health.last_sync_status === "error" ? `failed ${health.last_sync_time}` : health.last_sync_time}
-          </dd>
-        </div>
-      )}
-      {!health.last_sync_time && health.connection_count > 0 && (
-        <div className="flex items-center gap-1.5">
-          <Activity className="size-3" />
-          <span>Never synced</span>
-        </div>
-      )}
-      {inProgress && (
-        <div className="text-foreground flex items-center gap-1.5 font-medium">
-          <Loader2 className="size-3 animate-spin" />
-          In progress
-        </div>
-      )}
-    </dl>
-  );
-}
-
 interface ProviderScoreboardProps {
   health: ProviderHealthResponse | undefined;
   tone: ProviderTone;
@@ -199,11 +154,3 @@ function ScoreCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <dt>{label}</dt>
-      <dd className="text-foreground font-medium">{value}</dd>
-    </div>
-  );
-}

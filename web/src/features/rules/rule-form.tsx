@@ -152,7 +152,7 @@ const ruleFormSchema = z
     }
   });
 
-export type RuleFormValues = z.infer<typeof ruleFormSchema>;
+type RuleFormValues = z.infer<typeof ruleFormSchema>;
 
 export interface RuleFormSubmit {
   name: string;

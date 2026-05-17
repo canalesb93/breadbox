@@ -35,7 +35,7 @@ export const accountsSearchSchema = z.object({
   group: z.enum(["institution", "type"]).optional(),
 });
 
-export type AccountsSearch = z.infer<typeof accountsSearchSchema>;
+type AccountsSearch = z.infer<typeof accountsSearchSchema>;
 
 export function AccountsPage() {
   const search = useSearch({ strict: false }) as AccountsSearch;

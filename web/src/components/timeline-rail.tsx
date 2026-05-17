@@ -9,22 +9,16 @@ import { cn } from "@/lib/utils";
 // the card background so it "punches through" the line. Headings (day
 // labels, week labels, run-status labels) sit outside the rail as anchors.
 //
-// Promoted in iter 26 from `features/transactions/activity-timeline.tsx`
-// (open-coded since iter 5). Reworked in iter 56 to fix the rail-tail bug
-// flagged by iter 55's audit: the per-group rail used `<ol border-l>`,
-// which made the line visibly extend past the last row's icon disc — the
-// disc was inset with negative margin so the `<ol>`'s left border kept
-// going past the centred icon. We now draw the rail per-row via an
-// `::before` pseudo-element on each `<li>` and clip it to the disc centre
-// on the first and last row of each group via `:first-of-type` /
-// `:last-of-type`. Middle rows draw a full-height segment so the line
-// reads as continuous within each group.
+// The rail is drawn per-row via an `::before` pseudo-element on each `<li>`
+// and clipped to the disc centre on the first and last row of each group via
+// `:first-of-type` / `:last-of-type`. Middle rows draw a full-height segment
+// so the line reads as continuous within each group. (A previous `<ol
+// border-l>` implementation made the line extend past the last disc.)
 //
-// Composition (unchanged consumer API): <TimelineRail> renders the wrapper
-// spacing; nest <TimelineRail.Group> children with optional `label` (day
-// heading); inside the group render any number of <TimelineRail.Row>
-// children. Each row takes an `icon` (Lucide component) and arbitrary
-// children for the content.
+// Composition: <TimelineRail> renders the wrapper spacing; nest
+// <TimelineRail.Group> children with optional `label` (day heading); inside
+// the group render any number of <TimelineRail.Row> children. Each row takes
+// an `icon` (Lucide component) and arbitrary children for the content.
 
 interface TimelineRailProps extends React.HTMLAttributes<HTMLDivElement> {
   // Vertical rhythm between groups. Defaults to `space-y-5` — matches the
@@ -172,11 +166,6 @@ function TimelineRailRow({
         "relative flex gap-3 pl-3.5",
         // Rail line drawn via `::before`. 1px wide, centred on the disc
         // centre at x=14px → left = 14px - 0.5px = calc(0.875rem - 0.5px).
-        // Iter 56 introduced this pseudo-element rail (replacing
-        // `<ol border-l>`) but anchored it at `left-0`, which sat the rail
-        // 13.5px to the left of the disc centre — a regression caught in
-        // iter 77 and fixed here. The pseudo gets the same
-        // `border-border/60` token as the previous border.
         "before:content-[''] before:absolute before:left-[calc(0.875rem-0.5px)] before:w-px before:bg-border/60",
         // Middle rows: full height; the row's `space-y-3` (12px) gap with
         // the next sibling is bridged by `bottom: -12px` so the rail
@@ -282,10 +271,4 @@ export const TimelineRail = Object.assign(TimelineRailRoot, {
   RowSkeleton: TimelineRailRowSkeleton,
 });
 
-export type {
-  TimelineRailProps,
-  TimelineRailGroupProps,
-  TimelineRailRowProps,
-  TimelineRailRowSkeletonProps,
-  TimelineRailTone,
-};
+export type { TimelineRailTone };

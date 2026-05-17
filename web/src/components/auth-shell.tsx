@@ -9,26 +9,13 @@ import {
 import { cn } from "@/lib/utils";
 
 // Two-pane shell for unauthenticated pages (login + setup-account). Left
-// pane is a brand panel that echoes the sidebar lockup so signing in feels
-// like stepping into the same product, not a separate marketing site. The
-// pane collapses on small screens — `lg:` is the breakpoint for showing the
-// full split. Right pane carries the page-specific form/card.
+// pane is a brand panel that echoes the in-app sidebar so signing in feels
+// like stepping into the same product; collapses below `lg`. Right pane
+// carries the page-specific form (`eyebrow` + `title` + `description`
+// echo PageHeader's vocabulary).
 //
-// Visual contract:
-// - Outer container: `min-h-screen bg-background` with a soft grid pattern
-//   in the brand panel; the rest of the chrome (header, footer note) lives
-//   in the form pane so the brand never has to know about the page state.
-// - Brand pane: bg-sidebar (matches the in-app sidebar surface so it reads
-//   as "Breadbox") + tinted accents (`primary/12`, `primary/5`) for the
-//   glow + feature pills. Decorative dot grid uses `mask-image` so it fades
-//   to the edges, avoiding the "tablecloth" effect.
-// - Form pane: the page passes `eyebrow` + `title` + `description` (echoes
-//   PageHeader vocabulary) and any form body / footer node. Optional
-//   `secondaryAction` slot sits on the right of the title row for things
-//   like "Need help?" or "Switch account".
-//
-// Keep this primitive simple — it does layout + brand, not state. State
-// (loading, success, error) belongs in the consumer.
+// Keep this primitive simple — layout + brand, not state. Loading /
+// success / error belong in the consumer.
 
 export interface AuthShellProps {
   eyebrow?: React.ReactNode;
