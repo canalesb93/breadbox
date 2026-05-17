@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/format";
 import type { TransactionRule } from "@/api/types";
@@ -117,28 +118,38 @@ export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
       {/* Sibling action cluster — absolutely positioned over the Link so
           clicks land on the buttons before bubbling into the navigation. */}
       <div className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-0.5">
-        <Button
-          asChild
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          aria-label={`Edit rule ${rule.name}`}
-        >
-          <Link to="/rules/$id/edit" params={{ id: rule.short_id }}>
-            <Pencil className="size-3.5" />
-          </Link>
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
+              asChild
               variant="ghost"
               size="icon"
               className="size-7"
-              aria-label={`Rule ${rule.name} actions`}
+              aria-label={`Edit rule ${rule.name}`}
             >
-              <MoreVertical className="size-4" />
+              <Link to="/rules/$id/edit" params={{ id: rule.short_id }}>
+                <Pencil className="size-3.5" />
+              </Link>
             </Button>
-          </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Edit rule</TooltipContent>
+        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  aria-label={`Rule ${rule.name} actions`}
+                >
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Rule actions</TooltipContent>
+          </Tooltip>
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem onSelect={() => onToggle(rule)}>
               {rule.enabled ? (

@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ColorRailCard, ColorRailCardSkeleton } from "@/components/color-rail-card";
 import {
   DetailList,
@@ -611,16 +612,21 @@ function Hero({
             </Button>
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 rounded-full"
-                aria-label="Connection actions"
-              >
-                <MoreHorizontal className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 rounded-full"
+                    aria-label="Connection actions"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Connection actions</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               {conn.status !== "disconnected" && (
                 <DropdownMenuItem

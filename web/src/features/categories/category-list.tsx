@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, EyeOff, Lock, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ListCard } from "@/components/list-card";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { IdPill } from "@/components/id-pill";
@@ -137,20 +138,25 @@ function CategoryRow({
           </div>
         </Link>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          asChild
-          className="text-muted-foreground hover:text-foreground size-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-        >
-          <Link
-            to="/categories/$id"
-            params={{ id: category.short_id }}
-            aria-label={`Edit ${category.display_name}`}
-          >
-            <Pencil className="size-3.5" />
-          </Link>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="text-muted-foreground hover:text-foreground size-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            >
+              <Link
+                to="/categories/$id"
+                params={{ id: category.short_id }}
+                aria-label={`Edit ${category.display_name}`}
+              >
+                <Pencil className="size-3.5" />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Edit category</TooltipContent>
+        </Tooltip>
       </div>
 
       {isOpen && hasChildren && (

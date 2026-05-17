@@ -39,7 +39,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -513,67 +512,65 @@ function BackupRowItem({
         </div>
       </div>
 
-      <TooltipProvider delayDuration={200}>
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                asChild
-                aria-label="Download backup"
-              >
-                <a href={backupDownloadHref(row.filename)}>
-                  <Download className="size-4" />
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Download</TooltipContent>
-          </Tooltip>
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              asChild
+              aria-label="Download backup"
+            >
+              <a href={backupDownloadHref(row.filename)}>
+                <Download className="size-4" />
+              </a>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Download</TooltipContent>
+        </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setConfirm("restore")}
-                disabled={busy || restoreDisabled}
-                aria-label="Restore from this backup"
-              >
-                {restore.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Restore</TooltipContent>
-          </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirm("restore")}
+              disabled={busy || restoreDisabled}
+              aria-label="Restore from this backup"
+            >
+              {restore.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RotateCcw className="size-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Restore</TooltipContent>
+        </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setConfirm("delete")}
-                disabled={busy}
-                aria-label="Delete backup"
-                className="text-destructive hover:text-destructive"
-              >
-                {del.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
-          </Tooltip>
-        </div>
-      </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirm("delete")}
+              disabled={busy}
+              aria-label="Delete backup"
+              className="text-destructive hover:text-destructive"
+            >
+              {del.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
+      </div>
 
       <ConfirmDialog
         open={confirm === "restore"}
