@@ -6,6 +6,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +48,9 @@ func NewAgentScheduler(orch *Orchestrator, svc *Service, logger *slog.Logger) *A
 func (s *AgentScheduler) Start(ctx context.Context) {
 	s.registerAll(ctx)
 	_, err := s.cron.AddFunc("15 3 * * *", func() {
-		s.cleanupAgentRuns(context.Background())
+		bg := context.Background()
+		s.cleanupAgentRuns(bg)
+		s.cleanupTranscriptFiles(bg)
 	})
 	if err != nil {
 		s.logger.Error("agent scheduler: add cleanup job failed", "error", err)
@@ -185,9 +190,73 @@ func nextMinuteAfterQuietEnd(now time.Time, end string) time.Time {
 	return candidate
 }
 
+// cleanupTranscriptFiles prunes NDJSON transcript files older than the
+// retention window. Reuses the same `agent.run_retention_days` setting as
+// the agent_runs cleanup, so the two surfaces stay aligned — deleting a
+// run row but keeping its transcript on disk (or vice versa) would be
+// confusing. Skips silently when transcript_dir is unset or retention=0.
+func (s *AgentScheduler) cleanupTranscriptFiles(ctx context.Context) {
+	transcriptDir := appconfig.String(ctx, s.svc.Queries, appconfig.KeyAgentTranscriptDir, "")
+	if transcriptDir == "" {
+		return
+	}
+	retentionDays := appconfig.Int(ctx, s.svc.Queries, appconfig.KeyAgentRunRetentionDays, 30)
+	if retentionDays <= 0 {
+		s.logger.Debug("agent transcript cleanup disabled", "retention_days", retentionDays)
+		return
+	}
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	deleted, scanned, err := pruneTranscriptFiles(transcriptDir, cutoff)
+	if err != nil {
+		s.logger.Error("agent transcript cleanup failed",
+			"dir", transcriptDir, "error", err)
+		return
+	}
+	if deleted > 0 {
+		s.logger.Info("agent transcript cleanup completed",
+			"dir", transcriptDir, "deleted", deleted,
+			"scanned", scanned, "retention_days", retentionDays)
+	}
+}
+
+// pruneTranscriptFiles is the pure file-walking pass — split out so tests
+// can exercise it against a tempdir without a scheduler. Deletes `*.ndjson`
+// files in `dir` whose mtime is before `cutoff`. Returns (deleted, scanned,
+// first-error). Non-NDJSON entries and subdirectories are left untouched
+// so an operator who points transcript_dir at a shared folder doesn't lose
+// adjacent files.
+func pruneTranscriptFiles(dir string, cutoff time.Time) (deleted, scanned int, err error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, 0, nil
+		}
+		return 0, 0, err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(e.Name(), ".ndjson") {
+			continue
+		}
+		scanned++
+		info, ierr := e.Info()
+		if ierr != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			if rerr := os.Remove(filepath.Join(dir, e.Name())); rerr == nil {
+				deleted++
+			}
+		}
+	}
+	return deleted, scanned, nil
+}
+
 // cleanupAgentRuns prunes completed agent_runs older than the retention
-// period (default 30 days; 0 disables). Transcript file GC is deferred
-// to a later iteration.
+// period (default 30 days; 0 disables). The matching on-disk transcript
+// files are pruned by cleanupTranscriptFiles using the same retention.
 func (s *AgentScheduler) cleanupAgentRuns(ctx context.Context) {
 	retentionDays := appconfig.Int(ctx, s.svc.Queries, appconfig.KeyAgentRunRetentionDays, 30)
 	if retentionDays <= 0 {

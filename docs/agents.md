@@ -69,7 +69,7 @@ Exit code 3 = no Anthropic credential; exit code 5 = sidecar binary not found.
 
 ## Operational notes
 
-- **Cleanup**: completed runs older than `agent.run_retention_days` (default 30) are pruned daily at 3:15 AM local time.
+- **Cleanup**: completed runs older than `agent.run_retention_days` (default 30) are pruned daily at 3:15 AM local time. The matching on-disk transcript files (`<agent.transcript_dir>/<runID>.ndjson`) are pruned in the same pass using the same retention so the two surfaces stay in sync.
 - **Orphan recovery**: in-progress runs from a previous boot are marked `error` at startup so the run history doesn't lie.
 - **Auth precedence trap**: if both `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` are in the sidecar's env, the API key wins. The sidecar scrubs the unused var before invoking the SDK so this can't bite you accidentally.
 
