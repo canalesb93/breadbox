@@ -6,6 +6,13 @@ import type { Transaction } from "@/api/types";
 
 interface TransactionPrimaryProps {
   transaction: Transaction;
+  /**
+   * When provided, the merchant title becomes a click target that fires
+   * this callback (and stops propagation so the surrounding row click
+   * — typically focus / enter-select — doesn't also fire). Used by the
+   * transactions list row to open the detail page from the title only.
+   */
+  onTitleClick?: (transaction: Transaction) => void;
   className?: string;
 }
 
@@ -17,8 +24,29 @@ interface TransactionPrimaryProps {
 // just adds visual noise.
 export function TransactionPrimary({
   transaction: t,
+  onTitleClick,
   className,
 }: TransactionPrimaryProps) {
+  const titleClasses = "truncate font-medium";
+  const title = onTitleClick ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onTitleClick(t);
+      }}
+      // Subtle hover hint that the title is the navigation affordance —
+      // doesn't dress it up as a full link.
+      className={cn(
+        titleClasses,
+        "hover:underline underline-offset-2 decoration-muted-foreground/50 focus-visible:outline-none focus-visible:underline text-left",
+      )}
+    >
+      {t.provider_name}
+    </button>
+  ) : (
+    <span className={titleClasses}>{t.provider_name}</span>
+  );
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <CategoryIconTile
@@ -28,7 +56,7 @@ export function TransactionPrimary({
       />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className="truncate font-medium">{t.provider_name}</span>
+          {title}
           {t.pending && (
             <span className="text-muted-foreground shrink-0 text-xs">
               Pending

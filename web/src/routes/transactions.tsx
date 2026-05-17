@@ -162,6 +162,12 @@ export function TransactionsPage() {
   // Keyboard-navigated row focus (j/k). Index into `rows`; null = no focus.
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
+  const openTransaction = useCallback(
+    (t: Transaction) =>
+      navigate({ to: "/transactions/$id", params: { id: t.short_id } }),
+    [navigate],
+  );
+
   const columns = useMemo(
     () => buildTransactionColumns({ selection: selectMode }),
     [selectMode],
@@ -179,6 +185,31 @@ export function TransactionsPage() {
   const toggleRowSelection = useCallback((t: Transaction) => {
     setRowSelection((prev) => ({ ...prev, [t.id]: !prev[t.id] }));
   }, []);
+
+  // Row click outside select mode is a two-stage interaction:
+  //   1st tap → focus the row (same affordance as j/k)
+  //   2nd tap on the already-focused row → enter select mode + select it
+  //     (same affordance as the `x` shortcut)
+  // The merchant title remains the dedicated open-detail target — its
+  // own onClick stops propagation so it never lands here.
+  const handleRowClick = useCallback(
+    (t: Transaction) => {
+      if (selectMode) {
+        toggleRowSelection(t);
+        return;
+      }
+      const idx = rows.findIndex((r) => r.id === t.id);
+      if (idx === -1) return;
+      if (focusedIndex === idx) {
+        setSelectMode(true);
+        setRowSelection((prev) => ({ ...prev, [t.id]: true }));
+        lastIndexRef.current = idx;
+        return;
+      }
+      setFocusedIndex(idx);
+    },
+    [selectMode, toggleRowSelection, rows, focusedIndex],
+  );
 
   const toggleSelectMode = useCallback(() => {
     if (selectMode) exitSelectMode();
@@ -211,18 +242,13 @@ export function TransactionsPage() {
           return next;
         });
       },
+      onOpenDetail: openTransaction,
     }),
-    [rows],
+    [rows, openTransaction],
   );
 
   const focusedRowId =
     focusedIndex != null ? rows[focusedIndex]?.id : undefined;
-
-  const openTransaction = useCallback(
-    (t: Transaction) =>
-      navigate({ to: "/transactions/$id", params: { id: t.short_id } }),
-    [navigate],
-  );
 
   // --- Keyboard shortcuts (registered while this page is mounted) ---
   useShortcut(
@@ -427,7 +453,7 @@ export function TransactionsPage() {
         onRowSelectionChange={setRowSelection}
         meta={tableMeta}
         focusedRowId={focusedRowId}
-        onRowClick={selectMode ? toggleRowSelection : openTransaction}
+        onRowClick={handleRowClick}
         stickyHeader
         refinedHeader
         emptyState={
