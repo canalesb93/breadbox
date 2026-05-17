@@ -15,24 +15,65 @@ export interface SidecarEvent {
   data: Record<string, unknown>;
 }
 
+// Switch stdout to blocking mode at module load. Without this, writeSync on
+// a pipe whose kernel buffer is full throws EAGAIN (Bun pipes stdout in
+// O_NONBLOCK by default). We hit this in iter-47 dogfooding: an MCP tool
+// returned ~64 KB of JSON (list_categories), writeSync wrote up to the
+// pipe boundary and then threw EAGAIN on the next call — the line got
+// truncated at byte 65538 and the subsequent error event's bytes were
+// concatenated onto the tail with no newline, producing one corrupted
+// line that dropped the tool_result and made the viewer show the call
+// as "pending" forever.
+//
+// setBlocking(true) makes writeSync block until the kernel accepts every
+// byte — the natural single-writer behavior we want for an NDJSON stream
+// where each line is one event.
+(process.stdout as unknown as { _handle?: { setBlocking?: (b: boolean) => void } })?._handle?.setBlocking?.(true);
+
+/**
+ * writeAll loops writeSync until every byte is on the wire. Even with
+ * blocking stdout, writeSync may still return short (e.g. interrupted
+ * syscall) and may rarely throw EAGAIN if blocking didn't take effect —
+ * so the loop is the robust shape regardless.
+ */
+function writeAll(fd: number, str: string): void {
+  const buf = Buffer.from(str, "utf8");
+  let offset = 0;
+  while (offset < buf.length) {
+    try {
+      const n = writeSync(fd, buf, offset, buf.length - offset);
+      if (n <= 0) break;
+      offset += n;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "EAGAIN" || code === "EWOULDBLOCK" || code === "EINTR") {
+        // Pipe wasn't ready; give the reader a tick to drain and retry.
+        // Bun.sleepSync is synchronous — fine here because we're already
+        // blocking and don't yield to the event loop during emit().
+        try {
+          // @ts-expect-error Bun global at runtime
+          Bun.sleepSync(1);
+        } catch {
+          // ignore if not running under Bun
+        }
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 /**
  * Emit one NDJSON event to stdout. The Go orchestrator (sidecar.go) is the
  * sole writer of the transcript file on disk — it reads each line off our
- * stdout and persists it. Letting both processes touch the same file races
- * and interleaves mid-JSON bytes (the malformed-line bug we hit in iter-47
- * dogfooding). The transcriptPath argument is kept on the signature for
- * call-site compatibility but is intentionally unused.
+ * stdout and persists it.
  *
- * Uses writeSync(1, …) instead of process.stdout.write because Bun pipes
- * stdout in non-blocking mode and may delay actual flushes until the next
- * I/O tick. For a streaming run watched live in the SPA, that delay turned
- * up as "events only appear at the end" (iter-47 dogfooding finding #7).
- * Sync writes are fine here — each line is small (<1 KB typical) and we
- * emit on the order of dozens per run, not thousands per second.
+ * Synchronous so the line lands in the kernel pipe immediately (the SPA
+ * polls live), and loops on short writes / EAGAIN so events larger than
+ * the kernel pipe buffer never truncate.
  */
 export function emit(event: SidecarEvent, _transcriptPath?: string): void {
-  const line = JSON.stringify(event) + "\n";
-  writeSync(1, line);
+  writeAll(1, JSON.stringify(event) + "\n");
 }
 
 export function emitError(
