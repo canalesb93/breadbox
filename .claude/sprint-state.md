@@ -618,6 +618,39 @@ Next iteration candidates (refreshed):
 
 Picking **#1 "Use last prefix" affordance** next iteration — tiniest follow-up that compounds iter-23's value; no schema or behavior change, pure UX win for operators iterating on a prefix.
 
+## ITER 24 — 2026-05-17 04:50
+Shipped (PR #1250 squash-merged into sprint branch as fe664ae0):
+- New `GetAgentLastPromptPrefixes` sqlc query — DISTINCT ON (agent_definition_id) returning the most recent non-null/non-empty prompt_prefix per def. Bulk-keyed like iter-19 cost stats (one query, no N+1).
+- `AgentDefinitionResponse.LastPromptPrefix` (*string, list-only). ListAgentDefinitions zips it in; soft-fails on query error.
+- SPA: `AgentDefinition.last_prompt_prefix` mirror; RunNowDialog accepts `lastPrefix` prop, renders a Ghost "Use last prefix" button (Sparkles icon) next to the char counter when one exists. Disabled when textarea already matches.
+- 2 new service integration tests: most-recent-non-empty wins (newer empty runs don't shadow earlier prefixed ones); definitions with zero prefixed runs leave LastPromptPrefix nil.
+- All 5 CI jobs green.
+
+Screenshot intentionally omitted from PR body — the button only renders when an agent has a prior non-null prefix, and seeding that requires DB writes the sandbox correctly denied. The classifier did the right thing; iter-23 already showed the baseline dialog. **Lesson:** for "only visible when state X exists" features, plan the evidence-capture story before requesting writes to shared infra.
+
+## ITER 25 — 2026-05-17 05:05
+Shipped (PR #1251 squash-merged into sprint branch as 5f2f464b):
+- Closed the unbounded-disk-growth gap deferred since iter-7. Daily 3:15 AM cleanup tick now also prunes on-disk NDJSON transcripts in the same pass.
+- New `cleanupTranscriptFiles` reads `agent.transcript_dir` + `agent.run_retention_days` from app_config; skips silently when transcript_dir unset or retention<=0.
+- `pruneTranscriptFiles(dir, cutoff)` pure helper — only touches `*.ndjson`, leaves subdirectories and other files alone (operator-safe if they repurpose the directory). Returns (deleted, scanned, err).
+- 3 new unit tests: happy path with mixed file types + subdirectory; missing dir is not an error; empty dir returns zeros.
+- docs/agents.md operational-notes bullet documents the shared retention.
+- All 5 CI jobs green.
+
+Two deferred items captured in PR body: "force cleanup" admin button (sync trigger from settings) and transcript compression. Both YAGNI for now.
+
+Next iteration candidates (refreshed):
+1. **Inline rule-engine docs in the prompt builder** — collapsible help card on agents.$slug.edit linking to docs/rule-dsl.md with operator reference. UI-only, small, helps anyone authoring a rule-applying agent.
+2. **Empty/error state polish across agent pages** — UI sweep.
+3. **Mobile-responsive sweep on agent pages** — UI sweep.
+4. **Force-cleanup button on Settings → Agents** — small follow-up to iter-25 (lets operator trigger the daily tick on demand after lowering retention).
+5. **Per-model cost breakdown** — needs model column on agent_runs. Bigger.
+6. **Webhook trigger** — bigger.
+7. **Suggested rules agent** — bigger.
+8. **Multi-concurrent runs** — lift v1 max_concurrent=1 cap once we trust the system. Needs careful semaphore + scheduler tests.
+
+Picking **#1 inline rule-DSL help card** next iteration — concrete operator-value win for the most common agent intent (rule creation), bounded UI scope, captures clean evidence.
+
 
 
 
