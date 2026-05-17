@@ -13,7 +13,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  ColorRailCard,
+  ColorRailCardSkeleton,
+} from "@/components/color-rail-card";
 import {
   DetailList,
   compactDetailRows,
@@ -351,22 +354,10 @@ function titleize(value: string | null | undefined): string | null {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="bg-card relative overflow-hidden rounded-xl border">
-        <div className="bg-muted absolute inset-y-0 left-0 w-1" />
-        <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-x-10 lg:gap-y-5">
-          <div className="flex items-start gap-3 sm:gap-4 lg:row-start-1">
-            <Skeleton className="size-12 rounded-md" />
-            <div className="space-y-2 py-1">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-3 w-32" />
-            </div>
-          </div>
-          <div className="space-y-2 lg:row-start-1 lg:row-span-2 lg:items-end">
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-          <div className="space-y-5 lg:row-start-2">
+      <ColorRailCardSkeleton
+        tileShape="rounded-md"
+        body={
+          <div className="space-y-5">
             <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -379,8 +370,8 @@ function DetailSkeleton() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        }
+      />
       <div className="flex gap-2">
         <Skeleton className="h-7 w-32 rounded-md" />
         <Skeleton className="h-7 w-32 rounded-md" />
