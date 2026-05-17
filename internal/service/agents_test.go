@@ -232,8 +232,9 @@ func TestGetAgentSettings_DefaultsWhenUnset(t *testing.T) {
 	if s.SubscriptionToken != nil {
 		t.Errorf("SubscriptionToken should be nil when unset, got %v", *s.SubscriptionToken)
 	}
-	if s.MaxConcurrent != 1 {
-		t.Errorf("MaxConcurrent default = %d, want 1", s.MaxConcurrent)
+	// Default lifted from 1 → 3 in iter-29. See serve.go for rationale.
+	if s.MaxConcurrent != 3 {
+		t.Errorf("MaxConcurrent default = %d, want 3", s.MaxConcurrent)
 	}
 }
 

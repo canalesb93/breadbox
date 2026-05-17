@@ -125,7 +125,11 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	} else if n := cleanupResult.RowsAffected(); n > 0 {
 		logger.Info("cleaned up orphaned agent runs", "count", n)
 	}
-	agentMaxConcurrent := appconfig.Int(ctx, a.Queries, appconfig.KeyAgentMaxConcurrent, 1)
+	// Default was 1 in iter-1 as a v1 safety net. Lifted to 3 in iter-29 after
+	// 28 iterations of dogfood proved the semaphore + mint-and-revoke survive
+	// concurrent contention. Operators can raise (or lower back to 1) in
+	// Settings → Agents.
+	agentMaxConcurrent := appconfig.Int(ctx, a.Queries, appconfig.KeyAgentMaxConcurrent, 3)
 	agentRuntimePath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
 	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "")
 	agentSidecar := &agent.Sidecar{
