@@ -405,10 +405,10 @@ export function ComponentsSection() {
       <Specimen
         label="Eyebrow"
         code="components/eyebrow"
-        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, and timeline-rail day headings. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them. Three variants — `default` (`text-[10px] tracking-[0.1em]`) is the everyday eyebrow; `hero` (`tracking-[0.12em]`) gets extra letter air for spots where it sits directly under a large display title; `page` (`text-[11px] tracking-[0.08em]`) is the slightly heavier rhythm reserved for *page*-scale framing — `<PageHeader>` eyebrow, home-stats KPI cell labels, provider-card 'Provider' caption — where the eyebrow has to hold its own next to a 2xl–3xl title without disappearing (iter 94, retiring six hand-rolled call sites). Don't reach for raw `text-[10-11px] font-medium tracking-* uppercase` markup — extend this primitive."
+        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, timeline-rail day headings, AND sidebar/menu group labels. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them; iter 95 added the `nav` cousin to retire the remaining three `font-semibold` sidebar-group-label drift sites (`nav-main`, `settings-shell` desktop sidebar, `shortcut-sheet` group headers). Four variants — `default` (`text-[10px] tracking-[0.1em]`) is the everyday eyebrow; `hero` (`tracking-[0.12em]`) gets extra letter air for spots where it sits directly under a large display title; `page` (`text-[11px] tracking-[0.08em]`) is the slightly heavier rhythm reserved for *page*-scale framing (PageHeader eyebrow, home-stats KPI labels, provider-card 'Provider' caption); `nav` (`font-semibold text-[10px] tracking-[0.08em]`) is the heavier cousin used inside sidebar / menu chrome where the label sits against a coloured surface and needs the extra weight to read. Don't reach for raw `text-[10-11px] font-medium/semibold tracking-* uppercase` markup — extend this primitive."
         className="block"
       >
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border p-4">
             <Eyebrow>Default · in a card header</Eyebrow>
             <p className="text-foreground mt-1 text-sm">
@@ -438,6 +438,23 @@ export function ComponentsSection() {
             </h1>
             <p className="text-muted-foreground mt-1 text-xs">
               page · text-[11px] · tracking-[0.08em]
+            </p>
+          </div>
+          <div className="bg-sidebar text-sidebar-foreground rounded-lg border p-4">
+            <Eyebrow
+              variant="nav"
+              as="p"
+              className="text-muted-foreground/80"
+            >
+              Workspace
+            </Eyebrow>
+            <ul className="mt-2 space-y-0.5 text-sm">
+              <li className="rounded-md px-2 py-1">Home</li>
+              <li className="rounded-md px-2 py-1">Transactions</li>
+              <li className="rounded-md px-2 py-1">Categories</li>
+            </ul>
+            <p className="text-muted-foreground mt-2 text-xs">
+              nav · font-semibold · text-[10px] · tracking-[0.08em]
             </p>
           </div>
         </div>

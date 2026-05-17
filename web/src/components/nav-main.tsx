@@ -6,6 +6,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { Eyebrow } from "@/components/eyebrow";
 import { isNavMatch, navKey, type NavGroup, type NavLeaf } from "@/lib/nav";
 import { openModal, useActiveModal } from "@/lib/modals";
 import { cn } from "@/lib/utils";
@@ -17,8 +18,10 @@ export function NavMain({ group }: { group: NavGroup }) {
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className="text-muted-foreground/80 text-[10px] font-semibold tracking-[0.08em] uppercase">
-        {group.label}
+      <SidebarGroupLabel asChild>
+        <Eyebrow variant="nav" as="div" className="text-muted-foreground/80">
+          {group.label}
+        </Eyebrow>
       </SidebarGroupLabel>
       <SidebarMenu>
         {group.items.map((item) => (

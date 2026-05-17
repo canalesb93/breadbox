@@ -23,6 +23,7 @@ import { BackupsSection } from "@/features/settings/backups-section";
 import { HouseholdSection } from "@/features/settings/household-section";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { StatusPanel } from "@/components/status-panel";
+import { Eyebrow } from "@/components/eyebrow";
 
 const SETTINGS_MODAL_KEY = "settings";
 
@@ -94,9 +95,13 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
     return (
       <div className="flex h-full">
         <nav className="bg-sidebar text-sidebar-foreground w-56 shrink-0 border-r p-3">
-          <p className="text-muted-foreground/80 mb-2 px-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
+          <Eyebrow
+            as="p"
+            variant="nav"
+            className="text-muted-foreground/80 mb-2 px-2"
+          >
             Settings
-          </p>
+          </Eyebrow>
           <ul className="space-y-0.5">
             {SETTINGS_SECTIONS.map((s) => {
               const Icon = s.icon;
