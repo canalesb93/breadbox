@@ -1,6 +1,5 @@
-import { Clock, Tag as TagIcon } from "lucide-react";
+import { Tag as TagIcon } from "lucide-react";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import { MetaBadge } from "@/components/meta-badge";
 import { TagList } from "@/components/tag-chip";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
@@ -11,10 +10,11 @@ interface TransactionPrimaryProps {
 }
 
 // Identity block for a transaction: category icon tile, bank description
-// with an inline `Pending` MetaBadge, and a secondary line of metadata
-// (account · member · tags). Pending rides MetaBadge so it joins the
-// secondary-state chip family (System / Hidden / Excluded / Linked /
-// Re-auth) instead of an orphan muted span.
+// with an inline muted `Pending` label, and a secondary line of metadata
+// (account · member · tags). Pending is plain text — it's the only
+// secondary signal in the primary line and the surrounding row already
+// hosts pill-shaped tags + category badges, so an additional pill here
+// just adds visual noise.
 export function TransactionPrimary({
   transaction: t,
   className,
@@ -27,12 +27,12 @@ export function TransactionPrimary({
         size="sm"
       />
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span className="truncate font-medium">{t.provider_name}</span>
           {t.pending && (
-            <MetaBadge muted icon={Clock} className="shrink-0">
+            <span className="text-muted-foreground shrink-0 text-xs">
               Pending
-            </MetaBadge>
+            </span>
           )}
         </div>
         <TransactionMeta transaction={t} />
