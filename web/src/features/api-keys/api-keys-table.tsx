@@ -27,6 +27,7 @@ import {
   ActorBadge,
   ScopeBadge,
 } from "@/features/api-keys/api-key-badges";
+import { APIKeyRowSkeleton } from "@/features/api-keys/api-key-row-skeleton";
 
 export interface APIKeysTableProps {
   keys: APIKey[];
@@ -187,6 +188,7 @@ export function APIKeysTable({
         emptyState={emptyState}
         stickyHeader
         refinedHeader
+        renderSkeletonRow={() => <APIKeyRowSkeleton revoked={revoked} />}
       />
 
       <Dialog
