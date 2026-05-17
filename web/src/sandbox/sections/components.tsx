@@ -92,6 +92,7 @@ import { DangerZone } from "@/components/danger-zone";
 import { PaginationBar } from "@/components/pagination-bar";
 import { ViewAllPill } from "@/components/view-all-pill";
 import { SearchInput } from "@/components/search-input";
+import { HeroGrid } from "@/components/hero-grid";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -282,6 +283,42 @@ export function ComponentsSection() {
                 Posted May 14, 2026 · Chase ····2890
               </p>
             </div>
+          </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="HeroGrid"
+        code="components/hero-grid"
+        description="Body grid that sits one level inside `<ColorRailCard>` — arranges the identity column on the left and the metric column on the right. Promoted from three byte-identical sites (account, category, connection detail) plus a near-identical TX-detail variant. Stacks rows on mobile, docks the metric column to the right on lg. The transaction-detail variant tightens the lg row-gap via `lgGapClassName='lg:gap-x-10 lg:gap-y-5'` because the left column stacks identity on top of classify rows."
+        className="block"
+      >
+        <div className="max-w-xl">
+          <ColorRailCard accent="#0ea5e9">
+            <HeroGrid>
+              <div className="min-w-0 space-y-1">
+                <span className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                  Asset
+                </span>
+                <h3 className="text-foreground text-xl font-semibold tracking-tight">
+                  Chase Sapphire
+                </h3>
+                <p className="text-muted-foreground text-xs">
+                  Credit card · ····2890
+                </p>
+              </div>
+              <div className="flex flex-col items-start gap-1.5 lg:items-end lg:text-right">
+                <span className="bg-success/10 text-success inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                  Balance
+                </span>
+                <div className="text-3xl font-semibold tabular-nums sm:text-4xl">
+                  $4,210.55
+                </div>
+                <p className="text-muted-foreground text-[11px] tabular-nums">
+                  $1,789.45 available
+                </p>
+              </div>
+            </HeroGrid>
           </ColorRailCard>
         </div>
       </Specimen>
