@@ -34,13 +34,23 @@ next target, then updates this file at the end of the run.
 (Populated by iterations as drift is discovered.)
 
 - **Active-state vocabulary** (iter 1, established; timing parity
-  iter 73): primary-tinted 3px left rail at row's outer edge + tinted
-  icon + accent bg. Used in `nav-main.tsx` and `settings-shell.tsx`.
-  Both rails share the same in/out transition vocabulary:
-  `before:transition-(transform|all) before:duration-200 before:ease-out`.
-  Any new nav/list with an active row should reuse this language *and*
-  the 200ms ease-out timing — pulling the rail into a shared util in
-  `web/src/components/` is worth doing once a third surface needs it.
+  iter 73; settings desktop sweep iter 78 #1191): primary-tinted 3px
+  left rail at row's outer edge + tinted icon + accent bg. Used in
+  `nav-main.tsx` and `settings-shell.tsx` (desktop). Both rails share
+  the same transform-driven in/out vocabulary:
+  `before:scale-y-0` → `data-[active=true]:before:scale-y-100` with
+  `before:transition-transform before:duration-200 before:ease-out`.
+  Settings desktop nav also adopts `bg-sidebar` chrome + the matching
+  `[&>svg]:text-muted-foreground/80` →
+  `data-[active=true]:[&>svg]:text-primary` icon tint so the settings
+  modal reads as "sidebar lifted into a dialog" instead of a separate
+  surface. Any new nav/list with an active row should reuse this
+  language *and* the 200ms ease-out timing — pulling the rail into a
+  shared util in `web/src/components/` is worth doing once a third
+  surface needs it (settings dialog can't reuse `nav-main`'s
+  `SidebarMenuItem` wrapper because the SidebarMenuButton is
+  `overflow-hidden` and the rail must escape, so today it's two inline
+  class blocks sharing the same vocabulary, not one shared component).
 - **Branch naming gotcha** (iter 1): the remote already holds
   `design/v2-shadcn` as a leaf ref, so a child branch named
   `design/v2-shadcn/<topic>` cannot be pushed (git refs can't be both a
@@ -2008,6 +2018,32 @@ Cross-cutting components:
     unaffected — it carries its own `marginLeft: -17px` math anchored
     on the same x=14px disc-centre axis, so the heading dots already
     sat on the new rail axis. Nothing else needed nudging.
+
+- **Iter 78 — Settings desktop nav rail aligned with canonical sidebar vocabulary** ([#1191](https://github.com/canalesb93/breadbox/pull/1191))
+  - Settings shell's desktop nav was running its own bespoke
+    active-state vocabulary (2px rail at the inner edge,
+    `before:inset-y-*` animation, `bg-accent` row, no icon tint
+    transition). This pulls it back into the iter-1 vocabulary so
+    settings + sidebar read as siblings.
+  - 3px primary-tinted rail at the panel's **outer** edge
+    (`before:-left-3 before:w-[3px]`), animated in via
+    `before:scale-y-0` → `data-[active=true]:before:scale-y-100` with
+    the iter-73 timing (`transition-transform duration-200 ease-out`)
+    — identical shape and timing to `nav-main`'s `NAV_ITEM_CLS`.
+  - Active icon picks up `text-primary` via the same
+    `data-[active=true]:[&>svg]:text-primary` selector `nav-main` uses
+    so the muted→primary icon transition matches across surfaces.
+  - Panel chrome switched from `bg-muted/40` to `bg-sidebar` (+
+    `bg-sidebar-accent` for active rows) so the settings modal reads
+    as "the app sidebar lifted into a dialog" instead of a generic
+    muted panel. Row padding tightened to symmetric `px-2.5` matching
+    the sidebar menu rhythm.
+  - No extraction yet — the rail can't trivially live on the
+    `SidebarMenuItem` wrapper because the settings dialog uses plain
+    `<button>` not the Sidebar primitives, and a shared `RailButton`
+    would need to satisfy both Sidebar's `overflow-hidden` constraint
+    and the dialog's no-overflow context. Two inline class blocks
+    sharing the same vocabulary is the right size today.
 
 ## Open observations / questions
 
