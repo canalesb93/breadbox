@@ -3,6 +3,8 @@
 /breadbox-server
 breadbox.exe
 /bin/
+# Local iteration test binaries built during the agents sprint
+/breadbox-iter*
 
 # Tailwind CSS standalone binary and generated CSS
 tailwindcss-extra

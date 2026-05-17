@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import { api, apiText } from "@/api/client";
 
 // Types mirror the Go-side response shapes in internal/service/agents.go
 // and internal/service/agent_settings.go. Endpoints documented in
@@ -223,5 +223,128 @@ export function useUpdateAgentSettings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents", "settings"] });
     },
+  });
+}
+
+// --- Transcript types ---
+
+// Discriminated union of NDJSON event shapes emitted by the breadbox sidecar.
+// Payloads pass through from the SDK message objects for assistant_message /
+// tool_use / tool_result; the result event has the structured shape the
+// Go-side internal/service expects.
+
+export interface AssistantContentText {
+  type: "text";
+  text: string;
+}
+
+export interface AssistantContentToolUse {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+export type AssistantContent = AssistantContentText | AssistantContentToolUse;
+
+export interface AssistantMessageData {
+  message: {
+    role: "assistant";
+    content: AssistantContent[];
+  };
+}
+
+export interface ToolUseData {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface ToolResultData {
+  type: "tool_result";
+  tool_use_id: string;
+  content: unknown; // string | ContentBlock[]
+  is_error?: boolean;
+}
+
+export interface ResultData {
+  totalCostUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  turnCount: number;
+  numToolCalls: number;
+  sessionId: string;
+  stopReason: string; // "end_turn" | "max_turns" | "budget_exceeded" | ""
+}
+
+export interface TranscriptErrorData {
+  message: string;
+  stack?: string;
+  code?: string;
+}
+
+export interface CostCapHitData {
+  code: string;
+  message: string;
+}
+
+export interface SystemEventData {
+  [key: string]: unknown;
+}
+
+interface EventBase {
+  ts: number;
+}
+
+export type TranscriptEvent =
+  | (EventBase & { type: "assistant_message"; data: AssistantMessageData })
+  | (EventBase & { type: "tool_use"; data: ToolUseData })
+  | (EventBase & { type: "tool_result"; data: ToolResultData })
+  | (EventBase & { type: "result"; data: ResultData })
+  | (EventBase & { type: "error"; data: TranscriptErrorData })
+  | (EventBase & { type: "cost_cap_hit"; data: CostCapHitData })
+  | (EventBase & { type: "system"; data: SystemEventData });
+
+export interface TranscriptResult {
+  events: TranscriptEvent[];
+  rawLength: number;
+  truncated: boolean;
+}
+
+// Hard cap on parsed events so a multi-MB transcript doesn't crash the
+// browser. Above this the viewer renders a banner linking to the raw file.
+const TRANSCRIPT_MAX_EVENTS = 500;
+
+export function useTranscript(shortId: string | undefined) {
+  return useQuery({
+    queryKey: ["agents", "runs", shortId, "transcript"],
+    queryFn: async (): Promise<TranscriptResult> => {
+      const text = await apiText(
+        `/api/v1/agents/runs/${shortId}/transcript`,
+      );
+      const lines = text.split("\n").filter((l) => l.trim().length > 0);
+      const rawLength = lines.length;
+      const slice = lines.slice(0, TRANSCRIPT_MAX_EVENTS);
+      const events: TranscriptEvent[] = [];
+      for (const line of slice) {
+        try {
+          events.push(JSON.parse(line) as TranscriptEvent);
+        } catch {
+          // skip malformed lines
+        }
+      }
+      return {
+        events,
+        rawLength,
+        truncated: rawLength > TRANSCRIPT_MAX_EVENTS,
+      };
+    },
+    enabled: Boolean(shortId),
+    // Transcripts are immutable once a run completes — keep them cached
+    // across Sheet open/close.
+    staleTime: 5 * 60 * 1000,
   });
 }
