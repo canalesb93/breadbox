@@ -1,0 +1,131 @@
+//go:build !lite
+
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+
+	"breadbox/internal/agent"
+	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
+	"breadbox/internal/config"
+
+	"github.com/spf13/cobra"
+)
+
+// silentError wraps an error so cobra won't print the "Error:" prefix
+// after our handler has already emitted a user-friendly message. The
+// underlying error still flows out for MapExitCode to inspect.
+type silentError struct{ err error }
+
+func (s *silentError) Error() string { return s.err.Error() }
+func (s *silentError) Unwrap() error { return s.err }
+func silentlyFail(err error) error   { return &silentError{err: err} }
+
+// AddAgentCmd registers `breadbox agent <subcommand>` — the local-scope
+// parent for agent-subsystem diagnostics.
+func AddAgentCmd(root *cobra.Command) {
+	parent := &cobra.Command{
+		Use:   "agent",
+		Short: "Diagnose and test the Claude Agent SDK subsystem",
+	}
+
+	test := &cobra.Command{
+		Use:   "test",
+		Short: "End-to-end smoke test of the agent sidecar + auth + binary discovery",
+		Long: `Spawn the breadbox-agent sidecar with a tiny "say OK" prompt to verify
+the full chain works:
+
+  - Anthropic credential is configured in app_config
+  - breadbox-agent binary is discoverable
+  - sidecar can spawn and reach the SDK
+  - SDK can reach Anthropic and produce a response
+
+No agent definition is registered, no MCP servers attached, no
+agent_runs row written. Cost is bounded to ~5¢ via the diagnostic
+budget cap.
+
+Exit codes:
+  0  test succeeded
+  3  no Anthropic credential configured
+  5  agent binary not found
+  1  test ran but model returned an error / sidecar crashed
+`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAgentTest(cmd.Context())
+		},
+	}
+	parent.AddCommand(test)
+	root.AddCommand(parent)
+}
+
+func runAgentTest(parent context.Context) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+
+	a, err := app.New(ctx, cfg, logger)
+	if err != nil {
+		return fmt.Errorf("init app: %w", err)
+	}
+	defer a.DB.Close()
+
+	binaryPath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
+	transcriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "")
+	sidecar := &agent.Sidecar{
+		BinaryPath:    binaryPath,
+		TranscriptDir: transcriptDir,
+	}
+
+	fmt.Fprintln(os.Stdout, "🔎 breadbox agent test")
+	fmt.Fprintln(os.Stdout, "")
+
+	result, err := agent.SmokeTest(ctx, a.Queries, cfg.EncryptionKey, sidecar, binaryPath)
+	if err != nil {
+		switch {
+		case errors.Is(err, agent.ErrAuthNotConfigured):
+			fmt.Fprintln(os.Stdout, "  ✗ auth          not configured")
+			fmt.Fprintln(os.Stdout, "")
+			fmt.Fprintln(os.Stdout, "Open the v2 SPA → Settings → Agents and paste an Anthropic credential.")
+			fmt.Fprintln(os.Stdout, "For a subscription token: run `claude setup-token` on any machine, then paste the sk-ant-oat01-… into Settings.")
+			return silentlyFail(err)
+		case errors.Is(err, agent.ErrBinaryNotFound):
+			fmt.Fprintln(os.Stdout, "  ✗ binary        not found")
+			fmt.Fprintln(os.Stdout, "")
+			fmt.Fprintln(os.Stdout, "Build the sidecar: `make agent-sidecar` (writes ./bin/breadbox-agent).")
+			fmt.Fprintln(os.Stdout, "Or set an explicit path: `breadbox config set agent.runtime_path /path/to/breadbox-agent`.")
+			return silentlyFail(err)
+		default:
+			fmt.Fprintln(os.Stdout, "  ✗ smoke run failed")
+			fmt.Fprintf(os.Stdout, "\n%v\n", err)
+			return silentlyFail(err)
+		}
+	}
+
+	fmt.Fprintf(os.Stdout, "  ✓ auth          %s\n", result.AuthMode)
+	if result.BinaryPath == "" {
+		fmt.Fprintln(os.Stdout, "  ✓ binary        auto-discovered (./bin/breadbox-agent or $PATH)")
+	} else {
+		fmt.Fprintf(os.Stdout, "  ✓ binary        %s\n", result.BinaryPath)
+	}
+	fmt.Fprintf(os.Stdout, "  ✓ model         %s\n", result.Model)
+	fmt.Fprintf(os.Stdout, "  ✓ duration      %dms\n", result.DurationMs)
+	fmt.Fprintf(os.Stdout, "  ✓ cost          $%.6f (%d in / %d out tokens)\n", result.TotalCostUSD, result.InputTokens, result.OutputTokens)
+	if result.AssistantText != "" {
+		fmt.Fprintf(os.Stdout, "  ✓ response      %q\n", result.AssistantText)
+	}
+	fmt.Fprintln(os.Stdout, "")
+	fmt.Fprintln(os.Stdout, "Smoke test passed. The agent subsystem is ready to run real definitions.")
+	return nil
+}

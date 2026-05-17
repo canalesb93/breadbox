@@ -21,6 +21,31 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
 4. **Edit prompt + schedule**, click Save, then flip the Enabled toggle. The agent fires on its cron schedule and shows up in the Runs page.
 5. **Hit Run now** in the list page to trigger immediately. The result lands in the run history with a full transcript (tool calls + cost + token usage).
 
+### Verify everything is wired
+
+Before you run a real agent, sanity-check the chain with the diagnostic CLI:
+
+```sh
+./breadbox agent test
+```
+
+It spawns the sidecar with a tiny "say OK" prompt (no MCP servers, no agent definition, bounded to ~5¢). On success you'll see something like:
+
+```
+🔎 breadbox agent test
+
+  ✓ auth          subscription
+  ✓ binary        /Users/you/breadbox/bin/breadbox-agent
+  ✓ model         claude-haiku-4-5
+  ✓ duration      812ms
+  ✓ cost          $0.000123 (15 in / 1 out tokens)
+  ✓ response      "OK"
+
+Smoke test passed. The agent subsystem is ready to run real definitions.
+```
+
+Exit code 3 = no Anthropic credential; exit code 5 = sidecar binary not found.
+
 ## Architecture (one-line view per layer)
 
 | Layer | Lives at | What it does |
