@@ -246,6 +246,23 @@ export function useUpdateAgentSettings() {
   });
 }
 
+// --- Readiness probe (cheap, no API call) ---
+
+export interface AgentSubsystemStatus {
+  auth_mode: string;
+  auth_configured: boolean;
+  binary_present: boolean;
+  binary_path?: string;
+  ready: boolean;
+}
+
+export function useAgentSubsystemStatus() {
+  return useQuery({
+    queryKey: ["agents", "status"],
+    queryFn: () => api<AgentSubsystemStatus>("/api/v1/agents/status"),
+  });
+}
+
 // --- Smoke test (diagnostic) ---
 
 export interface AgentTestResult {

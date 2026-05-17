@@ -270,6 +270,7 @@ Agent definitions are scheduled Claude Agent SDK runs that call breadbox MCP to 
 | GET | `/agents/runs/{shortId}` | R | One run detail (by short_id or UUID) |
 | GET | `/agents/runs/{shortId}/transcript` | R | Streams the NDJSON transcript; 404 when not yet written |
 | GET | `/agents/settings` | R | Agent subsystem config; token fields returned masked, never plaintext |
+| GET | `/agents/status` | R | Cheap readiness probe — `{auth_configured, binary_present, ready}` for onboarding hints (no API call) |
 | PUT | `/agents/settings` | W | Update settings; nil fields are unchanged, empty string for token fields clears them |
 
 `subscription_token` and `anthropic_api_key` are AES-256-GCM encrypted at rest. GET returns a masked display string (`"sk-ant-oat01-XXXXXXXXX••••wxyz"`); the full value never leaves the server. A per-run scoped API key (`actor_type='agent'`) is minted at run start by the orchestrator and revoked at completion — it is not exposed via this surface.

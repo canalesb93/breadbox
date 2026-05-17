@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"breadbox/internal/agent"
 	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 )
@@ -124,6 +125,45 @@ func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettings
 		}
 	}
 	return s.GetAgentSettings(ctx, encKey)
+}
+
+// AgentSubsystemStatus is a cheap, side-effect-free readiness report for
+// the agent subsystem — used by the v2 SPA list page to surface
+// onboarding hints, and (later) by the smoke-test endpoints to short-
+// circuit before charging a real API call.
+type AgentSubsystemStatus struct {
+	AuthMode        string `json:"auth_mode"`
+	AuthConfigured  bool   `json:"auth_configured"`
+	BinaryPresent   bool   `json:"binary_present"`
+	BinaryPath      string `json:"binary_path,omitempty"`
+	Ready           bool   `json:"ready"` // AuthConfigured && BinaryPresent
+}
+
+// GetAgentSubsystemStatus inspects app_config + the filesystem to report
+// whether the agent subsystem is ready to fire a run. Mirrors the
+// `breadbox doctor` check; the only difference is the wire shape.
+func (s *Service) GetAgentSubsystemStatus(ctx context.Context) *AgentSubsystemStatus {
+	authMode := appconfig.String(ctx, s.Queries, appconfig.KeyAgentAuthMode, appconfig.AuthModeSubscription)
+	tokenKey := appconfig.KeyAgentSubscriptionToken
+	if authMode == appconfig.AuthModeAPIKey {
+		tokenKey = appconfig.KeyAgentAnthropicAPIKey
+	}
+	stored, _ := appconfig.Read(ctx, s.Queries, tokenKey)
+	authConfigured := stored != ""
+
+	binaryPath := appconfig.String(ctx, s.Queries, appconfig.KeyAgentRuntimePath, "")
+	resolved, binErr := agent.LocateBinary(binaryPath)
+	binaryPresent := binErr == nil
+	if !binaryPresent {
+		resolved = ""
+	}
+	return &AgentSubsystemStatus{
+		AuthMode:       authMode,
+		AuthConfigured: authConfigured,
+		BinaryPresent:  binaryPresent,
+		BinaryPath:     resolved,
+		Ready:          authConfigured && binaryPresent,
+	}
 }
 
 // maskToken returns a display string for a secret. nil for empty input.

@@ -2397,6 +2397,24 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/status:
+    get:
+      tags: [Agents]
+      summary: Readiness probe for the agent subsystem
+      description: |
+        Side-effect-free check that returns whether the agent subsystem
+        is ready to fire a run — auth configured + sidecar binary
+        discoverable. Used by the v2 SPA list page to surface onboarding
+        hints inline. Does NOT call Anthropic; for a live round-trip
+        use POST /agents/test instead.
+      responses:
+        "200":
+          description: Readiness report.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/v1/agents/settings:
     get:
       tags: [Agents]
