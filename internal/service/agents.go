@@ -803,7 +803,8 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		return nil, fmt.Errorf("agent: unknown auth_mode %q", authMode)
 	}
 
-	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, "")
+	// (transcript_dir is read by the Sidecar layer; see Sidecar.Run for
+	// the authoritative path assembly — iter-36 audit HIGH #5 cleanup.)
 
 	mcpServers := map[string]agent.MCPServerConfig{
 		"breadbox": {
@@ -839,9 +840,13 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	if run.SessionID != nil {
 		spec.SessionID = *run.SessionID
 	}
-	if transcriptDir != "" {
-		spec.TranscriptPath = transcriptDir + "/" + run.ShortID + ".ndjson"
-	}
+	// Note: transcript path is set by Sidecar.Run from (TranscriptDir,
+	// spec.RunID) and overwrites whatever's here on the spec. Don't try
+	// to control it from this side — keeping the assignment authority
+	// in one place avoids the iter-36 audit HIGH #5 inconsistency where
+	// AssembleJobSpec set `<dir>/<short_id>.ndjson` and Sidecar.Run
+	// then opened `<dir>/<RunID>.ndjson`, leaving the spec field briefly
+	// inconsistent before marshal.
 	return spec, nil
 }
 
@@ -925,8 +930,11 @@ func validateAgentDefinitionFields(name, slug, prompt, toolScope, model string, 
 	if model != "" && strings.TrimSpace(model) == "" {
 		return fmt.Errorf("%w: model cannot be blank", ErrInvalidParameter)
 	}
+	// 0 is accepted and falls back to DefaultAgentMaxTurns in the caller —
+	// the docstring used to say "1-100" but the actual behavior allowed
+	// 0 silently. iter-36 audit LOW #7 reworded for accuracy.
 	if maxTurns < 0 || maxTurns > 100 {
-		return fmt.Errorf("%w: max_turns must be 1-100", ErrInvalidParameter)
+		return fmt.Errorf("%w: max_turns must be 0-100 (0 falls back to the default)", ErrInvalidParameter)
 	}
 	if maxBudget != nil && (*maxBudget < 0 || *maxBudget > 1000) {
 		return fmt.Errorf("%w: max_budget_usd must be 0-1000", ErrInvalidParameter)
