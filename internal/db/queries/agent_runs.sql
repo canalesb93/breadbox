@@ -60,6 +60,21 @@ SET status        = 'skipped',
     error_message = $2
 WHERE id = $1;
 
+-- name: GetAgentCostStats30d :many
+-- Per-definition cost rollup over the last 30 days. Used by the v2 SPA
+-- list page to surface lifetime spend at a glance. Excludes skipped runs
+-- (no real cost incurred) but includes errored runs (often DO incur
+-- partial cost).
+SELECT
+    agent_definition_id,
+    COUNT(*)::int                                        AS run_count,
+    COALESCE(SUM(total_cost_usd), 0)::numeric(10,4)      AS total_cost_usd
+FROM agent_runs
+WHERE agent_definition_id IS NOT NULL
+  AND started_at >= NOW() - INTERVAL '30 days'
+  AND status != 'skipped'
+GROUP BY agent_definition_id;
+
 -- name: SetAgentRunNote :one
 UPDATE agent_runs
 SET operator_note = $2

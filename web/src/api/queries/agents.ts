@@ -15,6 +15,11 @@ export interface AgentRunSummary {
   total_cost_usd?: number | null;
 }
 
+export interface AgentCostStats {
+  run_count: number;
+  total_cost_usd: number;
+}
+
 export interface AgentDefinition {
   id: string;
   short_id: string;
@@ -32,6 +37,7 @@ export interface AgentDefinition {
   quiet_hours_start?: string | null; // "HH:MM" 24-hour; nil disables window
   quiet_hours_end?: string | null;
   last_run?: AgentRunSummary | null;
+  cost_stats_30d?: AgentCostStats | null;
   created_at: string;
   updated_at: string;
 }
