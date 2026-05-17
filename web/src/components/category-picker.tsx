@@ -83,7 +83,10 @@ export function CategoryPicker({
             // signal (ring + chevron) is confined to the badge's exact
             // bounds. The ring sits flush around the badge edge; the
             // chevron floats inside the badge's right padding.
-            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
+            // `[&_[data-slot=badge]]:hover:!ring-0` suppresses CategoryBadge's
+            // own override ring during hover so the hover-state stroke wins
+            // — without this the two rings would stack on overridden rows.
+            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 hover:[&_[data-slot=badge]]:!ring-0 focus-visible:[&_[data-slot=badge]]:!ring-0",
             className,
           )}
         >
