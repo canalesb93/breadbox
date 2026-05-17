@@ -20,4 +20,5 @@ func registerServerCommands(root *cobra.Command) {
 	AddResetPasswordCmd(root)
 	AddInitCmd(root)
 	AddBackupCmd(root)
+	AddAgentCmd(root)
 }
