@@ -65,8 +65,19 @@ type AgentDefinitionResponse struct {
 	// hours, populated by ListAgentDefinitions only (list-only like
 	// CostStats30d — single-row Get leaves nil). RFC3339 string when set.
 	NextFireAt *string `json:"next_fire_at,omitempty"`
-	CreatedAt  string  `json:"created_at"`
-	UpdatedAt  string  `json:"updated_at"`
+	// RecentErrorStats is the count of errors among the last 5 non-skipped
+	// runs. Used by the v2 SPA to surface a warning when 3+ recent runs
+	// failed. List-only; nil when the agent has no run history.
+	RecentErrorStats *AgentRecentErrorStats `json:"recent_error_stats,omitempty"`
+	CreatedAt        string                 `json:"created_at"`
+	UpdatedAt        string                 `json:"updated_at"`
+}
+
+// AgentRecentErrorStats is the "is this agent broken right now?" signal —
+// errors among the last 5 non-skipped runs.
+type AgentRecentErrorStats struct {
+	ErrorCount int `json:"error_count"`
+	RunCount   int `json:"run_count"` // up to 5; less when there's less history
 }
 
 // AgentCostStats is the per-agent cost rollup over the last 30 days.
@@ -181,6 +192,20 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		}
 	}
 
+	// Recent error rollup — same soft-fail pattern.
+	errStatsRows, err := s.Queries.GetAgentRecentErrorStats(ctx)
+	if err != nil {
+		s.Logger.Warn("list agent definitions: recent error stats query failed", "error", err)
+		errStatsRows = nil
+	}
+	errStatsByID := make(map[string]AgentRecentErrorStats, len(errStatsRows))
+	for _, r := range errStatsRows {
+		errStatsByID[pgconv.FormatUUID(r.AgentDefinitionID)] = AgentRecentErrorStats{
+			ErrorCount: int(r.ErrorCount),
+			RunCount:   int(r.RunCount),
+		}
+	}
+
 	out := make([]AgentDefinitionResponse, 0, len(rows))
 	for _, row := range rows {
 		last, err := s.lastRunSummary(ctx, row.ID)
@@ -190,6 +215,9 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		resp := agentDefinitionFromRow(row, last)
 		if stats, ok := statsByID[resp.ID]; ok {
 			resp.CostStats30d = &stats
+		}
+		if errStats, ok := errStatsByID[resp.ID]; ok {
+			resp.RecentErrorStats = &errStats
 		}
 		if resp.Enabled {
 			if nextFire := ComputeNextFire(&resp, time.Now()); nextFire != nil {

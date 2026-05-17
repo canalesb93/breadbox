@@ -58,6 +58,7 @@ import {
   useToggleAgent,
   type AgentCostStats,
   type AgentDefinition,
+  type AgentRecentErrorStats,
 } from "@/api/queries/agents";
 import { openModal } from "@/lib/modals";
 import { useNavigate } from "@tanstack/react-router";
@@ -413,6 +414,7 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
             <span>Model: {agent.model}</span>
             <span>Max turns: {agent.max_turns}</span>
             <CostStatsPill stats={agent.cost_stats_30d} />
+            <RecentErrorPill stats={agent.recent_error_stats} />
             <LastRunPill run={agent.last_run} />
           </div>
         </div>
@@ -458,6 +460,29 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
         </div>
       </div>
     </Card>
+  );
+}
+
+// RECENT_ERROR_WARN_THRESHOLD is the number of errors in the last 5 runs
+// that triggers the warning pill. Bump if it turns out noisy.
+const RECENT_ERROR_WARN_THRESHOLD = 3;
+
+function RecentErrorPill({
+  stats,
+}: {
+  stats?: AgentRecentErrorStats | null;
+}) {
+  if (!stats || stats.error_count < RECENT_ERROR_WARN_THRESHOLD) {
+    return null;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300"
+      title={`${stats.error_count} of last ${stats.run_count} runs errored — check the run history`}
+    >
+      <AlertCircle className="size-3" />
+      {stats.error_count}/{stats.run_count} errored
+    </span>
   );
 }
 

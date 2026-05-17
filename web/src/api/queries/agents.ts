@@ -20,6 +20,11 @@ export interface AgentCostStats {
   total_cost_usd: number;
 }
 
+export interface AgentRecentErrorStats {
+  error_count: number;
+  run_count: number; // up to 5
+}
+
 export interface AgentDefinition {
   id: string;
   short_id: string;
@@ -39,6 +44,7 @@ export interface AgentDefinition {
   last_run?: AgentRunSummary | null;
   cost_stats_30d?: AgentCostStats | null;
   next_fire_at?: string | null; // RFC3339; nil when no schedule, disabled, or unparseable
+  recent_error_stats?: AgentRecentErrorStats | null;
   created_at: string;
   updated_at: string;
 }
