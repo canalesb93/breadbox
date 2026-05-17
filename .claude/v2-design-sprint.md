@@ -3091,3 +3091,55 @@ Cross-cutting components:
     button trigger). Any new tiny *status* chip should reach for
     `<MetaBadge>` first; if it carries a count or lives inside a
     button trigger, `<Badge>` direct is still right.
+
+
+- **Iter 105 — SyncHistoryList onto TimelineRail (+ destructive tone)** ([#1222](https://github.com/canalesb93/breadbox/pull/1222))
+  - The per-connection Sync history feed was the only timeline-shaped
+    surface in v2 still hand-rolling its own row geometry (size-6 chip +
+    custom status tiles + flat `divide-y` list) — the iter-26 promotion of
+    `<TimelineRail>` originally queued sync logs as the second consumer,
+    iter 93 added the semantic-tone vocabulary the migration depended on,
+    and this iteration finally closes the loop. Now routes through
+    `<TimelineRail>` with day-group headings ("Today" / "Yesterday" /
+    weekday-month-day) so the per-connection sync feed reads as the same
+    temporal vocabulary as the transaction-detail Activity feed.
+  - **`destructive` tone added to `TimelineRailTone`** (parity with
+    StatusPanel / ColorRailCard / Sonner). Status → tone mapping:
+    `success` → `success` (emerald), `error` → **`destructive`** (red),
+    `in_progress` → `primary` (spinner). The iter-93 vocabulary missed a
+    destructive tier — the nearest semantic match was `warning` (amber),
+    which already encoded "soft / removed" (`tag_removed`). Errored sync
+    runs deserve the same destructive-red that StatusPanel and
+    ColorRailCard use for hard-failure surfaces. Token uses the standard
+    `border-destructive/40` + `text-destructive` shadcn pair so the v2
+    visual system reads as one across rail / panel / card / toast.
+  - **In-progress rows** route the spin animation via
+    `iconClassName="[&>svg]:animate-spin"` — the disc target the Lucide
+    svg child without forking the primitive. The previous open-coded row
+    threaded `animate-spin` directly on `<Loader2>` because it didn't go
+    through `<TimelineRail.Row>`; the new flow needed the indirection
+    because the primitive renders the icon itself. Clean enough — a
+    `spin` prop on the primitive would be over-fitting (one consumer,
+    one usage).
+  - Loading skeleton in `connection-detail.tsx` swapped from four
+    `h-12` `<Skeleton>` blocks to `<TimelineRail.RowSkeleton>`s — disc +
+    rail visible in the loading state too, so the loaded data lands
+    without a layout jump. Same vocabulary as the transaction-detail
+    Activity feed's loading state.
+  - Sandbox specimen extended with a destructive-tone row alongside the
+    existing success/primary/info/warning rows so the full tone
+    vocabulary is browseable; description updated to enumerate the seven
+    tones (`neutral` · `primary` · `success` · `warning` ·
+    **`destructive`** · `info` · `muted`) and to drop the "queued for
+    per-connection sync logs" note (this PR ships that consumer).
+  - **TimelineRail is now used by two consumers** — TX-detail Activity
+    feed (iter 26 / iter 93) + Connection-detail Sync history (this
+    iter). The remaining queued consumer from iter 26 ("rule run
+    history") still hasn't landed as a surface yet; when it does, it'll
+    inherit the same vocabulary. The primitive count stays at 28 — this
+    is a consumer migration plus a richer tone prop, not a new component.
+  - Tiny day-grouping helper (`dayLabel` / `groupByDay`) duplicates the
+    one in `activity-timeline.tsx` because the two feeds shouldn't yet
+    share a `lib/format` export — a third timeline consumer is the right
+    promotion gate. Until then, copy is cheaper than a one-call-site
+    shared util.
