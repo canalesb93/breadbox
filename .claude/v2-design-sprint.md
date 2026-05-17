@@ -387,6 +387,29 @@ next target, then updates this file at the end of the run.
   `account-links-section`, `preview-panel`) intentionally stay
   on the raw `Alert` primitive — they're scoped inline contexts,
   not full-page error surfaces.
+- **DetailPageSkeleton primitive** — extracted to
+  `web/src/components/detail-page-skeleton.tsx` in iter 83
+  (#1197). The canonical page-level loading shell for every v2
+  detail page (transaction, account, category, connection).
+  Composition on top of `<ColorRailCardSkeleton>` (iter 10) +
+  a `<JumpToRow>`-shaped pill strip (iter 75) + a two-column
+  grid of `rounded-xl` block placeholders matching
+  `<SectionCard>` / `<ListCard>` chrome. Four surfaces share it
+  today (every v2 detail page). API: `hero` (forwards
+  `tileShape` / `withFooter` / `body` to `<ColorRailCardSkeleton>`),
+  `jumpPills` (count of `h-7 w-32` pill placeholders, `0` to omit),
+  `main` / `sidebar` (arrays of Tailwind height classes for
+  stacked `rounded-xl` block placeholders — empty sidebar collapses
+  the grid to one column). Sibling of `<PageError>` (iter 82) —
+  three states, three vocabularies, one visual system: error ->
+  `<PageError>`, loading -> `<DetailPageSkeleton>`, empty ->
+  `<EmptyState>`. Every v2 detail page already routed its error
+  state through `<PageError>` — this primitive gives the loading
+  state the same one-place-to-edit treatment. Don't fork the look
+  — extend this primitive if a fifth consumer needs a new layout
+  knob. The `ColorRailCardSkeletonProps` interface is now exported
+  (was internal-only pre-iter-83) so the primitive can forward
+  props with full type safety.
 
 ## Backlog (ordered roughly by impact)
 
@@ -2266,8 +2289,30 @@ Cross-cutting components:
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
 
-
-
-
-
-
+- **Iter 83 — DetailPageSkeleton primitive** ([#1197](https://github.com/canalesb93/breadbox/pull/1197))
+  - New `<DetailPageSkeleton>` at
+    `web/src/components/detail-page-skeleton.tsx` composes the
+    iter-10 `<ColorRailCardSkeleton>` hero + a `<JumpToRow>`-shaped
+    pill strip + a 2-col grid of `rounded-xl` block placeholders
+    matching `<SectionCard>` / `<ListCard>` chrome. Sibling of
+    iter-82's `<PageError>` — three states, three vocabularies,
+    one visual system: error -> PageError, loading ->
+    DetailPageSkeleton, empty -> EmptyState. 22nd shared primitive
+    in the v2 vocabulary.
+  - Four routes migrated onto it (transaction-detail,
+    account-detail, category-detail, connection-detail). Each
+    route's hand-rolled `function DetailSkeleton()` collapses from
+    ~15 lines of copy-pasted JSX to a single props call. Width
+    variance on jump pills (Category had `w-48` + `w-32`) collapsed
+    to uniform `w-32` — decorative-only difference, not worth a
+    knob. Connection-detail keeps its no-pills + 3+2 grid via
+    `jumpPills: 0` + `main` of length 3.
+  - Exports `ColorRailCardSkeletonProps` interface from
+    `color-rail-card.tsx` (was internal) so the new primitive can
+    forward props with full type safety.
+  - No visual change. The intentional consolidation: future
+    skeleton tweaks (icon-tile sizing, sidebar widths, pill geometry)
+    now propagate from one file. The drift that motivated this
+    primitive — four nearly-identical `DetailSkeleton` functions
+    that hand-rolled `space-y-6` + `grid lg:grid-cols-[minmax(0,1fr)_18rem]`
+    + `flex gap-2` etc. — is gone.
