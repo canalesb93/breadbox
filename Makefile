@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck
 
 PORT ?= 8080
 
@@ -146,6 +146,27 @@ web: web-install
 VITE_PORT ?= $(shell echo $$(($(PORT) + 1000)))
 web-dev: web-install
 	cd web && BREADBOX_BACKEND_PORT=$(PORT) VITE_PORT=$(VITE_PORT) bun run dev
+
+# agent-sidecar: build the standalone breadbox-agent binary that the Go
+# server exec's per Claude Agent SDK run. Output is bin/breadbox-agent —
+# a self-contained binary with the Bun runtime embedded (~50 MB).
+# The Go server discovers this binary via app_config agent.runtime_path,
+# the BREADBOX_AGENT_BIN env var, or by falling back to ./bin/breadbox-agent.
+agent-sidecar-install:
+	@if ! command -v bun &>/dev/null; then \
+		echo "Error: bun is not installed. Install via 'curl -fsSL https://bun.sh/install | bash'."; \
+		exit 1; \
+	fi
+	cd agent/sidecar && bun install --frozen-lockfile || cd agent/sidecar && bun install
+
+agent-sidecar: agent-sidecar-install
+	cd agent/sidecar && bun run build
+	@mkdir -p bin
+	@cp agent/sidecar/bin/breadbox-agent bin/breadbox-agent 2>/dev/null || true
+	@echo "Built bin/breadbox-agent (also at agent/sidecar/bin/breadbox-agent)."
+
+agent-sidecar-typecheck: agent-sidecar-install
+	cd agent/sidecar && bun run typecheck
 
 test: generate
 	go test ./...

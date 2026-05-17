@@ -1,0 +1,20 @@
+{
+  "name": "breadbox-agent-sidecar",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "TypeScript Claude Agent SDK sidecar exec'd by the breadbox Go server",
+  "scripts": {
+    "build": "bun build --compile --minify --target=bun --outfile bin/breadbox-agent index.ts",
+    "dev": "bun run index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}
