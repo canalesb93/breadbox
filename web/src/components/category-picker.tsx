@@ -64,11 +64,12 @@ export function CategoryPicker({
     await apply(pick);
   };
 
-  // `group/picker` lets the chevron hint reveal only on hover/focus
-  // without taking layout space at rest, so a tx row's category column
-  // reads as a tidy badge until the user shows intent to edit.
-  const chevronClass =
-    size === "sm" ? "size-2.5 -mr-0.5" : "size-3 -mr-0.5";
+  // Chevron sits OUTSIDE the trigger bounds (absolute-positioned just to
+  // its right) so the badge stays flush at rest. It fades in only on
+  // hover / keyboard focus. `relative` on the trigger + a tiny `mr` on
+  // the parent cell aren't needed because the chevron escapes via
+  // negative right offset.
+  const chevronClass = size === "sm" ? "size-2.5" : "size-3";
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -78,10 +79,11 @@ export function CategoryPicker({
           disabled={isPending}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            // Pickier hover state — bg + ring — than the previous
-            // `hover:bg-accent` alone, so the affordance reads at-a-glance
-            // even when the badge already carries its own coloured tint.
-            "group/picker focus-visible:ring-ring inline-flex items-center gap-1 rounded-md p-0.5 transition-colors hover:bg-accent hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
+            // Trigger wraps the badge with no extra padding so every hover
+            // signal (ring + chevron) is confined to the badge's exact
+            // bounds. The ring sits flush around the badge edge; the
+            // chevron floats inside the badge's right padding.
+            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
             className,
           )}
         >
@@ -105,10 +107,10 @@ export function CategoryPicker({
           <ChevronDown
             aria-hidden
             className={cn(
-              // Hidden at rest, revealed on group hover or keyboard
-              // focus so the picker affordance is discoverable without
-              // adding weight to the badge.
-              "text-muted-foreground opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+              // Layered INSIDE the trigger's right edge, overlapping the
+              // badge's natural right padding so we don't reserve any
+              // width at rest. Fades in on hover/focus.
+              "text-muted-foreground pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
               chevronClass,
             )}
           />
