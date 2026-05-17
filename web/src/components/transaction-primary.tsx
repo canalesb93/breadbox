@@ -66,7 +66,7 @@ function TransactionMeta({ transaction: t }: { transaction: Transaction }) {
             {t.tags!.length}
           </span>
           <span className="hidden sm:inline-flex">
-            <TagList slugs={t.tags} max={2} size="sm" />
+            <TagList slugs={t.tags} max={2} size="xs" />
           </span>
         </>
       )}

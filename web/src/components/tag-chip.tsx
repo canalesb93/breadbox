@@ -14,16 +14,18 @@ interface TagChipProps {
   onRemove?: () => void;
   /**
    * Visual density.
+   * - `xs` — inline inside a meta row (16px text line); does not grow the row
    * - `sm` — table rows / dense list cells (parity with `CategoryBadge size="sm"`)
    * - `md` — default; detail-page hero actions, sandbox, rule-display
    */
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
   className?: string;
 }
 
 // Per-size token recipe — mirrors CategoryBadge's recipe so the two share a
 // rhythm when rendered side-by-side in a transaction row. Adjust as a pair.
-const SIZE: Record<"sm" | "md", string> = {
+const SIZE: Record<"xs" | "sm" | "md", string> = {
+  xs: "h-4 px-1.5 text-[10px] leading-none gap-0.5 [&>svg]:size-2.5",
   sm: "h-5 px-1.5 text-[11px] gap-0.5 [&>svg]:size-2.5",
   md: "h-6 px-2 text-xs gap-1 [&>svg]:size-3",
 };
@@ -61,7 +63,7 @@ interface TagListProps {
   /** Cap the chips shown; the remainder collapse into a "+N" badge. */
   max?: number;
   /** Forwarded to every `TagChip` and the overflow badge for density parity. */
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
   className?: string;
 }
 
