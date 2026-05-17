@@ -37,7 +37,7 @@ Replace the v1 admin "agent-prompts" copy-to-clipboard wizard with a real recurr
 
 Each iteration ends in **one merged PR to main** (squashed). Iterations are sequenced — don't open the next PR until the previous is merged and CI is green on main.
 
-### Iteration 1 — schema + appconfig + sidecar skeleton (foundation PR)
+### Iteration 1 — schema + appconfig + sidecar skeleton (foundation PR) ✅ MERGED #1223
 - [ ] Migration: `agent_definitions` table (id, short_id, name, slug, prompt, schedule_cron, tool_scope, allowed_tools jsonb, model, max_turns, max_budget_usd, enabled, created_at, updated_at)
 - [ ] Migration: `agent_runs` table (id, agent_definition_id FK, trigger, status, started_at, completed_at, duration_ms, total_cost_usd, input_tokens, output_tokens, max_turns_used, error_message, transcript_path, session_id)
 - [ ] Migration: app_config keys defined:
@@ -169,8 +169,8 @@ When this loop fires, the agent should:
    - Code review pre-PR → `feature-dev:code-reviewer`
 8. **Run the tests** before opening PR: `go build ./...`, `go vet ./...`, `go test ./...`, `make test-integration` if DB-touching, `cd web && bun run typecheck && bun run lint`.
 9. **Open the PR** to main with a description that explains intent, scope, what was deferred, and a test plan. Wait for CI.
-10. **Merge when green** via `gh pr merge <num> --squash --delete-branch=false` (keep the sprint branch). NEVER use `--auto`.
-11. **After merge:** `git pull origin main --rebase` to incorporate the merge into the sprint branch.
+10. **Merge when green** via `gh pr merge <num> --squash --delete-branch=false` (keep the sprint branch). NEVER use `--auto`. **CRITICAL:** the `--delete-branch=false` flag is mandatory — the repo has auto-delete-on-merge enabled and forgetting the flag will wipe the sprint branch on origin.
+11. **After merge:** do NOT use `git pull --rebase` — main's squashed commit overlaps with the sprint branch's pre-merge commits and produces ugly conflicts. Instead run: `git fetch origin main && git reset --hard origin/main && git push --force-with-lease origin agents/claude-agent-sdk-sprint`. The squashed merge commit IS the full iteration's content; resetting to it keeps the sprint branch exactly at main's tip and ready for the next iteration's commits. If you forgot `--delete-branch=false` at step 10, this same recovery sequence re-creates the branch on origin.
 12. **Append to iteration log** in this file with what shipped, what was deferred, what's next. Commit the log update directly to the sprint branch.
 13. **End turn with `result:` line.** If blocked on a decision, end with `needs input:` line.
 
