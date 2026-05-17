@@ -407,6 +407,27 @@ Next iteration candidates (in rough impact order):
 
 Picking **#5 onboarding polish** next iteration — smallest UX win, leans on the iter-13 doctor knowledge surfaced as inline guidance, pairs well with the seeded starter agents from iter 6 (which look enabled-able but aren't usable until auth is configured).
 
+## ITER 14 — 2026-05-17 02:31
+Shipped (PR #1240 squash-merged into sprint branch as 9505ca49):
+- New GET /api/v1/agents/status (cheap readiness probe; same checks as the iter-13 doctor line).
+- v2 SPA Alert on /v2/agents that self-renders when either auth or binary is missing, with deep-link to Settings → Agents + `make agent-sidecar` reminder.
+- Self-hides as soon as both prereqs land — no manual dismiss.
+- All 5 CI jobs green; drift test green.
+
+Onboarding loop closed: fresh install → list page banner → fix Settings → banner re-evaluates → enable agent → "Run now" works. The seeded starter agents from iter 6 no longer look like a wall of mysteriously-disabled toggles.
+
+Side note: img402.dev was unreachable during this iter's screenshot upload (HTTP 000 on the POST). Local capture verified the banner renders correctly across viewports; PR body explained the absent embed. Future iters resume normal evidence flow if img402 is back.
+
+Next iteration candidates (in rough impact order):
+1. **Per-agent quiet hours** — schema column + scheduler tweak + UI control. Mid.
+2. **Cost dashboard** in /v2/agents — sparkline on list page OR /v2/agents/cost. Bigger.
+3. **Webhook trigger** — fire an agent after a connection finishes a sync. Touches sync engine + agent_definitions schema.
+4. **Suggested rules agent** — scans recent transactions, proposes new transaction_rules, queues for human review. Bigger.
+5. **Inline run notes** — operator-editable note field on each agent_run row (track context around a manual fire). Small backend + small UI.
+
+Picking **#1 per-agent quiet hours** next iteration — mid-size, touches schema + scheduler + edit form which is the agent system's "main control loop" and worth strengthening before more peripheral features land.
+
+
 
 
 
