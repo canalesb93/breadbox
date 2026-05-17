@@ -1949,6 +1949,47 @@ Cross-cutting components:
     (Search / Wallet / Receipt icons) in their typical detail-
     page hero rhythm.
 
+- **Iter 76 — `<ActionPill>` primitive for h-7 footer/trailing action buttons** ([#1189](https://github.com/canalesb93/breadbox/pull/1189))
+  - Audit of icon sizes across the SPA found a sibling vocabulary
+    to iter 75's `<JumpToPill>`: the `h-7 gap-1.5 text-xs` +
+    `size-3.5` leading icon recipe used inside
+    `<ColorRailCard footer>` strips (account-detail Link / View;
+    connection-detail Sync now / Re-authenticate / Import more /
+    Pause) and `<StatusPanel trailing>` slots (connection-detail
+    re-auth banner, error-page Reload, account-detail Open
+    connection). Eight open-coded sites carried the same className
+    triplet — promoted to `<ActionPill>` at
+    `web/src/components/action-pill.tsx` (19th shared primitive).
+  - Semantic split with JumpToPill: same `h-7` height + `text-xs`
+    label, but ActionPill omits `px-2.5`, uses `size-3.5` icons,
+    and defaults to `variant="ghost"` (override to `outline` for
+    higher-weight `<StatusPanel trailing>` CTAs). The pill carries
+    a dispatched handler (`onClick` or `asChild` Link) — it's an
+    action, not a lateral nav. JumpToPill stays the canonical
+    detail-page hero lateral-link vocabulary.
+  - Drift swept while migrating: connection-detail Pause/Resume
+    used `size-3` icons (vs canonical `size-3.5` on every other
+    action in the same hero strip) — settles on `size-3.5` so the
+    footer reads as one coherent surface. error-page Reload was a
+    `ghost` JumpToPill-shape oddity (`px-2.5` + `size-3`) — promoted
+    to the canonical ActionPill recipe. placeholder.tsx
+    related-pills cluster migrated to `<JumpToPill>` (5th surface),
+    retiring the last open-coded `h-7 gap-1.5 px-2.5 text-xs` site
+    in the codebase — only the two primitive files now own that
+    className triplet.
+  - Sandbox specimen lives next to `<JumpToPill>` in
+    `sections/components.tsx` so the two pill vocabularies
+    (ActionPill / JumpToPill) are side-by-side. Four buttons
+    cover both variants: Sync now / Pause / View transactions
+    (`ghost`, the dominant in-card-footer case) and
+    Re-authenticate (`outline`, the StatusPanel-trailing case).
+  - Future drift to watch: section-card action slots use a
+    tighter `h-7 gap-1 px-2 text-xs` shape (no leading icon
+    label "Show / Hide" toggles in error-page Technical details
+    and connection-detail Accounts header). Two consumers today;
+    promote to a `<SectionCardAction>` slot if a third surface
+    adopts it.
+
 ## Open observations / questions
 
 (Populated by iterations.)
