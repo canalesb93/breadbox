@@ -117,11 +117,41 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - [ ] Final pass: error paths, edge cases (sidecar crash mid-run, scheduler restart, sidecar binary missing)
 - **PR title:** `feat(agents): observability, docs, polish`
 
-### Iteration 8+ (stretch)
-- Subscription auth (Claude plan) as alternative to API key
-- Multi-concurrent runs (lift v1 limit)
-- Cost dashboards / usage analytics
-- "Suggested rules" agent that proposes new transaction rules and queues them for human approval
+### Iteration 8+ (stretch — loop keeps going until Ricardo says merge)
+
+Pick from this menu in roughly this order; bias toward what makes the system more *useful and trustworthy* per iteration. Add new ideas to this list as you find them.
+
+**Functionality**
+- Subscription auth was set up in iter 1; iter 8 should verify the live end-to-end path (`claude setup-token` → sidecar → SDK → MCP → categorize a real transaction). Send a PushNotification asking Ricardo to drop in a token; meanwhile write the smoke-test harness so it's ready the moment a token arrives.
+- "Suggested rules" agent: scans recent transactions, proposes new `transaction_rules`, queues them for a human-approval review row instead of applying directly.
+- Webhook trigger: fire an agent when a connection finishes a sync (extends the existing `webhook` trigger value).
+- Per-agent quiet hours: don't fire between configurable hours of the day (respect "don't ping Claude at 3am").
+- Multi-concurrent runs (lift the v1 `max_concurrent=1` cap once we trust the system).
+- Resume + multi-step agents (use the SDK's `sessionId` to chain runs that exceed `max_turns` in one shot).
+
+**Trust & observability**
+- Cost dashboards in `/v2/agents`: per-agent + global spend over time, projection vs. budget.
+- "Dry run" mode: an agent run with `read_only` scope that emits what it *would* have changed, queued for human approval.
+- Per-agent audit page linking each run's transcript to the actual DB changes it produced (categorizations, rule additions, etc.).
+- Alert-on-anomaly: surface runs that hit `max_turns`, `budget_exceeded`, or had unusual tool-call counts.
+- Optional OpenTelemetry export wired through the SDK (`OTEL_*` env vars).
+
+**DX & docs**
+- A `breadbox agent run <slug>` CLI subcommand for manual one-off runs from the shell (useful for self-hosters who want to test before scheduling).
+- A `breadbox agent test` command that runs a tiny no-MCP "say hello" prompt to validate the sidecar + auth + binary discovery, suitable for `breadbox doctor`.
+- Seed-agent library expansion: more than the v1 set — onboarding, account reconciliation, monthly close-out, anomaly review.
+- Inline rule-engine docs in the prompt builder (link/preview of `docs/rule-dsl.md`).
+- Migration guide for users moving from the v1 admin agent-prompts wizard.
+
+**Polish**
+- Run-history filtering (status, date range, definition).
+- Inline transcript search.
+- Settings page: "Test connection" button that validates auth before save.
+- Empty-state and error-state polish across all agent pages (use the `frontend-design` skill).
+- Mobile-responsive sweep on the agent pages (use `simple-validate-ui` for evidence).
+- Dark-mode polish.
+
+When the menu is exhausted, re-read the sprint state for skipped sub-items, then ping Ricardo (per the End-of-sprint exit section).
 
 ## Iteration log
 
@@ -176,7 +206,23 @@ When this loop fires, the agent should:
 13. **Append to iteration log** in this file with what shipped, what was deferred, what's next. Commit the log update directly to the sprint branch and push.
 14. **End turn with `result:` line.** If blocked on a decision, end with `needs input:` line.
 
-**End-of-sprint exit:** when all planned iterations are done (or Ricardo signals "ship it"), open ONE final PR from `agents/claude-agent-sdk-sprint` → `main`. Do NOT merge that PR autonomously — that's Ricardo's call.
+## End-of-sprint exit (read carefully)
+
+**Ricardo holds the merge-to-main signal — the loop does not open or merge the sprint→main PR autonomously, even after iteration 7.** Specifically:
+
+- After iter 7 ships, do **not** open `agents/claude-agent-sdk-sprint` → `main`.
+- Instead, pick the next-most-valuable stretch item (see the "Iteration 8+" list below) and run another iteration into the sprint branch.
+- Keep iterating until Ricardo writes the literal phrase "we're good to merge" (or an obvious paraphrase: "ship it", "open the merge PR", "ready for review"). Only then open ONE PR from the sprint branch into main with a comprehensive description covering every iteration. **Even then, do not merge it** — wait for Ricardo.
+- When you reach the end of a stretch iteration and there's no obvious next thing, do these in order: (a) re-read this whole file looking for items you've skipped; (b) re-run the full test suite + a `feature-dev:code-reviewer` pass on the diff between the sprint branch and main to find polish work; (c) only as a last resort send ONE PushNotification of the form "Sprint at iter N, X stretch items left or [list]. Anything to add before I queue more?" — but only if there's been no progress for two consecutive fires.
+
+## Cron self-care
+
+Sessions can drop and the recurring task auto-expires after 7 days. On each fire:
+
+1. Call `CronList`. If no entry matches this sprint's prompt, the loop is dead in this session — fire a `PushNotification`: "Agent SDK sprint loop expired — run /loop 30m to resume." Then continue this iteration (one last useful turn before going silent).
+2. If the cron entry exists but the sprint state has stalled (no new iteration log entry in the last 3 fires), send ONE PushNotification asking Ricardo to check in.
+
+Do not try to re-arm `CronCreate` yourself — the user's `/loop` invocation is authoritative.
 
 If at any point the next iteration's scope is unclear, stop and use `AskUserQuestion` rather than guessing on a load-bearing decision (model choice, auth scheme, schema breaking change).
 
