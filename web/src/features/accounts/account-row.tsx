@@ -102,7 +102,7 @@ export function AccountRow({ account: a }: AccountRowProps) {
             </div>
           )}
         </div>
-        <ChevronRight className="text-muted-foreground/40 group-hover:text-muted-foreground size-4 transition-colors" />
+        <ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground size-3.5 transition-colors" />
       </div>
     </Link>
   );
