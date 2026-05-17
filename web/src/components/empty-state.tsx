@@ -28,9 +28,8 @@ export interface EmptyStateProps {
   className?: string;
 }
 
-// Zero-data state for a page or section that loaded fine but has nothing to
-// show. Distinct from routes/placeholder.tsx, which marks a page that hasn't
-// been built yet.
+// Zero-data state for a page or section that loaded fine but has nothing
+// to show. (Use `routes/placeholder.tsx` instead for an unbuilt page.)
 //
 // Visual contract:
 // - Always centered, icon tile → title → description → action.

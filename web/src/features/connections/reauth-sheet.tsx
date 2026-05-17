@@ -81,10 +81,6 @@ export function ReauthSheet({
   const conn = connQuery.data;
   const institutionName = conn?.institution_name ?? "Untitled connection";
 
-  function handleSheetChange(next: boolean) {
-    onOpenChange(next);
-  }
-
   async function onReconnect() {
     if (!conn) return;
     setErrorMessage(null);
@@ -141,7 +137,7 @@ export function ReauthSheet({
       toast.success(`Reconnected ${institutionName}.`, {
         description: "Sync resumed — accounts will refresh on the next webhook.",
       });
-      handleSheetChange(false);
+      onOpenChange(false);
     } catch (err) {
       const msg =
         err instanceof ApiError
@@ -162,7 +158,7 @@ export function ReauthSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={handleSheetChange}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col gap-0 p-0">
         <DetailSheetHeader
           density="accent"
@@ -243,7 +239,7 @@ export function ReauthSheet({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleSheetChange(false)}
+              onClick={() => onOpenChange(false)}
               disabled={reauthStart.isPending}
             >
               Cancel
@@ -266,7 +262,7 @@ export function ReauthSheet({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleSheetChange(false)}
+              onClick={() => onOpenChange(false)}
             >
               Close
             </Button>

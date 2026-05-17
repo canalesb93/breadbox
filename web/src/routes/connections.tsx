@@ -38,7 +38,7 @@ export const connectionsSearchSchema = z.object({
   reauth: z.string().optional(),
 });
 
-export type ConnectionsSearch = z.infer<typeof connectionsSearchSchema>;
+type ConnectionsSearch = z.infer<typeof connectionsSearchSchema>;
 
 export function ConnectionsPage() {
   const search = useSearch({ strict: false }) as ConnectionsSearch;

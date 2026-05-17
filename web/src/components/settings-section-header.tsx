@@ -37,16 +37,13 @@ interface SettingsSectionHeaderProps {
  *   - `sub`     → `<h3>` `text-sm font-semibold`, action centered to title
  *     row, `space-y-1` description.
  *
- * Iter 107 ripple from iter 106's `SectionCard` / `ListCard` baseline polish:
- * bumped both heading tokens from `font-medium` to `font-semibold` so the
- * title carries enough anchor next to a real action button (`Button size="sm"`,
- * `Add member` etc.) instead of reading as a caption. The vocabulary now
- * matches `PageHeader` (`text-2xl font-semibold`) and the canonical card
- * header recipe (`text-sm font-semibold`).
+ * Both heading tokens use `font-semibold` to match `PageHeader` and the
+ * canonical card-header recipe — the title needs anchor weight next to a
+ * real action button instead of reading as a caption.
  *
- * Don't fork the look — extend the primitive. If a fourth weight is needed
- * (e.g. a "field group" rhythm tighter than `sub`), add it as a new token
- * here rather than open-coding another `<h4>` block in a feature file.
+ * Don't fork the look — extend the primitive. If a fourth weight is needed,
+ * add it as a new token here rather than open-coding another `<h4>` block
+ * in a feature file.
  */
 export function SettingsSectionHeader({
   level = "section",

@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StatusPanel } from "@/components/status-panel";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -680,14 +679,3 @@ function ColumnSelect({
   );
 }
 
-// CsvImportFormSkeleton renders an approximate skeleton for the form — used
-// by the sandbox specimen so the layout shows up without needing a live file
-// preview.
-export function CsvImportFormSkeleton() {
-  return (
-    <div className="flex flex-col gap-4">
-      <Skeleton className="h-32 w-full rounded-lg" />
-      <Skeleton className="h-10 w-full" />
-    </div>
-  );
-}

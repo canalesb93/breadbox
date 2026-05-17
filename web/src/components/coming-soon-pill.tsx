@@ -4,33 +4,13 @@ import { Clock, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * ComingSoonPill — the canonical muted "Coming soon" status pill rendered
- * in the trailing slot of a `<StatusPanel tone="info">` for unbuilt
- * surfaces.
+ * ComingSoonPill — the canonical muted "Coming soon" status pill, used in
+ * the trailing slot of `<StatusPanel tone="info">` for unbuilt surfaces.
  *
- * Vocabulary: muted background + muted-foreground label, fully-rounded
- * pill (`rounded-full`), `px-2.5 py-1 text-[11px]`, uppercase + wide
- * tracking, leading `Clock` icon at `size-3`. Distinct from the iter-37
- * `<Eyebrow>` (no chip, used as a section/page micro-label) and from
- * shadcn `<Badge>` (rectangular, semantic-tone variants) — this is a
- * neutral inline status chip whose only job is to caption "not yet."
- *
- * Two consumers share it today: `routes/placeholder.tsx` (the canonical
- * unbuilt-nav-leaf shell, iter 21) and `components/settings-shell.tsx`
- * (the in-the-works settings section panel, iter 78). Both previously
- * hand-rolled a 10-class span — promoted in iter 102 so the pill shape,
- * padding, and rhythm live in one place. Sibling of `<JumpToPill>` in
- * the iter-30 "primary-tinted pill triad" drift note: when a new
- * surface needs the muted variant, reach for this; when it needs the
- * primary-tinted v2-chip variant, that one is still inlined in
- * `BrandHeader` / `AuthShell` until the third surface adopts it.
- *
- * `icon` defaults to `Clock` (matches both live consumers); pass a
- * different `LucideIcon` if a new caller wants a different leading
- * glyph without losing the chip rhythm. `children` is the label —
- * keep it short ("Coming soon", "In review", "Beta"). If a non-muted
- * tone is ever needed, add a `tone` prop here rather than forking the
- * className — keep the vocabulary in one file.
+ * Neutral inline status chip whose only job is to caption "not yet." Don't
+ * fork the look — pass `icon` / `children` to vary the leading glyph or
+ * label; if a non-muted tone is ever needed, add a `tone` prop here rather
+ * than forking the className.
  */
 export interface ComingSoonPillProps
   extends Omit<React.HTMLAttributes<HTMLSpanElement>, "children"> {

@@ -38,7 +38,7 @@ export const rulesSearchSchema = z.object({
   p: z.coerce.number().int().min(1).optional(),
 });
 
-export type RulesSearch = z.infer<typeof rulesSearchSchema>;
+type RulesSearch = z.infer<typeof rulesSearchSchema>;
 
 // Title-bar widths rotate per-row so the skeleton stack reads as a stack of
 // varied-length rules instead of a metronome. Five rows matches the page-size

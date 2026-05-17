@@ -160,7 +160,8 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 			continue
 		}
 		if transcript != nil {
-			_, _ = transcript.Write(append(append([]byte{}, line...), '\n'))
+			_, _ = transcript.Write(line)
+			_, _ = transcript.Write([]byte{'\n'})
 		}
 		evt, err := ParseEvent(line)
 		if err != nil {

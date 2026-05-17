@@ -44,7 +44,7 @@ const createSchema = z.object({
   color: z.string().nullable(),
 });
 
-export type TagFormValues = z.infer<typeof createSchema>;
+type TagFormValues = z.infer<typeof createSchema>;
 
 interface TagFormProps {
   mode: "create" | "edit";

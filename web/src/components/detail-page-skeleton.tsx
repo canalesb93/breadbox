@@ -38,23 +38,13 @@ interface DetailPageSkeletonProps {
 }
 
 // DetailPageSkeleton is the canonical loading shell for every v2 detail
-// page (transaction, account, category, connection). It composes the
-// existing iter-10 `<ColorRailCardSkeleton>` hero with the iter-75
+// page. It composes a `<ColorRailCardSkeleton>` hero with a
 // `<JumpToRow>`-shaped pill strip and a two-column grid of `rounded-xl`
 // block placeholders matching `<SectionCard>` / `<ListCard>` chrome.
 //
-// Sibling of `<PageError>` (iter 82 #1196) — three states, three
-// vocabularies, one visual system: error → `<PageError>`, loading →
-// `<DetailPageSkeleton>`, empty → `<EmptyState>`. Every v2 detail page
-// already routes its error state through `<PageError>`; this primitive
-// gives the loading state the same one-place-to-edit treatment.
-//
-// Before this primitive landed, every detail route hand-rolled its own
-// `function DetailSkeleton()` with copy-pasted layout markup that drifted
-// in subtle ways (gap spacing, sidebar widths, pill widths). Four
-// surfaces now route through it: transaction-detail, account-detail,
-// category-detail, connection-detail. Don't fork — extend this
-// primitive if a fifth consumer needs a new layout knob.
+// Three loading vocabularies, one visual system: error → `<PageError>`,
+// loading → `<DetailPageSkeleton>`, empty → `<EmptyState>`. Don't fork —
+// extend this primitive if a new layout knob is needed.
 export function DetailPageSkeleton({
   hero,
   jumpPills = 0,

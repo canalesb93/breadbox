@@ -4,7 +4,6 @@ package agent
 
 import "encoding/json"
 
-// EventType constants for the sidecar's NDJSON stream.
 const (
 	EventTypeAssistantMessage = "assistant_message"
 	EventTypeToolUse          = "tool_use"
@@ -63,10 +62,8 @@ func ParseEvent(line []byte) (Event, error) {
 	return Event{Type: env.Type, TS: env.TS, Raw: raw}, nil
 }
 
-// ParseResult unmarshals the raw JSON into a ResultPayload.
-// Only meaningful when e.Type == EventTypeResult — but ResultPayload's
-// fields live alongside the envelope, not nested under "data", so the
-// raw bytes work as-is.
+// ParseResult unmarshals the raw JSON into a ResultPayload. Only meaningful
+// when e.Type == EventTypeResult.
 func (e Event) ParseResult() (ResultPayload, error) {
 	// The sidecar emits {type, ts, data: {...payload...}}. Unwrap data.
 	var wrapper struct {

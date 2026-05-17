@@ -29,10 +29,9 @@ interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "t
 
 // SectionCard is the canonical "page section in a card" container — bordered
 // header that names the section, optional trailing action, body that hosts
-// the content. Established across the v2 design pass on Home (recent
-// activity / connections), Transaction-detail (Activity / Details), and now
-// Account-detail (Settings / Links / Recent transactions / Details). Wraps
-// shadcn `Card` so every surface speaks the same vocabulary.
+// the content. Wraps shadcn `Card` so every surface speaks the same
+// vocabulary. Pair with `ListCard` (same header rhythm) when the body is a
+// list. Don't fork the look — change this primitive.
 //
 // Visual contract:
 //   `<Card className="gap-0 py-0">`
@@ -40,20 +39,9 @@ interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "t
 //     `<CardContent className="px-5 py-5">` content (or px-0 py-0 when flushBody)
 //     optional `<div className="border-t px-5 py-3 text-right">` footer
 //
-// Vertical rhythm: header `py-4` (16px) + body `py-5` (20px) reads as a
-// slight density step from chrome to content. Matched by `ListCard` so the
-// two cards visually align when they sit on the same page. Don't fork the
-// look — change this primitive.
-//
-// Header alignment (iter 105): the shadcn `CardHeader` grid defaults to
-// `items-start`, which pinned the 20px title to the top of the row while a
-// 28-32px action (ViewAllPill / Button size="sm") protruded downward by
-// 8-12px. That asymmetry — title's baseline higher than the action's
-// vertical center — was the "header looks crooked" complaint. We override
-// to `items-center` so the title and action sit on the same vertical
-// midline regardless of action height. The title weight bump from
-// `font-medium` → `font-semibold` gives it enough anchor that it doesn't
-// read as a caption next to the action button.
+// The header overrides shadcn's default `items-start` to `items-center` so
+// mixed-height children (20px title vs 28-32px trailing action) sit on the
+// same midline.
 export function SectionCard({
   title,
   action,

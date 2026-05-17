@@ -57,7 +57,7 @@ const baseSchema = z.object({
   hidden: z.boolean(),
 });
 
-export type CategoryFormValues = z.infer<typeof baseSchema>;
+type CategoryFormValues = z.infer<typeof baseSchema>;
 
 interface CategoryFormProps {
   mode: "create" | "edit";

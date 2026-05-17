@@ -442,7 +442,7 @@ function DetailBody({
         />
       )}
 
-      <QuickActions conn={conn} />
+      <QuickActions />
 
       {/* Two-column body: primary content on the left, settings + details
           on the right. Mirrors the Account-detail layout (which inverted
@@ -725,11 +725,11 @@ function Hero({
   );
 }
 
-// QuickActions matches the iter-5/6 "Jump to" pill row used on TX and
-// Account detail — labelled lateral navigation that surfaces concrete
-// targets (the connection's accounts, the global sync-logs feed) rather
-// than just verbs.
-function QuickActions(_props: { conn: ConnectionDetail }) {
+// QuickActions matches the "Jump to" pill row used on TX and Account
+// detail — labelled lateral navigation that surfaces concrete targets
+// (the connection's accounts, the global sync-logs feed) rather than
+// just verbs.
+function QuickActions() {
   return (
     <JumpToRow>
       <JumpToPill asChild>

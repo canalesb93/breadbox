@@ -39,15 +39,11 @@ interface EyebrowProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 // Eyebrow is the canonical uppercase micro-label used across detail pages,
-// hero cards, timeline rails, AND sidebar/menu group labels:
+// hero cards, timeline rails, and sidebar/menu group labels:
 // `text-muted-foreground text-[10px] font-medium tracking-[0.1em]
 // uppercase` is the default; `font-semibold` cousins live behind the
-// `nav` variant. The pattern was open-coded across ten files in five
-// subtly different sizes/trackings before iter 37 consolidated them, and
-// the `nav`-scale `font-semibold` cousins (sidebar group labels +
-// shortcut-sheet group headers) were unified onto the primitive in
-// iter 95. Don't reach for raw `text-[10px] font-medium/semibold
-// tracking-* uppercase` markup again — extend this primitive with a new
+// `nav` variant. Don't reach for raw `text-[10px] font-medium/semibold
+// tracking-* uppercase` markup — extend this primitive with a new
 // variant if a host needs a different rhythm.
 export function Eyebrow({
   as: Tag = "span",

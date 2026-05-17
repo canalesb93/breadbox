@@ -61,16 +61,9 @@ interface ListCardProps<T> extends Omit<React.HTMLAttributes<HTMLDivElement>, "c
 // off. Row padding is consumer-supplied (typically `px-5 py-3` or
 // `px-5 py-3.5`), one stride below the header.
 //
-// Header alignment (iter 105): same fix as `SectionCard`. The shadcn
-// `CardHeader` grid defaults to `items-start` plus a `[.border-b]:pb-6`
-// rule that injects 24px of bottom padding when the header has a divider.
-// On `ListCard`'s "Recent activity" / "Connections" headers — title on
-// the left, `ViewAllPill` / "Manage" pill on the right — the result was
-// a crooked baseline (title pinned to top, action protruding 8px below)
-// AND a too-tall header band (24px below the title instead of 16px,
-// breaking symmetry with the 20px row stride below). `!pb-4` matches
-// `SectionCard`'s long-standing override; `items-center` plus title
-// `font-semibold` cures the baseline.
+// Header overrides shadcn's default `items-start` to `items-center` and
+// `!pb-4` to neutralize the `[.border-b]:pb-6` rule — same fix as
+// `SectionCard`, so the two primitives' headers stay symmetric.
 //
 // When `rows.length === 0`, the `empty` slot replaces the `<ul>`. Pass
 // `<EmptyState>` for first-class look + CTA, or a short muted string for a

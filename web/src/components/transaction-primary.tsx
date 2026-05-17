@@ -10,17 +10,11 @@ interface TransactionPrimaryProps {
   className?: string;
 }
 
-// TransactionPrimary is the reusable identity block for a transaction — the
-// category icon tile, the bank description as the title with an inline
-// "Pending" marker, and a secondary line of metadata (account · member · tags).
-// Shared by the transactions table and any future transaction list.
-//
-// Pending vocabulary (iter 103): the inline "Pending" marker now rides
-// `<MetaBadge muted icon={Clock}>` so it reads as part of the v2
-// secondary-state chip family (System / Hidden / Excluded / Linked / Re-auth)
-// instead of an orphan muted span. Pairs with the italic + opacity
-// treatment in `<TransactionAmount>` so both columns communicate
-// "not yet settled" at a glance.
+// Identity block for a transaction: category icon tile, bank description
+// with an inline `Pending` MetaBadge, and a secondary line of metadata
+// (account · member · tags). Pending rides MetaBadge so it joins the
+// secondary-state chip family (System / Hidden / Excluded / Linked /
+// Re-auth) instead of an orphan muted span.
 export function TransactionPrimary({
   transaction: t,
   className,
