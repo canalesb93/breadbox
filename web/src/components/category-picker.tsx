@@ -80,19 +80,10 @@ export function CategoryPicker({
           disabled={isPending}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            // Trigger wraps the badge with no extra padding so every hover
-            // signal stays inside the badge bounds.
-            // `[&_[data-slot=badge]]:hover:!ring-0` suppresses CategoryBadge's
-            // own override ring during hover so the hover-state stroke wins.
-            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 hover:[&_[data-slot=badge]]:!ring-0 focus-visible:[&_[data-slot=badge]]:!ring-0",
-            // Hover ring + icon-swap only when a category is assigned.
-            // The empty-state pill carries its own dashed border that
-            // intensifies on hover — adding a solid ring on top would
-            // double-stroke.
-            category?.display_name &&
-              "hover:ring-1 hover:ring-border",
-            hasIcon &&
-              "[&_[data-slot=badge]>svg:first-child]:transition-opacity group-hover/picker:[&_[data-slot=badge]>svg:first-child]:opacity-0 group-focus-visible/picker:[&_[data-slot=badge]>svg:first-child]:opacity-0",
+            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
+            // Hover ring only when a category is assigned. Empty-state
+            // pill keeps its dashed border alone (no double-stroke).
+            category?.display_name && "hover:ring-1 hover:ring-border",
             className,
           )}
         >
@@ -113,19 +104,22 @@ export function CategoryPicker({
               Category
             </span>
           )}
-          {/* Pencil swap-in: overlays the category icon spot to signal
-              "edit this category". Visible only when the badge has an
-              icon to replace; otherwise the hover ring alone carries
-              the affordance. */}
+          {/* Pencil swap-in: overlays the category icon's spot on hover.
+              The wrapper carries a `bg-secondary` fill (matching the
+              CategoryBadge surface) so it masks the underlying icon —
+              cleaner than trying to fade the badge's own svg via a
+              descendant selector. */}
           {hasIcon && (
-            <Pencil
+            <span
               aria-hidden
               className={cn(
-                "text-muted-foreground pointer-events-none absolute top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+                "bg-secondary pointer-events-none absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-[2px] opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
                 chevronLeftClass,
                 chevronClass,
               )}
-            />
+            >
+              <Pencil className={cn("text-muted-foreground", chevronClass)} />
+            </span>
           )}
         </button>
       </PopoverTrigger>
