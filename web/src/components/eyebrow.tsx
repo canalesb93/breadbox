@@ -23,9 +23,13 @@ interface EyebrowProps extends React.HTMLAttributes<HTMLElement> {
    * slightly tighter-cap `tracking-[0.12em]` variant used in
    * detail-page hero columns ("Liability" / "Income" / "Category") where
    * the eyebrow sits directly under a large display title and benefits
-   * from the extra letter air.
+   * from the extra letter air. `page` is the slightly heavier
+   * `text-[11px] tracking-[0.08em]` rhythm used at the *page* scale —
+   * `<PageHeader>` eyebrow, the home-stats KPI cell labels, and the
+   * provider-card "Provider" caption — where the eyebrow has to hold its
+   * own next to a 2xl–3xl title without disappearing.
    */
-  variant?: "default" | "hero";
+  variant?: "default" | "hero" | "page";
   className?: string;
   children: React.ReactNode;
 }
@@ -50,6 +54,7 @@ export function Eyebrow({
         "text-muted-foreground font-medium uppercase",
         variant === "default" && "text-[10px] tracking-[0.1em]",
         variant === "hero" && "text-[10px] tracking-[0.12em]",
+        variant === "page" && "text-[11px] tracking-[0.08em]",
         className,
       )}
       {...rest}

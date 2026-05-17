@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { Eyebrow } from "@/components/eyebrow";
 import { SectionCard } from "@/components/section-card";
 import type { ProviderHealthResponse } from "@/api/types";
 import {
@@ -29,9 +30,9 @@ export function CsvCard({ health }: CsvCardProps) {
               <FileSpreadsheet className="size-5" />
             </div>
             <div className="min-w-0 space-y-1">
-              <div className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
+              <Eyebrow as="p" variant="page">
                 Provider
-              </div>
+              </Eyebrow>
               <h2 className="text-foreground text-lg font-semibold tracking-tight">
                 CSV import
               </h2>
