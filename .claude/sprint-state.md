@@ -566,6 +566,32 @@ Next iteration candidates (in rough impact order):
 
 Picking **#1 settings test-connection button** next iteration — small, leverages SmokeTest infra (already exists on per-agent settings page per useSmokeTestAgent hook), adds a global "Test auth" affordance on Settings → Agents that validates the saved subscription_token / api_key before the operator schedules any real runs. Most-onboarding-friendly next step.
 
+## ITER 22 — 2026-05-17 04:20
+Pivoted at branch-creation: the "Test connection" button I'd queued for iter-22 already shipped in earlier work — `features/settings/agents-section.tsx` already wires `useSmokeTestAgent` to a button with Alert-based result + error states. Saved a confused duplicate PR by surveying SPA before starting.
+
+Pivoted to **iter-22-candidate #4 (`breadbox doctor --with-live`)** instead. Shipped (PR #1248 squash-merged into sprint branch as fb594a95):
+- `breadbox doctor` gains `--with-live` flag (local-mode only). When set + cheap subsystem check passes, fires `agent.SmokeTest` and surfaces the result as a second "agent smoke test" doctor row alongside model/duration/cost/tokens/auth-mode.
+- `runAgentSmokeCheck` short-circuits to skip-row when cheap subsystem check warned/skipped (no duplicate failure pair); warn-row when ENCRYPTION_KEY is unset.
+- `liveSmokeCheck` is the pure decision helper — split out for testability; maps `ErrAuthNotConfigured` / `ErrBinaryNotFound` / generic-err to targeted remediation hints.
+- 60s context timeout wrapping the smoke run so a hung sidecar doesn't hang the doctor.
+- Lite-build doctor stub signature updated.
+- 5 new `TestLiveSmokeCheck` sub-cases + existing 4 `TestAgentSubsystemCheck` cases all pass.
+- `docs/cli-commands.md` row updated per cli-commands upkeep rule.
+- All 5 CI jobs green.
+
+**Lesson:** survey SPA before implementing a UI-touching iter — the test-connection button had been built in an earlier iter I'd forgotten. Saved a useless duplicate PR. Future iters should grep for the candidate's user-visible affordance before assuming it doesn't exist.
+
+Next iteration candidates (refreshed):
+1. **"Run now" with custom prompt prefix** — small UX, operator value during dogfooding. Touches: agents.tsx run-now button → dialog with optional textarea → POST /api/v1/agents/:slug/runs accepts `prompt_prefix` → orchestrator prepends it. Service test + SPA.
+2. **Per-model cost breakdown** — extend iter-19 stats; tooltip on the cost pill showing which model is the spend leader.
+3. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger.
+4. **Suggested rules agent** — bigger.
+5. **Empty/error state polish across all agent pages** — UI sweep.
+6. **Mobile-responsive sweep on agent pages** — UI sweep.
+7. **Inline rule-engine docs in the prompt builder** — link/preview to `docs/rule-dsl.md`.
+
+Picking **#1 "Run now" with custom prompt prefix** next iteration — small (one backend field + one dialog), high operator value during dogfooding, touches both layers, UI evidence opportunity.
+
 
 
 
