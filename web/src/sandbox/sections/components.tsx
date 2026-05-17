@@ -980,7 +980,7 @@ export function ComponentsSection() {
       <Specimen
         label="SettingsSectionHeader"
         code="components/settings-section-header"
-        description="The canonical title + description block used by every section inside the Settings shell. Top-of-pane titles (Account / Household / Backups) and inline sub-sections (Change password / Actions / Stored backups / Automatic schedule) both route through here, so the typographic rhythm — heading size + weight, description colour + line-height, action alignment — stays in one place. Tokens: `section` (h2, text-lg, baseline-aligned action) and `sub` (h3, text-sm). The optional `action` slot is sm:right-aligned and baseline-aligned to the heading so an Add-member CTA sits flush with the title."
+        description="The canonical title + description block used by every section inside the Settings shell. Top-of-pane titles (Account / Household / Backups) and inline sub-sections (Change password / Actions / Stored backups / Automatic schedule) both route through here, so the typographic rhythm — heading size + weight, description colour + line-height, action alignment — stays in one place. Tokens: `section` (h2, text-lg, font-semibold) and `sub` (h3, text-sm, font-semibold). Iter 107 ripple from the iter 106 card-header polish: both heads now share `font-semibold` weight + `items-center` action alignment with `SectionCard` / `ListCard` / `PageHeader`, so an Add-member CTA sits flush with the title midline instead of bottom-docking under the description."
         className="block"
       >
         <div className="grid gap-4 lg:grid-cols-2">
