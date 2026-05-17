@@ -1679,6 +1679,41 @@ Cross-cutting components:
     are different enough today that forcing them onto one
     primitive would distort the loaded view.
 
+- **Iter 68 — `<MetaBadge>` primitive unifies the tiny status chip** ([#1181](https://github.com/canalesb93/breadbox/pull/1181))
+  - 17th shared primitive in the v2 vocabulary, at
+    `web/src/components/meta-badge.tsx`. Owns the canonical
+    "tiny status chip" density tokens (`text-[10px]` + `gap-1`
+    + `px-1.5 py-0` + `[&>svg]:size-2.5`) that were hand-rolled
+    across six surfaces — Hidden / Excluded / Linked / Re-auth
+    / System / Paused. Default tone is `outline` (a meta chip
+    is intentionally calmer than the row's primary
+    classification). `muted` opts into the
+    `text-muted-foreground font-normal` shading that
+    categories list uses so "System" / "Hidden" don't compete
+    with the category name. Tone-specific chips with custom
+    colours (the amber `Re-auth` pill in accounts list) pass
+    `className` — the density tokens still apply, which is the
+    whole point.
+  - Six surfaces share it today: accounts list (`Linked`,
+    `Re-auth`), categories list (parent `System` + `Hidden`,
+    child `Hidden`), account-detail (`Excluded`,
+    `Linked dependent`), category-detail (`System`, `Hidden`),
+    connection-detail (`Paused`). The connection-detail
+    `Paused` pill was the odd one out — a free-floating
+    `<span>` with its own `bg-muted` + `rounded-full` + `gap-1`
+    + `text-[10px]` mix; now it's a
+    `<MetaBadge variant="secondary">` and the rest of the
+    vocabulary applies for free.
+  - Sandbox specimen added between `IdPill` and `DetailList`
+    (alphabetically-ordered "small primitive" cluster) so the
+    six shapes — `System` (muted), `Hidden` (muted),
+    `Excluded` (outline), `Linked` (secondary), `Paused`
+    (secondary), and the amber `Re-auth` override — live in
+    one place for future tweaks.
+  - Don't fork the look — extend this primitive. Drops the
+    `Badge` import from the consumer files that used it only
+    for the meta-chip pattern (account-detail).
+
 ## Open observations / questions
 
 (Populated by iterations.)
