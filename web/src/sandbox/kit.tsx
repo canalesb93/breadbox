@@ -26,6 +26,18 @@ export function SandboxSection({
   );
 }
 
+// `data-specimen-label` + an id derived from the label make every Specimen
+// addressable for the per-section outline rendered in `routes/sandbox.tsx`.
+// Keep it on the wrapper (not the heading) so the scroll anchor sits just
+// above the label, not flush with it.
+export function specimenSlug(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 // A single labeled example. `code` names the component/token so the gallery
 // doubles as a quick "what's it called" reference.
 export function Specimen({
@@ -42,7 +54,11 @@ export function Specimen({
   className?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div
+      id={specimenSlug(label)}
+      data-specimen-label={label}
+      className="scroll-mt-20 space-y-2"
+    >
       <div className="flex items-baseline gap-2">
         <h3 className="text-sm font-medium">{label}</h3>
         {code && (
