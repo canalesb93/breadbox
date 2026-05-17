@@ -239,12 +239,12 @@ export function TransactionsPage() {
       setFocusedIndex((i) =>
         i == null ? 0 : Math.min(i + 1, rows.length - 1),
       ),
-    { label: "Move focus down", group: "Transactions" },
+    { label: "Move focus down", group: "Transactions", repeat: true },
   );
   useShortcut(
     ["k"],
     () => setFocusedIndex((i) => (i == null ? 0 : Math.max(i - 1, 0))),
-    { label: "Move focus up", group: "Transactions" },
+    { label: "Move focus up", group: "Transactions", repeat: true },
   );
   useShortcut(
     ["enter"],
