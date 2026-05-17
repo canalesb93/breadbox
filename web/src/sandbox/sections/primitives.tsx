@@ -420,7 +420,12 @@ export function PrimitivesSection() {
         description="The searchable list behind the command palette and every picker."
         className="block"
       >
-        <Command className="max-w-sm rounded-lg border">
+        {/* `value=""` keeps cmdk from auto-selecting the first item on mount;
+            its built-in `selected → scrollIntoView` would otherwise scroll the
+            whole sandbox page to land on this specimen every time the
+            Primitives tab opens. cmdk reverts to its normal "highlight as you
+            type" behavior once the user interacts. */}
+        <Command className="max-w-sm rounded-lg border" value="">
           <CommandInput placeholder="Search…" />
           <CommandList>
             <CommandEmpty>No results.</CommandEmpty>
