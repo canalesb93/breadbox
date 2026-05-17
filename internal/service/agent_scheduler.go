@@ -30,6 +30,15 @@ type AgentScheduler struct {
 
 	mu       sync.Mutex
 	entryIDs map[string]cron.EntryID // slug → entry id
+
+	// reloadMu serializes the WHOLE Reload critical section
+	// (remove-all + DB read + AddFunc loop) so concurrent CRUD mutations
+	// can't interleave their reloads and produce duplicate cron entries
+	// with leaked EntryIDs. Separate from `mu` (which protects the
+	// entryIDs map for single-statement read/write) because Reload spans
+	// multiple cron-library calls plus a DB query — holding `mu` for that
+	// long would block fireCronJob lookups longer than needed.
+	reloadMu sync.Mutex
 }
 
 // NewAgentScheduler constructs the scheduler. Call Start to begin firing.
@@ -117,6 +126,15 @@ func (s *AgentScheduler) logCleanupResult(r AgentCleanupResult, source string) {
 		"retention_days", r.RetentionDays)
 }
 
+// EntryCountForTest returns the live count of cron entries — agent
+// registrations PLUS the singleton cleanup tick added in Start. Exposed
+// for the iter-34 concurrent-Reload regression test; the cron library
+// has no other way to verify "no duplicate entries leaked." Do not call
+// from production code.
+func (s *AgentScheduler) EntryCountForTest() int {
+	return len(s.cron.Entries())
+}
+
 // Stop gracefully halts the scheduler, waiting for any in-flight jobs.
 func (s *AgentScheduler) Stop() {
 	stopCtx := s.cron.Stop()
@@ -126,7 +144,14 @@ func (s *AgentScheduler) Stop() {
 
 // Reload removes all per-definition cron entries and re-registers from DB.
 // Called after any agent_definition CRUD mutation.
+//
+// Holds reloadMu for the entire span so two concurrent CRUD-triggered
+// reloads can't both pass the "remove all" phase and then both call
+// AddFunc, producing duplicate cron entries whose EntryIDs are leaked
+// (entryIDs[slug] can only store one ID). Cf. iter-32 audit BLOCKER #2.
 func (s *AgentScheduler) Reload(ctx context.Context) {
+	s.reloadMu.Lock()
+	defer s.reloadMu.Unlock()
 	s.mu.Lock()
 	for slug, id := range s.entryIDs {
 		s.cron.Remove(id)
