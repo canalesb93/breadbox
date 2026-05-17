@@ -25,7 +25,7 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
    - **Routine Review** — daily/weekly pass over fresh transactions.
    - **Spending Report** — weekly category-grouped summary with anomalies.
 
-   All five seed with `claude-opus-4-7` for maximum reasoning. Edit the **Model** field on any agent's edit page to switch to a cheaper/faster variant — Haiku for short routine passes, Sonnet for everyday work, Opus for setup or complex analysis. The model picker covers every supported Claude model the SDK accepts.
+   Each seed picks a default model tuned for its workload — Opus 4.7 for the cold-start setup work (initial-setup, bulk-review), Sonnet 4.6 for the weekly analytical pass (spending-report), and Haiku 4.5 for the short routine agents (quick-review, routine-review). Edit the **Model** field on any agent's edit page to override. The picker covers every supported Claude model the SDK accepts.
 4. **Edit prompt + schedule**, click Save, then flip the Enabled toggle. The agent fires on its cron schedule and shows up in the Runs page.
 5. **Hit Run now** in the list page to trigger immediately. The result lands in the run history with a full transcript (tool calls + cost + token usage).
 

@@ -66,6 +66,27 @@ func TestSeedDefaults_PopulatesEmptyTable(t *testing.T) {
 			t.Errorf("seeded definition %q has suspiciously short prompt (%d chars)", d.Slug, len(d.Prompt))
 		}
 	}
+
+	// iter-46: per-agent model tuning. The seed-row Model field must
+	// reach the DB unchanged; the defensive default-to-Opus path in
+	// SeedDefaults must NOT kick in when the seed entry sets Model
+	// explicitly (which all canonical seeds do as of iter-46).
+	bySlug := make(map[string]string, len(defs))
+	for _, d := range defs {
+		bySlug[d.Slug] = d.Model
+	}
+	wantModels := map[string]string{
+		"initial-setup":   "claude-opus-4-7",
+		"bulk-review":     "claude-opus-4-7",
+		"quick-review":    "claude-haiku-4-5",
+		"routine-review":  "claude-haiku-4-5",
+		"spending-report": "claude-sonnet-4-6",
+	}
+	for slug, want := range wantModels {
+		if got := bySlug[slug]; got != want {
+			t.Errorf("seeded model for %q = %q, want %q", slug, got, want)
+		}
+	}
 }
 
 func TestSeedDefaults_IdempotentOnSecondRun(t *testing.T) {
