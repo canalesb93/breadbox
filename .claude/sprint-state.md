@@ -151,7 +151,14 @@ Pick from this menu in roughly this order; bias toward what makes the system mor
 - Mobile-responsive sweep on the agent pages (use `simple-validate-ui` for evidence).
 - Dark-mode polish.
 
-When the menu is exhausted, re-read the sprint state for skipped sub-items, then ping Ricardo (per the End-of-sprint exit section).
+**When the explicit menu runs out, the loop generates its own next items — don't stop, don't ping.** In order:
+
+1. **Subagent: gap audit.** Spawn `feature-dev:code-reviewer` against the full diff `git diff main...agents/claude-agent-sdk-sprint -- ':!*.md'`. Ask it to find: missing tests, edge cases, fragile code paths, security smells, accessibility gaps, error-handling holes. Each finding becomes a new menu item appended to this list. Pick the top-priority one and ship it as the next iteration.
+2. **Subagent: feature extension proposals.** Spawn `general-purpose` with the brief "you're reviewing the breadbox Claude Agent SDK system at sprint branch agents/claude-agent-sdk-sprint. Read the sprint state, the new code under internal/agent/ and web/src/routes/agents*. Propose 3-5 concrete extensions that would make this more valuable to a self-hoster — be specific (files to touch, the user-visible win). Sort by impact/effort." Append the proposals and pick the top one.
+3. **Subagent: end-user journey audit.** Spawn `Explore` with "trace what a new self-hoster experiences from `git pull && make build` through enabling their first agent. List every friction point — missing docs, ambiguous error messages, install-time surprises, settings that aren't discoverable. Output a punch list." Convert each into an iteration.
+4. **Subagent: comparable-product scan.** Spawn `claude-code-guide` with "what features do other agent-orchestration systems (LangGraph dashboards, Zapier agent runs, n8n schedules) ship that we don't? Look at their actual docs. Don't copy uncritically — but list what's worth considering for breadbox's specific self-hosted finance use case." Append worth-doing items.
+
+Cycle through (1)→(2)→(3)→(4) and start over. Only after all four come back with nothing actionable AND there are no skipped sub-items in this file should the loop send the end-of-menu PushNotification described in the End-of-sprint exit section. **Bias hard against stopping — every iteration that ships improves the product.**
 
 ## Iteration log
 
@@ -228,5 +235,5 @@ If at any point the next iteration's scope is unclear, stop and use `AskUserQues
 
 ## Async coordination with Ricardo
 
-- **Subscription auth onboarding:** when you reach the point of running a real end-to-end test against the live Anthropic API and need a valid `CLAUDE_CODE_OAUTH_TOKEN`, send a `PushNotification` asking Ricardo to run `claude setup-token` and paste the token into the settings page (or into a dev `.env`). **Do not block other work waiting on this** — keep moving on plumbing/tests that don't require live API. The push fires once; if no response after one iteration, move on and try again later.
-- **General principle:** the user has standing merge auth on this branch — do not ask for permission to merge a green PR. Only ping for things only they can do (live auth credentials, philosophy calls, scope changes).
+- **Subscription auth onboarding (FIRE-AND-FORGET):** when you reach a point that wants a live `CLAUDE_CODE_OAUTH_TOKEN`, send ONE `PushNotification` describing what you need and where to paste it, then **immediately move on to other work**. Do not stall, do not loop waiting, do not re-send. Ricardo may not be around when the loop fires — he's explicitly delegated. The smoke-test harness should be coded to *detect* a token in `app_config` on each fire and run automatically when one appears, without any further code change on our side. Until then, fill the iteration with anything else from the menu.
+- **General principle:** the user has standing approval to merge iteration sub-branches into the sprint branch. Do not ask for permission. Only the sprint→main PR is gated on his explicit "we're good to merge" signal. Push notifications are reserved for: (a) one-shot live-auth requests as above; (b) the rare end-of-menu "anything else?" ping per the End-of-sprint exit section; (c) genuine blockers that no amount of subagent delegation can solve.
