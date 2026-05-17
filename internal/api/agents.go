@@ -435,6 +435,29 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 	}
 }
 
+type updateAgentRunNoteRequest struct {
+	Note string `json:"note"`
+}
+
+// UpdateAgentRunNoteHandler sets/clears the operator note on one run.
+// Body: { "note": "..." }; empty string clears the field. Capped at 2000
+// chars server-side (matches the SPA textarea cap).
+func UpdateAgentRunNoteHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "shortId")
+		var req updateAgentRunNoteRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		out, err := svc.SetAgentRunNote(r.Context(), id, req.Note)
+		if err != nil {
+			writeAgentError(w, err, "run not found")
+			return
+		}
+		writeData(w, out)
+	}
+}
+
 // agentTestResponse mirrors agent.SmokeResult for the JSON wire format.
 type agentTestResponse struct {
 	AuthMode     string  `json:"auth_mode"`

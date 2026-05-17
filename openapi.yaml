@@ -2460,6 +2460,29 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/{shortId}:
+    parameters:
+      - { name: shortId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Agents]
+      summary: Set or clear the operator note on a run
+      description: |
+        Body: `{ "note": "..." }`. Empty string clears the field. Capped
+        at 2000 chars. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        "200":
+          description: Updated run.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
   /api/v1/agents/runs/{shortId}/transcript:
     parameters:
       - { name: shortId, in: path, required: true, schema: { type: string } }

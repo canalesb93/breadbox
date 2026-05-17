@@ -56,7 +56,10 @@ export interface AgentRun {
   error_message?: string | null;
   transcript_path?: string | null;
   session_id?: string | null;
+  operator_note?: string | null;
 }
+
+export const AGENT_RUN_NOTE_MAX_LEN = 2000;
 
 export interface AgentRunListResult {
   runs: AgentRun[];
@@ -246,6 +249,21 @@ export function useUpdateAgentSettings() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents", "settings"] });
+    },
+  });
+}
+
+export function useUpdateAgentRunNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shortId, note }: { shortId: string; note: string }) =>
+      api<AgentRun>(`/api/v1/agents/runs/${shortId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ note }),
+      }),
+    onSuccess: (_run, { shortId }) => {
+      qc.invalidateQueries({ queryKey: ["agents", "runs", shortId] });
+      qc.invalidateQueries({ queryKey: ["agents"] }); // any list referencing this run
     },
   });
 }
