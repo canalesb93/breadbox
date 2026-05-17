@@ -13,7 +13,6 @@ import {
   FileSpreadsheet,
   Landmark,
   Loader2,
-  MoreHorizontal,
   Pause,
   Play,
   Plug,
@@ -29,11 +28,8 @@ import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusPanel } from "@/components/status-panel";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -42,8 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ActionPill } from "@/components/action-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { ColorRailCard } from "@/components/color-rail-card";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import {
@@ -591,45 +587,32 @@ function Hero({
               Re-authenticate
             </ActionPill>
           )}
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 rounded-full"
-                    aria-label="Connection actions"
-                  >
-                    <MoreHorizontal className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Connection actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              {conn.status !== "disconnected" && (
-                <DropdownMenuItem
-                  onClick={onTogglePause}
-                  disabled={pausePending}
-                >
-                  {conn.paused ? (
-                    <>
-                      <Play className="size-4" /> Resume syncing
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="size-4" /> Pause syncing
-                    </>
-                  )}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onDisconnect}>
-                <Unplug className="size-4" /> Disconnect…
+          <RowActionsMenu
+            label="Connection actions"
+            size="xs"
+            triggerClassName="rounded-full"
+          >
+            {conn.status !== "disconnected" && (
+              <DropdownMenuItem
+                onClick={onTogglePause}
+                disabled={pausePending}
+              >
+                {conn.paused ? (
+                  <>
+                    <Play className="size-4" /> Resume syncing
+                  </>
+                ) : (
+                  <>
+                    <Pause className="size-4" /> Pause syncing
+                  </>
+                )}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={onDisconnect}>
+              <Unplug className="size-4" /> Disconnect…
+            </DropdownMenuItem>
+          </RowActionsMenu>
         </>
       }
     >

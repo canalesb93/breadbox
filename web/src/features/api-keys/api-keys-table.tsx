@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Ban, Loader2, MoreHorizontal } from "lucide-react";
+import { Ban, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,15 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { formatLongDate, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useRevokeAPIKey } from "@/api/queries/api-keys";
@@ -127,35 +122,19 @@ export function APIKeysTable({
         header: () => <span className="sr-only">Actions</span>,
         meta: { className: "w-px" },
         cell: ({ row }) => (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Actions for ${row.original.name}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>API key actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent
-              align="end"
-              onClick={(e) => e.stopPropagation()}
+          <RowActionsMenu
+            label={`Actions for ${row.original.name}`}
+            onTriggerClick={(e) => e.stopPropagation()}
+            onContentClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmRevoke(row.original)}
             >
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => setConfirmRevoke(row.original)}
-              >
-                <Ban className="size-4" />
-                Revoke
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <Ban className="size-4" />
+              Revoke
+            </DropdownMenuItem>
+          </RowActionsMenu>
         ),
       },
     ];

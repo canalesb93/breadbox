@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,15 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { TagChip } from "@/components/tag-chip";
 import { useDeleteTag } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -101,45 +98,29 @@ export function TagsTable({
         header: () => <span className="sr-only">Actions</span>,
         meta: { className: "w-px" },
         cell: ({ row }) => (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Actions for ${row.original.display_name}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Tag actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent
-              align="end"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <DropdownMenuItem asChild>
-                <Link
-                  to="/tags/$slug"
-                  params={{ slug: row.original.slug }}
-                >
-                  <Pencil className="size-4" />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => setConfirmDelete(row.original)}
+          <RowActionsMenu
+            label={`Actions for ${row.original.display_name}`}
+            onTriggerClick={(e) => e.stopPropagation()}
+            onContentClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem asChild>
+              <Link
+                to="/tags/$slug"
+                params={{ slug: row.original.slug }}
               >
-                <Trash2 className="size-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Pencil className="size-4" />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmDelete(row.original)}
+            >
+              <Trash2 className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </RowActionsMenu>
         ),
       },
     ],
