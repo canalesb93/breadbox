@@ -6,7 +6,6 @@ import {
   CheckSquare,
   CircleDot,
   DollarSign,
-  Search,
   Shapes,
   X,
 } from "lucide-react";
@@ -27,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchInput } from "@/components/search-input";
 import { KbdTooltip } from "@/components/kbd-tooltip";
 import { CategoryCommandList } from "@/components/category-command";
 import {
@@ -200,22 +200,19 @@ export function TransactionsToolbar({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full min-w-48 sm:w-64">
-          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-          <Input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            // Esc inside the search box blurs back to the page so the global
-            // shortcuts (j/k/c/Esc-to-clear-selection) regain control without
-            // a manual click-away.
-            onKeyDown={(e) => {
-              if (e.key === "Escape") e.currentTarget.blur();
-            }}
-            placeholder="Search merchant or description…"
-            className="pl-8"
-          />
-        </div>
+        <SearchInput
+          ref={searchRef}
+          containerClassName="w-full min-w-48 sm:w-64"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          // Esc inside the search box blurs back to the page so the global
+          // shortcuts (j/k/c/Esc-to-clear-selection) regain control without
+          // a manual click-away.
+          onKeyDown={(e) => {
+            if (e.key === "Escape") e.currentTarget.blur();
+          }}
+          placeholder="Search merchant or description…"
+        />
 
         {/* Filter pills — grouped so they wrap as a unit, independent of
             the sort/select controls. */}

@@ -91,6 +91,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DangerZone } from "@/components/danger-zone";
 import { PaginationBar } from "@/components/pagination-bar";
 import { ViewAllPill } from "@/components/view-all-pill";
+import { SearchInput } from "@/components/search-input";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -593,6 +594,45 @@ export function ComponentsSection() {
           <ViewAllPill to="/">View all</ViewAllPill>
           <ViewAllPill to="/">Manage</ViewAllPill>
           <ViewAllPill to="/">See all transactions</ViewAllPill>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="SearchInput"
+        code="components/search-input"
+        description="The canonical text input with a leading magnifier glyph used by every v2 list page (Tags, Categories, API keys, Transactions). Wraps the stock `<Input>` primitive with a `pointer-events-none` `Search` glyph absolutely positioned at `left-2.5` and `pl-8` on the field to clear it. Forwards every native input prop (value, onChange, onKeyDown, placeholder, …) and a `ref` for callers that need to focus from a keyboard shortcut. `containerClassName` is the escape hatch for the outer wrapper width (default `w-full max-w-sm`; API keys uses `w-full max-w-xs`; Transactions toolbar uses `w-full min-w-48 sm:w-64`). Don't open-code the icon + Input pair — extend this primitive."
+        className="block"
+      >
+        <div className="space-y-4 rounded-lg border p-4">
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Default · `w-full max-w-sm`
+            </div>
+            <SearchInput
+              defaultValue=""
+              placeholder="Search by name, slug, or description…"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Narrow · `containerClassName='w-full max-w-xs'`
+            </div>
+            <SearchInput
+              containerClassName="w-full max-w-xs"
+              defaultValue=""
+              placeholder="Search by name, prefix, actor…"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Toolbar · `containerClassName='w-full min-w-48 sm:w-64'`
+            </div>
+            <SearchInput
+              containerClassName="w-full min-w-48 sm:w-64"
+              defaultValue="coffee"
+              placeholder="Search merchant or description…"
+            />
+          </div>
         </div>
       </Specimen>
 
