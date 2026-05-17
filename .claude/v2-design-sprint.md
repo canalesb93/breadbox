@@ -38,3 +38,12 @@
     `confirm-dialog` (composes `AlertDialog` for yes/no
     confirmations). The form-bearing gap iter 100 left open is now
     fully closed.
+  - Process note: stomped the sprint state on first push attempt by
+    redirecting python output to the temp file *after* `cat >>`
+    appended to it (`python -c "...open('$TMPDIR/...').write(...)"`
+    overwrote the appended file). Always either: (a) write the
+    fetch output to a distinct path from the working file, or (b)
+    verify with `wc -c` before piping through `base64`. The PUT API
+    accepts the truncated content without warning. Caught + fixed by
+    pulling the prior version from the parent commit
+    (`32854d3b9462…`) and re-uploading.
