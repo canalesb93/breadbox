@@ -2970,3 +2970,54 @@ Cross-cutting components:
     if the base64 is over ~100k, build a JSON payload and
     `curl -d @payload.json` instead of passing through `gh api -f
     content=...` which can silently truncate.
+
+- **Iter 102 — ComingSoonPill primitive (2 in-the-works surfaces unified)** ([#1218](https://github.com/canalesb93/breadbox/pull/1218))
+  - Pure drift retirement on a small but byte-identical lockup.
+    `routes/placeholder.tsx` (iter 21 unbuilt-nav-leaf shell) and
+    `components/settings-shell.tsx` (iter 78 in-the-works settings
+    panel) both hand-rolled the same 10-class span for the muted
+    "Coming soon" status pill that rides the `<StatusPanel
+    tone="info">` trailing slot. Promoted to `<ComingSoonPill>`
+    at `web/src/components/coming-soon-pill.tsx` — 28th shared
+    primitive in the v2 vocabulary.
+  - Visual contract preserved exactly: `bg-muted text-muted-foreground
+    rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide
+    uppercase` + leading `Clock size-3`. The two consumer surfaces
+    render byte-equivalent pixels after the migration — the win is
+    in the code: one place to evolve the chip's rounding / padding
+    / rhythm instead of two, and a clear name for the "not yet"
+    vocabulary that distinguishes it from sibling primitives
+    (`<Eyebrow>` for section/page micro-labels, `<Badge>` for
+    semantic-tone rectangular chips, `<JumpToPill>` / `<ActionPill>`
+    for the labelled-lateral-nav / labelled-action vocabulary).
+  - API: `icon` defaults to `Clock` (matches both live consumers);
+    pass a different `LucideIcon` for a future caller without losing
+    the chip rhythm. `children` defaults to `"Coming soon"` and is
+    the label. Sandbox specimen at `/v2/sandbox?section=components`
+    right after `<ActionPill>` shows the default + an icon override
+    (`Sparkles` + "Beta") + a label override ("In review").
+  - **Two consumers is below the iter-30-style "third surface" gate**
+    on principle, but this case is byte-identical lockup duplication
+    rather than a recipe convergence — when the *next* StatusPanel
+    surface (or any new "not yet" caption) lands, it'll reach for
+    this primitive instead of accreting a third hand-rolled site.
+    Promote-on-duplication is the right call when the duplicated
+    chunk is a literal 10-class string with a leading icon.
+  - **Iter-30 drift note "primary-tinted pill triad" is still open.**
+    The *primary*-tinted recipe (`bg-primary/15 text-primary`) lives
+    in three surfaces: `auth-shell` ("V2" chip), `brand-header` ("V2"
+    chip, byte-identical), `nav-user` (admin RoleBadge in
+    `ROLE_TONE`). When a fourth surface adopts the primary recipe,
+    promote to a `<PrimaryPill>` / `<VersionPill>` mirroring this
+    primitive's API. The muted variant (this PR) and the primary
+    variant carry different signal (muted = "not yet" status caption;
+    primary = brand/version/role chrome) so they belong in separate
+    primitives, not a single tone-prop'd one.
+  - Process note: sandbox needed a fresh icon import (`Sparkles`)
+    alongside the existing `Clock` / `Wand2`. The
+    `coming-soon-pill.tsx` primitive itself imports `Clock` from
+    `lucide-react` as its default value — when migrating each
+    consumer, the local `Clock` import becomes unused, so dropping it
+    is mandatory or `bun run lint` will fail (`tsc --noEmit` flags
+    unused imports under the project's `noUnusedLocals` config).
+    Caught both removals in the same diff to keep the tip green.
