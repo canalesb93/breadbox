@@ -60,6 +60,28 @@ SET status        = 'skipped',
     error_message = $2
 WHERE id = $1;
 
+-- name: GetAgentRecentErrorStats :many
+-- Per-definition "is this agent broken right now?" signal: error count
+-- in the last 5 non-skipped runs. Skipped runs (quiet hours, concurrency
+-- lock) are excluded — they aren't agent failures. The v2 SPA list
+-- renders a warning pill when error_count >= 3.
+WITH ranked AS (
+    SELECT agent_definition_id, status,
+           ROW_NUMBER() OVER (
+               PARTITION BY agent_definition_id
+               ORDER BY started_at DESC
+           ) AS rn
+    FROM agent_runs
+    WHERE agent_definition_id IS NOT NULL
+      AND status != 'skipped'
+)
+SELECT agent_definition_id,
+       COUNT(*) FILTER (WHERE status = 'error')::int AS error_count,
+       COUNT(*)::int                                  AS run_count
+FROM ranked
+WHERE rn <= 5
+GROUP BY agent_definition_id;
+
 -- name: GetAgentCostStats30d :many
 -- Per-definition cost rollup over the last 30 days. Used by the v2 SPA
 -- list page to surface lifetime spend at a glance. Excludes skipped runs
