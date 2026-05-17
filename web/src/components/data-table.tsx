@@ -55,6 +55,16 @@ export interface DataTableProps<TData, TValue> {
   /** Optional row click handler — e.g. navigate to a detail page. */
   onRowClick?: (row: TData) => void;
   /**
+   * Whether to render the row body with a pointer cursor on hover.
+   * Defaults to `true` whenever an `onRowClick` is set — the right call
+   * for tables where row click is a navigation/CTA (tags, api-keys).
+   * Pass `false` for tables where the row body is a focus/select target
+   * and a specific child carries the navigation (transactions, where the
+   * merchant title is the deeplink) — a row-level pointer there would
+   * overpromise that any click anywhere navigates.
+   */
+  pointerRows?: boolean;
+  /**
    * Controlled row selection. Like sorting, the state lives in the calling
    * route; DataTable just renders it. `getRowId` should return a stable id
    * (not the array index) so a selection survives pagination/refetch.
@@ -101,6 +111,7 @@ export function DataTable<TData, TValue>({
   sorting,
   onSortingChange,
   onRowClick,
+  pointerRows,
   enableRowSelection,
   rowSelection,
   onRowSelectionChange,
@@ -276,7 +287,7 @@ export function DataTable<TData, TValue>({
                     onRowClick ? () => onRowClick(row.original) : undefined
                   }
                   className={cn(
-                    onRowClick && "cursor-pointer",
+                    (pointerRows ?? !!onRowClick) && "cursor-pointer",
                     // Keyboard-focus indicator: a 3px primary accent bar on
                     // the left edge plus a faint primary tint, layered via
                     // inset box-shadow so it doesn't shift the row geometry

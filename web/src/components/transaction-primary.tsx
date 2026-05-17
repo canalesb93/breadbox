@@ -36,10 +36,12 @@ export function TransactionPrimary({
         onTitleClick(t);
       }}
       // Subtle hover hint that the title is the navigation affordance —
-      // doesn't dress it up as a full link.
+      // doesn't dress it up as a full link. Pointer cursor sells the
+      // deeplink even though the surrounding row body uses the default
+      // cursor (it's a focus / select target, not a navigation CTA).
       className={cn(
         titleClasses,
-        "hover:underline underline-offset-2 decoration-muted-foreground/50 focus-visible:outline-none focus-visible:underline text-left",
+        "cursor-pointer hover:underline underline-offset-2 decoration-muted-foreground/50 focus-visible:outline-none focus-visible:underline text-left",
       )}
     >
       {t.provider_name}
