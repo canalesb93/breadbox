@@ -28,6 +28,7 @@ import {
 } from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
+import { PageError } from "@/components/page-error";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
@@ -94,8 +95,16 @@ export function AccountDetailPage() {
 
       {acctQuery.isLoading ? (
         <DetailSkeleton />
-      ) : acctQuery.isError || !acctQuery.data ? (
+      ) : acctQuery.isError ? (
+        <PageError
+          resource="this account"
+          error={acctQuery.error}
+          onRetry={() => acctQuery.refetch()}
+          retrying={acctQuery.isFetching}
+        />
+      ) : !acctQuery.data ? (
         <EmptyState
+          variant="card"
           icon={Banknote}
           title="Account not found"
           description="This account may have been disconnected, or the link is out of date. Head back to the accounts list to pick another."

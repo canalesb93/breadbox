@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { PageError } from "@/components/page-error";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
 import {
@@ -35,7 +36,8 @@ import type { Transaction } from "@/api/types";
 
 export function TransactionDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
-  const { data, isLoading, isError } = useTransaction(id);
+  const query = useTransaction(id);
+  const { data, isLoading, isError } = query;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -43,8 +45,16 @@ export function TransactionDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError || !data ? (
+      ) : isError ? (
+        <PageError
+          resource="this transaction"
+          error={query.error}
+          onRetry={() => query.refetch()}
+          retrying={query.isFetching}
+        />
+      ) : !data ? (
         <EmptyState
+          variant="card"
           icon={Receipt}
           title="Transaction not found"
           description="This transaction may have been deleted, or the link is out of date. Head back to the transactions list to pick another."

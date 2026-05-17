@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { PageError } from "@/components/page-error";
 import { DangerZone } from "@/components/danger-zone";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
@@ -16,7 +17,8 @@ import type { Tag } from "@/api/types";
 
 export function TagDetailPage() {
   const { slug } = useParams({ strict: false }) as { slug?: string };
-  const { data: tags, isLoading, isError } = useTags();
+  const tagsQuery = useTags();
+  const { data: tags, isLoading, isError } = tagsQuery;
   const tag = useMemo(
     () => tags?.find((t) => t.slug === slug),
     [tags, slug],
@@ -28,8 +30,16 @@ export function TagDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError || !tag ? (
+      ) : isError ? (
+        <PageError
+          resource="this tag"
+          error={tagsQuery.error}
+          onRetry={() => tagsQuery.refetch()}
+          retrying={tagsQuery.isFetching}
+        />
+      ) : !tag ? (
         <EmptyState
+          variant="card"
           icon={TagsIcon}
           title="Tag not found"
           description="This tag may have been deleted, or the link is out of date. Head back to the tags list to pick another."

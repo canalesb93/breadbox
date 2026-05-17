@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
+import { PageError } from "@/components/page-error";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
@@ -44,7 +45,8 @@ import type { Category } from "@/api/types";
 
 export function CategoryDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
-  const { data: tree, isLoading, isError } = useCategories();
+  const categoriesQuery = useCategories();
+  const { data: tree, isLoading, isError } = categoriesQuery;
   const category = useMemo(
     () =>
       id
@@ -59,8 +61,16 @@ export function CategoryDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError || !category ? (
+      ) : isError ? (
+        <PageError
+          resource="this category"
+          error={categoriesQuery.error}
+          onRetry={() => categoriesQuery.refetch()}
+          retrying={categoriesQuery.isFetching}
+        />
+      ) : !category ? (
         <EmptyState
+          variant="card"
           icon={Shapes}
           title="Category not found"
           description="This category may have been deleted, or the link is out of date. Head back to the categories list to pick another."
