@@ -38,6 +38,7 @@ export interface AgentDefinition {
   quiet_hours_end?: string | null;
   last_run?: AgentRunSummary | null;
   cost_stats_30d?: AgentCostStats | null;
+  next_fire_at?: string | null; // RFC3339; nil when no schedule, disabled, or unparseable
   created_at: string;
   updated_at: string;
 }

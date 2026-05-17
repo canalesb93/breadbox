@@ -409,6 +409,7 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
                 ? `Cron: ${agent.schedule_cron}`
                 : "Manual only"}
             </span>
+            <NextFirePill at={agent.next_fire_at} />
             <span>Model: {agent.model}</span>
             <span>Max turns: {agent.max_turns}</span>
             <CostStatsPill stats={agent.cost_stats_30d} />
@@ -457,6 +458,19 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
         </div>
       </div>
     </Card>
+  );
+}
+
+function NextFirePill({ at }: { at?: string | null }) {
+  if (!at) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      title={`Next scheduled fire: ${new Date(at).toLocaleString()}`}
+    >
+      <Clock className="size-3" />
+      Next: {formatRelativeTime(at)}
+    </span>
   );
 }
 
