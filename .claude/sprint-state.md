@@ -1,9 +1,10 @@
 # Claude Agent SDK integration sprint
 
-**Branch:** `agents/claude-agent-sdk-sprint`
+**Sprint branch (persistent, accumulates all iterations):** `agents/claude-agent-sdk-sprint`
 **Worktree:** `.claude/worktrees/agents+claude-agent-sdk-sprint`
 **Started:** 2026-05-16 off origin/main @ 446709e9
-**Authorization:** Ricardo has granted explicit standing approval to open AND merge PRs against main from this branch for the duration of this sprint. Do not enable GitHub auto-merge; use `gh pr merge --squash` after CI passes.
+**Authorization & workflow:** Ricardo has granted standing approval to open AND squash-merge iteration PRs INTO the sprint branch (NOT into main). Iter 1 was grandfathered into main directly via PR #1223; iter 2+ accumulates on the sprint branch. At end of sprint, ONE final PR opens from `agents/claude-agent-sdk-sprint` → `main` for Ricardo to review the full feature in one place. Do not enable GitHub auto-merge.
+**Per-iteration branches:** each iteration creates `agents/iter-N-<slug>` (e.g. `agents/iter-2-service-rest`) off the sprint branch, opens a PR into the sprint branch, merges, and is auto-deleted on merge. The sprint branch is never deleted.
 **Driver:** `/loop 30m` autonomous continuation.
 
 ## Goal
@@ -35,7 +36,7 @@ Replace the v1 admin "agent-prompts" copy-to-clipboard wizard with a real recurr
 
 ## Iteration plan
 
-Each iteration ends in **one merged PR to main** (squashed). Iterations are sequenced — don't open the next PR until the previous is merged and CI is green on main.
+Each iteration ends in **one squash-merged PR into the sprint branch** (not main — see header). Iterations are sequenced — don't open the next iteration branch until the previous PR is merged into the sprint branch.
 
 ### Iteration 1 — schema + appconfig + sidecar skeleton (foundation PR) ✅ MERGED #1223
 - [ ] Migration: `agent_definitions` table (id, short_id, name, slug, prompt, schedule_cron, tool_scope, allowed_tools jsonb, model, max_turns, max_budget_usd, enabled, created_at, updated_at)
@@ -157,22 +158,25 @@ Next iteration: service layer + REST API + scoped key mint/revoke.
 When this loop fires, the agent should:
 
 1. **Read this whole file first.** It is the single source of sprint truth.
-2. **Confirm working directory.** Should be the worktree: `.claude/worktrees/agents+claude-agent-sdk-sprint`. Branch should be `agents/claude-agent-sdk-sprint`. If not, `cd` into the worktree.
-3. **Pull latest:** `git pull origin main --rebase` to keep the sprint branch on top of main.
-4. **Check the iteration log** to find the next undone iteration.
-5. **Survey open PRs** from this branch: `gh pr list --search "head:agents/claude-agent-sdk-sprint" --state all --json number,title,state,mergeStateStatus,statusCheckRollup`. Don't start a new iteration if the previous PR is open and unmerged — instead, address review comments OR merge it (CI green + Ricardo's standing auth).
-6. **Pick exactly one iteration's worth of work.** Don't try to do two. Each iteration ends in one merged PR.
-7. **Delegate heavy work to subagents:**
+2. **Confirm working directory.** Should be the worktree: `.claude/worktrees/agents+claude-agent-sdk-sprint`. If somehow elsewhere, `cd` into the worktree.
+3. **Sync the sprint branch:** `git checkout agents/claude-agent-sdk-sprint && git fetch origin && git pull origin agents/claude-agent-sdk-sprint --ff-only`. The sprint branch is the long-lived base for all iteration PRs — keep it clean.
+4. **Check the iteration log** in this file to find the next undone iteration.
+5. **Survey open iteration PRs:** `gh pr list --base agents/claude-agent-sdk-sprint --state open --json number,title,headRefName,mergeStateStatus,statusCheckRollup`. If a previous iteration PR is still open and unmerged, finish it first (address review comments, fix red CI, or merge if green) before starting a new iteration.
+6. **Create the iteration branch:** `git checkout -b agents/iter-N-<short-slug>` off the sprint branch. Naming: `agents/iter-2-service-rest`, `agents/iter-3-scheduler`, `agents/iter-4-spa-list`, etc.
+7. **Pick exactly one iteration's worth of work.** Don't try to do two. Each iteration ends in one merged PR into the sprint branch.
+8. **Delegate heavy work to subagents:**
    - Schema design + sqlc → `feature-dev:code-architect` then implement directly
    - Frontend work → `frontend-design` skill, plus use `mcp__shadcn__*` for components
    - UI evidence → `simple-validate-ui` (v2 SPA) for screenshots
    - Code review pre-PR → `feature-dev:code-reviewer`
-8. **Run the tests** before opening PR: `go build ./...`, `go vet ./...`, `go test ./...`, `make test-integration` if DB-touching, `cd web && bun run typecheck && bun run lint`.
-9. **Open the PR** to main with a description that explains intent, scope, what was deferred, and a test plan. Wait for CI.
-10. **Merge when green** via `gh pr merge <num> --squash --delete-branch=false` (keep the sprint branch). NEVER use `--auto`. **CRITICAL:** the `--delete-branch=false` flag is mandatory — the repo has auto-delete-on-merge enabled and forgetting the flag will wipe the sprint branch on origin.
-11. **After merge:** do NOT use `git pull --rebase` — main's squashed commit overlaps with the sprint branch's pre-merge commits and produces ugly conflicts. Instead run: `git fetch origin main && git reset --hard origin/main && git push --force-with-lease origin agents/claude-agent-sdk-sprint`. The squashed merge commit IS the full iteration's content; resetting to it keeps the sprint branch exactly at main's tip and ready for the next iteration's commits. If you forgot `--delete-branch=false` at step 10, this same recovery sequence re-creates the branch on origin.
-12. **Append to iteration log** in this file with what shipped, what was deferred, what's next. Commit the log update directly to the sprint branch.
-13. **End turn with `result:` line.** If blocked on a decision, end with `needs input:` line.
+9. **Run the tests** before opening the PR: `go build ./...`, `go vet ./...`, `go test ./...`, `make test-integration` if DB-touching, `cd web && bun run typecheck && bun run lint`. For build-tag coverage also run `go build -tags=headless ./...` and `go build -tags=lite ./...`.
+10. **Open the iteration PR** against the sprint branch (NOT main): `gh pr create --base agents/claude-agent-sdk-sprint --head agents/iter-N-<slug> --title "..." --body "..."`. Description should explain intent, scope, what was deferred, and a test plan. Wait for CI.
+11. **Merge when green** via `gh pr merge <num> --squash` (auto-delete cleans up the iteration sub-branch; the sprint branch is the base and persists). NEVER use `--auto`.
+12. **Pull the merge into the local sprint branch:** `git checkout agents/claude-agent-sdk-sprint && git pull origin agents/claude-agent-sdk-sprint --ff-only`. No rebase dance needed — the sprint branch is the merge target, so it advances cleanly.
+13. **Append to iteration log** in this file with what shipped, what was deferred, what's next. Commit the log update directly to the sprint branch and push.
+14. **End turn with `result:` line.** If blocked on a decision, end with `needs input:` line.
+
+**End-of-sprint exit:** when all planned iterations are done (or Ricardo signals "ship it"), open ONE final PR from `agents/claude-agent-sdk-sprint` → `main`. Do NOT merge that PR autonomously — that's Ricardo's call.
 
 If at any point the next iteration's scope is unclear, stop and use `AskUserQuestion` rather than guessing on a load-bearing decision (model choice, auth scheme, schema breaking change).
 
