@@ -71,9 +71,10 @@ export interface DataTableProps<TData, TValue> {
    */
   focusedRowId?: string;
   /**
-   * Render the column header as a sticky band that pins to the top of the
-   * scroll container. Pairs well with long lists. Uses a subtle muted
+   * Render the column header as a sticky band that pins flush under the
+   * app shell's sticky header (h-14) on long lists. Uses a subtle muted
    * backdrop so it visually separates from the body without a hard line.
+   * Pairs well with `transactions.tsx`, `tags-table.tsx`, `api-keys-table.tsx`.
    */
   stickyHeader?: boolean;
   /**
@@ -141,7 +142,11 @@ export function DataTable<TData, TValue>({
         <TableHeader
           className={cn(
             stickyHeader &&
-              "bg-muted/40 supports-[backdrop-filter]:bg-muted/30 sticky top-0 z-10 backdrop-blur-sm",
+              // top-14 sits the band flush under the app shell's sticky
+              // header (`h-14` in `__root.tsx`) so the column labels stay
+              // visible without being obscured. z-10 keeps the band above
+              // the table body but well below the app header (z-30).
+              "bg-muted/40 supports-[backdrop-filter]:bg-muted/30 sticky top-14 z-10 backdrop-blur-sm",
           )}
         >
           {table.getHeaderGroups().map((headerGroup) => (

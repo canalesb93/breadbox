@@ -16,11 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import {
-  ColorRailCard,
-  ColorRailCardSkeleton,
-} from "@/components/color-rail-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { HeroGrid } from "@/components/hero-grid";
 import { DangerZone } from "@/components/danger-zone";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import {
   DetailList,
   compactDetailRows,
@@ -30,6 +29,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
+import { PageError } from "@/components/page-error";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
@@ -46,7 +46,8 @@ import type { Category } from "@/api/types";
 
 export function CategoryDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
-  const { data: tree, isLoading, isError } = useCategories();
+  const categoriesQuery = useCategories();
+  const { data: tree, isLoading, isError } = categoriesQuery;
   const category = useMemo(
     () =>
       id
@@ -61,8 +62,16 @@ export function CategoryDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError || !category ? (
+      ) : isError ? (
+        <PageError
+          resource="this category"
+          error={categoriesQuery.error}
+          onRetry={() => categoriesQuery.refetch()}
+          retrying={categoriesQuery.isFetching}
+        />
+      ) : !category ? (
         <EmptyState
+          variant="card"
           icon={Shapes}
           title="Category not found"
           description="This category may have been deleted, or the link is out of date. Head back to the categories list to pick another."
@@ -150,7 +159,7 @@ function Hero({
 
   return (
     <ColorRailCard accent={accent}>
-      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <HeroGrid>
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -235,7 +244,7 @@ function Hero({
                 : "Tagged with this category"}
           </p>
         </div>
-      </div>
+      </HeroGrid>
     </ColorRailCard>
   );
 }
@@ -390,19 +399,11 @@ function DeleteCategory({ category }: { category: Category }) {
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <ColorRailCardSkeleton tileShape="rounded-lg" />
-      <div className="flex gap-2">
-        <Skeleton className="h-7 w-48 rounded-md" />
-        <Skeleton className="h-7 w-32 rounded-md" />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Skeleton className="h-96 rounded-xl" />
-        <div className="space-y-6">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <DetailPageSkeleton
+      hero={{ tileShape: "rounded-lg" }}
+      jumpPills={2}
+      main={["h-96"]}
+      sidebar={["h-48", "h-64"]}
+    />
   );
 }

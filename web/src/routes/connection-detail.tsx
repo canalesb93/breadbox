@@ -13,7 +13,6 @@ import {
   FileSpreadsheet,
   Landmark,
   Loader2,
-  MoreHorizontal,
   Pause,
   Play,
   Plug,
@@ -29,11 +28,8 @@ import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StatusPanel } from "@/components/status-panel";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -42,9 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ActionPill } from "@/components/action-pill";
-import { ColorRailCard, ColorRailCardSkeleton } from "@/components/color-rail-card";
+import { RowActionsMenu } from "@/components/row-actions-menu";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { HeroGrid } from "@/components/hero-grid";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
+import { PageError } from "@/components/page-error";
 import {
   DetailList,
   compactDetailRows,
@@ -55,6 +54,7 @@ import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
+import { ViewAllPill } from "@/components/view-all-pill";
 import { formatLongDate } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,7 @@ import {
 } from "@/api/queries/connections";
 import { useAccounts } from "@/api/queries/accounts";
 import { useSyncLogs } from "@/api/queries/sync-logs";
+import { ApiError } from "@/api/client";
 import type { Account, ConnectionDetail } from "@/api/types";
 import type { SyncLog } from "@/api/queries/sync-logs";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
@@ -211,8 +212,19 @@ export function ConnectionDetailPage() {
 
       {connQuery.isLoading ? (
         <DetailSkeleton />
-      ) : connQuery.isError || !connQuery.data ? (
+      ) : connQuery.isError &&
+        !(
+          connQuery.error instanceof ApiError && connQuery.error.status === 404
+        ) ? (
+        <PageError
+          resource="this connection"
+          error={connQuery.error}
+          onRetry={() => connQuery.refetch()}
+          retrying={connQuery.isFetching}
+        />
+      ) : !connQuery.data ? (
         <EmptyState
+          variant="card"
           icon={Plug}
           title="Connection not found"
           description="This connection may have been removed, or the link is out of date. Head back to the connections list to pick another."
@@ -489,12 +501,9 @@ function DetailBody({
             action={<Eyebrow>Last 10</Eyebrow>}
             footer={
               syncLogs.length > 0 ? (
-                <Link
-                  to="/sync-logs"
-                  className="text-muted-foreground hover:text-foreground text-xs"
-                >
-                  View all →
-                </Link>
+                <ViewAllPill to="/sync-logs" align="footer">
+                  View all
+                </ViewAllPill>
               ) : undefined
             }
           >
@@ -592,49 +601,36 @@ function Hero({
               Re-authenticate
             </ActionPill>
           )}
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 rounded-full"
-                    aria-label="Connection actions"
-                  >
-                    <MoreHorizontal className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Connection actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              {conn.status !== "disconnected" && (
-                <DropdownMenuItem
-                  onClick={onTogglePause}
-                  disabled={pausePending}
-                >
-                  {conn.paused ? (
-                    <>
-                      <Play className="size-4" /> Resume syncing
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="size-4" /> Pause syncing
-                    </>
-                  )}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={onDisconnect}>
-                <Unplug className="size-4" /> Disconnect…
+          <RowActionsMenu
+            label="Connection actions"
+            size="xs"
+            triggerClassName="rounded-full"
+          >
+            {conn.status !== "disconnected" && (
+              <DropdownMenuItem
+                onClick={onTogglePause}
+                disabled={pausePending}
+              >
+                {conn.paused ? (
+                  <>
+                    <Play className="size-4" /> Resume syncing
+                  </>
+                ) : (
+                  <>
+                    <Pause className="size-4" /> Pause syncing
+                  </>
+                )}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={onDisconnect}>
+              <Unplug className="size-4" /> Disconnect…
+            </DropdownMenuItem>
+          </RowActionsMenu>
         </>
       }
     >
-      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <HeroGrid>
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -716,7 +712,7 @@ function Hero({
             </p>
           ) : null}
         </div>
-      </div>
+      </HeroGrid>
     </ColorRailCard>
   );
 }
@@ -762,12 +758,9 @@ function SettingsCard({
   return (
     <SectionCard title="Settings" bodyClassName="space-y-4 px-5 py-5 text-sm">
       <div className="space-y-1.5">
-        <label
-          htmlFor="sync-interval"
-          className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase"
-        >
+        <Eyebrow as="label" htmlFor="sync-interval">
           Sync interval
-        </label>
+        </Eyebrow>
         <Select
           value={intervalValue}
           onValueChange={onIntervalChange}
@@ -887,26 +880,17 @@ function formatIntervalLabel(minutes: number): string {
 }
 
 function DetailSkeleton() {
+  // Hero matches the loaded `<ColorRailCard>` shape: status-tinted rail +
+  // `rounded-lg` icon tile + bordered action-strip footer (Sync now /
+  // Re-authenticate / overflow). The `DetailPageSkeleton` primitive
+  // converges every v2 detail page on a single skeleton shape — no
+  // jump-pill strip here because connection-detail puts its actions in
+  // the hero footer instead.
   return (
-    <div className="space-y-6">
-      {/* Hero — matches the loaded `<ColorRailCard>` shape: status-tinted
-          rail + `rounded-lg` icon tile + bordered action-strip footer
-          (Sync now / Re-authenticate / overflow). Mirrors the
-          account-detail and transaction-detail loading vocabulary so
-          the three sibling detail pages converge on a single skeleton
-          shape. */}
-      <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="min-w-0 space-y-6">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-        <div className="space-y-6">
-          <Skeleton className="h-40 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <DetailPageSkeleton
+      hero={{ tileShape: "rounded-lg", withFooter: true }}
+      main={["h-32", "h-48", "h-48"]}
+      sidebar={["h-40", "h-48"]}
+    />
   );
 }

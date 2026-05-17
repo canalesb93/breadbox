@@ -1,30 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Pencil, Trash2 } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { TagChip } from "@/components/tag-chip";
 import { useDeleteTag } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
 import type { Tag } from "@/api/types";
+import { TagRowSkeleton } from "./tag-row-skeleton";
 
 interface TagsTableProps {
   tags: Tag[];
@@ -100,45 +90,29 @@ export function TagsTable({
         header: () => <span className="sr-only">Actions</span>,
         meta: { className: "w-px" },
         cell: ({ row }) => (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Actions for ${row.original.display_name}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Tag actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent
-              align="end"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <DropdownMenuItem asChild>
-                <Link
-                  to="/tags/$slug"
-                  params={{ slug: row.original.slug }}
-                >
-                  <Pencil className="size-4" />
-                  Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => setConfirmDelete(row.original)}
+          <RowActionsMenu
+            label={`Actions for ${row.original.display_name}`}
+            onTriggerClick={(e) => e.stopPropagation()}
+            onContentClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem asChild>
+              <Link
+                to="/tags/$slug"
+                params={{ slug: row.original.slug }}
               >
-                <Trash2 className="size-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Pencil className="size-4" />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmDelete(row.original)}
+            >
+              <Trash2 className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </RowActionsMenu>
         ),
       },
     ],
@@ -171,41 +145,20 @@ export function TagsTable({
         // band + uppercase vocabulary as the Transactions list.
         stickyHeader
         refinedHeader
+        renderSkeletonRow={() => <TagRowSkeleton />}
       />
 
-      <Dialog
+      <ConfirmDialog
         open={confirmDelete !== null}
-        onOpenChange={(o) => !o && !del.isPending && setConfirmDelete(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Delete tag "{confirmDelete?.display_name}"?
-            </DialogTitle>
-            <DialogDescription>
-              The tag will be removed from every transaction it's attached to.
-              Activity history is preserved. This can't be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setConfirmDelete(null)}
-              disabled={del.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirmDelete}
-              disabled={del.isPending}
-            >
-              {del.isPending && <Loader2 className="size-4 animate-spin" />}
-              Delete tag
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={(o) => !o && setConfirmDelete(null)}
+        icon={Trash2}
+        title={`Delete tag "${confirmDelete?.display_name ?? ""}"?`}
+        description="The tag will be removed from every transaction it's attached to. Activity history is preserved. This can't be undone."
+        confirmLabel="Delete tag"
+        pendingLabel="Deleting…"
+        pending={del.isPending}
+        onConfirm={onConfirmDelete}
+      />
     </>
   );
 }

@@ -1,9 +1,10 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { SoftBackButton } from "@/components/soft-back-button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmptyState } from "@/components/empty-state";
+import { PageError } from "@/components/page-error";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/api/client";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -85,27 +86,28 @@ export function RuleFormPage({ mode }: RuleFormPageProps) {
 
   if (isEdit && ruleQuery.isError) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Couldn't load this rule</AlertTitle>
-        <AlertDescription>
-          {ruleQuery.error instanceof Error
-            ? ruleQuery.error.message
-            : "Try refreshing the page."}
-        </AlertDescription>
-      </Alert>
+      <PageError
+        resource="this rule"
+        error={ruleQuery.error}
+        onRetry={() => ruleQuery.refetch()}
+        retrying={ruleQuery.isFetching}
+      />
     );
   }
 
   if (isEdit && !rule) {
     return (
-      <Alert>
-        <AlertTitle>Rule not found</AlertTitle>
-        <AlertDescription>
-          <Button asChild variant="link" className="px-0">
+      <EmptyState
+        variant="card"
+        icon={Wand2}
+        title="Rule not found"
+        description="This rule may have been deleted, or the link is out of date. Head back to the rules list to pick another."
+        action={
+          <Button asChild>
             <Link to="/rules">Back to rules</Link>
           </Button>
-        </AlertDescription>
-      </Alert>
+        }
+      />
     );
   }
 

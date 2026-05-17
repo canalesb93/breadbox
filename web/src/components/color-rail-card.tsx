@@ -82,7 +82,7 @@ export function ColorRailCard({
   );
 }
 
-interface ColorRailCardSkeletonProps {
+export interface ColorRailCardSkeletonProps {
   /**
    * Shape of the hero icon tile to mirror — match what the loaded hero
    * renders. `rounded-md` for transaction-detail (matches

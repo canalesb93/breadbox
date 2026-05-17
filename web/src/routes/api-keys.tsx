@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { Key, Plus, Search } from "lucide-react";
+import { Key, Plus } from "lucide-react";
 import { z } from "zod";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAPIKeys } from "@/api/queries/api-keys";
 import { APIKeysTable } from "@/features/api-keys/api-keys-table";
@@ -132,15 +132,12 @@ export function APIKeysPage() {
             </TabsList>
           </Tabs>
 
-          <div className="relative w-full max-w-xs">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, prefix, actor…"
-              className="pl-8"
-            />
-          </div>
+          <SearchInput
+            containerClassName="w-full max-w-xs"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, prefix, actor…"
+          />
         </div>
 
         <APIKeysTable

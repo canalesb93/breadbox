@@ -1,14 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { Infinity as InfinityIcon, ListFilter, MoreVertical, Pause, Pencil, Play, Shield, Trash2, Zap } from "lucide-react";
+import { Infinity as InfinityIcon, ListFilter, Pause, Pencil, Play, Shield, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/format";
 import type { TransactionRule } from "@/api/types";
@@ -134,44 +130,31 @@ export function RuleRow({ rule, onToggle, onDelete }: RuleRowProps) {
           </TooltipTrigger>
           <TooltipContent>Edit rule</TooltipContent>
         </Tooltip>
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  aria-label={`Rule ${rule.name} actions`}
-                >
-                  <MoreVertical className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Rule actions</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onSelect={() => onToggle(rule)}>
-              {rule.enabled ? (
-                <>
-                  <Pause className="size-3.5" /> Disable
-                </>
-              ) : (
-                <>
-                  <Play className="size-3.5" /> Enable
-                </>
-              )}
-            </DropdownMenuItem>
-            {!isSystem && (
-              <DropdownMenuItem
-                onSelect={() => onDelete(rule)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="size-3.5" /> Delete
-              </DropdownMenuItem>
+        <RowActionsMenu
+          label={`Rule ${rule.name} actions`}
+          size="xs"
+          contentClassName="w-44"
+        >
+          <DropdownMenuItem onSelect={() => onToggle(rule)}>
+            {rule.enabled ? (
+              <>
+                <Pause className="size-3.5" /> Disable
+              </>
+            ) : (
+              <>
+                <Play className="size-3.5" /> Enable
+              </>
             )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenuItem>
+          {!isSystem && (
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => onDelete(rule)}
+            >
+              <Trash2 className="size-3.5" /> Delete
+            </DropdownMenuItem>
+          )}
+        </RowActionsMenu>
       </div>
     </div>
   );

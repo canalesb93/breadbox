@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Receipt } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Receipt } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
+import { ViewAllPill } from "@/components/view-all-pill";
 import type { Transaction } from "@/api/types";
 
 interface HomeRecentTransactionsProps {
@@ -21,17 +21,7 @@ export function HomeRecentTransactions({
   transactions,
   isLoading,
 }: HomeRecentTransactionsProps) {
-  const viewAll = (
-    <Button asChild variant="ghost" size="sm" className="-mr-2 h-8 px-2">
-      <Link
-        to="/transactions"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-      >
-        View all
-        <ArrowRight className="size-3.5" />
-      </Link>
-    </Button>
-  );
+  const viewAll = <ViewAllPill to="/transactions">View all</ViewAllPill>;
 
   if (isLoading) {
     return (

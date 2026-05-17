@@ -19,6 +19,7 @@ import {
   Monitor,
   Moon,
   Pause,
+  Pencil,
   Plus,
   Receipt,
   RefreshCw,
@@ -30,6 +31,7 @@ import {
   Sun,
   Tag,
   Trash2,
+  Unplug,
   Users,
   Wallet,
   Wand2,
@@ -69,8 +71,15 @@ import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
 import { ActionPill } from "@/components/action-pill";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
+import {
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
+import { PageError } from "@/components/page-error";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { Sheet } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +90,10 @@ import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DangerZone } from "@/components/danger-zone";
 import { PaginationBar } from "@/components/pagination-bar";
+import { ViewAllPill } from "@/components/view-all-pill";
+import { SearchInput } from "@/components/search-input";
+import { HeroGrid } from "@/components/hero-grid";
+import { ProviderCardHeader } from "@/components/provider-card-header";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -133,6 +146,7 @@ export function ComponentsSection() {
   const [confirmPending, setConfirmPending] = useState(false);
   const [dangerPending, setDangerPending] = useState(false);
   const [paginationPage, setPaginationPage] = useState(3);
+  const [pageErrorRetrying, setPageErrorRetrying] = useState(false);
 
   return (
     <SandboxSection
@@ -189,14 +203,15 @@ export function ComponentsSection() {
           <SectionCard
             title="Notes"
             footer={
-              <Button size="sm" variant="ghost">
+              <ViewAllPill to="/" align="footer">
                 View all
-              </Button>
+              </ViewAllPill>
             }
           >
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Reach for `SectionCard` for any non-list section. The footer slot
-              renders a flush bordered strip — typically a "See all" link.
+              Reach for <code>SectionCard</code> for any non-list section. The
+              footer slot renders a flush bordered strip — typically a{" "}
+              <code>&lt;ViewAllPill&gt;</code> link to a fuller index.
             </p>
           </SectionCard>
         </div>
@@ -211,11 +226,7 @@ export function ComponentsSection() {
         <div className="max-w-md">
           <ListCard
             title="Recent transactions"
-            action={
-              <Button size="sm" variant="ghost">
-                View all
-              </Button>
-            }
+            action={<ViewAllPill to="/">View all</ViewAllPill>}
             rows={sampleTransactions.slice(0, 3)}
             getRowKey={(t) => t.id}
             renderRow={(t) => (
@@ -273,6 +284,86 @@ export function ComponentsSection() {
                 Posted May 14, 2026 · Chase ····2890
               </p>
             </div>
+          </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="HeroGrid"
+        code="components/hero-grid"
+        description="Body grid that sits one level inside `<ColorRailCard>` — arranges the identity column on the left and the metric column on the right. Promoted from three byte-identical sites (account, category, connection detail) plus a near-identical TX-detail variant. Stacks rows on mobile, docks the metric column to the right on lg. The transaction-detail variant tightens the lg row-gap via `lgGapClassName='lg:gap-x-10 lg:gap-y-5'` because the left column stacks identity on top of classify rows."
+        className="block"
+      >
+        <div className="max-w-xl">
+          <ColorRailCard accent="#0ea5e9">
+            <HeroGrid>
+              <div className="min-w-0 space-y-1">
+                <span className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                  Asset
+                </span>
+                <h3 className="text-foreground text-xl font-semibold tracking-tight">
+                  Chase Sapphire
+                </h3>
+                <p className="text-muted-foreground text-xs">
+                  Credit card · ····2890
+                </p>
+              </div>
+              <div className="flex flex-col items-start gap-1.5 lg:items-end lg:text-right">
+                <span className="bg-success/10 text-success inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                  Balance
+                </span>
+                <div className="text-3xl font-semibold tabular-nums sm:text-4xl">
+                  $4,210.55
+                </div>
+                <p className="text-muted-foreground text-[11px] tabular-nums">
+                  $1,789.45 available
+                </p>
+              </div>
+            </HeroGrid>
+          </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ProviderCardHeader"
+        code="components/provider-card-header"
+        description="Canonical header body inside a provider settings card — sits one level inside `<ColorRailCard>` on the Plaid, Teller, and CSV pages. Identity column on the left (tone-tinted `size-11 rounded-lg` tile + 'Provider' eyebrow + title + optional status badge + capped description) docks beside an optional `trailing` slot (typically `<ProviderScoreboard>`). Stacks on mobile, aligns on a single baseline at ≥640px. Promoted from three near-byte-identical header blocks."
+        className="block"
+      >
+        <div className="max-w-3xl space-y-4">
+          <ColorRailCard accent="#22c55e">
+            <ProviderCardHeader
+              icon={<Landmark className="size-5" />}
+              iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              title="Plaid"
+              description="Connect 12,000+ US banks via Plaid Link. Webhook-driven incremental sync."
+              badge={
+                <Badge
+                  variant="outline"
+                  className="border-success/30 bg-success/10 text-success"
+                >
+                  Configured
+                </Badge>
+              }
+              trailing={
+                <div className="flex flex-col items-start gap-1 sm:items-end">
+                  <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+                    Last sync
+                  </span>
+                  <span className="text-foreground text-sm tabular-nums">
+                    2m ago
+                  </span>
+                </div>
+              }
+            />
+          </ColorRailCard>
+          <ColorRailCard accent="#f59e0b">
+            <ProviderCardHeader
+              icon={<Receipt className="size-5" />}
+              iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              title="CSV import"
+              description="Drop in transactions exported from any bank — no API credentials required."
+            />
           </ColorRailCard>
         </div>
       </Specimen>
@@ -397,14 +488,17 @@ export function ComponentsSection() {
       <Specimen
         label="Eyebrow"
         code="components/eyebrow"
-        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, and timeline-rail day headings. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them. Two variants — `default` (text-[10px] tracking-[0.1em]) is the everyday eyebrow; `hero` (tracking-[0.12em]) gets extra letter air for spots where it sits directly under a large display title. Don't reach for raw `text-[10px] font-medium tracking-* uppercase` markup — extend this primitive."
+        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, timeline-rail day headings, AND sidebar/menu group labels. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them; iter 95 added the `nav` cousin to retire the remaining three `font-semibold` sidebar-group-label drift sites (`nav-main`, `settings-shell` desktop sidebar, `shortcut-sheet` group headers). Four variants — `default` (`text-[10px] tracking-[0.1em]`) is the everyday eyebrow; `hero` (`tracking-[0.12em]`) gets extra letter air for spots where it sits directly under a large display title; `page` (`text-[11px] tracking-[0.08em]`) is the slightly heavier rhythm reserved for *page*-scale framing (PageHeader eyebrow, home-stats KPI labels, provider-card 'Provider' caption); `nav` (`font-semibold text-[10px] tracking-[0.08em]`) is the heavier cousin used inside sidebar / menu chrome where the label sits against a coloured surface and needs the extra weight to read. Don't reach for raw `text-[10-11px] font-medium/semibold tracking-* uppercase` markup — extend this primitive."
         className="block"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border p-4">
             <Eyebrow>Default · in a card header</Eyebrow>
             <p className="text-foreground mt-1 text-sm">
-              "Showing 24 of 879" / "Synced 4 minutes ago" / "Reference"
+              "Showing 24 of 879" / "Reference"
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              text-[10px] · tracking-[0.1em]
             </p>
           </div>
           <div className="bg-card rounded-lg border p-4">
@@ -415,7 +509,35 @@ export function ComponentsSection() {
               Chase Sapphire ····2890
             </h4>
             <p className="text-muted-foreground mt-1 text-xs">
-              hero variant — sits under a display title with extra letter air
+              hero · tracking-[0.12em]
+            </p>
+          </div>
+          <div className="rounded-lg border p-4">
+            <Eyebrow variant="page" as="p">
+              Synced 4 minutes ago
+            </Eyebrow>
+            <h1 className="text-foreground mt-1.5 text-2xl font-semibold tracking-tight">
+              Connections
+            </h1>
+            <p className="text-muted-foreground mt-1 text-xs">
+              page · text-[11px] · tracking-[0.08em]
+            </p>
+          </div>
+          <div className="bg-sidebar text-sidebar-foreground rounded-lg border p-4">
+            <Eyebrow
+              variant="nav"
+              as="p"
+              className="text-muted-foreground/80"
+            >
+              Workspace
+            </Eyebrow>
+            <ul className="mt-2 space-y-0.5 text-sm">
+              <li className="rounded-md px-2 py-1">Home</li>
+              <li className="rounded-md px-2 py-1">Transactions</li>
+              <li className="rounded-md px-2 py-1">Categories</li>
+            </ul>
+            <p className="text-muted-foreground mt-2 text-xs">
+              nav · font-semibold · text-[10px] · tracking-[0.08em]
             </p>
           </div>
         </div>
@@ -474,6 +596,124 @@ export function ComponentsSection() {
               <RefreshCw className="size-3.5" />
               Re-authenticate
             </ActionPill>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="RowActionsMenu"
+        code="components/row-actions-menu"
+        description="The canonical row-actions kebab — `Tooltip` + `DropdownMenuTrigger` + `Button` lockup that every list row, hero footer, and inline action cluster shares so trigger geometry, icon glyph (`MoreHorizontal size-4`), and aria vocabulary stay consistent across the SPA. `size='sm'` (default) is the dominant size-8 ghost square (connection-row, household-section, tags-table, api-keys-table). `size='xs'` is the tighter size-7 variant for hero footers and nested list rows (account-links, rule-row, connection-detail hero). `loading` swaps the icon for a spinning Loader2 and disables the trigger. `triggerClassName` is the escape hatch (only connection-detail's hero footer uses it today for `rounded-full` to pair with surrounding pills). Sibling of `<ActionPill>` (labelled inline action) — same `text-muted-foreground → hover:text-foreground` icon-button vocabulary, but RowActionsMenu opens a menu rather than dispatching."
+        className="block"
+      >
+        <div className="flex flex-col gap-4 rounded-lg border p-4">
+          <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+            <div className="text-sm">
+              <div className="font-medium">Tag actions (size sm)</div>
+              <div className="text-muted-foreground text-xs">
+                Dominant row-actions trigger — size-8 ghost square
+              </div>
+            </div>
+            <RowActionsMenu label="Tag actions">
+              <DropdownMenuItem onSelect={() => toast.message("Edit tag")}>
+                <Pencil className="size-4" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => toast.error("Delete tag")}
+              >
+                <Trash2 className="size-4" /> Delete
+              </DropdownMenuItem>
+            </RowActionsMenu>
+          </div>
+          <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+            <div className="text-sm">
+              <div className="font-medium">Rule actions (size xs)</div>
+              <div className="text-muted-foreground text-xs">
+                Tighter variant for hero footers + nested rows — size-7 ghost square
+              </div>
+            </div>
+            <RowActionsMenu
+              label="Rule actions"
+              size="xs"
+              contentClassName="w-44"
+            >
+              <DropdownMenuItem onSelect={() => toast.message("Disable rule")}>
+                <Pause className="size-3.5" /> Disable
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => toast.error("Delete rule")}
+              >
+                <Trash2 className="size-3.5" /> Delete
+              </DropdownMenuItem>
+            </RowActionsMenu>
+          </div>
+          <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
+            <div className="text-sm">
+              <div className="font-medium">Link actions (loading)</div>
+              <div className="text-muted-foreground text-xs">
+                `loading` swaps the kebab icon for a spinning Loader2
+              </div>
+            </div>
+            <RowActionsMenu label="Link actions" size="xs" loading>
+              <DropdownMenuItem>
+                <Unplug className="size-3.5" /> Unlink
+              </DropdownMenuItem>
+            </RowActionsMenu>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ViewAllPill"
+        code="components/view-all-pill"
+        description="The canonical 'card-header / footer goto' pill used when a bordered surface defers to a fuller list page. 28px-tall ghost link (`h-7 px-2 text-xs` muted → foreground on hover) with a trailing `<ArrowRight className='size-3' />` icon — matches the `<JumpToPill>` size-3 leading-icon vocabulary so the two lateral-link primitives speak the same icon language. `align='header'` (default) supplies the `-mr-2` flush shoulder for use in a `<ListCard action>` / `<SectionCard action>` slot; `align='footer'` drops the shoulder for footer slots. Distinct from `<ActionPill>` (real handler, `size-3.5` icon) and from `<Button size='sm'>` (32px CTA). Live across Home recent activity, Home connections, Account-detail recent transactions, Connection-detail sync history."
+        className="block"
+      >
+        <div className="flex flex-wrap items-center gap-6 rounded-lg border p-4">
+          <ViewAllPill to="/">View all</ViewAllPill>
+          <ViewAllPill to="/">Manage</ViewAllPill>
+          <ViewAllPill to="/">See all transactions</ViewAllPill>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="SearchInput"
+        code="components/search-input"
+        description="The canonical text input with a leading magnifier glyph used by every v2 list page (Tags, Categories, API keys, Transactions). Wraps the stock `<Input>` primitive with a `pointer-events-none` `Search` glyph absolutely positioned at `left-2.5` and `pl-8` on the field to clear it. Forwards every native input prop (value, onChange, onKeyDown, placeholder, …) and a `ref` for callers that need to focus from a keyboard shortcut. `containerClassName` is the escape hatch for the outer wrapper width (default `w-full max-w-sm`; API keys uses `w-full max-w-xs`; Transactions toolbar uses `w-full min-w-48 sm:w-64`). Don't open-code the icon + Input pair — extend this primitive."
+        className="block"
+      >
+        <div className="space-y-4 rounded-lg border p-4">
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Default · `w-full max-w-sm`
+            </div>
+            <SearchInput
+              defaultValue=""
+              placeholder="Search by name, slug, or description…"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Narrow · `containerClassName='w-full max-w-xs'`
+            </div>
+            <SearchInput
+              containerClassName="w-full max-w-xs"
+              defaultValue=""
+              placeholder="Search by name, prefix, actor…"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Toolbar · `containerClassName='w-full min-w-48 sm:w-64'`
+            </div>
+            <SearchInput
+              containerClassName="w-full min-w-48 sm:w-64"
+              defaultValue="coffee"
+              placeholder="Search merchant or description…"
+            />
           </div>
         </div>
       </Specimen>
@@ -851,9 +1091,98 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
+        label="PageError"
+        code="components/page-error"
+        description="The canonical page-level 'this page couldn't fetch its data' state. Two variants. `panel` (default) composes `<StatusPanel tone='destructive'>` — AlertTriangle icon, `Couldn't load {resource}` heading, the error's `message` (or a fallback) as body, and an outline `RefreshCw` Retry button in the trailing slot that swaps to a spinning icon + `Retrying…` label while in-flight. `inline` (iter 88) drops the bordered StatusPanel chrome so the same icon tile + heading + body + retry sits flush inside an already-bordered host (a SectionCard body, a ListCard slot) — used by the transaction-detail activity-timeline. Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading) — three states, three vocabularies, one visual system. Seven surfaces share it today: accounts, connections, providers, rules, rule-form, rule-detail, activity-timeline (inline). Don't fork — extend this primitive."
+        className="block"
+      >
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+                panel · with retry handler
+              </div>
+              <PageError
+                resource="accounts"
+                error={new Error("Network request failed (ECONNRESET).")}
+                onRetry={() => {
+                  setPageErrorRetrying(true);
+                  window.setTimeout(() => setPageErrorRetrying(false), 1200);
+                }}
+                retrying={pageErrorRetrying}
+              />
+            </div>
+            <div>
+              <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+                panel · without retry · fallback message
+              </div>
+              <PageError resource="rules" />
+            </div>
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-2 px-1 text-[11px] tracking-wide uppercase">
+              inline · nested inside a bordered host (SectionCard / ListCard)
+            </div>
+            <div className="bg-card rounded-lg border">
+              <div className="border-b px-5 py-3 text-sm font-medium">
+                Activity
+              </div>
+              <div className="p-5">
+                <PageError
+                  variant="inline"
+                  resource="the activity timeline"
+                  error={new Error("Request failed with status 500.")}
+                  onRetry={() => {
+                    setPageErrorRetrying(true);
+                    window.setTimeout(() => setPageErrorRetrying(false), 1200);
+                  }}
+                  retrying={pageErrorRetrying}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DetailPageSkeleton"
+        code="components/detail-page-skeleton"
+        description="The canonical page-level loading shell for every v2 detail page (transaction, account, category, connection). Composes the iter-10 `<ColorRailCardSkeleton>` hero + a `<JumpToRow>`-shaped pill strip + a 2-column grid of `rounded-xl` block placeholders matching `<SectionCard>` / `<ListCard>` chrome. Sibling of `<PageError>` (error) and `<EmptyState>` (empty) — three states, three vocabularies, one visual system. `hero` forwards `tileShape` / `withFooter` / `body` to `<ColorRailCardSkeleton>`; `jumpPills` counts the lateral-nav pill row (`0` to omit); `main` / `sidebar` are arrays of Tailwind height classes for the stacked block placeholders. Pass an empty `sidebar` to collapse the grid to a single column. Don't fork — extend this primitive."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              transaction · hero rounded-md · 3 pills · 1+2
+            </div>
+            <div className="p-4">
+              <DetailPageSkeleton
+                hero={{ tileShape: "rounded-md" }}
+                jumpPills={3}
+                main={["h-64"]}
+                sidebar={["h-32", "h-40"]}
+              />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              connection · hero withFooter · no pills · 3+0
+            </div>
+            <div className="p-4">
+              <DetailPageSkeleton
+                hero={{ tileShape: "rounded-lg", withFooter: true }}
+                jumpPills={0}
+                main={["h-32", "h-48", "h-56"]}
+              />
+            </div>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
-        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Each row accepts a semantic `tone` (`neutral` · `primary` · `success` · `warning` · `info` · `muted`, iter 93) that tints the disc border + icon so the eye can pick out rule fires, classification changes, and sync events without parsing the summary line. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
         className="block"
       >
         <div className="grid gap-6 max-w-3xl sm:grid-cols-2">
@@ -863,7 +1192,7 @@ export function ComponentsSection() {
             </div>
             <TimelineRail>
             <TimelineRail.Group label="Today">
-              <TimelineRail.Row icon={MessageSquare}>
+              <TimelineRail.Row icon={MessageSquare} tone="neutral">
                 <p className="text-sm leading-snug">
                   You left a comment
                 </p>
@@ -874,7 +1203,7 @@ export function ComponentsSection() {
                   2 minutes ago
                 </p>
               </TimelineRail.Row>
-              <TimelineRail.Row icon={Wand2}>
+              <TimelineRail.Row icon={Wand2} tone="primary">
                 <p className="text-sm leading-snug">
                   Rule "Coffee shops" applied — category set to Dining out
                 </p>
@@ -882,9 +1211,17 @@ export function ComponentsSection() {
                   18 minutes ago
                 </p>
               </TimelineRail.Row>
+              <TimelineRail.Row icon={RefreshCw} tone="info">
+                <p className="text-sm leading-snug">
+                  Sync from Chase updated this transaction
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  42 minutes ago
+                </p>
+              </TimelineRail.Row>
             </TimelineRail.Group>
             <TimelineRail.Group label="Yesterday">
-              <TimelineRail.Row icon={Shapes}>
+              <TimelineRail.Row icon={Shapes} tone="primary">
                 <p className="text-sm leading-snug">
                   Ricardo changed category to Groceries
                 </p>
@@ -892,12 +1229,20 @@ export function ComponentsSection() {
                   Yesterday at 4:12 PM
                 </p>
               </TimelineRail.Row>
-              <TimelineRail.Row icon={Tag}>
+              <TimelineRail.Row icon={Tag} tone="success">
                 <p className="text-sm leading-snug">
                   Ricardo added tag "reimbursable"
                 </p>
                 <p className="text-muted-foreground mt-1 text-[11px]">
                   Yesterday at 4:11 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={Tag} tone="warning">
+                <p className="text-sm leading-snug">
+                  Ricardo removed tag "needs-review"
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 4:00 PM
                 </p>
               </TimelineRail.Row>
               <TimelineRail.Row icon={MessageSquare} muted>

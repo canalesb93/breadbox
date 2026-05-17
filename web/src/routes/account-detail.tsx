@@ -18,12 +18,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ActionPill } from "@/components/action-pill";
-import {
-  ColorRailCard,
-  ColorRailCardSkeleton,
-} from "@/components/color-rail-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { HeroGrid } from "@/components/hero-grid";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import {
   DetailList,
   compactDetailRows,
@@ -31,12 +29,14 @@ import {
 } from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
+import { PageError } from "@/components/page-error";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
 import { useAccount, useAccounts } from "@/api/queries/accounts";
+import { ApiError } from "@/api/client";
 import type { AccountDetail } from "@/api/types";
 import {
   accountLabel,
@@ -97,8 +97,19 @@ export function AccountDetailPage() {
 
       {acctQuery.isLoading ? (
         <DetailSkeleton />
-      ) : acctQuery.isError || !acctQuery.data ? (
+      ) : acctQuery.isError &&
+        !(
+          acctQuery.error instanceof ApiError && acctQuery.error.status === 404
+        ) ? (
+        <PageError
+          resource="this account"
+          error={acctQuery.error}
+          onRetry={() => acctQuery.refetch()}
+          retrying={acctQuery.isFetching}
+        />
+      ) : !acctQuery.data ? (
         <EmptyState
+          variant="card"
           icon={Banknote}
           title="Account not found"
           description="This account may have been disconnected, or the link is out of date. Head back to the accounts list to pick another."
@@ -225,7 +236,7 @@ function Hero({
         </>
       }
     >
-      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <HeroGrid>
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -342,7 +353,7 @@ function Hero({
             </p>
           ) : null}
         </div>
-      </div>
+      </HeroGrid>
 
     </ColorRailCard>
   );
@@ -482,19 +493,11 @@ function connectionStatusAlert(a: AccountDetail) {
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
-      <div className="flex gap-2">
-        <Skeleton className="h-7 w-32 rounded-md" />
-        <Skeleton className="h-7 w-32 rounded-md" />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Skeleton className="h-96 rounded-xl" />
-        <div className="space-y-6">
-          <Skeleton className="h-56 rounded-xl" />
-          <Skeleton className="h-72 rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <DetailPageSkeleton
+      hero={{ tileShape: "rounded-lg", withFooter: true }}
+      jumpPills={2}
+      main={["h-96"]}
+      sidebar={["h-56", "h-72"]}
+    />
   );
 }

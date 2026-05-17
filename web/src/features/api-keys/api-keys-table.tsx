@@ -1,24 +1,11 @@
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Ban, Loader2, MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Ban } from "lucide-react";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
+import { RowActionsMenu } from "@/components/row-actions-menu";
 import { formatLongDate, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useRevokeAPIKey } from "@/api/queries/api-keys";
@@ -27,6 +14,7 @@ import {
   ActorBadge,
   ScopeBadge,
 } from "@/features/api-keys/api-key-badges";
+import { APIKeyRowSkeleton } from "@/features/api-keys/api-key-row-skeleton";
 
 export interface APIKeysTableProps {
   keys: APIKey[];
@@ -126,35 +114,19 @@ export function APIKeysTable({
         header: () => <span className="sr-only">Actions</span>,
         meta: { className: "w-px" },
         cell: ({ row }) => (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Actions for ${row.original.name}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>API key actions</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent
-              align="end"
-              onClick={(e) => e.stopPropagation()}
+          <RowActionsMenu
+            label={`Actions for ${row.original.name}`}
+            onTriggerClick={(e) => e.stopPropagation()}
+            onContentClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => setConfirmRevoke(row.original)}
             >
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => setConfirmRevoke(row.original)}
-              >
-                <Ban className="size-4" />
-                Revoke
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <Ban className="size-4" />
+              Revoke
+            </DropdownMenuItem>
+          </RowActionsMenu>
         ),
       },
     ];
@@ -187,42 +159,20 @@ export function APIKeysTable({
         emptyState={emptyState}
         stickyHeader
         refinedHeader
+        renderSkeletonRow={() => <APIKeyRowSkeleton revoked={revoked} />}
       />
 
-      <Dialog
+      <ConfirmDialog
         open={confirmRevoke !== null}
-        onOpenChange={(o) =>
-          !o && !revokeInFlight && setConfirmRevoke(null)
-        }
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Revoke "{confirmRevoke?.name}"?</DialogTitle>
-            <DialogDescription>
-              The next request using this key will be rejected. Existing
-              activity history is preserved, but the key can't be restored —
-              you'll need to mint a new one.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setConfirmRevoke(null)}
-              disabled={revokeInFlight}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirmRevoke}
-              disabled={revokeInFlight}
-            >
-              {revokeInFlight && <Loader2 className="size-4 animate-spin" />}
-              Revoke key
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={(o) => !o && setConfirmRevoke(null)}
+        icon={Ban}
+        title={`Revoke "${confirmRevoke?.name ?? ""}"?`}
+        description="The next request using this key will be rejected. Existing activity history is preserved, but the key can't be restored — you'll need to mint a new one."
+        confirmLabel="Revoke key"
+        pendingLabel="Revoking…"
+        pending={revokeInFlight}
+        onConfirm={onConfirmRevoke}
+      />
     </>
   );
 }

@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Search, Shapes } from "lucide-react";
+import { Plus, Shapes } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { ListCard } from "@/components/list-card";
+import { PageError } from "@/components/page-error";
 import { CategoryList } from "@/features/categories/category-list";
 import { useCategories } from "@/api/queries/categories";
 
 export function CategoriesPage() {
   const [query, setQuery] = useState("");
-  const { data: tree, isLoading, isError } = useCategories();
+  const categoriesQuery = useCategories();
+  const { data: tree, isLoading, isError, isFetching } = categoriesQuery;
 
   // Mirror the iter-3/4 list-page eyebrow vocabulary
   // ("Loading" / "Error" / "N categories" / "Showing N of M" / "No matches" /
@@ -75,15 +77,11 @@ export function CategoriesPage() {
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative w-full max-w-sm">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name or slug…"
-              className="pl-8"
-            />
-          </div>
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or slug…"
+          />
         </div>
 
         {isLoading ? (
@@ -102,10 +100,11 @@ export function CategoriesPage() {
             )}
           />
         ) : isError ? (
-          <EmptyState
-            icon={Shapes}
-            title="Couldn't load categories"
-            description="Something went wrong fetching the category tree. Refresh the page or check back in a moment."
+          <PageError
+            resource="categories"
+            error={categoriesQuery.error}
+            onRetry={() => categoriesQuery.refetch()}
+            retrying={isFetching}
           />
         ) : !tree || tree.length === 0 ? (
           <EmptyState

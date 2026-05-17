@@ -313,9 +313,20 @@ next target, then updates this file at the end of the run.
   the abstraction would weigh more than the duplication.
 - **ListRowSkeleton primitive** — extracted to
   `web/src/components/list-row-skeleton.tsx` in iter 36 (#1150).
-  Five surfaces now share the canonical loading-row shape:
+  Five surfaces share the canonical loading-row shape:
   Connections list, Accounts list, Categories list, Home
-  connections panel, Home recent activity. Vocabulary tokens:
+  connections panel, Home recent activity. DataTable lists
+  (Transactions, Tags, API keys — and Rules' bespoke card-list)
+  ride a sibling family of co-located row-skeletons in their
+  features directory (`transaction-row-skeleton`,
+  `tag-row-skeleton`, `api-key-row-skeleton`, `rule-row-skeleton`,
+  added across iters 4, 67, and 84) because each renders
+  `<TableCell>`s that mirror the consumer's specific column shape.
+  If a fourth or fifth such per-cell skeleton lands, lift the
+  shapes (`badge`, `value-stack`, `text`, `chip`, `pill`) into
+  a `<TableRowSkeleton>` primitive sibling of `<ListRowSkeleton>`
+  with a `cells` prop. Until then, co-location stays cheaper than
+  the abstraction. Vocabulary tokens:
   `density` (`compact`/`regular`/`comfortable`), `leading`
   (`sm-square`/`md-square`/`lg-square` matching CategoryIconTile
   sizes), `trailing` (`none`/`badge`/`value-stack`). Every
@@ -327,36 +338,46 @@ next target, then updates this file at the end of the run.
   one-off building block for non-list skeletons (backups stat
   grid, providers cards, transaction-row in a TableCell).
 - **Eyebrow primitive** — extracted to
-  `web/src/components/eyebrow.tsx` in iter 37 (#1151). Six surfaces
-  now share the canonical uppercase muted micro-label: TX-detail,
-  Account-detail, Category-detail, Connection-detail,
-  TimelineRail, ProviderScoreboard. Two variants: `default`
-  (`text-[10px] tracking-[0.1em]` for section heads, "Jump to"
-  pills, sync-activity action labels, scoreboard cells) and `hero`
-  (`text-[10px] tracking-[0.12em]` for detail-page hero card
-  eyebrows). Don't hand-roll `text-[10px] font-medium tracking-*
-  uppercase` markup for new surfaces — reach for `<Eyebrow>` or
-  extend it with a new variant if the rhythm needs to differ. The
-  brand-header / auth-shell / shortcut-sheet uppercase labels are
-  intentionally outside this vocabulary — they're surface-specific
-  framing (login chrome, brand lockup, command-palette grouping),
-  not detail-page eyebrows.
+  `web/src/components/eyebrow.tsx` in iter 37 (#1151), expanded in
+  iter 94 (#1209). Nine surfaces now share the canonical uppercase
+  muted micro-label: TX-detail, Account-detail, Category-detail,
+  Connection-detail, TimelineRail, ProviderScoreboard, PageHeader
+  (iter 94), home-stats `HeroCell`/`SecondaryCell` (iter 94),
+  Plaid / CSV / Teller cards' Provider caption (iter 94). Three
+  variants: `default` (`text-[10px] tracking-[0.1em]` for section
+  heads, "Jump to" pills, sync-activity action labels, scoreboard
+  cells); `hero` (`text-[10px] tracking-[0.12em]` for detail-page
+  hero card eyebrows); `page` (iter 94 — `text-[11px]
+  tracking-[0.08em]` for *page*-scale framing where the eyebrow
+  has to hold its own next to a 2xl–3xl title). Don't hand-roll
+  `text-[10-11px] font-medium tracking-* uppercase` markup for new
+  surfaces — reach for `<Eyebrow>` or extend it with a new variant
+  if the rhythm needs to differ. The three variants encode "section
+  · hero · page" weight tiers; a fourth without a concrete host
+  requirement would muddy that signal. The brand-header /
+  auth-shell / shortcut-sheet uppercase labels are intentionally
+  outside this vocabulary — they're surface-specific framing
+  (login chrome, brand lockup, command-palette grouping), not
+  detail-page eyebrows.
 - **DetailSheetHeader primitive** — extracted to
   `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
-  Two surfaces now share the canonical icon-tile sheet header lockup:
-  ShortcutSheet (iter 39) and ConnectBankSheet (iter 40). Vocabulary
-  tokens: `density` (`default` = size-9 tile + p-5, ambient overlays
-  like Shortcut sheet; `accent` = size-10 tile + bg-muted/20 + p-6,
-  primary flows like Connect-bank), `eyebrow` (optional), `trailing`
-  (optional slot). The lockup mirrors StatusPanel / EmptyState /
-  SectionCard's icon-tile vocabulary so every v2 Sheet reads as part
-  of the system, not a stock shadcn surface. Don't open `<SheetHeader>`
-  inline for a new Sheet — extend this primitive. `reauth-sheet` and
-  `link-account-sheet` use different header shapes (no icon-tile
-  lockup) and stay open-coded — promote if a third Sheet adopts the
-  lockup with a yet-different rhythm. No sandbox specimen because
-  SheetTitle/SheetDescription require radix Dialog context; the live
-  consumers carry the visual reference.
+  Four surfaces share the canonical icon-tile sheet header lockup
+  (iter 90 #1205 added `reauth-sheet` + `link-account-sheet`):
+  ShortcutSheet (iter 39), ConnectBankSheet (iter 40), LinkAccountSheet
+  (iter 90), ReauthSheet (iter 90). Vocabulary tokens: `density`
+  (`default` = size-9 tile + p-5, ambient overlays like Shortcut
+  sheet; `accent` = size-10 tile + bg-muted/20 + p-6, primary flows
+  like Connect-bank / Link-account / Re-auth), `eyebrow` (optional),
+  `trailing` (optional slot). The lockup mirrors StatusPanel /
+  EmptyState / SectionCard's icon-tile vocabulary so every v2 Sheet
+  reads as part of the system, not a stock shadcn surface. Every v2
+  Sheet now also shares the canonical body padding (`p-6`) + bordered
+  footer strip (`bg-muted/20 border-t px-6 py-3` with `size="sm"`
+  Cancel + primary). Don't open `<SheetHeader>` inline for a new
+  Sheet — extend this primitive. The iter-41 "promote if a third
+  Sheet adopts the lockup" follow-up is now resolved. No sandbox
+  specimen because SheetTitle/SheetDescription require radix Dialog
+  context; the live consumers carry the visual reference.
 - **JumpToPill primitive** — extracted to
   `web/src/components/jump-to-pill.tsx` in iter 75 (#1188). The
   canonical detail-page "Jump to" lateral-link pill: 28px tall
@@ -370,6 +391,52 @@ next target, then updates this file at the end of the run.
   category-detail, connection-detail. Reach for it for any new
   detail-page hero lateral-nav cluster. Don't open-code the
   className triplet — pass props.
+- **PageError primitive** — extracted to
+  `web/src/components/page-error.tsx` in iter 82 (#1196). The
+  canonical page-level "couldn't fetch its data" state. Two
+  variants: `panel` (default) composes `<StatusPanel
+  tone="destructive">` with the AlertTriangle icon, `Couldn't
+  load {resource}` heading, `Error.message` body (or a fallback),
+  and an outline `RefreshCw` Retry button in StatusPanel's
+  `trailing` slot. Retry swaps to a spinning icon + `Retrying…`
+  label while `isFetching` is true. `inline` (iter 88, #1203)
+  drops the bordered StatusPanel chrome — same destructive icon
+  tile + heading + body + retry, but no border / rail / muted
+  background — for nesting inside an already-bordered host
+  (SectionCard / ListCard) where two nested borders read heavy.
+  Seven surfaces share it today: accounts, connections, providers,
+  rules, rule-form, rule-detail (all `panel`), and activity-timeline
+  (`inline` inside the TX-detail Activity SectionCard). Sibling of
+  `EmptyState` (no-data) and `StatusPanel` (inline notice) —
+  three states, three vocabularies, one visual system. Don't
+  fork the look — extend this primitive. Component-level alerts
+  inside features (`backups-section`, `reauth-sheet`,
+  `account-links-section`, `preview-panel`) intentionally stay
+  on the raw `Alert` primitive — they're scoped inline contexts,
+  not full-page error surfaces.
+- **DetailPageSkeleton primitive** — extracted to
+  `web/src/components/detail-page-skeleton.tsx` in iter 83
+  (#1197). The canonical page-level loading shell for every v2
+  detail page (transaction, account, category, connection).
+  Composition on top of `<ColorRailCardSkeleton>` (iter 10) +
+  a `<JumpToRow>`-shaped pill strip (iter 75) + a two-column
+  grid of `rounded-xl` block placeholders matching
+  `<SectionCard>` / `<ListCard>` chrome. Four surfaces share it
+  today (every v2 detail page). API: `hero` (forwards
+  `tileShape` / `withFooter` / `body` to `<ColorRailCardSkeleton>`),
+  `jumpPills` (count of `h-7 w-32` pill placeholders, `0` to omit),
+  `main` / `sidebar` (arrays of Tailwind height classes for
+  stacked `rounded-xl` block placeholders — empty sidebar collapses
+  the grid to one column). Sibling of `<PageError>` (iter 82) —
+  three states, three vocabularies, one visual system: error ->
+  `<PageError>`, loading -> `<DetailPageSkeleton>`, empty ->
+  `<EmptyState>`. Every v2 detail page already routed its error
+  state through `<PageError>` — this primitive gives the loading
+  state the same one-place-to-edit treatment. Don't fork the look
+  — extend this primitive if a fifth consumer needs a new layout
+  knob. The `ColorRailCardSkeletonProps` interface is now exported
+  (was internal-only pre-iter-83) so the primitive can forward
+  props with full type safety.
 
 ## Backlog (ordered roughly by impact)
 
@@ -2045,9 +2112,150 @@ Cross-cutting components:
     and the dialog's no-overflow context. Two inline class blocks
     sharing the same vocabulary is the right size today.
 
+- **Iter 80 — Sticky table header pinned below the app shell header (+ build unblock)** ([#1194](https://github.com/canalesb93/breadbox/pull/1194))
+  - `DataTable`'s `stickyHeader` opt-in pinned the column band to
+    `top-0`, which on the v2 SPA lands behind the app shell's own
+    sticky header (`h-14` in `__root.tsx`) — column labels disappeared
+    under the chrome as soon as the page scrolled. Bumped the offset
+    to `top-14` so the band sits flush under the app header and stays
+    legible.
+  - Three consumers benefit immediately:
+    `transactions.tsx`, `tags-table.tsx`, `api-keys-table.tsx`.
+    z-index left at `z-10` (above table body, well below the app
+    header's `z-30`).
+  - Tightened the JSDoc on `stickyHeader` to call out the shell
+    coupling so future surfaces don't reintroduce the regression.
+  - Same PR also unblocks the design-branch dev build: a stray
+    duplicate `const referenceRows` in `transaction-detail.tsx` and a
+    literal `<ViewAllPill>` token sitting inside JSX prose in
+    `sandbox/sections/components.tsx` were both crashing
+    `vite` / `tsc -b`. Neither shows up in `bun run lint` because
+    the repo's root `tsconfig.json` ships `files: []` — only
+    `tsc -b` (the script run by `bun run build`) walks the actual
+    project graph. Worth tightening `bun run lint` to run `tsc -b`
+    instead of `tsc --noEmit` so this class of regression catches in
+    iteration-level lint, not just CI build.
+
+- **Iter 81 — Lint script actually type-checks now (+ surfaced-error cleanup)** ([#1195](https://github.com/canalesb93/breadbox/pull/1195))
+  - Followed up on iter 80's open observation: `web/`'s `bun run lint`
+    was running `tsc --noEmit` with no `-p`, falling through to the
+    root `tsconfig.json` which has `files: []` and `references: [...]`
+    — so it compiled zero files and exited 0 unconditionally. That's
+    why iter 79's PR #1193 landed with a duplicate `referenceRows`
+    declaration + unescaped JSX text that real type-checking would
+    have caught.
+  - Switched the script to `tsc -b --noEmit` (build mode walks project
+    references). Verified end-to-end: injecting `const x: string = 123`
+    in `main.tsx` now exits 2 with the expected TS2322 (plus the
+    `noUnusedLocals` rule for free).
+  - Fixed the 8 pre-existing type errors that surfaced so the PR could
+    merge clean, scoped tight: `list-card` and `section-card` both
+    needed `Omit<HTMLAttributes, "title">` so the `ReactNode` title
+    prop doesn't collide with the DOM string `title`; `detail-list`
+    dropped an unused `import * as React`; `eyebrow` gained `"label"`
+    in its `as` union (and `htmlFor`) — pattern was already in use on
+    `connect-bank-sheet` and `csv-import-form`; `backups-section`
+    dropped unused `CheckCircle2`; `accounts.tsx` dropped a missing
+    `formatCurrency` import (no such export — would've been a real
+    bug at runtime); `connection-detail`'s `QuickActions` renamed
+    unused `conn` prop to `_props`.
+  - No visual change. Future design iterations now have a real
+    type-check gate before merge.
+
+- **Iter 82 — Unified page-level error state via `PageError` primitive** ([#1196](https://github.com/canalesb93/breadbox/pull/1196))
+  - New `PageError` at `web/src/components/page-error.tsx` wraps
+    `StatusPanel` (tone `destructive`) with the canonical
+    "Couldn't load X" lockup + an inline Retry button that calls
+    the query's `refetch()`. Outline `RefreshCw` button lands in
+    `StatusPanel`'s `trailing` slot; switches to an animated
+    spinner + "Retrying…" label while `isFetching` is true.
+  - Six pages converted from hand-rolled `<Alert variant="destructive">
+    + AlertTitle + AlertDescription` blocks to `<PageError>`:
+    accounts, connections, providers, rules, rule-form, rule-detail.
+    Destructive page-level errors now speak the same 3px tone-tinted
+    left rail vocabulary as warnings (StatusPanel), success notices
+    (setup-account), and env-locked providers — closing the last
+    "destructive notice fork" in the app.
+  - Drift cleanups in the same sweep:
+    - Connections' amber "N connections need attention" alert
+      moves to `<StatusPanel tone="warning">` (third surface in the
+      iter-16 vocabulary, retiring an open-coded `border-amber-500/30
+      bg-amber-500/5` alert).
+    - Rule-form / rule-detail "Rule not found" branches drop the
+      bare `<Alert>` for `<EmptyState variant="card">`, matching
+      tag-detail / category-detail. Not-found is now a single
+      vocabulary across all detail pages.
+  - Component-level alerts inside features (`backups-section`,
+    `reauth-sheet`, `account-links-section`, `preview-panel`)
+    intentionally stay on the raw `Alert` primitive — they're
+    scoped inline contexts, not full-page error surfaces.
+  - PageError is the 21st shared v2 primitive. Sibling of
+    `EmptyState` (no-data) and `StatusPanel` (inline notice) —
+    three states, three vocabularies, one visual system. Don't
+    fork the look — extend this primitive if a seventh consumer
+    needs a new variant.
+
+- **Iter 86 — `<RowActionsMenu>` primitive for row kebabs** ([#1201](https://github.com/canalesb93/breadbox/pull/1201))
+  - New `<RowActionsMenu>` at `web/src/components/row-actions-menu.tsx`
+    bundles `Tooltip` + `DropdownMenuTrigger` + `Button` into one
+    lockup so every list row, hero footer, and inline action cluster
+    shares the same trigger geometry, icon glyph, and aria
+    vocabulary. 23rd shared v2 primitive. Sibling of `<ActionPill>`
+    (iter 76) — same `text-muted-foreground → hover:text-foreground`
+    icon-button voice, but RowActionsMenu opens a menu rather than
+    dispatching.
+  - Seven open-coded sites consolidated onto the primitive
+    (connection-row, api-keys-table, tags-table, household-section
+    on `size="sm"`; rule-row, account-links-section,
+    connection-detail hero on `size="xs"`). Drift retired across
+    four dimensions:
+    - **Icon glyph**: 5 sites used `MoreHorizontal`, 2 used
+      `MoreVertical` (rule-row, household-section). Standardised
+      on `MoreHorizontal size-4`.
+    - **Trigger size**: size-7 / size-8 / unbranded `size="icon"`
+      (size-9 default). Standardised on `size="sm"` (size-8
+      ghost square — dominant) and `size="xs"` (size-7 — for
+      hero footers + nested rows).
+    - **Loading affordance**: account-links open-coded the
+      `reconcile.isPending || remove.isPending ? Loader2 :
+      MoreHorizontal` swap. Standardised on a `loading` prop with
+      built-in spin + auto-disable.
+    - **Destructive item style**: rule-row used `className=
+      "text-destructive focus:text-destructive"` while every
+      other consumer used the canonical `variant="destructive"`.
+      Swept onto the variant.
+  - One escape hatch retained: `triggerClassName` on
+    `RowActionsMenu`. Only one consumer uses it today
+    (connection-detail's hero footer adds `rounded-full` so the
+    kebab pairs visually with the surrounding `<ActionPill>`
+    cluster). Documented in the JSDoc.
+  - Tooltip imports dropped from 4 files where they were only
+    feeding the kebab trigger (household-section,
+    account-links-section, connection-detail, connection-row).
+    The other 3 consumers kept Tooltip for unrelated buttons.
+  - Sandbox specimen lives next to `<ActionPill>` in
+    `sections/components.tsx` so the two sibling primitives
+    (labelled inline action vs. kebab menu) read side-by-side.
+    Three buttons cover the API: `sm` default, `xs` with
+    `contentClassName="w-44"`, `xs` with `loading`.
+
 ## Open observations / questions
 
 (Populated by iterations.)
+
+- **`bun run lint` doesn't catch real TS errors** (iter 80, closed
+  iter 81 [#1195](https://github.com/canalesb93/breadbox/pull/1195)):
+  the script ran `tsc --noEmit` against the root `tsconfig.json`
+  which has `files: []` — it type-checked nothing. Iter 81 changed
+  the script to `tsc -b --noEmit` (build mode honors project
+  references) and fixed the 8 pre-existing type errors the change
+  surfaced (HTMLAttributes/title collisions on `list-card` and
+  `section-card`, unused React/icon/util imports, `Eyebrow` needing
+  `as="label"` for the pattern already in use on
+  `connect-bank-sheet` + `csv-import-form`, unused `conn` prop on
+  `connection-detail`'s `QuickActions`). Verified with an injected
+  `const x: string = 123` test — lint now exits 2 with the expected
+  TS2322. Observation closed.
 
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
@@ -2152,7 +2360,563 @@ Cross-cutting components:
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
 
+- **Iter 83 — DetailPageSkeleton primitive** ([#1197](https://github.com/canalesb93/breadbox/pull/1197))
+  - New `<DetailPageSkeleton>` at
+    `web/src/components/detail-page-skeleton.tsx` composes the
+    iter-10 `<ColorRailCardSkeleton>` hero + a `<JumpToRow>`-shaped
+    pill strip + a 2-col grid of `rounded-xl` block placeholders
+    matching `<SectionCard>` / `<ListCard>` chrome. Sibling of
+    iter-82's `<PageError>` — three states, three vocabularies,
+    one visual system: error -> PageError, loading ->
+    DetailPageSkeleton, empty -> EmptyState. 22nd shared primitive
+    in the v2 vocabulary.
+  - Four routes migrated onto it (transaction-detail,
+    account-detail, category-detail, connection-detail). Each
+    route's hand-rolled `function DetailSkeleton()` collapses from
+    ~15 lines of copy-pasted JSX to a single props call. Width
+    variance on jump pills (Category had `w-48` + `w-32`) collapsed
+    to uniform `w-32` — decorative-only difference, not worth a
+    knob. Connection-detail keeps its no-pills + 3+2 grid via
+    `jumpPills: 0` + `main` of length 3.
+  - Exports `ColorRailCardSkeletonProps` interface from
+    `color-rail-card.tsx` (was internal) so the new primitive can
+    forward props with full type safety.
+  - No visual change. The intentional consolidation: future
+    skeleton tweaks (icon-tile sizing, sidebar widths, pill geometry)
+    now propagate from one file. The drift that motivated this
+    primitive — four nearly-identical `DetailSkeleton` functions
+    that hand-rolled `space-y-6` + `grid lg:grid-cols-[minmax(0,1fr)_18rem]`
+    + `flex gap-2` etc. — is gone.
+
+- **Iter 84 — Row-shape loading skeletons for Rules / Tags / API keys lists** ([#1198](https://github.com/canalesb93/breadbox/pull/1198))
+  - Parallel to iter 83's `<DetailPageSkeleton>` sweep on detail
+    pages — every v2 detail page now loads through a real-shape
+    skeleton, but three list pages still fell back to generic
+    `<Skeleton>` blocks while the rest of the list family
+    (Connections, Accounts, Categories, Transactions) ship a
+    row-shape skeleton via `<ListRowSkeleton>` or a co-located
+    feature-folder sibling.
+  - New `RuleRowSkeleton`
+    (`features/rules/rule-row-skeleton.tsx`) — mirrors the
+    `rounded-xl border` card, `size-9 rounded-xl` avatar tile,
+    title + meta-line stack, lg-only stage / last-active stat
+    columns, and the absolute action cluster. Title widths rotate
+    per-row (`SKELETON_TITLE_WIDTHS = ["w-52", "w-40", "w-64",
+    "w-44", "w-48"]`) so the loading stack reads varied instead
+    of metronomic. Rules page swaps its inline `Skeleton
+    h-[72px] rounded-xl` strip for five `<RuleRowSkeleton>` rows.
+  - New `TagRowSkeleton`
+    (`features/tags/tag-row-skeleton.tsx`) — mirrors the four
+    columns of the Tags table (chip + name, mono slug pill,
+    description, action button). Wired through
+    `DataTable.renderSkeletonRow`.
+  - New `APIKeyRowSkeleton`
+    (`features/api-keys/api-key-row-skeleton.tsx`) — mirrors the
+    six columns of the API-keys table (name + prefix pill stack,
+    scope badge, actor badge, last-used / revoked-at text,
+    created date, action button). Respects the revoked tab's
+    no-actions-column shape via a `revoked` prop.
+  - No new shared primitive — these live alongside their consumers
+    matching the iter-4 `TransactionRowSkeleton` pattern. The
+    `ListRowSkeleton` drift note now documents the per-cell
+    sibling family + the rule for when to lift them into a
+    `<TableRowSkeleton>` primitive (fourth or fifth consumer).
+
+- **Iter 85 — Sandbox specimens for `<PageError>` + `<DetailPageSkeleton>`** ([#1200](https://github.com/canalesb93/breadbox/pull/1200))
+  - Adds the two iter 82/83 primitives to the sandbox showcase so
+    the "three states, three vocabularies, one visual system"
+    sibling family (no data → load failed → loading) reads top
+    to bottom in one place at `/v2/sandbox#components`. Both
+    specimens land immediately after `<EmptyState>` so the
+    vocabulary triad is colocated.
+  - `<PageError>` specimen covers both shapes consumers actually
+    hit: with-retry (interactive spinner driven by a local
+    `useState` so the `Retrying…` label is reachable from the
+    showcase) and without-retry (fallback `Try again or refresh
+    the page.` body when the query exposes no `refetch` hook).
+  - `<DetailPageSkeleton>` specimen shows two real consumer
+    configurations side-by-side: the transaction shape (hero
+    `tileShape="rounded-md"` + 3 jump pills + 1+2 grid) and the
+    connection shape (hero `withFooter` + no pills + 3+0
+    single-column grid). The two cards make the API knobs
+    (`hero` / `jumpPills` / `main` / `sidebar`) visually obvious
+    without prose.
+  - Sandbox-only addition: no runtime change, no new primitive
+    (still 22). Resolves the iteration-prompt observation that
+    PageError + DetailPageSkeleton specimens were missing from
+    the sandbox after their iter 82 / 83 PRs landed.
+
+- **Iter 87 — Split load-error vs not-found on detail pages** ([#1202](https://github.com/canalesb93/breadbox/pull/1202))
+  - Five detail pages (transaction, account, category, connection,
+    tag) used to render the same `<EmptyState>` "X not found" for
+    both `isError` and `\!data`. A real failure (network drop, 500,
+    dropped session) looked identical to a stale URL and offered no
+    way to retry. Verified by a fetch-init-script demo on the design
+    branch: the "Failed to fetch" screenshot and the bad-id 404
+    screenshot were byte-identical (same MD5).
+  - Each page now triages three states: `isError` (non-404) ->
+    `<PageError>` with Retry (reusing the iter 82 primitive); `404`
+    or `\!data` -> `<EmptyState variant="card">` with the prior
+    "X not found" copy; `data` -> the page. Brings every detail
+    page into the rule-detail / rule-form vocabulary from iter 75
+    (three states, three vocabularies, one visual system) — error
+    -> PageError, loading -> DetailPageSkeleton, empty/not-found
+    -> EmptyState.
+  - The `api<>` helper throws `ApiError` on every non-2xx, so the
+    three single-resource endpoints (transaction-detail,
+    account-detail, connection-detail) needed an explicit
+    `error instanceof ApiError && error.status === 404` discriminator
+    to keep 404s out of the destructive PageError lane. Category-
+    detail and tag-detail filter a list client-side so they hit the
+    `\!result` branch naturally — no 404 path possible.
+  - `EmptyState` now ships with `variant="card"` on the not-found
+    branch so the bordered chrome parallels the PageError panel and
+    the page doesn't collapse to a flat centered blob.
+  - No new primitive, no new sandbox specimen — both PageError and
+    EmptyState already have showcases. Activity-timeline (inside a
+    SectionCard) still uses a bare `<p>` for its isError fallback;
+    queued as a follow-up observation below.
+
+- **Activity-timeline isError uses bare `<p>`** (iter 87
+  observation, closed iter 88 [#1203](https://github.com/canalesb93/breadbox/pull/1203)):
+  resolved by growing a new `inline` variant on `<PageError>` that
+  drops the bordered StatusPanel chrome — same destructive icon
+  tile + heading + body + retry vocabulary, but no border / rail /
+  muted background so the error sits flush inside the parent
+  `<SectionCard title="Activity">` without doubling up borders.
+  Same primitive, new shell. Observation closed.
+
+- **Iter 88 — PageError inline variant + activity-timeline error state** ([#1203](https://github.com/canalesb93/breadbox/pull/1203))
+  - New `inline` variant on `<PageError>` drops the bordered
+    StatusPanel chrome so the canonical "couldn't load X"
+    vocabulary (destructive icon tile + heading + body + retry)
+    can nest inside an already-bordered host (SectionCard /
+    ListCard) without doubling up borders. Same primitive, new
+    shell — `panel` (default) remains byte-identical.
+  - Wires the transaction-detail activity timeline through it.
+    Was `<p className="text-muted-foreground text-sm">Couldn't
+    load the activity timeline.</p>` with no retry; now matches
+    every other v2 error surface and lets the user retry without
+    a full page reload (`refetch` + `isFetching` from the
+    `useAnnotations` `useQuery` are wired into `onRetry` /
+    `retrying`).
+  - Sandbox specimen rebuilt — both shapes now render
+    side-by-side. `panel · with retry handler` + `panel · without
+    retry · fallback message` stay in the iter-85 grid; a new
+    `inline · nested inside a bordered host (SectionCard /
+    ListCard)` row renders the inline variant inside a fake
+    Activity SectionCard so the nesting semantics read at a
+    glance. No new primitive (still 23 after iter 86's
+    RowActionsMenu).
+  - Closes the iter-87 follow-up observation. The decision the
+    observation queued — lift error up vs. compact PageError
+    variant — picked the variant route. The compact shape is
+    reusable for any future nested error state inside a bordered
+    section (e.g. preview-panel could swap its plain-text "No
+    matches yet" / failure-state shapes when a real failure path
+    lands).
+
+- **Iter 89 — List-page empty/error state polish** ([#1204](https://github.com/canalesb93/breadbox/pull/1204))
+  - Sweep four list pages to align with the iter-87
+    three-states-three-vocabularies contract and the filter-vs-zero-data
+    empty-state pattern API keys + Transactions already follow.
+  - Categories: `isError` now renders `<PageError>` (with Retry)
+    instead of a flat `EmptyState` — every other list page already
+    routed load failures through `PageError`, so this was the lone
+    holdout. Wires `categoriesQuery.refetch` + `isFetching` into the
+    Retry button.
+  - Connections + Accounts: filter-empty `<EmptyState>` gets the
+    matching `Plug` / `Banknote` icon so the filter and zero-data
+    empties are visually parallel (icon tile + title + description;
+    CTA only on zero-data).
+  - Rules: filter-empty drops the "Create rule" CTA. The action
+    belongs to the no-rules-yet state, not "your filter excluded the
+    existing rules" — mirrors how Transactions already gates its
+    "Connect a bank" CTA.
+  - No new primitive, no visual contract change. After this, every
+    v2 list page funnels load failures through `<PageError>` and
+    renders filter-empty + zero-data-empty as visually parallel
+    `<EmptyState>` blocks. The backlog item "list-page empty states —
+    verify filter empty vs zero-data empty distinction across all
+    lists" is closed.
+
+- **Iter 90 — DetailSheetHeader sweep for link-account + reauth** ([#1205](https://github.com/canalesb93/breadbox/pull/1205))
+  - Both remaining open-coded Sheet headers — `link-account-sheet`
+    and `reauth-sheet` — now route through `<DetailSheetHeader
+    density="accent">`, joining `shortcut-sheet` and
+    `connect-bank-sheet`. The icon-tile lockup (size-10 tile +
+    `bg-muted/20` border-bottom band + eyebrow + title +
+    description) is now canonical across all four v2 Sheet
+    consumers. Resolves the iter-41 drift observation
+    ("`reauth-sheet` and `link-account-sheet` use different header
+    shapes (no icon-tile lockup) and stay open-coded — promote if
+    a third Sheet adopts the lockup").
+  - link-account-sheet: Link2 icon, eyebrow "Account link",
+    SheetFooter swapped for the canonical
+    `bg-muted/20 border-t px-6 py-3` strip with `size="sm"` Cancel
+    + primary buttons, body switched to `flex/gap-5 p-6` with
+    `<Eyebrow as="label">` labels matching the Connect-bank rhythm.
+    Dropped the now-unused `Label` import.
+  - reauth-sheet: ShieldAlert icon, eyebrow "Re-authenticate",
+    title bound to `institution_name` once loaded (falls back to
+    "Re-authenticate" while the connection query resolves) so the
+    user knows at a glance which connection they're about to
+    reauth. Same canonical footer strip for the Confirm +
+    Unsupported stages. Plaid + Teller launcher buttons
+    (invisible auto-opening SDK shells) moved into the body's
+    scroll container instead of sitting as siblings of the old
+    `SheetFooter`.
+  - Component drift "Modal/Sheet content density consistency" is
+    now closed for Sheets — every v2 Sheet shares the
+    DetailSheetHeader lockup, the body padding rhythm (`p-6`), and
+    the bordered footer strip. Dialogs (confirm, household,
+    backups, command-palette) keep their own rhythm because they're
+    a different surface type (centered modal vs side sheet);
+    content-density audit of those is queued separately.
+
+- **Iter 91 — AuthError onto StatusPanel + unreachable-gate fix** ([#1206](https://github.com/canalesb93/breadbox/pull/1206))
+  - Closes the iter-35 drift note ("`routes/__root.tsx` still
+    hand-rolls an inline `AuthError` component… sweep onto a
+    `<StatusPanel tone="destructive">` next time we touch the root
+    layout"). The `/me` non-401 failure surface (network drop, 500,
+    malformed payload) now reads as the canonical bordered
+    destructive panel — 3px destructive left rail + tinted
+    `AlertTriangle` icon tile + heading + body + outline Reload
+    button with `RefreshCw` glyph in the `trailing` slot — instead
+    of bare-text + raw underline-`<button>` markup that predated
+    every v2 error vocabulary.
+  - Fixes a latent gate bug uncovered while capturing the BEFORE
+    screenshot: `if (is401 || me.isPending || !me.data)` short-
+    circuited the `me.error` branch, so the AuthError surface was
+    unreachable — every non-401 failure stuck at the splash loader.
+    Gate now triages 401/pending → `<AuthSplash>`, error →
+    `<AuthError>`, then defensive `!me.data` → splash. The before
+    capture was taken against the fixed gate so the comparison
+    shows the visual swap, not the unreachability.
+  - `<AuthSplash>` is intentionally left alone — sub-second flash
+    during the initial `/me` fetch where a bare loader reads as
+    "imminently leaving"; promoting it to a StatusPanel would add
+    visual weight.
+  - Can't reach for `<PageError>` here because the sidebar / page
+    chrome isn't mounted yet (the gate failed before
+    `<AuthenticatedShell>` could render), but the inner lockup is
+    identical since `<PageError>` itself composes `<StatusPanel>`.
+    Same primitive, different host. No new primitive (still 23).
+  - Process note: vite's dep cache + transform cache became sticky
+    on the same edited file. Iter-35's `bun dev --force` recipe
+    didn't break the cache on the existing 5301 port — had to spin
+    up a fresh port (5401) with `--force` to get vite to re-read
+    the on-disk file. The chronic cache-staleness observation from
+    iter 35 still applies; queue: pin vite's `cacheDir` per-worktree
+    or set `optimizeDeps.force=true` in `web/vite.config.ts` for
+    dev so the CLI flag isn't required.
+
+- **Iter 95 — Eyebrow `nav` variant retires 3 sidebar-label drift sites** ([#1210](https://github.com/canalesb93/breadbox/pull/1210))
+  - Iter 94 closed the page-scale Eyebrow drift; the remaining
+    eyebrow-shaped uppercase markup in the v2 SPA was the
+    `text-[10px] font-semibold tracking-[0.08em] uppercase` rhythm
+    used by sidebar / menu group labels. Three surfaces hand-rolled
+    that class triplet: `<NavMain>`'s `<SidebarGroupLabel>` (Money /
+    Library / System group headers in the app sidebar), the
+    `settings-shell` desktop sidebar's "Settings" caption, and the
+    `<ShortcutSheet>` group section headers. The two nav ones used
+    `text-muted-foreground/80` and `tracking-[0.08em]`; the shortcut
+    sheet used `text-muted-foreground` and `tracking-wider` (slightly
+    different but the same intent).
+  - Added a fourth `"nav"` variant to `<Eyebrow>` —
+    `font-semibold text-[10px] tracking-[0.08em]` — the only existing
+    variant family with a different `font-weight` from `default`,
+    deliberately so: nav labels sit against `bg-sidebar` chrome and
+    need the heavier weight to read. The variant switch flows through
+    `cn`: `variant === "nav" ? "font-semibold" : "font-medium"` so the
+    other three variants keep their `font-medium` rhythm. Routed all
+    three call sites through the primitive. The shortcut-sheet
+    consumer drops the slightly-off `tracking-wider` and lands on
+    `tracking-[0.08em]` for consistency.
+  - `<NavMain>` keeps `<SidebarGroupLabel asChild>` as the host so the
+    shadcn chrome (`flex h-8 items-center px-2`, ring/focus,
+    collapsible-icon transitions) survives; Eyebrow becomes the
+    underlying element and only owns the type rhythm. The
+    `text-muted-foreground/80` override lives on the className prop
+    (the nav-only "softer than the default eyebrow mute" choice that
+    Ricardo's settings-shell desktop sidebar matches).
+  - Sandbox showcase grows a fourth specimen tile so all four
+    variants (`default` · `hero` · `page` · `nav`) live side-by-side
+    in a `lg:grid-cols-4` layout; the `nav` tile renders against
+    `bg-sidebar text-sidebar-foreground` so reviewers see the rhythm
+    against the surface it was designed for. Description spells out
+    the new variant + its consumers + the iter-95 retirement note.
+  - Pre-merge audit confirms zero stragglers: `grep -rn
+    'text-\[10px\] font-semibold tracking' web/src --include="*.tsx" |
+    grep -v sandbox | grep -v eyebrow.tsx` returns only intentional
+    *non-eyebrow* weights (brand-header version chip, nav-user role
+    pill — both coloured chips, not labels). The iter-37 invariant
+    ("raw `text-[10-11px] font-medium/semibold tracking-* uppercase`
+    markup never appears outside `<Eyebrow>`") now holds across every
+    weight tier — `default` (`font-medium`, 0.1em), `hero`
+    (`font-medium`, 0.12em), `page` (`font-medium`, 11px/0.08em), and
+    `nav` (`font-semibold`, 10px/0.08em).
+  - Four variants is the new natural ceiling. Don't add a fifth
+    without a concrete fifth host requirement — the four currently
+    encode "section · hero · page · nav" tiers; further sub-variants
+    would muddy that signal. If a new context needs slightly
+    different geometry, prefer overriding the className over coining
+    a variant.
+
+- **Iter 94 — Eyebrow `page` variant retires 8 hand-rolled call sites** ([#1209](https://github.com/canalesb93/breadbox/pull/1209))
+  - Audited the v2 SPA for stray uppercase tracked labels (`uppercase
+    tracking-[…]`) markup blocks and found eight surfaces hand-rolling
+    `text-[11px] font-medium tracking-[0.08em] uppercase` — the
+    slightly heavier rhythm reserved for *page*-scale framing, where
+    the default `<Eyebrow>` `text-[10px] tracking-[0.1em]` rhythm
+    disappears next to a 2xl–3xl title. The iter-37 promise was
+    "don't reach for raw `text-[10px] font-medium tracking-* uppercase`
+    markup again — extend the primitive"; the page-scale rhythm
+    quietly drifted past it because the variant didn't exist yet.
+  - Added a `"page"` variant to `<Eyebrow>` (`text-[11px]
+    tracking-[0.08em]`) and routed all eight surfaces through it:
+    `<PageHeader>`'s eyebrow, `<HeroCell>` + `<SecondaryCell>` in
+    home-stats (the KPI cell labels with the leading lucide icon),
+    the `Provider` caption in Plaid / CSV / Teller cards (three
+    surfaces share the same `<div>` markup), and the `Sync interval`
+    form label in connection-detail (the only `tracking-[0.1em]`
+    holdout — was already in the right rhythm for the `default`
+    variant, just hand-rolled the markup; routed through `<Eyebrow
+    as="label" htmlFor="…">` for the screen-reader-friendly
+    composition).
+  - Sandbox showcase grows a third specimen tile so all three
+    variants (`default` / `hero` / `page`) live side-by-side instead
+    of two — the description documents the rhythm of each variant
+    *and* lists the new variant's canonical consumers + the iter-94
+    retirement note so the next agent who reaches for raw uppercase
+    tracking markup hits the docstring before the find-grep.
+  - Pre-merge audit confirms zero stragglers: `grep -rn
+    "text-\[11px\] font-medium tracking-\[0\.08em\] uppercase\|
+    tracking-\[0\.1em\] uppercase\|tracking-\[0\.12em\] uppercase"
+    web/src --include="*.tsx" | grep -v "sandbox\|eyebrow.tsx"`
+    returns empty. The iter-37 invariant — "raw `text-[10-11px]
+    font-medium tracking-* uppercase` markup never appears outside
+    `<Eyebrow>`" — is finally enforced across every consumer, not
+    just the eight surfaces iter 37 swept.
+  - Three variants is the natural ceiling. `default` is the
+    detail-page section header + "Jump to" pills + timeline-rail day
+    heading rhythm; `hero` is the hero-card eyebrow ("Liability" /
+    "Income") with extra letter air below a display title; `page` is
+    the page-scale eyebrow + KPI cell label + provider-card caption
+    rhythm. Don't add a fourth without a concrete fourth host
+    requirement — the three currently encode "section · hero · page"
+    weight tiers and a fourth without a host would muddy that signal.
+  - Observation: connection-detail had several other inline
+    eyebrow-shaped labels (line 456 `<Eyebrow>Last 7 days</Eyebrow>`,
+    line 500 `<Eyebrow>Last 10</Eyebrow>`, line 645 `<Eyebrow as="p"
+    variant="hero">`) that are already routed through the primitive
+    — those four pre-existing call sites validate that consumers
+    were reaching for the primitive when they knew the variant
+    existed. The hand-rolled markup survived only where the iter-37
+    sweep didn't catch the rhythm. Lesson for next sweeps: when
+    consolidating a primitive, grep for *every* close variant
+    (slightly different size or tracking) not just the canonical
+    one — the close cousins are usually the same intent.
+
+- **Iter 93 — TimelineRail.Row gains semantic `tone` accent** ([#1208](https://github.com/canalesb93/breadbox/pull/1208))
+  - The activity timeline's icon discs were all rendered in the same
+    neutral `border-border/60 text-muted-foreground` lockup regardless
+    of event kind — comments, rule fires, sync events, and tag
+    adds/removes were visually indistinguishable from each other.
+    Scanning a long feed forced the eye to read every `summary` line
+    just to find the rule-driven changes amid the chatter.
+  - `<TimelineRail.Row>` now takes a semantic `tone` prop —
+    `neutral` (default; preserves the legacy look) · `primary` ·
+    `success` · `warning` · `info` · `muted`. A `TONE_CLASSES`
+    record tints both the disc *border* and the icon glyph (background
+    stays `bg-card` so the disc keeps punching through the rail line).
+    Tokens picked to match the existing v2 colour vocabulary
+    (StatusPanel / ColorRailCard / MetaBadge): `primary` for the
+    accent, `emerald` for success, `amber` for warning, `sky` for
+    info — so the timeline reads as part of the same system, not a
+    bolted-on palette.
+  - Wired into transaction-detail activity timeline via a per-kind
+    `KIND_TONE` map: `rule_applied` + `category_set` → primary
+    (system-driven / classification edits are the dominant signal),
+    `sync_started` + `sync_updated` → info (data arrived from the
+    outside; matches the sync vocabulary on Connection-detail),
+    `tag_added` → success (additive), `tag_removed` → warning
+    (something taken away), comments + unmapped kinds → neutral.
+    Deleted rows drop the tint regardless of kind so the
+    strikethrough/muted vocabulary owns the deletion signal alone.
+  - Sandbox specimen expanded to demo five tones in a single
+    timeline (added a sync-info row in Today, a tag-warning row in
+    Yesterday) so the visual contract is browseable; description
+    spells out the new mapping. The primitive count stays at 23 —
+    no new component, just a richer prop on an existing one.
+  - TimelineRail is now the only v2 primitive with kind-based
+    colour encoding *inside* a list — ColorRailCard / StatusPanel
+    encode tone at the container level; this lands the same
+    "colour = meaning" principle at the row level for activity
+    feeds. Worth promoting to rule run history + per-connection
+    sync logs when those land (already queued in the iter-26
+    promotion notes).
+
+- **Iter 92 — Settings 'Coming soon' fallback onto StatusPanel** ([#1207](https://github.com/canalesb93/breadbox/pull/1207))
+  - The settings modal's unbuilt-section fallback (today: only
+    Security) was the last "naked text" empty-state surface in the
+    v2 SPA — a bare `<p className="text-muted-foreground text-sm">
+    Coming soon.</p>` paragraph that lived under the
+    `<SettingsSectionHeader>` with no icon, no rail, no structure.
+    Now routed through `<StatusPanel tone="info">` so it speaks the
+    same canonical "in the works" vocabulary as
+    `routes/placeholder.tsx`: `Hammer` icon tile + tone-tinted 3px
+    left rail + heading + body, uppercase `Coming soon` pill with
+    `Clock` glyph in the trailing slot.
+  - The heading interpolates the section title — today it reads as
+    `Security settings are in the works`, but any future entry
+    added to `lib/settings-sections.ts` without a real
+    implementation inherits the canonical lockup for free.
+  - Lockup matches the placeholder route's `<StatusPanel>`
+    precisely (same `Hammer` icon, same uppercase `Clock` pill
+    geometry) so a user clicking around v2 reads "this surface
+    isn't built yet" as one consistent affordance, whether they
+    got there via a sidebar leaf (Reports / Agents) or via the
+    settings modal.
+  - No new primitive (still 23). Closes the
+    "Settings shell desktop secondary states" candidate from the
+    iter-92 prompt — the secondary states the desktop nav can
+    drop you into (load failure surfaces are caught higher up,
+    "Coming soon" is the only remaining stub) now share the v2
+    visual vocabulary.
+  - Process note: vite's stale-transform-cache from iter 91
+    bit again on the same edited file. The 5601 port kept serving
+    the old `Coming soon.` paragraph after the edit landed on
+    disk — fresh-port 5701 with `--force` immediately served the
+    new code. Still chronic; queue: `optimizeDeps.force=true` in
+    `web/vite.config.ts` for dev so the CLI flag isn't required
+    (queued since iter 91, not yet picked up).
+
+
+- **Iter 96 — SearchInput primitive (4 list-page search inputs unified)** ([#1211](https://github.com/canalesb93/breadbox/pull/1211))
+  - Long-className audit found 4 sites open-coding the same
+    icon-input lockup: `<div className="relative w-full max-w-sm">
+    <Search className="text-muted-foreground pointer-events-none
+    absolute top-1/2 left-2.5 size-4 -translate-y-1/2"/>
+    <Input className="pl-8" .../></div>`. Tags, Categories, and
+    API keys list pages were byte-identical except for the wrapper
+    width (`max-w-sm` vs `max-w-xs`); Transactions toolbar shared
+    the same shape but added a `ref` + an `Esc`-to-blur
+    `onKeyDown`. Promoted to `<SearchInput>` at
+    `web/src/components/search-input.tsx` — 24th shared primitive
+    in the v2 vocabulary.
+  - API: `React.forwardRef` so the Transactions toolbar's
+    `searchRef` keeps working; spreads all native input props
+    (value / onChange / onKeyDown / placeholder / defaultValue);
+    `containerClassName` is the escape hatch for the outer wrapper
+    width — default `w-full max-w-sm` matches the dominant
+    list-page pattern (Tags / Categories), with explicit overrides
+    documented in the docstring for the API keys (`max-w-xs`) and
+    Transactions toolbar (`min-w-48 sm:w-64`) shapes. Input
+    `type="search"` so browsers know to surface the clear-X on
+    desktop without us having to wire one.
+  - Sandbox specimen at `/v2/sandbox#components` (right after
+    `<ViewAllPill>`) shows three preset widths so future consumers
+    don't have to spelunk through call sites to pick the right
+    `containerClassName`. Visual change is by design negligible —
+    every consumer renders byte-equivalent geometry (same icon
+    position, same `pl-8`, same wrapper width). The win is one
+    place to evolve the search-field vocabulary (focus glow,
+    icon glyph, density) instead of four.
+  - Audit observation: the same long-className pass surfaced two
+    more 3-site duplications worth promoting in subsequent
+    iterations — the `grid gap-5 px-5 py-5 sm:gap-6 sm:px-7
+    sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start
+    lg:gap-10` detail-page hero body grid (account-detail,
+    category-detail, connection-detail) and the `flex flex-col
+    gap-5 px-6 py-5 sm:flex-row sm:items-center
+    sm:justify-between sm:px-7` provider-card header bar
+    (plaid-card, teller-card, csv-card). Both are good
+    candidates: each retires three open-coded sites and gives the
+    primitive a clear name (`<HeroGrid>` / `<ProviderCardHeader>`).
+    Queued for the long-className backlog.
+  - Iter 4 (#1117) called out a `<ListToolbar>` primitive
+    opportunity for "search input + filter controls in a flex row";
+    this PR ships the search-input half. The filter half stays
+    per-page until a third page picks up the Transactions
+    toolbar's `FilterPill` vocabulary — at which point a
+    `<ListToolbar>` slot composition makes sense.
+
+
+- **Iter 97 — HeroGrid primitive (4 detail-page hero bodies unified)** ([#1212](https://github.com/canalesb93/breadbox/pull/1212))
+  - Picked up iter 96's first queued long-className candidate. Three
+    byte-identical sites (account-detail, category-detail,
+    connection-detail) and one near-identical variant
+    (transaction-detail) all open-coded the same body grid:
+    `grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6
+    lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10`.
+    Promoted to `<HeroGrid>` at `web/src/components/hero-grid.tsx` —
+    25th shared primitive in the v2 vocabulary.
+  - API: thin `lgGapClassName` escape hatch (default `lg:gap-10`)
+    admits the TX-detail variant (`lg:gap-x-10 lg:gap-y-5`). The
+    transaction-detail left column stacks identity on top of a
+    classify row so its vertical rhythm needs to be tighter — the
+    other three consumers don't have that stack and stay on the
+    looser default. Forwards `className` + native div attrs.
+  - Visual change is by design negligible — every consumer renders
+    byte-equivalent geometry (same breakpoints, same px / py, same
+    column tracks, same lg row-gap). The win is one place to evolve
+    the hero body density (eg. tighten the lg padding or change the
+    column track expression) instead of four.
+  - Sandbox specimen at `/v2/sandbox?section=components` between
+    `ColorRailCard` and `ColorRailCardSkeleton` shows the asset hero
+    shape (`<ColorRailCard accent="#0ea5e9">` wrapping
+    `<HeroGrid>` with identity + metric columns).
+  - One iter-96 candidate left in the long-className backlog:
+    `<ProviderCardHeader>` for the `flex flex-col gap-5 px-6 py-5
+    sm:flex-row sm:items-center sm:justify-between sm:px-7` bar
+    shared by plaid-card, teller-card, csv-card. Next iteration if
+    no higher-priority target appears.
 
 
 
-
+- **Iter 100 — Retire 2 destructive Dialogs onto ConfirmDialog** ([#1215](https://github.com/canalesb93/breadbox/pull/1215))
+  - Triple-digit-milestone iteration. Pure drift retirement on the
+    cross-cutting destructive-confirmation vocabulary. Tags
+    (`tags-table`, delete tag) and API keys (`api-keys-table`, revoke
+    key) both hand-rolled a plain `<Dialog>` + `<DialogHeader/Footer>`
+    + destructive `<Button>` with a `<Loader2>` spinner — when
+    `<ConfirmDialog>` (iter 18) already existed and 8 other surfaces
+    (backups x3, household delete-member, plaid/teller cards) already
+    spoke its vocabulary. Both now route through `<ConfirmDialog>` —
+    10th and 11th consumers.
+  - Wins: the tone-tinted destructive icon tile (`Trash2` for the
+    tag delete; `Ban` for the api-key revoke — distinct icons,
+    intentional, "trash this" vs "stop honouring this") now reads
+    the dialog's intent at a glance instead of relying on the red
+    "Revoke key" / "Delete tag" button text alone. Both surfaces
+    also inherit the canonical pending-state behaviour
+    (`block-close-during-mutation` + spinner) for free, instead of
+    threading `disabled={pending}` through three Button instances.
+    Net diff: ~40 LOC removed across the two files.
+  - Visual contract is now consistent across every v2 destructive
+    confirmation surface: 16-square tone-tinted icon tile + title
+    + description + Cancel (outline) left + destructive primary
+    right. The previous bare-text destructive Dialogs were the only
+    two surfaces that didn't speak this vocabulary.
+  - No primitive changes. Visual difference is loud (the icon tile
+    is the headline change), but the system itself didn't grow —
+    this is a pure consumer migration on a tested primitive.
+  - **Remaining centered-modal `<Dialog>` consumers in `web/src/`**
+    are intentionally *not* candidates for this primitive:
+    `household-section` (Add member, Create login, Share setup
+    link), `settings-shell` (sr-only header on the settings modal
+    chrome itself), `confirm-dialog` (composes `AlertDialog`).
+    Those four are form-bearing modals (multi-field inputs +
+    submit handlers), not yes/no confirmations — they belong to a
+    future `DetailDialogHeader` primitive (sibling of
+    `DetailSheetHeader`) if/when the form-modal lockup grows a
+    third consumer. For now, the gap is documented and won't
+    accidentally get folded into `ConfirmDialog`.
+  - Process note: vite's transform-cache staleness reappeared (per
+    iter 35 + iter 91 observations) — capturing the BEFORE
+    screenshot after the commit required tearing down the dev
+    server, restarting on a fresh port with `--force`. The
+    `optimizeDeps.force=true` queue item in iter 91 is still the
+    right durable fix; logged here so the next iteration that hits
+    this pain has more evidence to motivate the change.

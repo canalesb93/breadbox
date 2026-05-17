@@ -11,12 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { EmptyState } from "@/components/empty-state";
+import { PageError } from "@/components/page-error";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import {
-  ColorRailCard,
-  ColorRailCardSkeleton,
-} from "@/components/color-rail-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { HeroGrid } from "@/components/hero-grid";
 import {
   DetailList,
   compactDetailRows,
@@ -31,13 +31,20 @@ import { TagManager } from "@/features/transactions/tag-manager";
 import { ActivityTimeline } from "@/features/transactions/activity-timeline";
 import { CommentComposer } from "@/features/transactions/comment-composer";
 import { useTransaction } from "@/api/queries/transactions";
+import { ApiError } from "@/api/client";
 import { formatAmount, formatLongDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
 
 export function TransactionDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
-  const { data, isLoading, isError } = useTransaction(id);
+  const query = useTransaction(id);
+  const { data, isLoading, isError, error } = query;
+  // 404 means the URL is stale (deleted or never existed) — show the
+  // "not found" empty state, which has a concrete back-to-list CTA.
+  // Every other failure (network drop, 500, dropped session) is a real
+  // load error — show PageError with Retry. Three states, three vocabularies.
+  const notFound = isError && error instanceof ApiError && error.status === 404;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -45,8 +52,16 @@ export function TransactionDetailPage() {
 
       {isLoading ? (
         <DetailSkeleton />
-      ) : isError || !data ? (
+      ) : isError && !notFound ? (
+        <PageError
+          resource="this transaction"
+          error={error}
+          onRetry={() => query.refetch()}
+          retrying={query.isFetching}
+        />
+      ) : !data ? (
         <EmptyState
+          variant="card"
           icon={Receipt}
           title="Transaction not found"
           description="This transaction may have been deleted, or the link is out of date. Head back to the transactions list to pick another."
@@ -115,7 +130,7 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
           the identity + classify stack on the left and the amount column
           docks to the right (identity stays anchored at the top via
           `lg:row-span-2`). */}
-      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-10 lg:gap-y-5">
+      <HeroGrid lgGapClassName="lg:gap-x-10 lg:gap-y-5">
         {/* Identity row (full width on mobile, left column on lg) */}
         <div className="flex min-w-0 items-start gap-3 sm:gap-4 lg:row-start-1">
           <CategoryIconTile
@@ -218,7 +233,7 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
             </ClassifyField>
           </div>
         </div>
-      </div>
+      </HeroGrid>
     </ColorRailCard>
   );
 }
@@ -353,10 +368,10 @@ function titleize(value: string | null | undefined): string | null {
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <ColorRailCardSkeleton
-        tileShape="rounded-md"
-        body={
+    <DetailPageSkeleton
+      hero={{
+        tileShape: "rounded-md",
+        body: (
           <div className="space-y-5">
             <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -370,16 +385,11 @@ function DetailSkeleton() {
               </div>
             </div>
           </div>
-        }
-      />
-      <div className="flex gap-2">
-        <Skeleton className="h-7 w-32 rounded-md" />
-        <Skeleton className="h-7 w-32 rounded-md" />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Skeleton className="h-72 rounded-xl" />
-        <Skeleton className="h-56 rounded-xl" />
-      </div>
-    </div>
+        ),
+      }}
+      jumpPills={2}
+      main={["h-72"]}
+      sidebar={["h-56"]}
+    />
   );
 }

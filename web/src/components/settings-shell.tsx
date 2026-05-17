@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { Clock, Hammer } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,8 @@ import { AccountSection } from "@/features/settings/account-section";
 import { BackupsSection } from "@/features/settings/backups-section";
 import { HouseholdSection } from "@/features/settings/household-section";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
+import { StatusPanel } from "@/components/status-panel";
+import { Eyebrow } from "@/components/eyebrow";
 
 const SETTINGS_MODAL_KEY = "settings";
 
@@ -92,9 +95,13 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
     return (
       <div className="flex h-full">
         <nav className="bg-sidebar text-sidebar-foreground w-56 shrink-0 border-r p-3">
-          <p className="text-muted-foreground/80 mb-2 px-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
+          <Eyebrow
+            as="p"
+            variant="nav"
+            className="text-muted-foreground/80 mb-2 px-2"
+          >
             Settings
-          </p>
+          </Eyebrow>
           <ul className="space-y-0.5">
             {SETTINGS_SECTIONS.map((s) => {
               const Icon = s.icon;
@@ -199,13 +206,30 @@ function SectionContent({ section }: { section: SettingsSection }) {
     return <BackupsSection />;
   }
 
+  // Fallback for sections defined in `lib/settings-sections.ts` that don't
+  // yet have a real implementation (today: Security). Mirrors the canonical
+  // "Coming soon" vocabulary from `routes/placeholder.tsx` — a
+  // `<StatusPanel tone="info">` with a pill in the trailing slot — so the
+  // settings modal speaks the same language as the rest of the SPA's
+  // unbuilt-nav-leaf surfaces instead of a naked muted paragraph.
   return (
     <div className="space-y-4">
       <SettingsSectionHeader
         title={section.title}
         description={section.description}
       />
-      <p className="text-muted-foreground text-sm">Coming soon.</p>
+      <StatusPanel
+        tone="info"
+        icon={Hammer}
+        heading={`${section.title} settings are in the works`}
+        body="We're still building this surface. The configuration that lives here will land in a follow-up PR — for now, the panel is wired but empty."
+        trailing={
+          <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide uppercase">
+            <Clock className="size-3" />
+            Coming soon
+          </span>
+        }
+      />
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { ProviderCardHeader } from "@/components/provider-card-header";
 import { SectionCard } from "@/components/section-card";
 import { FormFooter } from "@/components/form-footer";
 import { IdPill } from "@/components/id-pill";
@@ -115,28 +116,16 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
   return (
     <div className="space-y-4">
       <ColorRailCard accent={providerToneAccent(tone)}>
-        <div className="flex flex-col gap-5 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 flex size-11 shrink-0 items-center justify-center rounded-lg">
-              <Building2 className="size-5" />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <div className="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
-                Provider
-              </div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-foreground text-lg font-semibold tracking-tight">
-                  Plaid
-                </h2>
-                <ProviderStatusBadge health={health} configured={config.configured} />
-              </div>
-              <p className="text-muted-foreground max-w-md text-sm">
-                Thousands of financial institutions across the US, Canada, and Europe.
-              </p>
-            </div>
-          </div>
-          <ProviderScoreboard health={health} tone={tone} />
-        </div>
+        <ProviderCardHeader
+          icon={<Building2 className="size-5" />}
+          iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          title="Plaid"
+          description="Thousands of financial institutions across the US, Canada, and Europe."
+          badge={
+            <ProviderStatusBadge health={health} configured={config.configured} />
+          }
+          trailing={<ProviderScoreboard health={health} tone={tone} />}
+        />
       </ColorRailCard>
 
       <SectionCard

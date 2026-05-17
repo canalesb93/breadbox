@@ -14,9 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageError } from "@/components/page-error";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
@@ -28,6 +27,7 @@ import {
 import type { RulesFilters } from "@/api/queries/rules";
 import type { TransactionRule } from "@/api/types";
 import { RuleRow } from "@/features/rules/rule-row";
+import { RuleRowSkeleton } from "@/features/rules/rule-row-skeleton";
 
 export const rulesSearchSchema = z.object({
   q: z.string().optional(),
@@ -39,6 +39,11 @@ export const rulesSearchSchema = z.object({
 });
 
 export type RulesSearch = z.infer<typeof rulesSearchSchema>;
+
+// Title-bar widths rotate per-row so the skeleton stack reads as a stack of
+// varied-length rules instead of a metronome. Five rows matches the page-size
+// preview the loaded list shows below the toolbar.
+const SKELETON_TITLE_WIDTHS = ["w-52", "w-40", "w-64", "w-44", "w-48"];
 
 function searchToFilters(s: RulesSearch): RulesFilters {
   return {
@@ -175,18 +180,16 @@ export function RulesPage() {
       )}
 
       {isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Couldn't load rules</AlertTitle>
-          <AlertDescription>
-            {rulesQuery.error instanceof Error
-              ? rulesQuery.error.message
-              : "Try refreshing the page."}
-          </AlertDescription>
-        </Alert>
+        <PageError
+          resource="rules"
+          error={rulesQuery.error}
+          onRetry={() => rulesQuery.refetch()}
+          retrying={isFetching}
+        />
       ) : isLoading ? (
         <div className="flex flex-col gap-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-[72px] rounded-xl" />
+          {SKELETON_TITLE_WIDTHS.map((w, i) => (
+            <RuleRowSkeleton key={i} titleClassName={w} />
           ))}
         </div>
       ) : rows.length === 0 ? (
@@ -199,11 +202,13 @@ export function RulesPage() {
               : "Create a rule to automatically categorize, tag, or comment on transactions as they sync in."
           }
           action={
-            <Button asChild>
-              <Link to="/rules/new">
-                <Plus className="size-4" /> Create rule
-              </Link>
-            </Button>
+            hasActiveFilters ? undefined : (
+              <Button asChild>
+                <Link to="/rules/new">
+                  <Plus className="size-4" /> Create rule
+                </Link>
+              </Button>
+            )
           }
         />
       ) : (

@@ -1,15 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link2, Loader2 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
+import { Eyebrow } from "@/components/eyebrow";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAccountLinks,
@@ -106,33 +100,27 @@ export function LinkAccountSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Link2 className="size-4" />
-            Link an account
-          </SheetTitle>
-          <SheetDescription>
-            Attribute matched transactions on a dependent account to its
-            primary cardholder. The dependent account is excluded from totals
-            so charges aren&apos;t double-counted.
-          </SheetDescription>
-        </SheetHeader>
+      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <DetailSheetHeader
+          density="accent"
+          icon={Link2}
+          eyebrow="Account link"
+          title="Link an account"
+          description="Attribute matched transactions on a dependent account to its primary cardholder. The dependent account is excluded from totals so charges aren't double-counted."
+        />
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-4">
-          <div className="space-y-1.5">
-            <Label className="text-muted-foreground text-xs">
-              Primary (this account)
-            </Label>
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
+          <div className="flex flex-col gap-2">
+            <Eyebrow as="p">Primary (this account)</Eyebrow>
             <div className="bg-muted/40 rounded-md border px-3 py-2 text-sm">
               {primaryLabel}
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="dependent" className="text-muted-foreground text-xs">
+          <div className="flex flex-col gap-2">
+            <Eyebrow as="label" htmlFor="dependent">
               Dependent account
-            </Label>
+            </Eyebrow>
             {eligibleCount === 0 ? (
               <Alert>
                 <AlertTitle>No eligible accounts</AlertTitle>
@@ -159,15 +147,15 @@ export function LinkAccountSheet({
               </Select>
             )}
             <p className="text-muted-foreground text-xs">
-              Matched transactions on the dependent account will be
-              attributed to the same person as this account.
+              Matched transactions on the dependent account will be attributed
+              to the same person as this account.
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="tolerance" className="text-muted-foreground text-xs">
+          <div className="flex flex-col gap-2">
+            <Eyebrow as="label" htmlFor="tolerance">
               Match tolerance (days)
-            </Label>
+            </Eyebrow>
             <Input
               id="tolerance"
               type="number"
@@ -184,19 +172,26 @@ export function LinkAccountSheet({
           </div>
         </div>
 
-        <SheetFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            disabled={create.isPending}
+          >
             Cancel
           </Button>
           <Button
+            size="sm"
             onClick={onSubmit}
             disabled={!dependentId || create.isPending || eligibleCount === 0}
           >
             {create.isPending && <Loader2 className="size-4 animate-spin" />}
             Link accounts
           </Button>
-        </SheetFooter>
+        </div>
       </SheetContent>
     </Sheet>
   );
 }
+

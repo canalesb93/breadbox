@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Search, Tags as TagsIcon } from "lucide-react";
+import { Plus, Tags as TagsIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { TagsTable } from "@/features/tags/tags-table";
 import { useTags } from "@/api/queries/tags";
 
@@ -59,15 +59,11 @@ export function TagsPage() {
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative w-full max-w-sm">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, slug, or description…"
-              className="pl-8"
-            />
-          </div>
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, slug, or description…"
+          />
         </div>
 
         <TagsTable
