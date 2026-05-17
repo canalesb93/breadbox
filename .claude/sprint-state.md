@@ -369,6 +369,26 @@ Next iteration candidates (in rough impact order):
 
 Picking **#2 inline transcript search** next iteration — smallest possible follow-up, lives entirely in the TranscriptViewer feature component, and pairs naturally with the run-history filtering just shipped (filter your way to a run, then filter inside the transcript).
 
+## ITER 12 — 2026-05-17 02:07
+Shipped (PR #1238 squash-merged into sprint branch as c85fcd5a):
+- TranscriptViewer search input with clear button + status line.
+- eventMatchesQuery covers assistant text, tool names, tool inputs+outputs (JSON-stringified so search hits arg values), error / cost-cap messages.
+- Pre-grouping filter so partial matches inside a turn still surface the turn wrapper.
+- Pure feature-component state; no backend/API/schema changes.
+- All 5 CI jobs green.
+
+Pairs with iter-11's run-history filtering: filter → find the run → open transcript → filter inside the transcript. Two-layer drilldown is now ergonomic.
+
+Next iteration candidates (in rough impact order):
+1. **Per-agent quiet hours** — schema column (quiet_hours_start/end as text "HH:MM" or NULL), scheduler tweak that compares now() against the window, UI control on the edit page. Mid-size; touches scheduler + edit form.
+2. **Cost dashboard** in /v2/agents — sum total_cost_usd per agent over time, surface as sparkline on the list page OR a separate /v2/agents/cost page with bar chart. Bigger.
+3. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger, touches sync engine + agent_definitions schema.
+4. **breadbox doctor integration** of agent smoke test — small DX win; reuse SmokeTest.
+5. **Suggested rules agent** — scans recent transactions, proposes new transaction_rules, queues them for human-approval review row. Bigger, touches transaction_rules + reviews.
+
+Picking **#4 breadbox doctor integration** next iteration — smallest follow-up, reuses iter-8 SmokeTest, valuable for first-run troubleshooting which is the most fragile moment of the self-hoster journey.
+
+
 
 
 
