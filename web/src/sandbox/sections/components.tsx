@@ -93,6 +93,7 @@ import { PaginationBar } from "@/components/pagination-bar";
 import { ViewAllPill } from "@/components/view-all-pill";
 import { SearchInput } from "@/components/search-input";
 import { HeroGrid } from "@/components/hero-grid";
+import { ProviderCardHeader } from "@/components/provider-card-header";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -319,6 +320,50 @@ export function ComponentsSection() {
                 </p>
               </div>
             </HeroGrid>
+          </ColorRailCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ProviderCardHeader"
+        code="components/provider-card-header"
+        description="Canonical header body inside a provider settings card — sits one level inside `<ColorRailCard>` on the Plaid, Teller, and CSV pages. Identity column on the left (tone-tinted `size-11 rounded-lg` tile + 'Provider' eyebrow + title + optional status badge + capped description) docks beside an optional `trailing` slot (typically `<ProviderScoreboard>`). Stacks on mobile, aligns on a single baseline at ≥640px. Promoted from three near-byte-identical header blocks."
+        className="block"
+      >
+        <div className="max-w-3xl space-y-4">
+          <ColorRailCard accent="#22c55e">
+            <ProviderCardHeader
+              icon={<Landmark className="size-5" />}
+              iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              title="Plaid"
+              description="Connect 12,000+ US banks via Plaid Link. Webhook-driven incremental sync."
+              badge={
+                <Badge
+                  variant="outline"
+                  className="border-success/30 bg-success/10 text-success"
+                >
+                  Configured
+                </Badge>
+              }
+              trailing={
+                <div className="flex flex-col items-start gap-1 sm:items-end">
+                  <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+                    Last sync
+                  </span>
+                  <span className="text-foreground text-sm tabular-nums">
+                    2m ago
+                  </span>
+                </div>
+              }
+            />
+          </ColorRailCard>
+          <ColorRailCard accent="#f59e0b">
+            <ProviderCardHeader
+              icon={<Receipt className="size-5" />}
+              iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              title="CSV import"
+              description="Drop in transactions exported from any bank — no API credentials required."
+            />
           </ColorRailCard>
         </div>
       </Specimen>
