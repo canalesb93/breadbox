@@ -44,7 +44,8 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ActionPill } from "@/components/action-pill";
-import { ColorRailCard, ColorRailCardSkeleton } from "@/components/color-rail-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import {
   DetailList,
   compactDetailRows,
@@ -885,26 +886,17 @@ function formatIntervalLabel(minutes: number): string {
 }
 
 function DetailSkeleton() {
+  // Hero matches the loaded `<ColorRailCard>` shape: status-tinted rail +
+  // `rounded-lg` icon tile + bordered action-strip footer (Sync now /
+  // Re-authenticate / overflow). The `DetailPageSkeleton` primitive
+  // converges every v2 detail page on a single skeleton shape — no
+  // jump-pill strip here because connection-detail puts its actions in
+  // the hero footer instead.
   return (
-    <div className="space-y-6">
-      {/* Hero — matches the loaded `<ColorRailCard>` shape: status-tinted
-          rail + `rounded-lg` icon tile + bordered action-strip footer
-          (Sync now / Re-authenticate / overflow). Mirrors the
-          account-detail and transaction-detail loading vocabulary so
-          the three sibling detail pages converge on a single skeleton
-          shape. */}
-      <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="min-w-0 space-y-6">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-        <div className="space-y-6">
-          <Skeleton className="h-40 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <DetailPageSkeleton
+      hero={{ tileShape: "rounded-lg", withFooter: true }}
+      main={["h-32", "h-48", "h-48"]}
+      sidebar={["h-40", "h-48"]}
+    />
   );
 }

@@ -18,12 +18,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ActionPill } from "@/components/action-pill";
-import {
-  ColorRailCard,
-  ColorRailCardSkeleton,
-} from "@/components/color-rail-card";
+import { ColorRailCard } from "@/components/color-rail-card";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import {
   DetailList,
   compactDetailRows,
@@ -482,19 +479,11 @@ function connectionStatusAlert(a: AccountDetail) {
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
-      <div className="flex gap-2">
-        <Skeleton className="h-7 w-32 rounded-md" />
-        <Skeleton className="h-7 w-32 rounded-md" />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Skeleton className="h-96 rounded-xl" />
-        <div className="space-y-6">
-          <Skeleton className="h-56 rounded-xl" />
-          <Skeleton className="h-72 rounded-xl" />
-        </div>
-      </div>
-    </div>
+    <DetailPageSkeleton
+      hero={{ tileShape: "rounded-lg", withFooter: true }}
+      jumpPills={2}
+      main={["h-96"]}
+      sidebar={["h-56", "h-72"]}
+    />
   );
 }
