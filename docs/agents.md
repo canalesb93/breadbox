@@ -83,9 +83,9 @@ Exit codes (full reference):
 
 ## Operational notes
 
-- **Cleanup**: completed runs older than `agent.run_retention_days` (default 30) are pruned daily at 3:15 AM local time. The matching on-disk transcript files (`<agent.transcript_dir>/<runID>.ndjson`) are pruned in the same pass using the same retention so the two surfaces stay in sync.
+- **Cleanup**: completed runs older than `agent.run_retention_days` (default 30) are pruned daily at 3:15 AM local time. The matching on-disk transcript files (`<agent.transcript_dir>/<runID>.ndjson`) are pruned in the same pass using the same retention so the two surfaces stay in sync. **Disk sizing**: transcripts run ~50 KB–500 KB each depending on the agent's verbosity (review-style agents are smaller; rules-and-tools agents with many MCP calls are larger). For 3 agents running daily on the default 30-day retention, budget roughly 50–500 MB of transcript storage steady-state. Settings → Agents → "Run cleanup now" forces an immediate prune if you just lowered the retention.
 - **Orphan recovery**: in-progress runs from a previous boot are marked `error` at startup so the run history doesn't lie.
-- **Auth precedence trap**: if both `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` are in the sidecar's env, the API key wins. The sidecar scrubs the unused var before invoking the SDK so this can't bite you accidentally.
+- **Auth precedence trap**: if both `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` are in the sidecar's env, the API key wins. The sidecar scrubs the unused var before invoking the SDK so this can't bite you accidentally — but the cleaner setup is to only set one in your `breadbox serve` environment. If you switch auth modes via Settings → Agents, also unset the unused env var on the host so future operators looking at `printenv` don't get confused.
 
 ## What replaced what
 

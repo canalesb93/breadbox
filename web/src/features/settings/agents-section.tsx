@@ -271,7 +271,7 @@ export function AgentsSection() {
                   <FormLabel>breadbox-agent binary path</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="auto-detected (./bin/breadbox-agent or PATH)"
+                      placeholder="auto: $BREADBOX_AGENT_BIN, ./bin/breadbox-agent, or PATH"
                       {...field}
                     />
                   </FormControl>

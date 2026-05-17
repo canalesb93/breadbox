@@ -157,6 +157,15 @@ export function AgentsPage() {
               The seeded starter agents below won't fire until two pieces
               are in place. Status checked without any API call:
             </p>
+            {!status.auth_configured && (
+              <p className="text-muted-foreground text-xs">
+                <strong>New here?</strong> Pick the subscription token
+                option (free under your Claude plan credits, runs{" "}
+                <code>claude setup-token</code> once on any machine).
+                Switch to an Anthropic API key later if you need
+                pay-as-you-go billing past the 2026-06-15 cutover.
+              </p>
+            )}
             <ul className="text-sm">
               <li className="flex items-center gap-2">
                 {status.auth_configured ? (
