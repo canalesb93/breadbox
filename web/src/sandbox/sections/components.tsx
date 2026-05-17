@@ -81,6 +81,7 @@ import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DangerZone } from "@/components/danger-zone";
 import { PaginationBar } from "@/components/pagination-bar";
+import { ViewAllPill } from "@/components/view-all-pill";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -189,14 +190,15 @@ export function ComponentsSection() {
           <SectionCard
             title="Notes"
             footer={
-              <Button size="sm" variant="ghost">
+              <ViewAllPill to="/" align="footer">
                 View all
-              </Button>
+              </ViewAllPill>
             }
           >
             <p className="text-muted-foreground text-sm leading-relaxed">
               Reach for `SectionCard` for any non-list section. The footer slot
-              renders a flush bordered strip — typically a "See all" link.
+              renders a flush bordered strip — typically a `<ViewAllPill>`
+              link to a fuller index.
             </p>
           </SectionCard>
         </div>
@@ -211,11 +213,7 @@ export function ComponentsSection() {
         <div className="max-w-md">
           <ListCard
             title="Recent transactions"
-            action={
-              <Button size="sm" variant="ghost">
-                View all
-              </Button>
-            }
+            action={<ViewAllPill to="/">View all</ViewAllPill>}
             rows={sampleTransactions.slice(0, 3)}
             getRowKey={(t) => t.id}
             renderRow={(t) => (
@@ -475,6 +473,19 @@ export function ComponentsSection() {
               Re-authenticate
             </ActionPill>
           </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ViewAllPill"
+        code="components/view-all-pill"
+        description="The canonical 'card-header / footer goto' pill used when a bordered surface defers to a fuller list page. 28px-tall ghost link (`h-7 px-2 text-xs` muted → foreground on hover) with a trailing `<ArrowRight className='size-3' />` icon — matches the `<JumpToPill>` size-3 leading-icon vocabulary so the two lateral-link primitives speak the same icon language. `align='header'` (default) supplies the `-mr-2` flush shoulder for use in a `<ListCard action>` / `<SectionCard action>` slot; `align='footer'` drops the shoulder for footer slots. Distinct from `<ActionPill>` (real handler, `size-3.5` icon) and from `<Button size='sm'>` (32px CTA). Live across Home recent activity, Home connections, Account-detail recent transactions, Connection-detail sync history."
+        className="block"
+      >
+        <div className="flex flex-wrap items-center gap-6 rounded-lg border p-4">
+          <ViewAllPill to="/">View all</ViewAllPill>
+          <ViewAllPill to="/">Manage</ViewAllPill>
+          <ViewAllPill to="/">See all transactions</ViewAllPill>
         </div>
       </Specimen>
 

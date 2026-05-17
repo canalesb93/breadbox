@@ -1,10 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
+import { ViewAllPill } from "@/components/view-all-pill";
 import type { Transaction } from "@/api/types";
 
 interface AccountRecentTransactionsProps {
@@ -53,12 +52,13 @@ export function AccountRecentTransactions({
       }
       footer={
         hasRows ? (
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/transactions" search={{ account: accountShortId }}>
-              See all transactions for this account
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </Button>
+          <ViewAllPill
+            to="/transactions"
+            search={{ account: accountShortId }}
+            align="footer"
+          >
+            See all transactions for this account
+          </ViewAllPill>
         ) : undefined
       }
     />
