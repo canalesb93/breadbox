@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -853,14 +854,44 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	// (transcript_dir is read by the Sidecar layer; see Sidecar.Run for
 	// the authoritative path assembly — iter-36 audit HIGH #5 cleanup.)
 
+	// Resolve to the currently-running breadbox binary so the SDK's MCP
+	// child spawn works regardless of $PATH. The TS SDK calls
+	// fs.existsSync(command) before spawning; a bare "breadbox" fails
+	// when the server was started from an out-of-PATH location (a worktree
+	// build, /tmp/<name>, air's hot-reload temp dir, etc.). os.Executable
+	// returns the live process path in all of those cases.
+	breadboxBin, exeErr := os.Executable()
+	if exeErr != nil || breadboxBin == "" {
+		breadboxBin = "breadbox"
+	}
 	mcpServers := map[string]agent.MCPServerConfig{
 		"breadbox": {
-			Command: "breadbox",
+			Command: breadboxBin,
 			Args:    []string{"mcp"},
 			Env: map[string]string{
 				"BREADBOX_API_KEY": apiKeyPlaintext,
 			},
 		},
+	}
+
+	// The TS sidecar runs with permissionMode: "dontAsk", which auto-denies
+	// any tool call NOT in allowedTools. An empty allowedTools therefore
+	// disables every breadbox MCP tool — i.e. the whole point of the
+	// integration. Always inject "mcp__breadbox" (which the SDK treats as
+	// the "all tools from the breadbox MCP server" wildcard) so the
+	// breadbox tools are callable regardless of operator customization.
+	// Permission inside breadbox is still gated by the minted API key's
+	// scope and the MCP server's read_only/read_write mode.
+	allowedTools := append([]string{}, def.AllowedTools...)
+	hasBreadbox := false
+	for _, t := range allowedTools {
+		if t == "mcp__breadbox" || strings.HasPrefix(t, "mcp__breadbox__") {
+			hasBreadbox = true
+			break
+		}
+	}
+	if !hasBreadbox {
+		allowedTools = append([]string{"mcp__breadbox"}, allowedTools...)
 	}
 
 	maxBudget := 1.0
@@ -877,7 +908,7 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		MaxTurns:          def.MaxTurns,
 		MaxBudgetUsd:      maxBudget,
 		ToolScope:         def.ToolScope,
-		AllowedTools:      def.AllowedTools,
+		AllowedTools:      allowedTools,
 		MCPServers:        mcpServers,
 		Auth: agent.AuthConfig{
 			Mode:  authMode,

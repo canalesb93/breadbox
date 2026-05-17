@@ -440,6 +440,20 @@ export interface ToolResultData {
   is_error?: boolean;
 }
 
+// SDK shape: user-role messages whose content carries tool_result blocks
+// (one per tool_use the assistant fired). The breadbox sidecar normalizes
+// the raw "user" SDK message-type to "user_message" before forwarding.
+export type UserContent =
+  | { type: "text"; text: string }
+  | ({ type: "tool_result" } & ToolResultData);
+
+export interface UserMessageData {
+  message: {
+    role: "user";
+    content: UserContent[];
+  };
+}
+
 export interface ResultData {
   totalCostUsd: number;
   inputTokens: number;
@@ -473,6 +487,7 @@ interface EventBase {
 
 export type TranscriptEvent =
   | (EventBase & { type: "assistant_message"; data: AssistantMessageData })
+  | (EventBase & { type: "user_message"; data: UserMessageData })
   | (EventBase & { type: "tool_use"; data: ToolUseData })
   | (EventBase & { type: "tool_result"; data: ToolResultData })
   | (EventBase & { type: "result"; data: ResultData })
@@ -490,7 +505,11 @@ export interface TranscriptResult {
 // browser. Above this the viewer renders a banner linking to the raw file.
 const TRANSCRIPT_MAX_EVENTS = 500;
 
-export function useTranscript(shortId: string | undefined) {
+export function useTranscript(
+  shortId: string | undefined,
+  opts: { inProgress?: boolean } = {},
+) {
+  const { inProgress = false } = opts;
   return useQuery({
     queryKey: ["agents", "runs", shortId, "transcript"],
     queryFn: async (): Promise<TranscriptResult> => {
@@ -515,8 +534,12 @@ export function useTranscript(shortId: string | undefined) {
       };
     },
     enabled: Boolean(shortId),
-    // Transcripts are immutable once a run completes — keep them cached
-    // across Sheet open/close.
-    staleTime: 5 * 60 * 1000,
+    // Completed transcripts are immutable — cache them across Sheet open/close.
+    // While the run is still in flight, poll every 2s and treat the
+    // file-not-yet-on-disk window as a transient miss rather than an error
+    // (the consumer renders a friendly "still warming up" state).
+    staleTime: inProgress ? 0 : 5 * 60 * 1000,
+    refetchInterval: inProgress ? 2000 : false,
+    retry: inProgress ? false : 1,
   });
 }

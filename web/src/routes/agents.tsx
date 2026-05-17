@@ -569,15 +569,21 @@ function RunNowDialog({
   const [open, setOpen] = useState(false);
   const [prefix, setPrefix] = useState("");
   const runNow = useRunAgentNow();
+  const navigate = useNavigate();
   const hasLastPrefix = Boolean(lastPrefix && lastPrefix.length > 0);
 
   const submit = async () => {
+    let startedShortId: string | null = null;
     const ok = await withMutationToast(
-      () => runNow.mutateAsync({ slug, promptPrefix: prefix }),
+      async () => {
+        const result = await runNow.mutateAsync({ slug, promptPrefix: prefix });
+        startedShortId = result.short_id;
+        return result;
+      },
       {
         success: prefix
-          ? `Run started for ${name} (with prefix)`
-          : `Run started for ${name}`,
+          ? `Run started for ${name} (with prefix) — opening transcript`
+          : `Run started for ${name} — opening transcript`,
         error:
           "Run failed — check Settings → Agents for auth, or `make agent-sidecar` for the binary",
       },
@@ -585,6 +591,15 @@ function RunNowDialog({
     if (ok) {
       setOpen(false);
       setPrefix("");
+      // Land on the runs page with the freshly-kicked-off run pre-selected.
+      // The transcript drawer + 2s polling pick up events as they stream in.
+      if (startedShortId) {
+        navigate({
+          to: "/agents/$slug/runs",
+          params: { slug },
+          search: { run: startedShortId },
+        });
+      }
     }
   };
 

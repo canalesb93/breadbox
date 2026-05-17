@@ -29,6 +29,7 @@ import type {
   ToolResultData,
   ToolUseData,
   TranscriptEvent,
+  UserContent,
 } from "@/api/queries/agents";
 
 interface TranscriptViewerProps {
@@ -47,6 +48,50 @@ interface TurnGroup {
   toolResults: Array<ToolResultData & { ts: number }>;
 }
 
+// extractToolUses pulls tool_use content blocks out of an assistant message.
+// The SDK nests them inside `message.content[]`; earlier viewer iterations
+// expected standalone top-level "tool_use" events that never actually
+// appeared on the wire (iter-46 finding, fixed in iter-48).
+function extractToolUses(
+  data: AssistantMessageData,
+  ts: number,
+): Array<ToolUseData & { ts: number }> {
+  const out: Array<ToolUseData & { ts: number }> = [];
+  for (const block of data.message?.content ?? []) {
+    if (block.type === "tool_use") {
+      out.push({
+        ts,
+        type: "tool_use",
+        id: block.id,
+        name: block.name,
+        input: (block.input ?? {}) as Record<string, unknown>,
+      });
+    }
+  }
+  return out;
+}
+
+// extractToolResults pulls tool_result content blocks out of a user message.
+// Same nesting story as extractToolUses.
+function extractToolResults(
+  content: UserContent[] | undefined,
+  ts: number,
+): Array<ToolResultData & { ts: number }> {
+  const out: Array<ToolResultData & { ts: number }> = [];
+  for (const block of content ?? []) {
+    if (block.type === "tool_result") {
+      out.push({
+        ts,
+        type: "tool_result",
+        tool_use_id: block.tool_use_id,
+        content: block.content,
+        is_error: block.is_error,
+      });
+    }
+  }
+  return out;
+}
+
 function groupIntoTurns(events: TranscriptEvent[]): TurnGroup[] {
   const turns: TurnGroup[] = [];
   let current: TurnGroup = { assistant: null, toolUses: [], toolResults: [] };
@@ -57,6 +102,11 @@ function groupIntoTurns(events: TranscriptEvent[]): TurnGroup[] {
         current = { assistant: null, toolUses: [], toolResults: [] };
       }
       current.assistant = { ...ev.data, ts: ev.ts };
+      current.toolUses.push(...extractToolUses(ev.data, ev.ts));
+    } else if (ev.type === "user_message") {
+      current.toolResults.push(
+        ...extractToolResults(ev.data.message?.content, ev.ts),
+      );
     } else if (ev.type === "tool_use") {
       current.toolUses.push({ ...ev.data, ts: ev.ts });
     } else if (ev.type === "tool_result") {
@@ -79,10 +129,31 @@ function eventMatchesQuery(ev: TranscriptEvent, q: string): boolean {
   switch (ev.type) {
     case "assistant_message": {
       const blocks = ev.data.message?.content ?? [];
-      return blocks.some(
-        (b) =>
-          b.type === "text" && b.text.toLowerCase().includes(needle),
-      );
+      return blocks.some((b) => {
+        if (b.type === "text") return b.text.toLowerCase().includes(needle);
+        if (b.type === "tool_use") {
+          if (b.name?.toLowerCase().includes(needle)) return true;
+          try {
+            return JSON.stringify(b.input).toLowerCase().includes(needle);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+    }
+    case "user_message": {
+      const blocks = ev.data.message?.content ?? [];
+      return blocks.some((b) => {
+        if (b.type === "tool_result") {
+          try {
+            return JSON.stringify(b.content).toLowerCase().includes(needle);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
     }
     case "tool_use":
       if (ev.data.name?.toLowerCase().includes(needle)) return true;
@@ -123,30 +194,59 @@ export function TranscriptViewer({
       filtered = filtered.filter((ev) => eventMatchesQuery(ev, trimmed));
     }
     if (toolsOnly) {
-      // Keep tool_use + tool_result so input/output pairs render together;
-      // also keep error/cost_cap_hit so the headline Alerts up top still
-      // fire — those aren't part of the noise the chip suppresses.
-      filtered = filtered.filter(
-        (ev) =>
-          ev.type === "tool_use" ||
-          ev.type === "tool_result" ||
-          ev.type === "error" ||
-          ev.type === "cost_cap_hit",
-      );
+      // Tool-use lives in assistant_message.content; tool_result lives in
+      // user_message.content. Keep those messages when they carry any tool
+      // block (a text-only assistant_message gets dropped). Also keep
+      // standalone tool_use/tool_result (forward compat) and the headline
+      // error/cost_cap_hit events so the Alerts up top still fire.
+      filtered = filtered.filter((ev) => {
+        if (ev.type === "tool_use" || ev.type === "tool_result") return true;
+        if (ev.type === "error" || ev.type === "cost_cap_hit") return true;
+        if (ev.type === "assistant_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_use",
+          );
+        }
+        if (ev.type === "user_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_result",
+          );
+        }
+        return false;
+      });
     }
     if (errorsOnly) {
-      // Keep errored tool_results + the error/cost_cap_hit events. Skip
-      // tool_use entries whose matching result didn't error (they'd render
-      // as orphan "pending" badges).
-      const errResultIds = new Set(
-        filtered
-          .filter((ev) => ev.type === "tool_result" && ev.data.is_error === true)
-          .map((ev) => (ev.type === "tool_result" ? ev.data.tool_use_id : "")),
-      );
+      // Collect erroring tool_result block IDs (nested in user_message
+      // content, plus any legacy top-level events). Then keep assistant_
+      // messages that fired any of those IDs, the user_messages that carry
+      // the errors, and the headline error/cost_cap_hit alerts.
+      const errResultIds = new Set<string>();
+      for (const ev of filtered) {
+        if (ev.type === "tool_result" && ev.data.is_error) {
+          errResultIds.add(ev.data.tool_use_id);
+        }
+        if (ev.type === "user_message") {
+          for (const b of ev.data.message?.content ?? []) {
+            if (b.type === "tool_result" && b.is_error) {
+              errResultIds.add(b.tool_use_id);
+            }
+          }
+        }
+      }
       filtered = filtered.filter((ev) => {
         if (ev.type === "error" || ev.type === "cost_cap_hit") return true;
         if (ev.type === "tool_result") return ev.data.is_error === true;
         if (ev.type === "tool_use") return errResultIds.has(ev.data.id);
+        if (ev.type === "user_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_result" && b.is_error === true,
+          );
+        }
+        if (ev.type === "assistant_message") {
+          return (ev.data.message?.content ?? []).some(
+            (b) => b.type === "tool_use" && errResultIds.has(b.id),
+          );
+        }
         return false;
       });
     }

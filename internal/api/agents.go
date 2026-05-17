@@ -487,7 +487,7 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 				fmt.Sprintf("prompt must be at most %d characters", PromptOverrideMaxLen))
 			return
 		}
-		runResp, runErr := orch.RunNowWith(r.Context(), def, service.RunOverrides{
+		runResp, runErr := orch.RunNowAsyncWith(r.Context(), def, service.RunOverrides{
 			PromptPrefix:   req.PromptPrefix,
 			PromptOverride: req.PromptOverride,
 		})

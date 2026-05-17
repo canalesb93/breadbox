@@ -1,5 +1,3 @@
-import { appendFileSync } from "node:fs";
-
 export type SidecarEventType =
   | "assistant_message"
   | "tool_use"
@@ -16,19 +14,16 @@ export interface SidecarEvent {
 }
 
 /**
- * Emit one NDJSON event to stdout and (if configured) append to the
- * transcript file. Writes are synchronous so they survive a crash.
+ * Emit one NDJSON event to stdout. The Go orchestrator (sidecar.go) is the
+ * sole writer of the transcript file on disk — it reads each line off our
+ * stdout and persists it. Letting both processes touch the same file races
+ * and interleaves mid-JSON bytes (the malformed-line bug we hit in iter-47
+ * dogfooding). The transcriptPath argument is kept on the signature for
+ * call-site compatibility but is intentionally unused.
  */
-export function emit(event: SidecarEvent, transcriptPath?: string): void {
+export function emit(event: SidecarEvent, _transcriptPath?: string): void {
   const line = JSON.stringify(event) + "\n";
   process.stdout.write(line);
-  if (transcriptPath) {
-    try {
-      appendFileSync(transcriptPath, line, "utf8");
-    } catch {
-      // Best-effort: don't fail the run if the transcript file is unwritable.
-    }
-  }
 }
 
 export function emitError(
