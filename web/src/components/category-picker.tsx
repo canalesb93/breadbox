@@ -84,9 +84,13 @@ export function CategoryPicker({
             // signal stays inside the badge bounds.
             // `[&_[data-slot=badge]]:hover:!ring-0` suppresses CategoryBadge's
             // own override ring during hover so the hover-state stroke wins.
-            // When the category has an icon, fade it out on hover so the
-            // chevron swap reads as a single-icon replacement (no overlap).
-            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow hover:ring-1 hover:ring-border focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 hover:[&_[data-slot=badge]]:!ring-0 focus-visible:[&_[data-slot=badge]]:!ring-0",
+            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50 hover:[&_[data-slot=badge]]:!ring-0 focus-visible:[&_[data-slot=badge]]:!ring-0",
+            // Hover ring + icon-swap only when a category is assigned.
+            // The empty-state pill carries its own dashed border that
+            // intensifies on hover — adding a solid ring on top would
+            // double-stroke.
+            category?.display_name &&
+              "hover:ring-1 hover:ring-border",
             hasIcon &&
               "[&_[data-slot=badge]>svg:first-child]:transition-opacity group-hover/picker:[&_[data-slot=badge]>svg:first-child]:opacity-0 group-focus-visible/picker:[&_[data-slot=badge]>svg:first-child]:opacity-0",
             className,
