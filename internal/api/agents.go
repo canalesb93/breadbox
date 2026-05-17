@@ -20,31 +20,35 @@ import (
 // --- Request envelopes ---
 
 type createAgentRequest struct {
-	Name         string   `json:"name"`
-	Slug         string   `json:"slug"`
-	Prompt       string   `json:"prompt"`
-	SystemPrompt *string  `json:"system_prompt"`
-	ScheduleCron *string  `json:"schedule_cron"`
-	ToolScope    string   `json:"tool_scope"`
-	AllowedTools []string `json:"allowed_tools"`
-	Model        string   `json:"model"`
-	MaxTurns     int      `json:"max_turns"`
-	MaxBudgetUSD *float64 `json:"max_budget_usd"`
-	Enabled      bool     `json:"enabled"`
+	Name            string   `json:"name"`
+	Slug            string   `json:"slug"`
+	Prompt          string   `json:"prompt"`
+	SystemPrompt    *string  `json:"system_prompt"`
+	ScheduleCron    *string  `json:"schedule_cron"`
+	ToolScope       string   `json:"tool_scope"`
+	AllowedTools    []string `json:"allowed_tools"`
+	Model           string   `json:"model"`
+	MaxTurns        int      `json:"max_turns"`
+	MaxBudgetUSD    *float64 `json:"max_budget_usd"`
+	Enabled         bool     `json:"enabled"`
+	QuietHoursStart *string  `json:"quiet_hours_start"`
+	QuietHoursEnd   *string  `json:"quiet_hours_end"`
 }
 
 type updateAgentRequest struct {
-	Name         *string   `json:"name"`
-	Slug         *string   `json:"slug"`
-	Prompt       *string   `json:"prompt"`
-	SystemPrompt *string   `json:"system_prompt"`
-	ScheduleCron *string   `json:"schedule_cron"`
-	ToolScope    *string   `json:"tool_scope"`
-	AllowedTools *[]string `json:"allowed_tools"`
-	Model        *string   `json:"model"`
-	MaxTurns     *int      `json:"max_turns"`
-	MaxBudgetUSD *float64  `json:"max_budget_usd"`
-	Enabled      *bool     `json:"enabled"`
+	Name            *string   `json:"name"`
+	Slug            *string   `json:"slug"`
+	Prompt          *string   `json:"prompt"`
+	SystemPrompt    *string   `json:"system_prompt"`
+	ScheduleCron    *string   `json:"schedule_cron"`
+	ToolScope       *string   `json:"tool_scope"`
+	AllowedTools    *[]string `json:"allowed_tools"`
+	Model           *string   `json:"model"`
+	MaxTurns        *int      `json:"max_turns"`
+	MaxBudgetUSD    *float64  `json:"max_budget_usd"`
+	Enabled         *bool     `json:"enabled"`
+	QuietHoursStart *string   `json:"quiet_hours_start"`
+	QuietHoursEnd   *string   `json:"quiet_hours_end"`
 }
 
 type updateAgentSettingsRequest struct {
@@ -92,17 +96,19 @@ func CreateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		out, err := svc.CreateAgentDefinition(r.Context(), service.CreateAgentDefinitionParams{
-			Name:         req.Name,
-			Slug:         req.Slug,
-			Prompt:       req.Prompt,
-			SystemPrompt: req.SystemPrompt,
-			ScheduleCron: req.ScheduleCron,
-			ToolScope:    req.ToolScope,
-			AllowedTools: req.AllowedTools,
-			Model:        req.Model,
-			MaxTurns:     req.MaxTurns,
-			MaxBudgetUSD: req.MaxBudgetUSD,
-			Enabled:      req.Enabled,
+			Name:            req.Name,
+			Slug:            req.Slug,
+			Prompt:          req.Prompt,
+			SystemPrompt:    req.SystemPrompt,
+			ScheduleCron:    req.ScheduleCron,
+			ToolScope:       req.ToolScope,
+			AllowedTools:    req.AllowedTools,
+			Model:           req.Model,
+			MaxTurns:        req.MaxTurns,
+			MaxBudgetUSD:    req.MaxBudgetUSD,
+			Enabled:         req.Enabled,
+			QuietHoursStart: req.QuietHoursStart,
+			QuietHoursEnd:   req.QuietHoursEnd,
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
@@ -130,17 +136,19 @@ func UpdateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		out, err := svc.UpdateAgentDefinition(r.Context(), slug, service.UpdateAgentDefinitionParams{
-			Name:         req.Name,
-			Slug:         req.Slug,
-			Prompt:       req.Prompt,
-			SystemPrompt: req.SystemPrompt,
-			ScheduleCron: req.ScheduleCron,
-			ToolScope:    req.ToolScope,
-			AllowedTools: req.AllowedTools,
-			Model:        req.Model,
-			MaxTurns:     req.MaxTurns,
-			MaxBudgetUSD: req.MaxBudgetUSD,
-			Enabled:      req.Enabled,
+			Name:            req.Name,
+			Slug:            req.Slug,
+			Prompt:          req.Prompt,
+			SystemPrompt:    req.SystemPrompt,
+			ScheduleCron:    req.ScheduleCron,
+			ToolScope:       req.ToolScope,
+			AllowedTools:    req.AllowedTools,
+			Model:           req.Model,
+			MaxTurns:        req.MaxTurns,
+			MaxBudgetUSD:    req.MaxBudgetUSD,
+			Enabled:         req.Enabled,
+			QuietHoursStart: req.QuietHoursStart,
+			QuietHoursEnd:   req.QuietHoursEnd,
 		})
 		if err != nil {
 			writeAgentError(w, err, "agent not found")
