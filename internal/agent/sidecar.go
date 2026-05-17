@@ -98,6 +98,13 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 			result.DurationMs = time.Since(start).Milliseconds()
 			return result, result.Err
 		}
+		// Sidecar.Run is the single source of truth for the transcript
+		// path. Built from (TranscriptDir, spec.RunID — the UUID, not
+		// the short_id) so it's stable across the run's lifecycle. The
+		// result.TranscriptPath we surface back to the orchestrator and
+		// the spec.TranscriptPath we forward to the TS sidecar process
+		// both reference this exact `p` — DO NOT set spec.TranscriptPath
+		// elsewhere (it gets clobbered here just before json.Marshal).
 		p := filepath.Join(s.TranscriptDir, spec.RunID+".ndjson")
 		f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {

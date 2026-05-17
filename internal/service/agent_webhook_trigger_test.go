@@ -37,25 +37,27 @@ func TestFireSyncCompleteAgents_OnlyFiresEligible(t *testing.T) {
 
 	orch.FireSyncCompleteAgents(context.Background())
 
-	// FireSyncCompleteAgents dispatches per-goroutine; give them a moment to
-	// land + complete.
-	deadline := time.After(2 * time.Second)
+	// Deterministic wait: we expect exactly 1 fire (only the eligible
+	// agent qualifies). Block until it lands or fail after a generous
+	// timeout. Then sweep the channel briefly to catch any unexpected
+	// extra fires the bug-this-test-pins might produce. Replaces the
+	// iter-30 time.After polling pattern flagged as LOW #6 in iter-32
+	// audit — the previous shape was timing-sensitive under CI load.
 	var got []string
-loop:
-	for {
-		select {
-		case agentID := <-fired:
-			got = append(got, agentID)
-		case <-time.After(150 * time.Millisecond):
-			break loop
-		case <-deadline:
-			break loop
-		}
+	select {
+	case agentID := <-fired:
+		got = append(got, agentID)
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for the eligible webhook fire; got %v", got)
+	}
+	// Tight tail to catch extras (if any agent that shouldn't fire does).
+	select {
+	case extra := <-fired:
+		t.Fatalf("unexpected extra fire from agent %q (only enabled+webhook should run)", extra)
+	case <-time.After(200 * time.Millisecond):
+		// pass — no extras
 	}
 
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 webhook fire, got %d: %v", len(got), got)
-	}
 	if got[0] != enabledWebhook.ID {
 		t.Errorf("fired agent ID = %q, want %q (the enabled+webhook one)",
 			got[0], enabledWebhook.ID)
