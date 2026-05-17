@@ -82,10 +82,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "!bg-transparent !text-muted-foreground hover:!text-foreground " +
             "!h-7 !rounded-md !px-2 !text-xs",
+          // Match the shadcn ghost icon-button vocabulary: no border, no
+          // background until hover, foreground-tinted icon at hover. Sonner's
+          // default close (bordered + popover-bg) reads as a separate floating
+          // badge stuck to the corner — out of place next to the rest of v2's
+          // close affordances. Override the inline svg sizing/stroke so the
+          // icon matches the weight of lucide icons elsewhere (sonner ships a
+          // 12×12, stroke-1.5 svg by default).
           closeButton:
-            "!bg-popover !border !border-border !text-muted-foreground " +
+            "!bg-transparent !border-0 !text-muted-foreground/70 " +
             "hover:!bg-muted hover:!text-foreground " +
-            "!left-auto !right-2 !top-2 !translate-x-0 !translate-y-0",
+            "!size-6 !rounded-md !flex !items-center !justify-center transition-colors " +
+            "!left-auto !right-2 !top-2 !translate-x-0 !translate-y-0 " +
+            "[&_svg]:!size-3.5 [&_svg]:!stroke-[2]",
         },
       }}
       style={
