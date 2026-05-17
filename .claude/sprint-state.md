@@ -468,6 +468,25 @@ Next iteration candidates (in rough impact order):
 
 Picking **#5 note indicator** next iteration — tiny polish that lands the iter-16 notes feature on the run-history surface (where most users will see them); 30-min iteration.
 
+## ITER 17 — 2026-05-17 03:01
+Shipped (PR #1243 squash-merged into sprint branch as 21489d0c):
+- Note indicator (StickyNote icon + "note" label) on RunRow when operator_note is non-empty.
+- title attribute carries first 80 chars as native hover preview.
+- Single-file 14-line change. All 5 CI jobs green.
+
+Pure polish iteration that finishes the iter-16 notes story across both surfaces (drawer + list).
+
+Next iteration candidates (in rough impact order):
+1. **Cost dashboard** in /v2/agents — sparkline on list page or /v2/agents/cost page. Bigger UI work; high impact for self-hosters worried about spend.
+2. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger.
+3. **Suggested rules agent** — proposes new transaction_rules from recent transactions. Bigger.
+4. **"Next fire" preview honoring quiet hours** — small iter-15 follow-up.
+5. **make web post-step that recreates web/dist/.gitkeep** — small infra fix to kill the recurring gitkeep race in iter commits.
+6. **breadbox doctor "agent run <slug> --dry"** — extends agent test with the option to fire a real definition.
+
+Picking **#5 gitkeep infra fix** next iteration — smallest possible, kills a recurring footgun across all future iters (have hit it 4+ times now). Then #1 (cost dashboard) is the next high-impact item.
+
+
 
 
 
