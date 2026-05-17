@@ -134,6 +134,11 @@ type AgentRunResponse struct {
 	CacheReadTokens     *int     `json:"cache_read_tokens,omitempty"`
 	CacheCreationTokens *int     `json:"cache_creation_tokens,omitempty"`
 	TurnCount           *int     `json:"turn_count,omitempty"`
+	// MaxTurnsUsed is the per-run snapshot of the agent's max_turns cap
+	// at the time the run started. Named for historical reasons; "max
+	// turns at run-start" would be clearer. Pair with turn_count to
+	// render "actual / cap". Until iter-33 this column erroneously
+	// mirrored turn_count, making every run look like it hit the cap.
 	MaxTurnsUsed        *int     `json:"max_turns_used,omitempty"`
 	NumToolCalls        *int     `json:"num_tool_calls,omitempty"`
 	ErrorMessage        *string  `json:"error_message,omitempty"`
@@ -720,7 +725,14 @@ func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, ca
 
 // CompleteAgentRunDB persists a terminal RunResult onto the run row.
 // Used by the orchestrator after Runner.Run returns.
-func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult) (db.AgentRun, error) {
+//
+// maxTurnsCap is the per-run snapshot of the agent's max_turns at the
+// time the run started. Stored separately from turn_count so the SPA
+// can render "turns / cap" — until iter-33 this column mirrored
+// turn_count, which made every run look like a max-turns hit. The cap
+// itself never changes mid-run, so the orchestrator captures it
+// from def.MaxTurns at run-start and passes it through here.
+func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult, maxTurnsCap int) (db.AgentRun, error) {
 	costPtr := result.TotalCostUSD
 	return s.Queries.CompleteAgentRun(ctx, db.CompleteAgentRunParams{
 		ID:                  runID,
@@ -732,7 +744,7 @@ func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, res
 		CacheReadTokens:     pgtype.Int4{Int32: int32(result.CacheReadTokens), Valid: true},
 		CacheCreationTokens: pgtype.Int4{Int32: int32(result.CacheCreationTokens), Valid: true},
 		TurnCount:           pgtype.Int4{Int32: int32(result.TurnCount), Valid: true},
-		MaxTurnsUsed:        pgtype.Int4{Int32: int32(result.TurnCount), Valid: true},
+		MaxTurnsUsed:        pgtype.Int4{Int32: int32(maxTurnsCap), Valid: maxTurnsCap > 0},
 		NumToolCalls:        pgtype.Int4{Int32: int32(result.NumToolCalls), Valid: true},
 		TranscriptPath:      pgtype.Text{String: result.TranscriptPath, Valid: result.TranscriptPath != ""},
 		SessionID:           pgtype.Text{String: result.SessionID, Valid: result.SessionID != ""},
