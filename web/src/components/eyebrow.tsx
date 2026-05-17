@@ -27,20 +27,28 @@ interface EyebrowProps extends React.HTMLAttributes<HTMLElement> {
    * `text-[11px] tracking-[0.08em]` rhythm used at the *page* scale —
    * `<PageHeader>` eyebrow, the home-stats KPI cell labels, and the
    * provider-card "Provider" caption — where the eyebrow has to hold its
-   * own next to a 2xl–3xl title without disappearing.
+   * own next to a 2xl–3xl title without disappearing. `nav` is the
+   * heavier `font-semibold` cousin used by sidebar / shortcut-sheet
+   * group labels (`text-[10px] tracking-[0.08em]`) where the eyebrow
+   * sits inside chrome rather than next to content and needs the extra
+   * weight to read against a coloured surface.
    */
-  variant?: "default" | "hero" | "page";
+  variant?: "default" | "hero" | "page" | "nav";
   className?: string;
   children: React.ReactNode;
 }
 
 // Eyebrow is the canonical uppercase micro-label used across detail pages,
-// hero cards, and timeline rails: `text-muted-foreground text-[10px]
-// font-medium tracking-[0.1em] uppercase`. The pattern was open-coded
-// across ten files in five subtly different sizes/trackings before iter 37
-// consolidated them. Don't reach for raw `text-[10px] font-medium
+// hero cards, timeline rails, AND sidebar/menu group labels:
+// `text-muted-foreground text-[10px] font-medium tracking-[0.1em]
+// uppercase` is the default; `font-semibold` cousins live behind the
+// `nav` variant. The pattern was open-coded across ten files in five
+// subtly different sizes/trackings before iter 37 consolidated them, and
+// the `nav`-scale `font-semibold` cousins (sidebar group labels +
+// shortcut-sheet group headers) were unified onto the primitive in
+// iter 95. Don't reach for raw `text-[10px] font-medium/semibold
 // tracking-* uppercase` markup again — extend this primitive with a new
-// variant if a hero needs a different rhythm.
+// variant if a host needs a different rhythm.
 export function Eyebrow({
   as: Tag = "span",
   variant = "default",
@@ -51,10 +59,12 @@ export function Eyebrow({
   return (
     <Tag
       className={cn(
-        "text-muted-foreground font-medium uppercase",
+        "text-muted-foreground uppercase",
+        variant === "nav" ? "font-semibold" : "font-medium",
         variant === "default" && "text-[10px] tracking-[0.1em]",
         variant === "hero" && "text-[10px] tracking-[0.12em]",
         variant === "page" && "text-[11px] tracking-[0.08em]",
+        variant === "nav" && "text-[10px] tracking-[0.08em]",
         className,
       )}
       {...rest}

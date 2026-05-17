@@ -2,6 +2,7 @@ import * as React from "react";
 import { Keyboard } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
+import { Eyebrow } from "@/components/eyebrow";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { displayKey } from "@/lib/kbd-display";
 import {
@@ -99,9 +100,9 @@ export function ShortcutSheet() {
                   className="bg-card overflow-hidden rounded-md border"
                 >
                   <header className="bg-muted/30 flex items-baseline justify-between gap-2 border-b px-3 py-2">
-                    <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+                    <Eyebrow as="h3" variant="nav">
                       {group}
-                    </h3>
+                    </Eyebrow>
                     <span className="text-muted-foreground/70 text-[10px] tabular-nums">
                       {items.length}
                     </span>
