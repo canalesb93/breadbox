@@ -28,11 +28,13 @@ interface ReauthSheetProps {
 // launch, Teller reconnection-mode launch, and the post-success completion
 // call. CSV connections never reach here in practice (the Connect/Detail
 // pages don't surface a re-auth affordance for them) but we render an N/A
-// stage for hand-crafted URLs rather than crash.
+// stage for hand-crafted URLs rather than crash. Teller needs both the
+// enrollment id (carries the existing connection) and the application id
+// (boots Teller Connect); both ride on the reauth response.
 type Stage =
   | { kind: "confirm" }
   | { kind: "plaid"; linkToken: string }
-  | { kind: "teller"; enrollmentId: string }
+  | { kind: "teller"; enrollmentId: string; applicationId: string }
   | { kind: "completing" }
   | { kind: "unsupported"; reason: string };
 
@@ -103,7 +105,18 @@ export function ReauthSheet({
       if (conn.provider === "plaid") {
         setStage({ kind: "plaid", linkToken: session.link_token });
       } else if (conn.provider === "teller") {
-        setStage({ kind: "teller", enrollmentId: session.link_token });
+        const applicationId = session.application_id ?? "";
+        if (!applicationId) {
+          toast.error(
+            "Teller application id is not configured on this server.",
+          );
+          return;
+        }
+        setStage({
+          kind: "teller",
+          enrollmentId: session.link_token,
+          applicationId,
+        });
       } else {
         setStage({
           kind: "unsupported",
@@ -147,14 +160,6 @@ export function ReauthSheet({
     }
     setStage({ kind: "confirm" });
   }
-
-  // The Teller application id comes from a window global injected by the
-  // Vite shell, mirroring the Connect-bank Sheet. Without it Teller Connect
-  // can't bootstrap.
-  const tellerAppId =
-    (typeof window !== "undefined" &&
-      (window as Window & { __TELLER_APP_ID__?: string }).__TELLER_APP_ID__) ||
-    "";
 
   return (
     <Sheet open={open} onOpenChange={handleSheetChange}>
@@ -222,7 +227,7 @@ export function ReauthSheet({
               "enroll". */}
           {stage.kind === "teller" && (
             <TellerConnectButton
-              applicationId={tellerAppId}
+              applicationId={stage.applicationId}
               enrollmentId={stage.enrollmentId}
               onSuccess={() => completeReauth()}
               onExit={() => onProviderExit(null)}

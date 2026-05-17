@@ -219,11 +219,15 @@ export interface ProviderInfo {
 
 // --- Connect: link-session response (POST /providers/{name}/link-session) ---
 // Returned by providers that need a server-issued init token (Plaid today).
-// Providers without one (Teller, CSV) get a 204 — surfaced here as a null
-// result.
+// Providers without one (CSV) get a 204 — surfaced here as a null result.
+// Teller's connect-flow response carries the configured app id as
+// `link_token`; the Teller-reauth response (POST /connections/{id}/reauth)
+// carries the enrollment id as `link_token` and the app id as the optional
+// `application_id` so Teller Connect can boot in reconnection mode.
 export interface LinkSession {
   link_token: string;
   expiration: string;
+  application_id?: string;
 }
 
 // --- Connect: connection-create envelope (POST /connections) ---
