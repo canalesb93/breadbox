@@ -8,7 +8,9 @@ import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageError } from "@/components/page-error";
+import { StatusPanel } from "@/components/status-panel";
+import { AlertTriangle } from "lucide-react";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useShortcut } from "@/lib/shortcuts";
 import { useConnections, useSyncAll } from "@/api/queries/connections";
@@ -247,16 +249,16 @@ export function ConnectionsPage() {
       )}
 
       {attentionCount > 0 && (
-        <Alert variant="default" className="border-amber-500/30 bg-amber-500/5">
-          <AlertTitle className="text-amber-700 dark:text-amber-400">
-            {attentionCount === 1
+        <StatusPanel
+          tone="warning"
+          icon={AlertTriangle}
+          heading={
+            attentionCount === 1
               ? "1 connection needs attention"
-              : `${attentionCount} connections need attention`}
-          </AlertTitle>
-          <AlertDescription>
-            Re-authenticate the rows below to resume syncing.
-          </AlertDescription>
-        </Alert>
+              : `${attentionCount} connections need attention`
+          }
+          body="Re-authenticate the rows below to resume syncing."
+        />
       )}
 
       {(usersQuery.data?.length ?? 0) > 1 && (
@@ -287,14 +289,12 @@ export function ConnectionsPage() {
           )}
         />
       ) : isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Couldn't load connections</AlertTitle>
-          <AlertDescription>
-            {connectionsQuery.error instanceof Error
-              ? connectionsQuery.error.message
-              : "Try refreshing the page."}
-          </AlertDescription>
-        </Alert>
+        <PageError
+          resource="connections"
+          error={connectionsQuery.error}
+          onRetry={() => connectionsQuery.refetch()}
+          retrying={connectionsQuery.isFetching}
+        />
       ) : connections.length === 0 ? (
         <EmptyState
           icon={Plug}

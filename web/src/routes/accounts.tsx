@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageError } from "@/components/page-error";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -186,14 +186,12 @@ export function AccountsPage() {
           )}
         />
       ) : isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Couldn't load accounts</AlertTitle>
-          <AlertDescription>
-            {accountsQuery.error instanceof Error
-              ? accountsQuery.error.message
-              : "Try refreshing the page."}
-          </AlertDescription>
-        </Alert>
+        <PageError
+          resource="accounts"
+          error={accountsQuery.error}
+          onRetry={() => accountsQuery.refetch()}
+          retrying={accountsQuery.isFetching}
+        />
       ) : accounts.length === 0 ? (
         <EmptyState
           icon={Banknote}

@@ -1,6 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageError } from "@/components/page-error";
 import {
   useProviderConfig,
   useProviderHealth,
@@ -63,14 +63,12 @@ export function ProvidersPage() {
           title="Providers"
           description={PROVIDERS_DESCRIPTION}
         />
-        <Alert variant="destructive">
-          <AlertTitle>Couldn't load provider configuration</AlertTitle>
-          <AlertDescription>
-            {config.error instanceof Error
-              ? config.error.message
-              : "Try refreshing the page."}
-          </AlertDescription>
-        </Alert>
+        <PageError
+          resource="provider configuration"
+          error={config.error}
+          onRetry={() => config.refetch()}
+          retrying={config.isFetching}
+        />
       </>
     );
   }
