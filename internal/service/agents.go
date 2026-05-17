@@ -56,8 +56,20 @@ type AgentDefinitionResponse struct {
 	QuietHoursStart *string          `json:"quiet_hours_start,omitempty"`
 	QuietHoursEnd   *string          `json:"quiet_hours_end,omitempty"`
 	LastRun         *AgentRunSummary `json:"last_run,omitempty"`
-	CreatedAt       string           `json:"created_at"`
-	UpdatedAt       string           `json:"updated_at"`
+	// CostStats30d is populated only by ListAgentDefinitions (the surface
+	// where users want to compare spend at a glance). Single-row
+	// GetAgentDefinition leaves it nil so the edit-page hot path doesn't
+	// pay for an extra aggregation query.
+	CostStats30d *AgentCostStats `json:"cost_stats_30d,omitempty"`
+	CreatedAt    string          `json:"created_at"`
+	UpdatedAt    string          `json:"updated_at"`
+}
+
+// AgentCostStats is the per-agent cost rollup over the last 30 days.
+// run_count excludes 'skipped' rows (no real spend incurred).
+type AgentCostStats struct {
+	RunCount     int     `json:"run_count"`
+	TotalCostUSD float64 `json:"total_cost_usd"`
 }
 
 // AgentRunSummary is the inline last-run shape on list/detail responses.
@@ -147,13 +159,35 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 	if err != nil {
 		return nil, fmt.Errorf("list agent definitions: %w", err)
 	}
+	// Cost stats are a single aggregation query keyed by definition id —
+	// fetch once outside the per-row loop.
+	statsRows, err := s.Queries.GetAgentCostStats30d(ctx)
+	if err != nil {
+		// Soft-fail: a stats query hiccup shouldn't block the list page.
+		// Log + render without cost columns.
+		s.Logger.Warn("list agent definitions: cost stats query failed", "error", err)
+		statsRows = nil
+	}
+	statsByID := make(map[string]AgentCostStats, len(statsRows))
+	for _, r := range statsRows {
+		cost, _ := pgconv.NumericToFloat(r.TotalCostUsd)
+		statsByID[pgconv.FormatUUID(r.AgentDefinitionID)] = AgentCostStats{
+			RunCount:     int(r.RunCount),
+			TotalCostUSD: cost,
+		}
+	}
+
 	out := make([]AgentDefinitionResponse, 0, len(rows))
 	for _, row := range rows {
 		last, err := s.lastRunSummary(ctx, row.ID)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, agentDefinitionFromRow(row, last))
+		resp := agentDefinitionFromRow(row, last)
+		if stats, ok := statsByID[resp.ID]; ok {
+			resp.CostStats30d = &stats
+		}
+		out = append(out, resp)
 	}
 	return out, nil
 }

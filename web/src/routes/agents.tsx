@@ -8,6 +8,7 @@ import {
   Bot,
   CheckCircle2,
   Clock,
+  Coins,
   History,
   KeyRound,
   Pencil,
@@ -55,6 +56,7 @@ import {
   useDeleteAgent,
   useRunAgentNow,
   useToggleAgent,
+  type AgentCostStats,
   type AgentDefinition,
 } from "@/api/queries/agents";
 import { openModal } from "@/lib/modals";
@@ -409,6 +411,7 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
             </span>
             <span>Model: {agent.model}</span>
             <span>Max turns: {agent.max_turns}</span>
+            <CostStatsPill stats={agent.cost_stats_30d} />
             <LastRunPill run={agent.last_run} />
           </div>
         </div>
@@ -454,6 +457,24 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
         </div>
       </div>
     </Card>
+  );
+}
+
+function CostStatsPill({
+  stats,
+}: {
+  stats?: AgentCostStats | null;
+}) {
+  if (!stats || stats.run_count === 0) {
+    return null;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      title={`${stats.run_count} run${stats.run_count === 1 ? "" : "s"} in the last 30 days`}
+    >
+      <Coins className="size-3" />${stats.total_cost_usd.toFixed(2)} / 30d
+    </span>
   );
 }
 

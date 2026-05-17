@@ -8,7 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"breadbox/internal/appconfig"
+	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 )
 
@@ -279,6 +283,97 @@ func TestUpdateAgentSettings_ClearTokenWithEmptyString(t *testing.T) {
 	}
 	if cleared.SubscriptionToken != nil {
 		t.Errorf("expected SubscriptionToken nil after clearing, got %v", *cleared.SubscriptionToken)
+	}
+}
+
+func TestListAgentDefinitions_PopulatesCostStats30d(t *testing.T) {
+	svc, q, pool := newService(t)
+	ctx := context.Background()
+
+	def := mustCreateAgentDefinition(t, svc, "svc-cost-stats", true)
+	defUUID, err := pgconv.ParseUUID(def.ID)
+	if err != nil {
+		t.Fatalf("parse uuid: %v", err)
+	}
+	_ = pool // pool is plumbed for parity with other tests in this file
+
+	// 2 success runs ($0.0123 + $0.0042) + 1 skipped (should NOT count).
+	mustInsertCompletedRun(t, q, defUUID, "0.0123")
+	mustInsertCompletedRun(t, q, defUUID, "0.0042")
+	mustInsertSkippedRun(t, q, defUUID)
+
+	list, err := svc.ListAgentDefinitions(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	var got *service.AgentDefinitionResponse
+	for i := range list {
+		if list[i].Slug == def.Slug {
+			got = &list[i]
+			break
+		}
+	}
+	if got == nil {
+		t.Fatal("created agent missing from list response")
+	}
+	if got.CostStats30d == nil {
+		t.Fatal("expected CostStats30d on the response, got nil")
+	}
+	if got.CostStats30d.RunCount != 2 {
+		t.Errorf("RunCount = %d, want 2 (skipped row should be excluded)", got.CostStats30d.RunCount)
+	}
+	wantCost := 0.0165
+	if got.CostStats30d.TotalCostUSD < wantCost-0.0001 || got.CostStats30d.TotalCostUSD > wantCost+0.0001 {
+		t.Errorf("TotalCostUSD = %v, want ~%v", got.CostStats30d.TotalCostUSD, wantCost)
+	}
+}
+
+func mustInsertCompletedRun(t *testing.T, q *db.Queries, defID pgtype.UUID, costStr string) {
+	t.Helper()
+	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
+		AgentDefinitionID: defID,
+		Trigger:           "manual",
+	})
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	var cost pgtype.Numeric
+	if err := cost.Scan(costStr); err != nil {
+		t.Fatalf("numeric scan: %v", err)
+	}
+	if _, err := q.CompleteAgentRun(context.Background(), db.CompleteAgentRunParams{
+		ID:                  run.ID,
+		Status:              "success",
+		DurationMs:          pgtype.Int4{Int32: 100, Valid: true},
+		TotalCostUsd:        cost,
+		InputTokens:         pgtype.Int4{Int32: 10, Valid: true},
+		OutputTokens:        pgtype.Int4{Int32: 5, Valid: true},
+		CacheReadTokens:     pgtype.Int4{Int32: 0, Valid: true},
+		CacheCreationTokens: pgtype.Int4{Int32: 0, Valid: true},
+		TurnCount:           pgtype.Int4{Int32: 1, Valid: true},
+		MaxTurnsUsed:        pgtype.Int4{Int32: 10, Valid: true},
+		NumToolCalls:        pgtype.Int4{Int32: 0, Valid: true},
+		TranscriptPath:      pgtype.Text{},
+		SessionID:           pgtype.Text{},
+	}); err != nil {
+		t.Fatalf("complete run: %v", err)
+	}
+}
+
+func mustInsertSkippedRun(t *testing.T, q *db.Queries, defID pgtype.UUID) {
+	t.Helper()
+	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
+		AgentDefinitionID: defID,
+		Trigger:           "cron",
+	})
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	if err := q.MarkAgentRunSkipped(context.Background(), db.MarkAgentRunSkippedParams{
+		ID:           run.ID,
+		ErrorMessage: pgtype.Text{String: "quiet hours", Valid: true},
+	}); err != nil {
+		t.Fatalf("mark skipped: %v", err)
 	}
 }
 
