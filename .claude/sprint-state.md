@@ -85,15 +85,14 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - [x] 6 new orchestrator integration tests pass
 - [ ] **Deferred to iter 7:** transcript file GC (orphaned NDJSON files after row delete) — DB rows are pruned, disk cleanup is polish
 
-### Iteration 4 — v2 SPA `/agents` list + settings
-- [ ] New route `/v2/agents` via PAGE_OVERRIDES, registered in `web/src/lib/nav.ts` (Money or System group)
-- [ ] `web/src/api/queries/agents.ts` hooks (list, get, create, update, delete, run-now)
-- [ ] `web/src/routes/agents.tsx` list page: table/grid of definitions, enable toggle, last-run status, next-run time, "Run now"
-- [ ] `web/src/routes/agents-settings.tsx` or extend Settings page: Anthropic key input (paste once, shown masked), global caps
-- [ ] Sandbox specimens for any new components (per design-system rule)
-- [ ] Use `validate-ui` or `simple-validate-ui` to capture screenshots
-- **Tests:** smoke test that loads the page in Chrome DevTools MCP, type-check passes
-- **PR title:** `feat(agents): v2 SPA list + settings page`
+### Iteration 4 — v2 SPA `/agents` list + settings ✅ MERGED #1230 (into sprint branch)
+- [x] PAGE_OVERRIDES entry for `/agents` (nav slot was already in System)
+- [x] `web/src/api/queries/agents.ts` — all hooks (list/get/create/update/delete/enable/disable/run-now/runs/settings)
+- [x] `web/src/routes/agents.tsx` — list page with cards, toggle, run-now, delete, quick-create Sheet
+- [x] `web/src/features/settings/agents-section.tsx` + sections registration + shell wiring
+- [x] shadcn Switch primitive added
+- [x] Screenshots captured (desktop+tablet+mobile composite) and embedded in PR body via img402.dev
+- [ ] **Deferred to iter 5:** sandbox specimens (agent row is feature-scoped today; promote in iter 5 once edit/transcript components emerge)
 
 ### Iteration 5 — prompt builder + run history viewer
 - [ ] `web/src/routes/agents.$slug.edit.tsx`: prompt textarea with token counter, model picker (claude-opus-4-7 default), schedule picker (cron expression with friendly presets), tool-scope dropdown, allowed-tools multi-select sourced from MCP tool registry, max_turns + max_budget_usd inputs
@@ -223,6 +222,25 @@ Deferred:
 - Transcript file GC (iter 7).
 
 Next iteration: v2 SPA /agents page (list + settings) — first UI work, will pull in the frontend-design skill and capture screenshots per the embedded-evidence rule.
+
+## ITER 4 — 2026-05-17 00:48
+Shipped (PR #1230 squash-merged into sprint branch as 074fe997):
+- First UI iteration. Full /agents list page + Settings → Agents tab.
+- TanStack Query hooks for the entire agents REST surface.
+- shadcn Switch added (only new primitive needed).
+- Screenshot evidence captured at desktop+tablet+mobile via simple-validate-ui, uploaded to img402.dev, embedded in PR body.
+- All 5 CI jobs green.
+- Two failure modes hit + recovered during this iter, both noted as lessons:
+  1. First Edit call against settings-sections.ts silently no-op'd (got "File has not been read yet" error). The lint passed because settings-shell.tsx imported AgentsSection but settings-sections.ts didn't register the tab — meaning the tab never rendered. Recovered by re-reading + re-editing. **Lesson for future loops: when an Edit returns "File has not been read yet", that edit DID NOT APPLY — re-read then re-edit before moving on.**
+  2. `git add -A` swept up the local test binary (./breadbox-iter4, 55MB) and removed web/dist/.gitkeep. Caught in `git show --stat` before push, amended. **Lesson for future loops: after `git add -A` run `git status` and check for unexpected binaries / .gitkeep removals before committing.**
+
+Deferred to iter 5:
+- Edit page with full prompt builder + allowed-tools multi-select + schedule preset picker
+- Run history drawer + transcript viewer
+- Sandbox specimens (promote agent row to components/ when iter-5 reuse appears)
+
+Next iteration: iter 5 — prompt builder + run history viewer. The agent row will likely move from features/ to components/ once the edit page reuses it.
+
 
 
 
