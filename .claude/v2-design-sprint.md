@@ -1953,6 +1953,20 @@ Cross-cutting components:
 
 (Populated by iterations.)
 
+- **HIGH PRIORITY — TimelineRail horizontal position regression** (Ricardo, 2026-05-17):
+  PR [#1169](https://github.com/canalesb93/breadbox/pull/1169) (iter 56,
+  the rail-tail fix that replaced `<ol border-l>` with per-row `::before`
+  rails clipped via `:first-of-type`/`:last-of-type`) appears to have
+  shifted the rail's horizontal position — **the rail is no longer
+  centered on the icon discs**. Likely the `::before` `left-*` offset
+  doesn't match the original `border-l`'s implicit position relative to
+  the disc's negative-margin inset (`-ml-[calc(0.875rem+1px)]`).
+  Next iteration: open `web/src/components/timeline-rail.tsx`, screenshot
+  the TX-detail activity timeline at 1440x900 to see the misalignment,
+  then nudge the `::before` `left-*` value so the rail line passes
+  through disc centres. Small targeted fix, single file, should ship in
+  a few tool calls.
+
 - **Mobile audit — Settings shell** (residual from iter 22): Accounts
   + Providers retired in iter 24 ([#1137](https://github.com/canalesb93/breadbox/pull/1137));
   Settings shell retired in iter 27 ([#1139](https://github.com/canalesb93/breadbox/pull/1139))
