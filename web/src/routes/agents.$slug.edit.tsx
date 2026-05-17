@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
 import { withMutationToast } from "@/lib/mutation-toast";
-import { useAgent, useUpdateAgent } from "@/api/queries/agents";
+import { useAgent, useRunAgentNow, useUpdateAgent } from "@/api/queries/agents";
 import {
   AGENT_MODELS,
   TOOL_SCOPES,
@@ -455,10 +455,15 @@ export function AgentEditPage() {
                 />
               </Card>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button type="button" variant="outline" asChild>
                   <Link to="/agents">Cancel</Link>
                 </Button>
+                <TestPromptButton
+                  slug={slug}
+                  promptValue={form.watch("prompt")}
+                  disabled={updateAgent.isPending}
+                />
                 <Button type="submit" disabled={updateAgent.isPending}>
                   {updateAgent.isPending && (
                     <Loader2 className="size-4 animate-spin" />
@@ -471,5 +476,74 @@ export function AgentEditPage() {
         </Form>
       )}
     </>
+  );
+}
+
+// TestPromptButton dry-fires the in-edit-form prompt via the iter-45
+// prompt_override path on POST /api/v1/agents/:slug/run. Lets operators
+// iterate on prompts without round-tripping through Save (which would
+// mutate the stored definition + fire every cron from that point onward
+// with the new prompt). Disabled when the form is mid-save or the prompt
+// field is empty.
+//
+// On success, navigates to the agent's run history with the new run's
+// transcript drawer pre-opened, so operators can immediately read the
+// model's response.
+function TestPromptButton({
+  slug,
+  promptValue,
+  disabled,
+}: {
+  slug: string;
+  promptValue: string | undefined;
+  disabled: boolean;
+}) {
+  const runNow = useRunAgentNow();
+  const navigate = useNavigate();
+  const empty = !promptValue || promptValue.trim().length === 0;
+  const onClick = async () => {
+    const trimmed = (promptValue ?? "").trim();
+    if (!trimmed) return;
+    const ok = await withMutationToast(
+      async () => {
+        const run = await runNow.mutateAsync({
+          slug,
+          promptOverride: trimmed,
+        });
+        navigate({
+          to: "/agents/$slug/runs",
+          params: { slug },
+          search: { run: run.short_id },
+        });
+        return run;
+      },
+      {
+        success: "Test run dispatched — opening transcript…",
+        error:
+          "Test run failed — check Settings → Agents for auth, or `make agent-sidecar` for the binary",
+      },
+    );
+    // navigate() above triggers regardless of toast result; no-op here.
+    void ok;
+  };
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={onClick}
+      disabled={disabled || runNow.isPending || empty}
+      title={
+        empty
+          ? "Fill in the prompt above to dry-fire it without saving"
+          : "Dry-fire this prompt now without saving the definition"
+      }
+    >
+      {runNow.isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Play className="size-4" />
+      )}
+      Test this prompt
+    </Button>
   );
 }

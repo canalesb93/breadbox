@@ -422,10 +422,17 @@ func UpdateAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFu
 }
 
 // runAgentNowRequest is the optional JSON body for "run now". An empty
-// body — common for the v2 SPA's bare-button click — leaves prompt_prefix
-// unset, which the orchestrator treats as no prefix.
+// body — common for the v2 SPA's bare-button click — leaves both fields
+// unset, which the orchestrator treats as "use the saved def.Prompt
+// verbatim."
 type runAgentNowRequest struct {
 	PromptPrefix string `json:"prompt_prefix,omitempty"`
+	// PromptOverride replaces def.Prompt entirely for this fire. Powers
+	// the iter-45 "Test this prompt" button on the agent edit page so an
+	// operator can dry-fire an unsaved prompt without round-tripping
+	// through Save. Mutually exclusive with PromptPrefix at apply time
+	// (override wins) per Orchestrator.RunNowWith.
+	PromptOverride string `json:"prompt,omitempty"`
 }
 
 // PromptPrefixMaxLen caps operator-supplied prefixes so a runaway paste
@@ -433,6 +440,12 @@ type runAgentNowRequest struct {
 // 2000-char ceiling used for operator notes — the two surfaces feel
 // related from the operator's POV.
 const PromptPrefixMaxLen = 2000
+
+// PromptOverrideMaxLen caps the iter-45 full-prompt override. 20× the
+// prefix cap because real agent prompts are long-form markdown (the
+// seeded starters run 1000-2500 chars each). 40 KB is well under any
+// model's effective context but blocks pathological pastes.
+const PromptOverrideMaxLen = 40_000
 
 // RunAgentNowHandler triggers an immediate synchronous run of the named agent.
 // 503 CONCURRENCY_LOCKED when another run is in progress (no DB row written).
@@ -469,7 +482,15 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 				fmt.Sprintf("prompt_prefix must be at most %d characters", PromptPrefixMaxLen))
 			return
 		}
-		runResp, runErr := orch.RunNow(r.Context(), def, req.PromptPrefix)
+		if len(req.PromptOverride) > PromptOverrideMaxLen {
+			mw.WriteError(w, http.StatusBadRequest, "PROMPT_TOO_LONG",
+				fmt.Sprintf("prompt must be at most %d characters", PromptOverrideMaxLen))
+			return
+		}
+		runResp, runErr := orch.RunNowWith(r.Context(), def, service.RunOverrides{
+			PromptPrefix:   req.PromptPrefix,
+			PromptOverride: req.PromptOverride,
+		})
 		if errors.Is(runErr, agent.ErrConcurrencyLocked) {
 			mw.WriteError(w, http.StatusServiceUnavailable,
 				"CONCURRENCY_LOCKED",

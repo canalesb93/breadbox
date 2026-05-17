@@ -93,6 +93,24 @@ func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error
 	return agent.SmokeTest(ctx, o.svc.Queries, o.encKey, o.runner, binaryPath)
 }
 
+// RunOverrides carries the optional per-call mutations the operator may
+// apply to a manual run. Both fields default to "use the def value"; set
+// them sparingly:
+//
+//   - PromptPrefix prepends to def.Prompt for this fire only (iter-23).
+//   - PromptOverride replaces def.Prompt entirely for this fire (iter-45),
+//     enabling the "Test this prompt" flow on the edit form. Takes
+//     precedence over PromptPrefix when both are set — the override is
+//     the full prompt the operator wants to test, and prepending a prefix
+//     wouldn't match the typed value any longer.
+//
+// Cron + webhook paths always pass the zero value; only manual runs from
+// the v2 SPA / CLI / HTTP API construct non-empty overrides.
+type RunOverrides struct {
+	PromptPrefix   string
+	PromptOverride string
+}
+
 // RunNow executes one agent run synchronously, for "run now" requests.
 // Returns ErrConcurrencyLocked WITHOUT creating a run row when the semaphore
 // is full — the caller (HTTP handler) maps to 503 and the user retries.
@@ -100,13 +118,22 @@ func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error
 //
 // promptPrefix is the operator-supplied per-run prefix that gets prepended to
 // the agent's stored prompt for this fire only. Empty string disables the
-// prefix; cron callers always pass "".
+// prefix; cron callers always pass "". For a full prompt override (the
+// iter-45 "Test this prompt" flow), use RunNowWith instead.
 func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse, promptPrefix string) (*AgentRunResponse, error) {
+	return o.RunNowWith(ctx, def, RunOverrides{PromptPrefix: promptPrefix})
+}
+
+// RunNowWith is the full-shape variant of RunNow that accepts the operator's
+// RunOverrides struct. Used by the iter-45 "Test this prompt" button on
+// the agent edit page to dry-fire an unsaved prompt without mutating the
+// stored definition.
+func (o *Orchestrator) RunNowWith(ctx context.Context, def *AgentDefinitionResponse, ov RunOverrides) (*AgentRunResponse, error) {
 	if err := o.sem.Acquire(ctx); err != nil {
 		return nil, err
 	}
 	defer o.sem.Release()
-	return o.runLocked(ctx, def, "manual", promptPrefix)
+	return o.runLocked(ctx, def, "manual", ov)
 }
 
 // FireSyncCompleteAgents dispatches a webhook-triggered run for every
@@ -172,11 +199,12 @@ func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionRespon
 		return &resp, err
 	}
 	defer o.sem.Release()
-	return o.runLocked(ctx, def, trigger, "")
+	return o.runLocked(ctx, def, trigger, RunOverrides{})
 }
 
 // runLocked assumes the caller holds the semaphore.
-func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionResponse, trigger, promptPrefix string) (*AgentRunResponse, error) {
+func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionResponse, trigger string, ov RunOverrides) (*AgentRunResponse, error) {
+	promptPrefix := ov.PromptPrefix
 	defUUID, err := pgconv.ParseUUID(def.ID)
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: parse def id: %w", err)
@@ -216,8 +244,16 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	}()
 
 	spec, err := o.svc.AssembleJobSpec(ctx, def, &runResp, keyResult.PlaintextKey, o.encKey)
-	if err == nil && promptPrefix != "" {
-		spec.Prompt = applyPromptPrefix(promptPrefix, spec.Prompt)
+	if err == nil {
+		// Override semantics: a full PromptOverride wins outright (the
+		// operator is testing a freshly-typed prompt, not annotating the
+		// stored one). Otherwise fall through to the iter-23 prefix prepend.
+		switch {
+		case ov.PromptOverride != "":
+			spec.Prompt = ov.PromptOverride
+		case promptPrefix != "":
+			spec.Prompt = applyPromptPrefix(promptPrefix, spec.Prompt)
+		}
 	}
 	if err != nil {
 		o.logger.Warn("orchestrator: assemble spec failed",
