@@ -18,13 +18,11 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DetailDialogHeader } from "@/components/detail-dialog-header";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -352,13 +350,11 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
   if (shareToken) {
     return (
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share their setup link</DialogTitle>
-          <DialogDescription>
-            {memberName} can use this one-time link to set their password. It
-            expires in 7 days.
-          </DialogDescription>
-        </DialogHeader>
+        <DetailDialogHeader
+          icon={Link2}
+          title="Share their setup link"
+          description={`${memberName} can use this one-time link to set their password. It expires in 7 days.`}
+        />
         <SetupLinkBox token={shareToken} />
         <DialogFooter>
           <Button onClick={onDone}>Done</Button>
@@ -371,13 +367,11 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
 
   return (
     <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>Add a household member</DialogTitle>
-        <DialogDescription>
-          New members are added without a login by default. Invite them to sign
-          in to share read or edit access.
-        </DialogDescription>
-      </DialogHeader>
+      <DetailDialogHeader
+        icon={UserPlus}
+        title="Add a household member"
+        description="New members are added without a login by default. Invite them to sign in to share read or edit access."
+      />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
@@ -532,12 +526,11 @@ function CreateLoginDialog({
 
   return (
     <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>Invite {user.name} to sign in</DialogTitle>
-        <DialogDescription>
-          We'll create a login and give you a one-time setup link to share.
-        </DialogDescription>
-      </DialogHeader>
+      <DetailDialogHeader
+        icon={UserPlus}
+        title={`Invite ${user.name} to sign in`}
+        description="We'll create a login and give you a one-time setup link to share."
+      />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
@@ -615,13 +608,11 @@ function ShareLinkDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share their setup link</DialogTitle>
-          <DialogDescription>
-            {memberName} can use this one-time link to set their password. It
-            expires in 7 days.
-          </DialogDescription>
-        </DialogHeader>
+        <DetailDialogHeader
+          icon={Link2}
+          title="Share their setup link"
+          description={`${memberName} can use this one-time link to set their password. It expires in 7 days.`}
+        />
         {token && <SetupLinkBox token={token} />}
         <DialogFooter>
           <Button onClick={onClose}>Done</Button>

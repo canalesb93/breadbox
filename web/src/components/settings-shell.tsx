@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Clock, Hammer } from "lucide-react";
+import { Hammer } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ import { BackupsSection } from "@/features/settings/backups-section";
 import { HouseholdSection } from "@/features/settings/household-section";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { StatusPanel } from "@/components/status-panel";
+import { ComingSoonPill } from "@/components/coming-soon-pill";
 import { Eyebrow } from "@/components/eyebrow";
 
 const SETTINGS_MODAL_KEY = "settings";
@@ -228,12 +229,7 @@ function SectionContent({ section }: { section: SettingsSection }) {
         icon={Hammer}
         heading={`${section.title} settings are in the works`}
         body="We're still building this surface. The configuration that lives here will land in a follow-up PR — for now, the panel is wired but empty."
-        trailing={
-          <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide uppercase">
-            <Clock className="size-3" />
-            Coming soon
-          </span>
-        }
+        trailing={<ComingSoonPill />}
       />
     </div>
   );

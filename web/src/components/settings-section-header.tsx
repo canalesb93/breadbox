@@ -32,10 +32,17 @@ interface SettingsSectionHeaderProps {
  * line-height, action alignment — stays in one place.
  *
  * Vocabulary tokens:
- *   - `section` → `<h2>` `text-lg font-medium`, baseline-aligned action,
- *     `space-y-1` description.
- *   - `sub`     → `<h3>` `text-sm font-medium`, baseline-aligned action,
- *     `space-y-1` description.
+ *   - `section` → `<h2>` `text-lg font-semibold`, action centered to title
+ *     row, `space-y-1` description.
+ *   - `sub`     → `<h3>` `text-sm font-semibold`, action centered to title
+ *     row, `space-y-1` description.
+ *
+ * Iter 107 ripple from iter 106's `SectionCard` / `ListCard` baseline polish:
+ * bumped both heading tokens from `font-medium` to `font-semibold` so the
+ * title carries enough anchor next to a real action button (`Button size="sm"`,
+ * `Add member` etc.) instead of reading as a caption. The vocabulary now
+ * matches `PageHeader` (`text-2xl font-semibold`) and the canonical card
+ * header recipe (`text-sm font-semibold`).
  *
  * Don't fork the look — extend the primitive. If a fourth weight is needed
  * (e.g. a "field group" rhythm tighter than `sub`), add it as a new token
@@ -51,13 +58,20 @@ export function SettingsSectionHeader({
   const Heading = level === "section" ? "h2" : "h3";
   const headingClass =
     level === "section"
-      ? "text-lg font-medium tracking-tight"
-      : "text-sm font-medium";
+      ? "text-lg font-semibold tracking-tight"
+      : "text-sm font-semibold";
 
   return (
     <div
       className={cn(
-        "flex flex-col items-start gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4",
+        // Iter 107: when an action is present and the title row is the
+        // visual anchor, `sm:items-center` keeps the button vertically
+        // centered relative to the title+description block instead of
+        // bottom-docked under the description (which protruded the button
+        // below the title baseline by 8-12px — the same mismatch iter 106
+        // fixed on `SectionCard` / `ListCard`). When there's no action the
+        // alignment is moot — `flex-col` collapses to a single column.
+        "flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
         className,
       )}
     >

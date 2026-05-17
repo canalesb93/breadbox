@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowUpRight,
   Check,
@@ -28,10 +29,12 @@ import {
   Search,
   Shapes,
   ShieldAlert,
+  Sparkles,
   Sun,
   Tag,
   Trash2,
   Unplug,
+  UserPlus,
   Users,
   Wallet,
   Wand2,
@@ -70,6 +73,7 @@ import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
 import { ActionPill } from "@/components/action-pill";
+import { ComingSoonPill } from "@/components/coming-soon-pill";
 import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import {
@@ -81,7 +85,9 @@ import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { PageError } from "@/components/page-error";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
+import { DetailDialogHeader } from "@/components/detail-dialog-header";
 import { Sheet } from "@/components/ui/sheet";
+import { Dialog } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
@@ -432,7 +438,7 @@ export function ComponentsSection() {
       <Specimen
         label="MetaBadge"
         code="components/meta-badge"
-        description="Tiny meta chip used in list rows and detail-page hero columns to label a row's secondary state — Hidden, Excluded, Linked, Re-auth, System, Paused, … Owns the v2 density vocabulary (`text-[10px]` + `gap-1` + `px-1.5 py-0` + `[&>svg]:size-2.5`) so the same chip never gets re-derived. Tone routes through the underlying `<Badge>` variant — `outline` by default because a meta label is intentionally calmer than the row's primary classification. `muted` opts into the `text-muted-foreground font-normal` shading the categories list uses so 'System' / 'Hidden' don't compete with the category name. For tone-specific chips (the amber Re-auth pill) pass `className` — the density tokens still apply, which is the whole point. Six surfaces share it: accounts list, accounts detail, categories list (parent + child rows), category detail, connection detail."
+        description="Tiny meta chip used in list rows and detail-page hero columns to label a row's secondary state — Hidden, Excluded, Linked, Re-auth, System, Paused, Primary, Dependent, Error, Disconnected, Disabled, … Owns the v2 density vocabulary (`text-[10px]` + `gap-1` + `px-1.5 py-0` + `[&>svg]:size-2.5`) so the same chip never gets re-derived. Tone routes through the underlying `<Badge>` variant — `outline` by default because a meta label is intentionally calmer than the row's primary classification. `muted` opts into the `text-muted-foreground font-normal` shading the categories list uses so 'System' / 'Hidden' don't compete with the category name. For tone-specific chips (the amber Re-auth pill) pass `className` — the density tokens still apply, which is the whole point. Seven surfaces share it: accounts list (statusBadge for error/disconnected, Linked pill, iter 104), accounts detail, account-links section (Primary/Dependent/Disabled, iter 104), categories list (parent + child rows), category detail, connection detail."
       >
         <MetaBadge icon={Lock} muted>
           System
@@ -447,6 +453,11 @@ export function ComponentsSection() {
         <MetaBadge icon={Pause} variant="secondary">
           Paused
         </MetaBadge>
+        <MetaBadge variant="default">Primary</MetaBadge>
+        <MetaBadge variant="secondary">Dependent</MetaBadge>
+        <MetaBadge variant="destructive">Error</MetaBadge>
+        <MetaBadge>Disconnected</MetaBadge>
+        <MetaBadge>Disabled</MetaBadge>
         <MetaBadge
           icon={AlertTriangle}
           className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
@@ -601,6 +612,25 @@ export function ComponentsSection() {
               Re-authenticate
             </ActionPill>
           </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ComingSoonPill"
+        code="components/coming-soon-pill"
+        description="The canonical muted 'Coming soon' status pill rendered in the trailing slot of a `<StatusPanel tone='info'>` for unbuilt surfaces. Fully-rounded pill (`rounded-full`) with muted background + muted-foreground label, `px-2.5 py-1 text-[11px]` uppercase + wide tracking, leading `Clock` icon at `size-3`. Two consumers today: `routes/placeholder.tsx` (the unbuilt-nav-leaf shell, iter 21) and `components/settings-shell.tsx` (the in-the-works settings panel, iter 78) — both previously hand-rolled the 10-class span. Distinct from `<Eyebrow>` (no chip; section/page micro-label) and shadcn `<Badge>` (rectangular, semantic-tone variants). Pass a different `icon` to swap the leading glyph without losing the rhythm; pass `children` to override the label. Promoted in iter 102."
+        className="block"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <ComingSoonPill />
+            <ComingSoonPill icon={Sparkles}>Beta</ComingSoonPill>
+            <ComingSoonPill icon={Wand2}>In review</ComingSoonPill>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Default leading icon is <code>Clock</code>. Override with the
+            <code> icon</code> prop and the label via <code>children</code>.
+          </p>
         </div>
       </Specimen>
 
@@ -849,6 +879,42 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
+        label="DetailDialogHeader"
+        code="components/detail-dialog-header"
+        description="Sibling of `<DetailSheetHeader>` for centered Dialogs that host a form or multi-step payload (Add member, Create login, Share setup link). Same leading rounded-lg icon tile + optional eyebrow + title + description + optional trailing slot — just routed through `<DialogTitle>` / `<DialogDescription>` so it composes with shadcn `<Dialog>` instead of `<Sheet>`. Promoted in iter 101 to retire the four open-coded `<DialogHeader>` lockups in household-section onto a shared primitive. Wrapped in a hidden `<Dialog open>` here so the radix Dialog context is available."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border bg-card p-4">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              add-member · title + description
+            </div>
+            <Dialog open onOpenChange={() => {}}>
+              <DetailDialogHeader
+                icon={UserPlus}
+                title="Add a household member"
+                description="New members are added without a login by default. Invite them to sign in to share read or edit access."
+              />
+            </Dialog>
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-card p-4">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              share-link · with eyebrow + trailing
+            </div>
+            <Dialog open onOpenChange={() => {}}>
+              <DetailDialogHeader
+                icon={Link2}
+                eyebrow="Household"
+                title="Share their setup link"
+                description="Alex can use this one-time link to set their password. It expires in 7 days."
+                trailing={<Badge variant="secondary">7d</Badge>}
+              />
+            </Dialog>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
         label="FormFooter"
         code="components/form-footer"
         description="The flush bordered action strip at the bottom of a form container. Cancel sits left, primary right; optional `hint` slot for an inline validation note. Two insets — `card` (default) flushes to a `<SectionCard>` body (px-5 py-5), `sheet` flushes to a `<Sheet>` body (p-6) and uses `mt-auto` so it sticks to the Sheet bottom. Iter 49 folded the CSV form's bespoke footer onto the `sheet` variant."
@@ -918,7 +984,7 @@ export function ComponentsSection() {
       <Specimen
         label="SettingsSectionHeader"
         code="components/settings-section-header"
-        description="The canonical title + description block used by every section inside the Settings shell. Top-of-pane titles (Account / Household / Backups) and inline sub-sections (Change password / Actions / Stored backups / Automatic schedule) both route through here, so the typographic rhythm — heading size + weight, description colour + line-height, action alignment — stays in one place. Tokens: `section` (h2, text-lg, baseline-aligned action) and `sub` (h3, text-sm). The optional `action` slot is sm:right-aligned and baseline-aligned to the heading so an Add-member CTA sits flush with the title."
+        description="The canonical title + description block used by every section inside the Settings shell. Top-of-pane titles (Account / Household / Backups) and inline sub-sections (Change password / Actions / Stored backups / Automatic schedule) both route through here, so the typographic rhythm — heading size + weight, description colour + line-height, action alignment — stays in one place. Tokens: `section` (h2, text-lg, font-semibold) and `sub` (h3, text-sm, font-semibold). Iter 107 ripple from the iter 106 card-header polish: both heads now share `font-semibold` weight + `items-center` action alignment with `SectionCard` / `ListCard` / `PageHeader`, so an Add-member CTA sits flush with the title midline instead of bottom-docking under the description."
         className="block"
       >
         <div className="grid gap-4 lg:grid-cols-2">
@@ -1186,7 +1252,7 @@ export function ComponentsSection() {
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
-        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Each row accepts a semantic `tone` (`neutral` · `primary` · `success` · `warning` · `info` · `muted`, iter 93) that tints the disc border + icon so the eye can pick out rule fires, classification changes, and sync events without parsing the summary line. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Each row accepts a semantic `tone` (`neutral` · `primary` · `success` · `warning` · `destructive` · `info` · `muted`, iter 93; `destructive` added iter 105 for sync-history errored runs) that tints the disc border + icon so the eye can pick out rule fires, classification changes, and sync events without parsing the summary line. Used by the transaction-detail activity feed and the per-connection sync-history feed."
         className="block"
       >
         <div className="grid gap-6 max-w-3xl sm:grid-cols-2">
@@ -1247,6 +1313,14 @@ export function ComponentsSection() {
                 </p>
                 <p className="text-muted-foreground mt-1 text-[11px]">
                   Yesterday at 4:00 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={AlertCircle} tone="destructive">
+                <p className="text-sm leading-snug">
+                  Sync from Chase failed — credentials expired
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 3:58 PM
                 </p>
               </TimelineRail.Row>
               <TimelineRail.Row icon={MessageSquare} muted>
