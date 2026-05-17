@@ -22,6 +22,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
 import { NAV, NAV_LEAVES, navKey, type NavLeaf } from "@/lib/nav";
 import { openModal } from "@/lib/modals";
 import { useShortcut } from "@/lib/shortcuts";
@@ -110,7 +111,15 @@ function ItemRow({
       {hint ? <CommandShortcut>{hint}</CommandShortcut> : null}
       {trailingChevron ? (
         <ChevronRight
-          className="text-muted-foreground/0 group-data-[selected=true]:text-muted-foreground/70 ml-auto size-3.5 transition-colors"
+          // When a hint is present it already owns `ml-auto` (via
+          // `CommandShortcut`) and pushes itself right; two `ml-auto`
+          // siblings would split the free space and park the hint mid-row.
+          // Drop our own `ml-auto` in that case so the chevron sits flush
+          // against the hint.
+          className={cn(
+            "text-muted-foreground/0 group-data-[selected=true]:text-muted-foreground/70 size-3.5 transition-colors",
+            hint ? "ml-2" : "ml-auto",
+          )}
           aria-hidden
         />
       ) : null}
