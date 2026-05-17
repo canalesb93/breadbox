@@ -25,6 +25,12 @@ interface CategoryPickerProps {
    * so there's room for the comfier size. Pass `sm` for tighter rails.
    */
   size?: "sm" | "md";
+  /**
+   * Override the default behaviour (single-tx update mutation + toast).
+   * Used by the sandbox specimen and any future caller that wants to
+   * own the pick handler (bulk flows, dry-run previews, etc.).
+   */
+  onPick?: (pick: CategoryPick) => void | Promise<void>;
   className?: string;
 }
 
@@ -37,6 +43,7 @@ export function CategoryPicker({
   category,
   overridden,
   size = "md",
+  onPick: onPickOverride,
   className,
 }: CategoryPickerProps) {
   // Match the empty-state pill's geometry to the active badge so the column
@@ -50,6 +57,10 @@ export function CategoryPicker({
 
   const onPick = async (pick: CategoryPick) => {
     setOpen(false);
+    if (onPickOverride) {
+      await onPickOverride(pick);
+      return;
+    }
     await apply(pick);
   };
 
