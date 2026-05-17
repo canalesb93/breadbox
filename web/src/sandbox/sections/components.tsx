@@ -73,6 +73,8 @@ import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DangerZone } from "@/components/danger-zone";
+import { PaginationBar } from "@/components/pagination-bar";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -123,6 +125,8 @@ export function ComponentsSection() {
   const [dateRange, setDateRange] = useState<DateRangeValue>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPending, setConfirmPending] = useState(false);
+  const [dangerPending, setDangerPending] = useState(false);
+  const [paginationPage, setPaginationPage] = useState(3);
 
   return (
     <SandboxSection
@@ -674,6 +678,28 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
+        label="DangerZone"
+        code="components/danger-zone"
+        description="Inline destructive-confirm pattern used by detail-page delete actions (tag-detail, category-detail). A `border-destructive/40` Card hosts the prompt + outline trigger; the trigger expands in place into a tinted confirm block — no modal churn for delete flows. Pair with `withMutationToast` to surface the success / error message after the mutation resolves. Use `<ConfirmDialog>` instead when the destructive action lives on a list row or inside another dialog (no surrounding card surface available)."
+        className="block"
+      >
+        <div className="max-w-xl">
+          <DangerZone
+            description="The tag will be removed from every transaction it's attached to. Activity history is preserved. This can't be undone."
+            confirmTarget={<span className="font-semibold">Reimbursable</span>}
+            actionLabel="Delete tag"
+            isPending={dangerPending}
+            onConfirm={async () => {
+              setDangerPending(true);
+              await new Promise((resolve) => window.setTimeout(resolve, 900));
+              setDangerPending(false);
+              toast.success("Tag deleted.");
+            }}
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
         label="AuthShell"
         code="components/auth-shell"
         description="Two-pane brand + form shell used by Login and Setup. It's a whole-screen primitive — view it live on the unauthenticated routes rather than scaled into this gallery."
@@ -1096,6 +1122,27 @@ export function ComponentsSection() {
             />
           }
         />
+      </Specimen>
+
+      <Specimen
+        label="PaginationBar"
+        code="components/pagination-bar"
+        description="Caller-driven page selector that wraps the shadcn `Pagination` primitive. Owns the page-window math (≤7 pages shows every number; beyond that a 5-page window slides around the current page with leading / trailing ellipses) and the muted `Page N of M · count itemLabel` caption. Set `isFetching` to dim controls while a page is in flight — discourages double-clicks without locking the surface. Used by the Transactions list (`features/transactions/transactions-pagination`), Rules, Category detail, and Tag detail."
+        className="block"
+      >
+        <div className="space-y-4">
+          <PaginationBar
+            page={paginationPage}
+            pageSize={50}
+            total={879}
+            onPageChange={setPaginationPage}
+            itemLabel="transactions"
+          />
+          <p className="text-muted-foreground text-center text-xs">
+            Click a page to update the window. Ellipses appear once the total
+            exceeds 7 pages.
+          </p>
+        </div>
       </Specimen>
     </SandboxSection>
   );
