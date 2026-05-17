@@ -63,6 +63,13 @@ export interface UseShortcutOptions {
    * toggle from anywhere — never for bare-letter shortcuts.
    */
   global?: boolean;
+  /**
+   * Fire on key-repeat (holding the key). Default false — single-press
+   * shortcuts (open, submit, toggle…) should not blast as the user holds.
+   * Opt in for navigation shortcuts (j/k) where continuous movement is the
+   * desired affordance.
+   */
+  repeat?: boolean;
 }
 
 export function useShortcut(
@@ -70,7 +77,13 @@ export function useShortcut(
   handler: (event: KeyboardEvent) => void,
   options: UseShortcutOptions,
 ): void {
-  const { label, group, enabled = true, global = false } = options;
+  const {
+    label,
+    group,
+    enabled = true,
+    global = false,
+    repeat = false,
+  } = options;
   const id = `${group ?? "global"}:${label}`;
   // Both `keys` (inline array literal) and `handler` (inline arrow) are
   // referentially unstable across renders. Without this, the effect tears
@@ -87,9 +100,11 @@ export function useShortcut(
     const unregister = registerShortcut({ id, keys: parsedKeys, label, group });
     const match = parseKeys(parsedKeys);
     const onKey = (event: KeyboardEvent) => {
-      // Holding a key down repeats keydown — let single-press shortcuts
-      // (j/k navigation especially) fire once per press, not per frame.
-      if (event.repeat) return;
+      // Holding a key down repeats keydown. Default to single-press so
+      // shortcuts like Enter / x don't blast as the user holds; opt
+      // explicit `repeat: true` callers (j/k row navigation) into the
+      // OS key-repeat cadence.
+      if (event.repeat && !repeat) return;
       if (event.key.toLowerCase() !== match.key) return;
       if (!!match.meta !== (event.metaKey || event.ctrlKey)) return;
       if (!!match.shift !== event.shiftKey) return;
@@ -116,5 +131,5 @@ export function useShortcut(
       window.removeEventListener("keydown", onKey);
       unregister();
     };
-  }, [enabled, id, keysKey, label, group, global]);
+  }, [enabled, id, keysKey, label, group, global, repeat]);
 }
