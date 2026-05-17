@@ -1873,6 +1873,34 @@ Cross-cutting components:
     panel lands (e.g. a Drawer), reach for `duration-200 ease-out`
     by default to stay in the v2 vocabulary.
 
+- **Iter 74 — Sandbox showcase: DangerZone + PaginationBar specimens** ([#1187](https://github.com/canalesb93/breadbox/pull/1187))
+  - Component inventory pass against `web/src/components/` found
+    two reusable v2 primitives missing from the sandbox showcase:
+    `<DangerZone>` (inline destructive confirm on tag-detail +
+    category-detail) and `<PaginationBar>` (caller-driven page
+    selector across Transactions list, Rules, Tag detail, Category
+    detail). Every other primitive in the directory either ships a
+    specimen already or is a whole-screen shell that points readers
+    at the live route (NavUser, AuthShell).
+  - `web/src/sandbox/sections/components.tsx`: live specimens for
+    both. DangerZone uses a deferred-resolve mutation so the
+    expand-in-place confirm block, pending spinner, and toast all
+    fire from one click. PaginationBar's specimen uses `total=879`
+    + `pageSize=50` so the 5-page window + leading/trailing
+    ellipsis math is visible from the default state — the same
+    shape Transactions hits in production.
+  - Each description follows the existing showcase vocabulary
+    (token list + consumer count + choice rule against the
+    sibling primitive): DangerZone's prose names `<ConfirmDialog>`
+    as the alternative when the destructive action lives on a
+    list row or inside another dialog (no surrounding card
+    surface available), so the gallery reads as one continuous
+    reference rather than a list of cards.
+  - Sandbox-only addition: no runtime change, +47 LOC. No new
+    primitive (still 17). The note in the iteration prompt that
+    "Sandbox showcase update — verify it has all recent additions"
+    is now resolved for the current snapshot.
+
 ## Open observations / questions
 
 (Populated by iterations.)
