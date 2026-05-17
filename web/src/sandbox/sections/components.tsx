@@ -1029,7 +1029,7 @@ export function ComponentsSection() {
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
-        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Each row accepts a semantic `tone` (`neutral` · `primary` · `success` · `warning` · `info` · `muted`, iter 93) that tints the disc border + icon so the eye can pick out rule fires, classification changes, and sync events without parsing the summary line. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
         className="block"
       >
         <div className="grid gap-6 max-w-3xl sm:grid-cols-2">
@@ -1039,7 +1039,7 @@ export function ComponentsSection() {
             </div>
             <TimelineRail>
             <TimelineRail.Group label="Today">
-              <TimelineRail.Row icon={MessageSquare}>
+              <TimelineRail.Row icon={MessageSquare} tone="neutral">
                 <p className="text-sm leading-snug">
                   You left a comment
                 </p>
@@ -1050,7 +1050,7 @@ export function ComponentsSection() {
                   2 minutes ago
                 </p>
               </TimelineRail.Row>
-              <TimelineRail.Row icon={Wand2}>
+              <TimelineRail.Row icon={Wand2} tone="primary">
                 <p className="text-sm leading-snug">
                   Rule "Coffee shops" applied — category set to Dining out
                 </p>
@@ -1058,9 +1058,17 @@ export function ComponentsSection() {
                   18 minutes ago
                 </p>
               </TimelineRail.Row>
+              <TimelineRail.Row icon={RefreshCw} tone="info">
+                <p className="text-sm leading-snug">
+                  Sync from Chase updated this transaction
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  42 minutes ago
+                </p>
+              </TimelineRail.Row>
             </TimelineRail.Group>
             <TimelineRail.Group label="Yesterday">
-              <TimelineRail.Row icon={Shapes}>
+              <TimelineRail.Row icon={Shapes} tone="primary">
                 <p className="text-sm leading-snug">
                   Ricardo changed category to Groceries
                 </p>
@@ -1068,12 +1076,20 @@ export function ComponentsSection() {
                   Yesterday at 4:12 PM
                 </p>
               </TimelineRail.Row>
-              <TimelineRail.Row icon={Tag}>
+              <TimelineRail.Row icon={Tag} tone="success">
                 <p className="text-sm leading-snug">
                   Ricardo added tag "reimbursable"
                 </p>
                 <p className="text-muted-foreground mt-1 text-[11px]">
                   Yesterday at 4:11 PM
+                </p>
+              </TimelineRail.Row>
+              <TimelineRail.Row icon={Tag} tone="warning">
+                <p className="text-sm leading-snug">
+                  Ricardo removed tag "needs-review"
+                </p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Yesterday at 4:00 PM
                 </p>
               </TimelineRail.Row>
               <TimelineRail.Row icon={MessageSquare} muted>

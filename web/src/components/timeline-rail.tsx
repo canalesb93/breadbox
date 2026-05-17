@@ -91,10 +91,45 @@ function TimelineRailGroup({
   );
 }
 
+// Semantic tone for the icon disc. Encodes the *kind* of event so a
+// scanning eye can pick out rule applications vs sync events vs comments
+// without parsing the summary line. Default `neutral` matches the legacy
+// look — switch to a tinted variant when the event carries a clear
+// semantic role (sync, rule fire, classification change, etc.). Tones
+// adapt to light/dark themes via the standard shadcn vocabulary
+// (primary / emerald / amber / sky) used elsewhere in v2 (StatusPanel,
+// ColorRailCard, MetaBadge). Iter 93.
+type TimelineRailTone =
+  | "neutral"
+  | "primary"
+  | "success"
+  | "warning"
+  | "info"
+  | "muted";
+
+// TONE_CLASSES tints both the disc *border* and the inner icon so the
+// accent reads on both — a bare-coloured icon on a neutral border looks
+// like a colour smudge, and a coloured border with a neutral icon looks
+// like the disc itself is wrong. Backgrounds stay `bg-card` (set on the
+// disc base in TimelineRailRow) so the disc still punches through the
+// rail line.
+const TONE_CLASSES: Record<TimelineRailTone, string> = {
+  neutral: "border-border/60 text-muted-foreground",
+  primary: "border-primary/40 text-primary",
+  success: "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
+  warning: "border-amber-500/40 text-amber-600 dark:text-amber-400",
+  info: "border-sky-500/40 text-sky-600 dark:text-sky-400",
+  muted: "border-border/60 text-muted-foreground/70",
+};
+
 interface TimelineRailRowProps extends React.HTMLAttributes<HTMLLIElement> {
   // Icon disc on the rail. Required — the primitive's identity is the
   // punched-through disc.
   icon: LucideIcon;
+  // Semantic tone for the icon disc — see `TimelineRailTone`. Defaults
+  // to `neutral` (the legacy look). Combines with `muted` — a
+  // `tone="primary" muted` row keeps the primary tint at reduced opacity.
+  tone?: TimelineRailTone;
   // Optional muted/strikethrough rendering — for soft-deleted or otherwise
   // de-emphasised rows. Two intensities so consumers don't have to fork a
   // class string.
@@ -108,6 +143,7 @@ interface TimelineRailRowProps extends React.HTMLAttributes<HTMLLIElement> {
 
 function TimelineRailRow({
   icon: Icon,
+  tone = "neutral",
   muted = false,
   className,
   iconClassName,
@@ -157,8 +193,10 @@ function TimelineRailRow({
           // Disc centred on the rail (x=0). `-ml-3.5` (-14px) pulls the
           // 28px-wide disc back so its centre sits on the row's left edge.
           // `relative z-10` + `bg-card` punches the disc through the rail
-          // pseudo behind it.
-          "bg-card border-border/60 text-muted-foreground relative z-10 -ml-3.5 flex size-7 shrink-0 items-center justify-center rounded-full border",
+          // pseudo behind it. Tone classes layered after the base set the
+          // border + icon tint per event kind.
+          "bg-card relative z-10 -ml-3.5 flex size-7 shrink-0 items-center justify-center rounded-full border",
+          TONE_CLASSES[tone],
           iconMuted && "opacity-50",
           iconClassName,
         )}
@@ -240,4 +278,5 @@ export type {
   TimelineRailGroupProps,
   TimelineRailRowProps,
   TimelineRailRowSkeletonProps,
+  TimelineRailTone,
 };

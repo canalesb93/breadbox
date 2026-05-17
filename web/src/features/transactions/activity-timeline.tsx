@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { PageError } from "@/components/page-error";
-import { TimelineRail } from "@/components/timeline-rail";
+import {
+  TimelineRail,
+  type TimelineRailTone,
+} from "@/components/timeline-rail";
 import { useAnnotations } from "@/api/queries/annotations";
 import { formatRelativeTime } from "@/lib/format";
 import type { Annotation } from "@/api/types";
@@ -23,6 +26,28 @@ const KIND_ICON: Record<string, LucideIcon> = {
   category_set: Shapes,
   sync_started: RefreshCw,
   sync_updated: RefreshCw,
+};
+
+// KIND_TONE tints each event's disc semantically so a scanning eye can
+// pick out rule fires, sync events, and classification changes without
+// reading the summary line. Iter 93. Mapping rationale:
+//   - rule_applied / category_set → primary (system-driven /
+//     classification edits are the dominant signal on a transaction)
+//   - sync_started / sync_updated → info (sky; data arrived from the
+//     outside, matches the sync vocabulary on Connections)
+//   - tag_added → success (additive change)
+//   - tag_removed → warning (amber; something was taken away)
+//   - comment → neutral (the body bubble carries its own colour cue)
+//   - unmapped kinds → neutral via the default `tone="neutral"` on
+//     <TimelineRail.Row>.
+const KIND_TONE: Record<string, TimelineRailTone> = {
+  comment: "neutral",
+  rule_applied: "primary",
+  category_set: "primary",
+  tag_added: "success",
+  tag_removed: "warning",
+  sync_started: "info",
+  sync_updated: "info",
 };
 
 const dayHeadingFormatter = new Intl.DateTimeFormat("en-US", {
@@ -134,9 +159,13 @@ function TimelineRow({ annotation }: { annotation: Annotation }) {
   const deleted = annotation.is_deleted;
   // Comments carry a body; everything else is fully described by `summary`.
   const showBody = annotation.kind === "comment" && !deleted && annotation.content;
+  // Deleted rows drop the tint entirely (the strikethrough vocabulary
+  // owns the signal); live rows pick from KIND_TONE, falling back to
+  // neutral for unmapped kinds.
+  const tone: TimelineRailTone = deleted ? "neutral" : (KIND_TONE[annotation.kind] ?? "neutral");
 
   return (
-    <TimelineRail.Row icon={Icon} muted={deleted ? true : false}>
+    <TimelineRail.Row icon={Icon} tone={tone} muted={deleted ? true : false}>
       <p className="text-sm leading-snug">
         {deleted
           ? `${annotation.actor_name} deleted a comment`
