@@ -347,6 +347,19 @@ next target, then updates this file at the end of the run.
   lockup with a yet-different rhythm. No sandbox specimen because
   SheetTitle/SheetDescription require radix Dialog context; the live
   consumers carry the visual reference.
+- **JumpToPill primitive** — extracted to
+  `web/src/components/jump-to-pill.tsx` in iter 75 (#1188). The
+  canonical detail-page "Jump to" lateral-link pill: 28px tall
+  (`h-7`), `px-2.5 text-xs`, `size-3` leading icon, outline
+  variant. Distinct from `Button size="xs"` (24px toolbar pill,
+  `h-6`) and `Button size="sm"` (32px CTA, `h-8`). Sibling
+  `<JumpToRow>` bundles the `<Eyebrow>"Jump to"</Eyebrow>` label
+  with the cluster so the row also speaks the canonical iter-37
+  micro-label vocabulary. Four surfaces share it today (every
+  v2 detail page): transaction-detail, account-detail,
+  category-detail, connection-detail. Reach for it for any new
+  detail-page hero lateral-nav cluster. Don't open-code the
+  className triplet — pass props.
 
 ## Backlog (ordered roughly by impact)
 
@@ -1900,6 +1913,41 @@ Cross-cutting components:
     primitive (still 17). The note in the iteration prompt that
     "Sandbox showcase update — verify it has all recent additions"
     is now resolved for the current snapshot.
+
+- **Iter 75 — `<JumpToPill>` primitive for detail-page lateral nav** ([#1188](https://github.com/canalesb93/breadbox/pull/1188))
+  - Audit of detail pages found the same "Jump to" pill cluster
+    open-coded across four routes (transaction-detail,
+    account-detail, category-detail, connection-detail). Same
+    triplet every time: `Button variant="outline" size="sm"
+    className="h-7 gap-1.5 text-xs"` + `<Eyebrow>"Jump to"</Eyebrow>`
+    + `size-3` leading icon. 28px-tall outline pill — distinct
+    from `Button size=xs` (24px toolbar pill) and `Button size=sm`
+    (32px CTA). Reads as a labelled lateral link from the hero,
+    not a CTA.
+  - Promotes the cluster to `web/src/components/jump-to-pill.tsx`
+    (18th shared primitive). Two exports:
+    - `<JumpToPill>` — the pill itself. Forwards all `<Button>`
+      props; defaults `variant="outline"`, `size="sm"`, and
+      `className="h-7 gap-1.5 px-2.5 text-xs"`. `asChild`
+      passes through to shadcn `Button.asChild` so consumers can
+      wrap a `<Link>` (the dominant case) without losing keyboard
+      ergonomics.
+    - `<JumpToRow>` — the labelled cluster. Composes
+      `<Eyebrow>"Jump to"</Eyebrow>` with a
+      `flex flex-wrap items-center gap-1.5` row of pills. Eyebrow
+      label overridable via the `label` prop.
+  - Four consumers retired their open-coded markup onto the
+    primitive in the same PR. Byte-identical at the pixel level
+    — same MD5 on before/after screenshots, same iter-9-style
+    mechanical sweep. The point isn't a visual change; it's that
+    the "Jump to" pill vocabulary now lives in exactly one place
+    so future tweaks (height, padding, icon size, eyebrow rhythm)
+    propagate to every detail page.
+  - Sandbox specimen lives next to `<Eyebrow>` in
+    `sections/components.tsx` so the vocabulary is discoverable
+    at `/v2/sandbox`. Demo shows the cluster with three pills
+    (Search / Wallet / Receipt icons) in their typical detail-
+    page hero rhythm.
 
 ## Open observations / questions
 
