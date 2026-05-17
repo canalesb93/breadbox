@@ -353,6 +353,23 @@ Next iteration candidates (in rough impact order):
 
 Picking #1 next iteration — filtering is the highest-impact polish item with the most-used surface (run history page).
 
+## ITER 11 — 2026-05-17 01:58
+Shipped (PR #1237 squash-merged into sprint branch as e44835e7):
+- /v2/agents/$slug/runs filter row: status Select + trigger Select + DateRangeFilter + Clear filters button.
+- Backend: ListAgentRuns swapped from sqlc to dynamic SQL with composable WHERE clauses (matches transactions/rules pattern).
+- Date params accept YYYY-MM-DD (auto-bumped to EOD on `end`) or RFC3339.
+- URL state via extended agentRunsSearchSchema — filters are shareable links + back-button restorable.
+- All 5 CI jobs green; drift test stays green (same path, more query params).
+
+Next iteration candidates (in rough impact order):
+1. **Per-agent quiet hours** — schema column on agent_definitions (quiet_hours_start, quiet_hours_end as text "HH:MM"), scheduler tweak to skip fires inside the window, UI control. Mid-size; touches scheduler.
+2. **Inline transcript search** in TranscriptViewer — small UI; filter event list by text match.
+3. **Cost dashboard** in /v2/agents — sum per-agent total_cost_usd over time, surface in a small chart on the list page or as /v2/agents/cost. Bigger.
+4. **Webhook trigger** — fire an agent after a connection finishes a sync. Bigger.
+
+Picking **#2 inline transcript search** next iteration — smallest possible follow-up, lives entirely in the TranscriptViewer feature component, and pairs naturally with the run-history filtering just shipped (filter your way to a run, then filter inside the transcript).
+
+
 
 
 
