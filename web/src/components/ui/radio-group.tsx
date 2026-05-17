@@ -25,7 +25,14 @@ function RadioGroupItem({
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
       className={cn(
-        "aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:ring-destructive/40",
+        // Dark-mode parity with the checkbox fix from iter 45:
+        // stock `border-input` + `dark:bg-input/30` is ~4.5% white
+        // over `bg-card`, so unchecked radios read as hairline dots.
+        // Bump the border to white/25 and the dish fill to
+        // white/[0.04] (hover white/[0.07]) so unchecked items are
+        // legible. Checked state keeps the stock `text-primary` +
+        // filled dot.
+        "aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:border-white/25 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] dark:aria-invalid:ring-destructive/40",
         className
       )}
       {...props}

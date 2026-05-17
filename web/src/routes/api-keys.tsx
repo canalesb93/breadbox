@@ -167,7 +167,7 @@ function renderEmptyState({ tab, query, newKeyButton }: EmptyStateArgs) {
       <EmptyState
         icon={Key}
         title="No revoked keys"
-        description="Revoked keys show up here so you can audit the trail."
+        description="Once you revoke a key it lands here so you can keep an audit trail of what was issued and rolled."
       />
     );
   }
@@ -176,7 +176,7 @@ function renderEmptyState({ tab, query, newKeyButton }: EmptyStateArgs) {
       <EmptyState
         icon={Key}
         title="No matching keys"
-        description="Try a different search."
+        description="Try a different search term, or clear the filter to see every key."
       />
     );
   }
@@ -184,7 +184,7 @@ function renderEmptyState({ tab, query, newKeyButton }: EmptyStateArgs) {
     <EmptyState
       icon={Key}
       title="No API keys yet"
-      description="Mint a key to let agents, scripts, or the CLI talk to Breadbox."
+      description="Mint a key to let agents, scripts, or the CLI talk to Breadbox over REST or MCP."
       action={newKeyButton}
     />
   );

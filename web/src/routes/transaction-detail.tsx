@@ -13,8 +13,17 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import { ColorRailCard } from "@/components/color-rail-card";
-import { IdPill } from "@/components/id-pill";
+import {
+  ColorRailCard,
+  ColorRailCardSkeleton,
+} from "@/components/color-rail-card";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
+import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryEditor } from "@/features/transactions/category-editor";
@@ -40,7 +49,7 @@ export function TransactionDetailPage() {
         <EmptyState
           icon={Receipt}
           title="Transaction not found"
-          description="It may have been deleted, or the link is wrong."
+          description="This transaction may have been deleted, or the link is out of date. Head back to the transactions list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/transactions">Back to transactions</Link>
@@ -101,77 +110,64 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
       accent={accent}
       cardClassName={cn(t.pending && "border-dashed")}
     >
-      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
-        {/* Identity column */}
-        <div className="min-w-0 space-y-5">
-          <div className="flex items-start gap-4">
-            <CategoryIconTile
-              icon={t.category?.icon}
-              color={t.category?.color}
-              size="lg"
-            />
-            <div className="min-w-0 space-y-1">
-              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
-                Transaction
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-xl font-semibold tracking-tight">
-                  {t.provider_name}
-                </h1>
-                {t.pending && (
-                  <Badge
-                    variant="outline"
-                    className="text-muted-foreground border-dashed text-[10px] font-medium tracking-wide uppercase"
-                  >
-                    Pending
-                  </Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                <span>{formatLongDate(t.date)}</span>
-                {(subtitle || t.account_name) && (
-                  <span aria-hidden className="opacity-50">
-                    ·
-                  </span>
-                )}
-                {subtitle && <span className="truncate">{subtitle}</span>}
-                {subtitle && t.account_name && (
-                  <span aria-hidden className="opacity-50">
-                    ·
-                  </span>
-                )}
-                {t.account_name && (
-                  <span className="truncate">{t.account_name}</span>
-                )}
-              </p>
+      {/* Hero grid: on mobile the rows flow identity → amount → classify so
+          the amount sits in the priority slot right under the title. On lg
+          the identity + classify stack on the left and the amount column
+          docks to the right (identity stays anchored at the top via
+          `lg:row-span-2`). */}
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-10 lg:gap-y-5">
+        {/* Identity row (full width on mobile, left column on lg) */}
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4 lg:row-start-1">
+          <CategoryIconTile
+            icon={t.category?.icon}
+            color={t.category?.color}
+            size="lg"
+          />
+          <div className="min-w-0 space-y-1">
+            <Eyebrow as="p" variant="hero">
+              Transaction
+            </Eyebrow>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {t.provider_name}
+              </h1>
+              {t.pending && (
+                <Badge
+                  variant="outline"
+                  className="text-muted-foreground border-dashed text-[10px] font-medium tracking-wide uppercase"
+                >
+                  Pending
+                </Badge>
+              )}
             </div>
-          </div>
-
-          <Separator />
-
-          {/* Inline classify strip — keeps the identity, category, and tags
-              within one glance instead of three stacked cards. */}
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
-            <ClassifyField label="Category">
-              <CategoryEditor
-                transactionId={t.id}
-                category={t.category}
-                overridden={t.category_override}
-              />
-            </ClassifyField>
-            <ClassifyField label="Tags">
-              <div className="min-h-9 flex items-center">
-                <TagManager transactionId={t.id} tags={t.tags ?? []} />
-              </div>
-            </ClassifyField>
+            <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+              <span>{formatLongDate(t.date)}</span>
+              {(subtitle || t.account_name) && (
+                <span aria-hidden className="opacity-50">
+                  ·
+                </span>
+              )}
+              {subtitle && <span className="truncate">{subtitle}</span>}
+              {subtitle && t.account_name && (
+                <span aria-hidden className="opacity-50">
+                  ·
+                </span>
+              )}
+              {t.account_name && (
+                <span className="truncate">{t.account_name}</span>
+              )}
+            </p>
           </div>
         </div>
 
-        {/* Amount column */}
+        {/* Amount row (sits below identity on mobile so the headline number is
+            visible without a scroll past tags + category; docks to the right
+            column on lg). `lg:row-span-2` keeps it aligned with the identity
+            row instead of straddling the classify strip beneath. */}
         <div
           className={cn(
             "flex flex-col items-start gap-1.5",
-            "lg:items-end lg:text-right",
+            "lg:row-start-1 lg:row-span-2 lg:items-end lg:text-right",
           )}
         >
           <div
@@ -201,6 +197,27 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
             </p>
           )}
         </div>
+
+        {/* Classify strip — last on mobile so the priority order reads
+            identity → amount → tags/category. Spans the full left column on
+            lg via `lg:row-start-2`. */}
+        <div className="space-y-5 lg:row-start-2">
+          <Separator />
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+            <ClassifyField label="Category">
+              <CategoryEditor
+                transactionId={t.id}
+                category={t.category}
+                overridden={t.category_override}
+              />
+            </ClassifyField>
+            <ClassifyField label="Tags">
+              <div className="min-h-9 flex items-center">
+                <TagManager transactionId={t.id} tags={t.tags ?? []} />
+              </div>
+            </ClassifyField>
+          </div>
+        </div>
       </div>
     </ColorRailCard>
   );
@@ -215,9 +232,7 @@ function ClassifyField({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </p>
+      <Eyebrow as="p">{label}</Eyebrow>
       {children}
     </div>
   );
@@ -234,11 +249,8 @@ function QuickActions({
   // internal/mcp/tools.go compactIDs + REST handler shape), so it can flow
   // straight into the transactions list `?account=` filter.
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
-        Jump to
-      </span>
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link
           to="/transactions"
           search={{ q: merchantQuery }}
@@ -247,9 +259,9 @@ function QuickActions({
           <Search className="size-3" />
           Similar transactions
         </Link>
-      </Button>
+      </JumpToPill>
       {t.account_id && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/transactions"
             search={{ account: t.account_id }}
@@ -258,10 +270,10 @@ function QuickActions({
             <Wallet className="size-3" />
             {t.account_name ?? "All on account"}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
       {t.category?.slug && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/transactions"
             search={{ category: t.category.slug }}
@@ -270,9 +282,9 @@ function QuickActions({
             <Building2 className="size-3" />
             {t.category.display_name}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
-    </div>
+    </JumpToRow>
   );
 }
 
@@ -280,8 +292,8 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
   const attributedDiffers =
     !!t.attributed_user_name && t.attributed_user_name !== t.user_name;
 
-  const accountRows: DetailRowData[] = compactRows([
-    { label: "Account", value: t.account_name },
+  const accountRows: DetailRowData[] = compactDetailRows([
+    { label: "Name", value: t.account_name },
     { label: "Member", value: t.user_name },
     attributedDiffers
       ? {
@@ -293,18 +305,28 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
     { label: "Currency", value: t.iso_currency_code },
   ]);
 
-  const providerRows: DetailRowData[] = compactRows([
+  // Drop low-signal provider rows: a `Channel: other` row reads as
+  // "Breadbox didn't get a channel" noise; same for an empty category. We
+  // already render the detailed category in the hero. The Details sidebar
+  // earns its keep when every row carries information the user couldn't get
+  // upstream — pad it out and it reads as a dump.
+  const channelLabel = titleize(t.provider_payment_channel);
+  const providerCategory = titleize(
+    t.provider_category_detailed ?? t.provider_category_primary,
+  );
+  const providerRows: DetailRowData[] = compactDetailRows([
     {
       label: "Authorized",
       value: t.authorized_date ? formatLongDate(t.authorized_date) : null,
     },
-    { label: "Channel", value: titleize(t.provider_payment_channel) },
-    {
-      label: "Provider category",
-      value: titleize(
-        t.provider_category_detailed ?? t.provider_category_primary,
-      ),
-    },
+    channelLabel && channelLabel.toLowerCase() !== "other"
+      ? { label: "Channel", value: channelLabel }
+      : null,
+    providerCategory ? { label: "Category", value: providerCategory } : null,
+  ]);
+
+  const referenceRows: DetailRowData[] = compactDetailRows([
+    { label: "ID", value: t.short_id, mono: true },
   ]);
 
   const referenceRows: DetailRowData[] = compactRows([
@@ -313,64 +335,10 @@ function DetailsCard({ transaction: t }: { transaction: Transaction }) {
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      <DetailGroup label="Account" rows={accountRows} />
-      {providerRows.length > 0 && (
-        <DetailGroup label="Provider" rows={providerRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Account" rows={accountRows} />
+      <DetailList label="Provider" rows={providerRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
-  );
-}
-
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  hint?: string;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: DetailRowData[];
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </h3>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value} /> : row.value}
-              {row.hint && (
-                <span className="text-muted-foreground mt-1 block text-[11px] leading-snug whitespace-normal">
-                  {row.hint}
-                </span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 
@@ -390,18 +358,10 @@ function titleize(value: string | null | undefined): string | null {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="bg-card relative overflow-hidden rounded-xl border">
-        <div className="bg-muted absolute inset-y-0 left-0 w-1" />
-        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <ColorRailCardSkeleton
+        tileShape="rounded-md"
+        body={
           <div className="space-y-5">
-            <div className="flex items-start gap-4">
-              <Skeleton className="size-12 rounded-md" />
-              <div className="space-y-2 py-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-            </div>
             <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -414,12 +374,8 @@ function DetailSkeleton() {
               </div>
             </div>
           </div>
-          <div className="space-y-2 lg:items-end">
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-        </div>
-      </div>
+        }
+      />
       <div className="flex gap-2">
         <Skeleton className="h-7 w-32 rounded-md" />
         <Skeleton className="h-7 w-32 rounded-md" />

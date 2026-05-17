@@ -20,6 +20,7 @@ import { closeModal, openModal, useActiveModal } from "@/lib/modals";
 import { AccountSection } from "@/features/settings/account-section";
 import { BackupsSection } from "@/features/settings/backups-section";
 import { HouseholdSection } from "@/features/settings/household-section";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 const SETTINGS_MODAL_KEY = "settings";
 
@@ -90,7 +91,7 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
   if (desktop) {
     return (
       <div className="flex h-full">
-        <nav className="bg-muted/40 w-56 shrink-0 border-r p-3">
+        <nav className="bg-sidebar text-sidebar-foreground w-56 shrink-0 border-r p-3">
           <p className="text-muted-foreground/80 mb-2 px-2 text-[10px] font-semibold tracking-[0.08em] uppercase">
             Settings
           </p>
@@ -105,12 +106,24 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                     onClick={() => onSelect(s.slug)}
                     data-active={isActive ? "true" : undefined}
                     className={cn(
-                      "group relative flex w-full items-center gap-2 rounded-md py-2 pr-3 pl-3.5 text-left text-sm transition-colors",
-                      "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-r-full before:bg-transparent before:transition-all",
-                      "[&>svg]:size-4 [&>svg]:text-muted-foreground",
+                      "group relative flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                      // 3px primary-tinted rail at the outer panel edge, scaled
+                      // in via transform on activation. Matches the canonical
+                      // nav-main vocabulary (iter 1, timing parity iter 73):
+                      // before:transition-transform before:duration-200 before:ease-out.
+                      "before:bg-primary before:absolute before:top-1.5 before:bottom-1.5 before:-left-3 before:w-[3px] before:scale-y-0 before:rounded-r-full before:transition-transform before:duration-200 before:ease-out",
+                      "data-[active=true]:before:scale-y-100",
+                      // Shared focus-visible vocabulary (matches Button +
+                      // SidebarMenuButton) so keyboard users can see which
+                      // section is focused before pressing Enter.
+                      "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
+                      // Icon picks up the primary tint on active so the row
+                      // reads at a glance — matches nav-main's NAV_ROW_CLS.
+                      "[&>svg]:text-muted-foreground/80 [&>svg]:size-4 [&>svg]:transition-colors",
+                      "data-[active=true]:[&>svg]:text-primary",
                       isActive
-                        ? "bg-accent text-accent-foreground before:bg-primary before:inset-y-1 [&>svg]:text-primary"
-                        : "hover:bg-accent/60",
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                     )}
                   >
                     <Icon />
@@ -148,6 +161,10 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
                   data-active={isActive ? "true" : undefined}
                   className={cn(
                     "group flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                    // Shared focus-visible vocabulary so keyboard users
+                    // tabbing through the mobile pill strip can see which
+                    // section is selected.
+                    "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
                     "[&>svg]:size-3.5",
                     isActive
                       ? "border-primary/30 bg-primary/10 text-primary [&>svg]:text-primary"
@@ -183,10 +200,12 @@ function SectionContent({ section }: { section: SettingsSection }) {
   }
 
   return (
-    <div className="space-y-1">
-      <h2 className="text-lg font-medium">{section.title}</h2>
-      <p className="text-muted-foreground text-sm">{section.description}</p>
-      <p className="text-muted-foreground mt-4 text-sm">Coming soon.</p>
+    <div className="space-y-4">
+      <SettingsSectionHeader
+        title={section.title}
+        description={section.description}
+      />
+      <p className="text-muted-foreground text-sm">Coming soon.</p>
     </div>
   );
 }

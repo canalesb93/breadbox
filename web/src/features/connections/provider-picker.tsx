@@ -1,4 +1,4 @@
-import { Building2, FileSpreadsheet, Landmark } from "lucide-react";
+import { Building2, Check, FileSpreadsheet, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // PROVIDER_META is the static labelling for every known provider. Centralised
@@ -42,6 +42,12 @@ export interface ProviderPickerProps {
 // to the caller. Reused by the sandbox specimen (display-only) and, soon, by
 // the hosted-link page (`/link/{token}`) where a household member finishes
 // a connection without an admin login.
+//
+// Visual contract (iter 40): each row mirrors the v2 active-state vocabulary
+// — `border-primary` + `bg-primary/5` selection with a tinted icon tile
+// (rounded-xl size-9 to match CategoryIconTile / StatusPanel / EmptyState),
+// a trailing `Check` mark when selected, and a muted "Not configured" pill
+// when the provider isn't wired up on this server.
 export function ProviderPicker({
   enabledProviders,
   providers = ["plaid", "teller", "csv"],
@@ -68,40 +74,54 @@ export function ProviderPicker({
             onClick={() => onChange(p)}
             aria-pressed={isSelected}
             className={cn(
-              "group flex w-full items-start gap-3 rounded-md border p-4 text-left transition",
-              "hover:border-primary/60 hover:bg-accent/40",
+              "group relative flex w-full items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              isConfigured && !isSelected && "hover:border-primary/40 hover:bg-accent/40",
               isSelected
-                ? "border-primary bg-accent/40 ring-2 ring-primary/20"
+                ? "border-primary bg-primary/5"
                 : "border-border",
               !isConfigured &&
-                "cursor-not-allowed opacity-50 hover:border-border hover:bg-transparent",
+                "cursor-not-allowed opacity-60 hover:border-border hover:bg-transparent",
             )}
           >
-            <div
+            <span
               className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-md border",
+                "flex size-9 shrink-0 items-center justify-center rounded-xl border transition",
                 isSelected
-                  ? "border-primary/40 bg-primary/10 text-primary"
-                  : "border-border bg-muted/40 text-muted-foreground",
+                  ? "border-primary/30 bg-primary/10 text-primary"
+                  : "border-border bg-muted/50 text-muted-foreground group-hover:text-foreground",
               )}
             >
               <meta.Icon className="size-4" />
-            </div>
-            <div className="flex-1">
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{meta.name}</span>
+                <span className="text-foreground text-sm font-medium">
+                  {meta.name}
+                </span>
                 {!isConfigured && (
-                  <span className="text-muted-foreground text-xs">
+                  <span className="bg-muted/60 text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
                     Not configured
                   </span>
                 )}
               </div>
               {meta.tagline && (
-                <p className="text-muted-foreground mt-0.5 text-xs">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   {meta.tagline}
                 </p>
               )}
             </div>
+            <span
+              aria-hidden
+              className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full border transition",
+                isSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/60 bg-transparent text-transparent",
+              )}
+            >
+              <Check className="size-3" strokeWidth={3} />
+            </span>
           </button>
         );
       })}

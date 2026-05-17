@@ -408,7 +408,7 @@ export function TransactionsToolbar({
                 type="button"
                 onClick={() => clearChip(chip.key)}
                 aria-label={`Clear ${chip.label}`}
-                className="text-muted-foreground hover:text-foreground -mr-0.5"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none -mr-0.5 rounded-sm"
               >
                 <X className="size-3" />
               </button>

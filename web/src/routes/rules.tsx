@@ -131,11 +131,23 @@ export function RulesPage() {
 
   const showCount = !isLoading && !isError && rows.length > 0;
 
+  // Match the canonical list-page eyebrow vocabulary (Connections, Tags,
+  // Accounts, Categories): one short state string. The count line below
+  // the header carries the precise number when the body is populated.
+  const eyebrow = isLoading
+    ? "Loading"
+    : isError
+      ? "Error"
+      : total === 1
+        ? "1 rule"
+        : `${total} rules`;
+
   return (
     <>
       <PageHeader
+        eyebrow={eyebrow}
         title="Rules"
-        description="Automatically categorize, tag, or comment on transactions during sync."
+        description="Conditions that fire during every sync. Match transactions on merchant, amount, account, or category, then categorize, tag, comment, or skip review automatically."
         actions={
           <Button asChild size="sm">
             <Link to="/rules/new">
@@ -183,8 +195,8 @@ export function RulesPage() {
           title={hasActiveFilters ? "No matching rules" : "No rules yet"}
           description={
             hasActiveFilters
-              ? "Try adjusting or clearing your filters."
-              : "Create a rule to automatically categorize, tag, or comment on transactions during sync."
+              ? "Try adjusting your filters, or clear them to see every rule."
+              : "Create a rule to automatically categorize, tag, or comment on transactions as they sync in."
           }
           action={
             <Button asChild>

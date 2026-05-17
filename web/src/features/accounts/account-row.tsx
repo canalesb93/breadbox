@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronRight, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { MetaBadge } from "@/components/meta-badge";
+import { formatBalance } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/api/types";
 import {
@@ -8,7 +10,6 @@ import {
   accountTypeIcon,
   accountTypeLabel,
   creditUtilization,
-  formatCurrency,
   isLiability,
   utilizationBarClass,
 } from "./account-utils";
@@ -44,9 +45,9 @@ export function AccountRow({ account: a }: AccountRowProps) {
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{accountLabel(a)}</span>
           {a.is_dependent_linked && (
-            <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-[10px]">
-              <Link2 className="size-2.5" /> Linked
-            </Badge>
+            <MetaBadge icon={Link2} variant="secondary">
+              Linked
+            </MetaBadge>
           )}
           {statusPill}
         </div>
@@ -65,7 +66,7 @@ export function AccountRow({ account: a }: AccountRowProps) {
               <span>{Math.round(util)}% used</span>
               {a.balance_limit != null && (
                 <span>
-                  {formatCurrency(a.balance_limit, a.iso_currency_code)} limit
+                  {formatBalance(a.balance_limit, a.iso_currency_code)} limit
                 </span>
               )}
             </div>
@@ -89,7 +90,7 @@ export function AccountRow({ account: a }: AccountRowProps) {
             )}
           >
             {a.balance_current != null
-              ? formatCurrency(
+              ? formatBalance(
                   liability ? -a.balance_current : a.balance_current,
                   a.iso_currency_code,
                 )
@@ -101,7 +102,7 @@ export function AccountRow({ account: a }: AccountRowProps) {
             </div>
           )}
         </div>
-        <ChevronRight className="text-muted-foreground/40 group-hover:text-muted-foreground size-4 transition-colors" />
+        <ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground size-3.5 transition-colors" />
       </div>
     </Link>
   );
@@ -111,12 +112,12 @@ function statusBadge(status: string | null) {
   if (!status || status === "active") return null;
   if (status === "pending_reauth") {
     return (
-      <Badge
-        variant="outline"
-        className="gap-1 border-amber-500/40 bg-amber-500/5 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-400"
+      <MetaBadge
+        icon={AlertTriangle}
+        className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
       >
-        <AlertTriangle className="size-2.5" /> Re-auth
-      </Badge>
+        Re-auth
+      </MetaBadge>
     );
   }
   if (status === "error") {

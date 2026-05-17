@@ -39,7 +39,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -53,8 +52,10 @@ import {
   type BackupRow,
   type BackupStatus,
 } from "@/api/queries/backups";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { EmptyState } from "@/components/empty-state";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 const SCHEDULE_OPTIONS = [
   { value: "off", label: "Disabled — manual only" },
@@ -73,13 +74,16 @@ export function BackupsSection() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-medium">Backups</h2>
-        <p className="text-muted-foreground text-sm">
-          Compressed PostgreSQL dumps (<code className="font-mono text-xs">.sql.gz</code>) of the
-          household database. Restore replaces every row — handle with care.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        title="Backups"
+        description={
+          <>
+            Compressed PostgreSQL dumps (
+            <code className="font-mono text-xs">.sql.gz</code>) of the
+            household database. Restore replaces every row — handle with care.
+          </>
+        }
+      />
 
       {query.isLoading ? (
         <BackupsSkeleton />
@@ -231,7 +235,8 @@ function BackupActions({ disabled }: { disabled: boolean }) {
     if (!pendingUpload) return;
     const file = pendingUpload;
     const ok = await withMutationToast(() => upload.mutateAsync(file), {
-      success: "Restored from uploaded backup. Restart the server to be safe.",
+      success: "Restored from uploaded backup.",
+      successDescription: "Restart the server to be safe.",
     });
     if (ok) {
       setPendingUpload(null);
@@ -241,12 +246,11 @@ function BackupActions({ disabled }: { disabled: boolean }) {
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="font-medium">Actions</h3>
-        <p className="text-muted-foreground text-sm">
-          Create an on-demand backup, or restore from a file you have on disk.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        level="sub"
+        title="Actions"
+        description="Create an on-demand backup, or restore from a file you have on disk."
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -356,12 +360,11 @@ function ScheduleForm({
         className="space-y-4"
         noValidate
       >
-        <div className="space-y-1">
-          <h3 className="font-medium">Automatic schedule</h3>
-          <p className="text-muted-foreground text-sm">
-            Backups older than the retention window are pruned at the end of each scheduled run.
-          </p>
-        </div>
+        <SettingsSectionHeader
+          level="sub"
+          title="Automatic schedule"
+          description="Backups older than the retention window are pruned at the end of each scheduled run."
+        />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
           <FormField
@@ -418,6 +421,7 @@ function ScheduleForm({
         </div>
 
         <Button type="submit" disabled={save.isPending}>
+          {save.isPending && <Loader2 className="size-4 animate-spin" />}
           {save.isPending ? "Saving…" : "Save schedule"}
         </Button>
       </form>
@@ -434,19 +438,18 @@ function BackupsTable({
 }) {
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="font-medium">Stored backups</h3>
-        <p className="text-muted-foreground text-sm">
-          Newest first. Filenames carry the trigger (manual or scheduled) and a UTC timestamp.
-        </p>
-      </div>
+      <SettingsSectionHeader
+        level="sub"
+        title="Stored backups"
+        description="Newest first. Filenames carry the trigger (manual or scheduled) and a UTC timestamp."
+      />
 
       {backups.length === 0 ? (
         <EmptyState
           variant="card"
           icon={HardDrive}
           title="No backups yet"
-          description="Create one above or set a schedule to start a regular cadence."
+          description="Take a manual snapshot above, or enable scheduled backups to start a regular cadence."
         />
       ) : (
         <div className="border-border overflow-hidden rounded-md border">
@@ -478,7 +481,8 @@ function BackupRowItem({
 
   const runRestore = async () => {
     const ok = await withMutationToast(() => restore.mutateAsync(row.filename), {
-      success: `Restored from ${row.filename}. Restart the server to be safe.`,
+      success: `Restored from ${row.filename}.`,
+      successDescription: "Restart the server to be safe.",
     });
     if (ok) setConfirm(null);
   };
@@ -508,67 +512,65 @@ function BackupRowItem({
         </div>
       </div>
 
-      <TooltipProvider delayDuration={200}>
-        <div className="flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                asChild
-                aria-label="Download backup"
-              >
-                <a href={backupDownloadHref(row.filename)}>
-                  <Download className="size-4" />
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Download</TooltipContent>
-          </Tooltip>
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              asChild
+              aria-label="Download backup"
+            >
+              <a href={backupDownloadHref(row.filename)}>
+                <Download className="size-4" />
+              </a>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Download</TooltipContent>
+        </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setConfirm("restore")}
-                disabled={busy || restoreDisabled}
-                aria-label="Restore from this backup"
-              >
-                {restore.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Restore</TooltipContent>
-          </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirm("restore")}
+              disabled={busy || restoreDisabled}
+              aria-label="Restore from this backup"
+            >
+              {restore.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RotateCcw className="size-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Restore</TooltipContent>
+        </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setConfirm("delete")}
-                disabled={busy}
-                aria-label="Delete backup"
-                className="text-destructive hover:text-destructive"
-              >
-                {del.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
-          </Tooltip>
-        </div>
-      </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirm("delete")}
+              disabled={busy}
+              aria-label="Delete backup"
+              className="text-destructive hover:text-destructive"
+            >
+              {del.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
+      </div>
 
       <ConfirmDialog
         open={confirm === "restore"}
@@ -623,25 +625,9 @@ function BackupsSkeleton() {
 }
 
 function RelativeTime({ iso }: { iso: string }) {
-  const date = new Date(iso);
-  const label = formatRelative(date);
   return (
-    <time dateTime={iso} title={date.toLocaleString()}>
-      {label}
+    <time dateTime={iso} title={formatDateTime(iso)}>
+      {formatRelativeTime(iso)}
     </time>
   );
-}
-
-function formatRelative(date: Date): string {
-  const diffMs = date.getTime() - Date.now();
-  const diffSec = Math.round(diffMs / 1000);
-  const abs = Math.abs(diffSec);
-  const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (abs < 60) return fmt.format(diffSec, "second");
-  if (abs < 3600) return fmt.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86_400) return fmt.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 2_592_000) return fmt.format(Math.round(diffSec / 86_400), "day");
-  if (abs < 31_536_000)
-    return fmt.format(Math.round(diffSec / 2_592_000), "month");
-  return fmt.format(Math.round(diffSec / 31_536_000), "year");
 }

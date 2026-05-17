@@ -17,6 +17,8 @@ import { HomePage } from "@/routes/home";
 import { LoginPage } from "@/routes/login";
 import { SetupAccountPage } from "@/routes/setup-account";
 import { Placeholder } from "@/routes/placeholder";
+import { NotFoundPage } from "@/routes/not-found";
+import { ErrorPage } from "@/routes/error";
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
 import { TransactionDetailPage } from "@/routes/transaction-detail";
 import { CategoriesPage } from "@/routes/categories";
@@ -251,6 +253,14 @@ const router = createRouter({
   routeTree,
   basepath: "/v2",
   defaultPreload: "intent",
+  // Default not-found + error components render in place of <Outlet/> inside
+  // the authenticated shell, so the sidebar/topbar/command palette stay live
+  // and the user has a way out without a hard reload. See the route files
+  // for the visual contract.
+  defaultNotFoundComponent: NotFoundPage,
+  defaultErrorComponent: ({ error, reset }) => (
+    <ErrorPage error={error} reset={reset} />
+  ),
 });
 
 declare module "@tanstack/react-router" {
@@ -269,7 +279,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
+        <TooltipProvider delayDuration={200}>
           <RouterProvider router={router} />
         </TooltipProvider>
       </ThemeProvider>

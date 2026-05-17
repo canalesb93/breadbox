@@ -16,10 +16,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  ColorRailCard,
+  ColorRailCardSkeleton,
+} from "@/components/color-rail-card";
 import { DangerZone } from "@/components/danger-zone";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
-import { IdPill } from "@/components/id-pill";
+import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
+import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryForm } from "@/features/categories/category-form";
@@ -29,6 +39,7 @@ import {
   useDeleteCategory,
 } from "@/api/queries/categories";
 import { useTransactionCount } from "@/api/queries/transactions";
+import { formatLongDate } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/api/types";
@@ -54,7 +65,7 @@ export function CategoryDetailPage() {
         <EmptyState
           icon={Shapes}
           title="Category not found"
-          description="It may have been deleted, or the link is wrong."
+          description="This category may have been deleted, or the link is out of date. Head back to the categories list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/categories">Back to categories</Link>
@@ -139,7 +150,7 @@ function Hero({
 
   return (
     <ColorRailCard accent={accent}>
-      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -149,22 +160,16 @@ function Hero({
               size="lg"
             />
             <div className="min-w-0 space-y-1">
-              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
+              <Eyebrow as="p" variant="hero">
                 {eyebrow}
-              </p>
+              </Eyebrow>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-xl font-semibold tracking-tight">
                   {category.display_name}
                 </h1>
-                {category.is_system && (
-                  <Badge variant="outline" className="text-[10px]">
-                    System
-                  </Badge>
-                )}
+                {category.is_system && <MetaBadge>System</MetaBadge>}
                 {category.hidden && (
-                  <Badge variant="outline" className="gap-1 text-[10px]">
-                    <EyeOff className="size-2.5" /> Hidden
-                  </Badge>
+                  <MetaBadge icon={EyeOff}>Hidden</MetaBadge>
                 )}
               </div>
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
@@ -243,18 +248,15 @@ function QuickActions({
   parent: Category | undefined;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
-        Jump to
-      </span>
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link to="/transactions" search={{ category: category.slug }}>
           <Receipt className="size-3" />
           Transactions in {category.display_name}
         </Link>
-      </Button>
+      </JumpToPill>
       {parent && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/categories/$id"
             params={{ id: parent.short_id }}
@@ -262,9 +264,9 @@ function QuickActions({
             <Folder className="size-3" />
             {parent.display_name}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
-    </div>
+    </JumpToRow>
   );
 }
 
@@ -321,77 +323,33 @@ function DetailsCard({
   category: Category;
   parent: Category | undefined;
 }) {
-  const identityRows: DetailRowData[] = compactRows([
+  const identityRows: DetailRowData[] = compactDetailRows([
     { label: "Slug", value: category.slug, mono: true },
     { label: "Sort order", value: String(category.sort_order) },
     parent ? { label: "Parent", value: parent.display_name } : null,
   ]);
 
-  const stateRows: DetailRowData[] = compactRows([
+  const stateRows: DetailRowData[] = compactDetailRows([
     { label: "System", value: category.is_system ? "Yes" : "No" },
     { label: "Hidden", value: category.hidden ? "Yes" : "No" },
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
+  const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: category.short_id, mono: true },
     category.created_at
       ? {
           label: "Created",
-          value: new Date(category.created_at).toLocaleDateString(),
+          value: formatLongDate(category.created_at.slice(0, 10)),
         }
       : null,
   ]);
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      {identityRows.length > 0 && (
-        <DetailGroup label="Identity" rows={identityRows} />
-      )}
-      {stateRows.length > 0 && (
-        <DetailGroup label="State" rows={stateRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Identity" rows={identityRows} />
+      <DetailList label="State" rows={stateRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
-  );
-}
-
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined | false)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({ label, rows }: { label: string; rows: DetailRowData[] }) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </h3>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value as string} /> : row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 
@@ -433,26 +391,7 @@ function DeleteCategory({ category }: { category: Category }) {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="bg-card relative overflow-hidden rounded-xl border">
-        <div className="bg-muted absolute inset-y-0 left-0 w-1" />
-        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="space-y-3">
-            <div className="flex items-start gap-4">
-              <Skeleton className="size-12 rounded-lg" />
-              <div className="space-y-2 py-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2 lg:items-end">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-9 w-32" />
-            <Skeleton className="h-3 w-28" />
-          </div>
-        </div>
-      </div>
+      <ColorRailCardSkeleton tileShape="rounded-lg" />
       <div className="flex gap-2">
         <Skeleton className="h-7 w-48 rounded-md" />
         <Skeleton className="h-7 w-32 rounded-md" />

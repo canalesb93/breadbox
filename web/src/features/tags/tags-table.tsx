@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable } from "@/components/data-table";
 import { IdPill } from "@/components/id-pill";
 import { TagChip } from "@/components/tag-chip";
@@ -100,16 +101,21 @@ export function TagsTable({
         meta: { className: "w-px" },
         cell: ({ row }) => (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Actions for ${row.original.display_name}`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Actions for ${row.original.display_name}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Tag actions</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent
               align="end"
               onClick={(e) => e.stopPropagation()}

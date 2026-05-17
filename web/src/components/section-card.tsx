@@ -36,11 +36,14 @@ interface SectionCardProps extends React.HTMLAttributes<HTMLDivElement> {
 //
 // Visual contract:
 //   `<Card className="gap-0 py-0">`
-//     `<CardHeader className="border-b px-5 py-3.5">` title (text-sm font-medium)
+//     `<CardHeader className="border-b px-5 py-4">` title (text-sm font-medium)
 //     `<CardContent className="px-5 py-5">` content (or px-0 py-0 when flushBody)
 //     optional `<div className="border-t px-5 py-3 text-right">` footer
 //
-// Don't fork the look — change this primitive.
+// Vertical rhythm: header `py-4` (16px) + body `py-5` (20px) reads as a
+// slight density step from chrome to content. Matched by `ListCard` so the
+// two cards visually align when they sit on the same page. Don't fork the
+// look — change this primitive.
 export function SectionCard({
   title,
   action,
@@ -60,7 +63,14 @@ export function SectionCard({
       className={cn("gap-0 py-0", cardClassName, className)}
       {...rest}
     >
-      <CardHeader className={cn("border-b px-5 py-3.5", headerClassName)}>
+      {/* Override the shadcn Card primitive's `[.border-b]:pb-6` rule: when
+          a SectionCard header carries the divider the primitive injects an
+          extra 24px of bottom padding, which on top of our intentional
+          `py-4` produced an empty band before the body. `!pb-4` keeps the
+          density we designed for and matches the `pt-4` on top. */}
+      <CardHeader
+        className={cn("border-b px-5 py-4 !pb-4", headerClassName)}
+      >
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           {icon}
           {title}

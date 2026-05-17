@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelativeTime } from "@/lib/format";
+import { formatLongDate, formatRelativeTime } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useApplyRule,
@@ -86,7 +86,8 @@ export function RuleDetailPage() {
     const ok = await withMutationToast(
       () => applyRule.mutateAsync(rule.short_id),
       {
-        success: "Rule applied retroactively. Transactions are being updated.",
+        success: "Rule applied retroactively.",
+        successDescription: "Transactions are being updated.",
       },
     );
     if (ok) {
@@ -112,7 +113,7 @@ export function RuleDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-4">
-          <section className="bg-card rounded-2xl border p-5">
+          <section className="bg-card rounded-xl border p-5">
             <h2 className="text-sm font-medium">What this rule does</h2>
             <div className="mt-4 space-y-4">
               <div>
@@ -155,7 +156,7 @@ export function RuleDetailPage() {
         </div>
 
         <aside className="space-y-3">
-          <section className="bg-card space-y-3 rounded-2xl border p-4">
+          <section className="bg-card space-y-3 rounded-xl border p-4">
             <div>
               <h3 className="text-sm font-medium">Apply retroactively</h3>
               <p className="text-muted-foreground mt-1 text-xs">
@@ -180,7 +181,7 @@ export function RuleDetailPage() {
           </section>
 
           {!isSystem && (
-            <section className="bg-card space-y-3 rounded-2xl border p-4">
+            <section className="bg-card space-y-3 rounded-xl border p-4">
               <div>
                 <h3 className="text-sm font-medium">Delete rule</h3>
                 <p className="text-muted-foreground mt-1 text-xs">
@@ -267,7 +268,7 @@ export function RuleDetailPage() {
                   <span className="text-muted-foreground text-xs">·</span>
                   <span className="text-xs text-amber-600 dark:text-amber-400">
                     Expires{" "}
-                    {new Date(rule.expires_at).toLocaleDateString()}
+                    {formatLongDate(rule.expires_at.slice(0, 10))}
                   </span>
                 </>
               )}

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { JumpToPill } from "@/components/jump-to-pill";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusPanel } from "@/components/status-panel";
@@ -188,18 +189,12 @@ export function Placeholder({ title }: { title: string }) {
                     </span>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {content.related.map((r) => (
-                        <Button
-                          key={r.to}
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1.5 px-2.5 text-xs"
-                        >
+                        <JumpToPill key={r.to} asChild>
                           <Link to={r.to}>
                             {r.title}
                             <ArrowRight className="size-3" />
                           </Link>
-                        </Button>
+                        </JumpToPill>
                       ))}
                     </div>
                   </div>

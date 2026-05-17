@@ -33,12 +33,24 @@ next target, then updates this file at the end of the run.
 
 (Populated by iterations as drift is discovered.)
 
-- **Active-state vocabulary** (iter 1, established): primary-tinted 3px
+- **Active-state vocabulary** (iter 1, established; timing parity
+  iter 73; settings desktop sweep iter 78 #1191): primary-tinted 3px
   left rail at row's outer edge + tinted icon + accent bg. Used in
-  `nav-main.tsx` and `settings-shell.tsx`. Any new nav/list with an
-  active row should reuse this language — pulling the rail into a
+  `nav-main.tsx` and `settings-shell.tsx` (desktop). Both rails share
+  the same transform-driven in/out vocabulary:
+  `before:scale-y-0` → `data-[active=true]:before:scale-y-100` with
+  `before:transition-transform before:duration-200 before:ease-out`.
+  Settings desktop nav also adopts `bg-sidebar` chrome + the matching
+  `[&>svg]:text-muted-foreground/80` →
+  `data-[active=true]:[&>svg]:text-primary` icon tint so the settings
+  modal reads as "sidebar lifted into a dialog" instead of a separate
+  surface. Any new nav/list with an active row should reuse this
+  language *and* the 200ms ease-out timing — pulling the rail into a
   shared util in `web/src/components/` is worth doing once a third
-  surface needs it.
+  surface needs it (settings dialog can't reuse `nav-main`'s
+  `SidebarMenuItem` wrapper because the SidebarMenuButton is
+  `overflow-hidden` and the rail must escape, so today it's two inline
+  class blocks sharing the same vocabulary, not one shared component).
 - **Branch naming gotcha** (iter 1): the remote already holds
   `design/v2-shadcn` as a leaf ref, so a child branch named
   `design/v2-shadcn/<topic>` cannot be pushed (git refs can't be both a
@@ -100,6 +112,15 @@ next target, then updates this file at the end of the run.
   bordered card wrapper) — don't force those onto ListCard.
 - **ColorRailCard primitive** — extracted to
   `web/src/components/color-rail-card.tsx` in iter 10 (#1123).
+  Sibling `<ColorRailCardSkeleton>` lifted in iter 67 (#1180) into
+  the same file — mirrors the wrapper + rail for loading states so
+  the skeleton stays in lockstep when the card's radius / rail
+  width / padding change. Three detail-page DetailSkeletons
+  (transaction, account, category) now route through it; `tileShape`
+  prop matches the loaded tile (`rounded-md` for TX-detail's
+  `CategoryIconTile`, `rounded-lg` for accounts/categories),
+  `withFooter` toggles the bordered action strip, `body` slot covers
+  TX-detail's secondary details grid below the identity row.
   Four surfaces now share it (iter 11 added Connection detail):
   TX-detail hero (category color, neutral when uncategorised),
   Account-detail hero (success for assets, destructive for
@@ -133,12 +154,18 @@ next target, then updates this file at the end of the run.
 - **TimelineRail primitive** — extracted to
   `web/src/components/timeline-rail.tsx` in iter 26 (#1138).
   Compound API: `<TimelineRail>` / `<TimelineRail.Group label="…">`
-  / `<TimelineRail.Row icon={Icon} muted>`. Bordered `<ol>` rail +
+  / `<TimelineRail.Row icon={Icon} muted>` / `<TimelineRail.RowSkeleton body>`
+  (added iter 65, #1178). Bordered per-row rail (`::before` on
+  each `<li>`, clipped on first/last to the disc centre) +
   punched-through `bg-card` icon discs + day-headings as anchors
   outside the rail. One consumer today (transaction-detail
   Activity); queued for rule run history and per-connection sync
   log. `muted` prop centralises the soft-delete opacity vocabulary
-  so consumers don't fork the class string. Don't fork the look —
+  so consumers don't fork the class string. `RowSkeleton` mirrors
+  the row geometry exactly (same disc + rail) so the loading state
+  doesn't shift layout when annotations land — opt-in `body` prop
+  adds a `Skeleton h-8` block between the headline and timestamp
+  lines for comment-bubble-bearing rows. Don't fork the look —
   extend the primitive. The iter-5 drift note ("Generic enough to
   ship as a `<TimelineRail>` primitive if a second timeline lands")
   is now resolved (shipped pre-emptively before the second
@@ -284,13 +311,72 @@ next target, then updates this file at the end of the run.
   so the radius / padding / font-weight stays in one place.
   Until then, copy is fine — the pattern is small enough that
   the abstraction would weigh more than the duplication.
+- **ListRowSkeleton primitive** — extracted to
+  `web/src/components/list-row-skeleton.tsx` in iter 36 (#1150).
+  Five surfaces now share the canonical loading-row shape:
+  Connections list, Accounts list, Categories list, Home
+  connections panel, Home recent activity. Vocabulary tokens:
+  `density` (`compact`/`regular`/`comfortable`), `leading`
+  (`sm-square`/`md-square`/`lg-square` matching CategoryIconTile
+  sizes), `trailing` (`none`/`badge`/`value-stack`). Every
+  consumer picks the tokens that match its real row so the
+  skeleton no longer shifts on data arrival. When adding a new
+  list page, reach for `<ListRowSkeleton>` and pick from the
+  existing tokens — if no combination fits, extend the primitive
+  rather than fork. The shadcn `<Skeleton>` primitive stays the
+  one-off building block for non-list skeletons (backups stat
+  grid, providers cards, transaction-row in a TableCell).
+- **Eyebrow primitive** — extracted to
+  `web/src/components/eyebrow.tsx` in iter 37 (#1151). Six surfaces
+  now share the canonical uppercase muted micro-label: TX-detail,
+  Account-detail, Category-detail, Connection-detail,
+  TimelineRail, ProviderScoreboard. Two variants: `default`
+  (`text-[10px] tracking-[0.1em]` for section heads, "Jump to"
+  pills, sync-activity action labels, scoreboard cells) and `hero`
+  (`text-[10px] tracking-[0.12em]` for detail-page hero card
+  eyebrows). Don't hand-roll `text-[10px] font-medium tracking-*
+  uppercase` markup for new surfaces — reach for `<Eyebrow>` or
+  extend it with a new variant if the rhythm needs to differ. The
+  brand-header / auth-shell / shortcut-sheet uppercase labels are
+  intentionally outside this vocabulary — they're surface-specific
+  framing (login chrome, brand lockup, command-palette grouping),
+  not detail-page eyebrows.
+- **DetailSheetHeader primitive** — extracted to
+  `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
+  Two surfaces now share the canonical icon-tile sheet header lockup:
+  ShortcutSheet (iter 39) and ConnectBankSheet (iter 40). Vocabulary
+  tokens: `density` (`default` = size-9 tile + p-5, ambient overlays
+  like Shortcut sheet; `accent` = size-10 tile + bg-muted/20 + p-6,
+  primary flows like Connect-bank), `eyebrow` (optional), `trailing`
+  (optional slot). The lockup mirrors StatusPanel / EmptyState /
+  SectionCard's icon-tile vocabulary so every v2 Sheet reads as part
+  of the system, not a stock shadcn surface. Don't open `<SheetHeader>`
+  inline for a new Sheet — extend this primitive. `reauth-sheet` and
+  `link-account-sheet` use different header shapes (no icon-tile
+  lockup) and stay open-coded — promote if a third Sheet adopts the
+  lockup with a yet-different rhythm. No sandbox specimen because
+  SheetTitle/SheetDescription require radix Dialog context; the live
+  consumers carry the visual reference.
+- **JumpToPill primitive** — extracted to
+  `web/src/components/jump-to-pill.tsx` in iter 75 (#1188). The
+  canonical detail-page "Jump to" lateral-link pill: 28px tall
+  (`h-7`), `px-2.5 text-xs`, `size-3` leading icon, outline
+  variant. Distinct from `Button size="xs"` (24px toolbar pill,
+  `h-6`) and `Button size="sm"` (32px CTA, `h-8`). Sibling
+  `<JumpToRow>` bundles the `<Eyebrow>"Jump to"</Eyebrow>` label
+  with the cluster so the row also speaks the canonical iter-37
+  micro-label vocabulary. Four surfaces share it today (every
+  v2 detail page): transaction-detail, account-detail,
+  category-detail, connection-detail. Reach for it for any new
+  detail-page hero lateral-nav cluster. Don't open-code the
+  className triplet — pass props.
 
 ## Backlog (ordered roughly by impact)
 
 Pages:
 
 - [x] App shell + sidebar (`app-sidebar.tsx`, `__root.tsx`, `settings-shell.tsx`) — #1113
-- [x] Home / dashboard (`home.tsx`) — #1115
+- [x] Home / dashboard (`home.tsx`) — #1115; rebuilt iter 34 onto v2 primitives ([#1148](https://github.com/canalesb93/breadbox/pull/1148))
 - [x] Transactions list (`transactions.tsx`) — #1116
 - [x] Transaction detail (`transaction-detail.tsx`) — #1118
 - [x] Accounts list (`accounts.tsx`) — #1125
@@ -307,15 +393,21 @@ Pages:
 - [x] Login (`login.tsx`) — #1127
 - [x] Setup account (`setup-account.tsx`) — #1127
 - [x] Placeholder (`placeholder.tsx`) — #1134
+- [x] Not-found + Error boundary (`not-found.tsx`, `error.tsx`) — #1149
 
 Cross-cutting components:
 
 - [~] `page-header.tsx` — canonical header revised in #1113 (added
-  `eyebrow`, tightened spacing, sm:flex-row footer). Still needs a sweep
-  to migrate the remaining pages that build their own headers.
-  TX-detail (iter 5) deliberately does *not* use PageHeader — the hero
-  card carries the identity. Consider whether detail pages should ever
-  use PageHeader at all, or just rely on the hero.
+  `eyebrow`, tightened spacing, sm:flex-row footer). Copy vocabulary
+  documented in iter 72 (#1185): eyebrow is sentence-case in source
+  (CSS uppercases), title has no trailing punctuation, description is
+  a noun-led full sentence ending in a period, and multi-state pages
+  hoist the description copy to a module-level constant so it doesn't
+  shift on data transitions. Still needs a sweep to migrate the
+  remaining pages that build their own headers. TX-detail (iter 5)
+  deliberately does *not* use PageHeader — the hero card carries the
+  identity. Consider whether detail pages should ever use PageHeader
+  at all, or just rely on the hero.
 - [~] `data-table.tsx` — density + hover tightened in #1116 (new
   `stickyHeader` + `refinedHeader` opt-ins; `Table` primitive picks
   up softer borders and `px-3 py-2.5` cell padding). Iter 4 (#1117)
@@ -1267,6 +1359,692 @@ Cross-cutting components:
     for free (the audit in iter 31 noted dozens of `isPending` /
     `submitting` call sites). No call-site changes.
 
+- **Iter 33 — Primitive header + footer padding tightening** ([#1147](https://github.com/canalesb93/breadbox/pull/1147))
+  - User-directed: Ricardo flagged SectionCard, ListCard, FormFooter
+    headers as having "weird padding" he couldn't quite describe.
+  - Tightened header padding across the card-style primitives so they
+    read with the same vertical weight when stacked on the same page;
+    aligned FormFooter flush with SectionCard's bottom border (removed
+    sliver gap); unified eyebrow tracking and spacing.
+  - Touched files: `section-card.tsx`, `list-card.tsx`,
+    `color-rail-card.tsx`, `form-footer.tsx`, `api-key-form.tsx`,
+    `account-detail.tsx`.
+  - Process note: iter #33 hit an API 500 mid-run (after the work was
+    pushed + PR opened). The PR was merged from the main session. The
+    agent also did the unusual thing of working in the main repo
+    instead of a worktree — future iterations: stick to `git worktree
+    add ~/dev/breadbox-iter<N>` so the main repo working tree stays
+    untouched.
+
+- **Iter 34 — Home dashboard rebuild** ([#1148](https://github.com/canalesb93/breadbox/pull/1148))
+  - Home was iter 2, shipped before the v2 primitives (`ColorRailCard`,
+    `StatusPanel`, `ListCard`) existed. The 4-up hand-rolled scoreboard
+    read flatter than the polished detail pages.
+  - Replaced the scoreboard with a single `ColorRailCard` hero — Net
+    cash on the left (3xl tabular-nums, success/destructive rail
+    encodes solvency) and Cash + Credit & loans as supporting cells
+    separated by the card border. `sm:grid-cols-[1.4fr_1fr_1fr]` gives
+    the dominant value ~40% of the row width on tablet+.
+  - Connection-health summary moved into the Connections panel header
+    (`3 healthy`, or `2 need action · 1 healthy`) — the same number
+    isn't duplicated as a fourth stat tile anymore.
+  - New `HomeAttentionPanel`: a tone-rail `StatusPanel` (warning)
+    above the hero only when one or more connections need re-auth or
+    have a sync error — silent on a healthy household, no orphaned
+    "all good!" empty-state to mute. Reuses the established
+    setup-account / providers vocabulary.
+  - Touched files: `features/home/home-stats.tsx` (full rewrite —
+    `StatCard` retired, hero is now `ColorRailCard` + `HeroCell`/
+    `SecondaryCell`), `features/home/home-connections-panel.tsx`
+    (title now carries health subtitle), `features/home/home-attention-panel.tsx`
+    (new), `routes/home.tsx` (mounts the attention panel).
+  - Process note: ran from a worktree at `/tmp/claude/breadbox-iter34`
+    — clean, didn't disturb the main repo (corrects the iter 33 lapse).
+
+- **Iter 35 — 404 + Error boundary pages** ([#1149](https://github.com/canalesb93/breadbox/pull/1149))
+  - Adds `NotFoundPage` (`web/src/routes/not-found.tsx`) and
+    `ErrorPage` (`web/src/routes/error.tsx`), wired into
+    `createRouter({ defaultNotFoundComponent, defaultErrorComponent })`
+    on the TanStack router. Both render in place of `<Outlet/>` inside
+    the authenticated shell — sidebar, topbar, and command palette
+    stay live, so the user has a way out without a hard reload. The
+    previous behaviour was TanStack's bare default `Not Found` text
+    on a blank page (captured as the BEFORE in the PR).
+  - `NotFoundPage`: PageHeader `404 · NOT FOUND` eyebrow + title +
+    description; `StatusPanel tone="info"` showing the attempted
+    pathname as an `IdPill`; `SectionCard` "Jump to a page" with a
+    2x2 grid of quick-jump tiles (Home / Transactions / Accounts /
+    Categories) rendered as hover-aware `bg-muted/20` rounded cards
+    with a trailing `ArrowRight`. Header actions: `⌘K Jump to…`
+    button (dispatches the existing `breadbox:command-palette:open`
+    event) + Back to Home link.
+  - `ErrorPage`: PageHeader `500 · ERROR` eyebrow + title +
+    description; `StatusPanel tone="destructive"` with the human
+    -readable error message + trailing Reload button; collapsible
+    `SectionCard` "Technical details" hosting the raw stack trace
+    inside a `bg-muted/40 overflow-auto` `<pre>` (showDetails
+    toggle keeps it quiet by default — dev affordance). Header
+    actions: `⌘K Jump to…` + Try again (uses TanStack Router's
+    per-route `reset()` callback) + Back to Home.
+  - Pure composition of existing primitives (PageHeader,
+    StatusPanel, SectionCard, IdPill, Kbd/KbdGroup) — no new design
+    vocabulary, just two more production surfaces speaking it.
+    StatusPanel picks up new `info` + `destructive` consumers;
+    IdPill picks up a surface where it carries a URL path instead
+    of a short_id/slug — fits its "machine identifier" framing.
+  - Drift queued (not part of this iteration): `routes/__root.tsx`
+    still hand-rolls an inline `AuthError` component for the
+    `useMe()` failure case — same shape (fixed-position centered
+    message + reload affordance) but predates the StatusPanel
+    vocabulary. Sweep onto a `<StatusPanel tone="destructive">`
+    inside `<AuthShell>` next time we touch the root layout. Same
+    story for `AuthSplash` — a bare centered Loader2 — which a
+    `<StatusPanel tone="info">` inside `<AuthShell>` (or a
+    dedicated `<AuthShellSplash>`) would speak.
+  - Process note: tested BEFORE/AFTER by temporarily reverting
+    `web/src/main.tsx` to the pre-commit content via
+    `git show HEAD~1:web/src/main.tsx > web/src/main.tsx`, taking
+    the screenshot, then `git checkout HEAD -- web/src/main.tsx`
+    to restore. Vite needs a fresh port (`bun dev --port <N> --force`)
+    to flush its dep cache between the revert and the AFTER capture
+    — same dance as iters 4/5.
+
+- **Iter 36 — `ListRowSkeleton` primitive + skeleton drift sweep** ([#1150](https://github.com/canalesb93/breadbox/pull/1150))
+  - Five list surfaces were hand-rolling their loading rows
+    with subtly divergent paddings, gaps, icon-tile sizes, and
+    trailing chips. Skeletons no longer matched the real rows
+    underneath, so pages visually shifted on data arrival and
+    the loading vocabulary felt forked.
+  - Adds `<ListRowSkeleton>` at
+    `web/src/components/list-row-skeleton.tsx` with three
+    vocabulary tokens:
+    - `density`: `compact` (px-4 py-2.5) / `regular` (px-5 py-3)
+      / `comfortable` (px-5 py-3.5 sm:gap-4)
+    - `leading`: `sm-square` (size-7) / `md-square` (size-9) /
+      `lg-square` (size-10) — matches the `CategoryIconTile`
+      size scale so a "row with an icon tile of size X"
+      always picks the matching skeleton.
+    - `trailing`: `none` / `badge` (single chip) /
+      `value-stack` (two-line right-aligned column)
+  - Migrates Connections list, Accounts list, Categories list,
+    Home connections panel, and Home recent activity onto the
+    primitive (-45 LOC net of hand-rolled markup retired).
+  - Drift retired:
+    - home recent-activity skeleton `size-9`/`py-3.5` vs real
+      row `size-7`/`py-3` — now correctly tiny.
+    - home connections-panel skeleton `py-3.5` vs real row
+      `py-3` — tightened.
+    - categories skeleton `py-3` + fake `h-5 w-10` trailing
+      chip vs real row `py-2.5` with IdPill subtitle and no
+      trailing chip — chip dropped, density tightened.
+  - Reusing the existing `<ListCard>` host + the new
+    `<ListRowSkeleton>` body — sixth primitive in the v2 list
+    vocabulary alongside ListCard / SectionCard /
+    ColorRailCard / TimelineRail / EmptyState. Don't fork the
+    look — extend the primitive (add a `Leading` size if a new
+    consumer's real row uses a different icon tile size; add
+    a `Trailing` shape if a new consumer's real row has a
+    different right column).
+  - Tags list + transaction-rule list deliberately stay on the
+    `DataTable` skeleton (which has its own per-cell shape).
+    Backups + providers skeletons are not list-row shaped
+    (4-up stat grid + tall bar) and stay bespoke. The
+    `TransactionRowSkeleton` stays as-is — it's a *table cell*
+    skeleton (TableCell-wrapped), not a div row, so it can't
+    cleanly merge with this primitive.
+  - Process note: same BEFORE/AFTER dance as iter 35 — captured
+    AFTER first, then `git checkout HEAD~1 -- <files>` to revert
+    locally, captured BEFORE, then `git checkout HEAD -- <files>`
+    to restore. Vite picked up both directions via HMR without
+    needing a port restart this time.
+
+- **Iter 37 — `<Eyebrow>` primitive consolidates uppercase micro-label drift** ([#1151](https://github.com/canalesb93/breadbox/pull/1151))
+  - Audit of the codebase found six subtle variations of the
+    uppercase muted-foreground micro-label across ten files:
+    `tracking-[0.08em]` (1), `tracking-[0.1em]` (13, dominant),
+    `tracking-[0.12em]` (4, hero use), `tracking-wide` (6, mostly
+    inside pills), `tracking-wider` text-[11px] (3), and
+    `tracking-wider` text-xs (1). The dominant
+    `text-[10px] tracking-[0.1em]` shape is the canonical eyebrow.
+  - New primitive: `web/src/components/eyebrow.tsx`. Two variants:
+    - `default` — `text-[10px] tracking-[0.1em]` for section heads,
+      "Jump to" pills, sync-activity action labels, timeline-rail
+      day-headings, provider scoreboard cells.
+    - `hero` — `text-[10px] tracking-[0.12em]` for the detail-page
+      hero card eyebrows ("Transaction" / "Liability" / "Asset" /
+      "Income" / "Category") where the extra letter air pairs with
+      the large display title below.
+  - Migrated six files: `transaction-detail.tsx`,
+    `account-detail.tsx`, `category-detail.tsx`,
+    `connection-detail.tsx`, `timeline-rail.tsx`,
+    `features/providers/provider-status.tsx`. The
+    `<label htmlFor="sync-interval">` in connection-detail stays
+    as a raw `<label>` (accessibility) even though its visual
+    matches the eyebrow.
+  - Deliberately not migrated: brand-header (`text-[10px]
+    tracking-wide` inside the brand lockup), auth-shell
+    (`text-[11px] tracking-wider` framing for the sign-in chrome),
+    shortcut-sheet group label (`text-xs tracking-wider` matching
+    command-palette grouping). These are surface-specific framing
+    types, not the detail-page eyebrow vocabulary.
+  - Inside-pill uppercase (`text-[10px] tracking-wide uppercase`
+    on the direction badges in TX/account/category/connection
+    heroes + the "Pending" dashed badge on TX-detail) is part of
+    pill styling, not an eyebrow label — left alone.
+  - 13th primitive in the v2 vocabulary (alongside ListCard /
+    SectionCard / ColorRailCard / TimelineRail / EmptyState /
+    ListRowSkeleton / IdPill / PageHeader / PaginationBar /
+    DangerZone / FormFooter / SoftBackButton).
+
+- **Iter 38 — Sandbox showcase catches up on iter 36/37 primitives** ([#1152](https://github.com/canalesb93/breadbox/pull/1152))
+  - Adds `<Eyebrow>` and `<ListRowSkeleton>` specimens to
+    `web/src/sandbox/sections/components.tsx` so both primitives
+    have a discoverable home in the gallery at `/v2/sandbox`.
+  - Eyebrow specimen shows both `default` and `hero` variants
+    side-by-side in their typical hosts (card header vs. detail-page
+    hero column under a display title), with the consolidation
+    rationale baked into the description.
+  - ListRowSkeleton specimen demonstrates three of the most-used
+    token combinations: `regular · sm-square · value-stack` (Home
+    recent activity), `comfortable · lg-square · value-stack`
+    (Accounts / Connections), `compact · md-square · badge`
+    (Categories). The description points consumers at the
+    extend-don't-fork rule.
+  - First open item from iter 23 (`grow`-spacer sweep) verified
+    already clean — `grep -rEn '\bgrow\b' web/src` returns zero
+    matches (the iter-24 mobile sweep cleared everything; the only
+    remaining hit is a `// tag pages tend to grow long` comment
+    inside `tags-table.tsx`). Observation closed.
+
+- **Iter 39 — Shortcut sheet polish** ([#1153](https://github.com/canalesb93/breadbox/pull/1153))
+  - `web/src/components/shortcut-sheet.tsx` rebuilt onto v2
+    vocabulary. Header gets the icon-tile lockup
+    (`bg-muted size-9 rounded-lg border` + `Keyboard` lucide)
+    used by `StatusPanel`, `EmptyState`, and `SectionCard`, so
+    the sheet reads as a first-class v2 surface instead of a
+    stock shadcn Sheet.
+  - Group rows move into bordered `<section>` cards with a
+    `bg-muted/30 border-b` header carrying an uppercase eyebrow
+    label + a tabular-nums count pill on the right + a
+    `divide-y` body of rows with a subtle `hover:bg-muted/40`
+    response. Mirrors the ListCard vocabulary used across the
+    rest of v2 (Home recent-activity, Accounts groups,
+    Categories list, etc.).
+  - Footer now carries a thin cmdk-style action strip
+    (`bg-muted/30 border-t text-[11px]`) with `⇧?` Toggle this
+    sheet on the left + `esc` Close on the right. The
+    `<Kbd className="bg-background/80">` variant is the same one
+    `CommandPalette` uses on its footer pills, so the two
+    overlays now read as siblings.
+  - Empty-state added for the no-shortcuts-registered case (a
+    dashed-border tile + "No shortcuts registered" headline).
+    Paranoia — in practice Global always registers ⌘K and ⇧?.
+  - No new shared primitive: the inline cards are tightly
+    coupled to the sheet chrome (icon tile + scrollable body +
+    footer strip). If a second sheet adopts the same
+    icon-tile-header lockup, promote the inner shell into a
+    `<DetailSheetHeader>`.
+
+- **Iter 40 — Connect-bank Sheet polish** ([#1154](https://github.com/canalesb93/breadbox/pull/1154))
+  - Header gets the v2 icon-tile lockup (Landmark in a muted
+    rounded tile) matching `EmptyState` / `StatusPanel` /
+    `SectionCard`, an `<Eyebrow>` label, larger title, and a
+    `bg-muted/20 border-b p-6` frame so the Sheet reads as a
+    first-class v2 surface. Same vocabulary as iter 39's
+    Shortcut sheet — second Sheet to adopt the lockup.
+  - Picker selection vocabulary inherits the active-state
+    language used by nav/list rows; alerts adopt `<StatusPanel>`
+    so tone is consistent with Providers + Setup. Action strip
+    uses the canonical flush bordered footer
+    (`bg-muted/20 border-t px-6 py-3`) — open-coded here
+    because the host is a Sheet, not a SectionCard.
+  - Queued the inner shell extraction into a `<DetailSheetHeader>`
+    primitive for the next time a third Sheet adopts it.
+
+- **Iter 65 — `<TimelineRail.RowSkeleton>` (loading geometry matches the real row)** ([#1178](https://github.com/canalesb93/breadbox/pull/1178))
+  - ActivityTimeline was hand-rolling a `gap-3` skeleton with a
+    `size-7 rounded-full` chip that didn't carry the rail line —
+    loading-to-loaded swapped a flat row stack for a punched-through
+    rail, so the layout jumped on data arrival. Adds
+    `<TimelineRail.RowSkeleton>` to the timeline primitive's compound
+    API (third member alongside `Group` and `Row`). Geometry mirrors
+    `<TimelineRail.Row>` exactly: same `::before` rail clipped on
+    first/last rows to the disc centre, same 28px disc punched
+    through `bg-card`, same negative margin / pl-3.5 math.
+  - `body` prop (default `false`) renders an extra `Skeleton h-8`
+    block between the headline and timestamp lines for
+    comment-bubble-bearing rows. Activity timeline's loading state
+    uses four rows with one `body` to suggest the dominant comment +
+    system-event mix.
+  - Sandbox specimen at `/v2/sandbox` (Components → TimelineRail)
+    gains a side-by-side Loaded / Loading panel so the contract is
+    inspectable. The Loaded panel was already in place; just wrapped
+    the existing demo in a labelled column and added a matching
+    Loading column.
+  - Same pattern as iter 36's `<ListRowSkeleton>` for list surfaces
+    — extend the primitive, don't re-derive the loading shape. The
+    drift note in iter 26 ("primitive owns the loading shape") is
+    now resolved.
+  - Skeleton's disc carries `aria-hidden` since the real disc is
+    decorative (the row text carries the semantics). Skeleton
+    component reused from `components/ui/skeleton`.
+  - Process note: Skipped live AFTER screenshot — shared dev DB
+    admin password didn't match `password` in this worktree and
+    resetting the shared DB password isn't authorized. Future
+    iterations that hit the same wall: prefer reusing an
+    already-running `make dev` on the host (the
+    `BREADBOX_BACKEND_PORT=<port>` trick) over spinning a fresh
+    server on a new port; the active dev DB seed is the only one
+    where `admin@example.com / password` works.
+
+- **Iter 41 — `<DetailSheetHeader>` primitive** ([#1155](https://github.com/canalesb93/breadbox/pull/1155))
+  - Promotes the icon-tile Sheet header lockup established by
+    iter 39 (Shortcut sheet) and iter 40 (Connect-bank) into a
+    shared primitive at `web/src/components/detail-sheet-header.tsx`.
+    14th shared primitive in the v2 vocabulary.
+  - Two density tokens: `default` (size-9 tile + p-5, ambient
+    overlays — Shortcut sheet's rhythm) and `accent` (size-10
+    tile + bg-muted/20 + p-6, primary flows — Connect-bank's
+    rhythm). Both consumers now route through the primitive;
+    `reauth-sheet` and `link-account-sheet` use different
+    header shapes (no icon-tile lockup) and stay open-coded.
+  - No sandbox specimen: `SheetTitle` / `SheetDescription` are
+    radix-Dialog-context-bound, so the primitive can't render
+    standalone in `/v2/sandbox`. First specimen that couldn't
+    ship — the live consumers carry the visual reference.
+    Worth noting for any future primitive that wraps radix
+    Dialog/Sheet/Popover internals.
+
+- **Iter 66 — Rule pages join the canonical `rounded-xl` surface vocabulary** ([#1179](https://github.com/canalesb93/breadbox/pull/1179))
+  - Foundational radii sweep. Four stray `rounded-2xl` surface
+    cards in `features/rules/rule-form.tsx` (form shell) and
+    `routes/rule-detail.tsx` (What this rule does, Apply
+    retroactively, Delete rule) collapse to `rounded-xl`, the
+    canonical v2 surface card radius used by shadcn `Card`,
+    `SectionCard`, `ListCard`, `ColorRailCard`, `rule-row`, and
+    `preview-panel` (54 instances pre-sweep, 58 after). These
+    four were the only `rounded-2xl` sites anywhere in
+    `web/src` — the entire codebase is now on one surface
+    radius.
+  - Visual diff is a 2px corner reduction (`16px → 12px`) — the
+    rule pages now read at the same surface scale as the
+    surrounding `rule-row` cards on the same routes, instead of
+    one notch louder. No behavioural change.
+  - Post-sweep radius vocabulary census: `rounded-md` 130
+    (buttons, inputs, small controls), `rounded-lg` 60 (nested
+    panels, picker tiles), `rounded-xl` 58 (every surface card),
+    `rounded-full` 40 (badges, status dots, avatars),
+    `rounded-sm` 16 (cmdk pills, dense chips), `rounded-none` 5
+    (all inside shadcn calendar / tabs / toggle-group
+    internals), `rounded-xs` 2 (Dialog/Sheet close buttons,
+    shadcn defaults), `rounded-2xl` 0. No further radius drift
+    detected — the iter-66 backlog item from the prompt
+    ("Border radii consistency") closes here.
+  - No live screenshot pair: the same dev DB / admin password
+    wall noted by iter 65 ("admin@example.com / password" no
+    longer accepted by the active seed). The diff is mechanical
+    and small enough that the code review is the visual review.
+
+- **Iter 67 — `<ColorRailCardSkeleton>` lifts the detail-page hero loading state** ([#1180](https://github.com/canalesb93/breadbox/pull/1180))
+  - Three detail-page DetailSkeletons (`transaction-detail`,
+    `account-detail`, `category-detail`) hand-rolled the same
+    `bg-card rounded-xl border` + 4px muted left rail wrapper +
+    near-identical identity column (size-12 tile + eyebrow +
+    title + meta) and trailing metric column. Lifted the shared
+    shape into `<ColorRailCardSkeleton>` sibling of
+    `<ColorRailCard>` so the loading state mirrors the loaded
+    hero from one source.
+  - Tokens: `tileShape` (`rounded-md` for transactions /
+    `CategoryIconTile`, `rounded-lg` for accounts + categories)
+    keeps the loading tile flush with the loaded one;
+    `withFooter` toggles the bordered action strip used by
+    account-detail; optional `body` slot accepts the extra hero
+    rows TX-detail needs (Separator + 2-col field grid).
+  - Sandbox showcase updated alongside the live `ColorRailCard`
+    specimen so future tweaks to the wrapper land in one place.
+  - Three detail pages remain on bespoke skeletons (`tag`,
+    `rule`, `connection`) because they don't host a
+    `<ColorRailCard>` hero. A leaner shared shell for the
+    "no hero" detail pages stays a follow-up — the three shapes
+    are different enough today that forcing them onto one
+    primitive would distort the loaded view.
+
+- **Iter 69 — Connection-detail `DetailSkeleton` routes through `ColorRailCardSkeleton`** ([#1182](https://github.com/canalesb93/breadbox/pull/1182))
+  - The four detail pages with a `<ColorRailCard>` hero
+    (transaction, account, category, connection) now share the
+    same loading vocabulary. Connection-detail was the odd one
+    out — its `DetailSkeleton` rendered a generic
+    `<Skeleton h-32 rounded-xl>` for the hero band, which
+    shifted layout when the real hero (status-tinted rail +
+    `rounded-lg` icon tile + bordered action-strip footer for
+    Sync now / Re-authenticate / overflow) landed.
+  - Migrates to
+    `<ColorRailCardSkeleton tileShape="rounded-lg" withFooter />`,
+    mirroring the account-detail skeleton (same shape +
+    footer). The body grid keeps its `1fr / 18rem` split with
+    `min-w-0` on the primary column so long sync-history rows
+    can't push the sidebar off-screen at narrow viewports.
+  - Drift observation: the matching loaded action strip on
+    connection-detail still hand-rolls its `MoreHorizontal`
+    icon button inside the `ColorRailCard` `footer` slot —
+    same shape as the dropdown trigger on transaction-detail.
+    If a third surface adopts the trigger, promote to a
+    `ColorRailCard` action slot.
+  - Closes the iter-67 follow-up ("queued for rule run history
+    and per-connection sync log" referenced
+    `TimelineRail.RowSkeleton`; the connection-detail hero
+    skeleton was the parallel gap on the same page family).
+
+- **Iter 68 — `<MetaBadge>` primitive unifies the tiny status chip** ([#1181](https://github.com/canalesb93/breadbox/pull/1181))
+  - 17th shared primitive in the v2 vocabulary, at
+    `web/src/components/meta-badge.tsx`. Owns the canonical
+    "tiny status chip" density tokens (`text-[10px]` + `gap-1`
+    + `px-1.5 py-0` + `[&>svg]:size-2.5`) that were hand-rolled
+    across six surfaces — Hidden / Excluded / Linked / Re-auth
+    / System / Paused. Default tone is `outline` (a meta chip
+    is intentionally calmer than the row's primary
+    classification). `muted` opts into the
+    `text-muted-foreground font-normal` shading that
+    categories list uses so "System" / "Hidden" don't compete
+    with the category name. Tone-specific chips with custom
+    colours (the amber `Re-auth` pill in accounts list) pass
+    `className` — the density tokens still apply, which is the
+    whole point.
+  - Six surfaces share it today: accounts list (`Linked`,
+    `Re-auth`), categories list (parent `System` + `Hidden`,
+    child `Hidden`), account-detail (`Excluded`,
+    `Linked dependent`), category-detail (`System`, `Hidden`),
+    connection-detail (`Paused`). The connection-detail
+    `Paused` pill was the odd one out — a free-floating
+    `<span>` with its own `bg-muted` + `rounded-full` + `gap-1`
+    + `text-[10px]` mix; now it's a
+    `<MetaBadge variant="secondary">` and the rest of the
+    vocabulary applies for free.
+  - Sandbox specimen added between `IdPill` and `DetailList`
+    (alphabetically-ordered "small primitive" cluster) so the
+    six shapes — `System` (muted), `Hidden` (muted),
+    `Excluded` (outline), `Linked` (secondary), `Paused`
+    (secondary), and the amber `Re-auth` override — live in
+    one place for future tweaks.
+  - Don't fork the look — extend this primitive. Drops the
+    `Badge` import from the consumer files that used it only
+    for the meta-chip pattern (account-detail).
+
+- **Iter 70 — List-row trailing chevron vocabulary unified** ([#1183](https://github.com/canalesb93/breadbox/pull/1183))
+  - Sweep of the list-row "click to navigate" trailing
+    chevron. Of the four surfaces that ship one
+    (account-row, category-list child rows, command-palette,
+    error.tsx), account-row was the lone outlier at
+    `size-4` + `text-muted-foreground/40` + hover-transition.
+    Categories child rows had the canonical `size-3.5` +
+    `text-muted-foreground/60` but no hover transition.
+  - Canonical recipe is now
+    `text-muted-foreground/60 group-hover:text-muted-foreground size-3.5 transition-colors`.
+    Containing row needs the `group` token. Applied to
+    account-row + categories-list child rows; command-palette
+    and error.tsx already match.
+  - Pattern is small enough that the abstraction would weigh
+    more than the duplication — copy-paste from one of the
+    four sites when adding a new list. If a sixth surface
+    arrives with the same shape, promote to a
+    `<RowTrailingChevron>` then.
+
+- **Iter 71 — Tooltip presence on icon-only action buttons** ([#1184](https://github.com/canalesb93/breadbox/pull/1184))
+  - Sweeps every icon-only `<Button>` in the SPA that
+    previously carried only an `aria-label` / `sr-only` and
+    wraps it in a `Tooltip` so mouse users get the same
+    discoverability screen readers already had. Twelve sites:
+    `account-settings-card` (Save/Cancel inline rename),
+    `account-links-section` (Link actions trigger),
+    `connection-row` + `connection-detail` (Connection
+    actions trigger), `tags-table` + `api-keys-table` (row
+    Actions trigger), `rule-row` (Edit link + Rule actions
+    trigger), `category-list` (Edit), `rules/condition-row`
+    + `rules/action-row` (Remove — upgraded from the native
+    `title=` attribute to a real shadcn Tooltip), and
+    `settings/household-section` (Member actions).
+  - Bumps the global `TooltipProvider` `delayDuration` from
+    `0` to `200ms` so hovers feel deliberate without
+    flickering during transient cursor passes — same value
+    `backups-section` was already using locally, which means
+    we could also drop its redundant local `TooltipProvider`.
+  - Canonical composition for a dropdown trigger:
+    `<DropdownMenu><Tooltip><TooltipTrigger asChild>
+    <DropdownMenuTrigger asChild><Button …`. Hover reveals
+    the label; click opens the menu. Matches the pattern
+    `backups-section` had been using in isolation.
+  - The `condition-row` / `action-row` upgrade replaces the
+    OS-styled, slow-to-appear browser `title=` tooltip with
+    the themed shadcn one. Now any new icon-only button
+    should follow the same pattern; greenfield "naked"
+    icon-only `size="icon"` buttons are a backlog smell.
+
+- **Iter 72 — PageHeader description copy consistency sweep** ([#1185](https://github.com/canalesb93/breadbox/pull/1185))
+  - Documents the canonical `PageHeader` copy vocabulary directly
+    in the prop docstrings so future callers have the rule in
+    their LSP hover: `eyebrow` is sentence-case in source (the
+    `uppercase` class handles casing — never SCREAMING_CASE in
+    JSX), `title` carries no trailing punctuation, `description`
+    is a noun-led full sentence ending in a period (not an
+    imperative fragment), and multi-state pages must hoist the
+    description copy to a module-level constant so it doesn't
+    momentarily shrink on data arrival.
+  - `providers`: hoists the description into a
+    `PROVIDERS_DESCRIPTION` module constant — loading / error /
+    loaded states share one canonical sentence so the framing
+    doesn't shift as `useProviderConfig` resolves. (Previously
+    loaded used the full noun-led copy; loading and error fell
+    back to a shorter imperative one.)
+  - `rule-form`: brings onto the canonical form-page shell
+    already shared by `tag-new`, `category-new`, and
+    `api-key-new`. Renders `SoftBackButton` above the header,
+    swaps the hand-rolled "Back" ghost-button action for a
+    proper eyebrow ("New rule" / "Edit rule"), and promotes
+    the rule name to the title in edit mode (matching
+    `tag-detail` / `category-detail`). New description voice
+    ("Rules watch every incoming transaction during sync. When
+    the conditions match, the actions fire automatically…")
+    matches the noun-led framing rule.
+  - `rules` (list): gains the dynamic eyebrow vocabulary every
+    other list page already has — "N rules" / "Loading" /
+    "Error" — and a noun-led description ("Conditions that fire
+    during every sync. Match transactions on merchant, amount,
+    account, or category, then categorize, tag, comment, or
+    skip review automatically.") replacing the imperative
+    fragment ("Automatically categorize, tag, or comment on
+    transactions during sync.").
+  - Drift retired: rule-form was the last form/edit page
+    skipping the canonical `SoftBackButton` + `eyebrow` shell.
+    rules was the last list page without an eyebrow. No
+    primitive count change (still 17 shared primitives) — pure
+    copy + voice consistency on existing `<PageHeader>` calls.
+
+- **Iter 73 — Overlay + rail animation duration vocabulary unified** ([#1186](https://github.com/canalesb93/breadbox/pull/1186))
+  - Audit of `duration-*` utilities across the SPA found Sheet as
+    the lone overlay outlier: open 500ms / close 300ms, while
+    Dialog + AlertDialog both use a symmetric 200ms. Sheets felt
+    sluggish entering and rushed leaving compared to dialogs
+    (which read as siblings in the v2 vocabulary — both the
+    Connect-bank Sheet from iter 40 and the Shortcut Sheet from
+    iter 39 share the iter-41 `<DetailSheetHeader>` lockup with
+    the AlertDialog vocabulary, so animation parity was the last
+    missing piece).
+  - `ui/sheet.tsx`: collapsed `data-[state=closed]:duration-300
+    data-[state=open]:duration-500` → single `duration-200` so
+    both directions inherit the same timing. Matches
+    `ui/dialog.tsx` and `ui/alert-dialog.tsx`.
+  - `settings-shell.tsx` active rail: `before:transition-all`
+    (default ~150ms) → `before:transition-all before:duration-200
+    before:ease-out`. Matches the existing `nav-main.tsx` rail's
+    `before:duration-200 before:ease-out`. Both surfaces share
+    the iter-1 "primary-tinted 3px left rail" vocabulary; the
+    transition timing now matches too, so navigating between
+    sections inside settings feels indistinguishable from
+    navigating between top-level nav items.
+  - `routes/error.tsx` details disclosure: `transition-all` (=
+    default 150ms) → `transition-all duration-200 ease-out`. A
+    480px panel snapping open in 150ms felt abrupt; 200ms ease-out
+    matches the rest of the v2 expand vocabulary.
+  - No new primitive (still 17). Behavioral/timing change with
+    no static-frame screenshot evidence — diff is 3 lines, build
+    + lint green, sheets and rails feel like siblings of dialogs
+    now.
+  - Remaining drift to watch: Tooltip / Popover / Dropdown /
+    Select all use the tw-animate default (~150ms) with no
+    explicit duration. That's fine for tiny floating UI — leaving
+    them alone. If a fourth surface with a *page-level* sliding
+    panel lands (e.g. a Drawer), reach for `duration-200 ease-out`
+    by default to stay in the v2 vocabulary.
+
+- **Iter 74 — Sandbox showcase: DangerZone + PaginationBar specimens** ([#1187](https://github.com/canalesb93/breadbox/pull/1187))
+  - Component inventory pass against `web/src/components/` found
+    two reusable v2 primitives missing from the sandbox showcase:
+    `<DangerZone>` (inline destructive confirm on tag-detail +
+    category-detail) and `<PaginationBar>` (caller-driven page
+    selector across Transactions list, Rules, Tag detail, Category
+    detail). Every other primitive in the directory either ships a
+    specimen already or is a whole-screen shell that points readers
+    at the live route (NavUser, AuthShell).
+  - `web/src/sandbox/sections/components.tsx`: live specimens for
+    both. DangerZone uses a deferred-resolve mutation so the
+    expand-in-place confirm block, pending spinner, and toast all
+    fire from one click. PaginationBar's specimen uses `total=879`
+    + `pageSize=50` so the 5-page window + leading/trailing
+    ellipsis math is visible from the default state — the same
+    shape Transactions hits in production.
+  - Each description follows the existing showcase vocabulary
+    (token list + consumer count + choice rule against the
+    sibling primitive): DangerZone's prose names `<ConfirmDialog>`
+    as the alternative when the destructive action lives on a
+    list row or inside another dialog (no surrounding card
+    surface available), so the gallery reads as one continuous
+    reference rather than a list of cards.
+  - Sandbox-only addition: no runtime change, +47 LOC. No new
+    primitive (still 17). The note in the iteration prompt that
+    "Sandbox showcase update — verify it has all recent additions"
+    is now resolved for the current snapshot.
+
+- **Iter 75 — `<JumpToPill>` primitive for detail-page lateral nav** ([#1188](https://github.com/canalesb93/breadbox/pull/1188))
+  - Audit of detail pages found the same "Jump to" pill cluster
+    open-coded across four routes (transaction-detail,
+    account-detail, category-detail, connection-detail). Same
+    triplet every time: `Button variant="outline" size="sm"
+    className="h-7 gap-1.5 text-xs"` + `<Eyebrow>"Jump to"</Eyebrow>`
+    + `size-3` leading icon. 28px-tall outline pill — distinct
+    from `Button size=xs` (24px toolbar pill) and `Button size=sm`
+    (32px CTA). Reads as a labelled lateral link from the hero,
+    not a CTA.
+  - Promotes the cluster to `web/src/components/jump-to-pill.tsx`
+    (18th shared primitive). Two exports:
+    - `<JumpToPill>` — the pill itself. Forwards all `<Button>`
+      props; defaults `variant="outline"`, `size="sm"`, and
+      `className="h-7 gap-1.5 px-2.5 text-xs"`. `asChild`
+      passes through to shadcn `Button.asChild` so consumers can
+      wrap a `<Link>` (the dominant case) without losing keyboard
+      ergonomics.
+    - `<JumpToRow>` — the labelled cluster. Composes
+      `<Eyebrow>"Jump to"</Eyebrow>` with a
+      `flex flex-wrap items-center gap-1.5` row of pills. Eyebrow
+      label overridable via the `label` prop.
+  - Four consumers retired their open-coded markup onto the
+    primitive in the same PR. Byte-identical at the pixel level
+    — same MD5 on before/after screenshots, same iter-9-style
+    mechanical sweep. The point isn't a visual change; it's that
+    the "Jump to" pill vocabulary now lives in exactly one place
+    so future tweaks (height, padding, icon size, eyebrow rhythm)
+    propagate to every detail page.
+  - Sandbox specimen lives next to `<Eyebrow>` in
+    `sections/components.tsx` so the vocabulary is discoverable
+    at `/v2/sandbox`. Demo shows the cluster with three pills
+    (Search / Wallet / Receipt icons) in their typical detail-
+    page hero rhythm.
+
+- **Iter 76 — `<ActionPill>` primitive for h-7 footer/trailing action buttons** ([#1189](https://github.com/canalesb93/breadbox/pull/1189))
+  - Audit of icon sizes across the SPA found a sibling vocabulary
+    to iter 75's `<JumpToPill>`: the `h-7 gap-1.5 text-xs` +
+    `size-3.5` leading icon recipe used inside
+    `<ColorRailCard footer>` strips (account-detail Link / View;
+    connection-detail Sync now / Re-authenticate / Import more /
+    Pause) and `<StatusPanel trailing>` slots (connection-detail
+    re-auth banner, error-page Reload, account-detail Open
+    connection). Eight open-coded sites carried the same className
+    triplet — promoted to `<ActionPill>` at
+    `web/src/components/action-pill.tsx` (19th shared primitive).
+  - Semantic split with JumpToPill: same `h-7` height + `text-xs`
+    label, but ActionPill omits `px-2.5`, uses `size-3.5` icons,
+    and defaults to `variant="ghost"` (override to `outline` for
+    higher-weight `<StatusPanel trailing>` CTAs). The pill carries
+    a dispatched handler (`onClick` or `asChild` Link) — it's an
+    action, not a lateral nav. JumpToPill stays the canonical
+    detail-page hero lateral-link vocabulary.
+  - Drift swept while migrating: connection-detail Pause/Resume
+    used `size-3` icons (vs canonical `size-3.5` on every other
+    action in the same hero strip) — settles on `size-3.5` so the
+    footer reads as one coherent surface. error-page Reload was a
+    `ghost` JumpToPill-shape oddity (`px-2.5` + `size-3`) — promoted
+    to the canonical ActionPill recipe. placeholder.tsx
+    related-pills cluster migrated to `<JumpToPill>` (5th surface),
+    retiring the last open-coded `h-7 gap-1.5 px-2.5 text-xs` site
+    in the codebase — only the two primitive files now own that
+    className triplet.
+  - Sandbox specimen lives next to `<JumpToPill>` in
+    `sections/components.tsx` so the two pill vocabularies
+    (ActionPill / JumpToPill) are side-by-side. Four buttons
+    cover both variants: Sync now / Pause / View transactions
+    (`ghost`, the dominant in-card-footer case) and
+    Re-authenticate (`outline`, the StatusPanel-trailing case).
+  - Future drift to watch: section-card action slots use a
+    tighter `h-7 gap-1 px-2 text-xs` shape (no leading icon
+    label "Show / Hide" toggles in error-page Technical details
+    and connection-detail Accounts header). Two consumers today;
+    promote to a `<SectionCardAction>` slot if a third surface
+    adopts it.
+
+- **Iter 77 — TimelineRail line re-centred on icon disc centres** ([#1190](https://github.com/canalesb93/breadbox/pull/1190))
+  - Resolves the HIGH PRIORITY regression Ricardo flagged after iter
+    56 (#1169): the iter-56 swap from `<ol border-l>` to per-row
+    `::before` rails anchored the new pseudo at `before:left-0`,
+    which sat ~13.5px to the left of every icon disc centre. Disc
+    centre actually lives at x = 14px from the row's outer-left edge
+    (`pl-3.5` + `-ml-3.5` on a 28px disc), so the 1px line needs
+    `left = calc(0.875rem - 0.5px)` to centre on it.
+  - Single-file change in `web/src/components/timeline-rail.tsx`:
+    updated both `TimelineRailRow` and `TimelineRailRowSkeleton` so
+    the loading and loaded states share the same centred geometry.
+    Verified via `evaluate_script` on a real TX-detail timeline —
+    `before.left` reports `13.5px`, `liLeft + before.left + 0.5px`
+    matches `discCenter` exactly.
+  - Side note: the day-heading dot (in `TimelineRailGroup`) was
+    unaffected — it carries its own `marginLeft: -17px` math anchored
+    on the same x=14px disc-centre axis, so the heading dots already
+    sat on the new rail axis. Nothing else needed nudging.
+
+- **Iter 78 — Settings desktop nav rail aligned with canonical sidebar vocabulary** ([#1191](https://github.com/canalesb93/breadbox/pull/1191))
+  - Settings shell's desktop nav was running its own bespoke
+    active-state vocabulary (2px rail at the inner edge,
+    `before:inset-y-*` animation, `bg-accent` row, no icon tint
+    transition). This pulls it back into the iter-1 vocabulary so
+    settings + sidebar read as siblings.
+  - 3px primary-tinted rail at the panel's **outer** edge
+    (`before:-left-3 before:w-[3px]`), animated in via
+    `before:scale-y-0` → `data-[active=true]:before:scale-y-100` with
+    the iter-73 timing (`transition-transform duration-200 ease-out`)
+    — identical shape and timing to `nav-main`'s `NAV_ITEM_CLS`.
+  - Active icon picks up `text-primary` via the same
+    `data-[active=true]:[&>svg]:text-primary` selector `nav-main` uses
+    so the muted→primary icon transition matches across surfaces.
+  - Panel chrome switched from `bg-muted/40` to `bg-sidebar` (+
+    `bg-sidebar-accent` for active rows) so the settings modal reads
+    as "the app sidebar lifted into a dialog" instead of a generic
+    muted panel. Row padding tightened to symmetric `px-2.5` matching
+    the sidebar menu rhythm.
+  - No extraction yet — the rail can't trivially live on the
+    `SidebarMenuItem` wrapper because the settings dialog uses plain
+    `<button>` not the Sidebar primitives, and a shared `RailButton`
+    would need to satisfy both Sidebar's `overflow-hidden` constraint
+    and the dialog's no-overflow context. Two inline class blocks
+    sharing the same vocabulary is the right size today.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1373,5 +2151,8 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
+
+
 
 

@@ -8,6 +8,12 @@ import {
 import { CsvCard, PlaidCard, TellerCard } from "@/features/providers";
 import type { ProviderConfigResponse, ProviderHealthResponse } from "@/api/types";
 
+// Canonical description — hoisted so every render state (loading, error,
+// loaded) reads with the same voice and the page never momentarily swaps
+// to a shorter sentence on transition.
+const PROVIDERS_DESCRIPTION =
+  "Bank data providers that sync accounts and transactions into Breadbox. Each provider stores its own encrypted credentials.";
+
 // Build the small "N healthy · M of 3 configured" eyebrow that lands in
 // PageHeader so the page reads as a status overview before the cards.
 function buildEyebrow(
@@ -40,7 +46,7 @@ export function ProvidersPage() {
         <PageHeader
           eyebrow="Settings"
           title="Providers"
-          description="Configure bank data providers that sync accounts and transactions."
+          description={PROVIDERS_DESCRIPTION}
         />
         <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
           <Loader2 className="size-4 animate-spin" /> Loading provider configuration…
@@ -55,7 +61,7 @@ export function ProvidersPage() {
         <PageHeader
           eyebrow="Settings"
           title="Providers"
-          description="Configure bank data providers that sync accounts and transactions."
+          description={PROVIDERS_DESCRIPTION}
         />
         <Alert variant="destructive">
           <AlertTitle>Couldn't load provider configuration</AlertTitle>
@@ -78,7 +84,7 @@ export function ProvidersPage() {
       <PageHeader
         eyebrow={eyebrow}
         title="Providers"
-        description="Bank data providers that sync accounts and transactions into Breadbox. Each provider stores its own encrypted credentials."
+        description={PROVIDERS_DESCRIPTION}
       />
       <div className="grid gap-5">
         <PlaidCard config={plaid} health={healthMap["plaid"]} />

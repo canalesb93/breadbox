@@ -1,5 +1,6 @@
 import { Activity, AlertTriangle, CheckCircle2, CircleDashed, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Eyebrow } from "@/components/eyebrow";
 import { cn } from "@/lib/utils";
 import type { ProviderHealthResponse } from "@/api/types";
 
@@ -192,9 +193,7 @@ export function ProviderScoreboard({ health, tone, alwaysAvailable }: ProviderSc
 function ScoreCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-muted-foreground text-[10px] font-medium tracking-[0.08em] uppercase">
-        {label}
-      </div>
+      <Eyebrow as="div">{label}</Eyebrow>
       <div className="text-foreground text-lg font-semibold tabular-nums">{value}</div>
     </div>
   );

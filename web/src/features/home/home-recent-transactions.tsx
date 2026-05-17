@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Receipt } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
+import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import type { Transaction } from "@/api/types";
@@ -40,21 +40,17 @@ export function HomeRecentTransactions({
         action={viewAll}
         rows={[0, 1, 2, 3, 4]}
         getRowKey={(i) => i}
-        renderRow={(i) => (
-          <div
-            className="flex items-center gap-4 px-5 py-3.5"
-            key={i}
-          >
-            <Skeleton className="size-9 rounded-md" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-3.5 w-44" />
-              <Skeleton className="h-3 w-28" />
-            </div>
-            <div className="space-y-1.5 text-right">
-              <Skeleton className="ml-auto h-3.5 w-16" />
-              <Skeleton className="ml-auto h-3 w-10" />
-            </div>
-          </div>
+        renderRow={() => (
+          <ListRowSkeleton
+            density="regular"
+            leading="sm-square"
+            lines={2}
+            trailing="value-stack"
+            titleClassName="w-44"
+            subtitleClassName="w-28"
+            trailingTopClassName="w-16"
+            trailingBottomClassName="w-10"
+          />
         )}
       />
     );
@@ -70,7 +66,7 @@ export function HomeRecentTransactions({
         <Link
           to="/transactions/$txId"
           params={{ txId: t.short_id }}
-          className="hover:bg-muted/50 focus-visible:bg-muted/50 flex min-w-0 items-center gap-4 px-5 py-3 outline-none transition-colors"
+          className="hover:bg-muted/40 focus-visible:bg-muted/40 flex min-w-0 items-center gap-4 px-5 py-3 outline-none transition-colors"
         >
           <div className="min-w-0 flex-1">
             <TransactionPrimary transaction={t} />
@@ -82,7 +78,7 @@ export function HomeRecentTransactions({
         <EmptyState
           icon={Receipt}
           title="No transactions yet"
-          description="Connect a bank or import a CSV to start seeing activity here."
+          description="Connect a bank or import a CSV — fresh activity will start landing here within a minute."
         />
       }
     />

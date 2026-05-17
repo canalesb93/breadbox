@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ApiError } from "@/api/client";
 import {
   ArrowRight,
   Link2,
@@ -19,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SectionCard } from "@/components/section-card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { withMutationToast } from "@/lib/mutation-toast";
@@ -171,15 +174,22 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
   const otherUser = isPrimary ? link.dependent_user_name : link.primary_user_name;
 
   async function onReconcile() {
-    await withMutationToast(
-      async () => {
-        const r = await reconcile.mutateAsync(link.id);
-        return r;
-      },
-      {
-        success: `Reconciled — ${reconcile.data?.new_matches ?? 0} new matches.`,
-      },
-    );
+    try {
+      const r = await reconcile.mutateAsync(link.id);
+      const count = r?.new_matches ?? 0;
+      toast.success("Reconciled.", {
+        description:
+          count === 0
+            ? "No new matches this pass."
+            : `${count} new match${count === 1 ? "" : "es"} found.`,
+      });
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : "Couldn't reconcile this link. Try again.";
+      toast.error(msg);
+    }
   }
 
   async function onDelete() {
@@ -227,21 +237,26 @@ function LinkRow({ link, viewingShortId, accountByShortId }: LinkRowProps) {
         </div>
       </div>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            aria-label="Link actions"
-            disabled={reconcile.isPending || remove.isPending}
-          >
-            {reconcile.isPending || remove.isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <MoreHorizontal className="size-3.5" />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7"
+                aria-label="Link actions"
+                disabled={reconcile.isPending || remove.isPending}
+              >
+                {reconcile.isPending || remove.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="size-3.5" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Link actions</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onReconcile} disabled={reconcile.isPending}>
             <RotateCw className="size-3.5" /> Reconcile matches

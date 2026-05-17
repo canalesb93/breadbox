@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useFieldArray, useForm, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Plus, Save, Wand2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ChevronDown, Code2, Infinity as InfinityIcon, ListFilter, Loader2, Plus, Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -22,12 +22,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { StatusPanel } from "@/components/status-panel";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useTags } from "@/api/queries/tags";
+import { cn } from "@/lib/utils";
 import type { Condition, TransactionRule } from "@/api/types";
 import { ConditionRowFields } from "./condition-row";
 import { ActionRowFields } from "./action-row";
@@ -287,7 +289,7 @@ export function RuleForm({
       <Form {...form}>
         <form
           onSubmit={submitHandler}
-          className="bg-card overflow-hidden rounded-2xl border"
+          className="bg-card overflow-hidden rounded-xl border"
         >
           <div className="space-y-4 p-5 sm:p-6">
             <div className="flex items-center gap-3">
@@ -353,7 +355,7 @@ export function RuleForm({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="hover:bg-muted/50 group -mx-2 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition-colors"
+                  className="hover:bg-muted/40 focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none group -mx-2 flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs transition-colors"
                 >
                   <span className="text-muted-foreground inline-flex items-center gap-2">
                     Pipeline stage
@@ -380,11 +382,12 @@ export function RuleForm({
                               type="button"
                               onClick={() => field.onChange(preset.value)}
                               title={preset.hint}
-                              className={
+                              className={cn(
+                                "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none flex-1 rounded-lg px-2 py-1 text-xs font-medium",
                                 field.value === preset.value
-                                  ? "bg-background text-foreground flex-1 rounded-lg px-2 py-1 text-xs font-medium shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground flex-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
-                              }
+                                  ? "bg-background text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground transition-colors",
+                              )}
                             >
                               {preset.label}
                             </button>
@@ -437,22 +440,24 @@ export function RuleForm({
                     <button
                       type="button"
                       onClick={() => form.setValue("logic", "and")}
-                      className={
+                      className={cn(
+                        "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none rounded-md px-2.5 py-0.5 text-xs font-medium",
                         watchedLogic === "and"
-                          ? "bg-background text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium shadow-sm"
-                          : "text-muted-foreground hover:text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors"
-                      }
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground transition-colors",
+                      )}
                     >
                       AND
                     </button>
                     <button
                       type="button"
                       onClick={() => form.setValue("logic", "or")}
-                      className={
+                      className={cn(
+                        "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none rounded-md px-2.5 py-0.5 text-xs font-medium",
                         watchedLogic === "or"
-                          ? "bg-background text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium shadow-sm"
-                          : "text-muted-foreground hover:text-foreground rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors"
-                      }
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground transition-colors",
+                      )}
                     >
                       OR
                     </button>
@@ -545,7 +550,7 @@ export function RuleForm({
                       }
                       field.onChange(!field.value);
                     }}
-                    className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
+                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none flex items-center gap-1 rounded-sm text-xs"
                   >
                     <Code2 className="size-3" />
                     {field.value ? "Hide JSON" : "Edit as JSON"}
@@ -629,18 +634,20 @@ export function RuleForm({
             )}
 
             {comboWarnings.length > 0 && (
-              <Alert className="border-amber-500/30 bg-amber-500/5">
-                <AlertTitle className="text-amber-700 dark:text-amber-400 text-sm">
-                  Heads up
-                </AlertTitle>
-                <AlertDescription className="space-y-1">
-                  {comboWarnings.map((w, i) => (
-                    <p key={i} className="text-xs">
-                      {w}
-                    </p>
-                  ))}
-                </AlertDescription>
-              </Alert>
+              <StatusPanel
+                tone="warning"
+                icon={AlertTriangle}
+                heading="Heads up"
+                body={
+                  <span className="space-y-1">
+                    {comboWarnings.map((w, i) => (
+                      <span key={i} className="block">
+                        {w}
+                      </span>
+                    ))}
+                  </span>
+                }
+              />
             )}
           </div>
 
@@ -649,7 +656,11 @@ export function RuleForm({
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              <Save className="size-4" />
+              {submitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
               {submitting ? "Saving…" : submitLabel}
             </Button>
           </div>
@@ -776,6 +787,9 @@ function getRowErrors(
 function RowError({ errors }: { errors: string[] }) {
   if (errors.length === 0) return null;
   return (
-    <p className="text-destructive ml-12 text-xs">{errors.join(" · ")}</p>
+    <p className="text-destructive ml-12 flex items-start gap-1.5 text-xs">
+      <AlertCircle aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+      <span className="min-w-0">{errors.join(" · ")}</span>
+    </p>
   );
 }

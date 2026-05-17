@@ -8,7 +8,6 @@ import {
   Wand2,
   type LucideIcon,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { TimelineRail } from "@/components/timeline-rail";
 import { useAnnotations } from "@/api/queries/annotations";
@@ -72,18 +71,19 @@ export function ActivityTimeline({ transactionId }: { transactionId: string }) {
   const groups = useMemo(() => groupByDay(data ?? []), [data]);
 
   if (isLoading) {
+    // Skeleton mirrors the real TimelineRail geometry — disc punched through
+    // the rail line, content lines to the right — so the layout doesn't shift
+    // when annotations land. Second row carries a `body` block to suggest the
+    // comment bubble that often anchors a recent feed.
     return (
-      <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex gap-3">
-            <Skeleton className="size-7 shrink-0 rounded-full" />
-            <div className="flex-1 space-y-1.5 py-1">
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="h-3 w-1/4" />
-            </div>
-          </div>
-        ))}
-      </div>
+      <TimelineRail>
+        <TimelineRail.Group>
+          <TimelineRail.RowSkeleton />
+          <TimelineRail.RowSkeleton body />
+          <TimelineRail.RowSkeleton />
+          <TimelineRail.RowSkeleton />
+        </TimelineRail.Group>
+      </TimelineRail>
     );
   }
 
@@ -100,7 +100,7 @@ export function ActivityTimeline({ transactionId }: { transactionId: string }) {
       <EmptyState
         icon={Activity}
         title="No activity yet"
-        description="Comments, rule applications, and category changes show up here."
+        description="Comments, category changes, and rule applications will appear here as this transaction evolves."
       />
     );
   }

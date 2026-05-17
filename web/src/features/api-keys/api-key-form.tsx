@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FormFooter } from "@/components/form-footer";
 import { cn } from "@/lib/utils";
 import { useCreateAPIKey } from "@/api/queries/api-keys";
 import { storePendingPlaintextKey } from "@/features/api-keys/plaintext-store";
@@ -245,21 +246,25 @@ export function APIKeyForm() {
           )}
         />
 
-        <div className="bg-muted/20 -mx-5 -mb-5 mt-2 flex items-center justify-end gap-2 border-t px-5 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate({ to: "/api-keys" })}
-            disabled={create.isPending}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" size="sm" disabled={create.isPending}>
-            {create.isPending && <Loader2 className="size-4 animate-spin" />}
-            {create.isPending ? "Creating…" : "Create key"}
-          </Button>
-        </div>
+        <FormFooter
+          secondary={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate({ to: "/api-keys" })}
+              disabled={create.isPending}
+            >
+              Cancel
+            </Button>
+          }
+          primary={
+            <Button type="submit" size="sm" disabled={create.isPending}>
+              {create.isPending && <Loader2 className="size-4 animate-spin" />}
+              {create.isPending ? "Creating…" : "Create key"}
+            </Button>
+          }
+        />
       </form>
     </Form>
   );

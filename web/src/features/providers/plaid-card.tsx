@@ -104,7 +104,8 @@ export function PlaidCard({ config, health }: PlaidCardProps) {
 
   async function onDisable() {
     const ok = await withMutationToast(() => disable.mutateAsync("plaid"), {
-      success: "Plaid disabled. Stored credentials were cleared.",
+      success: "Plaid disabled.",
+      successDescription: "Stored credentials were cleared.",
     });
     if (ok) setConfirmingDisable(false);
   }

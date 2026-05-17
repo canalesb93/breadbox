@@ -80,13 +80,13 @@ export function TagsPage() {
               <EmptyState
                 icon={TagsIcon}
                 title="No matching tags"
-                description="Try a different search term."
+                description="Try a different search term, or clear the filter to see every tag."
               />
             ) : (
               <EmptyState
                 icon={TagsIcon}
                 title="No tags yet"
-                description="Create your first tag to start labelling transactions."
+                description="Create your first tag to label transactions across categories — useful for travel, reimbursements, or any ad-hoc grouping."
                 action={
                   <Button asChild>
                     <Link to="/tags/new">

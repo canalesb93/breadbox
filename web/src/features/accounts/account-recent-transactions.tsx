@@ -38,7 +38,7 @@ export function AccountRecentTransactions({
         <Link
           to="/transactions/$id"
           params={{ id: t.short_id }}
-          className="hover:bg-accent/40 flex items-center gap-3 px-5 py-2.5 transition-colors"
+          className="hover:bg-muted/40 flex items-center gap-3 px-5 py-2.5 transition-colors"
         >
           <TransactionPrimary transaction={t} className="flex-1" />
           <TransactionAmount transaction={t} />
@@ -47,7 +47,7 @@ export function AccountRecentTransactions({
       empty={
         <EmptyState
           title="No transactions yet"
-          description="They appear after the first sync."
+          description="Transactions for this account will land here after the first successful sync."
           className="py-10"
         />
       }

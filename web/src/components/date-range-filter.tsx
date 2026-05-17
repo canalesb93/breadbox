@@ -176,6 +176,9 @@ export function DateRangeFilter({
                 onClick={() => applyPreset(preset)}
                 className={cn(
                   "w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground",
+                  // Shared focus-visible recipe so keyboard users can see
+                  // which preset is focused before pressing Enter.
+                  "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
                   activePreset?.key === preset.key &&
                     "bg-accent font-medium text-accent-foreground",
                 )}

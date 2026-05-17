@@ -72,7 +72,10 @@ export function SelectionActionBar({
     if (syncable.length === 0) return;
     const ok = await withMutationToast(
       () => runChunked(syncable, (c) => sync.mutateAsync(c.id)),
-      { success: `Sync queued for ${syncable.length} connection${syncable.length === 1 ? "" : "s"}.` },
+      {
+        success: `Sync queued for ${syncable.length} connection${syncable.length === 1 ? "" : "s"}.`,
+        successDescription: "New transactions land within a minute.",
+      },
     );
     if (ok) onClear();
   }

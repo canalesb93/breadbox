@@ -6,22 +6,32 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  Eye,
+  EyeOff,
   Inbox,
   Info,
+  Keyboard,
   KeyRound,
+  Landmark,
+  Link2,
+  Lock,
   MessageSquare,
   Monitor,
   Moon,
+  Pause,
   Plus,
+  Receipt,
   RefreshCw,
   RotateCcw,
   Save,
+  Search,
   Shapes,
   ShieldAlert,
   Sun,
   Tag,
   Trash2,
   Users,
+  Wallet,
   Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,14 +58,29 @@ import { ColorPicker } from "@/components/color-picker";
 import { TransactionPrimary } from "@/components/transaction-primary";
 import { TransactionAmount } from "@/components/transaction-amount";
 import { KbdTooltip } from "@/components/kbd-tooltip";
+import { DetailList } from "@/components/detail-list";
 import { ListCard } from "@/components/list-card";
-import { ColorRailCard } from "@/components/color-rail-card";
+import {
+  ColorRailCard,
+  ColorRailCardSkeleton,
+} from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
+import { Eyebrow } from "@/components/eyebrow";
+import { ActionPill } from "@/components/action-pill";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
+import { MetaBadge } from "@/components/meta-badge";
+import { ListRowSkeleton } from "@/components/list-row-skeleton";
+import { DetailSheetHeader } from "@/components/detail-sheet-header";
+import { Sheet } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DangerZone } from "@/components/danger-zone";
+import { PaginationBar } from "@/components/pagination-bar";
 import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -106,6 +131,8 @@ export function ComponentsSection() {
   const [dateRange, setDateRange] = useState<DateRangeValue>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPending, setConfirmPending] = useState(false);
+  const [dangerPending, setDangerPending] = useState(false);
+  const [paginationPage, setPaginationPage] = useState(3);
 
   return (
     <SandboxSection
@@ -251,6 +278,18 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
+        label="ColorRailCardSkeleton"
+        code="components/color-rail-card"
+        description="Loading mirror of `<ColorRailCard>` — same shell + rail, with the stable identity column (tile + eyebrow + title + meta) and trailing metric column already baked in. `tileShape` picks `rounded-md` (transactions) vs `rounded-lg` (accounts, categories) to match the loaded tile. `withFooter` toggles the bordered action strip; `body` slots in any extra hero row (e.g. TX-detail's secondary details grid)."
+        className="block"
+      >
+        <div className="max-w-xl space-y-4">
+          <ColorRailCardSkeleton tileShape="rounded-md" />
+          <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
+        </div>
+      </Specimen>
+
+      <Specimen
         label="StatusPanel"
         code="components/status-panel"
         description="Inline tone-tinted status block — 3px left rail + tinted icon tile + heading + body. Same 'colour encodes meaning' principle as `ColorRailCard`, sized for in-page notices (env-locked panels, already-set-up confirmation, sync warnings). Four tones: success / destructive / warning / info."
@@ -296,31 +335,373 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
-        label="FormFooter"
-        code="components/form-footer"
-        description="The flush bordered action strip at the bottom of a `<SectionCard>` that wraps a form. Sticks Cancel left, primary right; optional `hint` slot for an inline validation note. Drop inside a `SectionCard` with default body padding — negative margins line the strip up with the card's outer border."
+        label="MetaBadge"
+        code="components/meta-badge"
+        description="Tiny meta chip used in list rows and detail-page hero columns to label a row's secondary state — Hidden, Excluded, Linked, Re-auth, System, Paused, … Owns the v2 density vocabulary (`text-[10px]` + `gap-1` + `px-1.5 py-0` + `[&>svg]:size-2.5`) so the same chip never gets re-derived. Tone routes through the underlying `<Badge>` variant — `outline` by default because a meta label is intentionally calmer than the row's primary classification. `muted` opts into the `text-muted-foreground font-normal` shading the categories list uses so 'System' / 'Hidden' don't compete with the category name. For tone-specific chips (the amber Re-auth pill) pass `className` — the density tokens still apply, which is the whole point. Six surfaces share it: accounts list, accounts detail, categories list (parent + child rows), category detail, connection detail."
+      >
+        <MetaBadge icon={Lock} muted>
+          System
+        </MetaBadge>
+        <MetaBadge icon={EyeOff} muted>
+          Hidden
+        </MetaBadge>
+        <MetaBadge icon={EyeOff}>Excluded</MetaBadge>
+        <MetaBadge icon={Link2} variant="secondary">
+          Linked
+        </MetaBadge>
+        <MetaBadge icon={Pause} variant="secondary">
+          Paused
+        </MetaBadge>
+        <MetaBadge
+          icon={AlertTriangle}
+          className="border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400"
+        >
+          Re-auth
+        </MetaBadge>
+      </Specimen>
+
+      <Specimen
+        label="DetailList"
+        code="components/detail-list"
+        description="The canonical label / value KV block used by every v2 detail-page Details sidebar (transaction, account, connection, category). Stack two or three inside a `<SectionCard bodyClassName='space-y-5 px-5 py-5 text-sm'>` host — uppercase tracked group label, `<dl>` for screen-reader semantics, label-left / value-right with `break-words` so long values wrap inside the column on 375px viewports. `compactDetailRows` keeps callsites declarative — pass nullable rows inline, the helper filters anything without a value. Mono rows route through `<IdPill>`. Don't fork — extend this primitive."
         className="block"
       >
-        <div className="max-w-md">
-          <SectionCard title="Edit tag">
-            <div className="grid gap-1.5">
-              <Label htmlFor="sb-form-name">Display name</Label>
-              <Input id="sb-form-name" defaultValue="Reimbursable" />
+        <div className="max-w-sm rounded-xl border">
+          <div className="space-y-5 px-5 py-5 text-sm">
+            <DetailList
+              label="Account"
+              rows={[
+                { label: "Name", value: "Plaid Checking" },
+                { label: "Member", value: "Ricardo (hosted-link test)" },
+                { label: "Currency", value: "USD" },
+              ]}
+            />
+            <DetailList
+              label="Provider"
+              rows={[
+                { label: "Authorized", value: "May 9, 2026" },
+                {
+                  label: "Category",
+                  value: "Transfer In Other Transfer In",
+                },
+              ]}
+            />
+            <DetailList
+              label="Reference"
+              rows={[{ label: "ID", value: "JKHqiBWP", mono: true }]}
+            />
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="Eyebrow"
+        code="components/eyebrow"
+        description="The canonical uppercase micro-label used across detail-page hero columns, section headers, 'Jump to' pills, and timeline-rail day headings. Open-coded across ten files in five subtly different sizes before iter 37 consolidated them. Two variants — `default` (text-[10px] tracking-[0.1em]) is the everyday eyebrow; `hero` (tracking-[0.12em]) gets extra letter air for spots where it sits directly under a large display title. Don't reach for raw `text-[10px] font-medium tracking-* uppercase` markup — extend this primitive."
+        className="block"
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border p-4">
+            <Eyebrow>Default · in a card header</Eyebrow>
+            <p className="text-foreground mt-1 text-sm">
+              "Showing 24 of 879" / "Synced 4 minutes ago" / "Reference"
+            </p>
+          </div>
+          <div className="bg-card rounded-lg border p-4">
+            <Eyebrow variant="hero" as="p">
+              Liability
+            </Eyebrow>
+            <h4 className="text-foreground mt-1 text-xl font-semibold tracking-tight">
+              Chase Sapphire ····2890
+            </h4>
+            <p className="text-muted-foreground mt-1 text-xs">
+              hero variant — sits under a display title with extra letter air
+            </p>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="JumpToPill"
+        code="components/jump-to-pill"
+        description="The canonical 'Jump to' pill cluster used in every detail-page hero (transaction, account, category, connection). `JumpToPill` is a 28px-tall outline button (`h-7 px-2.5 text-xs` with a `size-3` leading icon) — taller than `Button size=xs` (24px toolbar pill) and shorter than `Button size=sm` (32px action). Reads as a labelled lateral link from the hero, not a CTA. `JumpToRow` wraps the pills with the canonical `Eyebrow` 'Jump to' label. Don't open-code the className triplet — extend this primitive."
+        className="block"
+      >
+        <div className="rounded-lg border p-4">
+          <JumpToRow>
+            <JumpToPill>
+              <Search className="size-3" />
+              Similar transactions
+            </JumpToPill>
+            <JumpToPill>
+              <Wallet className="size-3" />
+              Chase Sapphire ····2890
+            </JumpToPill>
+            <JumpToPill>
+              <Receipt className="size-3" />
+              Dining out
+            </JumpToPill>
+          </JumpToRow>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ActionPill"
+        code="components/action-pill"
+        description="The canonical small action button used inside `<ColorRailCard footer>` strips (account-detail / connection-detail) and `<StatusPanel trailing>` slots. 28px-tall pill (`h-7`), `text-xs` label, `gap-1.5` between leading icon and label, `size-3.5` leading icon. Same height as `<JumpToPill>` but the action is a dispatched handler (`onClick`, or wraps a `<Link>` via `asChild`) rather than a lateral nav. Tone is governed by `variant`: `ghost` for action strips inside a card surface, `outline` for top-of-page `<StatusPanel trailing>` CTAs where the pill needs more visual weight. Don't fork the className triplet — extend this primitive."
+        className="block"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionPill onClick={() => toast.message("Sync started")}>
+              <RefreshCw className="size-3.5" />
+              Sync now
+            </ActionPill>
+            <ActionPill onClick={() => toast.message("Pause toggled")}>
+              <Pause className="size-3.5" />
+              Pause
+            </ActionPill>
+            <ActionPill onClick={() => toast.message("View transactions")}>
+              <Eye className="size-3.5" />
+              View transactions
+            </ActionPill>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionPill
+              variant="outline"
+              onClick={() => toast.message("Re-authenticate")}
+            >
+              <RefreshCw className="size-3.5" />
+              Re-authenticate
+            </ActionPill>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="ListRowSkeleton"
+        code="components/list-row-skeleton"
+        description="The canonical loading-row shape used by every v2 list — Home recent activity, Home connections, Connections, Accounts, Categories. Tokens encode the real row's rhythm: `density` (compact / regular / comfortable), `leading` (sm/md/lg-square matching CategoryIconTile sizes), `trailing` (none / badge / value-stack). Pick the tokens that match the real row so the skeleton doesn't shift on data arrival. Don't fork — extend the primitive with new tokens if no combination fits."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              regular · sm-square · value-stack
             </div>
-            <FormFooter
-              hint="Slug is generated automatically from the name."
-              secondary={
-                <Button variant="outline" size="sm">
-                  Cancel
-                </Button>
-              }
-              primary={
+            <div className="divide-y">
+              <ListRowSkeleton
+                density="regular"
+                leading="sm-square"
+                trailing="value-stack"
+                titleClassName="w-36"
+                subtitleClassName="w-24"
+              />
+              <ListRowSkeleton
+                density="regular"
+                leading="sm-square"
+                trailing="value-stack"
+                titleClassName="w-40"
+                subtitleClassName="w-20"
+              />
+              <ListRowSkeleton
+                density="regular"
+                leading="sm-square"
+                trailing="value-stack"
+                titleClassName="w-32"
+                subtitleClassName="w-28"
+              />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              comfortable · lg-square · value-stack
+            </div>
+            <div className="divide-y">
+              <ListRowSkeleton
+                density="comfortable"
+                leading="lg-square"
+                trailing="value-stack"
+                titleClassName="w-44"
+                subtitleClassName="w-24"
+              />
+              <ListRowSkeleton
+                density="comfortable"
+                leading="lg-square"
+                trailing="value-stack"
+                titleClassName="w-36"
+                subtitleClassName="w-20"
+              />
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <div className="text-muted-foreground border-b px-3 py-2 text-[11px] tracking-wide uppercase">
+              compact · md-square · badge
+            </div>
+            <div className="divide-y">
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                trailing="badge"
+                titleClassName="w-32"
+                subtitleClassName="w-20"
+                trailingTopClassName="w-14"
+              />
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                trailing="badge"
+                titleClassName="w-40"
+                subtitleClassName="w-24"
+                trailingTopClassName="w-12"
+              />
+              <ListRowSkeleton
+                density="compact"
+                leading="md-square"
+                trailing="none"
+                titleClassName="w-28"
+                lines={1}
+              />
+            </div>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="DetailSheetHeader"
+        code="components/detail-sheet-header"
+        description="The canonical icon-tile header lockup for every v2 Sheet — leading rounded-lg icon tile + optional uppercase eyebrow + title + description + optional trailing slot. Two densities: `default` (size-9 tile, p-5, ambient overlays like Shortcut sheet) and `accent` (size-10 tile + bg-muted/20 + p-6, primary flows like Connect-bank). Mirrors the StatusPanel / EmptyState / SectionCard icon-tile vocabulary so every Sheet reads as part of the v2 system. Wrapped in a hidden `<Sheet open>` here so the radix Dialog context is available for SheetTitle/SheetDescription — live consumers carry the surrounding `<SheetContent>` chrome."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              default · size-9 tile · p-5
+            </div>
+            <Sheet open onOpenChange={() => {}}>
+              <DetailSheetHeader
+                icon={Keyboard}
+                title="Keyboard shortcuts"
+                description="Available across the app. Shortcuts pause while you're typing in an input."
+              />
+            </Sheet>
+          </div>
+          <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="text-muted-foreground border-b bg-muted/30 px-3 py-2 text-[11px] tracking-wide uppercase">
+              accent · size-10 tile · p-6 · with eyebrow + trailing
+            </div>
+            <Sheet open onOpenChange={() => {}}>
+              <DetailSheetHeader
+                icon={Landmark}
+                eyebrow="New connection"
+                title="Connect a bank"
+                description="Pick a provider to link an institution and start syncing transactions."
+                density="accent"
+                trailing={<Badge variant="secondary">Plaid</Badge>}
+              />
+            </Sheet>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="FormFooter"
+        code="components/form-footer"
+        description="The flush bordered action strip at the bottom of a form container. Cancel sits left, primary right; optional `hint` slot for an inline validation note. Two insets — `card` (default) flushes to a `<SectionCard>` body (px-5 py-5), `sheet` flushes to a `<Sheet>` body (p-6) and uses `mt-auto` so it sticks to the Sheet bottom. Iter 49 folded the CSV form's bespoke footer onto the `sheet` variant."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <div className="text-muted-foreground mb-2 text-[11px] tracking-wide uppercase">
+              inset · card (inside SectionCard)
+            </div>
+            <SectionCard title="Edit tag">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sb-form-name">Display name</Label>
+                <Input id="sb-form-name" defaultValue="Reimbursable" />
+              </div>
+              <FormFooter
+                hint="Slug is generated automatically from the name."
+                secondary={
+                  <Button variant="outline" size="sm">
+                    Cancel
+                  </Button>
+                }
+                primary={
+                  <Button size="sm">
+                    <Save /> Save changes
+                  </Button>
+                }
+              />
+            </SectionCard>
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-2 text-[11px] tracking-wide uppercase">
+              inset · sheet (inside a Sheet body)
+            </div>
+            <div className="bg-card flex min-h-[200px] flex-col rounded-lg border p-6">
+              <p className="text-muted-foreground text-sm">
+                Mock Sheet body — the footer below flushes to the surrounding{" "}
+                <code className="bg-muted/60 rounded px-1 font-mono text-[11px]">
+                  p-6
+                </code>{" "}
+                edges and uses <code className="bg-muted/60 rounded px-1 font-mono text-[11px]">mt-auto</code>{" "}
+                so it sticks to the bottom of the Sheet.
+              </p>
+              <FormFooter
+                inset="sheet"
+                hint={
+                  <span className="text-muted-foreground text-xs">
+                    Ready to import{" "}
+                    <span className="text-foreground tabular-nums font-medium">
+                      241
+                    </span>{" "}
+                    rows.
+                  </span>
+                }
+                secondary={
+                  <Button variant="ghost" size="sm">
+                    Different file
+                  </Button>
+                }
+                primary={<Button size="sm">Import 241 rows</Button>}
+              />
+            </div>
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="SettingsSectionHeader"
+        code="components/settings-section-header"
+        description="The canonical title + description block used by every section inside the Settings shell. Top-of-pane titles (Account / Household / Backups) and inline sub-sections (Change password / Actions / Stored backups / Automatic schedule) both route through here, so the typographic rhythm — heading size + weight, description colour + line-height, action alignment — stays in one place. Tokens: `section` (h2, text-lg, baseline-aligned action) and `sub` (h3, text-sm). The optional `action` slot is sm:right-aligned and baseline-aligned to the heading so an Add-member CTA sits flush with the title."
+        className="block"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-lg border p-5">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              section · h2 · with action
+            </div>
+            <SettingsSectionHeader
+              title="Household"
+              description="Add family members to track everyone's accounts in one place. Each member can be invited to sign in with their own login."
+              action={
                 <Button size="sm">
-                  <Save /> Save changes
+                  <Plus /> Add member
                 </Button>
               }
             />
-          </SectionCard>
+          </div>
+          <div className="rounded-lg border p-5">
+            <div className="text-muted-foreground mb-3 text-[11px] tracking-wide uppercase">
+              sub · h3 · description only
+            </div>
+            <SettingsSectionHeader
+              level="sub"
+              title="Automatic schedule"
+              description="Backups older than the retention window are pruned at the end of each scheduled run."
+            />
+          </div>
         </div>
       </Specimen>
 
@@ -357,6 +738,28 @@ export function ComponentsSection() {
             }, 900);
           }}
         />
+      </Specimen>
+
+      <Specimen
+        label="DangerZone"
+        code="components/danger-zone"
+        description="Inline destructive-confirm pattern used by detail-page delete actions (tag-detail, category-detail). A `border-destructive/40` Card hosts the prompt + outline trigger; the trigger expands in place into a tinted confirm block — no modal churn for delete flows. Pair with `withMutationToast` to surface the success / error message after the mutation resolves. Use `<ConfirmDialog>` instead when the destructive action lives on a list row or inside another dialog (no surrounding card surface available)."
+        className="block"
+      >
+        <div className="max-w-xl">
+          <DangerZone
+            description="The tag will be removed from every transaction it's attached to. Activity history is preserved. This can't be undone."
+            confirmTarget={<span className="font-semibold">Reimbursable</span>}
+            actionLabel="Delete tag"
+            isPending={dangerPending}
+            onConfirm={async () => {
+              setDangerPending(true);
+              await new Promise((resolve) => window.setTimeout(resolve, 900));
+              setDangerPending(false);
+              toast.success("Tag deleted.");
+            }}
+          />
+        </div>
       </Specimen>
 
       <Specimen
@@ -450,11 +853,15 @@ export function ComponentsSection() {
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
-        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels sit outside the rail as anchors. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
+        description="Vertical activity feed primitive: a thin border-l rail anchors a stack of rows; each row's icon disc punches through the line. Group labels render as temporal dividers — a small dot anchored on the rail's x-axis + uppercase eyebrow + hairline rule extending right — so they read as separators *inside* the timeline, distinct from the surrounding section header. `<TimelineRail.RowSkeleton>` (iter 65) mirrors the row geometry exactly so loading-to-loaded transitions don't shift layout. Used by the transaction-detail activity feed; queued for rule run history and per-connection sync logs."
         className="block"
       >
-        <div className="max-w-md">
-          <TimelineRail>
+        <div className="grid gap-6 max-w-3xl sm:grid-cols-2">
+          <div>
+            <div className="text-muted-foreground mb-3 text-[11px] uppercase tracking-[0.08em]">
+              Loaded
+            </div>
+            <TimelineRail>
             <TimelineRail.Group label="Today">
               <TimelineRail.Row icon={MessageSquare}>
                 <p className="text-sm leading-snug">
@@ -503,6 +910,20 @@ export function ComponentsSection() {
               </TimelineRail.Row>
             </TimelineRail.Group>
           </TimelineRail>
+          </div>
+          <div>
+            <div className="text-muted-foreground mb-3 text-[11px] uppercase tracking-[0.08em]">
+              Loading
+            </div>
+            <TimelineRail>
+              <TimelineRail.Group>
+                <TimelineRail.RowSkeleton />
+                <TimelineRail.RowSkeleton body />
+                <TimelineRail.RowSkeleton />
+                <TimelineRail.RowSkeleton />
+              </TimelineRail.Group>
+            </TimelineRail>
+          </div>
         </div>
       </Specimen>
 
@@ -532,33 +953,81 @@ export function ComponentsSection() {
       <Specimen
         label="CategoryBadge"
         code="components/category-badge"
-        description="Single rendering of a category — rounded-rect, color-tinted. The ring marks a manual override; em-dash when uncategorized."
+        description="Single rendering of a category — rounded-rect, color-tinted. The ring marks a manual override; em-dash when uncategorized. Two sizes share one recipe with TagChip — sm (h-5 / 11px) for dense list cells, md (h-6 / 12px) for hero / pickers / sandbox."
+        className="block"
       >
-        <CategoryBadge category={coffeeCategory} />
-        <CategoryBadge category={gasCategory} />
-        <CategoryBadge category={coffeeCategory} overridden />
-        <CategoryBadge category={null} />
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            md (default)
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <CategoryBadge category={coffeeCategory} />
+            <CategoryBadge category={gasCategory} />
+            <CategoryBadge category={coffeeCategory} overridden />
+            <CategoryBadge category={null} />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            sm — dense list / table cells
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <CategoryBadge category={coffeeCategory} size="sm" />
+            <CategoryBadge category={gasCategory} size="sm" />
+            <CategoryBadge category={coffeeCategory} size="sm" overridden />
+            <CategoryBadge category={null} size="sm" />
+          </div>
+        </div>
       </Specimen>
 
       <Specimen
         label="TagChip · TagList"
         code="components/tag-chip"
-        description="Pill-shaped (the shape category badges deliberately avoid). TagList resolves slugs against the tag catalog and caps with a +N overflow."
+        description="Pill-shaped (the shape category badges deliberately avoid). Color-tinted icon + label; optional remove (×) for editable contexts. TagList resolves slugs against the tag catalog and caps with a +N overflow. Same sm / md sizes as CategoryBadge — pass through TagList to keep dense rows aligned."
         className="block"
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <TagChip tag={sampleTags[0]} />
-          <TagChip tag={sampleTags[1]} />
-          <TagChip
-            tag={sampleTags[2]}
-            onRemove={() => toast.message("Removed Subscription")}
-          />
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            md (default)
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <TagChip tag={sampleTags[0]} />
+            <TagChip tag={sampleTags[1]} />
+            <TagChip
+              tag={sampleTags[2]}
+              onRemove={() => toast.message("Removed Subscription")}
+            />
+          </div>
         </div>
-        <div className="mt-3">
-          <TagList
-            slugs={["needs-review", "business", "subscription", "reimbursable"]}
-            max={2}
-          />
+        <div className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            sm — dense list / table cells
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <TagChip tag={sampleTags[0]} size="sm" />
+            <TagChip tag={sampleTags[1]} size="sm" />
+            <TagChip
+              tag={sampleTags[2]}
+              size="sm"
+              onRemove={() => toast.message("Removed Subscription")}
+            />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
+            TagList · md + sm
+          </p>
+          <div className="space-y-2">
+            <TagList
+              slugs={["needs-review", "business", "subscription", "reimbursable"]}
+              max={2}
+            />
+            <TagList
+              slugs={["needs-review", "business", "subscription", "reimbursable"]}
+              max={2}
+              size="sm"
+            />
+          </div>
         </div>
       </Specimen>
 
@@ -716,6 +1185,27 @@ export function ComponentsSection() {
             />
           }
         />
+      </Specimen>
+
+      <Specimen
+        label="PaginationBar"
+        code="components/pagination-bar"
+        description="Caller-driven page selector that wraps the shadcn `Pagination` primitive. Owns the page-window math (≤7 pages shows every number; beyond that a 5-page window slides around the current page with leading / trailing ellipses) and the muted `Page N of M · count itemLabel` caption. Set `isFetching` to dim controls while a page is in flight — discourages double-clicks without locking the surface. Used by the Transactions list (`features/transactions/transactions-pagination`), Rules, Category detail, and Tag detail."
+        className="block"
+      >
+        <div className="space-y-4">
+          <PaginationBar
+            page={paginationPage}
+            pageSize={50}
+            total={879}
+            onPageChange={setPaginationPage}
+            itemLabel="transactions"
+          />
+          <p className="text-muted-foreground text-center text-xs">
+            Click a page to update the window. Ellipses appear once the total
+            exceeds 7 pages.
+          </p>
+        </div>
       </Specimen>
     </SandboxSection>
   );

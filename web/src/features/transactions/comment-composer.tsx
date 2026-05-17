@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useUpdateTransactions } from "@/api/queries/transactions";
@@ -55,6 +56,7 @@ export function CommentComposer({ transactionId }: CommentComposerProps) {
           disabled={!canSubmit}
           className="ml-auto"
         >
+          {update.isPending && <Loader2 className="size-4 animate-spin" />}
           {update.isPending ? "Posting…" : "Post note"}
         </Button>
       </div>

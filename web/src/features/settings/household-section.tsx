@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   Link2,
+  Loader2,
   MoreVertical,
   RefreshCw,
   Trash2,
@@ -51,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   setupAccountURL,
@@ -67,6 +69,7 @@ import { withMutationToast } from "@/lib/mutation-toast";
 import type { LoginAccount, User } from "@/api/types";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/empty-state";
+import { SettingsSectionHeader } from "@/components/settings-section-header";
 
 export function HouseholdSection() {
   const { data: users, isLoading } = useUsers();
@@ -76,24 +79,21 @@ export function HouseholdSection() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-lg font-medium">Household</h2>
-          <p className="text-muted-foreground text-sm">
-            Add family members to track everyone's accounts in one place. Each
-            member can be invited to sign in with their own login.
-          </p>
-        </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant={hasMembers ? "outline" : "default"}>
-              <UserPlus className="size-4" />
-              {hasMembers ? "Add member" : "Add your first member"}
-            </Button>
-          </DialogTrigger>
-          <AddMemberDialog onDone={() => setAddOpen(false)} />
-        </Dialog>
-      </div>
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <SettingsSectionHeader
+          title="Household"
+          description="Add family members to track everyone's accounts in one place. Each member can be invited to sign in with their own login."
+          action={
+            <DialogTrigger asChild>
+              <Button size="sm" variant={hasMembers ? "outline" : "default"}>
+                <UserPlus className="size-4" />
+                {hasMembers ? "Add member" : "Add your first member"}
+              </Button>
+            </DialogTrigger>
+          }
+        />
+        <AddMemberDialog onDone={() => setAddOpen(false)} />
+      </Dialog>
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading members…</p>
@@ -102,7 +102,7 @@ export function HouseholdSection() {
           variant="card"
           icon={Users}
           title="No family members yet"
-          description="Add members to connect their banks and attribute transactions by person."
+          description="Add a member to give each person their own connections and attribute transactions across the household."
         />
       ) : (
         <ul className="space-y-3">
@@ -230,16 +230,21 @@ function MemberMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-foreground size-8"
-        >
-          <MoreVertical className="size-4" />
-          <span className="sr-only">Member actions</span>
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground size-8"
+            >
+              <MoreVertical className="size-4" />
+              <span className="sr-only">Member actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Member actions</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-52">
         {login ? (
           <>
@@ -497,6 +502,7 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
+              {submitting && <Loader2 className="size-4 animate-spin" />}
               {submitting ? "Adding…" : "Add member"}
             </Button>
           </DialogFooter>
@@ -606,6 +612,7 @@ function CreateLoginDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={createLogin.isPending}>
+              {createLogin.isPending && <Loader2 className="size-4 animate-spin" />}
               {createLogin.isPending ? "Creating…" : "Create login"}
             </Button>
           </DialogFooter>

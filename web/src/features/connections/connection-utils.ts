@@ -44,23 +44,11 @@ export function needsAttention(c: Connection): boolean {
   return c.status === "pending_reauth" || c.status === "error";
 }
 
-// Relative time helper — keep the dependency-free version tiny. Returns "12m
-// ago", "2h ago", "3d ago", or an ISO date when older than 30 days. Mirrors
-// the v1 LastSyncedAtRelative shape closely enough for parity.
-export function relativeTime(iso: string | null, now: Date = new Date()): string {
-  if (!iso) return "never";
-  const then = new Date(iso);
-  const diffSec = Math.floor((now.getTime() - then.getTime()) / 1000);
-  if (diffSec < 30) return "just now";
-  if (diffSec < 60) return `${diffSec}s ago`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 30) return `${diffDay}d ago`;
-  return then.toISOString().slice(0, 10);
-}
+// Relative time helper — re-exported from `@/lib/format` as
+// `formatRelativeShort` for back-compat with existing connection-row /
+// sync-history-list / home-connections-panel consumers. New surfaces should
+// import `formatRelativeShort` directly from `@/lib/format`.
+export { formatRelativeShort as relativeTime } from "@/lib/format";
 
 export interface ConnectionAccountStats {
   count: number;
@@ -127,16 +115,3 @@ export function primaryBalance(
   };
 }
 
-// Currency formatter — defers to Intl. Returns the original number formatted
-// to the supplied currency, no leading sign manipulation.
-export function formatCurrency(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
-}

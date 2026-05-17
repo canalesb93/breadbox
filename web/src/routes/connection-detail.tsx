@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { StatusPanel } from "@/components/status-panel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,10 +42,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ColorRailCard } from "@/components/color-rail-card";
-import { IdPill } from "@/components/id-pill";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ActionPill } from "@/components/action-pill";
+import { ColorRailCard, ColorRailCardSkeleton } from "@/components/color-rail-card";
+import {
+  DetailList,
+  compactDetailRows,
+  type DetailRowData,
+} from "@/components/detail-list";
+import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
+import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
+import { formatLongDate } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -204,7 +215,7 @@ export function ConnectionDetailPage() {
         <EmptyState
           icon={Plug}
           title="Connection not found"
-          description="It may have been disconnected, or the link is wrong."
+          description="This connection may have been removed, or the link is out of date. Head back to the connections list to pick another."
           action={
             <Button variant="outline" asChild>
               <Link to="/connections">Back to connections</Link>
@@ -296,6 +307,7 @@ function DetailBody({
   async function onSync() {
     await withMutationToast(() => sync.mutateAsync(conn.id), {
       success: `Sync queued for ${conn.institution_name ?? "connection"}.`,
+      successDescription: "New transactions land within a minute.",
     });
   }
 
@@ -377,55 +389,44 @@ function DetailBody({
         </Alert>
       )}
 
-      {/* Banners */}
+      {/* Banners — promoted onto `<StatusPanel>` so they speak the same
+          tone-tinted vocabulary as Setup, Providers, Home attention-panel,
+          and account-detail's connection-status banners. The previous
+          open-coded `<Alert>` row used absolute-positioned icons +
+          inline amber utilities, which forced a different rhythm from the
+          rest of the v2 surfaces and wrapped the Re-authenticate CTA below
+          the body text in a half-aligned column on narrow viewports. The
+          StatusPanel's `flex items-start gap-3 + trailing` slot keeps the
+          icon tile + heading + CTA aligned on mobile, tablet, and desktop. */}
       {isReauthBanner && (
-        <Alert
-          className={
-            conn.status === "error"
-              ? "border-destructive/30 bg-destructive/5"
-              : "border-amber-500/30 bg-amber-500/5"
-          }
-        >
-          <AlertTriangle
-            className={
-              conn.status === "error"
-                ? "text-destructive size-4"
-                : "size-4 text-amber-700 dark:text-amber-400"
-            }
-          />
-          <AlertTitle
-            className={
-              conn.status === "error"
-                ? "text-destructive"
-                : "text-amber-700 dark:text-amber-400"
-            }
-          >
-            {conn.status === "pending_reauth"
+        <StatusPanel
+          tone={conn.status === "error" ? "destructive" : "warning"}
+          icon={AlertTriangle}
+          heading={
+            conn.status === "pending_reauth"
               ? "Login expired"
-              : "This connection had an error"}
-          </AlertTitle>
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-            <span>
-              {conn.error_message ??
-                "Reconnect to the bank to resume syncing this connection."}
-            </span>
-            <Button size="sm" variant="outline" onClick={onReauth}>
+              : "This connection had an error"
+          }
+          body={
+            conn.error_message ??
+            "Reconnect to the bank to resume syncing this connection."
+          }
+          trailing={
+            <ActionPill variant="outline" onClick={onReauth}>
+              <RefreshCw className="size-3.5" />
               Re-authenticate
-            </Button>
-          </AlertDescription>
-        </Alert>
+            </ActionPill>
+          }
+        />
       )}
 
       {showFailureBanner && (
-        <Alert className="border-amber-500/30 bg-amber-500/5">
-          <AlertTriangle className="size-4 text-amber-700 dark:text-amber-400" />
-          <AlertTitle className="text-amber-700 dark:text-amber-400">
-            {conn.consecutive_failures} syncs failed in a row
-          </AlertTitle>
-          <AlertDescription>
-            Recent syncs have been failing. Check the history below for details.
-          </AlertDescription>
-        </Alert>
+        <StatusPanel
+          tone="warning"
+          icon={AlertTriangle}
+          heading={`${conn.consecutive_failures} syncs failed in a row`}
+          body="Recent syncs have been failing. Check the history below for details."
+        />
       )}
 
       <QuickActions conn={conn} />
@@ -441,11 +442,7 @@ function DetailBody({
           <SectionCard
             title="Sync activity"
             icon={<Activity className="text-muted-foreground size-4" />}
-            action={
-              <span className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-                Last 7 days
-              </span>
-            }
+            action={<Eyebrow>Last 7 days</Eyebrow>}
           >
             {syncLogsLoading ? (
               <Skeleton className="h-[72px] w-full" />
@@ -489,11 +486,7 @@ function DetailBody({
           <SectionCard
             title="Sync history"
             icon={<RefreshCw className="text-muted-foreground size-4" />}
-            action={
-              <span className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-                Last 10
-              </span>
-            }
+            action={<Eyebrow>Last 10</Eyebrow>}
             footer={
               syncLogs.length > 0 ? (
                 <Link
@@ -578,54 +571,43 @@ function Hero({
       footer={
         <>
           {canSync && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onSync}
-              disabled={syncPending}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill onClick={onSync} disabled={syncPending}>
               {syncPending ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="size-3.5" />
               )}
               Sync now
-            </Button>
+            </ActionPill>
           )}
           {conn.provider === "csv" && conn.status !== "disconnected" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onImportCsv}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill onClick={onImportCsv}>
               <Upload className="size-3.5" />
               Import more
-            </Button>
+            </ActionPill>
           )}
           {conn.status !== "disconnected" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onReauth}
-              className="h-7 gap-1.5 text-xs"
-            >
+            <ActionPill onClick={onReauth}>
               <Plug className="size-3.5" />
               Re-authenticate
-            </Button>
+            </ActionPill>
           )}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 rounded-full"
-                aria-label="Connection actions"
-              >
-                <MoreHorizontal className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 rounded-full"
+                    aria-label="Connection actions"
+                  >
+                    <MoreHorizontal className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Connection actions</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               {conn.status !== "disconnected" && (
                 <DropdownMenuItem
@@ -652,7 +634,7 @@ function Hero({
         </>
       }
     >
-      <div className="grid gap-6 px-6 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -665,18 +647,18 @@ function Hero({
               <Icon className="text-muted-foreground size-5" />
             </div>
             <div className="min-w-0 space-y-1">
-              <p className="text-muted-foreground text-[10px] font-medium tracking-[0.12em] uppercase">
+              <Eyebrow as="p" variant="hero">
                 Connection
-              </p>
+              </Eyebrow>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-xl font-semibold tracking-tight">
                   {conn.institution_name ?? "Untitled connection"}
                 </h1>
                 <ConnectionStatusBadge status={conn.status} />
                 {conn.paused && (
-                  <span className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
-                    <Pause className="size-2.5" /> Paused
-                  </span>
+                  <MetaBadge icon={Pause} variant="secondary">
+                    Paused
+                  </MetaBadge>
                 )}
               </div>
               <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
@@ -745,33 +727,20 @@ function Hero({
 // than just verbs.
 function QuickActions({ conn }: { conn: ConnectionDetail }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-[0.1em] uppercase">
-        Jump to
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        asChild
-      >
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link to="/accounts">
           <Wallet className="size-3" />
           All accounts
         </Link>
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        asChild
-      >
+      </JumpToPill>
+      <JumpToPill asChild>
         <Link to="/sync-logs">
           <Activity className="size-3" />
           Sync log
         </Link>
-      </Button>
-    </div>
+      </JumpToPill>
+    </JumpToRow>
   );
 }
 
@@ -827,68 +796,22 @@ function SettingsCard({
             {conn.paused ? "Scheduled syncs paused" : "Syncing on schedule"}
           </div>
         </div>
-        <Button
+        <ActionPill
           variant="outline"
-          size="sm"
           onClick={onTogglePause}
           disabled={pausePending || conn.status === "disconnected"}
-          className="h-7 gap-1.5 text-xs"
         >
           {pausePending ? (
-            <Loader2 className="size-3 animate-spin" />
+            <Loader2 className="size-3.5 animate-spin" />
           ) : conn.paused ? (
-            <Play className="size-3" />
+            <Play className="size-3.5" />
           ) : (
-            <Pause className="size-3" />
+            <Pause className="size-3.5" />
           )}
           {conn.paused ? "Resume" : "Pause"}
-        </Button>
+        </ActionPill>
       </div>
     </SectionCard>
-  );
-}
-
-interface DetailRowData {
-  label: string;
-  value: string | null | undefined;
-  mono?: boolean;
-}
-
-function compactRows(
-  rows: (DetailRowData | null | undefined | false)[],
-): DetailRowData[] {
-  return rows.filter((r): r is DetailRowData => !!r && !!r.value);
-}
-
-function DetailGroup({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: DetailRowData[];
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="space-y-2.5">
-      <h3 className="text-muted-foreground text-[10px] font-medium tracking-[0.1em] uppercase">
-        {label}
-      </h3>
-      <dl className="space-y-2">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-baseline justify-between gap-3"
-          >
-            <dt className="text-muted-foreground shrink-0 text-xs">
-              {row.label}
-            </dt>
-            <dd className="min-w-0 truncate text-right text-xs">
-              {row.mono ? <IdPill value={row.value as string} /> : row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 
@@ -905,7 +828,7 @@ function DetailsCard({
   totalSyncs: number;
   syncLogsLoading: boolean;
 }) {
-  const healthRows: DetailRowData[] = compactRows([
+  const healthRows: DetailRowData[] = compactDetailRows([
     {
       label: "Success rate",
       value: successRate
@@ -924,7 +847,7 @@ function DetailsCard({
     },
   ]);
 
-  const providerRows: DetailRowData[] = compactRows([
+  const providerRows: DetailRowData[] = compactDetailRows([
     { label: "Provider", value: providerLabel(conn.provider) },
     conn.user_name ? { label: "User", value: conn.user_name } : null,
     conn.institution_id
@@ -932,26 +855,20 @@ function DetailsCard({
       : null,
   ]);
 
-  const referenceRows: DetailRowData[] = compactRows([
+  const referenceRows: DetailRowData[] = compactDetailRows([
     { label: "ID", value: conn.short_id, mono: true },
-    { label: "Created", value: new Date(conn.created_at).toLocaleDateString() },
+    { label: "Created", value: formatLongDate(conn.created_at.slice(0, 10)) },
     {
       label: "Updated",
-      value: new Date(conn.updated_at).toLocaleDateString(),
+      value: formatLongDate(conn.updated_at.slice(0, 10)),
     },
   ]);
 
   return (
     <SectionCard title="Details" bodyClassName="space-y-5 px-5 py-5 text-sm">
-      {healthRows.length > 0 && (
-        <DetailGroup label="Health" rows={healthRows} />
-      )}
-      {providerRows.length > 0 && (
-        <DetailGroup label="Provider" rows={providerRows} />
-      )}
-      {referenceRows.length > 0 && (
-        <DetailGroup label="Reference" rows={referenceRows} />
-      )}
+      <DetailList label="Health" rows={healthRows} />
+      <DetailList label="Provider" rows={providerRows} />
+      <DetailList label="Reference" rows={referenceRows} />
     </SectionCard>
   );
 }
@@ -972,9 +889,15 @@ function formatIntervalLabel(minutes: number): string {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-32 rounded-xl" />
+      {/* Hero — matches the loaded `<ColorRailCard>` shape: status-tinted
+          rail + `rounded-lg` icon tile + bordered action-strip footer
+          (Sync now / Re-authenticate / overflow). Mirrors the
+          account-detail and transaction-detail loading vocabulary so
+          the three sibling detail pages converge on a single skeleton
+          shape. */}
+      <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Skeleton className="h-32 rounded-xl" />
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-48 rounded-xl" />

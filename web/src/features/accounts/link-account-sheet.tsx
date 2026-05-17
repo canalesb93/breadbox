@@ -91,7 +91,10 @@ export function LinkAccountSheet({
           dependent_account_id: dependentId,
           match_tolerance_days: Number.isFinite(tol) && tol >= 0 ? tol : undefined,
         }),
-      { success: "Accounts linked. Matches will reconcile on the next sync." },
+      {
+        success: "Accounts linked.",
+        successDescription: "Matches will reconcile on the next sync.",
+      },
     );
     if (ok) {
       setDependentId("");

@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Banknote, CreditCard, Landmark, PiggyBank, Wallet } from "lucide-react";
 import type { Account } from "@/api/types";
 import { EmptyState } from "@/components/empty-state";
-import { formatCurrency } from "./connection-utils";
+import { formatBalance } from "@/lib/format";
 
 const TYPE_ICON: Record<string, typeof Banknote> = {
   depository: PiggyBank,
@@ -24,7 +24,7 @@ export function ConnectionAccountsList({ accounts }: ConnectionAccountsListProps
         variant="inline"
         icon={Wallet}
         title="No accounts yet"
-        description="Accounts will appear here after the first successful sync."
+        description="Accounts will land here after the first successful sync — usually within a minute of connecting."
       />
     );
   }
@@ -57,7 +57,7 @@ function AccountCard({ account: a }: { account: Account }) {
       </div>
       <div className="text-right text-sm font-semibold tabular-nums whitespace-nowrap">
         {a.balance_current != null && a.iso_currency_code
-          ? formatCurrency(a.balance_current, a.iso_currency_code)
+          ? formatBalance(a.balance_current, a.iso_currency_code)
           : "—"}
       </div>
     </Link>
