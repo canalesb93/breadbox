@@ -158,3 +158,8 @@ When this loop fires, the agent should:
 13. **End turn with `result:` line.** If blocked on a decision, end with `needs input:` line.
 
 If at any point the next iteration's scope is unclear, stop and use `AskUserQuestion` rather than guessing on a load-bearing decision (model choice, auth scheme, schema breaking change).
+
+## Async coordination with Ricardo
+
+- **Subscription auth onboarding:** when you reach the point of running a real end-to-end test against the live Anthropic API and need a valid `CLAUDE_CODE_OAUTH_TOKEN`, send a `PushNotification` asking Ricardo to run `claude setup-token` and paste the token into the settings page (or into a dev `.env`). **Do not block other work waiting on this** — keep moving on plumbing/tests that don't require live API. The push fires once; if no response after one iteration, move on and try again later.
+- **General principle:** the user has standing merge auth on this branch — do not ask for permission to merge a green PR. Only ping for things only they can do (live auth credentials, philosophy calls, scope changes).
