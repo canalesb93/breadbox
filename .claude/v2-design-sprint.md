@@ -2505,3 +2505,27 @@ Cross-cutting components:
     section (e.g. preview-panel could swap its plain-text "No
     matches yet" / failure-state shapes when a real failure path
     lands).
+
+- **Iter 89 — List-page empty/error state polish** ([#1204](https://github.com/canalesb93/breadbox/pull/1204))
+  - Sweep four list pages to align with the iter-87
+    three-states-three-vocabularies contract and the filter-vs-zero-data
+    empty-state pattern API keys + Transactions already follow.
+  - Categories: `isError` now renders `<PageError>` (with Retry)
+    instead of a flat `EmptyState` — every other list page already
+    routed load failures through `PageError`, so this was the lone
+    holdout. Wires `categoriesQuery.refetch` + `isFetching` into the
+    Retry button.
+  - Connections + Accounts: filter-empty `<EmptyState>` gets the
+    matching `Plug` / `Banknote` icon so the filter and zero-data
+    empties are visually parallel (icon tile + title + description;
+    CTA only on zero-data).
+  - Rules: filter-empty drops the "Create rule" CTA. The action
+    belongs to the no-rules-yet state, not "your filter excluded the
+    existing rules" — mirrors how Transactions already gates its
+    "Connect a bank" CTA.
+  - No new primitive, no visual contract change. After this, every
+    v2 list page funnels load failures through `<PageError>` and
+    renders filter-empty + zero-data-empty as visually parallel
+    `<EmptyState>` blocks. The backlog item "list-page empty states —
+    verify filter empty vs zero-data empty distinction across all
+    lists" is closed.
