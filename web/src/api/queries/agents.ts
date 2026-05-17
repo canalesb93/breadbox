@@ -72,6 +72,10 @@ export interface AgentRun {
   session_id?: string | null;
   operator_note?: string | null;
   prompt_prefix?: string | null;
+  // hit_cap names the safety ceiling this run bumped into when it
+  // terminated: "max_turns" | "max_budget" | null. Surfaces a "ran into
+  // the ceiling" pill on the run history row.
+  hit_cap?: "max_turns" | "max_budget" | null;
 }
 
 export const AGENT_RUN_NOTE_MAX_LEN = 2000;

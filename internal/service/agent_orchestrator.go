@@ -26,6 +26,22 @@ func applyPromptPrefix(prefix, original string) string {
 	return "Operator note for this run:\n" + prefix + "\n\n" + original
 }
 
+// capFromRunErr maps the sidecar's safety-cap sentinels onto the discrete
+// hit_cap string the DB stores. Returns "" for any other error (or nil).
+// max_turns is success-tagged by the sidecar (clean termination); budget
+// is error-tagged (mid-run abort) — capFromRunErr preserves that nuance
+// by leaving status untouched and only adding the hit_cap signal.
+func capFromRunErr(err error) string {
+	switch {
+	case errors.Is(err, agent.ErrMaxTurnsReached):
+		return "max_turns"
+	case errors.Is(err, agent.ErrBudgetExceeded):
+		return "max_budget"
+	default:
+		return ""
+	}
+}
+
 // Orchestrator drives one agent run end-to-end: acquires concurrency,
 // mints a scoped API key, assembles the JobSpec, runs the sidecar, persists
 // the resulting agent_runs row, and revokes the key.
@@ -189,6 +205,19 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 			return &runResp, runErr
 		}
 		return &runResp, completeErr
+	}
+
+	// Detect cap exhaustion. The sidecar surfaces it through runErr after
+	// having already classified status (max_turns → success, budget → error),
+	// so we record the cap separately for the audit trail without rewriting
+	// status.
+	if cap := capFromRunErr(runErr); cap != "" {
+		if capRow, err := o.svc.SetAgentRunHitCapDB(ctx, runRow.ID, cap); err == nil {
+			completedRow = capRow
+		} else {
+			o.logger.Warn("orchestrator: persist hit_cap failed",
+				"agent", def.Slug, "run", runResp.ShortID, "cap", cap, "error", err)
+		}
 	}
 
 	finalResp := AgentRunFromRow(completedRow)
