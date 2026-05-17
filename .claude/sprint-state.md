@@ -708,6 +708,31 @@ Next iteration candidates (refreshed):
 
 Picking **#1 multi-concurrent runs** next iteration — real capability lift (deferred since iter-3), tests existing primitive under contention, lets self-hosters run 2-3 agents in parallel without re-configuring.
 
+## ITER 29 — 2026-05-17 06:05
+Shipped (PR #1255 squash-merged as 0fa17098): default agent.max_concurrent lifted 1 → 3 in serve.go + agent_settings.go fallbacks. New TripleConcurrency integration test pins both branches (3 in parallel + 4th blocks + all keys revoked). docs/agents.md notes the lift + rationale.
+
+## ITER 30 — 2026-05-17 06:20
+Shipped (PR #1256 squash-merged as 1c482dad): the big one — webhook trigger. Migration adds agent_definitions.trigger_on_sync_complete + partial index. Sync engine gains OnSyncComplete func-pointer hook (no agent-pkg import); serve.go wires it to orchestrator.FireSyncCompleteAgents which dispatches eligible agents per-goroutine via RunOrSkip(trigger="webhook"). SPA edit-form checkbox. 2 new integration tests (only-eligible-fires + no-op-when-empty). New rule in .claude/rules/agents.md documents the no-import-cycle invariant.
+
+## ITER 31 — 2026-05-17 06:35
+Shipped (PR #1257 squash-merged as 85539d5c): bug fix bundled with iter-27/30 deferred chip.
+
+The bug: ListAgentRuns hand-rolled SELECT had been frozen since iter-3 but agent_runs gained operator_note (iter-22), prompt_prefix (iter-23), hit_cap (iter-27). Pills silently absent from /v2/agents/{slug}/runs history page even though GetAgentRun's single-row path surfaced them. Operators missing audit signal.
+
+Fix: added the three columns to the projection + scan. Bundled hit_cap filter chip (closes iter-27 deferred). 5 new sub-tests including the regression. docs/api-endpoints.md row updated to list every filter.
+
+**Lesson:** hand-rolled SQL projections drift silently. Spawned a code-reviewer subagent for iter-32 to check whether other endpoints have the same drift pattern.
+
+Next iteration candidates (refreshed):
+1. **Aggregate "recent caps hit" pill on /v2/agents** — list-level signal like iter-21's error pill, leans on iter-27 + iter-31.
+2. **Empty/error state polish across agent pages** — UI sweep.
+3. **Mobile-responsive sweep on agent pages** — UI sweep.
+4. **Per-model cost breakdown** — needs model column on agent_runs.
+5. **Suggested rules agent** — bigger.
+6. **Outputs of the code-reviewer subagent** — pending; queue top finding as iter-33.
+
+Picking **#1 aggregate caps-hit pill** next iteration in parallel with the audit; small + visible, mirrors iter-21 pattern.
+
 
 
 
