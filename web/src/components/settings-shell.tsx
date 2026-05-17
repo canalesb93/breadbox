@@ -56,7 +56,7 @@ export function SettingsShell() {
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="h-[600px] max-w-3xl gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogContent className="flex h-[600px] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>Manage your account and app preferences.</DialogDescription>
@@ -94,7 +94,7 @@ interface SettingsBodyProps {
 function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
   if (desktop) {
     return (
-      <div className="flex h-full">
+      <div className="flex min-h-0 flex-1">
         <nav className="bg-sidebar text-sidebar-foreground w-56 shrink-0 border-r p-3">
           <Eyebrow
             as="p"
