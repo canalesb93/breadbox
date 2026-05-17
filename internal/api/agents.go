@@ -355,6 +355,59 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 	}
 }
 
+// agentTestResponse mirrors agent.SmokeResult for the JSON wire format.
+type agentTestResponse struct {
+	AuthMode     string  `json:"auth_mode"`
+	BinaryPath   string  `json:"binary_path,omitempty"`
+	Model        string  `json:"model"`
+	DurationMs   int64   `json:"duration_ms"`
+	TotalCostUSD float64 `json:"total_cost_usd"`
+	InputTokens  int     `json:"input_tokens"`
+	OutputTokens int     `json:"output_tokens"`
+	Response     string  `json:"response,omitempty"`
+}
+
+// SmokeTestAgentHandler runs the same diagnostic the CLI's
+// `breadbox agent test` does. Surfaces it through the UI so non-CLI
+// self-hosters can validate their setup before scheduling real runs.
+// Cost-bounded (~5¢ ceiling).
+func SmokeTestAgentHandler(orch *service.Orchestrator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if orch == nil {
+			mw.WriteError(w, http.StatusServiceUnavailable, "AGENTS_DISABLED",
+				"Agent orchestrator is not configured on this server")
+			return
+		}
+		result, err := orch.SmokeTest(r.Context())
+		if err != nil {
+			switch {
+			case errors.Is(err, agent.ErrAuthNotConfigured):
+				mw.WriteError(w, http.StatusUnprocessableEntity,
+					"AUTH_NOT_CONFIGURED",
+					"Set a subscription token or Anthropic API key in agent settings before running the smoke test.")
+			case errors.Is(err, agent.ErrBinaryNotFound):
+				mw.WriteError(w, http.StatusUnprocessableEntity,
+					"AGENT_BINARY_NOT_FOUND",
+					"breadbox-agent binary not found. Run `make agent-sidecar` or set agent.runtime_path.")
+			default:
+				mw.WriteError(w, http.StatusInternalServerError,
+					"AGENT_TEST_FAILED", err.Error())
+			}
+			return
+		}
+		writeData(w, agentTestResponse{
+			AuthMode:     result.AuthMode,
+			BinaryPath:   result.BinaryPath,
+			Model:        result.Model,
+			DurationMs:   result.DurationMs,
+			TotalCostUSD: result.TotalCostUSD,
+			InputTokens:  result.InputTokens,
+			OutputTokens: result.OutputTokens,
+			Response:     result.AssistantText,
+		})
+	}
+}
+
 // writeAgentError maps a service error to the JSON error envelope.
 func writeAgentError(w http.ResponseWriter, err error, notFoundMsg string) {
 	switch {
