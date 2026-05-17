@@ -3143,3 +3143,56 @@ Cross-cutting components:
     share a `lib/format` export — a third timeline consumer is the right
     promotion gate. Until then, copy is cheaper than a one-call-site
     shared util.
+
+
+- **Iter 106 — SectionCard + ListCard header baseline polish** ([#1225](https://github.com/canalesb93/breadbox/pull/1225))
+  - Detail-attention iteration in response to Ricardo's "the cards still
+    feel wrong-ish" call: title looked too small, the action button
+    (`ViewAllPill` / `Button size="sm"`) on the right looked too big,
+    visible baseline mismatch, and the gap between header-bottom and
+    body-top was asymmetric vs the side padding. Diagnosed against the
+    sandbox specimens and the live Home / Account-detail consumers with
+    Chrome DevTools measurements.
+  - **Three targeted fixes to the canonical card-header recipe** —
+    nothing more, nothing less:
+    1. **`ListCard` was missing the `\!pb-4` override** that `SectionCard`
+       has carried since iter 33. Without it, the shadcn primitive's
+       `[.border-b]:pb-6` rule injected 24px of bottom padding (vs the
+       intentional 16px top padding) whenever the header had a divider.
+       Measured on Home: header padding `16px / 24px` before, `16px /
+       16px` after — the asymmetric gap Ricardo flagged was real and
+       traceable to one line.
+    2. **Header alignment `items-start` → `items-center`** (plus
+       `CardAction self-center`). The shadcn `CardHeader` grid defaults
+       to `items-start` and `CardAction` carries `self-start`. With a
+       20px title and a 28px `ViewAllPill` / 32px `Button size="sm"`,
+       the title got pinned to the top of the row while the action
+       protruded 8-12px below — title baseline visibly higher than the
+       action's vertical center, exactly the "crooked" feel.
+    3. **Title weight `text-sm font-medium` → `text-sm font-semibold`**
+       so the title carries enough anchor next to a real action button
+       instead of reading as a caption. Same `text-sm` size — the bump
+       is weight-only, the eye picks up the difference because the
+       action button stays at `text-xs font-medium`.
+  - **What I left alone (with rationale):** card body padding (`px-5
+    py-5`) and footer rhythm (`px-5 py-3`) — iter 33's tightening is
+    right; this was a header-row issue. `ColorRailCard` (footer already
+    `flex items-center justify-end`), `StatusPanel` (no title+action
+    header row; trailing slot is already `flex items-center`),
+    `FormFooter` (already `flex items-center`), `EmptyState`,
+    `PageHeader`, the five other header primitives — none of them
+    surface the same shadcn-grid `self-start` mismatch. Resisted
+    touching `CardTitle` in `ui/card.tsx` (would propagate the
+    semibold + alignment to non-header callers we haven't audited).
+  - **Zero new primitives, no consumer changes.** The fixes are
+    contained to `section-card.tsx` (already had `\!pb-4`; added
+    `items-center` + `self-center` + `font-semibold`) and
+    `list-card.tsx` (added all four: `\!pb-4`, `items-center`,
+    `self-center`, `font-semibold`). Primitive count stays at 28.
+  - **Drift status:** the canonical card-header pattern now has one
+    settled recipe — `border-b px-5 py-4 \!pb-4 items-center` on the
+    header div, `text-sm font-semibold` on the title, `self-center` on
+    the action. Any new card-header surface should reach for
+    `<SectionCard>` or `<ListCard>` and inherit the recipe; if a future
+    consumer needs a taller / shorter header, extend the primitive
+    rather than open-coding `<CardHeader>` directly.
