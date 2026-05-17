@@ -2604,6 +2604,45 @@ Cross-cutting components:
     or set `optimizeDeps.force=true` in `web/vite.config.ts` for
     dev so the CLI flag isn't required.
 
+- **Iter 93 — TimelineRail.Row gains semantic `tone` accent** ([#1208](https://github.com/canalesb93/breadbox/pull/1208))
+  - The activity timeline's icon discs were all rendered in the same
+    neutral `border-border/60 text-muted-foreground` lockup regardless
+    of event kind — comments, rule fires, sync events, and tag
+    adds/removes were visually indistinguishable from each other.
+    Scanning a long feed forced the eye to read every `summary` line
+    just to find the rule-driven changes amid the chatter.
+  - `<TimelineRail.Row>` now takes a semantic `tone` prop —
+    `neutral` (default; preserves the legacy look) · `primary` ·
+    `success` · `warning` · `info` · `muted`. A `TONE_CLASSES`
+    record tints both the disc *border* and the icon glyph (background
+    stays `bg-card` so the disc keeps punching through the rail line).
+    Tokens picked to match the existing v2 colour vocabulary
+    (StatusPanel / ColorRailCard / MetaBadge): `primary` for the
+    accent, `emerald` for success, `amber` for warning, `sky` for
+    info — so the timeline reads as part of the same system, not a
+    bolted-on palette.
+  - Wired into transaction-detail activity timeline via a per-kind
+    `KIND_TONE` map: `rule_applied` + `category_set` → primary
+    (system-driven / classification edits are the dominant signal),
+    `sync_started` + `sync_updated` → info (data arrived from the
+    outside; matches the sync vocabulary on Connection-detail),
+    `tag_added` → success (additive), `tag_removed` → warning
+    (something taken away), comments + unmapped kinds → neutral.
+    Deleted rows drop the tint regardless of kind so the
+    strikethrough/muted vocabulary owns the deletion signal alone.
+  - Sandbox specimen expanded to demo five tones in a single
+    timeline (added a sync-info row in Today, a tag-warning row in
+    Yesterday) so the visual contract is browseable; description
+    spells out the new mapping. The primitive count stays at 23 —
+    no new component, just a richer prop on an existing one.
+  - TimelineRail is now the only v2 primitive with kind-based
+    colour encoding *inside* a list — ColorRailCard / StatusPanel
+    encode tone at the container level; this lands the same
+    "colour = meaning" principle at the row level for activity
+    feeds. Worth promoting to rule run history + per-connection
+    sync logs when those land (already queued in the iter-26
+    promotion notes).
+
 - **Iter 92 — Settings 'Coming soon' fallback onto StatusPanel** ([#1207](https://github.com/canalesb93/breadbox/pull/1207))
   - The settings modal's unbuilt-section fallback (today: only
     Security) was the last "naked text" empty-state surface in the
