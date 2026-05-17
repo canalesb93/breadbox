@@ -2179,6 +2179,50 @@ Cross-cutting components:
     fork the look — extend this primitive if a seventh consumer
     needs a new variant.
 
+- **Iter 86 — `<RowActionsMenu>` primitive for row kebabs** ([#1201](https://github.com/canalesb93/breadbox/pull/1201))
+  - New `<RowActionsMenu>` at `web/src/components/row-actions-menu.tsx`
+    bundles `Tooltip` + `DropdownMenuTrigger` + `Button` into one
+    lockup so every list row, hero footer, and inline action cluster
+    shares the same trigger geometry, icon glyph, and aria
+    vocabulary. 23rd shared v2 primitive. Sibling of `<ActionPill>`
+    (iter 76) — same `text-muted-foreground → hover:text-foreground`
+    icon-button voice, but RowActionsMenu opens a menu rather than
+    dispatching.
+  - Seven open-coded sites consolidated onto the primitive
+    (connection-row, api-keys-table, tags-table, household-section
+    on `size="sm"`; rule-row, account-links-section,
+    connection-detail hero on `size="xs"`). Drift retired across
+    four dimensions:
+    - **Icon glyph**: 5 sites used `MoreHorizontal`, 2 used
+      `MoreVertical` (rule-row, household-section). Standardised
+      on `MoreHorizontal size-4`.
+    - **Trigger size**: size-7 / size-8 / unbranded `size="icon"`
+      (size-9 default). Standardised on `size="sm"` (size-8
+      ghost square — dominant) and `size="xs"` (size-7 — for
+      hero footers + nested rows).
+    - **Loading affordance**: account-links open-coded the
+      `reconcile.isPending || remove.isPending ? Loader2 :
+      MoreHorizontal` swap. Standardised on a `loading` prop with
+      built-in spin + auto-disable.
+    - **Destructive item style**: rule-row used `className=
+      "text-destructive focus:text-destructive"` while every
+      other consumer used the canonical `variant="destructive"`.
+      Swept onto the variant.
+  - One escape hatch retained: `triggerClassName` on
+    `RowActionsMenu`. Only one consumer uses it today
+    (connection-detail's hero footer adds `rounded-full` so the
+    kebab pairs visually with the surrounding `<ActionPill>`
+    cluster). Documented in the JSDoc.
+  - Tooltip imports dropped from 4 files where they were only
+    feeding the kebab trigger (household-section,
+    account-links-section, connection-detail, connection-row).
+    The other 3 consumers kept Tooltip for unrelated buttons.
+  - Sandbox specimen lives next to `<ActionPill>` in
+    `sections/components.tsx` so the two sibling primitives
+    (labelled inline action vs. kebab menu) read side-by-side.
+    Three buttons cover the API: `sm` default, `xs` with
+    `contentClassName="w-44"`, `xs` with `loading`.
+
 ## Open observations / questions
 
 (Populated by iterations.)
