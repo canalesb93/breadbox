@@ -373,11 +373,16 @@ Pages:
 Cross-cutting components:
 
 - [~] `page-header.tsx` — canonical header revised in #1113 (added
-  `eyebrow`, tightened spacing, sm:flex-row footer). Still needs a sweep
-  to migrate the remaining pages that build their own headers.
-  TX-detail (iter 5) deliberately does *not* use PageHeader — the hero
-  card carries the identity. Consider whether detail pages should ever
-  use PageHeader at all, or just rely on the hero.
+  `eyebrow`, tightened spacing, sm:flex-row footer). Copy vocabulary
+  documented in iter 72 (#1185): eyebrow is sentence-case in source
+  (CSS uppercases), title has no trailing punctuation, description is
+  a noun-led full sentence ending in a period, and multi-state pages
+  hoist the description copy to a module-level constant so it doesn't
+  shift on data transitions. Still needs a sweep to migrate the
+  remaining pages that build their own headers. TX-detail (iter 5)
+  deliberately does *not* use PageHeader — the hero card carries the
+  identity. Consider whether detail pages should ever use PageHeader
+  at all, or just rely on the hero.
 - [~] `data-table.tsx` — density + hover tightened in #1116 (new
   `stickyHeader` + `refinedHeader` opt-ins; `Table` primitive picks
   up softer borders and `px-3 py-2.5` cell padding). Iter 4 (#1117)
@@ -1789,6 +1794,46 @@ Cross-cutting components:
     should follow the same pattern; greenfield "naked"
     icon-only `size="icon"` buttons are a backlog smell.
 
+- **Iter 72 — PageHeader description copy consistency sweep** ([#1185](https://github.com/canalesb93/breadbox/pull/1185))
+  - Documents the canonical `PageHeader` copy vocabulary directly
+    in the prop docstrings so future callers have the rule in
+    their LSP hover: `eyebrow` is sentence-case in source (the
+    `uppercase` class handles casing — never SCREAMING_CASE in
+    JSX), `title` carries no trailing punctuation, `description`
+    is a noun-led full sentence ending in a period (not an
+    imperative fragment), and multi-state pages must hoist the
+    description copy to a module-level constant so it doesn't
+    momentarily shrink on data arrival.
+  - `providers`: hoists the description into a
+    `PROVIDERS_DESCRIPTION` module constant — loading / error /
+    loaded states share one canonical sentence so the framing
+    doesn't shift as `useProviderConfig` resolves. (Previously
+    loaded used the full noun-led copy; loading and error fell
+    back to a shorter imperative one.)
+  - `rule-form`: brings onto the canonical form-page shell
+    already shared by `tag-new`, `category-new`, and
+    `api-key-new`. Renders `SoftBackButton` above the header,
+    swaps the hand-rolled "Back" ghost-button action for a
+    proper eyebrow ("New rule" / "Edit rule"), and promotes
+    the rule name to the title in edit mode (matching
+    `tag-detail` / `category-detail`). New description voice
+    ("Rules watch every incoming transaction during sync. When
+    the conditions match, the actions fire automatically…")
+    matches the noun-led framing rule.
+  - `rules` (list): gains the dynamic eyebrow vocabulary every
+    other list page already has — "N rules" / "Loading" /
+    "Error" — and a noun-led description ("Conditions that fire
+    during every sync. Match transactions on merchant, amount,
+    account, or category, then categorize, tag, comment, or
+    skip review automatically.") replacing the imperative
+    fragment ("Automatically categorize, tag, or comment on
+    transactions during sync.").
+  - Drift retired: rule-form was the last form/edit page
+    skipping the canonical `SoftBackButton` + `eyebrow` shell.
+    rules was the last list page without an eyebrow. No
+    primitive count change (still 17 shared primitives) — pure
+    copy + voice consistency on existing `<PageHeader>` calls.
+
 ## Open observations / questions
 
 (Populated by iterations.)
@@ -1895,6 +1940,7 @@ Cross-cutting components:
   + `optimizeDeps.force=true` permanently in
   `web/vite.config.ts` so we don't need the `--force` CLI
   flag. Not blocking — just chronic.
+
 
 
 
