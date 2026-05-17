@@ -19,15 +19,18 @@ import {
   Moon,
   Pause,
   Plus,
+  Receipt,
   RefreshCw,
   RotateCcw,
   Save,
+  Search,
   Shapes,
   ShieldAlert,
   Sun,
   Tag,
   Trash2,
   Users,
+  Wallet,
   Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -63,6 +66,7 @@ import {
 import { SectionCard } from "@/components/section-card";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
@@ -412,6 +416,30 @@ export function ComponentsSection() {
               hero variant — sits under a display title with extra letter air
             </p>
           </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="JumpToPill"
+        code="components/jump-to-pill"
+        description="The canonical 'Jump to' pill cluster used in every detail-page hero (transaction, account, category, connection). `JumpToPill` is a 28px-tall outline button (`h-7 px-2.5 text-xs` with a `size-3` leading icon) — taller than `Button size=xs` (24px toolbar pill) and shorter than `Button size=sm` (32px action). Reads as a labelled lateral link from the hero, not a CTA. `JumpToRow` wraps the pills with the canonical `Eyebrow` 'Jump to' label. Don't open-code the className triplet — extend this primitive."
+        className="block"
+      >
+        <div className="rounded-lg border p-4">
+          <JumpToRow>
+            <JumpToPill>
+              <Search className="size-3" />
+              Similar transactions
+            </JumpToPill>
+            <JumpToPill>
+              <Wallet className="size-3" />
+              Chase Sapphire ····2890
+            </JumpToPill>
+            <JumpToPill>
+              <Receipt className="size-3" />
+              Dining out
+            </JumpToPill>
+          </JumpToRow>
         </div>
       </Specimen>
 

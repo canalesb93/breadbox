@@ -50,6 +50,7 @@ import {
   type DetailRowData,
 } from "@/components/detail-list";
 import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
@@ -746,31 +747,20 @@ function Hero({
 // than just verbs.
 function QuickActions({ conn }: { conn: ConnectionDetail }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Eyebrow className="mr-1">Jump to</Eyebrow>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        asChild
-      >
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link to="/accounts">
           <Wallet className="size-3" />
           All accounts
         </Link>
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 gap-1.5 text-xs"
-        asChild
-      >
+      </JumpToPill>
+      <JumpToPill asChild>
         <Link to="/sync-logs">
           <Activity className="size-3" />
           Sync log
         </Link>
-      </Button>
-    </div>
+      </JumpToPill>
+    </JumpToRow>
   );
 }
 

@@ -23,6 +23,7 @@ import {
   type DetailRowData,
 } from "@/components/detail-list";
 import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
 import { CategoryEditor } from "@/features/transactions/category-editor";
@@ -248,9 +249,8 @@ function QuickActions({
   // internal/mcp/tools.go compactIDs + REST handler shape), so it can flow
   // straight into the transactions list `?account=` filter.
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Eyebrow className="mr-1">Jump to</Eyebrow>
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link
           to="/transactions"
           search={{ q: merchantQuery }}
@@ -259,9 +259,9 @@ function QuickActions({
           <Search className="size-3" />
           Similar transactions
         </Link>
-      </Button>
+      </JumpToPill>
       {t.account_id && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/transactions"
             search={{ account: t.account_id }}
@@ -270,10 +270,10 @@ function QuickActions({
             <Wallet className="size-3" />
             {t.account_name ?? "All on account"}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
       {t.category?.slug && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/transactions"
             search={{ category: t.category.slug }}
@@ -282,9 +282,9 @@ function QuickActions({
             <Building2 className="size-3" />
             {t.category.display_name}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
-    </div>
+    </JumpToRow>
   );
 }
 

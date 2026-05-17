@@ -28,6 +28,7 @@ import {
 } from "@/components/detail-list";
 import { EmptyState } from "@/components/empty-state";
 import { Eyebrow } from "@/components/eyebrow";
+import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
@@ -247,16 +248,15 @@ function QuickActions({
   parent: Category | undefined;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Eyebrow className="mr-1">Jump to</Eyebrow>
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+    <JumpToRow>
+      <JumpToPill asChild>
         <Link to="/transactions" search={{ category: category.slug }}>
           <Receipt className="size-3" />
           Transactions in {category.display_name}
         </Link>
-      </Button>
+      </JumpToPill>
       {parent && (
-        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+        <JumpToPill asChild>
           <Link
             to="/categories/$id"
             params={{ id: parent.short_id }}
@@ -264,9 +264,9 @@ function QuickActions({
             <Folder className="size-3" />
             {parent.display_name}
           </Link>
-        </Button>
+        </JumpToPill>
       )}
-    </div>
+    </JumpToRow>
   );
 }
 
