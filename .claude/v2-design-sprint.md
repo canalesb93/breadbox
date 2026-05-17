@@ -3055,3 +3055,39 @@ Cross-cutting components:
     edits don't drift apart. Both files now reference each other in
     the comment so a change to one prompts a review of the other —
     they're a pair, not two independent components.
+
+- **Iter 104 — MetaBadge sweep across accounts family** ([#1221](https://github.com/canalesb93/breadbox/pull/1221))
+  - Pure drift retirement on the v2 tiny-chip vocabulary. Five
+    hand-rolled `<Badge text-[10px] px-1.5 py-0>` sites in the
+    accounts family now route through `<MetaBadge>` (iter 17
+    primitive). Two surfaces touched: `account-row.tsx`
+    (statusBadge for `error` → destructive, `disconnected` →
+    outline) and `account-links-section.tsx` (Primary/Dependent
+    role chip + Disabled marker on the link rows).
+  - **Zero-pixel refactor.** MetaBadge already owned the exact
+    density tokens (`text-[10px]` + `gap-1` + `px-1.5 py-0` +
+    `[&>svg]:size-2.5`); the hand-rolled sites carried the same
+    classes inline. The win is single-source-of-truth — extending
+    `MetaBadge` now flows to all seven sharing surfaces (was six),
+    instead of skipping these two callsites.
+  - Sandbox specimen extended with the three new tones now in use
+    (`default` for Primary, `secondary` for Dependent / pre-existing,
+    `destructive` for Error, plain outline for Disconnected + Disabled).
+    Description updated to enumerate the closed tone set:
+    `System` · `Hidden` (muted) · `Excluded` · `Linked` · `Paused` ·
+    **`Primary`** · **`Dependent`** · **`Error`** · **`Disconnected`** ·
+    **`Disabled`** · `Re-auth`. Same Specimen position as before
+    (next to IdPill / DetailList) — readers see the full chip
+    vocabulary at a glance.
+  - Two `Badge` imports dropped from the accounts feature; one
+    `MetaBadge` import added to `account-links-section.tsx`. The
+    primitive count stays at 28.
+  - **Drift status: tiny-chip vocabulary is now closed.** One
+    legitimate `Badge text-[10px]` site stays in `category-detail.tsx`
+    as a `SectionCard` action count (`{children.length}`) — that's
+    a count chip in a header action slot, not a meta status, so it
+    correctly stays on `Badge` directly. Same shape lives in
+    `transactions-toolbar.tsx` line 458 (count chip inside a filter
+    button trigger). Any new tiny *status* chip should reach for
+    `<MetaBadge>` first; if it carries a count or lives inside a
+    button trigger, `<Badge>` direct is still right.
