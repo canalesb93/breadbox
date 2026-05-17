@@ -2872,3 +2872,34 @@ Cross-cutting components:
     sm:flex-row sm:items-center sm:justify-between sm:px-7` bar
     shared by plaid-card, teller-card, csv-card. Next iteration if
     no higher-priority target appears.
+
+- **Iter 98 — ProviderCardHeader primitive (3 provider cards unified)** ([#1213](https://github.com/canalesb93/breadbox/pull/1213))
+  - Closes the remaining iter-96 long-className candidate. Three
+    near-byte-identical header blocks (plaid-card, teller-card,
+    csv-card) all open-coded the same identity bar inside
+    `<ColorRailCard>`: a `flex flex-col gap-5 px-6 py-5
+    sm:flex-row sm:items-center sm:justify-between sm:px-7`
+    wrapper holding an `size-11 rounded-lg` tone tile + Eyebrow
+    "Provider" + `h2 text-lg font-semibold tracking-tight` title
+    (+ optional `<ProviderStatusBadge>`) + `text-muted-foreground
+    max-w-md text-sm` description, with a trailing scoreboard slot.
+    Promoted to `<ProviderCardHeader>` at
+    `web/src/components/provider-card-header.tsx` — 26th shared
+    primitive in the v2 vocabulary.
+  - API: `icon` + `iconClassName` (tone color carried as a string so
+    each provider keeps its identity — Plaid blue, Teller emerald,
+    CSV amber); `title` + `description` text props; `badge`
+    optional slot (CSV omits it because it has no credentials to
+    gate); `trailing` slot for the scoreboard. Sibling of
+    `<HeroGrid>` from iter 97 — both are body layers that sit
+    inside `<ColorRailCard>` chrome, not chrome themselves.
+  - Visual change is by design negligible — every consumer renders
+    byte-equivalent geometry (same flex wrapper, same icon tile
+    geometry, same typography stack, same right-aligned scoreboard
+    docking). The win is one place to evolve the provider header
+    (eg. swap the tile shape or tighten the description max-width)
+    instead of three.
+  - Follow-up queued: add a `<ProviderCardHeader>` specimen to
+    `/v2/sandbox?section=components` alongside the existing
+    HeroGrid / SearchInput / RowActionsMenu specimens so the
+    primitive shows up in the audit surface.
