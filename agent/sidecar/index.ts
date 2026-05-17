@@ -104,9 +104,25 @@ async function main() {
 
     for await (const message of stream as AsyncIterable<any>) {
       const ts = Date.now();
-      const type = (message?.type as string | undefined) ?? "system";
+      const rawType = (message?.type as string | undefined) ?? "system";
 
-      if (type === "tool_use") numToolCalls += 1;
+      // Normalize SDK type names to the breadbox-side contract documented in
+      // internal/agent/event.go and consumed by web/src/features/agents/
+      // transcript-viewer.tsx. The SDK currently emits "assistant" /
+      // "user" for content events; iter-1's spec named these "assistant_message"
+      // / "user_message" assuming an earlier SDK shape. Tool_use blocks
+      // arrive as content blocks INSIDE the assistant event, not as their
+      // own top-level events — counting them is handled below by inspecting
+      // the nested message content.
+      let type = rawType;
+      if (rawType === "assistant") type = "assistant_message";
+      else if (rawType === "user") type = "user_message";
+
+      if (rawType === "assistant" && Array.isArray(message?.message?.content)) {
+        for (const block of message.message.content) {
+          if (block?.type === "tool_use") numToolCalls += 1;
+        }
+      }
 
       emit({ type: type as any, ts, data: message }, transcriptPath);
 
