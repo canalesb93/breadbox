@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageError } from "@/components/page-error";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { HeroGrid } from "@/components/hero-grid";
 import {
   DetailList,
   compactDetailRows,
@@ -129,7 +130,7 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
           the identity + classify stack on the left and the amount column
           docks to the right (identity stays anchored at the top via
           `lg:row-span-2`). */}
-      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-10 lg:gap-y-5">
+      <HeroGrid lgGapClassName="lg:gap-x-10 lg:gap-y-5">
         {/* Identity row (full width on mobile, left column on lg) */}
         <div className="flex min-w-0 items-start gap-3 sm:gap-4 lg:row-start-1">
           <CategoryIconTile
@@ -232,7 +233,7 @@ function Hero({ transaction: t }: { transaction: Transaction }) {
             </ClassifyField>
           </div>
         </div>
-      </div>
+      </HeroGrid>
     </ColorRailCard>
   );
 }

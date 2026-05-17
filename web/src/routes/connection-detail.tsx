@@ -41,6 +41,7 @@ import {
 import { ActionPill } from "@/components/action-pill";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import { ColorRailCard } from "@/components/color-rail-card";
+import { HeroGrid } from "@/components/hero-grid";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { PageError } from "@/components/page-error";
 import {
@@ -629,7 +630,7 @@ function Hero({
         </>
       }
     >
-      <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10">
+      <HeroGrid>
         {/* Identity column */}
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -711,7 +712,7 @@ function Hero({
             </p>
           ) : null}
         </div>
-      </div>
+      </HeroGrid>
     </ColorRailCard>
   );
 }
