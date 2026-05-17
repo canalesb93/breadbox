@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ColorRailCard } from "@/components/color-rail-card";
+import { ColorRailCard, ColorRailCardSkeleton } from "@/components/color-rail-card";
 import {
   DetailList,
   compactDetailRows,
@@ -915,9 +915,15 @@ function formatIntervalLabel(minutes: number): string {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-32 rounded-xl" />
+      {/* Hero — matches the loaded `<ColorRailCard>` shape: status-tinted
+          rail + `rounded-lg` icon tile + bordered action-strip footer
+          (Sync now / Re-authenticate / overflow). Mirrors the
+          account-detail and transaction-detail loading vocabulary so
+          the three sibling detail pages converge on a single skeleton
+          shape. */}
+      <ColorRailCardSkeleton tileShape="rounded-lg" withFooter />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Skeleton className="h-32 rounded-xl" />
           <Skeleton className="h-48 rounded-xl" />
           <Skeleton className="h-48 rounded-xl" />
