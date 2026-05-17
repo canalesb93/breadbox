@@ -1679,6 +1679,32 @@ Cross-cutting components:
     are different enough today that forcing them onto one
     primitive would distort the loaded view.
 
+- **Iter 69 — Connection-detail `DetailSkeleton` routes through `ColorRailCardSkeleton`** ([#1182](https://github.com/canalesb93/breadbox/pull/1182))
+  - The four detail pages with a `<ColorRailCard>` hero
+    (transaction, account, category, connection) now share the
+    same loading vocabulary. Connection-detail was the odd one
+    out — its `DetailSkeleton` rendered a generic
+    `<Skeleton h-32 rounded-xl>` for the hero band, which
+    shifted layout when the real hero (status-tinted rail +
+    `rounded-lg` icon tile + bordered action-strip footer for
+    Sync now / Re-authenticate / overflow) landed.
+  - Migrates to
+    `<ColorRailCardSkeleton tileShape="rounded-lg" withFooter />`,
+    mirroring the account-detail skeleton (same shape +
+    footer). The body grid keeps its `1fr / 18rem` split with
+    `min-w-0` on the primary column so long sync-history rows
+    can't push the sidebar off-screen at narrow viewports.
+  - Drift observation: the matching loaded action strip on
+    connection-detail still hand-rolls its `MoreHorizontal`
+    icon button inside the `ColorRailCard` `footer` slot —
+    same shape as the dropdown trigger on transaction-detail.
+    If a third surface adopts the trigger, promote to a
+    `ColorRailCard` action slot.
+  - Closes the iter-67 follow-up ("queued for rule run history
+    and per-connection sync log" referenced
+    `TimelineRail.RowSkeleton`; the connection-detail hero
+    skeleton was the parallel gap on the same page family).
+
 - **Iter 68 — `<MetaBadge>` primitive unifies the tiny status chip** ([#1181](https://github.com/canalesb93/breadbox/pull/1181))
   - 17th shared primitive in the v2 vocabulary, at
     `web/src/components/meta-badge.tsx`. Owns the canonical
