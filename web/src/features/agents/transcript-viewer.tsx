@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/format";
 import type {
-  AssistantContent,
   AssistantMessageData,
   ResultData,
   ToolResultData,
@@ -39,13 +38,28 @@ interface TranscriptViewerProps {
   shortId: string;
 }
 
-// Grouped representation of one assistant turn: the assistant's message
-// plus any tool_use blocks and matching tool_result blocks before the next
-// assistant_message.
+// Grouped representation of one model turn. The SDK splits a single model
+// turn into MULTIPLE assistant_message events — typically one with the text
+// (reasoning) block and a separate one with the tool_use block. The viewer
+// groups consecutive assistant_messages together so one turn = one card,
+// matching the SDK's `num_turns` count in the footer.
 interface TurnGroup {
-  assistant: (AssistantMessageData & { ts: number }) | null;
+  ts: number;
+  text: string;
   toolUses: Array<ToolUseData & { ts: number }>;
   toolResults: Array<ToolResultData & { ts: number }>;
+}
+
+function emptyTurn(ts: number): TurnGroup {
+  return { ts, text: "", toolUses: [], toolResults: [] };
+}
+
+function turnHasContent(t: TurnGroup): boolean {
+  return (
+    t.text.length > 0 ||
+    t.toolUses.length > 0 ||
+    t.toolResults.length > 0
+  );
 }
 
 // extractToolUses pulls tool_use content blocks out of an assistant message.
@@ -92,30 +106,45 @@ function extractToolResults(
   return out;
 }
 
+function extractText(data: AssistantMessageData): string {
+  const parts: string[] = [];
+  for (const block of data.message?.content ?? []) {
+    if (block.type === "text" && block.text) parts.push(block.text);
+  }
+  return parts.join("\n\n");
+}
+
 function groupIntoTurns(events: TranscriptEvent[]): TurnGroup[] {
   const turns: TurnGroup[] = [];
-  let current: TurnGroup = { assistant: null, toolUses: [], toolResults: [] };
+  let current = emptyTurn(0);
+  // sawUserSinceLastAssistant tracks whether the next assistant_message
+  // should open a new turn. The SDK splits one model turn into multiple
+  // assistant_message events (text + tool_use as separate messages); only
+  // a user_message (tool_results coming back) marks the end of a turn.
+  let sawUserSinceLastAssistant = true;
   for (const ev of events) {
     if (ev.type === "assistant_message") {
-      if (current.assistant !== null || current.toolUses.length > 0) {
-        turns.push(current);
-        current = { assistant: null, toolUses: [], toolResults: [] };
+      if (sawUserSinceLastAssistant) {
+        if (turnHasContent(current)) turns.push(current);
+        current = emptyTurn(ev.ts);
+        sawUserSinceLastAssistant = false;
       }
-      current.assistant = { ...ev.data, ts: ev.ts };
+      const text = extractText(ev.data);
+      if (text) current.text = current.text ? `${current.text}\n\n${text}` : text;
       current.toolUses.push(...extractToolUses(ev.data, ev.ts));
     } else if (ev.type === "user_message") {
       current.toolResults.push(
         ...extractToolResults(ev.data.message?.content, ev.ts),
       );
+      sawUserSinceLastAssistant = true;
     } else if (ev.type === "tool_use") {
       current.toolUses.push({ ...ev.data, ts: ev.ts });
     } else if (ev.type === "tool_result") {
       current.toolResults.push({ ...ev.data, ts: ev.ts });
+      sawUserSinceLastAssistant = true;
     }
   }
-  if (current.assistant !== null || current.toolUses.length > 0) {
-    turns.push(current);
-  }
+  if (turnHasContent(current)) turns.push(current);
   return turns;
 }
 
@@ -387,7 +416,7 @@ function TurnBlock({ turn, index }: { turn: TurnGroup; index: number }) {
       <div className="text-muted-foreground text-[10px] uppercase tracking-wider">
         Turn {index + 1}
       </div>
-      {turn.assistant && <MessageBubble data={turn.assistant} />}
+      {turn.text && <MessageBubble text={turn.text} />}
       {turn.toolUses.map((tu) => {
         const result = turn.toolResults.find(
           (tr) => tr.tool_use_id === tu.id,
@@ -400,8 +429,7 @@ function TurnBlock({ turn, index }: { turn: TurnGroup; index: number }) {
   );
 }
 
-function MessageBubble({ data }: { data: AssistantMessageData }) {
-  const text = useMemo(() => extractText(data.message.content), [data]);
+function MessageBubble({ text }: { text: string }) {
   if (!text) return null;
   return (
     <div className="bg-muted/40 rounded-md p-3">
@@ -410,13 +438,6 @@ function MessageBubble({ data }: { data: AssistantMessageData }) {
       </pre>
     </div>
   );
-}
-
-function extractText(content: AssistantContent[]): string {
-  return content
-    .filter((b): b is { type: "text"; text: string } => b.type === "text")
-    .map((b) => b.text)
-    .join("\n\n");
 }
 
 interface ToolCallPairProps {
