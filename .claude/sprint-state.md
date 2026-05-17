@@ -73,15 +73,17 @@ Each iteration ends in **one squash-merged PR into the sprint branch** (not main
 - [ ] **Deferred to iter 3:** handler-layer integration tests (need *app.App in buildTestRouter)
 - [ ] **Deferred to iter 3:** add `agents/**` to .github/workflows/ci.yml `pull_request.branches` so iteration PRs targeting the sprint branch actually run CI. Currently only main / stack/** / feat/** match — sprint PRs merge on local-test confidence + standing auth.
 
-### Iteration 3 — scheduler + runner orchestrator
-- [ ] Extend `internal/sync/scheduler.go` (or new `internal/agent/scheduler.go`) to register a cron entry per enabled agent_definition
-- [ ] Reload on definition changes (CRUD invalidates scheduler)
-- [ ] Concurrency mutex: server-wide guard (configurable, default 1)
-- [ ] Runner orchestrator: assemble spec → spawn sidecar → stream events → persist transcript → write final `agent_runs` row
-- [ ] Manual "run now" endpoint
-- [ ] Cleanup job: prune transcripts older than retention (default 30d, matches sync_logs pattern)
-- **Tests:** integration test that registers an agent, fires manually, verifies a run row + transcript file
-- **PR title:** `feat(agents): scheduler, runner orchestrator, manual trigger`
+### Iteration 3 — scheduler + runner orchestrator ✅ MERGED #1229 (into sprint branch)
+- [x] `internal/service/agent_scheduler.go` — robfig/cron wrapper, one entry per enabled definition
+- [x] OnDefinitionChanged hook reloads scheduler on CRUD
+- [x] `internal/agent/concurrency.go` — Semaphore (cap from app_config, default 1)
+- [x] `internal/service/agent_orchestrator.go` — Mint → Insert → Assemble → Runner.Run → Complete → Revoke
+- [x] POST /api/v1/agents/{slug}/run handler (503/422/200 cases)
+- [x] Daily 3:15am cleanup job for old agent_runs rows
+- [x] CleanupOrphanedAgentRuns at startup
+- [x] CI trigger fix: `agents/**` added to .github/workflows/ci.yml (iter 3 PR was the first to exercise it — all 5 jobs green)
+- [x] 6 new orchestrator integration tests pass
+- [ ] **Deferred to iter 7:** transcript file GC (orphaned NDJSON files after row delete) — DB rows are pruned, disk cleanup is polish
 
 ### Iteration 4 — v2 SPA `/agents` list + settings
 - [ ] New route `/v2/agents` via PAGE_OVERRIDES, registered in `web/src/lib/nav.ts` (Money or System group)
@@ -205,6 +207,23 @@ Deferred to iter 3:
 - Orchestrator that actually invokes Mint → Assemble → Runner.Run → Revoke.
 
 Next iteration: scheduler + run-now + orchestrator + CI trigger fix.
+
+## ITER 3 — 2026-05-17 00:38
+Shipped (PR #1229 squash-merged into sprint branch as 361acafb):
+- Closed the loop: agent system can now actually fire (cron) and be triggered manually (run-now).
+- Concurrency primitive + orchestrator with auth/binary/runner error surfacing.
+- Scheduler with Reload on CRUD.
+- Daily cleanup + startup orphan cleanup.
+- Serve.go wiring — agent subsystem starts alongside the sync scheduler.
+- CI trigger fix landed AND verified: iter 3 PR triggered all 5 CI jobs (api, headless, lite, rest, service), all green. Future iter PRs get real coverage.
+- 6 new orchestrator integration tests (happy, concurrency-lock-under-contention, skipped row, no-auth, runner-error persistence, mint-revoke round-trip).
+
+Deferred:
+- Handler-layer integration tests still need *app.App in buildTestRouter (deferred from iter 2; still optional given strong service-layer coverage).
+- Transcript file GC (iter 7).
+
+Next iteration: v2 SPA /agents page (list + settings) — first UI work, will pull in the frontend-design skill and capture screenshots per the embedded-evidence rule.
+
 
 
 
