@@ -1740,6 +1740,25 @@ Cross-cutting components:
     `Badge` import from the consumer files that used it only
     for the meta-chip pattern (account-detail).
 
+- **Iter 70 — List-row trailing chevron vocabulary unified** ([#1183](https://github.com/canalesb93/breadbox/pull/1183))
+  - Sweep of the list-row "click to navigate" trailing
+    chevron. Of the four surfaces that ship one
+    (account-row, category-list child rows, command-palette,
+    error.tsx), account-row was the lone outlier at
+    `size-4` + `text-muted-foreground/40` + hover-transition.
+    Categories child rows had the canonical `size-3.5` +
+    `text-muted-foreground/60` but no hover transition.
+  - Canonical recipe is now
+    `text-muted-foreground/60 group-hover:text-muted-foreground size-3.5 transition-colors`.
+    Containing row needs the `group` token. Applied to
+    account-row + categories-list child rows; command-palette
+    and error.tsx already match.
+  - Pattern is small enough that the abstraction would weigh
+    more than the duplication — copy-paste from one of the
+    four sites when adding a new list. If a sixth surface
+    arrives with the same shape, promote to a
+    `<RowTrailingChevron>` then.
+
 ## Open observations / questions
 
 (Populated by iterations.)
