@@ -293,6 +293,14 @@ export function useAgentRuns(
       );
     },
     enabled: Boolean(slug),
+    // Poll while ANY visible run is in_progress so the row's status pill
+    // flips to success/error as soon as the sidecar finishes (the
+    // orchestrator runs async post-iter-47 and doesn't push status into
+    // the cache). Stops automatically once no in-flight runs remain.
+    refetchInterval: (q) =>
+      (q.state.data?.runs ?? []).some((r) => r.status === "in_progress")
+        ? 2000
+        : false,
   });
 }
 
@@ -301,6 +309,12 @@ export function useAgentRun(shortId: string | undefined) {
     queryKey: ["agents", "runs", shortId],
     queryFn: () => api<AgentRun>(`/api/v1/agents/runs/${shortId}`),
     enabled: Boolean(shortId),
+    // Same in_progress polling story as useAgentRuns — the transcript
+    // drawer's "Run in progress" banner pivots on runDetail.data.status,
+    // so without this the banner would stay forever after the sidecar
+    // exited.
+    refetchInterval: (q) =>
+      q.state.data?.status === "in_progress" ? 2000 : false,
   });
 }
 
