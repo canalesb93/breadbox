@@ -5,7 +5,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CategoryBadge } from "@/components/category-badge";
+import {
+  CATEGORY_BADGE_ICON,
+  CATEGORY_BADGE_SHAPE,
+  CategoryBadge,
+} from "@/components/category-badge";
 import {
   CategoryCommandList,
   useCategoryEditor,
@@ -46,35 +50,18 @@ export function CategoryPicker({
   onPick: onPickOverride,
   className,
 }: CategoryPickerProps) {
-  // Match the empty-state pill's geometry to the active badge so the column
-  // doesn't shift when the user assigns or clears a category from the row.
-  const emptyPillClass =
-    size === "sm"
-      ? "h-5 px-1.5 text-[11px] gap-0.5"
-      : "h-6 px-2 text-xs gap-1";
   const [open, setOpen] = useState(false);
   const { apply, isPending } = useCategoryEditor(transactionId);
 
   const onPick = async (pick: CategoryPick) => {
     setOpen(false);
-    if (onPickOverride) {
-      await onPickOverride(pick);
-      return;
-    }
-    await apply(pick);
+    await (onPickOverride ?? apply)(pick);
   };
 
-  // Chevron swaps in for the category icon on hover (cross-fade in the
-  // same spot) so the badge surface stays the same width and nothing
-  // overlaps the label. Falls back to a no-op when the category has no
-  // icon — the hover ring alone carries the affordance there.
-  const chevronClass = size === "sm" ? "size-2.5" : "size-3";
-  // Mask is intentionally bigger than the icon — and wider than tall —
-  // so stroke/edge bleed and per-icon viewBox variance on the underlying
-  // svg are fully covered (some lucide icons render a px or two past
-  // their nominal width).
+  const iconClass = CATEGORY_BADGE_ICON[size];
+  // Mask is wider than the icon so per-lucide-icon viewBox variance is
+  // fully covered (some render a px or two past their nominal width).
   const maskClass = size === "sm" ? "h-3 w-4" : "h-4 w-5";
-  const chevronLeftClass = size === "sm" ? "left-1" : "left-1";
   const hasIcon = !!category?.icon;
 
   return (
@@ -86,8 +73,7 @@ export function CategoryPicker({
           onClick={(e) => e.stopPropagation()}
           className={cn(
             "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
-            // Hover ring only when a category is assigned. Empty-state
-            // pill keeps its dashed border alone (no double-stroke).
+            // Empty-state pill carries its own dashed border — no double-stroke.
             category?.display_name && "hover:ring-1 hover:ring-border",
             className,
           )}
@@ -102,28 +88,22 @@ export function CategoryPicker({
             <span
               className={cn(
                 "text-muted-foreground border-border inline-flex items-center rounded-md border border-dashed group-hover/picker:text-foreground group-hover/picker:border-foreground/40",
-                emptyPillClass,
+                CATEGORY_BADGE_SHAPE[size],
               )}
             >
-              <Plus className={size === "sm" ? "size-2.5" : "size-3"} />
+              <Plus className={iconClass} />
               Category
             </span>
           )}
-          {/* Pencil swap-in: overlays the category icon's spot on hover.
-              The wrapper carries a `bg-secondary` fill (matching the
-              CategoryBadge surface) so it masks the underlying icon —
-              cleaner than trying to fade the badge's own svg via a
-              descendant selector. */}
           {hasIcon && (
             <span
               aria-hidden
               className={cn(
-                "bg-secondary pointer-events-none absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-[2px] opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
-                chevronLeftClass,
+                "bg-secondary pointer-events-none absolute top-1/2 left-1 flex -translate-y-1/2 items-center justify-center rounded-[2px] opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
                 maskClass,
               )}
             >
-              <Pencil className={cn("text-muted-foreground", chevronClass)} />
+              <Pencil className={cn("text-muted-foreground", iconClass)} />
             </span>
           )}
         </button>

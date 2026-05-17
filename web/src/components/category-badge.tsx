@@ -16,8 +16,18 @@ interface CategoryBadgeProps {
   className?: string;
 }
 
-// Per-size token recipe. Kept inline so the size axis is grep-able alongside
-// TagChip's matching recipe — if one shifts the other should too.
+// Shape tokens — the geometry shared by CategoryBadge, the CategoryPicker
+// empty-state pill, and the picker's pencil overlay. Exported so any
+// caller building a badge-shaped surface can match without re-deriving.
+// Kept in lockstep with TagChip's matching recipe.
+export const CATEGORY_BADGE_SHAPE: Record<"sm" | "md", string> = {
+  sm: "h-5 px-1.5 text-[11px] gap-0.5",
+  md: "h-6 px-2 text-xs gap-1",
+};
+export const CATEGORY_BADGE_ICON: Record<"sm" | "md", string> = {
+  sm: "size-2.5",
+  md: "size-3",
+};
 const SIZE: Record<"sm" | "md", string> = {
   sm: "h-5 px-1.5 text-[11px] gap-0.5 [&>svg]:size-2.5",
   md: "h-6 px-2 text-xs gap-1 [&>svg]:size-3",
