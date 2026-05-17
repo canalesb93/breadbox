@@ -338,20 +338,27 @@ next target, then updates this file at the end of the run.
   one-off building block for non-list skeletons (backups stat
   grid, providers cards, transaction-row in a TableCell).
 - **Eyebrow primitive** — extracted to
-  `web/src/components/eyebrow.tsx` in iter 37 (#1151). Six surfaces
-  now share the canonical uppercase muted micro-label: TX-detail,
-  Account-detail, Category-detail, Connection-detail,
-  TimelineRail, ProviderScoreboard. Two variants: `default`
-  (`text-[10px] tracking-[0.1em]` for section heads, "Jump to"
-  pills, sync-activity action labels, scoreboard cells) and `hero`
-  (`text-[10px] tracking-[0.12em]` for detail-page hero card
-  eyebrows). Don't hand-roll `text-[10px] font-medium tracking-*
-  uppercase` markup for new surfaces — reach for `<Eyebrow>` or
-  extend it with a new variant if the rhythm needs to differ. The
-  brand-header / auth-shell / shortcut-sheet uppercase labels are
-  intentionally outside this vocabulary — they're surface-specific
-  framing (login chrome, brand lockup, command-palette grouping),
-  not detail-page eyebrows.
+  `web/src/components/eyebrow.tsx` in iter 37 (#1151), expanded in
+  iter 94 (#1209). Nine surfaces now share the canonical uppercase
+  muted micro-label: TX-detail, Account-detail, Category-detail,
+  Connection-detail, TimelineRail, ProviderScoreboard, PageHeader
+  (iter 94), home-stats `HeroCell`/`SecondaryCell` (iter 94),
+  Plaid / CSV / Teller cards' Provider caption (iter 94). Three
+  variants: `default` (`text-[10px] tracking-[0.1em]` for section
+  heads, "Jump to" pills, sync-activity action labels, scoreboard
+  cells); `hero` (`text-[10px] tracking-[0.12em]` for detail-page
+  hero card eyebrows); `page` (iter 94 — `text-[11px]
+  tracking-[0.08em]` for *page*-scale framing where the eyebrow
+  has to hold its own next to a 2xl–3xl title). Don't hand-roll
+  `text-[10-11px] font-medium tracking-* uppercase` markup for new
+  surfaces — reach for `<Eyebrow>` or extend it with a new variant
+  if the rhythm needs to differ. The three variants encode "section
+  · hero · page" weight tiers; a fourth without a concrete host
+  requirement would muddy that signal. The brand-header /
+  auth-shell / shortcut-sheet uppercase labels are intentionally
+  outside this vocabulary — they're surface-specific framing
+  (login chrome, brand lockup, command-palette grouping), not
+  detail-page eyebrows.
 - **DetailSheetHeader primitive** — extracted to
   `web/src/components/detail-sheet-header.tsx` in iter 41 (#1155).
   Four surfaces share the canonical icon-tile sheet header lockup
@@ -2603,6 +2610,61 @@ Cross-cutting components:
     iter 35 still applies; queue: pin vite's `cacheDir` per-worktree
     or set `optimizeDeps.force=true` in `web/vite.config.ts` for
     dev so the CLI flag isn't required.
+
+- **Iter 94 — Eyebrow `page` variant retires 8 hand-rolled call sites** ([#1209](https://github.com/canalesb93/breadbox/pull/1209))
+  - Audited the v2 SPA for stray uppercase tracked labels (`uppercase
+    tracking-[…]`) markup blocks and found eight surfaces hand-rolling
+    `text-[11px] font-medium tracking-[0.08em] uppercase` — the
+    slightly heavier rhythm reserved for *page*-scale framing, where
+    the default `<Eyebrow>` `text-[10px] tracking-[0.1em]` rhythm
+    disappears next to a 2xl–3xl title. The iter-37 promise was
+    "don't reach for raw `text-[10px] font-medium tracking-* uppercase`
+    markup again — extend the primitive"; the page-scale rhythm
+    quietly drifted past it because the variant didn't exist yet.
+  - Added a `"page"` variant to `<Eyebrow>` (`text-[11px]
+    tracking-[0.08em]`) and routed all eight surfaces through it:
+    `<PageHeader>`'s eyebrow, `<HeroCell>` + `<SecondaryCell>` in
+    home-stats (the KPI cell labels with the leading lucide icon),
+    the `Provider` caption in Plaid / CSV / Teller cards (three
+    surfaces share the same `<div>` markup), and the `Sync interval`
+    form label in connection-detail (the only `tracking-[0.1em]`
+    holdout — was already in the right rhythm for the `default`
+    variant, just hand-rolled the markup; routed through `<Eyebrow
+    as="label" htmlFor="…">` for the screen-reader-friendly
+    composition).
+  - Sandbox showcase grows a third specimen tile so all three
+    variants (`default` / `hero` / `page`) live side-by-side instead
+    of two — the description documents the rhythm of each variant
+    *and* lists the new variant's canonical consumers + the iter-94
+    retirement note so the next agent who reaches for raw uppercase
+    tracking markup hits the docstring before the find-grep.
+  - Pre-merge audit confirms zero stragglers: `grep -rn
+    "text-\[11px\] font-medium tracking-\[0\.08em\] uppercase\|
+    tracking-\[0\.1em\] uppercase\|tracking-\[0\.12em\] uppercase"
+    web/src --include="*.tsx" | grep -v "sandbox\|eyebrow.tsx"`
+    returns empty. The iter-37 invariant — "raw `text-[10-11px]
+    font-medium tracking-* uppercase` markup never appears outside
+    `<Eyebrow>`" — is finally enforced across every consumer, not
+    just the eight surfaces iter 37 swept.
+  - Three variants is the natural ceiling. `default` is the
+    detail-page section header + "Jump to" pills + timeline-rail day
+    heading rhythm; `hero` is the hero-card eyebrow ("Liability" /
+    "Income") with extra letter air below a display title; `page` is
+    the page-scale eyebrow + KPI cell label + provider-card caption
+    rhythm. Don't add a fourth without a concrete fourth host
+    requirement — the three currently encode "section · hero · page"
+    weight tiers and a fourth without a host would muddy that signal.
+  - Observation: connection-detail had several other inline
+    eyebrow-shaped labels (line 456 `<Eyebrow>Last 7 days</Eyebrow>`,
+    line 500 `<Eyebrow>Last 10</Eyebrow>`, line 645 `<Eyebrow as="p"
+    variant="hero">`) that are already routed through the primitive
+    — those four pre-existing call sites validate that consumers
+    were reaching for the primitive when they knew the variant
+    existed. The hand-rolled markup survived only where the iter-37
+    sweep didn't catch the rhythm. Lesson for next sweeps: when
+    consolidating a primitive, grep for *every* close variant
+    (slightly different size or tracking) not just the canonical
+    one — the close cousins are usually the same intent.
 
 - **Iter 93 — TimelineRail.Row gains semantic `tone` accent** ([#1208](https://github.com/canalesb93/breadbox/pull/1208))
   - The activity timeline's icon discs were all rendered in the same
