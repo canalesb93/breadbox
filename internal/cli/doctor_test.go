@@ -3,10 +3,13 @@
 package cli
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
+	"breadbox/internal/agent"
 	"breadbox/internal/config"
 	"breadbox/internal/db"
 )
@@ -159,6 +162,66 @@ func TestCheckCronConfig(t *testing.T) {
 	})
 }
 
+func TestAgentSubsystemCheck(t *testing.T) {
+	tests := []struct {
+		name        string
+		authMode    string
+		authPresent bool
+		binPath     string
+		binReady    bool
+		wantStatus  string
+		wantMsgPart string
+	}{
+		{
+			name:        "both present",
+			authMode:    "subscription",
+			authPresent: true,
+			binPath:     "/usr/local/bin/breadbox-agent",
+			binReady:    true,
+			wantStatus:  doctorStatusPass,
+			wantMsgPart: "ready",
+		},
+		{
+			name:        "auth present, binary missing",
+			authMode:    "api_key",
+			authPresent: true,
+			binPath:     "",
+			binReady:    false,
+			wantStatus:  doctorStatusWarn,
+			wantMsgPart: "binary not found",
+		},
+		{
+			name:        "auth missing, binary present",
+			authMode:    "subscription",
+			authPresent: false,
+			binPath:     "/bin/breadbox-agent",
+			binReady:    true,
+			wantStatus:  doctorStatusWarn,
+			wantMsgPart: "no Anthropic credential",
+		},
+		{
+			name:        "neither configured",
+			authMode:    "subscription",
+			authPresent: false,
+			binPath:     "",
+			binReady:    false,
+			wantStatus:  doctorStatusSkip,
+			wantMsgPart: "not configured",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := agentSubsystemCheck(tc.authMode, tc.authPresent, tc.binPath, tc.binReady)
+			if got.Status != tc.wantStatus {
+				t.Errorf("status = %q, want %q", got.Status, tc.wantStatus)
+			}
+			if !strings.Contains(got.Message, tc.wantMsgPart) {
+				t.Errorf("message %q should contain %q", got.Message, tc.wantMsgPart)
+			}
+		})
+	}
+}
+
 func TestCheckPublicURL(t *testing.T) {
 	t.Run("unset skips", func(t *testing.T) {
 		t.Setenv("PUBLIC_URL", "")
@@ -171,6 +234,63 @@ func TestCheckPublicURL(t *testing.T) {
 		t.Setenv("PUBLIC_URL", "https://example.com")
 		if got := checkPublicURL(true).Status; got != doctorStatusSkip {
 			t.Fatalf("status: got %q, want skip", got)
+		}
+	})
+}
+
+func TestLiveSmokeCheck(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		got := liveSmokeCheck(&agent.SmokeResult{
+			AuthMode:     "subscription",
+			Model:        "claude-haiku-4-5",
+			DurationMs:   1234,
+			TotalCostUSD: 0.0042,
+			InputTokens:  12,
+			OutputTokens: 3,
+		}, nil)
+		if got.Status != doctorStatusPass {
+			t.Fatalf("status = %q, want pass", got.Status)
+		}
+		for _, want := range []string{"claude-haiku-4-5", "1234ms", "$0.0042", "12→3", "subscription"} {
+			if !strings.Contains(got.Message, want) {
+				t.Errorf("message %q missing %q", got.Message, want)
+			}
+		}
+	})
+	t.Run("auth-not-configured wraps to fail with remediation", func(t *testing.T) {
+		got := liveSmokeCheck(nil, fmt.Errorf("smoke: %w", agent.ErrAuthNotConfigured))
+		if got.Status != doctorStatusFail {
+			t.Fatalf("status = %q, want fail", got.Status)
+		}
+		if !strings.Contains(got.Remediation, "Settings → Agents") {
+			t.Errorf("remediation %q missing settings hint", got.Remediation)
+		}
+	})
+	t.Run("binary-not-found wraps to fail with build hint", func(t *testing.T) {
+		got := liveSmokeCheck(nil, fmt.Errorf("smoke: %w", agent.ErrBinaryNotFound))
+		if got.Status != doctorStatusFail {
+			t.Fatalf("status = %q, want fail", got.Status)
+		}
+		if !strings.Contains(got.Remediation, "make agent-sidecar") {
+			t.Errorf("remediation %q missing build hint", got.Remediation)
+		}
+	})
+	t.Run("generic error falls through to upstream check hint", func(t *testing.T) {
+		got := liveSmokeCheck(nil, errors.New("kaboom"))
+		if got.Status != doctorStatusFail {
+			t.Fatalf("status = %q, want fail", got.Status)
+		}
+		if !strings.Contains(got.Message, "kaboom") {
+			t.Errorf("message %q missing error text", got.Message)
+		}
+		if !strings.Contains(got.Remediation, "api.anthropic.com") {
+			t.Errorf("remediation %q missing network hint", got.Remediation)
+		}
+	})
+	t.Run("nil result with nil error guards against runner bug", func(t *testing.T) {
+		got := liveSmokeCheck(nil, nil)
+		if got.Status != doctorStatusFail {
+			t.Fatalf("status = %q, want fail", got.Status)
 		}
 	})
 }

@@ -107,8 +107,12 @@ import type { Transaction } from "@/api/types";
 import { SandboxSection, Specimen } from "@/sandbox/kit";
 import {
   sampleTags,
+  sampleTranscriptEvents,
+  sampleTranscriptEventsError,
   sampleTransactions,
 } from "@/sandbox/fixtures";
+import { CronField } from "@/features/agents/cron-field";
+import { TranscriptViewer } from "@/features/agents/transcript-viewer";
 
 const coffeeCategory = sampleTransactions[0].category;
 const gasCategory = sampleTransactions[2].category;
@@ -1626,6 +1630,47 @@ export function ComponentsSection() {
           </p>
         </div>
       </Specimen>
+
+      <Specimen
+        label="CronField"
+        code="features/agents/cron-field"
+        description="Cron input + live human-readable preview + popover preset picker. Used in the agent edit form (web/src/routes/agents.$slug.edit.tsx). The preview shows 'Mondays at 9 AM' style labels for known patterns, falls back to 'Custom: <expr>' otherwise."
+        className="block"
+      >
+        <CronFieldDemo />
+      </Specimen>
+
+      <Specimen
+        label="TranscriptViewer — successful run"
+        code="features/agents/transcript-viewer"
+        description="Parses NDJSON sidecar events into turn-grouped assistant blocks with collapsible tool calls + a result footer (cost, tokens, turn count, stop reason). Used inside the run-history Sheet at /v2/agents/$slug/runs."
+        className="block"
+      >
+        <div className="bg-background h-[480px] overflow-y-auto rounded-md border p-3">
+          <TranscriptViewer
+            events={sampleTranscriptEvents}
+            rawLength={sampleTranscriptEvents.length}
+            truncated={false}
+            shortId="abc12345"
+          />
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="TranscriptViewer — errored run"
+        code="features/agents/transcript-viewer"
+        description="The error banner variant — surfaces an SDK/sidecar error at the top with a destructive-tone Alert."
+        className="block"
+      >
+        <div className="bg-background overflow-y-auto rounded-md border p-3">
+          <TranscriptViewer
+            events={sampleTranscriptEventsError}
+            rawLength={sampleTranscriptEventsError.length}
+            truncated={false}
+            shortId="err00000"
+          />
+        </div>
+      </Specimen>
     </SandboxSection>
   );
 }
@@ -1678,6 +1723,13 @@ function ThemeSpecimen() {
       </p>
     </div>
   );
+}
+
+// CronField needs local state to render usefully — the demo wraps it in a
+// stateful container so users can click presets and watch the preview update.
+function CronFieldDemo() {
+  const [value, setValue] = useState("0 9 * * 1");
+  return <CronField value={value} onChange={setValue} />;
 }
 
 // Inline visual demo of the NavUser trigger — the dropdown itself depends on

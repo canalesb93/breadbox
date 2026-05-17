@@ -1,4 +1,5 @@
 import {
+  Bot,
   DatabaseBackup,
   Lock,
   User,
@@ -37,5 +38,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "Backups",
     description: "Snapshot the database, restore, and schedule automatic backups.",
     icon: DatabaseBackup,
+  },
+  {
+    slug: "agents",
+    title: "Agents",
+    description: "Claude credentials and global caps for the Agent SDK runner.",
+    icon: Bot,
   },
 ];

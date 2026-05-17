@@ -161,25 +161,27 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// session data is hosted on the Logs page's Sessions tab;
 		// it's registered here under the editor+ scope to preserve the
 		// previous /agents/sessions/{id} permission level.
-		r.Get("/agent-prompts", AgentsPageHandler(svc, sm, tr))
-		r.Get("/agent-prompts/builder/{type}", PromptBuilderHandler(sm, tr))
-		r.Get("/agent-prompts/builder/{type}/copy", PromptCopyHandler())
+		// v1 admin agent surfaces are retired in favor of the v2 SPA
+		// /v2/agents page. Every legacy path 302s there so bookmarks,
+		// CLI completions, and external references continue to work.
+		// AgentsPageHandler / PromptBuilderHandler / PromptCopyHandler
+		// remain compiled (unwired) until the broader v1 admin retirement
+		// so a rollback is a one-line change.
+		r.Get("/agent-prompts", redirectGET("/v2/agents"))
+		r.Get("/agent-prompts/builder/{type}", redirectGET("/v2/agents"))
+		r.Get("/agent-prompts/builder/{type}/copy", redirectGET("/v2/agents"))
 		r.Get("/logs/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 
-		// Legacy /agents, /agent-wizard, and /activity/sessions redirects.
-		r.Get("/agents", redirectGET("/agent-prompts"))
+		// Legacy /agents and /activity/sessions redirects.
+		r.Get("/agents", redirectGET("/v2/agents"))
 		r.Get("/agents/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
 		r.Get("/activity/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
-		r.Get("/agent-wizard/{type}", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type"), http.StatusMovedPermanently)
-		})
-		r.Get("/agent-wizard/{type}/copy", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type")+"/copy", http.StatusMovedPermanently)
-		})
+		r.Get("/agent-wizard/{type}", redirectGET("/v2/agents"))
+		r.Get("/agent-wizard/{type}/copy", redirectGET("/v2/agents"))
 	})
 
 	// Admin-only authenticated routes (HTML pages).

@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"breadbox/internal/agent"
 	"breadbox/internal/api"
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
@@ -22,6 +23,7 @@ import (
 	"breadbox/internal/sync"
 	versionpkg "breadbox/internal/version"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/spf13/cobra"
 )
 
@@ -115,6 +117,49 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger, syncTimeout)
 	scheduler.Start(cfg.SyncIntervalMinutes)
 	a.Scheduler = scheduler
+
+	// Agent orchestrator + scheduler — drives Claude Agent SDK runs against
+	// the MCP server. Both subscription-token and Anthropic API-key auth
+	// modes are supported (see app_config agent.auth_mode).
+	if cleanupResult, cerr := a.Queries.CleanupOrphanedAgentRuns(ctx); cerr != nil {
+		logger.Warn("failed to clean up orphaned agent runs", "error", cerr)
+	} else if n := cleanupResult.RowsAffected(); n > 0 {
+		logger.Info("cleaned up orphaned agent runs", "count", n)
+	}
+	// Default was 1 in iter-1 as a v1 safety net. Lifted to 3 in iter-29 after
+	// 28 iterations of dogfood proved the semaphore + mint-and-revoke survive
+	// concurrent contention. Operators can raise (or lower back to 1) in
+	// Settings → Agents.
+	agentMaxConcurrent := appconfig.Int(ctx, a.Queries, appconfig.KeyAgentMaxConcurrent, 3)
+	agentRuntimePath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
+	// Default transcripts to ./transcripts/agents (relative to the cwd
+	// `breadbox serve` was launched from). Iter-1 left this empty, which
+	// silently dropped transcripts — every run row had transcript_path=""
+	// and the v2 SPA's "open transcript" hit 404. Operators can override
+	// via Settings → Agents → "breadbox-agent transcripts dir" if they
+	// want them elsewhere. Daily cleanup (iter-25) still prunes whatever
+	// path is in effect.
+	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
+	agentSidecar := &agent.Sidecar{
+		BinaryPath:    agentRuntimePath,
+		TranscriptDir: agentTranscriptDir,
+	}
+	agentOrch := service.NewOrchestrator(a.Service, agentSidecar, agentMaxConcurrent, cfg.EncryptionKey, logger)
+	agentSched := service.NewAgentScheduler(agentOrch, a.Service, logger)
+	agentOrch.AttachScheduler(agentSched)
+	// Wire the post-sync hook so trigger_on_sync_complete agents fire
+	// after every successful sync. The orchestrator dispatches asynchronously
+	// so the sync engine returns immediately.
+	a.SyncEngine.OnSyncComplete = func(ctx context.Context, _ pgtype.UUID) {
+		agentOrch.FireSyncCompleteAgents(ctx)
+	}
+	if err := agent.SeedDefaults(ctx, a.Queries, logger); err != nil {
+		logger.Warn("agent seed failed", "error", err)
+	}
+	agentSched.Start(ctx)
+	a.AgentOrchestrator = agentOrch
+	a.AgentScheduler = agentSched
+	a.Service.OnDefinitionChanged = agentOrch.NotifyDefinitionChanged
 
 	if _, err := exec.LookPath("pg_dump"); err == nil {
 		backupDir := os.Getenv("BACKUP_DIR")

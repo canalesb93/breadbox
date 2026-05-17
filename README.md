@@ -22,6 +22,7 @@ Breadbox syncs your bank data into a PostgreSQL database you control, then expos
 - **Multi-user** household support (admin + family members)
 - **Category system** with 2-level hierarchy
 - **Agent reports** for AI agents to submit summaries and flag transactions
+- **Built-in agent runtime** -- schedule recurring [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview) runs that call breadbox MCP to enrich, categorize, and review transactions; cron / sync-complete / on-demand triggers, per-run cost + turn caps, full NDJSON transcripts
 - **API key auth** with scoped access (full/read-only)
 - **AES-256-GCM encryption** for provider credentials at rest
 - **CLI** -- `gh`-style `breadbox <noun> <verb>` driving a local or remote instance; same binary, plus a 10 MB `breadbox-cli` lite build for remote agents
@@ -120,6 +121,10 @@ chmod +x breadbox
 export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
 export ENCRYPTION_KEY="$(openssl rand -hex 32)"
 
+# First-time setup: pick an admin email + password (password is typed, not echoed).
+# Skip if you already have an admin account.
+./breadbox init
+
 ./breadbox serve
 # Visit http://localhost:8080
 ```
@@ -135,6 +140,9 @@ go install ./cmd/breadbox
 # Requires a running PostgreSQL instance
 export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
 export ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+# First-time setup: pick an admin email + password (password is typed, not echoed).
+breadbox init
 
 breadbox serve
 # Visit http://localhost:8080
@@ -246,13 +254,18 @@ Provider credentials can also be configured through the setup wizard or admin da
 
 ## CLI
 
+Common server-side commands (full catalog in [`docs/cli-commands.md`](docs/cli-commands.md)):
+
 ```
-breadbox serve           Start the server (API, MCP, dashboard, webhooks, cron)
-breadbox create-admin    Create an admin user
-breadbox mcp-stdio       Start MCP server on stdin/stdout
-breadbox migrate         Run pending database migrations
-breadbox doctor          Validate config and connectivity without booting the server
-breadbox version         Print version
+breadbox serve              Start the server (API, MCP, dashboard, webhooks, cron)
+breadbox init               First-time setup: create admin account interactively
+breadbox mcp                Start MCP server on stdin/stdout (alias: mcp-stdio, deprecated)
+breadbox migrate            Run pending database migrations
+breadbox doctor             Validate config and connectivity without booting the server
+breadbox agent test         Smoke-test the Claude Agent SDK integration (~5¢ bounded)
+breadbox agent run <slug>   Fire a configured agent immediately from the shell
+breadbox agent list         List configured agents (table or --json)
+breadbox version            Print version
 ```
 
 Run `breadbox doctor` if the server fails to start or something feels off — it
@@ -271,9 +284,11 @@ pass. See [Doctor](docs/doctor.md) for the full check list and `--json` /
 - [Teller Integration](docs/teller-integration.md) -- Teller mTLS setup
 - [CSV Import](docs/csv-import.md) -- CSV file format and import behavior
 - [Admin Dashboard](docs/admin-dashboard.md) -- dashboard pages and features
+- [Agents](docs/agents.md) -- built-in Claude Agent SDK runtime: auth, scheduling, safety caps, transcripts
 - [Design System](docs/design-system.md) -- UI framework and component reference
 - [Backup & Restore](docs/backup.md) -- database backup strategies
 - [Doctor](docs/doctor.md) -- `breadbox doctor` pre-flight / readiness check
+- [CLI Commands](docs/cli-commands.md) -- terse index of every `breadbox <noun> <verb>` command
 
 ## Contributing
 

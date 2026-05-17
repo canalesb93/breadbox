@@ -34,6 +34,10 @@ const (
 	// transcripts are written. One file per run, named "<runID>.ndjson".
 	// Default: "<data dir>/agent-transcripts" resolved by the runner.
 	KeyAgentTranscriptDir = "agent.transcript_dir"
+
+	// KeyAgentRunRetentionDays is the number of days to keep completed
+	// agent_runs rows. Default: 30. 0 disables cleanup.
+	KeyAgentRunRetentionDays = "agent.run_retention_days"
 )
 
 // AuthMode values for KeyAgentAuthMode.

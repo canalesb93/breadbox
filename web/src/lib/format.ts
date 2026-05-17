@@ -133,6 +133,19 @@ export function formatRelativeTime(iso: string): string {
   return relativeTimeFormatter.format(Math.round(diffSec), "second");
 }
 
+// formatDuration renders a millisecond count as a compact "5m 12s" / "823ms"
+// label. Returns "—" for null/undefined/zero — agent runs and sync logs both
+// surface NULL when a row hasn't completed yet.
+export function formatDuration(ms: number | null | undefined): string {
+  if (!ms) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const min = Math.floor(s / 60);
+  const rest = s % 60;
+  return rest > 0 ? `${min}m ${rest}s` : `${min}m`;
+}
+
 // formatRelativeShort renders an RFC3339 timestamp as a compact "12m ago" /
 // "3h ago" / "5d ago" — the dense form for connection rows, sync history,
 // and other surfaces where the long form ("12 minutes ago") would crowd

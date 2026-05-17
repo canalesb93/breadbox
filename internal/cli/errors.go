@@ -51,6 +51,15 @@ func MapExitCode(err error) int {
 	if errors.As(err, &ue) {
 		return ExitUsage
 	}
+	// Agent diagnostics surface these through the smoke-test CLI; treat
+	// missing credentials as ExitAuth and missing binary as ExitValidation
+	// (operator action needed in both cases, distinct codes for CI).
+	if errors.Is(err, agentErrAuthNotConfigured) {
+		return ExitAuth
+	}
+	if errors.Is(err, agentErrBinaryNotFound) {
+		return ExitValidation
+	}
 	if errors.Is(err, config.ErrNoHosts) || errors.Is(err, config.ErrHostNotFound) {
 		return ExitAuth
 	}

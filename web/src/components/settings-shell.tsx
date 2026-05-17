@@ -19,6 +19,7 @@ import { SETTINGS_SECTIONS, type SettingsSection } from "@/lib/settings-sections
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { closeModal, openModal, useActiveModal } from "@/lib/modals";
 import { AccountSection } from "@/features/settings/account-section";
+import { AgentsSection } from "@/features/settings/agents-section";
 import { BackupsSection } from "@/features/settings/backups-section";
 import { HouseholdSection } from "@/features/settings/household-section";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
@@ -205,6 +206,10 @@ function SectionContent({ section }: { section: SettingsSection }) {
 
   if (section.slug === "backups") {
     return <BackupsSection />;
+  }
+
+  if (section.slug === "agents") {
+    return <AgentsSection />;
   }
 
   // Fallback for sections defined in `lib/settings-sections.ts` that don't

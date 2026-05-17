@@ -251,6 +251,33 @@ Secret-flagged keys are masked on read. A denylist of keys (`ENCRYPTION_KEY`, `t
 | GET | `/webhook-events` | W | Paginated list of recent webhook events; filters `provider`, `status`, `page`, `limit` |
 | POST | `/webhook-events/{id}/replay` | W | Re-trigger the manual sync the event would have caused; events without a connection are reported as `triggered: false` |
 
+## Agents
+
+Agent definitions are scheduled Claude Agent SDK runs that call breadbox MCP to enrich, categorize, or report on data. Runs are append-only (no delete). Settings carry Anthropic credentials (encrypted at rest) and global caps.
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/agents` | R | List all agent definitions with last_run inlined (bare JSON array) |
+| GET | `/agents/{slug}` | R | One definition; accepts slug, short_id, or UUID |
+| POST | `/agents` | W | Create an agent definition |
+| PATCH | `/agents/{slug}` | W | PATCH-merge update; omitted fields are unchanged |
+| DELETE | `/agents/{slug}` | W | Delete the definition; historical runs preserved (FK SET NULL) |
+| POST | `/agents/{slug}/enable` | W | Flip enabled=true |
+| POST | `/agents/{slug}/disable` | W | Flip enabled=false |
+| POST | `/agents/{slug}/run` | W | Trigger an immediate synchronous run; optional body fields `{prompt_prefix}` (prepend, ≤2000) and `{prompt}` (full override, ≤40000) — `prompt` wins when both set; 503 `CONCURRENCY_LOCKED` when another run is in progress |
+| POST | `/agents/test` | W | Run the diagnostic smoke test (tiny "say OK" prompt, no MCP servers, ~5¢ cap); 422 `AUTH_NOT_CONFIGURED` / `AGENT_BINARY_NOT_FOUND` |
+| POST | `/agents/cleanup` | W | Run the agent cleanup pass on demand; returns `{runs_deleted, transcripts_deleted, transcripts_scanned, retention_days, transcript_dir}` |
+| GET | `/agents/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200); filters: `status`, `trigger`, `hit_cap` (`max_turns`/`max_budget`/`any`), `start`, `end` |
+| GET | `/agents/runs/recent-errors` | R | Errored runs across all agents in the last `hours` (default 24, max 168); `?limit=5` (max 50); joined with `agent_slug`+`agent_name` for deep-link |
+| GET | `/agents/runs/{shortId}` | R | One run detail (by short_id or UUID) |
+| PATCH | `/agents/runs/{shortId}` | W | Set/clear the operator note on a run. Body `{ "note": "..." }`; empty string clears. Capped at 2000 chars |
+| GET | `/agents/runs/{shortId}/transcript` | R | Streams the NDJSON transcript; 404 when not yet written |
+| GET | `/agents/settings` | R | Agent subsystem config; token fields returned masked, never plaintext |
+| GET | `/agents/status` | R | Cheap readiness probe — `{auth_configured, binary_present, ready}` for onboarding hints (no API call) |
+| PUT | `/agents/settings` | W | Update settings; nil fields are unchanged, empty string for token fields clears them |
+
+`subscription_token` and `anthropic_api_key` are AES-256-GCM encrypted at rest. GET returns a masked display string (`"sk-ant-oat01-XXXXXXXXX••••wxyz"`); the full value never leaves the server. A per-run scoped API key (`actor_type='agent'`) is minted at run start by the orchestrator and revoked at completion — it is not exposed via this surface.
+
 ## Rate limiting
 
 All `/api/v1/*` routes (except `/health/*` and `/api/v1/version`) are rate-limited per API key. Defaults: **120 req/min, burst 60**. Env vars `API_RATE_LIMIT_RPM` / `API_RATE_LIMIT_BURST`. Over-limit responses: `429 RATE_LIMITED` with `X-RateLimit-Limit/Remaining/Reset` + `Retry-After`.

@@ -2368,6 +2368,313 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderConfig" }
 
+  # -- Agents --
+  /api/v1/agents:
+    get:
+      tags: [Agents]
+      summary: List agent definitions
+      description: Returns all agent definitions with `last_run` inlined per definition.
+      responses:
+        "200":
+          description: Bare JSON array of agent definitions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+    post:
+      tags: [Agents]
+      summary: Create agent definition
+      description: |
+        Creates a Claude Agent SDK definition. Body includes the usual
+        `name`, `slug`, `prompt`, `model`, `max_turns`, `max_budget_usd`,
+        `tool_scope`, `allowed_tools`, `schedule_cron`, and the iter-30
+        `trigger_on_sync_complete` flag (fire after every successful
+        sync, in addition to any cron schedule). **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "201":
+          description: Created definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/status:
+    get:
+      tags: [Agents]
+      summary: Readiness probe for the agent subsystem
+      description: |
+        Side-effect-free check that returns whether the agent subsystem
+        is ready to fire a run — auth configured + sidecar binary
+        discoverable. Used by the v2 SPA list page to surface onboarding
+        hints inline. Does NOT call Anthropic; for a live round-trip
+        use POST /agents/test instead.
+      responses:
+        "200":
+          description: Readiness report.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/agents/settings:
+    get:
+      tags: [Agents]
+      summary: Get agent subsystem settings
+      description: |
+        Returns agent.* config from `app_config`. Token fields are masked
+        (e.g. `"sk-ant-oat01-XXXXXXXX••••wxyz"`); the full plaintext never
+        leaves the server.
+      responses:
+        "200":
+          description: Masked settings.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    put:
+      tags: [Agents]
+      summary: Update agent subsystem settings
+      description: |
+        PATCH-style update of agent.* config. Nil fields are unchanged;
+        empty-string for token fields clears the stored encrypted value.
+        Token values are AES-256-GCM encrypted at rest. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: New masked settings state.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/{shortId}:
+    parameters:
+      - { name: shortId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Agents]
+      summary: Get one agent run
+      description: Resolves by short_id or UUID.
+      responses:
+        "200":
+          description: Agent run detail.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/{shortId}:
+    parameters:
+      - { name: shortId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Agents]
+      summary: Set or clear the operator note on a run
+      description: |
+        Body: `{ "note": "..." }`. Empty string clears the field. Capped
+        at 2000 chars. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        "200":
+          description: Updated run.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/{shortId}/transcript:
+    parameters:
+      - { name: shortId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Agents]
+      summary: Stream agent run transcript
+      description: Returns the NDJSON transcript file. 404 when not yet written.
+      responses:
+        "200":
+          description: NDJSON stream.
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        "404":
+          description: Transcript not available.
+  /api/v1/agents/{slug}:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string }, description: "slug, short_id, or UUID" }
+    get:
+      tags: [Agents]
+      summary: Get one agent definition
+      responses:
+        "200":
+          description: Agent definition with last_run inlined.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    patch:
+      tags: [Agents]
+      summary: Partial update of an agent definition
+      description: Omitted fields are unchanged. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Updated definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    delete:
+      tags: [Agents]
+      summary: Delete an agent definition
+      description: Historical runs preserved (FK SET NULL). **Requires `full_access` scope.**
+      responses:
+        "204":
+          description: Deleted.
+  /api/v1/agents/{slug}/runs:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+      - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      - { name: offset, in: query, schema: { type: integer, default: 0 } }
+    get:
+      tags: [Agents]
+      summary: List runs for one agent
+      description: Offset-paginated run history.
+      responses:
+        "200":
+          description: Paginated runs.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/{slug}/enable:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Enable an agent
+      description: Sets enabled=true. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/{slug}/disable:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Disable an agent
+      description: Sets enabled=false. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Updated definition.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs/recent-errors:
+    parameters:
+      - { name: hours, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 168 } }
+      - { name: limit, in: query, schema: { type: integer, default: 5, minimum: 1, maximum: 50 } }
+    get:
+      tags: [Agents]
+      summary: List recent errored agent runs across all agents
+      description: |
+        Returns errored agent_runs from the last `hours` hours (default 24),
+        joined with agent slug + name for deep-linking. Powers the v2 SPA's
+        "Run-failed banner" on /v2/agents. Bare JSON array; most-recent first.
+      responses:
+        "200":
+          description: Bare JSON array of `{agent_slug, agent_name, run_short_id, started_at, error_message, duration_ms, hit_cap}`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+  /api/v1/agents/cleanup:
+    post:
+      tags: [Agents]
+      summary: Run the agent cleanup pass on demand
+      description: |
+        Synchronously runs the same prune pass the 3:15 AM cron does:
+        deletes completed agent_runs older than `agent.run_retention_days`
+        and prunes the matching `*.ndjson` transcripts under
+        `agent.transcript_dir`. Returns the counts. Safe to call
+        repeatedly — a no-op when nothing's eligible. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Cleanup counts.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "503":
+          description: Agent scheduler not configured (AGENTS_DISABLED).
+  /api/v1/agents/test:
+    post:
+      tags: [Agents]
+      summary: Run the agent diagnostic smoke test
+      description: |
+        Spawns the breadbox-agent sidecar with a tiny "say OK" prompt and
+        returns the result. Bypasses agent_definitions, mints no API key,
+        writes no agent_runs row. Cost-bounded to ~5¢. **Requires `full_access` scope.**
+      responses:
+        "200":
+          description: Diagnostic result.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "422":
+          description: Auth or binary not configured.
+        "500":
+          description: Test ran but the sidecar / model returned an error.
+  /api/v1/agents/{slug}/run:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Trigger an immediate agent run
+      description: |
+        Synchronously runs the named agent. Returns the resulting `agent_runs`
+        row. Status may be `success`, `error`, or `timeout`. Optional body
+        accepts `prompt_prefix` (prepends operator context to the saved
+        prompt for this fire only) and `prompt` (replaces the saved prompt
+        entirely for this fire — powers the iter-45 "Test this prompt"
+        button on the edit page). When both are set, `prompt` wins.
+        **Requires `full_access` scope.**
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt_prefix:
+                  type: string
+                  maxLength: 2000
+                  description: Optional per-run prefix prepended to the agent's prompt; cron runs leave it unset.
+                prompt:
+                  type: string
+                  maxLength: 40000
+                  description: Optional full-prompt override for this fire only. Takes precedence over `prompt_prefix` when both are set.
+      responses:
+        "201":
+          description: Run completed (may be in error state — see `status` and `error_message`).
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "400":
+          description: PROMPT_PREFIX_TOO_LONG / PROMPT_TOO_LONG when the body exceeds the cap.
+        "422":
+          description: Auth or binary not configured.
+        "503":
+          description: Another run is in progress (CONCURRENCY_LOCKED).
+
 components:
   securitySchemes:
     apiKeyAuth:
