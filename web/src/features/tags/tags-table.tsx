@@ -25,6 +25,7 @@ import { TagChip } from "@/components/tag-chip";
 import { useDeleteTag } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
 import type { Tag } from "@/api/types";
+import { TagRowSkeleton } from "./tag-row-skeleton";
 
 interface TagsTableProps {
   tags: Tag[];
@@ -171,6 +172,7 @@ export function TagsTable({
         // band + uppercase vocabulary as the Transactions list.
         stickyHeader
         refinedHeader
+        renderSkeletonRow={() => <TagRowSkeleton />}
       />
 
       <Dialog
