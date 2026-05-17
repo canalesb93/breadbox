@@ -3196,3 +3196,33 @@ Cross-cutting components:
     `<SectionCard>` or `<ListCard>` and inherit the recipe; if a future
     consumer needs a taller / shorter header, extend the primitive
     rather than open-coding `<CardHeader>` directly.
+
+
+- **Iter 107 — SettingsSectionHeader baseline polish ripple** ([#1226](https://github.com/canalesb93/breadbox/pull/1226))
+  - Ripple from iter 106's `SectionCard` + `ListCard` header polish.
+    The settings shell uses `SettingsSectionHeader` for every section
+    title (Account / Household / Backups, plus the inline sub-sections
+    like Change password / Actions / Stored backups / Automatic
+    schedule). It was the next-most-visible title+action lockup in the
+    v2 vocabulary that hadn't picked up the iter 106 recipe.
+  - **Two targeted fixes:**
+    1. **Heading weight `font-medium` → `font-semibold`** for both
+       `section` (h2 `text-lg`) and `sub` (h3 `text-sm`) tokens.
+       Now matches `PageHeader` (`text-2xl font-semibold`) and the
+       iter 106 card-header recipe (`text-sm font-semibold`) — every
+       page-/section-/card-level title in the v2 shell is one weight.
+    2. **Action alignment `sm:items-end` → `sm:items-center`** so a
+       `Button size="sm"` (Add member CTA, etc.) sits centered to
+       the title row instead of bottom-docking under the description.
+       Same 8-12px baseline mismatch as iter 106; same fix.
+  - **Zero new primitives, no consumer changes.** Contained to
+    `settings-section-header.tsx` (5 lines changed) + the sandbox
+    specimen description. Four consumers benefit immediately:
+    `AccountSection`, `HouseholdSection`, `BackupsSection`, and
+    the settings-shell placeholder fallback. Primitive count stays at 28.
+  - **Drift status:** page-level / section-level / card-header title
+    weights are now all `font-semibold` across the SPA. The iter 106
+    recipe ripple is complete for shared primitives. If a future
+    surface needs a lighter caption-weight title, add it as a new
+    `SettingsSectionHeader` token (e.g. `field`) rather than
+    forking the rhythm again.
