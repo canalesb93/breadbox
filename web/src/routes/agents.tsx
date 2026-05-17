@@ -18,7 +18,9 @@ import {
   Terminal,
   Trash2,
   XCircle,
+  Zap,
 } from "lucide-react";
+import { cronToProseLabel } from "@/lib/cron-prose";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PageError } from "@/components/page-error";
@@ -407,12 +409,26 @@ function AgentRow({ agent, onDelete }: AgentRowProps) {
             {agent.prompt}
           </p>
           <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-            <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-flex items-center gap-1"
+              title={
+                agent.schedule_cron
+                  ? `Cron expression: ${agent.schedule_cron}`
+                  : undefined
+              }
+            >
               <Clock className="size-3" />
-              {agent.schedule_cron
-                ? `Cron: ${agent.schedule_cron}`
-                : "Manual only"}
+              {cronToProseLabel(agent.schedule_cron)}
             </span>
+            {agent.trigger_on_sync_complete && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                title="Also fires after every successful bank sync (trigger=webhook)"
+              >
+                <Zap className="size-3" />
+                After sync
+              </span>
+            )}
             <NextFirePill at={agent.next_fire_at} />
             <span>Model: {agent.model}</span>
             <span>Max turns: {agent.max_turns}</span>
