@@ -24,6 +24,8 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
    - **Quick Review** — fast batch-categorize, prioritizes speed.
    - **Routine Review** — daily/weekly pass over fresh transactions.
    - **Spending Report** — weekly category-grouped summary with anomalies.
+
+   All five seed with `claude-opus-4-7` for maximum reasoning. Edit the **Model** field on any agent's edit page to switch to a cheaper/faster variant — Haiku for short routine passes, Sonnet for everyday work, Opus for setup or complex analysis. The model picker covers every supported Claude model the SDK accepts.
 4. **Edit prompt + schedule**, click Save, then flip the Enabled toggle. The agent fires on its cron schedule and shows up in the Runs page.
 5. **Hit Run now** in the list page to trigger immediately. The result lands in the run history with a full transcript (tool calls + cost + token usage).
 
@@ -99,6 +101,7 @@ The five seeded starter agents are direct ports of the v1 wizard's prompts. Edit
 ## See also
 
 - `docs/api-endpoints.md` — REST catalog for `/api/v1/agents/*`
+- `docs/cli-commands.md` — CLI surface for the `breadbox agent` subcommands (`test`, `run`, `list`)
 - `internal/agent/seed.go` — list of starter agents and their prompt mappings
 - `prompts/agents/` — the markdown source for every seeded prompt
 - `.claude/sprint-state.md` — sprint history and design decisions
