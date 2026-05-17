@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Building2, FileSpreadsheet, Landmark, Plug } from "lucide-react";
+import { Building2, FileSpreadsheet, Landmark, Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
+import { ViewAllPill } from "@/components/view-all-pill";
 import { ConnectionStatusBadge } from "@/features/connections/connection-status-badge";
 import { relativeTime } from "@/features/connections/connection-utils";
 import { cn } from "@/lib/utils";
@@ -37,17 +38,7 @@ export function HomeConnectionsPanel({
   ).length;
   const active = (connections ?? []).filter((c) => c.status === "active").length;
 
-  const manage = (
-    <Button asChild variant="ghost" size="sm" className="-mr-2 h-8 px-2">
-      <Link
-        to="/connections"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-      >
-        Manage
-        <ArrowRight className="size-3.5" />
-      </Link>
-    </Button>
-  );
+  const manage = <ViewAllPill to="/connections">Manage</ViewAllPill>;
 
   // Health line appears in the header subtitle when we have any connections.
   // It replaces the standalone "Connections" stat card in the hero strip —

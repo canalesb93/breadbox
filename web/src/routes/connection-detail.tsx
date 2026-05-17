@@ -55,6 +55,7 @@ import { JumpToPill, JumpToRow } from "@/components/jump-to-pill";
 import { MetaBadge } from "@/components/meta-badge";
 import { SectionCard } from "@/components/section-card";
 import { SoftBackButton } from "@/components/soft-back-button";
+import { ViewAllPill } from "@/components/view-all-pill";
 import { formatLongDate } from "@/lib/format";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
@@ -489,12 +490,9 @@ function DetailBody({
             action={<Eyebrow>Last 10</Eyebrow>}
             footer={
               syncLogs.length > 0 ? (
-                <Link
-                  to="/sync-logs"
-                  className="text-muted-foreground hover:text-foreground text-xs"
-                >
-                  View all →
-                </Link>
+                <ViewAllPill to="/sync-logs" align="footer">
+                  View all
+                </ViewAllPill>
               ) : undefined
             }
           >
