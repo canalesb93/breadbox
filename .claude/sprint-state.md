@@ -733,6 +733,25 @@ Next iteration candidates (refreshed):
 
 Picking **#1 aggregate caps-hit pill** next iteration in parallel with the audit; small + visible, mirrors iter-21 pattern.
 
+## ITER 32 — 2026-05-17 06:50
+Shipped PR #1258 (db30a290): aggregate `RecentCapStats` rollup + `RecentCapPill` on /v2/agents (amber, fires at 2+ caps in last 5 runs). Mirrors iter-21 pattern exactly. **Code-reviewer subagent audit ran in parallel and surfaced 2 BLOCKERS + 3 HIGH + 2 LOW findings** — full list captured at the bottom of iter-32 PR body and tracked in iter-33+.
+
+## ITER 33 — 2026-05-17 07:00
+Shipped PR #1259 (046c205e): audit BLOCKER #1. `CompleteAgentRunDB` was writing `result.TurnCount` into BOTH `turn_count` AND `max_turns_used` → every run looked like "7/7" regardless of cap. Fixed by adding `maxTurnsCap int` param and passing `def.MaxTurns` from orchestrator. Regression test with cap=25 + actual=7.
+
+## ITER 34 — 2026-05-17 07:10
+Shipped PR #1260 (3407b572): audit BLOCKER #2. `AgentScheduler.Reload` released its mutex between "remove all" and "AddFunc all," letting two concurrent CRUD-triggered reloads interleave and leak cron entries. Added separate `reloadMu sync.Mutex` to serialize the whole critical section. **Verified bug end-to-end**: 8 concurrent reloads produced 25 entries (21 leaked) without the fix; 4 entries with it.
+
+## ITER 35 — 2026-05-17 07:20
+Shipped PR #1261 (5d3cfaa0): audit HIGH #3 + HIGH #4. `FireSyncCompleteAgents` uses fresh ctx for the eligible-agents lookup (cancelled sync ctx no longer silently no-ops the webhook trigger). Extracted `writeAgentDefinitionMutationError` helper so Update handler maps duplicate-slug to 409 like Create (was falling through to generic 500). 4 sub-tests pin every branch (validation/dup-key/unique-constraint/generic).
+
+## ITER 36 — 2026-05-17 07:30
+Shipped PR #1262 (00a54bed): audit HIGH #5 + LOW #6 + LOW #7. Removed dead `spec.TranscriptPath` set in `AssembleJobSpec` (was clobbered by `Sidecar.Run` before marshal anyway); added comment in `Sidecar.Run` marking it the single source of truth. Webhook test switched from time-based polling to deterministic wait-for-1-then-sweep. `max_turns` validator message updated from "1-100" to "0-100 (0 falls back to the default)" matching actual behavior.
+
+**All 7 audit findings closed across iters 33-36.** Sprint diff is clean per the iter-32 reviewer's bar.
+
+## ITER 37 (in progress) — 2026-05-17 07:35
+In parallel: spawned `feature-dev` general-purpose subagent to propose 3-5 high-impact extension ideas. Will queue top finding for iter-38.
 
 
 
