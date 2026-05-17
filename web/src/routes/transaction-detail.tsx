@@ -11,12 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { EmptyState } from "@/components/empty-state";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import {
-  ColorRailCard,
-  ColorRailCardSkeleton,
-} from "@/components/color-rail-card";
+import { ColorRailCard } from "@/components/color-rail-card";
 import {
   DetailList,
   compactDetailRows,
@@ -353,10 +351,10 @@ function titleize(value: string | null | undefined): string | null {
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <ColorRailCardSkeleton
-        tileShape="rounded-md"
-        body={
+    <DetailPageSkeleton
+      hero={{
+        tileShape: "rounded-md",
+        body: (
           <div className="space-y-5">
             <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -370,16 +368,11 @@ function DetailSkeleton() {
               </div>
             </div>
           </div>
-        }
-      />
-      <div className="flex gap-2">
-        <Skeleton className="h-7 w-32 rounded-md" />
-        <Skeleton className="h-7 w-32 rounded-md" />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Skeleton className="h-72 rounded-xl" />
-        <Skeleton className="h-56 rounded-xl" />
-      </div>
-    </div>
+        ),
+      }}
+      jumpPills={2}
+      main={["h-72"]}
+      sidebar={["h-56"]}
+    />
   );
 }
