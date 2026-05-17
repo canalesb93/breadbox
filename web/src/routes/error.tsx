@@ -147,7 +147,7 @@ export function ErrorPage({ error, reset }: ErrorPageProps) {
           >
             <div
               className={cn(
-                "overflow-hidden transition-all",
+                "overflow-hidden transition-all duration-200 ease-out",
                 showDetails ? "max-h-[480px]" : "max-h-0",
               )}
             >
