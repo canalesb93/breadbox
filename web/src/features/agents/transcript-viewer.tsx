@@ -157,10 +157,20 @@ export function TranscriptViewer({
     () => groupIntoTurns(matchingEvents),
     [matchingEvents],
   );
-  const resultEvent = useMemo(
-    () => events.find((e) => e.type === "result"),
-    [events],
-  );
+  const resultEvent = useMemo(() => {
+    // The sidecar emits two `result` events per run: the raw SDK message
+    // (snake_case fields, nested `usage`) plus a normalized breadbox-shape
+    // event with camelCase fields. We always want the normalized one — pick
+    // the first event whose `data` has the expected `totalCostUsd` field,
+    // falling back to the last `result` event for forward compatibility.
+    const resultEvents = events.filter((e) => e.type === "result");
+    const normalized = resultEvents.find(
+      (e) =>
+        e.type === "result" &&
+        typeof (e.data as Partial<ResultData>).totalCostUsd === "number",
+    );
+    return normalized ?? resultEvents[resultEvents.length - 1];
+  }, [events]);
   const errorEvent = useMemo(
     () => events.find((e) => e.type === "error"),
     [events],
@@ -462,21 +472,29 @@ function ResultFooter({ data }: { data: ResultData }) {
         <FooterStat
           icon={Coins}
           label="Cost"
-          value={`$${data.totalCostUsd.toFixed(4)}`}
+          value={
+            typeof data.totalCostUsd === "number"
+              ? `$${data.totalCostUsd.toFixed(4)}`
+              : "—"
+          }
         />
-        <FooterStat icon={Cpu} label="Turns" value={String(data.turnCount)} />
+        <FooterStat
+          icon={Cpu}
+          label="Turns"
+          value={data.turnCount != null ? String(data.turnCount) : "—"}
+        />
         <FooterStat
           icon={Wrench}
           label="Tool calls"
-          value={String(data.numToolCalls)}
+          value={data.numToolCalls != null ? String(data.numToolCalls) : "—"}
         />
         <FooterStat
           icon={Cpu}
           label="Tokens"
-          value={`${data.inputTokens.toLocaleString()} in / ${data.outputTokens.toLocaleString()} out`}
+          value={`${(data.inputTokens ?? 0).toLocaleString()} in / ${(data.outputTokens ?? 0).toLocaleString()} out`}
           sub={
-            data.cacheReadTokens + data.cacheCreationTokens > 0
-              ? `cache: ${(data.cacheReadTokens + data.cacheCreationTokens).toLocaleString()}`
+            (data.cacheReadTokens ?? 0) + (data.cacheCreationTokens ?? 0) > 0
+              ? `cache: ${((data.cacheReadTokens ?? 0) + (data.cacheCreationTokens ?? 0)).toLocaleString()}`
               : undefined
           }
         />
