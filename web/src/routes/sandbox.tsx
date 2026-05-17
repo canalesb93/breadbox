@@ -237,7 +237,11 @@ function SectionWithOutline({
                       <a
                         href={`#${i.id}`}
                         className={cn(
-                          "block truncate rounded-md px-2 py-1 text-xs transition-colors",
+                          "block truncate rounded-md py-1 pr-2 text-xs transition-colors",
+                          // Indent subitems under a real group label so the
+                          // outline reads as a hierarchy; ungrouped fallback
+                          // keeps the flush left edge.
+                          g.id === "outline-general" ? "pl-2" : "pl-4",
                           activeId === i.id
                             ? "text-foreground bg-accent/50 font-medium"
                             : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
