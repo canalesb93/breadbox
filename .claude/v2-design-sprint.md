@@ -383,15 +383,21 @@ next target, then updates this file at the end of the run.
   className triplet — pass props.
 - **PageError primitive** — extracted to
   `web/src/components/page-error.tsx` in iter 82 (#1196). The
-  canonical page-level "couldn't fetch its data" state.
-  Composition on top of `<StatusPanel tone="destructive">` with
-  the AlertTriangle icon, `Couldn't load {resource}` heading,
-  `Error.message` body (or a fallback), and an outline
-  `RefreshCw` Retry button in StatusPanel's `trailing` slot.
-  Retry swaps to a spinning icon + `Retrying…` label while
-  `isFetching` is true. Six surfaces share it today: accounts,
-  connections, providers, rules, rule-form, rule-detail. Sibling
-  of `EmptyState` (no-data) and `StatusPanel` (inline notice) —
+  canonical page-level "couldn't fetch its data" state. Two
+  variants: `panel` (default) composes `<StatusPanel
+  tone="destructive">` with the AlertTriangle icon, `Couldn't
+  load {resource}` heading, `Error.message` body (or a fallback),
+  and an outline `RefreshCw` Retry button in StatusPanel's
+  `trailing` slot. Retry swaps to a spinning icon + `Retrying…`
+  label while `isFetching` is true. `inline` (iter 88, #1203)
+  drops the bordered StatusPanel chrome — same destructive icon
+  tile + heading + body + retry, but no border / rail / muted
+  background — for nesting inside an already-bordered host
+  (SectionCard / ListCard) where two nested borders read heavy.
+  Seven surfaces share it today: accounts, connections, providers,
+  rules, rule-form, rule-detail (all `panel`), and activity-timeline
+  (`inline` inside the TX-detail Activity SectionCard). Sibling of
+  `EmptyState` (no-data) and `StatusPanel` (inline notice) —
   three states, three vocabularies, one visual system. Don't
   fork the look — extend this primitive. Component-level alerts
   inside features (`backups-section`, `reauth-sheet`,
@@ -2462,13 +2468,40 @@ Cross-cutting components:
     queued as a follow-up observation below.
 
 - **Activity-timeline isError uses bare `<p>`** (iter 87
-  observation): `features/transactions/activity-timeline.tsx`
-  renders `<p className="text-muted-foreground text-sm">Couldn't
-  load the activity timeline.</p>` when its query fails. The
-  natural fix is `<PageError>`, but the timeline lives inside a
-  `<SectionCard title="Activity">`, and nesting a destructive
-  StatusPanel inside another bordered card reads heavy. Either lift
-  the error state up to the SectionCard's body (replacing the rail)
-  or grow a new compact variant on `<PageError>` (no card chrome).
-  Defer until a second nested-in-section-card error state needs the
-  same treatment.
+  observation, closed iter 88 [#1203](https://github.com/canalesb93/breadbox/pull/1203)):
+  resolved by growing a new `inline` variant on `<PageError>` that
+  drops the bordered StatusPanel chrome — same destructive icon
+  tile + heading + body + retry vocabulary, but no border / rail /
+  muted background so the error sits flush inside the parent
+  `<SectionCard title="Activity">` without doubling up borders.
+  Same primitive, new shell. Observation closed.
+
+- **Iter 88 — PageError inline variant + activity-timeline error state** ([#1203](https://github.com/canalesb93/breadbox/pull/1203))
+  - New `inline` variant on `<PageError>` drops the bordered
+    StatusPanel chrome so the canonical "couldn't load X"
+    vocabulary (destructive icon tile + heading + body + retry)
+    can nest inside an already-bordered host (SectionCard /
+    ListCard) without doubling up borders. Same primitive, new
+    shell — `panel` (default) remains byte-identical.
+  - Wires the transaction-detail activity timeline through it.
+    Was `<p className="text-muted-foreground text-sm">Couldn't
+    load the activity timeline.</p>` with no retry; now matches
+    every other v2 error surface and lets the user retry without
+    a full page reload (`refetch` + `isFetching` from the
+    `useAnnotations` `useQuery` are wired into `onRetry` /
+    `retrying`).
+  - Sandbox specimen rebuilt — both shapes now render
+    side-by-side. `panel · with retry handler` + `panel · without
+    retry · fallback message` stay in the iter-85 grid; a new
+    `inline · nested inside a bordered host (SectionCard /
+    ListCard)` row renders the inline variant inside a fake
+    Activity SectionCard so the nesting semantics read at a
+    glance. No new primitive (still 23 after iter 86's
+    RowActionsMenu).
+  - Closes the iter-87 follow-up observation. The decision the
+    observation queued — lift error up vs. compact PageError
+    variant — picked the variant route. The compact shape is
+    reusable for any future nested error state inside a bordered
+    section (e.g. preview-panel could swap its plain-text "No
+    matches yet" / failure-state shapes when a real failure path
+    lands).
