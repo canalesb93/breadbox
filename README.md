@@ -120,6 +120,10 @@ chmod +x breadbox
 export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
 export ENCRYPTION_KEY="$(openssl rand -hex 32)"
 
+# First-time setup: pick an admin email + password (password is typed, not echoed).
+# Skip if you already have an admin account.
+./breadbox init
+
 ./breadbox serve
 # Visit http://localhost:8080
 ```
@@ -135,6 +139,9 @@ go install ./cmd/breadbox
 # Requires a running PostgreSQL instance
 export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
 export ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+# First-time setup: pick an admin email + password (password is typed, not echoed).
+breadbox init
 
 breadbox serve
 # Visit http://localhost:8080

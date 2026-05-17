@@ -12,6 +12,12 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
    make agent-sidecar
    ```
    Outputs `bin/breadbox-agent`. Set `agent.runtime_path` in Settings → Agents if you put it elsewhere.
+
+   **Prerequisite: `bun`.** The sidecar is a TypeScript binary compiled via `bun build --compile`. If you don't have `bun` installed, the Makefile prints the install command — paste it into your shell:
+   ```sh
+   curl -fsSL https://bun.sh/install | bash
+   ```
+   No other Node/npm setup is required.
 3. **Pick a starter agent** from the v2 SPA at `/v2/agents`. Five defaults are seeded on fresh installs (disabled):
    - **Initial Setup** — broad rule + category mapping after first sync.
    - **Bulk Review** — thorough categorization pass over a large queue.
@@ -44,7 +50,14 @@ It spawns the sidecar with a tiny "say OK" prompt (no MCP servers, no agent defi
 Smoke test passed. The agent subsystem is ready to run real definitions.
 ```
 
-Exit code 3 = no Anthropic credential; exit code 5 = sidecar binary not found.
+Exit codes (full reference):
+
+| Exit | Meaning                                                  | Remediation                                                                 |
+| ---- | -------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 0    | Test succeeded — agent subsystem is ready                | None                                                                        |
+| 3    | No Anthropic credential configured                       | Paste a token in Settings → Agents (subscription or API key)                |
+| 5    | Sidecar binary not found                                 | Run `make agent-sidecar`, or set `agent.runtime_path` if it's already built |
+| 1    | Test ran but the sidecar crashed or the model errored    | Re-run with `--verbose` (planned) or check server logs for the sidecar stderr |
 
 ## Architecture (one-line view per layer)
 
