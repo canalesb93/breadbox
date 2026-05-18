@@ -61,8 +61,7 @@ Each iteration:
 
 ## In-flight PRs
 
-- **fix/mobile-navbar-no-blur** (subagent `ad2dc3ef`) — MOBILE-27 (T1, user-reported). Drops `backdrop-blur` + translucent bg on `<header>` at <640px; keeps the desktop glassy look. PR # TBD.
-- **fix/mobile-viewport-units-polish** (subagent `af498752`) — **MOBILE-28 (T4 polish)**. Finishes the viewport-unit cleanup: `min-h-screen` → `min-h-dvh` in `auth-shell.tsx` (×2), `min-h-svh` → `min-h-dvh` in `sidebar.tsx` wrapper, `100vw` → `100dvw` in popover/select/dropdown `max-w` clamps. Same family as PR #1320. PR # TBD.
+_(none)_
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -71,6 +70,8 @@ Each iteration:
 ## Completed (Phase 2)
 
 - ✅ **MOBILE-22/23** Button stacking polish — PR #1328 merged into sprint branch (`543599c8`). API-key Copy button gains `w-full sm:w-auto`; disconnect confirmation rewrapped as `flex-col-reverse sm:flex-row` with destructive Disconnect button on top + full-width-when-stacked. Follows the FormFooter pattern from #1321.
+- ✅ **MOBILE-27** Mobile navbar blur — PR #1330 merged into sprint branch (`70f8518d`). `<header>` now uses solid `bg-background` at <640px (no `backdrop-blur`, no translucency), restoring the glassy look at sm+ via `sm:backdrop-blur` / `sm:bg-background/95`. Eliminates the visible seam between solid safe-area zone and previously-blurred header on iOS.
+- ✅ **MOBILE-28** Viewport-unit polish (T4) — PR #1331 merged into sprint branch (`84bdb932`). 5 viewport-unit straggler swaps: `min-h-screen` → `min-h-dvh` on auth-shell wrapper + grid; `min-h-svh` → `min-h-dvh` on sidebar outer wrapper; `max-w-[calc(100vw-1rem)]` → `max-w-[calc(100dvw-1rem)]` in popover/select/dropdown content clamps. Finishes the dvh/dvw family.
 
 ## Notes for next iteration
 
