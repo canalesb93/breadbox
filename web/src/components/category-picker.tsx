@@ -42,6 +42,14 @@ interface CategoryPickerProps {
 // rows — a rounded-rect trigger showing the current category (or an "add"
 // affordance when uncategorized) over a searchable popover. stopPropagation
 // keeps a click from also firing the row's navigate handler.
+//
+// Memory note: this component renders 50× on the transactions list. The
+// always-mounted shell deliberately holds nothing heavier than a single
+// useState — the mutation observer (useCategoryEditor → useUpdateTransactions)
+// and the category list query (useCategories) live in PickerBody, which only
+// mounts while the popover is open. Eagerly mounting them per row was a
+// significant chunk of per-page React memory and contributed to iOS Safari
+// evicting the list from bfcache.
 export function CategoryPicker({
   transactionId,
   category,
@@ -51,12 +59,6 @@ export function CategoryPicker({
   className,
 }: CategoryPickerProps) {
   const [open, setOpen] = useState(false);
-  const { apply, isPending } = useCategoryEditor(transactionId);
-
-  const onPick = async (pick: CategoryPick) => {
-    setOpen(false);
-    await (onPickOverride ?? apply)(pick);
-  };
 
   const iconClass = CATEGORY_BADGE_ICON[size];
   // Width tuned to end at the badge's text edge — wider eats into the
@@ -69,7 +71,6 @@ export function CategoryPicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          disabled={isPending}
           onClick={(e) => e.stopPropagation()}
           className={cn(
             "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
@@ -113,12 +114,46 @@ export function CategoryPicker({
         align="start"
         onClick={(e) => e.stopPropagation()}
       >
-        <CategoryCommandList
-          currentSlug={category?.slug}
-          showReset={overridden}
-          onPick={onPick}
-        />
+        {open ? (
+          <PickerBody
+            transactionId={transactionId}
+            currentSlug={category?.slug}
+            showReset={overridden}
+            onPickOverride={onPickOverride}
+            close={() => setOpen(false)}
+          />
+        ) : null}
       </PopoverContent>
     </Popover>
+  );
+}
+
+// PickerBody is the heavy half of CategoryPicker — the editor mutation hook
+// and the category-list query mount only while this is rendered. The `open`
+// gate in CategoryPicker keeps that work off the per-row hot path.
+function PickerBody({
+  transactionId,
+  currentSlug,
+  showReset,
+  onPickOverride,
+  close,
+}: {
+  transactionId: string;
+  currentSlug: string | null | undefined;
+  showReset: boolean | undefined;
+  onPickOverride: ((pick: CategoryPick) => void | Promise<void>) | undefined;
+  close: () => void;
+}) {
+  const { apply } = useCategoryEditor(transactionId);
+  const onPick = async (pick: CategoryPick) => {
+    close();
+    await (onPickOverride ?? apply)(pick);
+  };
+  return (
+    <CategoryCommandList
+      currentSlug={currentSlug}
+      showReset={showReset}
+      onPick={onPick}
+    />
   );
 }
