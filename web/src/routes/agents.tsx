@@ -154,9 +154,24 @@ export function AgentsPage() {
                       — {status.binary_path}
                     </span>
                   ) : (
-                    <code className="bg-muted rounded px-1">
-                      make agent-sidecar
-                    </code>
+                    <span className="text-muted-foreground">
+                      — download <code className="bg-muted rounded px-1">
+                        breadbox-agent-&lt;os&gt;-&lt;arch&gt;
+                      </code>{" "}
+                      from the latest{" "}
+                      <a
+                        href="https://github.com/canalesb93/breadbox/releases/latest"
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        GitHub release
+                      </a>{" "}
+                      and place it on your PATH or at{" "}
+                      <code className="bg-muted rounded px-1">
+                        ~/.breadbox/agent-bin/breadbox-agent
+                      </code>. The Docker image already includes it.
+                    </span>
                   )}
                 </span>
               </li>
@@ -467,7 +482,7 @@ function RunNowDialog({
           ? `Run started for ${name} (with prefix) — opening transcript`
           : `Run started for ${name} — opening transcript`,
         error:
-          "Run failed — check Settings → Agents for auth, or `make agent-sidecar` for the binary",
+          "Run failed — check Settings → Agents for auth, or install the breadbox-agent binary (see onboarding banner)",
       },
     );
     if (ok) {

@@ -8,6 +8,25 @@ RUN bun install --frozen-lockfile
 COPY web/ ./
 RUN bun run build
 
+# Stage 1b: Compile the Claude Agent SDK sidecar to a standalone binary.
+# Bun cross-compiles to $TARGETARCH from $BUILDPLATFORM, so this runs
+# natively (no QEMU). We pick the musl variant because the runtime stage
+# below is Alpine (musl libc) — the glibc-targeted Bun binary would not
+# load there without gcompat shims.
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS sidecar-builder
+ARG TARGETARCH
+WORKDIR /sidecar
+COPY agent/sidecar/package.json agent/sidecar/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY agent/sidecar/ ./
+RUN case "$TARGETARCH" in \
+        amd64) TARGET=bun-linux-x64-musl   ;; \
+        arm64) TARGET=bun-linux-arm64-musl ;; \
+        *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && bun build --compile --minify --target=$TARGET \
+        --outfile /breadbox-agent index.ts
+
 # Stage 2: Build Go binary (runs natively on the build host, cross-compiles Go)
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
@@ -58,6 +77,9 @@ RUN apk --no-cache add ca-certificates tzdata postgresql16-client
 
 WORKDIR /app
 COPY --from=builder /breadbox /app/breadbox
+# Sidecar lands on PATH so internal/agent.LocateBinary picks it up via the
+# `breadbox-agent` lookup without any extra config.
+COPY --from=sidecar-builder /breadbox-agent /usr/local/bin/breadbox-agent
 
 EXPOSE 8080
 ENTRYPOINT []

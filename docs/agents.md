@@ -7,17 +7,21 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
 1. **Authenticate**: Settings → Agents → pick auth mode.
    - **Subscription token (recommended for hobbyists)**: run `claude setup-token` on any machine, paste the resulting `sk-ant-oat01-…` token. Free under your Claude plan's monthly Agent SDK credit (until 2026-06-15; details: https://support.claude.com/en/articles/15036540).
    - **Anthropic API key**: paste an `sk-ant-…` key from console.anthropic.com. Billed per API call; durable past the 2026-06-15 cutover.
-2. **Build the sidecar binary** (one-time):
-   ```sh
-   make agent-sidecar
-   ```
-   Outputs `bin/breadbox-agent`. Set `agent.runtime_path` in Settings → Agents if you put it elsewhere.
+2. **Install the sidecar binary**. The Claude Agent SDK is TypeScript-only, so the runner ships as a separate standalone binary (`breadbox-agent`) that the Go server exec's per run. Pick whichever install path matches how you're running breadbox:
 
-   **Prerequisite: `bun`.** The sidecar is a TypeScript binary compiled via `bun build --compile`. If you don't have `bun` installed, the Makefile prints the install command — paste it into your shell:
-   ```sh
-   curl -fsSL https://bun.sh/install | bash
-   ```
-   No other Node/npm setup is required.
+   - **From a GitHub release** (recommended for binary installs): grab the matching artifact from [the latest release](https://github.com/canalesb93/breadbox/releases/latest), make it executable, and drop it on your PATH or at `~/.breadbox/agent-bin/breadbox-agent`:
+     ```sh
+     curl -L -o ~/.breadbox/agent-bin/breadbox-agent \
+       https://github.com/canalesb93/breadbox/releases/latest/download/breadbox-agent-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+     chmod +x ~/.breadbox/agent-bin/breadbox-agent
+     ```
+   - **Docker image**: nothing to do — the published image bundles `breadbox-agent` at `/usr/local/bin/breadbox-agent`.
+   - **From source** (dev / contributors): `make agent-sidecar` writes `bin/breadbox-agent` next to your repo checkout. Requires `bun`:
+     ```sh
+     curl -fsSL https://bun.sh/install | bash
+     ```
+
+   Discovery order is: `agent.runtime_path` (Settings → Agents) → `$BREADBOX_AGENT_BIN` → `./bin/breadbox-agent` (cwd) → `~/.breadbox/agent-bin/breadbox-agent` → `$PATH` lookup. The v2 SPA onboarding banner shows which one resolved.
 3. **Pick a starter agent** from the v2 SPA at `/v2/agents`. Five defaults are seeded on fresh installs (disabled):
    - **Initial Setup** — broad rule + category mapping after first sync.
    - **Bulk Review** — thorough categorization pass over a large queue.
@@ -58,7 +62,7 @@ Exit codes (full reference):
 | ---- | -------------------------------------------------------- | --------------------------------------------------------------------------- |
 | 0    | Test succeeded — agent subsystem is ready                | None                                                                        |
 | 3    | No Anthropic credential configured                       | Paste a token in Settings → Agents (subscription or API key)                |
-| 5    | Sidecar binary not found                                 | Run `make agent-sidecar`, or set `agent.runtime_path` if it's already built |
+| 5    | Sidecar binary not found                                 | Download `breadbox-agent-<os>-<arch>` from [the latest release](https://github.com/canalesb93/breadbox/releases/latest) into `~/.breadbox/agent-bin/` (or your PATH), use the Docker image, or `make agent-sidecar` from source |
 | 1    | Test ran but the sidecar crashed or the model errored    | Re-run with `--verbose` (planned) or check server logs for the sidecar stderr |
 
 ## Architecture (one-line view per layer)

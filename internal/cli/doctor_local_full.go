@@ -150,7 +150,7 @@ func runAgentSmokeCheck(ctx context.Context, pool *pgxpool.Pool, cfg *bbconfig.C
 			Name:        "agent smoke test",
 			Status:      doctorStatusFail,
 			Message:     "binary lookup failed: " + err.Error(),
-			Remediation: "build with `make agent-sidecar` or set agent.runtime_path in Settings → Agents",
+			Remediation: "download breadbox-agent-<os>-<arch> from the latest GitHub release (or use the Docker image), or build from source with `make agent-sidecar`",
 		}
 	}
 	runCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -177,7 +177,7 @@ func liveSmokeCheck(result *agent.SmokeResult, err error) doctorCheck {
 				Name:        "agent smoke test",
 				Status:      doctorStatusFail,
 				Message:     "binary not found: " + err.Error(),
-				Remediation: "build with `make agent-sidecar` or set agent.runtime_path",
+				Remediation: "download breadbox-agent-<os>-<arch> from the latest GitHub release, set agent.runtime_path, or build from source with `make agent-sidecar`",
 			}
 		default:
 			return doctorCheck{
@@ -221,7 +221,7 @@ func agentSubsystemCheck(authMode string, authPresent bool, binaryPath string, b
 			Name:        "agent subsystem",
 			Status:      doctorStatusWarn,
 			Message:     "auth configured but breadbox-agent binary not found",
-			Remediation: "build with `make agent-sidecar` or set `agent.runtime_path` in Settings → Agents",
+			Remediation: "download breadbox-agent-<os>-<arch> from the latest GitHub release into ~/.breadbox/agent-bin/ (or use the Docker image), or build from source with `make agent-sidecar`",
 		}
 	case !authPresent && binaryReady:
 		return doctorCheck{

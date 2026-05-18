@@ -356,11 +356,32 @@ jobs:
             -o breadbox-${{ matrix.goos }}-${{ matrix.goarch }} \
             ./cmd/breadbox
 
+      - name: Build sidecar (bun cross-compile)
+        # The Claude Agent SDK is TypeScript-only, so the sidecar ships as a
+        # standalone Bun-compiled binary alongside the Go binary. Bun supports
+        # cross-compilation from any host, so we map goos/goarch to the
+        # matching bun --target and emit one sidecar per release matrix cell.
+        run: |
+          cd agent/sidecar
+          bun install --frozen-lockfile
+          case "${{ matrix.goos }}-${{ matrix.goarch }}" in
+            linux-amd64)  TARGET=bun-linux-x64    ;;
+            linux-arm64)  TARGET=bun-linux-arm64  ;;
+            darwin-amd64) TARGET=bun-darwin-x64   ;;
+            darwin-arm64) TARGET=bun-darwin-arm64 ;;
+            *) echo "unsupported matrix cell: ${{ matrix.goos }}-${{ matrix.goarch }}"; exit 1 ;;
+          esac
+          bun build --compile --minify --target=$TARGET \
+            --outfile ../../breadbox-agent-${{ matrix.goos }}-${{ matrix.goarch }} \
+            index.ts
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: breadbox-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: breadbox-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            breadbox-${{ matrix.goos }}-${{ matrix.goarch }}
+            breadbox-agent-${{ matrix.goos }}-${{ matrix.goarch }}
 
   publish-release:
     name: Publish Release
@@ -375,6 +396,8 @@ jobs:
           merge-multiple: true
 
       - name: Generate SHA256 checksums
+        # `breadbox-*` matches both the Go binary (`breadbox-<os>-<arch>`)
+        # and the sidecar (`breadbox-agent-<os>-<arch>`) per matrix cell.
         run: |
           cd artifacts
           sha256sum breadbox-* > SHA256SUMS

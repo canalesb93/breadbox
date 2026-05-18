@@ -596,7 +596,7 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 		if errors.Is(runErr, agent.ErrBinaryNotFound) {
 			mw.WriteError(w, http.StatusUnprocessableEntity,
 				"AGENT_BINARY_NOT_FOUND",
-				"breadbox-agent binary not found. Run `make agent-sidecar` or set agent.runtime_path.")
+				"breadbox-agent binary not found. Download the matching `breadbox-agent-<os>-<arch>` from the latest GitHub release and place it on your PATH or at ~/.breadbox/agent-bin/, set agent.runtime_path, or build from source with `make agent-sidecar`.")
 			return
 		}
 		// runResp may be non-nil even when runErr is set (mint succeeded but
@@ -671,7 +671,7 @@ func SmokeTestAgentHandler(orch *service.Orchestrator) http.HandlerFunc {
 			case errors.Is(err, agent.ErrBinaryNotFound):
 				mw.WriteError(w, http.StatusUnprocessableEntity,
 					"AGENT_BINARY_NOT_FOUND",
-					"breadbox-agent binary not found. Run `make agent-sidecar` or set agent.runtime_path.")
+					"breadbox-agent binary not found. Download the matching `breadbox-agent-<os>-<arch>` from the latest GitHub release and place it on your PATH or at ~/.breadbox/agent-bin/, set agent.runtime_path, or build from source with `make agent-sidecar`.")
 			default:
 				mw.WriteError(w, http.StatusInternalServerError,
 					"AGENT_TEST_FAILED", err.Error())

@@ -174,7 +174,7 @@ function TestPromptButton({
       {
         success: "Test run dispatched — opening transcript…",
         error:
-          "Test run failed — check Settings → Agents for auth, or `make agent-sidecar` for the binary",
+          "Test run failed — check Settings → Agents for auth, or install the breadbox-agent binary (see onboarding banner)",
       },
     );
     void ok;
