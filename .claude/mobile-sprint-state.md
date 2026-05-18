@@ -48,8 +48,11 @@ Each iteration:
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard. `web/src/routes/__root.tsx`. Requires real-device validation; no simulator fully reproduces keyboard occlusion.
 - [ ] **MOBILE-19** HeroGrid 20px padding feels cramped on 375px. `web/src/components/hero-grid.tsx`. Subjective — defer until visual evidence shows a clear problem.
 
-**New:**
-- _(empty — backlog drained, awaiting user reports or future scout)_
+**New (T1 — user-reported):**
+- [ ] **MOBILE-26** iOS Safari swipe-back gesture freezes / shows blank page. Tap-back works fine. _(in flight)_
+  - Likely cause: bfcache restore with no `pageshow` handler — TanStack Query refetches on focus, a stale-session 401 fires `navigate({ to: "/login" })` mid-swipe-animation. SPA is bfcache-eligible (no `unload`/WS/etc.) but doesn't react when restored.
+  - Files: `web/src/main.tsx`, `web/src/routes/__root.tsx` (401 handler).
+  - Fix: `pageshow` listener with `event.persisted` check that calls `router.invalidate()` + `queryClient.invalidateQueries()`; optionally gate the 401 redirect on `document.visibilityState === "visible"`.
 
 **Closed by audit:**
 - ✅ **MOBILE-API-COPY (closed as already-handled)** Scout flagged that API key copy on iOS might silently fail. Verified: `onCopy` at `api-key-created.tsx:47` already has try/catch with a clear error toast ("Couldn't access the clipboard. Select the value and copy manually.") and the readonly Input has `onFocus={e => e.currentTarget.select()}` for manual-copy ergonomics. No code change required.
@@ -58,7 +61,7 @@ Each iteration:
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-ios-swipe-back-bfcache** (subagent `af43354e`) — MOBILE-26 (T1). Adds `pageshow` handler that calls `router.invalidate()` + `queryClient.invalidateQueries()` on bfcache restore. Optional belt-and-suspenders to gate 401 redirect on `document.visibilityState`. PR # TBD.
 
 ## Completed (Phase 2)
 
