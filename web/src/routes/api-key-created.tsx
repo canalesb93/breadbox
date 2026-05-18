@@ -99,7 +99,7 @@ export function APIKeyCreatedPage() {
               <Button
                 type="button"
                 onClick={onCopy}
-                className="shrink-0"
+                className="w-full shrink-0 sm:w-auto"
                 variant={copied ? "secondary" : "default"}
               >
                 {copied ? (
