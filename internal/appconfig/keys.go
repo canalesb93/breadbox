@@ -38,6 +38,12 @@ const (
 	// KeyAgentRunRetentionDays is the number of days to keep completed
 	// agent_runs rows. Default: 30. 0 disables cleanup.
 	KeyAgentRunRetentionDays = "agent.run_retention_days"
+
+	// KeyV2Default, when "true", makes the v1 admin root (`/`) redirect to
+	// `/v2/`. Transitional setting — the v1 admin UI is on track for full
+	// retirement, and this lets a household opt into v2-as-home in the
+	// meantime. Default: false (v1 feed at root). Read in admin.FeedHandler.
+	KeyV2Default = "v2_default"
 )
 
 // AuthMode values for KeyAgentAuthMode.
