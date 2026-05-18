@@ -436,8 +436,7 @@ export function PromptsBuildPage() {
   // `customs` so it fires once per add — guard with the ref so we
   // don't re-focus on unrelated `customs` mutations (rename, delete).
   // requestAnimationFrame defers the focus past React's commit phase
-  // and any in-flight click-event focus shuffling, otherwise the
-  // textarea immediately loses focus back to <body>.
+  // so the row is laid out before scrollIntoView runs.
   useEffect(() => {
     const id = pendingFocusId.current;
     if (!id) return;
@@ -583,7 +582,17 @@ export function PromptsBuildPage() {
                         <ChevronDown className="size-3.5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-60"
+                      // Radix restores focus to the trigger button after
+                      // the menu closes. For this menu, "Add empty block"
+                      // moves focus to the new textarea — letting Radix
+                      // then snap focus back to the chevron immediately
+                      // overrides that. preventDefault keeps focus
+                      // wherever our handler put it.
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
                       <DropdownMenuItem onSelect={() => addEmptyBlock()}>
                         <Plus className="size-4" />
                         Add empty block
