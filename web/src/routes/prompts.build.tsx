@@ -951,7 +951,7 @@ function AddBlockMenu({
                   ? "Tap blocks to add — pick as many as you like."
                   : `${composedCount} block${composedCount === 1 ? "" : "s"} in composition`}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <Button
                   type="button"
                   variant="ghost"
