@@ -62,9 +62,7 @@ export function AgentNewPage() {
 
   return (
     <>
-      <SoftBackButton to="/agents" className="self-start">
-        Back to agents
-      </SoftBackButton>
+      <SoftBackButton to="/agents">Back to agents</SoftBackButton>
       <PageHeader
         eyebrow="Agent"
         title="New agent"

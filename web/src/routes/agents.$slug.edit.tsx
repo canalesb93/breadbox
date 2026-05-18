@@ -34,9 +34,7 @@ export function AgentEditPage() {
   if (agentQuery.isLoading || !agentQuery.data) {
     return (
       <>
-        <SoftBackButton to="/agents" className="self-start">
-          Back to agents
-        </SoftBackButton>
+        <SoftBackButton to="/agents">Back to agents</SoftBackButton>
         <PageHeader
           eyebrow="Agent"
           title="Edit agent"
@@ -111,9 +109,7 @@ function AgentEditFormView({
 
   return (
     <>
-      <SoftBackButton to="/agents" className="self-start">
-        Back to agents
-      </SoftBackButton>
+      <SoftBackButton to="/agents">Back to agents</SoftBackButton>
       <PageHeader
         eyebrow="Agent"
         title={agent.name}
