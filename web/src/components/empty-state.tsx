@@ -70,7 +70,7 @@ export function EmptyState({
       )}
       <h3 className="text-sm font-medium">{title}</h3>
       {description && (
-        <p className="text-muted-foreground max-w-sm text-sm">{description}</p>
+        <p className="text-muted-foreground max-w-xs text-sm">{description}</p>
       )}
       {action && <div className="mt-3">{action}</div>}
     </div>
