@@ -121,6 +121,8 @@ export function TagForm({ mode, tag }: TagFormProps) {
                   <Input
                     placeholder="needs-review"
                     autoFocus
+                    autoCapitalize="none"
+                    autoCorrect="off"
                     spellCheck={false}
                     className="font-mono text-sm"
                     {...field}

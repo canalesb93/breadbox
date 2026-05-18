@@ -197,6 +197,7 @@ function ValueInput({
     return (
       <Input
         type="number"
+        inputMode="decimal"
         step="0.01"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -231,9 +232,15 @@ function ValueInput({
         onChange={(e) => onChange(e.target.value)}
         className="bg-background h-8 min-w-0 flex-1"
         placeholder={op === "in" ? "slug1, slug2, …" : "tag-slug"}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
       />
     );
   }
+  // Rule values are technical: merchant fragments, regex patterns, CSV ID
+  // lists. Skip iOS autocorrect/autocapitalize so 'uber' doesn't become
+  // 'Uber' and a regex like `^[a-z]+` isn't mangled into smart quotes.
   return (
     <Input
       value={value}
@@ -242,6 +249,9 @@ function ValueInput({
       placeholder={
         op === "in" ? "value1, value2, …" : op === "matches" ? "regex…" : "value…"
       }
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
     />
   );
 }

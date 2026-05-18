@@ -400,6 +400,7 @@ export function RuleForm({
                         </p>
                         <Input
                           type="number"
+                          inputMode="numeric"
                           min={0}
                           max={1000}
                           value={field.value}

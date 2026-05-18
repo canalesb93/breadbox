@@ -326,6 +326,7 @@ export function AgentForm({
                     <FormControl>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         min={1}
                         max={200}
                         value={
@@ -352,6 +353,7 @@ export function AgentForm({
                     <FormControl>
                       <Input
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         min={0}
                         placeholder="0.50"
