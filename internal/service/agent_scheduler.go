@@ -42,9 +42,18 @@ type AgentScheduler struct {
 }
 
 // NewAgentScheduler constructs the scheduler. Call Start to begin firing.
+//
+// cron.WithLocation(time.UTC) pins the agent scheduler to UTC regardless of
+// the host's local time. The v2 web form composes presets in the browser's
+// local timezone and converts to UTC at pick time (see
+// `web/src/lib/cron-prose.ts::buildCronPresets`) — pinning here keeps that
+// translation honest across Docker, bare-metal, and the binary running
+// under any host TZ. Sync scheduler is intentionally separate and stays
+// host-local; its cron field is set per-connection by operators who already
+// think in their server's clock.
 func NewAgentScheduler(orch *Orchestrator, svc *Service, logger *slog.Logger) *AgentScheduler {
 	return &AgentScheduler{
-		cron:     cron.New(),
+		cron:     cron.New(cron.WithLocation(time.UTC)),
 		orch:     orch,
 		svc:      svc,
 		logger:   logger,

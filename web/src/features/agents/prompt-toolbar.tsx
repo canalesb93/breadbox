@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Loader2,
   Plus,
-  Search,
   Sparkles,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -23,7 +22,6 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   usePromptBlocks,
   type PromptBlock,
@@ -32,7 +30,6 @@ import {
 import { DynamicIcon } from "@/lib/icon";
 
 interface PromptToolbarProps {
-  promptValue: string;
   onInsert: (text: string) => void;
 }
 
@@ -59,7 +56,7 @@ const GROUP_ORDER: PromptBlockGroup[] = [
 // Visual: a thin row sitting above the textarea with a left-side
 // "insert from library" trigger (popover with grouped, searchable
 // command list) and a right-side eyebrow link to the full builder.
-export function PromptToolbar({ promptValue, onInsert }: PromptToolbarProps) {
+export function PromptToolbar({ onInsert }: PromptToolbarProps) {
   const blocksQuery = usePromptBlocks();
   const blocks = blocksQuery.data ?? [];
 
@@ -81,10 +78,8 @@ export function PromptToolbar({ promptValue, onInsert }: PromptToolbarProps) {
     setOpen(false);
   };
 
-  const hasPrompt = promptValue.trim().length > 0;
-
   return (
-    <div className="mb-1 flex items-center justify-between gap-2">
+    <div className="mb-1 flex items-center justify-start gap-2">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -95,10 +90,11 @@ export function PromptToolbar({ promptValue, onInsert }: PromptToolbarProps) {
           >
             <Plus className="size-3.5" />
             Insert block
-            {blocksQuery.isLoading && (
+            {blocksQuery.isLoading ? (
               <Loader2 className="size-3 animate-spin opacity-60" />
+            ) : (
+              <ChevronDown className="size-3 opacity-60" />
             )}
-            <ChevronDown className="size-3 opacity-60" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -107,14 +103,8 @@ export function PromptToolbar({ promptValue, onInsert }: PromptToolbarProps) {
           sideOffset={6}
         >
           <Command>
-            <div className="flex items-center border-b px-3">
-              <Search className="text-muted-foreground size-3.5 shrink-0" />
-              <CommandInput
-                placeholder="Search prompt blocks…"
-                className="h-9 border-0 px-2 focus-visible:ring-0"
-              />
-            </div>
-            <CommandList className="max-h-[320px]">
+            <CommandInput placeholder="Search prompt blocks…" />
+            <CommandList className="max-h-[340px]">
               <CommandEmpty>
                 <div className="text-muted-foreground py-6 text-center text-sm">
                   No blocks match.
@@ -133,7 +123,7 @@ export function PromptToolbar({ promptValue, onInsert }: PromptToolbarProps) {
                         key={b.id}
                         value={`${b.title} ${b.description} ${b.id}`}
                         onSelect={() => handlePick(b)}
-                        className="cursor-pointer gap-2.5"
+                        className="cursor-pointer items-start gap-2.5 py-2"
                       >
                         {b.icon && (
                           <DynamicIcon
@@ -177,15 +167,6 @@ export function PromptToolbar({ promptValue, onInsert }: PromptToolbarProps) {
           </Command>
         </PopoverContent>
       </Popover>
-
-      <div className="flex items-center gap-2">
-        {hasPrompt && (
-          <Badge variant="outline" className="text-[10px] font-normal">
-            <Sparkles className="size-2.5" />
-            Tip: insert appends below
-          </Badge>
-        )}
-      </div>
     </div>
   );
 }

@@ -8,14 +8,12 @@ import {
   Bot,
   CalendarClock,
   ChevronRight,
-  Cog,
   ExternalLink,
-  FileText,
   Hash,
+  Info,
   Layers,
   Loader2,
   Moon,
-  Plus,
   ShieldCheck,
   Sparkles,
   Wand2,
@@ -243,7 +241,6 @@ export function AgentForm({
             render={({ field }) => (
               <FormItem>
                 <PromptToolbar
-                  promptValue={field.value ?? ""}
                   onInsert={(text) => {
                     const current = field.value ?? "";
                     const next = current.trim()
@@ -369,6 +366,10 @@ export function AgentForm({
                     name={field.name}
                   />
                 </FormControl>
+                <FormDescription>
+                  Presets are framed in your browser's timezone — Breadbox
+                  stores and fires the schedule in UTC.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -503,13 +504,17 @@ export function AgentForm({
               name="max_turns"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">
+                  <FormLabel className="flex items-center gap-1.5">
                     Max turns
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="text-muted-foreground/70 cursor-help text-xs">
-                          ⓘ
-                        </span>
+                        <button
+                          type="button"
+                          className="text-muted-foreground/60 hover:text-foreground inline-flex cursor-help transition-colors"
+                          aria-label="What is a turn?"
+                        >
+                          <Info className="size-3.5" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent>
                         One turn = one back-and-forth with the model. 25 is
@@ -628,7 +633,7 @@ export function AgentForm({
         </FormSection>
 
         {/* FOOTER ------------------------------------------------------- */}
-        <div className="bg-background/70 sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
           <Button type="button" variant="ghost" asChild>
             <Link to={cancelTo}>Cancel</Link>
           </Button>
@@ -659,11 +664,6 @@ function PromptStats({ value }: { value: string }) {
     </div>
   );
 }
-
-// Re-export Plus so the prompt-toolbar can import it lazily without
-// dragging the whole lucide bundle (Vite tree-shakes anyway, but the
-// re-export keeps the surface explicit for unit-test imports).
-export const _internalPromptIcons = { Plus, FileText, Cog };
 
 // CREATE_DEFAULTS mirror the Go-side service defaults in internal/service/
 // agents.go::Create. Keep aligned — when a new field gets a server-side

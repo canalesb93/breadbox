@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   Popover,
@@ -17,9 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  CRON_PRESETS,
+  buildCronPresets,
   cronToProseLabel,
   isValidCronExpr,
+  presetToCronExpr,
 } from "@/lib/cron-prose";
 
 interface CronFieldProps {
@@ -46,6 +47,9 @@ export function CronField({
   const trimmed = value.trim();
   const valid = trimmed === "" || isValidCronExpr(trimmed);
   const previewLabel = cronToProseLabel(trimmed);
+  // Rebuild per render — the labels embed the live tz, so an open laptop
+  // that crosses a DST flip stays accurate without a remount.
+  const presets = useMemo(() => buildCronPresets(), []);
 
   return (
     <div className="space-y-1.5">
@@ -71,27 +75,38 @@ export function CronField({
               <ChevronDown className="size-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="end">
+          <PopoverContent className="w-[320px] p-0" align="end">
             <Command>
               <CommandInput placeholder="Search presets…" />
               <CommandList>
                 <CommandEmpty>No matching preset.</CommandEmpty>
                 <CommandGroup heading="Common schedules">
-                  {CRON_PRESETS.map((p) => (
-                    <CommandItem
-                      key={p.value}
-                      value={`${p.value} ${p.label}`}
-                      onSelect={() => {
-                        onChange(p.value);
-                        setOpen(false);
-                      }}
-                    >
-                      <span className="flex-1">{p.label}</span>
-                      <span className="text-muted-foreground font-mono text-[10px]">
-                        {p.value}
-                      </span>
-                    </CommandItem>
-                  ))}
+                  {presets.map((p) => {
+                    const expr = presetToCronExpr(p);
+                    return (
+                      <CommandItem
+                        key={p.key}
+                        value={`${p.label} ${expr}`}
+                        onSelect={() => {
+                          onChange(expr);
+                          setOpen(false);
+                        }}
+                        className="items-start gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm">{p.label}</div>
+                          {p.hint && (
+                            <div className="text-muted-foreground text-[11px]">
+                              {p.hint}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground mt-0.5 font-mono text-[10px]">
+                          {expr}
+                        </span>
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               </CommandList>
             </Command>
