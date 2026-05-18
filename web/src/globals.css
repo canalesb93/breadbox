@@ -153,3 +153,28 @@
 [data-slot="button"] {
   cursor: default;
 }
+
+/* Scroll-shadow indicator for horizontally-scrolling containers (used by
+   the Table primitive). Four layered backgrounds: two solid "cover" fades
+   that mask the shadow at the start/end (anchored to the local content
+   with `background-attachment: local` so they shrink as you scroll into
+   them), and two shadow gradients pinned to the viewport edges with
+   `scroll` so they fade in once the cover has scrolled away. Pure CSS,
+   no JS listener. Color uses --card so the cover blends with the
+   surrounding card surface; shadow color is themed for both modes so it
+   remains visible against the dark card. */
+.scroll-shadow-x {
+  --scroll-shadow-cover: var(--card);
+  --scroll-shadow-color: rgb(0 0 0 / 0.1);
+  background:
+    linear-gradient(to right, var(--scroll-shadow-cover) 30%, transparent),
+    linear-gradient(to right, transparent, var(--scroll-shadow-cover) 70%) 100% 0,
+    linear-gradient(to right, var(--scroll-shadow-color), transparent),
+    linear-gradient(to left, var(--scroll-shadow-color), transparent) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.dark .scroll-shadow-x {
+  --scroll-shadow-color: rgb(0 0 0 / 0.35);
+}
