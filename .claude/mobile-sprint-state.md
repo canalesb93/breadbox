@@ -25,6 +25,19 @@
 
 _(empty — both user-reported P0 bugs shipped)_
 
+## Backlog (P0 — re-scout, post-fix issues)
+
+- [ ] **MOBILE-14** Agent form right card sinks below at 375px. `web/src/features/agents/agent-form.tsx` (~line 113). `grid-cols-1 md:grid-cols-3` plus `md:col-span-2` on the left card causes the right card (settings/model/budget) to fall far down at 375px. Add `sm:grid-cols-2` reflow or stack semantically until md.
+- [ ] **MOBILE-15** FormFooter buttons stack vertically on narrow mobile. `web/src/components/form-footer.tsx` (~line 56). `flex flex-wrap gap-2` lets "Cancel" + "Create category" wrap to two rows when text is long. Try `flex-nowrap` with text truncation, or short labels on mobile.
+- [ ] **MOBILE-16** PageHeader actions clip on mobile. `web/src/components/page-header.tsx` (~lines 48-66). Right-hand actions div has `shrink-0` so two buttons can overflow at 375px. Drop `shrink-0` or allow `flex-wrap` so actions can drop below the title.
+
+## Backlog (P1 — re-scout)
+
+- [ ] **MOBILE-17** Empty state `max-w-sm` (384px) exceeds 375px viewport. `web/src/components/empty-state.tsx` (~line 73). Bump to `max-w-xs` or rely on viewport padding.
+- [ ] **MOBILE-18** Error page `<pre>` block lacks iOS momentum. `web/src/routes/error.tsx` (~line 152). Add `[-webkit-overflow-scrolling:touch]` (same pattern as #1319 table fix).
+- [ ] **MOBILE-19** HeroGrid tight 10px padding on 375px. `web/src/components/hero-grid.tsx` (~lines 43-45). `px-5 sm:px-7` feels cramped. Consider `px-4 sm:px-5` (more breathing room actually means less mobile padding) — verify against design intent.
+- [ ] **MOBILE-20** Transactions toolbar wraps pills above sort/select buttons. `web/src/features/transactions/transactions-toolbar.tsx` (~line 202). `flex flex-wrap` pushes sort/select to a third row when there are several filter chips. Consider horizontal-scroll chip rail on mobile or fixed positioning.
+
 ## Backlog (P1-P2 — scout-seeded)
 
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard / backdrop-blur glitches. `web/src/routes/__root.tsx` (`sticky top-0`). Validate in real device. (Header safe-area top inset handled in MOBILE-7 PR; keyboard-overlap concern still open.)
@@ -36,7 +49,6 @@ _(empty — both user-reported P0 bugs shipped)_
 ## In-flight PRs
 
 - **fix/mobile-viewport-units** (subagent) — bundles MOBILE-10 + MOBILE-13. Swaps `100vw` → `100dvw` in selection-action-bar; `h-svh` → `h-full`/`h-dvh` in sidebar. PR # TBD.
-- **Re-scout** (Explore agent) — auditing v2 SPA post-fixes for NEW mobile issues (forms, detail heroes, dialogs, toolbars, table columns, empty states). Will fold findings into backlog when done.
 
 ## Completed
 
