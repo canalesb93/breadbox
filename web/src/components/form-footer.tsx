@@ -67,7 +67,7 @@ export function FormFooter({
           {hint}
         </div>
       )}
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
         {secondary}
         {primary}
       </div>
