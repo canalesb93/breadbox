@@ -21,21 +21,9 @@
 - Popovers/dropdowns must respect viewport bounds (Radix `collisionPadding`).
 - Sheet on mobile is shadcn Sidebar's built-in behavior (`useSidebar().openMobile`).
 
-## Backlog (P0 — broken / user-reported)
+## Backlog (P0)
 
-- [ ] **MOBILE-2** Menus / popovers / pickers render offscreen on mobile.
-  - Files: audit `Popover`, `DropdownMenu`, `Command`, `Combobox`, `Select` usages across `web/src/`.
-  - Cause: missing `collisionPadding`, fixed `side`/`align` that overflow viewport, or content wider than `100vw - 2 * padding`.
-  - Fix: tighten Radix props (`collisionPadding`, `sideOffset`), constrain widths with `max-w-[calc(100vw-2rem)]`, prefer `Sheet` on mobile for category-picker-class pickers.
-
-## Backlog (P0 — additional from scout)
-
-- [ ] **MOBILE-3** Popover content overflows narrow viewports.
-  - File: `web/src/components/ui/popover.tsx` (`w-72` ≈ 18rem with no max-width).
-  - Fix: `w-72 max-w-[calc(100vw-1rem)]`, or wrap via composed component if `ui/*` is off-limits. Validate Radix collisionPadding for selects/dropdowns too.
-- [ ] **MOBILE-4** Select / DropdownMenu render offscreen.
-  - Files: `web/src/components/ui/select.tsx` (lines ~66-76), `web/src/components/ui/dropdown-menu.tsx` (lines ~32-50).
-  - Fix: `max-h-[50vh]`, `collisionPadding`, and viewport-aware width clamp.
+_(empty — both user-reported P0 bugs shipped)_
 
 ## Backlog (P1-P2 — scout-seeded)
 
@@ -53,11 +41,12 @@
 
 ## In-flight PRs
 
-- **fix/mobile-menus-onscreen** (subagent `a9a0c0ce`) — bundles MOBILE-2 + MOBILE-3 + MOBILE-4. Adds `collisionPadding`, `max-w-[calc(100vw-1rem)]`, and `max-h-[min(60vh,var(--radix-popper-available-height))]` to Popover / Select / DropdownMenu primitives (wrapper sweep or ui/* tweak, subagent picks the right path based on call-site count). PR # TBD on subagent return.
+_(none)_
 
 ## Completed
 
-- ✅ **MOBILE-1** Sidebar close-on-tap — PR #1312 merged into sprint branch (commit `ab6dd40a`). `useSidebar().setOpenMobile(false)` wired into both `NavMain` (link + modal branches) and `NavUser` (logout path). Desktop unaffected (gated on `isMobile`).
+- ✅ **MOBILE-1** Sidebar close-on-tap — PR #1312 merged (`ab6dd40a`). `useSidebar().setOpenMobile(false)` wired into `NavMain` (link + modal) and `NavUser` (logout). Desktop unaffected.
+- ✅ **MOBILE-2/3/4** Popover/Select/DropdownMenu onscreen — PR #1316 merged (`cfd98db9`). Added `collisionPadding={8}` (overridable default), `max-w-[calc(100vw-1rem)]`, and `max-h-[min(60vh, available-height)]` to all three primitive Content components. ui/* tweak path chosen over wrapper sweep (34 call sites > 15 threshold).
 
 ## Notes for next iteration
 
