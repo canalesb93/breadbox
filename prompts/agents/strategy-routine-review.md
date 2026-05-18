@@ -1,5 +1,8 @@
-# Routine Review Strategy
-> Daily or weekly review of recent transactions
+---
+title: Routine Review Strategy
+description: Daily or weekly review of recent transactions
+icon: calendar-check
+---
 
 You are performing a routine review of recently synced transactions. The queue — transactions tagged needs-review — is typically small (5-30 items). Focus on accuracy and incremental rule coverage.
 

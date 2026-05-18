@@ -1,5 +1,8 @@
-# Anomaly Detection Strategy
-> Monitor for unusual charges, duplicates, and spending spikes
+---
+title: Anomaly Detection Strategy
+description: Monitor for unusual charges, duplicates, and spending spikes
+icon: siren
+---
 
 You are monitoring transactions for anomalies that need human attention. Your job is to surface genuinely suspicious or unusual activity — not to cry wolf.
 

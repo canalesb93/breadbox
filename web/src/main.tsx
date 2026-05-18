@@ -46,8 +46,14 @@ import {
 } from "@/routes/account-detail";
 import { RulesPage, rulesSearchSchema } from "@/routes/rules";
 import { AgentsPage } from "@/routes/agents";
+import { AgentNewPage, agentsNewSearchSchema } from "@/routes/agents.new";
+import { AgentsRunsPage, agentsRunsSearchSchema } from "@/routes/agents.runs";
 import { AgentEditPage } from "@/routes/agents.$slug.edit";
 import { AgentRunsPage, agentRunsSearchSchema } from "@/routes/agents.$slug.runs";
+import {
+  PromptsBuildPage,
+  promptsBuildSearchSchema,
+} from "@/routes/prompts.build";
 import { RuleDetailPage } from "@/routes/rule-detail";
 import { RuleFormPage } from "@/routes/rule-form";
 import { NAV_LEAVES } from "@/lib/nav";
@@ -126,6 +132,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
   },
   "/agents": {
     component: AgentsPage,
+  },
+  "/prompts/build": {
+    component: PromptsBuildPage,
+    validateSearch: promptsBuildSearchSchema,
   },
 };
 
@@ -220,8 +230,24 @@ const ruleDetailRoute = createRoute({
   component: RuleDetailPage,
 });
 
-// /agents/$slug/edit and /agents/$slug/runs — declared before the more
-// general /agents nav-leaf route so chi-style longest-match prevails.
+// /agents/new, /agents/runs, /agents/$slug/edit and /agents/$slug/runs —
+// declared before the more general /agents nav-leaf route so chi-style
+// longest-match prevails. /agents/runs is a static path and must precede
+// the dynamic /agents/$slug/* family for the same reason.
+const agentNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/new",
+  component: AgentNewPage,
+  validateSearch: agentsNewSearchSchema,
+});
+
+const agentsRunsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/runs",
+  component: AgentsRunsPage,
+  validateSearch: agentsRunsSearchSchema,
+});
+
 const agentEditRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents/$slug/edit",
@@ -267,6 +293,8 @@ const routeTree = rootRoute.addChildren([
   ruleNewRoute,
   ruleEditRoute,
   ruleDetailRoute,
+  agentNewRoute,
+  agentsRunsRoute,
   agentEditRoute,
   agentRunsRoute,
   ...pageRoutes,

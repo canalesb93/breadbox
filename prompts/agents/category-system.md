@@ -1,5 +1,8 @@
-# Category System
-> Category hierarchy, slugs, merging, and taxonomy management
+---
+title: Category System
+description: Category hierarchy, slugs, merging, and taxonomy management
+icon: shapes
+---
 
 CATEGORIES:
 - 2-level hierarchy: primary → detailed subcategories

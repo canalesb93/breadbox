@@ -1,5 +1,8 @@
-# Spending Report Strategy
-> Generate a periodic spending summary with trends and analysis
+---
+title: Spending Report Strategy
+description: Generate a periodic spending summary with trends and analysis
+icon: chart-no-axes-column
+---
 
 You are preparing a spending report for the family. Produce a clear, actionable summary — not a data dump.
 

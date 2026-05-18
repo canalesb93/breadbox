@@ -38,10 +38,12 @@ import {
   Users,
   Wallet,
   Wand2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Popover,
   PopoverContent,
@@ -49,6 +51,7 @@ import {
 } from "@/components/ui/popover";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { FloatingActionBar } from "@/components/floating-action-bar";
 import { TimelineRail } from "@/components/timeline-rail";
 import { DataTable } from "@/components/data-table";
 import { CategoryBadge } from "@/components/category-badge";
@@ -1118,6 +1121,15 @@ export function ComponentsSection() {
       </Specimen>
 
       <Specimen
+        label="FloatingActionBar"
+        code="components/floating-action-bar"
+        description="Viewport-pinned action pill (`position: fixed`, bottom-center) with rounded chrome, border, shadow, and backdrop blur. Outer wrapper is `pointer-events-none` so the empty band stays click-through; only the inner pill captures events. Used by the bulk-selection toolbar on /v2/transactions and the output toolbar on /v2/prompts/build. Use for *transient or contextual* actions; PageHeader.actions is still the right home for persistent page-level affordances."
+        className="block"
+      >
+        <FloatingActionBarDemo />
+      </Specimen>
+
+      <Specimen
         label="EmptyState"
         code="components/empty-state"
         description="Three variants share one primitive — pick the weight that fits the surface. Same icon-tile vocabulary as the rest of v2 (square rounded-xl, not circle)."
@@ -1730,6 +1742,51 @@ function ThemeSpecimen() {
 function CronFieldDemo() {
   const [value, setValue] = useState("0 9 * * 1");
   return <CronField value={value} onChange={setValue} />;
+}
+
+// FloatingActionBar uses position:fixed → showing one inside the sandbox
+// would pin it to the viewport regardless of where the specimen sits.
+// We render a button that mounts the real bar so readers can see the
+// actual behavior (and dismiss it without leaving the sandbox).
+function FloatingActionBarDemo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-3">
+      <p className="text-muted-foreground text-xs">
+        The bar pins to the viewport bottom — toggle it on to see real
+        placement. Composition is freeform; the chrome is the only shared
+        piece.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? "Hide live bar" : "Show live bar"}
+      </Button>
+      {open && (
+        <FloatingActionBar ariaLabel="Sandbox example actions" className="pl-3">
+          <span className="text-sm font-medium whitespace-nowrap">
+            3 selected
+          </span>
+          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Button size="sm" className="h-8 rounded-full">
+            Apply
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 rounded-full"
+            onClick={() => setOpen(false)}
+            aria-label="Dismiss"
+          >
+            <X className="size-4" />
+          </Button>
+        </FloatingActionBar>
+      )}
+    </div>
+  );
 }
 
 // Inline visual demo of the NavUser trigger — the dropdown itself depends on

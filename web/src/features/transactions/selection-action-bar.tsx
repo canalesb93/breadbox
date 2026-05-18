@@ -10,11 +10,11 @@ import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { CategoryCommandList } from "@/components/category-command";
 import { TagCommandList } from "@/components/tag-command";
+import { FloatingActionBar } from "@/components/floating-action-bar";
 import { KbdTooltip } from "@/components/kbd-tooltip";
 import { useUpdateTransactions } from "@/api/queries/transactions";
 import type { UpdateTransactionsOp } from "@/api/types";
 import { applyBulkTransactionOp } from "@/features/transactions/bulk-update";
-import { cn } from "@/lib/utils";
 
 interface SelectionActionBarProps {
   selectedIds: string[];
@@ -58,17 +58,11 @@ export function SelectionActionBar({
     totalCount > selectedIds.length;
 
   return (
-    // pointer-events-none on the outer wrapper so the empty space around the
-    // pill stays click-through, while the pill itself re-enables events.
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 sm:bottom-6">
-      <div
-        data-state="open"
-        className={cn(
-          "pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border bg-popover/95 p-1 pl-3 text-popover-foreground shadow-xl backdrop-blur-sm",
-          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4 data-[state=open]:duration-200",
-        )}
-      >
-        {update.isPending ? (
+    <FloatingActionBar
+      ariaLabel="Bulk transaction actions"
+      className="pl-3"
+    >
+      {update.isPending ? (
           <div className="flex items-center gap-2 px-2 py-1 text-sm">
             <Loader2 className="size-4 animate-spin" />
             <span className="font-medium">
@@ -145,8 +139,7 @@ export function SelectionActionBar({
             </KbdTooltip>
           </>
         )}
-      </div>
-    </div>
+    </FloatingActionBar>
   );
 }
 
