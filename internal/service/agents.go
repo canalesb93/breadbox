@@ -155,9 +155,9 @@ type AgentRunResponse struct {
 	TurnCount           *int     `json:"turn_count,omitempty"`
 	// MaxTurnsUsed is the per-run snapshot of the agent's max_turns cap
 	// at the time the run started. Named for historical reasons; "max
-	// turns at run-start" would be clearer. Pair with turn_count to
-	// render "actual / cap". Until iter-33 this column erroneously
-	// mirrored turn_count, making every run look like it hit the cap.
+	// turns at run-start" would be clearer. Pair with turn_count to render
+	// "actual / cap" — these are easy to mix up: setting MaxTurnsUsed to
+	// result.TurnCount makes every run look like it hit the cap.
 	MaxTurnsUsed        *int     `json:"max_turns_used,omitempty"`
 	NumToolCalls        *int     `json:"num_tool_calls,omitempty"`
 	ErrorMessage        *string  `json:"error_message,omitempty"`
@@ -957,10 +957,9 @@ func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, ca
 //
 // maxTurnsCap is the per-run snapshot of the agent's max_turns at the
 // time the run started. Stored separately from turn_count so the SPA
-// can render "turns / cap" — until iter-33 this column mirrored
-// turn_count, which made every run look like a max-turns hit. The cap
-// itself never changes mid-run, so the orchestrator captures it
-// from def.MaxTurns at run-start and passes it through here.
+// can render "turns / cap". The cap itself never changes mid-run, so the
+// orchestrator captures it from def.MaxTurns at run-start and passes it
+// through here.
 //
 // When result.Err is non-nil (status="error" or "timeout"), its message
 // is truncated and persisted to error_message so the transcript drawer
@@ -1014,8 +1013,8 @@ func AgentRunFromRow(row db.AgentRun) AgentRunResponse {
 }
 
 // MintRunAPIKey mints a scoped API key for one agent run.
-// Returns the plaintext + the created record. The orchestrator (iter 3)
-// is responsible for revocation via RevokeAPIKey on completion.
+// Returns the plaintext + the created record. The orchestrator is
+// responsible for revocation via RevokeAPIKey on completion.
 func (s *Service) MintRunAPIKey(ctx context.Context, def *AgentDefinitionResponse, runShortID string) (*CreateAPIKeyResult, error) {
 	scope := "full_access"
 	if def.ToolScope == "read_only" {
@@ -1031,7 +1030,7 @@ func (s *Service) MintRunAPIKey(ctx context.Context, def *AgentDefinitionRespons
 
 // AssembleJobSpec builds the agent.JobSpec the runner needs.
 // Reads encrypted auth tokens from app_config and assembles MCP config.
-// Does NOT start the run — the orchestrator (iter 3) calls Runner.Run.
+// Does NOT start the run — the orchestrator calls Runner.Run.
 func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionResponse, run *AgentRunResponse, apiKeyPlaintext string, encKey []byte) (*agent.JobSpec, error) {
 	authMode := appconfig.String(ctx, s.Queries, appconfig.KeyAgentAuthMode, appconfig.AuthModeSubscription)
 
@@ -1060,7 +1059,7 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	}
 
 	// (transcript_dir is read by the Sidecar layer; see Sidecar.Run for
-	// the authoritative path assembly — iter-36 audit HIGH #5 cleanup.)
+	// the authoritative path assembly.)
 
 	// Resolve to the currently-running breadbox binary so the SDK's MCP
 	// child spawn works regardless of $PATH. The TS SDK calls
@@ -1137,11 +1136,9 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	}
 	// Note: transcript path is set by Sidecar.Run from (TranscriptDir,
 	// spec.RunID) and overwrites whatever's here on the spec. Don't try
-	// to control it from this side — keeping the assignment authority
-	// in one place avoids the iter-36 audit HIGH #5 inconsistency where
-	// AssembleJobSpec set `<dir>/<short_id>.ndjson` and Sidecar.Run
-	// then opened `<dir>/<RunID>.ndjson`, leaving the spec field briefly
-	// inconsistent before marshal.
+	// to control it from this side — keeping the assignment authority in
+	// one place avoids drift where AssembleJobSpec and Sidecar.Run use
+	// different identifiers (short_id vs RunID) for the same file.
 	return spec, nil
 }
 
@@ -1225,9 +1222,7 @@ func validateAgentDefinitionFields(name, slug, prompt, toolScope, model string, 
 	if model != "" && strings.TrimSpace(model) == "" {
 		return fmt.Errorf("%w: model cannot be blank", ErrInvalidParameter)
 	}
-	// 0 is accepted and falls back to DefaultAgentMaxTurns in the caller —
-	// the docstring used to say "1-100" but the actual behavior allowed
-	// 0 silently. iter-36 audit LOW #7 reworded for accuracy.
+	// 0 is accepted and falls back to DefaultAgentMaxTurns in the caller.
 	if maxTurns < 0 || maxTurns > 100 {
 		return fmt.Errorf("%w: max_turns must be 0-100 (0 falls back to the default)", ErrInvalidParameter)
 	}

@@ -126,19 +126,14 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	} else if n := cleanupResult.RowsAffected(); n > 0 {
 		logger.Info("cleaned up orphaned agent runs", "count", n)
 	}
-	// Default was 1 in iter-1 as a v1 safety net. Lifted to 3 in iter-29 after
-	// 28 iterations of dogfood proved the semaphore + mint-and-revoke survive
-	// concurrent contention. Operators can raise (or lower back to 1) in
-	// Settings → Agents.
+	// Operators can raise (or lower) in Settings → Agents. The orchestrator's
+	// mint-and-revoke + semaphore handle concurrent contention safely.
 	agentMaxConcurrent := appconfig.Int(ctx, a.Queries, appconfig.KeyAgentMaxConcurrent, 3)
 	agentRuntimePath := appconfig.String(ctx, a.Queries, appconfig.KeyAgentRuntimePath, "")
 	// Default transcripts to ./transcripts/agents (relative to the cwd
-	// `breadbox serve` was launched from). Iter-1 left this empty, which
-	// silently dropped transcripts — every run row had transcript_path=""
-	// and the v2 SPA's "open transcript" hit 404. Operators can override
-	// via Settings → Agents → "breadbox-agent transcripts dir" if they
-	// want them elsewhere. Daily cleanup (iter-25) still prunes whatever
-	// path is in effect.
+	// `breadbox serve` was launched from). An empty value silently drops
+	// transcripts — run rows end up with transcript_path="" and the v2 SPA's
+	// "open transcript" 404s. Operators can override via Settings → Agents.
 	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
 	agentSidecar := &agent.Sidecar{
 		BinaryPath:    agentRuntimePath,

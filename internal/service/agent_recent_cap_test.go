@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// TestListAgentDefinitions_PopulatesRecentCapStats pins the iter-32
-// aggregate rollup: the list response carries recent_cap_stats based on
-// the last 5 non-skipped runs, with skipped rows excluded. Seeds a mix
-// of clean, capped, and skipped runs and verifies the totals.
+// TestListAgentDefinitions_PopulatesRecentCapStats pins the aggregate
+// rollup: the list response carries recent_cap_stats based on the last 5
+// non-skipped runs, with skipped rows excluded. Seeds a mix of clean,
+// capped, and skipped runs and verifies the totals.
 func TestListAgentDefinitions_PopulatesRecentCapStats(t *testing.T) {
 	svc, q, _ := newService(t)
 	ctx := context.Background()

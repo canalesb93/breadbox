@@ -5,6 +5,7 @@ package api
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -153,8 +154,6 @@ func UpdateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 		if err != nil {
 			// Try not-found / validation first, then mutation-shaped errors
 			// (duplicate slug from a rename → 409 CONFLICT, otherwise 500).
-			// Before iter-35 the dup-slug branch only existed on Create;
-			// Update fell through to a generic 500.
 			if errors.Is(err, service.ErrNotFound) {
 				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "agent not found")
 				return
@@ -443,19 +442,7 @@ func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
-		// Best-effort copy; partial reads are OK for a viewer.
-		buf := make([]byte, 32*1024)
-		for {
-			n, rerr := f.Read(buf)
-			if n > 0 {
-				if _, werr := w.Write(buf[:n]); werr != nil {
-					return
-				}
-			}
-			if rerr != nil {
-				return
-			}
-		}
+		_, _ = io.Copy(w, f)
 	}
 }
 
@@ -518,10 +505,10 @@ func UpdateAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFu
 type runAgentNowRequest struct {
 	PromptPrefix string `json:"prompt_prefix,omitempty"`
 	// PromptOverride replaces def.Prompt entirely for this fire. Powers
-	// the iter-45 "Test this prompt" button on the agent edit page so an
-	// operator can dry-fire an unsaved prompt without round-tripping
-	// through Save. Mutually exclusive with PromptPrefix at apply time
-	// (override wins) per Orchestrator.RunNowWith.
+	// the "Test this prompt" button on the agent edit page so an operator
+	// can dry-fire an unsaved prompt without round-tripping through Save.
+	// Mutually exclusive with PromptPrefix at apply time (override wins)
+	// per Orchestrator.RunNowWith.
 	PromptOverride string `json:"prompt,omitempty"`
 }
 
@@ -531,10 +518,10 @@ type runAgentNowRequest struct {
 // related from the operator's POV.
 const PromptPrefixMaxLen = 2000
 
-// PromptOverrideMaxLen caps the iter-45 full-prompt override. 20× the
-// prefix cap because real agent prompts are long-form markdown (the
-// seeded starters run 1000-2500 chars each). 40 KB is well under any
-// model's effective context but blocks pathological pastes.
+// PromptOverrideMaxLen caps the full-prompt override. 20× the prefix cap
+// because real agent prompts are long-form markdown (the seeded starters
+// run 1000-2500 chars each). 40 KB is well under any model's effective
+// context but blocks pathological pastes.
 const PromptOverrideMaxLen = 40_000
 
 // RunAgentNowHandler triggers an immediate synchronous run of the named agent.

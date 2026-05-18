@@ -11,15 +11,13 @@ import (
 	"breadbox/internal/service"
 )
 
-// TestOrchestratorRunNow_MaxTurnsUsed_RecordsCapNotTurnCount is the
-// iter-33 regression test. Before iter-33, max_turns_used was set to
-// result.TurnCount instead of def.MaxTurns, which meant the column
-// was useless: every run looked like it hit the cap (e.g. "7/7" for
-// a clean 7-turn run with a cap of 10). The fix passes def.MaxTurns
-// through CompleteAgentRunDB. This test pins both:
+// TestOrchestratorRunNow_MaxTurnsUsed_RecordsCapNotTurnCount pins:
 //   - max_turns_used == def.MaxTurns (the cap snapshot)
 //   - turn_count == result.TurnCount (the actual turns used)
-// so the SPA can render "actual / cap" correctly.
+//
+// so the SPA can render "actual / cap" correctly. The two columns are easy
+// to mix up — using result.TurnCount for max_turns_used makes every run
+// look like it hit the cap (e.g. "7/7" for a clean 7-turn run with cap 10).
 func TestOrchestratorRunNow_MaxTurnsUsed_RecordsCapNotTurnCount(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)

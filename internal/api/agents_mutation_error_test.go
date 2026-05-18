@@ -12,15 +12,10 @@ import (
 	"breadbox/internal/service"
 )
 
-// TestWriteAgentDefinitionMutationError pins the iter-35 fix for audit
-// HIGH #4: before iter-35 only CreateAgentDefinitionHandler mapped the
-// Postgres unique-constraint failure to 409 CONFLICT — the Update path
-// fell through to a generic 500. The shared helper now serves both
-// handlers, so a slug-rename collision returns 409 consistently.
-//
-// Tests run against the helper directly (no router setup needed), which
-// also makes the validation-error and generic-error branches cheap to
-// pin.
+// TestWriteAgentDefinitionMutationError pins the shared helper that maps
+// Postgres unique-constraint failures (slug collision) to 409 CONFLICT for
+// both Create and Update paths. Tests run against the helper directly so
+// the validation-error and generic-error branches are cheap to pin too.
 func TestWriteAgentDefinitionMutationError(t *testing.T) {
 	tests := []struct {
 		name       string

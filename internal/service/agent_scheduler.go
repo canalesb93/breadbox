@@ -128,9 +128,9 @@ func (s *AgentScheduler) logCleanupResult(r AgentCleanupResult, source string) {
 
 // EntryCountForTest returns the live count of cron entries — agent
 // registrations PLUS the singleton cleanup tick added in Start. Exposed
-// for the iter-34 concurrent-Reload regression test; the cron library
-// has no other way to verify "no duplicate entries leaked." Do not call
-// from production code.
+// for the concurrent-Reload regression test; the cron library has no
+// other way to verify "no duplicate entries leaked." Do not call from
+// production code.
 func (s *AgentScheduler) EntryCountForTest() int {
 	return len(s.cron.Entries())
 }
@@ -148,7 +148,7 @@ func (s *AgentScheduler) Stop() {
 // Holds reloadMu for the entire span so two concurrent CRUD-triggered
 // reloads can't both pass the "remove all" phase and then both call
 // AddFunc, producing duplicate cron entries whose EntryIDs are leaked
-// (entryIDs[slug] can only store one ID). Cf. iter-32 audit BLOCKER #2.
+// (entryIDs[slug] can only store one ID).
 func (s *AgentScheduler) Reload(ctx context.Context) {
 	s.reloadMu.Lock()
 	defer s.reloadMu.Unlock()
@@ -333,7 +333,7 @@ func (s *AgentScheduler) cleanupAgentRuns(ctx context.Context) int64 {
 	retentionDays := appconfig.Int(ctx, s.svc.Queries, appconfig.KeyAgentRunRetentionDays, 30)
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	result, err := s.svc.Queries.DeleteAgentRunsOlderThan(ctx,
-		pgtype.Timestamptz{Time: cutoff, Valid: true})
+		pgconv.Timestamptz(cutoff))
 	if err != nil {
 		s.logger.Error("agent run cleanup failed", "error", err)
 		return 0

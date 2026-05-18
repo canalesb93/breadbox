@@ -13,10 +13,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// TestListRecentErroredAgentRuns_OnlyRecentErrors verifies the iter-38
-// surface: errored runs from the last `windowHours` show up; older
-// errors and non-error runs don't. Limit is respected; ordering is
-// most-recent-first by started_at.
+// TestListRecentErroredAgentRuns_OnlyRecentErrors verifies that errored
+// runs from the last `windowHours` show up; older errors and non-error
+// runs don't. Limit is respected; ordering is most-recent-first by started_at.
 func TestListRecentErroredAgentRuns_OnlyRecentErrors(t *testing.T) {
 	svc, q, pool := newService(t)
 	ctx := context.Background()

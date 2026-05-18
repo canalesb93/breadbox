@@ -12,19 +12,14 @@ import (
 	"breadbox/internal/service"
 )
 
-// TestAgentScheduler_Reload_ConcurrentCRUD_NoDuplicateEntries pins the
-// iter-34 fix for audit BLOCKER #2. Before iter-34, two concurrent
-// Reload() calls could interleave their "remove all + re-register"
-// phases such that AddFunc ran twice per slug, producing duplicate
-// cron entries whose EntryIDs were silently leaked (entryIDs[slug]
-// could only store the last one — the others fired forever, no way to
-// cancel them).
-//
-// The fix serializes the whole Reload critical section with reloadMu.
-// This test fires N concurrent Reloads against the live scheduler +
-// service and asserts the underlying cron.Cron has exactly the same
-// number of per-agent entries it would have after one sequential
-// Reload — no duplicates, no leaks.
+// TestAgentScheduler_Reload_ConcurrentCRUD_NoDuplicateEntries pins that
+// concurrent Reload() calls can't interleave their "remove all +
+// re-register" phases such that AddFunc runs twice per slug — which would
+// leak duplicate cron entries whose EntryIDs aren't recoverable
+// (entryIDs[slug] only stores the last one; the rest fire forever).
+// reloadMu serializes the full critical section; this test fires N
+// concurrent Reloads and asserts the per-agent entry count matches a
+// sequential Reload.
 func TestAgentScheduler_Reload_ConcurrentCRUD_NoDuplicateEntries(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)
@@ -63,8 +58,8 @@ func TestAgentScheduler_Reload_ConcurrentCRUD_NoDuplicateEntries(t *testing.T) {
 	const cleanupEntries = 1
 
 	// Fire 8 concurrent Reload calls — simulates a burst of CRUD
-	// mutations all triggering OnDefinitionChanged at once. Before
-	// iter-34 this routinely produced duplicate cron entries.
+	// mutations all triggering OnDefinitionChanged at once. Without
+	// reloadMu this routinely produces duplicate cron entries.
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)

@@ -108,12 +108,10 @@ async function main() {
 
       // Normalize SDK type names to the breadbox-side contract documented in
       // internal/agent/event.go and consumed by web/src/features/agents/
-      // transcript-viewer.tsx. The SDK currently emits "assistant" /
-      // "user" for content events; iter-1's spec named these "assistant_message"
-      // / "user_message" assuming an earlier SDK shape. Tool_use blocks
-      // arrive as content blocks INSIDE the assistant event, not as their
-      // own top-level events — counting them is handled below by inspecting
-      // the nested message content.
+      // transcript-viewer.tsx. The SDK emits "assistant" / "user" for content
+      // events; the breadbox contract uses "assistant_message" / "user_message".
+      // Tool_use blocks arrive as content blocks INSIDE the assistant event,
+      // not as top-level events — counted below by inspecting nested content.
       let type = rawType;
       if (rawType === "assistant") type = "assistant_message";
       else if (rawType === "user") type = "user_message";

@@ -63,9 +63,8 @@ function turnHasContent(t: TurnGroup): boolean {
 }
 
 // extractToolUses pulls tool_use content blocks out of an assistant message.
-// The SDK nests them inside `message.content[]`; earlier viewer iterations
-// expected standalone top-level "tool_use" events that never actually
-// appeared on the wire (iter-46 finding, fixed in iter-48).
+// The SDK nests them inside `message.content[]`; there are no standalone
+// top-level "tool_use" events on the wire.
 function extractToolUses(
   data: AssistantMessageData,
   ts: number,
@@ -445,7 +444,7 @@ interface ToolCallPairProps {
   toolResult?: ToolResultData & { ts: number };
 }
 
-// FilterChip is a small toggle button used for the iter-43 "Tools only" /
+// FilterChip is a small toggle button used for the "Tools only" /
 // "Errors only" quick filters above the transcript event stream. Active
 // state inverts the visual (filled badge) so the chip reads as "currently
 // applied" without a separate state indicator.

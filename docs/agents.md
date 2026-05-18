@@ -81,8 +81,8 @@ Exit codes (full reference):
 
 - **Per-agent caps**: `max_turns` and `max_budget_usd` on every definition.
 - **Global ceiling**: `agent.global_max_budget_usd` in Settings → Agents.
-- **Concurrency**: `agent.max_concurrent` (default 3 since iter-29; was 1 in iter-1 as a v1 safety net, lifted after the orchestrator's mint-and-revoke proved out under contention). Excess cron fires log as `skipped` rows; manual runs return 503 `CONCURRENCY_LOCKED`. Raise (or drop back to 1) in Settings → Agents.
-- **Triggers**: `cron` (schedule_cron), `manual` (Run now / API /run), and `webhook` (iter-30 — opt-in per agent via `trigger_on_sync_complete`, fires after every successful bank sync). The orchestrator surfaces the trigger on every run row so the history shows which path fired it.
+- **Concurrency**: `agent.max_concurrent` (default 3). Excess cron fires log as `skipped` rows; manual runs return 503 `CONCURRENCY_LOCKED`. Raise (or drop back to 1) in Settings → Agents.
+- **Triggers**: `cron` (schedule_cron), `manual` (Run now / API /run), and `webhook` (opt-in per agent via `trigger_on_sync_complete`, fires after every successful bank sync). The orchestrator surfaces the trigger on every run row so the history shows which path fired it.
 - **Scope**: per-agent `tool_scope` is `read_only` or `read_write`. Read-only agents mint a read-only API key that the MCP server rejects writes on.
 - **Mint-and-revoke**: every run gets a fresh, scoped API key named `agent:<slug>:<runShortID>`. It's revoked the instant the run completes (or errors).
 - **Encrypted at rest**: subscription tokens and API keys are AES-256-GCM encrypted in `app_config`. The full value never leaves the server after you save it — `GET /api/v1/agents/settings` returns a masked display string.
