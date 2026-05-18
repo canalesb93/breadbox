@@ -23,12 +23,6 @@
 
 ## Backlog (P0 — broken / user-reported)
 
-- [ ] **MOBILE-1** Sidebar stays open after tapping a nav item on mobile.
-  - Files: `web/src/components/nav-main.tsx`, `web/src/components/app-sidebar.tsx`, `web/src/components/ui/sidebar.tsx`
-  - Cause: `NavRow` for `kind: "link"` renders `<Link>` directly inside `SidebarMenuButton asChild` — no `setOpenMobile(false)` on tap. Modal items also miss this.
-  - Fix: call `useSidebar().setOpenMobile(false)` on nav-link tap on mobile.
-  - Status: PR not yet opened.
-
 - [ ] **MOBILE-2** Menus / popovers / pickers render offscreen on mobile.
   - Files: audit `Popover`, `DropdownMenu`, `Command`, `Combobox`, `Select` usages across `web/src/`.
   - Cause: missing `collisionPadding`, fixed `side`/`align` that overflow viewport, or content wider than `100vw - 2 * padding`.
@@ -63,7 +57,7 @@ _(none yet)_
 
 ## Completed
 
-_(none yet)_
+- ✅ **MOBILE-1** Sidebar close-on-tap — PR #1312 merged into sprint branch (commit `ab6dd40a`). `useSidebar().setOpenMobile(false)` wired into both `NavMain` (link + modal branches) and `NavUser` (logout path). Desktop unaffected (gated on `isMobile`).
 
 ## Notes for next iteration
 
