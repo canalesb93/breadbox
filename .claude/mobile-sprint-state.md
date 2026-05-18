@@ -53,7 +53,7 @@
 
 ## In-flight PRs
 
-_(none yet)_
+- **fix/mobile-menus-onscreen** (subagent `a9a0c0ce`) — bundles MOBILE-2 + MOBILE-3 + MOBILE-4. Adds `collisionPadding`, `max-w-[calc(100vw-1rem)]`, and `max-h-[min(60vh,var(--radix-popper-available-height))]` to Popover / Select / DropdownMenu primitives (wrapper sweep or ui/* tweak, subagent picks the right path based on call-site count). PR # TBD on subagent return.
 
 ## Completed
 
