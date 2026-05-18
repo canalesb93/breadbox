@@ -251,10 +251,18 @@ export function TransactionsPage() {
   );
   useShortcut(
     ["enter"],
-    () => {
+    (e) => {
       if (focusedIndex == null) return;
       const t = rows[focusedIndex];
-      if (t) openTransaction(t);
+      if (!t) return;
+      // Without preventDefault, the browser ALSO fires the default
+      // Enter-on-button/link action against whatever currently holds DOM
+      // focus (e.g. the sidebar's Transactions nav link the user just
+      // clicked, or the Connect bank header button). That click navigates
+      // away — often right back to the list — so the detail URL flashes
+      // in and out and the j/k focus ring vanishes with the unmount.
+      e.preventDefault();
+      openTransaction(t);
     },
     { label: "Open focused transaction", group: "Transactions" },
   );
