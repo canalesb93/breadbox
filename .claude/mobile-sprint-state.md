@@ -44,7 +44,6 @@ Each iteration:
 
 ## Backlog (Phase 2 — SPA-pitfall audit, iter ~14)
 
-- [ ] **MOBILE-31 (HIGH)** Reduced-motion bundle — wrap `animate-spin`, sidebar `transition-[left,right,width]`, and other animations with `motion-safe:` variants OR add global `@media (prefers-reduced-motion: reduce)` override in `globals.css`. Affects spinners across the app + `web/src/components/ui/sidebar.tsx` line ~165.
 - [ ] **MOBILE-32 (HIGH)** iOS keyboard hints — add `inputmode="email|numeric|decimal"` to typed inputs and `enterkeyhint="go|search|done"` on form submit fields. Audit: `web/src/routes/login.tsx`, `web/src/features/settings/*`, any amount/number inputs.
 - [ ] **MOBILE-33 (MEDIUM)** Identifier-field autocapitalize/autocorrect — slug/API-key/agent-slug inputs need `autoCorrect="off" autoCapitalize="off"` so iOS doesn't mangle them. Files: `web/src/features/agents/agent-form.tsx` (slug field at create time), `web/src/routes/api-key-new.tsx` (key name).
 - [ ] **MOBILE-34 (MEDIUM)** `overscroll-behavior: contain` on tables/lists — prevents iOS pull-to-refresh and parent rubber-band when scrolling inside `data-table.tsx`. Tailwind: `overscroll-contain`. One-line addition to the existing Table wrapper.
@@ -83,7 +82,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge.** Original scope was #1328+#1330+#1331+#1332+#1333; after the state-doc conflict was resolved (`858a75e1`) and #1335 + #1336 merged into sprint, the bundle now also includes the lazy-CategoryPicker perf fix and the prompts dialog-footer stacking fix.
-- **fix/mobile-prefers-reduced-motion** (subagent `a10d7f50`) — **MOBILE-31 (T2 HIGH from audit)**. Adds one global `@media (prefers-reduced-motion: reduce)` block to `globals.css` (CSS-tricks pattern — compress to 0.01ms so `animationend` still fires). Single-file ≤15 LOC. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -98,6 +96,7 @@ Each iteration:
 - ✅ **MOBILE-30** 401 visibility-gate — PR #1333 merged into sprint branch (`73e53940`). `AuthenticatedGate` in `__root.tsx` now defers the redirect-to-login while `document.visibilityState !== "visible"`, attaching a `visibilitychange` listener that fires the redirect when the user re-engages. Closes the residual bfcache-restore race left by PR #1329; cleanup-on-unmount included.
 - ✅ **MOBILE-35** Per-row CategoryPicker lazy body — PR #1335 merged into sprint branch (`fb8439c3`). Splits `CategoryPicker` into a lightweight always-mounted shell (just `useState(open)` + trigger) and a `PickerBody` that mounts only when `open === true` and owns `useCategoryEditor` (the mutation hook). Audit's actual finding: 50× `useMutation` observers per page (not popover content) were the leak. Reduces transactions-list React memory, improving iOS Safari bfcache eligibility.
 - ✅ **MOBILE-36** Prompts add-block dialog footer stacking — PR #1336 merged into sprint branch (`943dec09`). Inner action wrapper rewrapped as `flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center` so "Done" (affirmative) sits on top on mobile per the #1321 convention.
+- ✅ **MOBILE-31** Global `prefers-reduced-motion` (T2 HIGH a11y) — PR #1337 merged into sprint branch (`46323665`). Adds one `@media (prefers-reduced-motion: reduce)` block to `globals.css` using the CSS-tricks pattern (compress animation/transition to 0.01ms so `animationend` handlers still fire). Covers ~51 `animate-spin` usages + all shadcn primitive transitions without touching call sites. Cold-load splash (#1332) retains its own per-element `animation: none` override.
 
 ## Notes for next iteration
 
