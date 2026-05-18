@@ -37,8 +37,8 @@ export function AuthShell({
   topRight,
 }: AuthShellProps) {
   return (
-    <div className="bg-background min-h-screen">
-      <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="bg-background min-h-dvh">
+      <div className="grid min-h-dvh lg:grid-cols-2">
         <BrandPane />
         <div className="relative flex flex-col">
           <header className="flex items-center justify-between px-6 pt-6 sm:px-10 lg:hidden">
