@@ -83,6 +83,7 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge.** Original scope was #1328+#1330+#1331+#1332+#1333; after the state-doc conflict was resolved (`858a75e1`) and #1335 + #1336 merged into sprint, the bundle now also includes the lazy-CategoryPicker perf fix and the prompts dialog-footer stacking fix.
+- **fix/mobile-prefers-reduced-motion** (subagent `a10d7f50`) — **MOBILE-31 (T2 HIGH from audit)**. Adds one global `@media (prefers-reduced-motion: reduce)` block to `globals.css` (CSS-tricks pattern — compress to 0.01ms so `animationend` still fires). Single-file ≤15 LOC. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
