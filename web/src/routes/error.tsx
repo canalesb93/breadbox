@@ -1,19 +1,19 @@
-import { useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
   ChevronDown,
-  ChevronRight,
+  Home,
   RotateCw,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { ActionPill } from "@/components/action-pill";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/page-header";
-import { SectionCard } from "@/components/section-card";
-import { StatusPanel } from "@/components/status-panel";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Eyebrow } from "@/components/eyebrow";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { cn } from "@/lib/utils";
 
 interface ErrorPageProps {
   /** The error thrown during render — typed loosely to match TanStack
@@ -50,28 +50,67 @@ function readError(err: unknown): { message: string; stack?: string } {
 // and command palette stay live, so the user has a way out without a hard
 // reload.
 //
-// Visual contract (matches NotFoundPage / Placeholder):
-//   <PageHeader eyebrow="500 · ERROR" title="Something went wrong" />
-//   <StatusPanel tone="destructive" />  ← human-readable message
-//   <SectionCard title="Technical details">
-//     collapsible details payload with the raw stack trace (dev affordance)
-//   </SectionCard>
-//
-// Reset wiring: the router passes a `reset` callback that re-renders the
-// failing route. We expose it as "Try again" alongside a "Reload" fallback
-// (full-page) and a Home link.
+// Single-card hero (not PageHeader + StatusPanel + SectionCard): the
+// previous layout repeated the same destructive message in three stacked
+// containers. Now the error message itself IS the heading; the surrounding
+// "Something went wrong" framing lives as a small eyebrow above it. The
+// recovery actions cluster directly under the message, and the raw stack
+// trace lives behind a collapsible disclosure so debugging context is one
+// click away without dominating the surface for end users.
 export function ErrorPage({ error, reset }: ErrorPageProps) {
-  const [showDetails, setShowDetails] = useState(false);
   const { message, stack } = readError(error);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="500 · ERROR"
-        title="Something went wrong"
-        description="The page hit an unexpected error while rendering. The shell is still healthy — try again, or jump to another page."
-        actions={
-          <>
+    <div className="mx-auto w-full max-w-2xl">
+      <div
+        className="border-destructive/30 bg-card relative overflow-hidden rounded-xl border shadow-sm"
+        role="alert"
+      >
+        {/* Destructive accent stripe along the top. Same tone vocabulary as
+            <StatusPanel destructive> but a top-rail instead of a left-rail
+            so the card reads as the page hero, not an inline notice. */}
+        <div className="bg-destructive/80 absolute top-0 right-0 left-0 h-[3px]" />
+
+        <div className="flex flex-col items-center gap-4 px-6 pt-10 pb-8 text-center sm:px-10">
+          <div className="bg-destructive/10 text-destructive ring-destructive/20 flex size-14 items-center justify-center rounded-2xl ring-1">
+            <AlertTriangle className="size-7" />
+          </div>
+
+          <Eyebrow as="p" variant="page" className="text-destructive/80">
+            500 · Server error
+          </Eyebrow>
+
+          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
+            Something went wrong
+          </h1>
+
+          <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
+            The page hit an unexpected error while rendering. The shell is
+            still healthy — try again, or jump to another page.
+          </p>
+
+          {/* The raw error message in monospace so it stands apart from the
+              copy. Selectable + wraps long messages cleanly. */}
+          <code className="bg-muted/60 text-foreground border-border/60 mt-1 max-w-full overflow-x-auto rounded-md border px-3 py-2 text-left font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
+            {message}
+          </code>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {reset ? (
+              <Button size="sm" onClick={reset} className="gap-1.5">
+                <RotateCw className="size-3.5" />
+                Try again
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+              className="gap-1.5"
+            >
+              <RotateCw className="size-3.5" />
+              Reload page
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -84,76 +123,41 @@ export function ErrorPage({ error, reset }: ErrorPageProps) {
                 <Kbd>K</Kbd>
               </KbdGroup>
             </Button>
-            {reset ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={reset}
-                className="gap-1.5"
-              >
-                <RotateCw className="size-3.5" />
-                Try again
-              </Button>
-            ) : null}
-            <Button asChild size="sm">
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
               <Link to="/">
-                Back to Home
-                <ArrowRight className="size-4" />
+                <Home className="size-3.5" />
+                Home
+                <ArrowRight className="size-3.5" />
               </Link>
             </Button>
-          </>
-        }
-      />
-
-      <div className="flex flex-col gap-4">
-        <StatusPanel
-          tone="destructive"
-          icon={AlertTriangle}
-          heading={message}
-          body="If this keeps happening, reload the page or check the browser console for more context."
-          trailing={
-            <ActionPill onClick={() => window.location.reload()}>
-              <RotateCw className="size-3.5" />
-              Reload
-            </ActionPill>
-          }
-        />
+          </div>
+        </div>
 
         {stack ? (
-          <SectionCard
-            title="Technical details"
-            icon={
-              <AlertTriangle className="text-muted-foreground size-4" />
-            }
-            action={
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDetails((v) => !v)}
-                className="h-7 gap-1 px-2 text-xs"
-              >
-                {showDetails ? (
-                  <ChevronDown className="size-3.5" />
-                ) : (
-                  <ChevronRight className="size-3.5" />
-                )}
-                {showDetails ? "Hide" : "Show"}
-              </Button>
-            }
-          >
-            <div
-              className={cn(
-                "overflow-hidden transition-all duration-200 ease-out",
-                showDetails ? "max-h-[480px]" : "max-h-0",
-              )}
-            >
-              <pre className="bg-muted/40 text-muted-foreground max-h-[440px] overflow-auto rounded-md border p-3 text-[11px] leading-relaxed">
-                {stack}
-              </pre>
+          <Collapsible>
+            <div className="border-t">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="group hover:bg-muted/30 flex w-full items-center justify-between gap-2 px-6 py-3 text-left transition-colors sm:px-10"
+                >
+                  <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                    Technical details
+                  </span>
+                  <ChevronDown className="text-muted-foreground size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-6 pb-6 sm:px-10">
+                  <pre className="bg-muted/40 text-muted-foreground max-h-[440px] overflow-auto rounded-md border p-3 text-[11px] leading-relaxed">
+                    {stack}
+                  </pre>
+                </div>
+              </CollapsibleContent>
             </div>
-          </SectionCard>
+          </Collapsible>
         ) : null}
       </div>
-    </>
+    </div>
   );
 }
