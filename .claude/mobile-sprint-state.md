@@ -49,6 +49,16 @@ Each iteration:
 - [ ] **MOBILE-33 (MEDIUM)** Identifier-field autocapitalize/autocorrect — slug/API-key/agent-slug inputs need `autoCorrect="off" autoCapitalize="off"` so iOS doesn't mangle them. Files: `web/src/features/agents/agent-form.tsx` (slug field at create time), `web/src/routes/api-key-new.tsx` (key name).
 - [ ] **MOBILE-34 (MEDIUM)** `overscroll-behavior: contain` on tables/lists — prevents iOS pull-to-refresh and parent rubber-band when scrolling inside `data-table.tsx`. Tailwind: `overscroll-contain`. One-line addition to the existing Table wrapper.
 
+## Backlog (T3 scout — rules / agents / prompts, iter ~17)
+
+- [ ] **MOBILE-36 (HIGH)** Prompts add-block `DialogFooter` doesn't use `flex-col-reverse` — secondary appears above primary on mobile. `web/src/routes/prompts.build.tsx` (~line 948). Apply same pattern as PR #1321 FormFooter.
+- [ ] **MOBILE-37 (HIGH)** Agent runs table column widths explode beyond viewport on iOS. `web/src/routes/agents.runs.tsx` (~lines 303-388). Rigid `w-[22%] min-w-[160px]` + 8 fixed columns ⇒ horizontal scroll required. Verify whether the existing `scroll-shadow-x` from Table primitive helps; if not, hide-on-mobile or collapse columns into a Metrics expander.
+- [ ] **MOBILE-38 (HIGH)** Prompts builder modal `grid-cols-[10rem_1fr]` doesn't reflow on iPhone landscape. `web/src/routes/prompts.build.tsx` (~line 825). Switch to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]` so the nav rail stacks on small screens.
+- [ ] **MOBILE-39 (MEDIUM)** Rules filter toolbar three fixed-width selects wrap awkwardly. `web/src/routes/rules.tsx` (~line 290). Apply chip-rail pattern from #1324 (`max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto`).
+- [ ] **MOBILE-40 (MEDIUM)** Transcript sheet nested scroll trap. `web/src/features/agents/transcript-viewer.tsx`. Inner `<pre max-h-48 overflow-auto>` inside sheet body creates two scroll contexts; iOS swipe-up in the pre triggers back-gesture instead of scrolling sheet. Fix: `overscroll-behavior-y: contain` on the pre + expand `max-h` so it doesn't compete with the sheet scroll.
+- [ ] **MOBILE-41 (LOW)** Command palette input `h-11` vs `h-12` threshold from #1317. `web/src/components/command-palette.tsx` (~line 218). Debatable; bumping to `h-12` for consistency.
+- [ ] **MOBILE-42 (LOW)** `detail-sheet-header.tsx` missing safe-area-top in iPhone landscape with notch. `web/src/components/detail-sheet-header.tsx` (~lines 54-59). `pt-5` → `pt-[calc(1.25rem+env(safe-area-inset-top))]`.
+
 ## Deferred / low-value (won't fix without evidence)
 
 - **scroll-padding-top for anchor links** — niche, no anchor-link UX in the app today.
@@ -73,8 +83,9 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. Ships #1328+#1330+#1331+#1332+#1333 (button stacking, navbar blur, dvh polish, iOS shell + cold-load splash, 401 visibility-gate). **Awaiting user merge** — splash is the highest-impact item for the user's "blank pages 1-2s" complaint on transactions list.
-- **fix/mobile-tx-lazy-category-picker** (subagent `a40a0938`) — **MOBILE-35 (perf)**. Defer per-row CategoryPicker content (or hoist its data hook) to reduce per-page memory ~250 KB. Improves iOS Safari bfcache eligibility on the transactions list. PR # TBD.
+- **PR #1334** sprint→main Phase 2 bundle. Ships #1328+#1330+#1331+#1332+#1333. **Awaiting user merge** — splash is the highest-impact item for the user's "blank pages 1-2s" complaint on transactions list.
+- **fix/mobile-tx-lazy-category-picker** (subagent `a40a0938`) — **MOBILE-35 (perf)**. Defer per-row CategoryPicker content. PR # TBD.
+- **fix/mobile-prompts-dialog-footer** (subagent `ae93b950`) — **MOBILE-36 (T3 scout)**. Verify and fix the prompts add-block DialogFooter to use the `flex-col-reverse` pattern from #1321 if the audit's claim holds; otherwise close as non-issue. PR # TBD or no-op state commit.
 
 ## Completed (Phase 2 — direct-to-main)
 
