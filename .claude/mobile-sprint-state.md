@@ -25,10 +25,6 @@
 
 _(empty — both user-reported P0 bugs shipped)_
 
-## Backlog (P0 — re-scout, post-fix issues)
-
-- [ ] **MOBILE-14** Agent form right card sinks below at 375px. `web/src/features/agents/agent-form.tsx` (~line 113). `grid-cols-1 md:grid-cols-3` plus `md:col-span-2` on the left card causes the right card (settings/model/budget) to fall far down at 375px. Add `sm:grid-cols-2` reflow or stack semantically until md.
-
 ## Backlog (P1 — re-scout)
 
 - [ ] **MOBILE-17** Empty state `max-w-sm` (384px) exceeds 375px viewport. `web/src/components/empty-state.tsx` (~line 73). Bump to `max-w-xs` or rely on viewport padding.
@@ -44,7 +40,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-- **fix/mobile-agent-form-order** (subagent `a84bd45e`) — MOBILE-14. Reorders agent-form cards on mobile via CSS `order-first` / `md:order-none` so model/schedule/scope settings appear above the long prompt body on narrow viewports. Tab order unchanged (DOM order preserved). PR # TBD.
+_(none)_
 
 ## Completed
 
@@ -56,6 +52,7 @@ _(empty — both user-reported P0 bugs shipped)_
 - ✅ **MOBILE-11** Table scroll affordance — PR #1319 merged (`66d7d8d2`). Added `scroll-shadow-x` utility (4-layer CSS-only gradient, dark-mode aware) + `[-webkit-overflow-scrolling:touch]` to the `Table` primitive's container. Clipped tables now show a fade indicating scrollability; flat right edge confusion resolved.
 - ✅ **MOBILE-10/13** Dynamic viewport units — PR #1320 merged (`b3411af3`). Selection action bar swapped `100vw` → `100dvw` so it stays within the dynamic viewport as iOS chrome collapses; desktop sidebar swapped `h-svh` → `h-full` (parent-relative) so it fills exactly its container instead of the worst-case small-viewport height.
 - ✅ **MOBILE-15/16** Header + footer mobile stacking — PR #1321 merged (`669cfed6`). `PageHeader` actions cluster now wraps on mobile (`flex-wrap` + `sm:flex-nowrap sm:shrink-0`) so pages with multiple action buttons no longer overflow horizontally. `FormFooter` action cluster goes full-width column with primary on top (`flex-col-reverse w-full`) at <640px, restoring inline row on ≥640px — affirmative-on-top matches iOS / Material.
+- ✅ **MOBILE-14** Agent form mobile order — PR #1322 merged (`1bad8159`). CSS `order-first` / `md:order-none` reorders the agent-form cards so the operational knobs card (Model, Schedule, Tool scope, Allowed tools, Max turns, Budget) appears ABOVE the long prompt body on <768px. DOM and tab order unchanged.
 
 ## Notes for next iteration
 
