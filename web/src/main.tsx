@@ -326,6 +326,23 @@ const queryClient = new QueryClient({
   },
 });
 
+// iOS Safari restores the SPA from bfcache on swipe-back: the DOM snapshot is
+// reconstituted and JS resumes mid-state. Without intervention the stale React
+// + React-Query state can trigger a 401-refetch → /login redirect race during
+// Safari's restore animation, presenting as a frozen / blank page. Invalidate
+// the router (re-runs loaders + search validation) and mark queries stale (so
+// they refetch fresh data without flashing skeletons) on `pageshow.persisted`.
+// Don't `queryClient.clear()` — that drops cached data instantly. Don't add a
+// `beforeunload`/`unload` handler — that would disable bfcache entirely.
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      router.invalidate();
+      queryClient.invalidateQueries();
+    }
+  });
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

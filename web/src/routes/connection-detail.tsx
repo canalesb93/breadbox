@@ -377,10 +377,11 @@ function DetailBody({
               Disconnecting wipes credentials and soft-deletes related
               transactions. This can&apos;t be undone.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
               <Button
                 size="sm"
                 variant="ghost"
+                className="w-full sm:w-auto"
                 onClick={() => setConfirmingDisconnect(false)}
                 disabled={disconnect.isPending}
               >
@@ -389,6 +390,7 @@ function DetailBody({
               <Button
                 size="sm"
                 variant="destructive"
+                className="w-full sm:w-auto"
                 onClick={onDisconnect}
                 disabled={disconnect.isPending}
               >
