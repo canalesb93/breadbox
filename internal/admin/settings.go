@@ -50,6 +50,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
 	syncLogCount, _ := a.Service.CountSyncLogs(ctx)
 	onboardingDismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
+	v2Default := appconfig.Bool(ctx, a.Queries, appconfig.KeyV2Default, false)
 
 	nextSyncTime := ""
 	if a.Scheduler != nil {
@@ -68,6 +69,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		ProviderCount:        len(a.Providers),
 		HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
 		OnboardingDismissed:  onboardingDismissed,
+		V2Default:            v2Default,
 		NextSyncTime:         nextSyncTime,
 		ConfigSources:        a.Config.ConfigSources,
 	}
@@ -200,6 +202,35 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			SetFlash(ctx, sm, "success", fmt.Sprintf("Sync log retention set to %d days.", retentionDays))
 		}
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	}
+}
+
+// SettingsV2DefaultPostHandler serves POST /settings/v2-default. Toggles
+// the app_config key that flips the v1 admin root to redirect at /v2/.
+// Unchecked checkboxes don't submit, so a missing form value is treated
+// as "off".
+func SettingsV2DefaultPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		enabled := r.FormValue("v2_default") == "on"
+		value := "false"
+		if enabled {
+			value = "true"
+		}
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   appconfig.KeyV2Default,
+			Value: pgconv.Text(value),
+		}); err != nil {
+			a.Logger.Error("save v2 default", "error", err)
+			FlashRedirect(w, r, sm, "error", "Failed to save default UI setting.", "/settings/system")
+			return
+		}
+		if enabled {
+			SetFlash(ctx, sm, "success", "v2 dashboard is now the default. Visiting / will land on /v2/.")
+		} else {
+			SetFlash(ctx, sm, "success", "v1 admin dashboard restored as the default landing page.")
+		}
+		http.Redirect(w, r, "/settings/system", http.StatusSeeOther)
 	}
 }
 
