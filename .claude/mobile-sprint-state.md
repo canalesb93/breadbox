@@ -44,7 +44,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-agent-form-order** (subagent `a84bd45e`) — MOBILE-14. Reorders agent-form cards on mobile via CSS `order-first` / `md:order-none` so model/schedule/scope settings appear above the long prompt body on narrow viewports. Tab order unchanged (DOM order preserved). PR # TBD.
 
 ## Completed
 
