@@ -44,8 +44,6 @@ Each iteration:
 
 ## Backlog (Phase 2 — SPA-pitfall audit, iter ~14)
 
-- [ ] **MOBILE-32 (HIGH)** iOS keyboard hints — add `inputmode="email|numeric|decimal"` to typed inputs and `enterkeyhint="go|search|done"` on form submit fields. Audit: `web/src/routes/login.tsx`, `web/src/features/settings/*`, any amount/number inputs.
-- [ ] **MOBILE-33 (MEDIUM)** Identifier-field autocapitalize/autocorrect — slug/API-key/agent-slug inputs need `autoCorrect="off" autoCapitalize="off"` so iOS doesn't mangle them. Files: `web/src/features/agents/agent-form.tsx` (slug field at create time), `web/src/routes/api-key-new.tsx` (key name).
 - [ ] **MOBILE-34 (MEDIUM)** `overscroll-behavior: contain` on tables/lists — prevents iOS pull-to-refresh and parent rubber-band when scrolling inside `data-table.tsx`. Tailwind: `overscroll-contain`. One-line addition to the existing Table wrapper.
 
 ## Backlog (T3 scout — rules / agents / prompts, iter ~17)
@@ -82,7 +80,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — `CLEAN` status; now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337 (state-doc merge included).
-- **fix/mobile-form-ergonomics** (subagent `a8a6bc0f`) — **MOBILE-32 + MOBILE-33 (T2 HIGH/MEDIUM)**. iOS keyboard hints (`inputmode`, `enterkeyhint`) across typed inputs + `autoCorrect="off" autoCapitalize="off" spellCheck={false}` on identifier fields (slugs, API key names). Prefer setting defaults on `SearchInput` so every search box benefits. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -98,6 +95,7 @@ Each iteration:
 - ✅ **MOBILE-35** Per-row CategoryPicker lazy body — PR #1335 merged into sprint branch (`fb8439c3`). Splits `CategoryPicker` into a lightweight always-mounted shell (just `useState(open)` + trigger) and a `PickerBody` that mounts only when `open === true` and owns `useCategoryEditor` (the mutation hook). Audit's actual finding: 50× `useMutation` observers per page (not popover content) were the leak. Reduces transactions-list React memory, improving iOS Safari bfcache eligibility.
 - ✅ **MOBILE-36** Prompts add-block dialog footer stacking — PR #1336 merged into sprint branch (`943dec09`). Inner action wrapper rewrapped as `flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center` so "Done" (affirmative) sits on top on mobile per the #1321 convention.
 - ✅ **MOBILE-31** Global `prefers-reduced-motion` (T2 HIGH a11y) — PR #1337 merged into sprint branch (`46323665`). Adds one `@media (prefers-reduced-motion: reduce)` block to `globals.css` using the CSS-tricks pattern (compress animation/transition to 0.01ms so `animationend` handlers still fire). Covers ~51 `animate-spin` usages + all shadcn primitive transitions without touching call sites. Cold-load splash (#1332) retains its own per-element `animation: none` override.
+- ✅ **MOBILE-32/33** iOS form ergonomics (T2 HIGH/MEDIUM) — PR #1338 merged into sprint branch (`d00c6305`). `SearchInput` gets defaults (`inputMode="search"`, `enterKeyHint="search"`, `autoCapitalize="none"`, `autoCorrect="off"`, `spellCheck={false}`) so every search consumer benefits. Numeric inputs (agent `max_turns`, `budget_usd_cents`, link-account tolerance, rule values) get `inputMode="numeric|decimal"`. Identifier fields (API key name/prefix, rule values) get autocorrect/autocapitalize off.
 
 ## Notes for next iteration
 
