@@ -197,7 +197,17 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          {/* Safe-area: SheetContent has `p-0` here (sidebar needs a flush
+              layout) which would otherwise clobber the sheet primitive's own
+              env(safe-area-inset-*) padding. Re-apply the insets on the inner
+              column so the BrandHeader clears the notch and NavUser clears
+              the home indicator on edge-to-edge iPhones. Values resolve to 0
+              elsewhere — non-iPhone layouts unchanged. Semantic correctness
+              concern (viewport-edge), not styling — same justification as
+              the sheet.tsx edit shipping in the same PR. */}
+          <div className="flex h-full w-full flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     )
