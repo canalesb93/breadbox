@@ -57,7 +57,7 @@ export function PageHeader({
         )}
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description && (
-          <p className="text-muted-foreground max-w-prose text-sm">
+          <p className="text-muted-foreground text-sm">
             {description}
           </p>
         )}
