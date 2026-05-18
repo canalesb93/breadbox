@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
 import { SoftBackButton } from "@/components/soft-back-button";
+import { IdPill } from "@/components/id-pill";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAgent,
@@ -113,6 +114,7 @@ function AgentEditFormView({
         eyebrow="Agent"
         title={agent.name}
         description="Update prompt, schedule, model, and safety caps. Changes take effect on the next scheduled fire or manual run."
+        actions={<IdPill value={agent.slug} />}
       />
       <AgentForm
         mode="edit"

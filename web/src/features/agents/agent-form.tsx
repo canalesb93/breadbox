@@ -274,18 +274,20 @@ export function AgentForm({
           >
             <CollapsibleTrigger
               className={cn(
-                "text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium transition-colors",
+                "text-muted-foreground hover:text-foreground inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs font-medium transition-colors",
               )}
             >
-              <ChevronRight
-                className={cn(
-                  "size-3.5 transition-transform",
-                  advancedOpen && "rotate-90",
-                )}
-              />
-              Override system prompt
-              <span className="text-muted-foreground/70 ml-1 font-normal">
-                (optional — defaults to the Breadbox baseline)
+              <span className="inline-flex items-center gap-1.5">
+                <ChevronRight
+                  className={cn(
+                    "size-3.5 transition-transform",
+                    advancedOpen && "rotate-90",
+                  )}
+                />
+                Override system prompt
+              </span>
+              <span className="text-muted-foreground/70 font-normal">
+                optional — defaults to the Breadbox baseline
               </span>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-3">
