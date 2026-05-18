@@ -67,13 +67,18 @@ function CommandInput({
   return (
     <div
       data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b px-3"
+      // h-12 on touch (≥44pt tap target per Apple HIG, MOBILE-12); h-9
+      // on `pointer: fine` keeps desktop density unchanged. CommandDialog
+      // overrides this via `**:data-[slot=command-input-wrapper]:h-12`
+      // when rendered inside the palette, so the touch bump only changes
+      // standalone usage.
+      className="flex h-9 items-center gap-2 border-b px-3 pointer-coarse:h-12"
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:h-12",
           className
         )}
         {...props}

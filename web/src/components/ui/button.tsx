@@ -4,6 +4,14 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+// Icon-only sizes share an invisible 44×44pt tap-zone on touch devices
+// (Apple HIG minimum). The visible square stays small; a centered
+// pseudo-element extends the hit area without affecting layout. Scoped
+// to `pointer-coarse:` so desktop mice (`pointer: fine`) are unaffected.
+// See MOBILE-5 + the `Buttons — tap target` specimen in the sandbox.
+const TAP_TARGET =
+  "relative pointer-coarse:before:absolute pointer-coarse:before:left-1/2 pointer-coarse:before:top-1/2 pointer-coarse:before:size-11 pointer-coarse:before:-translate-x-1/2 pointer-coarse:before:-translate-y-1/2 pointer-coarse:before:content-['']"
+
 const buttonVariants = cva(
   // Disabled treatment: filled variants (default/destructive) override
   // `disabled:opacity-50` with a `bg-muted text-muted-foreground` swap below
@@ -32,10 +40,10 @@ const buttonVariants = cva(
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
         lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        icon: `size-9 ${TAP_TARGET}`,
+        "icon-xs": `size-6 rounded-md [&_svg:not([class*='size-'])]:size-3 ${TAP_TARGET}`,
+        "icon-sm": `size-8 ${TAP_TARGET}`,
+        "icon-lg": `size-10 ${TAP_TARGET}`,
       },
     },
     defaultVariants: {

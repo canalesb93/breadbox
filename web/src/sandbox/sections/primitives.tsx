@@ -137,6 +137,25 @@ export function PrimitivesSection() {
       </Specimen>
 
       <Specimen
+        label="Button — icon tap target"
+        code="size=icon* @ pointer: coarse"
+        description="Icon-only sizes (icon-xs/sm/icon/icon-lg = 24–40px visible) stay visually small on desktop but get a centered 44×44pt invisible tap-zone via a `pointer-coarse:before:size-11` pseudo-element. Apple HIG minimum without inflating the layout. Resize-emulate a touch viewport in DevTools to see the hit area expand (the box is invisible — toggle ::before in DevTools or temporarily add `before:bg-destructive/20` to confirm)."
+      >
+        <Button size="icon-xs" variant="ghost" aria-label="Add (icon-xs)">
+          <Plus />
+        </Button>
+        <Button size="icon-sm" variant="ghost" aria-label="Add (icon-sm)">
+          <Plus />
+        </Button>
+        <Button size="icon" variant="ghost" aria-label="Add (icon)">
+          <Plus />
+        </Button>
+        <Button size="icon-lg" variant="ghost" aria-label="Add (icon-lg)">
+          <Plus />
+        </Button>
+      </Specimen>
+
+      <Specimen
         label="Button — disabled across variants"
         code="disabled"
         description="Filled variants (default + destructive) swap to bg-muted text-muted-foreground instead of opacity-50 so dark mode doesn't render the near-white primary token as a bright tile. Outline/ghost/secondary/link keep the inherited opacity dim."
