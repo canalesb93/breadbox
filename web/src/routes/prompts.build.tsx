@@ -254,7 +254,6 @@ export function PromptsBuildPage() {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [customs, setCustoms] = useState<CustomBlock[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [order, setOrder] = useState<ComposedItem[] | null>(null);
   // Modal lives on the parent so it stays mounted across the
   // empty-state → composer-table swap that happens after the first
   // pick. If the dialog were nested inside whichever trigger element
@@ -274,14 +273,12 @@ export function PromptsBuildPage() {
     return items;
   }, [strategy, depth, integrations, knowledge, customs]);
 
+  const [order, setOrder] = useState<ComposedItem[]>(defaultOrder);
+
   // Resync the session order whenever the URL selection drifts.
   // Preserve manual reordering for items that still belong; append
   // new ones at the end.
   useEffect(() => {
-    if (order === null) {
-      setOrder(defaultOrder);
-      return;
-    }
     const have = new Set(order.map(rowKey));
     const want = new Set(defaultOrder.map(rowKey));
     if (
@@ -295,7 +292,7 @@ export function PromptsBuildPage() {
     }
   }, [defaultOrder, order]);
 
-  const effectiveOrder = order ?? defaultOrder;
+  const effectiveOrder = order;
 
   const setFilter = (patch: Partial<PromptsBuildSearch>) => {
     navigate({
@@ -310,30 +307,51 @@ export function PromptsBuildPage() {
     });
   };
 
-  // pickStrategy / pickDepth are toggles: clicking the active block
-  // removes it; clicking a different one replaces the current
-  // selection (Strategy and Depth are still single-select). Toggle-off
-  // matches the multi-select Integrations/Knowledge behavior so picks
-  // always feel reversible from the modal itself.
-  const pickStrategy = (id: string) =>
-    setFilter({ strategy: strategy === id ? undefined : id });
-  const pickDepth = (id: string) =>
-    setFilter({ depth: depth === id ? undefined : id });
-
-  const toggleIntegration = (id: string) => {
-    const next = integrations.includes(id)
-      ? integrations.filter((x) => x !== id)
-      : [...integrations, id];
-    setFilter({ integrations: joinCsv(next) });
-  };
-  const toggleKnowledge = (id: string) => {
-    const next = knowledge.includes(id)
-      ? knowledge.filter((x) => x !== id)
-      : [...knowledge, id];
-    setFilter({ knowledge: joinCsv(next) });
+  // pickBlock toggles a block into or out of the composition. Strategy
+  // and Depth are single-select (re-picking removes); Integrations and
+  // Knowledge are multi-select. Toggle-off everywhere keeps modal picks
+  // reversible without needing the row's trash button.
+  const pickBlock = (block: PromptBlock) => {
+    const id = block.id;
+    switch (block.group) {
+      case "strategy":
+        setFilter({ strategy: strategy === id ? undefined : id });
+        return;
+      case "depth":
+        setFilter({ depth: depth === id ? undefined : id });
+        return;
+      case "integration": {
+        const next = integrations.includes(id)
+          ? integrations.filter((x) => x !== id)
+          : [...integrations, id];
+        setFilter({ integrations: joinCsv(next) });
+        return;
+      }
+      case "knowledge": {
+        const next = knowledge.includes(id)
+          ? knowledge.filter((x) => x !== id)
+          : [...knowledge, id];
+        setFilter({ knowledge: joinCsv(next) });
+        return;
+      }
+    }
   };
 
   const removeFromComposition = (item: ComposedItem) => {
+    // Prune any expansion/edit entries the row left behind so the maps
+    // don't grow unbounded across add/remove churn in a session.
+    setExpanded((e) => {
+      if (!(item.id in e)) return e;
+      const next = { ...e };
+      delete next[item.id];
+      return next;
+    });
+    setEdits((s) => {
+      if (!(item.id in s)) return s;
+      const next = { ...s };
+      delete next[item.id];
+      return next;
+    });
     if (item.kind === "custom") {
       setCustoms((cs) => cs.filter((c) => c.id !== item.id));
       return;
@@ -368,10 +386,11 @@ export function PromptsBuildPage() {
   };
 
   // clearAll wipes every block out of the composition — both the
-  // URL-tracked library selections and the in-memory custom blocks.
-  // The component-level expansion/edits maps are not touched since
-  // they're keyed by item.id and will be naturally orphaned.
+  // URL-tracked library selections and the in-memory custom blocks
+  // plus their orphaned expansion/edit entries.
   const clearAll = () => {
+    setExpanded({});
+    setEdits({});
     setFilter({
       strategy: undefined,
       depth: undefined,
@@ -524,109 +543,101 @@ export function PromptsBuildPage() {
           onRetry={() => blocksQuery.refetch()}
           retrying={blocksQuery.isFetching}
         />
+      ) : isLoading ? (
+        <Card className="p-4">
+          <Skeleton className="h-32 w-full" />
+        </Card>
       ) : (
-        <div className="flex flex-col gap-3 pb-20">
-          {isLoading ? (
-            <Card className="p-4">
-              <Skeleton className="h-32 w-full" />
-            </Card>
-          ) : (
-            <>
-              <div className="flex items-center justify-end gap-1">
-                {effectiveOrder.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleExpandAll}
-                    className="text-muted-foreground hover:text-foreground h-8 px-2 text-xs"
-                  >
-                    {allExpanded ? (
-                      <>
-                        <ChevronsDownUp className="size-3.5" />
-                        Collapse all
-                      </>
-                    ) : (
-                      <>
-                        <ChevronsUpDown className="size-3.5" />
-                        Expand all
-                      </>
-                    )}
-                  </Button>
+        <>
+          <div className="flex items-center justify-end gap-1">
+            {effectiveOrder.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={toggleExpandAll}
+                className="text-muted-foreground hover:text-foreground h-8 px-2 text-xs"
+              >
+                {allExpanded ? (
+                  <>
+                    <ChevronsDownUp className="size-3.5" />
+                    Collapse all
+                  </>
+                ) : (
+                  <>
+                    <ChevronsUpDown className="size-3.5" />
+                    Expand all
+                  </>
                 )}
-                <ButtonGroup>
+              </Button>
+            )}
+            <ButtonGroup>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => setAddBlockOpen(true)}
+                className="h-8 px-3 text-xs"
+              >
+                <Plus className="size-3.5" />
+                Add block
+              </Button>
+              {/* Visible hairline divider between the main action and
+                  the overflow trigger — `bg-input` is too low-contrast
+                  on the filled primary surface. */}
+              <ButtonGroupSeparator className="bg-primary-foreground/25" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="default"
                     size="sm"
-                    onClick={() => setAddBlockOpen(true)}
-                    className="h-8 px-3 text-xs"
+                    aria-label="More add-block options"
+                    className="h-8 px-2"
                   >
-                    <Plus className="size-3.5" />
-                    Add block
+                    <ChevronDown className="size-3.5" />
                   </Button>
-                  {/* Visible hairline divider between the main action and
-                      the overflow trigger — `bg-input` is too low-contrast
-                      on the filled primary surface, so we lean on the
-                      primary-foreground tone the kbd pills used. */}
-                  <ButtonGroupSeparator className="bg-primary-foreground/25" />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        aria-label="More add-block options"
-                        className="h-8 px-2"
-                      >
-                        <ChevronDown className="size-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-60"
-                      // Radix restores focus to the trigger button after
-                      // the menu closes. For this menu, "Add empty block"
-                      // moves focus to the new textarea — letting Radix
-                      // then snap focus back to the chevron immediately
-                      // overrides that. preventDefault keeps focus
-                      // wherever our handler put it.
-                      onCloseAutoFocus={(e) => e.preventDefault()}
-                    >
-                      <DropdownMenuItem onSelect={() => addEmptyBlock()}>
-                        <Plus className="size-4" />
-                        Add empty block
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </ButtonGroup>
-              </div>
-              <ComposerTable
-                items={effectiveOrder}
-                onReorder={setOrder}
-                blocksById={blocksById}
-                customs={customs}
-                edits={edits}
-                expanded={expanded}
-                setExpanded={setExpanded}
-                setEdits={setEdits}
-                setCustoms={setCustoms}
-                onRemove={removeFromComposition}
-                addBlockEmptyTrigger={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isLoading}
-                    onClick={() => setAddBlockOpen(true)}
-                  >
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-60"
+                  // Radix would snap focus back to the chevron after
+                  // close; preventDefault keeps focus on the new
+                  // textarea our handler just focused.
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
+                  <DropdownMenuItem onSelect={() => addEmptyBlock()}>
                     <Plus className="size-4" />
-                    Add block
-                  </Button>
-                }
-              />
-            </>
-          )}
-        </div>
+                    Add empty block
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
+          </div>
+          <ComposerTable
+            items={effectiveOrder}
+            onReorder={setOrder}
+            blocksById={blocksById}
+            customs={customs}
+            edits={edits}
+            expanded={expanded}
+            setExpanded={setExpanded}
+            setEdits={setEdits}
+            setCustoms={setCustoms}
+            onRemove={removeFromComposition}
+            addBlockEmptyTrigger={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                onClick={() => setAddBlockOpen(true)}
+              >
+                <Plus className="size-4" />
+                Add block
+              </Button>
+            }
+          />
+        </>
       )}
       {!isLoading && !blocksQuery.isError && (
         <AddBlockMenu
@@ -635,10 +646,7 @@ export function PromptsBuildPage() {
           blocksByGroup={blocksByGroup}
           activeIds={activeLibraryIds}
           composedCount={effectiveOrder.length}
-          onPickStrategy={pickStrategy}
-          onPickDepth={pickDepth}
-          onToggleIntegration={toggleIntegration}
-          onToggleKnowledge={toggleKnowledge}
+          onPick={pickBlock}
           onAddCustom={addCustomBlock}
           onClearAll={clearAll}
           onApplyPreset={applyPreset}
@@ -669,10 +677,10 @@ interface AddBlockMenuProps {
   // the disabled state of the Clear all action. Distinct from
   // activeIds.size, which only counts library picks.
   composedCount: number;
-  onPickStrategy: (id: string) => void;
-  onPickDepth: (id: string) => void;
-  onToggleIntegration: (id: string) => void;
-  onToggleKnowledge: (id: string) => void;
+  // onPick handles selection. Parent dispatches by group to the right
+  // URL slot (single-select for strategy/depth, multi-select for
+  // integrations/knowledge), so the modal stays group-agnostic.
+  onPick: (block: PromptBlock) => void;
   onAddCustom: (content: string) => void;
   onClearAll: () => void;
   // onApplyPreset replaces the current composition with the preset's
@@ -693,10 +701,7 @@ function AddBlockMenu({
   blocksByGroup,
   activeIds,
   composedCount,
-  onPickStrategy,
-  onPickDepth,
-  onToggleIntegration,
-  onToggleKnowledge,
+  onPick,
   onAddCustom,
   onClearAll,
   onApplyPreset,
@@ -790,24 +795,9 @@ function AddBlockMenu({
         .filter((s) => s.blocks.length > 0);
     }, [activeGroup, filtered]);
 
-  const handlePick = (block: PromptBlock) => {
-    switch (block.group) {
-      case "strategy":
-        onPickStrategy(block.id);
-        break;
-      case "depth":
-        onPickDepth(block.id);
-        break;
-      case "integration":
-        onToggleIntegration(block.id);
-        break;
-      case "knowledge":
-        onToggleKnowledge(block.id);
-        break;
-    }
-    // Stay open: user might add several integrations / both a strategy
-    // and a depth in one sitting. They dismiss via Esc / backdrop / ×.
-  };
+  // Stay open after a pick: user might add several integrations / both
+  // a strategy and a depth in one sitting. They dismiss via Esc /
+  // backdrop / ×.
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -893,9 +883,16 @@ function AddBlockMenu({
                     </p>
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       {PRESETS.map((preset) => (
-                        <PresetCard
+                        <LibraryTile
                           key={preset.id}
-                          preset={preset}
+                          icon={preset.icon}
+                          title={preset.label}
+                          description={preset.description}
+                          footer={
+                            <span className="text-muted-foreground/70 mt-1 text-[10px] tabular-nums uppercase tracking-wide">
+                              Includes {preset.blockIds.length} blocks
+                            </span>
+                          }
                           onClick={() => onApplyPreset(preset)}
                         />
                       ))}
@@ -919,11 +916,13 @@ function AddBlockMenu({
                         </div>
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                           {section.blocks.map((block) => (
-                            <BlockCard
+                            <LibraryTile
                               key={block.id}
-                              block={block}
+                              icon={block.icon}
+                              title={block.title}
+                              description={block.description}
                               active={activeIds.has(block.id)}
-                              onClick={() => handlePick(block)}
+                              onClick={() => onPick(block)}
                             />
                           ))}
                         </div>
@@ -933,11 +932,13 @@ function AddBlockMenu({
                 ) : (
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                     {filtered.map((block) => (
-                      <BlockCard
+                      <LibraryTile
                         key={block.id}
-                        block={block}
+                        icon={block.icon}
+                        title={block.title}
+                        description={block.description}
                         active={activeIds.has(block.id)}
-                        onClick={() => handlePick(block)}
+                        onClick={() => onPick(block)}
                       />
                     ))}
                   </div>
@@ -1079,17 +1080,23 @@ function CategoryRailItem({
   );
 }
 
-// BlockCard renders one library block as a clickable tile. Active state
-// shows a check pill in the corner so the user can tell at a glance
-// which blocks are already in the composition (especially useful for
-// the multi-select Integrations / Knowledge groups).
-function BlockCard({
-  block,
+// LibraryTile is the shared card visual used by both BlockCard (one
+// library block) and PresetCard (one preset). Active shows a check
+// pill in the top-right; footer is an optional bottom line (e.g.
+// "Includes 3 blocks" for presets).
+function LibraryTile({
+  icon,
+  title,
+  description,
   active,
+  footer,
   onClick,
 }: {
-  block: PromptBlock;
-  active: boolean;
+  icon?: string;
+  title: string;
+  description?: string;
+  active?: boolean;
+  footer?: React.ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -1106,56 +1113,19 @@ function BlockCard({
           <Check className="size-3" />
         </span>
       )}
-      {block.icon && (
+      {icon && (
         <span className="bg-muted text-muted-foreground group-hover:text-foreground inline-flex size-8 items-center justify-center rounded-md">
-          <DynamicIcon name={block.icon} className="size-4" />
+          <DynamicIcon name={icon} className="size-4" />
         </span>
       )}
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium leading-tight">{block.title}</span>
-        {block.description && (
+        <span className="text-sm font-medium leading-tight">{title}</span>
+        {description && (
           <span className="text-muted-foreground line-clamp-3 text-xs leading-snug">
-            {block.description}
+            {description}
           </span>
         )}
-      </div>
-    </button>
-  );
-}
-
-// PresetCard renders one preset as a tile. The "Includes N blocks"
-// subtitle hints at the scope without listing block names — keeps the
-// card compact and consistent with BlockCard's visual rhythm.
-function PresetCard({
-  preset,
-  onClick,
-}: {
-  preset: Preset;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group hover:border-primary/40 hover:bg-accent/40 relative flex h-full flex-col gap-2 rounded-lg border p-3 text-left transition-colors"
-    >
-      {preset.icon && (
-        <span className="bg-muted text-muted-foreground group-hover:text-foreground inline-flex size-8 items-center justify-center rounded-md">
-          <DynamicIcon name={preset.icon} className="size-4" />
-        </span>
-      )}
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium leading-tight">
-          {preset.label}
-        </span>
-        {preset.description && (
-          <span className="text-muted-foreground line-clamp-3 text-xs leading-snug">
-            {preset.description}
-          </span>
-        )}
-        <span className="text-muted-foreground/70 mt-1 text-[10px] tabular-nums uppercase tracking-wide">
-          Includes {preset.blockIds.length} blocks
-        </span>
+        {footer}
       </div>
     </button>
   );
@@ -1191,6 +1161,14 @@ function ComposerTable({
   onRemove,
   addBlockEmptyTrigger,
 }: ComposerTableProps) {
+  // Pre-index customs by id so SortableRow lookups are O(1) instead of
+  // O(customs) per row per render.
+  const customsById = useMemo(() => {
+    const m = new Map<string, CustomBlock>();
+    for (const c of customs) m.set(c.id, c);
+    return m;
+  }, [customs]);
+
   // dnd-kit sensors: PointerSensor with a small activation distance so
   // a quick row click doesn't accidentally start a drag (only deliberate
   // movement past 6px does). KeyboardSensor for accessibility.
@@ -1276,7 +1254,7 @@ function ComposerTable({
                   key={rowKey(item)}
                   item={item}
                   blocksById={blocksById}
-                  customs={customs}
+                  customsById={customsById}
                   edits={edits}
                   expanded={Boolean(expanded[item.id])}
                   setExpanded={(open) =>
@@ -1298,7 +1276,7 @@ function ComposerTable({
 interface SortableRowProps {
   item: ComposedItem;
   blocksById: Map<string, PromptBlock>;
-  customs: CustomBlock[];
+  customsById: Map<string, CustomBlock>;
   edits: Record<string, string>;
   expanded: boolean;
   setExpanded: (open: boolean) => void;
@@ -1310,7 +1288,7 @@ interface SortableRowProps {
 function SortableRow({
   item,
   blocksById,
-  customs,
+  customsById,
   edits,
   expanded,
   setExpanded,
@@ -1336,7 +1314,7 @@ function SortableRow({
   const library =
     item.kind === "library" ? blocksById.get(item.id) : undefined;
   const custom =
-    item.kind === "custom" ? customs.find((c) => c.id === item.id) : undefined;
+    item.kind === "custom" ? customsById.get(item.id) : undefined;
 
   const title =
     library?.title ??
