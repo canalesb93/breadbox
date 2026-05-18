@@ -37,7 +37,11 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **Final scout** (Explore agent `af9b31eb`) — confirming no remaining mobile issues across untouched surfaces (setup/login/api-key-created, auth-shell, timeline-rail, floating-action-bar, connection/account detail, CSV flow). Will fold any genuine finds into the backlog; if empty, sprint is ready for sprint → main PR.
+
+## Sprint status
+
+**10 PRs merged on `sprint/mobile-ios-safari`.** Awaiting user authorization to open a final `sprint/mobile-ios-safari → main` PR — explicit permission needed per memory `feedback_no_auto_merge.md` (auth to merge subagent PRs INTO the sprint branch ≠ auth to merge sprint INTO main).
 
 ## Completed
 
