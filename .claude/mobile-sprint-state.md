@@ -37,8 +37,6 @@ Phase 1 shipped fixes (now in main):
 - [ ] **MOBILE-19** HeroGrid 20px padding feels cramped on 375px. `web/src/components/hero-grid.tsx`. Subjective — defer until visual evidence shows a clear problem.
 
 **New (Phase 2 scout, iter 12):**
-- [ ] **MOBILE-22** API key copy button isn't full-width when stacked — `web/src/routes/api-key-created.tsx` (~lines 91-112). _(in flight, see below)_
-- [ ] **MOBILE-23** Disconnect confirmation buttons cramped on mobile — `web/src/routes/connection-detail.tsx` (~lines 379-401). _(in flight, see below)_
 - [ ] **MOBILE-24** CSV column-mapping label wraps aggressively on narrow viewports — `web/src/features/connections/csv-import-form.tsx` (~lines 422-478). Needs visual evidence before fix.
 - [ ] **MOBILE-25** CSV drag-drop file input may not open picker reliably on iOS — `web/src/features/connections/csv-import-form.tsx` (~lines 166-190). Needs simulator verification.
 
@@ -47,7 +45,11 @@ Phase 1 shipped fixes (now in main):
 
 ## In-flight PRs
 
-- **fix/mobile-button-stacking-polish** (subagent `a0ad94fa`) — bundles MOBILE-22 + MOBILE-23. Adds `w-full sm:w-auto` to api-key Copy button; rewraps disconnect confirmation as `flex-col-reverse sm:flex-row` (destructive on top) with full-width-when-stacked buttons. Follows the FormFooter pattern from PR #1321. PR # TBD.
+_(none)_
+
+## Completed (Phase 2)
+
+- ✅ **MOBILE-22/23** Button stacking polish — PR #1328 merged into sprint branch (`543599c8`). API-key Copy button gains `w-full sm:w-auto`; disconnect confirmation rewrapped as `flex-col-reverse sm:flex-row` with destructive Disconnect button on top + full-width-when-stacked. Follows the FormFooter pattern from #1321.
 
 ## Notes for next iteration
 
