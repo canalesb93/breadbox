@@ -47,7 +47,7 @@ export function TransactionDetailPage() {
   const notFound = isError && error instanceof ApiError && error.status === 404;
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto flex max-w-5xl flex-col gap-5">
       <SoftBackButton to="/transactions">Back to transactions</SoftBackButton>
 
       {isLoading ? (

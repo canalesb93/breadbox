@@ -40,10 +40,11 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        // No outer margin — every caller wraps PageHeader in a flex column
-        // with its own `gap-*`, so an `mb-*` here stacks with that gap and
-        // produces a ~44px void on mobile (visible because the action chip
-        // wraps below the description). Let the parent layout own spacing.
+        // No outer margin — <main> is a flex column with gap-5 (see the
+        // contract comment in routes/__root.tsx) so the gap below PageHeader
+        // comes from the parent layout. Adding `mb-*` here stacks with that
+        // gap and produces a ~44px void on mobile (visible because the
+        // action chip wraps below the description).
         "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start sm:gap-4",
         className,
       )}

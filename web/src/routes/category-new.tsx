@@ -6,7 +6,7 @@ import { CategoryForm } from "@/features/categories/category-form";
 
 export function CategoryNewPage() {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <SoftBackButton to="/categories">Back to categories</SoftBackButton>
       <PageHeader
         eyebrow="New category"

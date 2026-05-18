@@ -208,7 +208,7 @@ export function ConnectionDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto flex max-w-5xl flex-col gap-5">
       <SoftBackButton to="/connections">Back to connections</SoftBackButton>
 
       {connQuery.isLoading ? (

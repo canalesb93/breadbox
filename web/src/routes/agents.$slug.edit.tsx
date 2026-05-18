@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Loader2, Play } from "lucide-react";
+import { Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
   useAgent,
@@ -90,11 +91,7 @@ export function AgentEditPage() {
   if (agentQuery.isLoading || !agentQuery.data) {
     return (
       <>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-          <Link to="/agents">
-            <ArrowLeft className="size-4" /> Back to agents
-          </Link>
-        </Button>
+        <SoftBackButton to="/agents">Back to agents</SoftBackButton>
         <PageHeader
           eyebrow="Agent"
           title="Edit agent"
@@ -180,11 +177,7 @@ function AgentEditFormView({
 
   return (
     <>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-        <Link to="/agents">
-          <ArrowLeft className="size-4" /> Back to agents
-        </Link>
-      </Button>
+      <SoftBackButton to="/agents">Back to agents</SoftBackButton>
       <PageHeader
         eyebrow="Agent"
         title={agent.name}

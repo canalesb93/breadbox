@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   AlertTriangle,
-  ArrowLeft,
   Clock,
   FilterX,
   Loader2,
@@ -30,6 +29,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
 import { EmptyState } from "@/components/empty-state";
+import { SoftBackButton } from "@/components/soft-back-button";
 import {
   DateRangeFilter,
   type DateRangeValue,
@@ -138,18 +138,14 @@ export function AgentRunsPage() {
 
   return (
     <>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-        <Link to="/agents">
-          <ArrowLeft className="size-4" /> Back to agents
-        </Link>
-      </Button>
+      <SoftBackButton to="/agents">Back to agents</SoftBackButton>
       <PageHeader
         eyebrow="Agent runs"
         title={agentQuery.data ? `${agentQuery.data.name} — runs` : "Run history"}
         description="Every fire of this agent (cron or manual). Click any row to view its transcript."
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Select
           value={search.status ?? ANY_VALUE}
           onValueChange={(v) =>

@@ -84,6 +84,7 @@ import {
 import { MetaBadge } from "@/components/meta-badge";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { PageError } from "@/components/page-error";
+import { ErrorPage } from "@/routes/error";
 import { DetailPageSkeleton } from "@/components/detail-page-skeleton";
 import { DetailSheetHeader } from "@/components/detail-sheet-header";
 import { DetailDialogHeader } from "@/components/detail-dialog-header";
@@ -1172,7 +1173,7 @@ export function ComponentsSection() {
       <Specimen
         label="PageError"
         code="components/page-error"
-        description="The canonical page-level 'this page couldn't fetch its data' state. Two variants. `panel` (default) composes `<StatusPanel tone='destructive'>` — AlertTriangle icon, `Couldn't load {resource}` heading, the error's `message` (or a fallback) as body, and an outline `RefreshCw` Retry button in the trailing slot that swaps to a spinning icon + `Retrying…` label while in-flight. `inline` (iter 88) drops the bordered StatusPanel chrome so the same icon tile + heading + body + retry sits flush inside an already-bordered host (a SectionCard body, a ListCard slot) — used by the transaction-detail activity-timeline. Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading) — three states, three vocabularies, one visual system. Seven surfaces share it today: accounts, connections, providers, rules, rule-form, rule-detail, activity-timeline (inline). Don't fork — extend this primitive."
+        description="The canonical page-level 'this page couldn't fetch its data' state. Two variants. `panel` (default) is a centred destructive-toned hero card — dashed `destructive/25` border, `bg-destructive/[0.02]` wash, `size-11` destructive icon tile, `Couldn't load {resource}` heading, the error's `message` (or a fallback) as body, and a `RefreshCw` Retry button beneath that swaps to a spinning icon + `Retrying…` label while in-flight. Shaped like `<EmptyState variant='card'>` but tone-tinted destructive so the surface reads as a failure state, not just an empty one. `inline` drops the panel chrome so the same icon tile + heading + body + retry sits flush inside an already-bordered host (a SectionCard body, a ListCard slot) — used by the transaction-detail activity-timeline. Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading) — three states, three vocabularies, one visual system. Don't fork — extend this primitive."
         className="block"
       >
         <div className="space-y-6">
@@ -1221,6 +1222,24 @@ export function ComponentsSection() {
             </div>
           </div>
         </div>
+      </Specimen>
+
+      <Specimen
+        label="ErrorPage"
+        code="routes/error"
+        description="The route-level error-boundary surface — wired into `createRouter({ defaultErrorComponent })`, so it renders in place of `<Outlet/>` whenever a route throws during render. Single hero card (not PageHeader + StatusPanel + SectionCard) with a top destructive accent stripe, a `size-14` destructive icon tile, `500 · Server error` eyebrow, `Something went wrong` H1, framing copy, the raw error message in a monospace `<code>` block, and a wrap-friendly action cluster: Try again (primary, when the router passes `reset`), Reload page, Jump to (⌘K), Home. The stack trace lives behind a `<Collapsible>` 'Technical details' disclosure at the foot of the card so it stays one click away without dominating the surface for end users. The sidebar, topbar, and command palette stay live behind it so the user always has a way out without a hard reload."
+        className="block"
+      >
+        <ErrorPage
+          error={
+            new Error(
+              "Failed to fetch /api/v1/transactions: Network request failed (ECONNRESET).",
+            )
+          }
+          reset={() => {
+            /* sandbox no-op */
+          }}
+        />
       </Specimen>
 
       <Specimen

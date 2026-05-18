@@ -52,7 +52,7 @@ export function HomePage() {
     accountsQuery.isLoading || connectionsQuery.isLoading;
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <PageHeader
         eyebrow={lastSyncedAt ? `Synced ${relativeTime(lastSyncedAt)}` : "Overview"}
         title={me ? `Welcome back, ${greetingName(me.username)}` : "Welcome"}
@@ -101,6 +101,6 @@ export function HomePage() {
           />
         </div>
       </div>
-    </div>
+    </>
   );
 }

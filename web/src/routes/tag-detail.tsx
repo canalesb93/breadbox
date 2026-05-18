@@ -25,7 +25,7 @@ export function TagDetailPage() {
   );
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <SoftBackButton to="/tags">Back to tags</SoftBackButton>
 
       {isLoading ? (

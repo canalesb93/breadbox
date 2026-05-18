@@ -23,9 +23,11 @@ interface SoftBackButtonProps {
 // new — promoted to a primitive in the iter-13 api-keys pass).
 //
 // Visual contract:
-//   `<Button variant="ghost" size="sm" className="-ml-2 mb-3 h-7 px-2 text-xs">`
+//   `<Button variant="ghost" size="sm" className="-ml-2 h-7 px-2 text-xs">`
 //
-// Don't fork the look — change this primitive instead.
+// No bottom margin — the page layout (<main> or a constrained-width wrapper)
+// is a flex column with gap-5 that owns the rhythm between the back-link and
+// the PageHeader below it. Don't fork the look — change this primitive instead.
 export function SoftBackButton({
   to,
   children,
@@ -38,7 +40,7 @@ export function SoftBackButton({
       size="sm"
       asChild
       className={cn(
-        "text-muted-foreground hover:text-foreground mb-3 -ml-2 h-7 px-2 text-xs",
+        "text-muted-foreground hover:text-foreground -ml-2 h-7 px-2 text-xs",
         className,
       )}
     >

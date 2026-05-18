@@ -69,7 +69,7 @@ export function APIKeyCreatedPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <PageHeader
         eyebrow="Key created"
         title={pending.name}
@@ -127,7 +127,7 @@ export function APIKeyCreatedPage() {
         </div>
       </SectionCard>
 
-      <div className="mt-6 flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/api-keys/new">Mint another</Link>
         </Button>

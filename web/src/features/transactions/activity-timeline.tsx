@@ -164,14 +164,20 @@ function TimelineRow({ annotation }: { annotation: Annotation }) {
   // neutral for unmapped kinds.
   const tone: TimelineRailTone = deleted ? "neutral" : (KIND_TONE[annotation.kind] ?? "neutral");
 
+  // For live comment rows the bubble below carries the full body, so the
+  // header line collapses to "<actor> commented" — otherwise the
+  // server-built `summary` ("Alice commented: hello world") would duplicate
+  // the bubble text. Mirrors v1's TimelineCommentRow shape.
+  const headerLine = showBody
+    ? `${annotation.actor_name} commented`
+    : deleted
+      ? `${annotation.actor_name} deleted a comment`
+      : (annotation.summary ??
+        `${annotation.actor_name} ${annotation.action ?? annotation.kind}`);
+
   return (
     <TimelineRail.Row icon={Icon} tone={tone} muted={deleted ? true : false}>
-      <p className="text-sm leading-snug">
-        {deleted
-          ? `${annotation.actor_name} deleted a comment`
-          : (annotation.summary ??
-            `${annotation.actor_name} ${annotation.action ?? annotation.kind}`)}
-      </p>
+      <p className="text-sm leading-snug">{headerLine}</p>
       {showBody && (
         <p className="text-muted-foreground bg-muted/50 mt-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-pre-wrap">
           {annotation.content}
