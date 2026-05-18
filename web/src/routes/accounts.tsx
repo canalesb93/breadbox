@@ -120,7 +120,7 @@ export function AccountsPage() {
           : `Showing ${visible.length} of ${totalCount}`;
 
   return (
-    <div className="flex flex-col gap-5">
+    <>
       <PageHeader
         eyebrow={eyebrow}
         title="Accounts"
@@ -240,6 +240,6 @@ export function AccountsPage() {
           })}
         </div>
       )}
-    </div>
+    </>
   );
 }

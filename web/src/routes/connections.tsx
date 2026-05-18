@@ -214,7 +214,7 @@ export function ConnectionsPage() {
           : `Showing ${visible.length} of ${connections.length}`;
 
   return (
-    <div className="flex flex-col gap-5">
+    <>
       <PageHeader
         eyebrow={eyebrow}
         title="Connections"
@@ -383,6 +383,6 @@ export function ConnectionsPage() {
         }}
         connectionShortId={search.reauth}
       />
-    </div>
+    </>
   );
 }

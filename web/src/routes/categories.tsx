@@ -60,7 +60,7 @@ export function CategoriesPage() {
   })();
 
   return (
-    <div className="flex flex-col gap-5">
+    <>
       <PageHeader
         eyebrow={eyebrow}
         title="Categories"
@@ -136,6 +136,6 @@ export function CategoriesPage() {
           />
         )}
       </div>
-    </div>
+    </>
   );
 }

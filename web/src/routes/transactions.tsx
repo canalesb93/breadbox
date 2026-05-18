@@ -375,7 +375,7 @@ export function TransactionsPage() {
   })();
 
   return (
-    <div className="flex flex-col gap-5">
+    <>
       <PageHeader
         eyebrow={eyebrow}
         title="Transactions"
@@ -513,6 +513,6 @@ export function TransactionsPage() {
       >
         <TagCommandList onPick={handleTagPick} />
       </CommandDialog>
-    </div>
+    </>
   );
 }

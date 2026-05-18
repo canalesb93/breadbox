@@ -149,7 +149,7 @@ export function AgentsPage() {
       />
 
       {showOnboardingBanner && status && (
-        <Alert className="mb-4">
+        <Alert>
           <Bot className="size-4" />
           <AlertTitle>Finish setting up the agent subsystem</AlertTitle>
           <AlertDescription className="space-y-2">
@@ -517,7 +517,7 @@ function RecentErrorsBanner() {
   };
 
   return (
-    <Alert variant="destructive" className="mb-4">
+    <Alert variant="destructive">
       <AlertCircle className="size-4" />
       <AlertTitle>
         {rows.length === 1

@@ -262,7 +262,7 @@ export function RulesPage() {
 
 function CountLine({ count, fetching }: { count: number; fetching: boolean }) {
   return (
-    <div className="text-muted-foreground mb-3 flex items-center gap-2 text-sm">
+    <div className="text-muted-foreground flex items-center gap-2 text-sm">
       <span className="tabular-nums">
         {count.toLocaleString()} rule{count === 1 ? "" : "s"} found
       </span>
@@ -287,7 +287,7 @@ function RulesToolbar({
   onSortChange: (v: string) => void;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Input
         type="search"
         value={query}
