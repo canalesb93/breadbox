@@ -144,7 +144,7 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             border-box squeezes the 56px interactive area). The inset
             resolves to 0 elsewhere (desktop, Android, older iOS), so
             non-iPhone layouts are unchanged. */}
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
+        <header className="bg-background sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] sm:bg-background/95 sm:supports-[backdrop-filter]:bg-background/80 sm:backdrop-blur">
           <div className="flex w-full items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-1 h-4" />
