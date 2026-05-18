@@ -106,11 +106,8 @@ export function totalsByCurrency(accounts: Account[]): CurrencyTotal[] {
   return [...m.values()].sort((a, b) => b.count - a.count);
 }
 
-// Group accounts by a chosen dimension. We render the page grouped by
-// connection (institution) by default since that's how users think about
-// their money; "type" gives a depository-vs-credit overview.
-export type AccountGroupBy = "institution" | "type";
-
+// Accounts on the list page are always grouped by connection (institution)
+// — that's how users think about their money.
 export interface AccountGroup {
   key: string;
   label: string;
@@ -164,21 +161,11 @@ export function groupNetTotal(accounts: Account[]): GroupTotal {
   return { currency: primary, total, excluded };
 }
 
-export function groupAccounts(
-  accounts: Account[],
-  by: AccountGroupBy,
-): AccountGroup[] {
+export function groupAccounts(accounts: Account[]): AccountGroup[] {
   const m = new Map<string, AccountGroup>();
   for (const a of accounts) {
-    let key: string;
-    let label: string;
-    if (by === "institution") {
-      key = a.connection_id ?? "_unlinked";
-      label = a.institution_name ?? "Manual / CSV";
-    } else {
-      key = a.type;
-      label = TYPE_LABEL[a.type] ?? a.type;
-    }
+    const key = a.connection_id ?? "_unlinked";
+    const label = a.institution_name ?? "Manual / CSV";
     let g = m.get(key);
     if (!g) {
       g = { key, label, accounts: [] };

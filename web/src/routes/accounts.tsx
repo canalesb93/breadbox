@@ -1,38 +1,28 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { Banknote, Building2, Layers, Plus } from "lucide-react";
+import { Banknote, Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ListCard } from "@/components/list-card";
 import { Button } from "@/components/ui/button";
 import { ListRowSkeleton } from "@/components/list-row-skeleton";
 import { PageError } from "@/components/page-error";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
 import { useAccounts } from "@/api/queries/accounts";
 import { useUsers } from "@/api/queries/users";
 import { FamilyTabs } from "@/features/connections/family-tabs";
 import { AccountRow } from "@/features/accounts/account-row";
 import { AccountsSummary } from "@/features/accounts/accounts-summary";
-import {
-  groupAccounts,
-  groupNetTotal,
-  type AccountGroupBy,
-} from "@/features/accounts/account-utils";
+import { groupAccounts, groupNetTotal } from "@/features/accounts/account-utils";
 import { formatBalance } from "@/lib/format";
 
 // Search-param schema.
 //   user → "all" or a user short_id  (family-member filter)
-//   group → "institution" (default) or "type" (grouping dimension)
 //   action → "connect" (passthrough into the connect-bank flow on
 //            /connections; sending users here would be confusing since this
 //            page never opens its own sheet, so we just navigate.)
 export const accountsSearchSchema = z.object({
   user: z.string().optional(),
-  group: z.enum(["institution", "type"]).optional(),
 });
 
 type AccountsSearch = z.infer<typeof accountsSearchSchema>;
@@ -41,7 +31,6 @@ export function AccountsPage() {
   const search = useSearch({ strict: false }) as AccountsSearch;
   const navigate = useNavigate();
   const userFilter = search.user ?? "all";
-  const groupBy: AccountGroupBy = search.group ?? "institution";
 
   const accountsQuery = useAccounts();
   const usersQuery = useUsers();
@@ -67,7 +56,7 @@ export function AccountsPage() {
     return all.filter((a) => a.user_id === userFilter);
   }, [accountsQuery.data, userFilter]);
 
-  const groups = useMemo(() => groupAccounts(visible, groupBy), [visible, groupBy]);
+  const groups = useMemo(() => groupAccounts(visible), [visible]);
 
   function setUserFilter(next: string) {
     navigate({
@@ -75,17 +64,6 @@ export function AccountsPage() {
       search: (prev: AccountsSearch) => ({
         ...prev,
         user: next === "all" ? undefined : next,
-      }),
-      replace: true,
-    });
-  }
-
-  function setGroupBy(next: AccountGroupBy) {
-    navigate({
-      to: "/accounts",
-      search: (prev: AccountsSearch) => ({
-        ...prev,
-        group: next === "institution" ? undefined : next,
       }),
       replace: true,
     });
@@ -137,25 +115,6 @@ export function AccountsPage() {
           counts={countsByUserShortId}
           totalCount={totalCount}
         />
-      )}
-
-      {accounts.length > 0 && (
-        <div className="flex items-center justify-end">
-          <ToggleGroup
-            type="single"
-            size="sm"
-            value={groupBy}
-            onValueChange={(v) => v && setGroupBy(v as AccountGroupBy)}
-            variant="outline"
-          >
-            <ToggleGroupItem value="institution" aria-label="Group by institution">
-              <Building2 className="size-3.5" /> Institution
-            </ToggleGroupItem>
-            <ToggleGroupItem value="type" aria-label="Group by type">
-              <Layers className="size-3.5" /> Type
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </div>
       )}
 
       {isLoading ? (
