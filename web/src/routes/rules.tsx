@@ -293,6 +293,11 @@ function RulesToolbar({
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Search rules…"
+        inputMode="search"
+        enterKeyHint="search"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         className="h-9 max-w-xs"
       />
       <Select value={enabled ?? "all"} onValueChange={onEnabledChange}>

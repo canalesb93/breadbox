@@ -39,6 +39,16 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <Input
           ref={ref}
           type="search"
+          // iOS form-ergonomics defaults — every consumer of SearchInput
+          // gets the search-tinted keyboard (magnifying-glass return key)
+          // for free, with no autocapitalize/autocorrect interfering with
+          // merchant slugs, IDs, and other technical query terms. Consumers
+          // can still override any of these via props.
+          inputMode="search"
+          enterKeyHint="search"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           className={cn("pl-8", className)}
           {...props}
         />

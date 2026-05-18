@@ -277,6 +277,7 @@ export function AgentsSection() {
                       <FormControl>
                         <Input
                           type="number"
+                          inputMode="numeric"
                           min={1}
                           max={50}
                           {...field}
@@ -303,6 +304,7 @@ export function AgentsSection() {
                       <FormControl>
                         <Input
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           placeholder="No global cap"
                           {...field}
@@ -332,6 +334,9 @@ export function AgentsSection() {
                       <Input
                         placeholder="auto: $BREADBOX_AGENT_BIN, ./bin/breadbox-agent, or PATH"
                         className="font-mono text-xs"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         {...field}
                       />
                     </FormControl>
