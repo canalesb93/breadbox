@@ -25,6 +25,9 @@ export function ShortcutSheet() {
   useShortcut(["shift", "?"], () => setOpen((v) => !v), {
     label: "Show keyboard shortcuts",
     group: "Global",
+    // `global: true` so the same chord can close the sheet — without it, focus
+    // inside the open Radix dialog trips the input/dialog guard in useShortcut.
+    global: true,
   });
 
   // Command palette (and any other surface) can ask us to open without
