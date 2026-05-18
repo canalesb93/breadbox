@@ -41,7 +41,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-tap-targets** (subagent `a0c32b09`) — bundles MOBILE-5 + MOBILE-12. Adds `(pointer: coarse)` pseudo-element tap-zone to icon-only Button variants + bumps CommandInput height on touch. Visual size unchanged on desktop. PR # TBD.
 
 ## Completed
 
