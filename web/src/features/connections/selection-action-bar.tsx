@@ -118,7 +118,7 @@ export function SelectionActionBar({
   return (
     <>
       <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-        <div className="bg-popover text-popover-foreground flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 pl-3 shadow-lg">
+        <div className="bg-popover text-popover-foreground flex max-w-[calc(100dvw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 pl-3 shadow-lg">
           <span className="text-sm font-medium whitespace-nowrap">
             {selected.length} selected
           </span>
