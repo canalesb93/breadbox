@@ -73,7 +73,8 @@ Each iteration:
 
 ## In-flight PRs
 
-_(none)_
+- **PR #1334** sprint→main Phase 2 bundle. Ships #1328+#1330+#1331+#1332+#1333 (button stacking, navbar blur, dvh polish, iOS shell + cold-load splash, 401 visibility-gate). **Awaiting user merge** — splash is the highest-impact item for the user's "blank pages 1-2s" complaint on transactions list.
+- **fix/mobile-tx-lazy-category-picker** (subagent `a40a0938`) — **MOBILE-35 (perf)**. Defer per-row CategoryPicker content (or hoist its data hook) to reduce per-page memory ~250 KB. Improves iOS Safari bfcache eligibility on the transactions list. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
