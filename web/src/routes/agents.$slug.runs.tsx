@@ -126,7 +126,9 @@ export function AgentRunsPage() {
 
   return (
     <>
-      <SoftBackButton to="/agents">Back to agents</SoftBackButton>
+      <SoftBackButton to="/agents" className="self-start">
+        Back to agents
+      </SoftBackButton>
       <PageHeader
         eyebrow="Agent runs"
         title={agentQuery.data ? `${agentQuery.data.name} — runs` : "Run history"}

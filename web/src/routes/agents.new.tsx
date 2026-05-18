@@ -1,8 +1,7 @@
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
+import { SoftBackButton } from "@/components/soft-back-button";
 import { useCreateAgent } from "@/api/queries/agents";
 import { withMutationToast } from "@/lib/mutation-toast";
 import {
@@ -63,11 +62,9 @@ export function AgentNewPage() {
 
   return (
     <>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-        <Link to="/agents">
-          <ArrowLeft className="size-4" /> Back to agents
-        </Link>
-      </Button>
+      <SoftBackButton to="/agents" className="self-start">
+        Back to agents
+      </SoftBackButton>
       <PageHeader
         eyebrow="Agent"
         title="New agent"

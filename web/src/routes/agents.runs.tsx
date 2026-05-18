@@ -144,7 +144,7 @@ export function AgentsRunsPage() {
       />
       <AgentsTabs value="runs" />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Select
           value={search.agent ?? ANY_VALUE}
           onValueChange={(v) =>
