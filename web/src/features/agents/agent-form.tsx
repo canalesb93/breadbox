@@ -53,6 +53,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FormSection } from "@/components/form-section";
+import { KbdTooltip } from "@/components/kbd-tooltip";
+import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { AGENT_MODELS, TOOL_SCOPES } from "./agent-constants";
 import { CronField } from "./cron-field";
@@ -161,6 +163,23 @@ export function AgentForm({
     await onSubmit(values);
   });
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // ⌘+S submits the form — matches the convention every form-heavy
+  // dashboard sets. `global: true` makes the shortcut fire even from
+  // inside a focused textarea (otherwise typing in the prompt would
+  // swallow it via the in-input guard).
+  useShortcut(
+    ["mod", "s"],
+    (e) => {
+      e.preventDefault();
+      if (!pending) submit();
+    },
+    {
+      label: mode === "create" ? "Create agent" : "Save agent",
+      group: "Agent form",
+      global: true,
+    },
+  );
 
   return (
     <Form {...form}>
@@ -640,10 +659,15 @@ export function AgentForm({
             <Link to={cancelTo}>Cancel</Link>
           </Button>
           {extraActions?.(form)}
-          <Button type="submit" disabled={pending}>
-            {pending && <Loader2 className="size-4 animate-spin" />}
-            {submitLabel}
-          </Button>
+          <KbdTooltip
+            label={mode === "create" ? "Create agent" : "Save changes"}
+            keys={["mod", "s"]}
+          >
+            <Button type="submit" disabled={pending}>
+              {pending && <Loader2 className="size-4 animate-spin" />}
+              {submitLabel}
+            </Button>
+          </KbdTooltip>
         </div>
       </form>
     </Form>

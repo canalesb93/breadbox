@@ -7,6 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   Popover,
   PopoverContent,
@@ -76,6 +77,9 @@ export function PromptToolbar({ onInsert }: PromptToolbarProps) {
   const handlePick = (block: PromptBlock) => {
     onInsert(block.content.trim());
     setOpen(false);
+    toast.success(`Inserted "${block.title}"`, {
+      description: "Appended to your prompt — edit freely.",
+    });
   };
 
   return (
