@@ -46,36 +46,26 @@ export function AccountsPage() {
   const accountsQuery = useAccounts();
   const usersQuery = useUsers();
 
-  // Counts per user, shared by the FamilyTabs labels and by the filter
-  // resolution below. We key on user short_id to match the tab's value.
+  // Counts per user, shared by the FamilyTabs labels and the filter below.
+  // AccountResponse.user_id is the owner's short_id (see service/accounts.go
+  // — `textPtr(r.UserShortID)`), so we can key directly on it.
   const countsByUserShortId = useMemo(() => {
     const out = new Map<string, number>();
-    const idToShortId = new Map<string, string>();
     for (const u of usersQuery.data ?? []) {
-      idToShortId.set(u.id, u.short_id);
       out.set(u.short_id, 0);
     }
     for (const a of accountsQuery.data ?? []) {
       if (!a.user_id) continue;
-      const sid = idToShortId.get(a.user_id);
-      if (!sid) continue;
-      out.set(sid, (out.get(sid) ?? 0) + 1);
+      out.set(a.user_id, (out.get(a.user_id) ?? 0) + 1);
     }
     return out;
   }, [accountsQuery.data, usersQuery.data]);
 
-  // Resolve the selected short_id back to a UUID so we can filter the
-  // accounts (which carry the user's UUID, not short_id).
-  const filterUserId = useMemo(() => {
-    if (userFilter === "all") return null;
-    return usersQuery.data?.find((u) => u.short_id === userFilter)?.id ?? null;
-  }, [userFilter, usersQuery.data]);
-
   const visible = useMemo(() => {
     const all = accountsQuery.data ?? [];
-    if (filterUserId == null) return all;
-    return all.filter((a) => a.user_id === filterUserId);
-  }, [accountsQuery.data, filterUserId]);
+    if (userFilter === "all") return all;
+    return all.filter((a) => a.user_id === userFilter);
+  }, [accountsQuery.data, userFilter]);
 
   const groups = useMemo(() => groupAccounts(visible, groupBy), [visible, groupBy]);
 

@@ -56,39 +56,26 @@ export function ConnectionsPage() {
   );
 
   // Connection counts per user, used as a tab-label superscript and as the
-  // basis for the visible-after-filtering list below.
-  const countsByUser = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of connectionsQuery.data ?? []) {
-      // The connection carries the user's UUID; the FamilyTabs key on
-      // short_id, which we get by joining against the users list.
-      if (!c.user_id) continue;
-      m.set(c.user_id, (m.get(c.user_id) ?? 0) + 1);
-    }
-    return m;
-  }, [connectionsQuery.data]);
-
-  // Map UUID counts → short_id counts so the FamilyTabs can render them by
-  // the same key it uses for the trigger value.
+  // basis for the visible-after-filtering list below. ConnectionResponse.
+  // user_id is the owner's short_id (see service/connections.go —
+  // `textPtr(r.UserShortID)`), matching the FamilyTabs trigger key.
   const countsByUserShortId = useMemo(() => {
     const out = new Map<string, number>();
     for (const u of usersQuery.data ?? []) {
-      out.set(u.short_id, countsByUser.get(u.id) ?? 0);
+      out.set(u.short_id, 0);
+    }
+    for (const c of connectionsQuery.data ?? []) {
+      if (!c.user_id) continue;
+      out.set(c.user_id, (out.get(c.user_id) ?? 0) + 1);
     }
     return out;
-  }, [countsByUser, usersQuery.data]);
-
-  // Resolve the selected short_id back to a UUID for the row filter.
-  const filterUserId = useMemo(() => {
-    if (userFilter === "all") return null;
-    return usersQuery.data?.find((u) => u.short_id === userFilter)?.id ?? null;
-  }, [userFilter, usersQuery.data]);
+  }, [connectionsQuery.data, usersQuery.data]);
 
   const visible = useMemo(() => {
     const all = connectionsQuery.data ?? [];
-    if (filterUserId == null) return all;
-    return all.filter((c) => c.user_id === filterUserId);
-  }, [connectionsQuery.data, filterUserId]);
+    if (userFilter === "all") return all;
+    return all.filter((c) => c.user_id === userFilter);
+  }, [connectionsQuery.data, userFilter]);
 
   const attentionCount = useMemo(
     () => (connectionsQuery.data ?? []).filter(needsAttention).length,
