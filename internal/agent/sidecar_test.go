@@ -117,6 +117,46 @@ func TestSidecarRun_BinaryNotFound(t *testing.T) {
 	}
 }
 
+// TestLocateBinary_UserInstallDir covers step 4 of the lookup order:
+// ~/.breadbox/agent-bin/breadbox-agent. The release artifacts land here for
+// users coming from a tarball install, so this path must resolve without
+// any explicit config — it's the difference between binary_present=true
+// and an onboarding-banner nag for a fresh install.
+func TestLocateBinary_UserInstallDir(t *testing.T) {
+	tmpHome := t.TempDir()
+	binDir := filepath.Join(tmpHome, ".breadbox", "agent-bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	binPath := filepath.Join(binDir, "breadbox-agent")
+	if err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+
+	// Shadow $HOME so os.UserHomeDir() points at our temp tree. Also clear
+	// $BREADBOX_AGENT_BIN so step 2 doesn't shortcut, and point PATH at a
+	// nonexistent dir so step 5 (LookPath) doesn't accidentally win.
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("BREADBOX_AGENT_BIN", "")
+	t.Setenv("PATH", "/nonexistent-for-test")
+
+	// And cd into a directory without a ./bin/breadbox-agent so step 3
+	// doesn't shortcut either.
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	if err := os.Chdir(tmpHome); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	got, err := LocateBinary("")
+	if err != nil {
+		t.Fatalf("LocateBinary: unexpected error: %v", err)
+	}
+	if got != binPath {
+		t.Errorf("LocateBinary = %q, want %q", got, binPath)
+	}
+}
+
 func TestSidecarRun_NonZeroExit(t *testing.T) {
 	tmp := t.TempDir()
 	body := `{"type":"error","ts":1,"data":{"code":"X","message":"sidecar said no"}}`

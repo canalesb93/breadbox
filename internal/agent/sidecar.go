@@ -43,8 +43,9 @@ func (s *Sidecar) resolveBinary() (string, error) {
 //
 //	1. explicit path (e.g. app_config.agent.runtime_path)
 //	2. $BREADBOX_AGENT_BIN
-//	3. ./bin/breadbox-agent (process cwd)
-//	4. PATH lookup (`breadbox-agent`)
+//	3. ./bin/breadbox-agent (process cwd; dev `make agent-sidecar` output)
+//	4. ~/.breadbox/agent-bin/breadbox-agent (per-user release install)
+//	5. PATH lookup (`breadbox-agent`; Docker image + install scripts)
 //
 // Returns ErrBinaryNotFound when none of the above hit.
 func LocateBinary(explicitPath string) (string, error) {
@@ -61,6 +62,12 @@ func LocateBinary(explicitPath string) (string, error) {
 			return abs, nil
 		}
 		return local, nil
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		userInstall := filepath.Join(home, ".breadbox", "agent-bin", "breadbox-agent")
+		if _, err := os.Stat(userInstall); err == nil {
+			return userInstall, nil
+		}
 	}
 	p, err := exec.LookPath("breadbox-agent")
 	if err != nil {

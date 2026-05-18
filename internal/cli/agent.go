@@ -164,7 +164,7 @@ func runAgentRun(parent context.Context, slug string, jsonOut bool, promptPrefix
 			fmt.Fprintln(os.Stderr, "auth not configured — paste a token in Settings → Agents or run `breadbox agent test` for diagnostic detail")
 			return silentlyFail(runErr)
 		case errors.Is(runErr, agent.ErrBinaryNotFound):
-			fmt.Fprintln(os.Stderr, "breadbox-agent binary not found — run `make agent-sidecar` or set agent.runtime_path")
+			fmt.Fprintln(os.Stderr, "breadbox-agent binary not found — download breadbox-agent-<os>-<arch> from the latest GitHub release and place it on your PATH or at ~/.breadbox/agent-bin/, set agent.runtime_path, or build from source via `make agent-sidecar`")
 			return silentlyFail(runErr)
 		case errors.Is(runErr, agent.ErrConcurrencyLocked):
 			// Shouldn't happen with a fresh per-CLI orchestrator, but
@@ -253,7 +253,10 @@ func runAgentTest(parent context.Context) error {
 		case errors.Is(err, agent.ErrBinaryNotFound):
 			fmt.Fprintln(os.Stdout, "  ✗ binary        not found")
 			fmt.Fprintln(os.Stdout, "")
-			fmt.Fprintln(os.Stdout, "Build the sidecar: `make agent-sidecar` (writes ./bin/breadbox-agent).")
+			fmt.Fprintln(os.Stdout, "From a release: download `breadbox-agent-<os>-<arch>` from https://github.com/canalesb93/breadbox/releases/latest")
+			fmt.Fprintln(os.Stdout, "  and place it on your PATH or at ~/.breadbox/agent-bin/breadbox-agent.")
+			fmt.Fprintln(os.Stdout, "Docker users: the published image already includes it.")
+			fmt.Fprintln(os.Stdout, "From source: `make agent-sidecar` (writes ./bin/breadbox-agent).")
 			fmt.Fprintln(os.Stdout, "Or set an explicit path: `breadbox config set agent.runtime_path /path/to/breadbox-agent`.")
 			return silentlyFail(err)
 		default:
@@ -265,7 +268,7 @@ func runAgentTest(parent context.Context) error {
 
 	fmt.Fprintf(os.Stdout, "  ✓ auth          %s\n", result.AuthMode)
 	if result.BinaryPath == "" {
-		fmt.Fprintln(os.Stdout, "  ✓ binary        auto-discovered (./bin/breadbox-agent or $PATH)")
+		fmt.Fprintln(os.Stdout, "  ✓ binary        auto-discovered (./bin/breadbox-agent, ~/.breadbox/agent-bin/, or $PATH)")
 	} else {
 		fmt.Fprintf(os.Stdout, "  ✓ binary        %s\n", result.BinaryPath)
 	}
