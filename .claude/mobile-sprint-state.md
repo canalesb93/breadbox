@@ -38,7 +38,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-transactions-toolbar-rail** (subagent `a858ae15`) — MOBILE-20. Converts transactions filter-pills container to horizontal-scroll chip rail on mobile (`max-sm:scroll-shadow-x max-sm:overflow-x-auto max-sm:flex-nowrap`); restores `flex-wrap` on sm+. Reuses `scroll-shadow-x` utility from PR #1319. PR # TBD.
 
 ## Completed
 
