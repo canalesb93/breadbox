@@ -62,6 +62,7 @@ Each iteration:
 ## In-flight PRs
 
 - **fix/mobile-navbar-no-blur** (subagent `ad2dc3ef`) — MOBILE-27 (T1, user-reported). Drops `backdrop-blur` + translucent bg on `<header>` at <640px; keeps the desktop glassy look. PR # TBD.
+- **fix/mobile-viewport-units-polish** (subagent `af498752`) — **MOBILE-28 (T4 polish)**. Finishes the viewport-unit cleanup: `min-h-screen` → `min-h-dvh` in `auth-shell.tsx` (×2), `min-h-svh` → `min-h-dvh` in `sidebar.tsx` wrapper, `100vw` → `100dvw` in popover/select/dropdown `max-w` clamps. Same family as PR #1320. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
