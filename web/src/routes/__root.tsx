@@ -136,7 +136,15 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
           horizontally-scrolling table) grows the inset past the viewport
           instead of letting the page's own overflow container scroll. */}
       <SidebarInset className="min-w-0">
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b backdrop-blur">
+        {/* pt-[env(safe-area-inset-top)] pairs with viewport-fit=cover in
+            web/index.html so the sticky header clears the iPhone notch /
+            Dynamic Island instead of letting the status bar overlap its
+            contents. Switching the fixed `h-14` to `min-h-14` lets the
+            header grow by the inset on edge-to-edge iPhones (otherwise
+            border-box squeezes the 56px interactive area). The inset
+            resolves to 0 elsewhere (desktop, Android, older iOS), so
+            non-iPhone layouts are unchanged. */}
+        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
           <div className="flex w-full items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-1 h-4" />

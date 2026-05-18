@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover activates env(safe-area-inset-*) on edge-to-edge
+         iOS devices (notch / Dynamic Island / home indicator). Without it,
+         the insets resolve to 0 and the browser chrome eats into content.
+         We deliberately do NOT set user-scalable=no or maximum-scale=1 —
+         both block accessibility zoom on iOS. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <title>Breadbox — Self-hosted finance for households</title>
     <meta
