@@ -97,12 +97,12 @@ func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error
 // apply to a manual run. Both fields default to "use the def value"; set
 // them sparingly:
 //
-//   - PromptPrefix prepends to def.Prompt for this fire only (iter-23).
-//   - PromptOverride replaces def.Prompt entirely for this fire (iter-45),
-//     enabling the "Test this prompt" flow on the edit form. Takes
-//     precedence over PromptPrefix when both are set — the override is
-//     the full prompt the operator wants to test, and prepending a prefix
-//     wouldn't match the typed value any longer.
+//   - PromptPrefix prepends to def.Prompt for this fire only.
+//   - PromptOverride replaces def.Prompt entirely for this fire, enabling
+//     the "Test this prompt" flow on the edit form. Takes precedence over
+//     PromptPrefix when both are set — the override is the full prompt the
+//     operator wants to test, and prepending a prefix wouldn't match the
+//     typed value any longer.
 //
 // Cron + webhook paths always pass the zero value; only manual runs from
 // the v2 SPA / CLI / HTTP API construct non-empty overrides.
@@ -119,15 +119,15 @@ type RunOverrides struct {
 // promptPrefix is the operator-supplied per-run prefix that gets prepended to
 // the agent's stored prompt for this fire only. Empty string disables the
 // prefix; cron callers always pass "". For a full prompt override (the
-// iter-45 "Test this prompt" flow), use RunNowWith instead.
+// "Test this prompt" flow), use RunNowWith instead.
 func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse, promptPrefix string) (*AgentRunResponse, error) {
 	return o.RunNowWith(ctx, def, RunOverrides{PromptPrefix: promptPrefix})
 }
 
 // RunNowWith is the full-shape variant of RunNow that accepts the operator's
-// RunOverrides struct. Used by the iter-45 "Test this prompt" button on
-// the agent edit page to dry-fire an unsaved prompt without mutating the
-// stored definition.
+// RunOverrides struct. Used by the "Test this prompt" button on the agent
+// edit page to dry-fire an unsaved prompt without mutating the stored
+// definition.
 func (o *Orchestrator) RunNowWith(ctx context.Context, def *AgentDefinitionResponse, ov RunOverrides) (*AgentRunResponse, error) {
 	if err := o.sem.Acquire(ctx); err != nil {
 		return nil, err
@@ -144,14 +144,13 @@ func (o *Orchestrator) RunNowWith(ctx context.Context, def *AgentDefinitionRespo
 //
 // Runs each agent in its own goroutine so the sync engine returns
 // immediately. Concurrency is bounded by the orchestrator's existing
-// semaphore (iter-29 default: 3) — excess fires roll into skipped rows.
+// semaphore — excess fires roll into skipped rows.
 func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
 	// Use a fresh context for the lookup — the incoming ctx is the sync
 	// engine's, and a cancelled webhook request or timed-out sync would
-	// silently no-op the entire webhook trigger here (audit HIGH #3 from
-	// iter-32). Per-dispatched goroutine below ALSO uses a fresh ctx for
-	// the same reason. 30s is plenty for the unindexed-by-default lookup
-	// even with a few dozen agents.
+	// silently no-op the entire webhook trigger here. Per-dispatched
+	// goroutine below ALSO uses a fresh ctx for the same reason. 30s is
+	// plenty for the unindexed-by-default lookup even with a few dozen agents.
 	lookupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	defs, err := o.svc.ListAgentDefinitionsForSyncWebhook(lookupCtx)
@@ -322,19 +321,17 @@ func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionRespo
 		}
 		result, runErr := o.runner.Run(runCtx, *spec, handler)
 
-		completedRow, completeErr := o.svc.CompleteAgentRunDB(runCtx, runRow.ID, result, def.MaxTurns)
-		if completeErr != nil {
+		if _, completeErr := o.svc.CompleteAgentRunDB(runCtx, runRow.ID, result, def.MaxTurns); completeErr != nil {
 			o.logger.Error("orchestrator: persist completed run failed",
 				"agent", def.Slug, "run", runResp.ShortID, "error", completeErr)
 			return
 		}
-		if cap := capFromRunErr(runErr); cap != "" {
-			if _, err := o.svc.SetAgentRunHitCapDB(runCtx, runRow.ID, cap); err != nil {
+		if hitCap := capFromRunErr(runErr); hitCap != "" {
+			if _, err := o.svc.SetAgentRunHitCapDB(runCtx, runRow.ID, hitCap); err != nil {
 				o.logger.Warn("orchestrator: persist hit_cap failed",
-					"agent", def.Slug, "run", runResp.ShortID, "cap", cap, "error", err)
+					"agent", def.Slug, "run", runResp.ShortID, "cap", hitCap, "error", err)
 			}
 		}
-		_ = completedRow
 		if runErr != nil {
 			o.logger.Warn("orchestrator: run finished with error",
 				"agent", def.Slug, "run", runResp.ShortID,
@@ -394,7 +391,7 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	if err == nil {
 		// Override semantics: a full PromptOverride wins outright (the
 		// operator is testing a freshly-typed prompt, not annotating the
-		// stored one). Otherwise fall through to the iter-23 prefix prepend.
+		// stored one). Otherwise fall through to the prefix prepend.
 		switch {
 		case ov.PromptOverride != "":
 			spec.Prompt = ov.PromptOverride
@@ -436,12 +433,12 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	// having already classified status (max_turns → success, budget → error),
 	// so we record the cap separately for the audit trail without rewriting
 	// status.
-	if cap := capFromRunErr(runErr); cap != "" {
-		if capRow, err := o.svc.SetAgentRunHitCapDB(ctx, runRow.ID, cap); err == nil {
+	if hitCap := capFromRunErr(runErr); hitCap != "" {
+		if capRow, err := o.svc.SetAgentRunHitCapDB(ctx, runRow.ID, hitCap); err == nil {
 			completedRow = capRow
 		} else {
 			o.logger.Warn("orchestrator: persist hit_cap failed",
-				"agent", def.Slug, "run", runResp.ShortID, "cap", cap, "error", err)
+				"agent", def.Slug, "run", runResp.ShortID, "cap", hitCap, "error", err)
 		}
 	}
 

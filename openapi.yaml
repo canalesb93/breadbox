@@ -2388,7 +2388,7 @@ paths:
       description: |
         Creates a Claude Agent SDK definition. Body includes the usual
         `name`, `slug`, `prompt`, `model`, `max_turns`, `max_budget_usd`,
-        `tool_scope`, `allowed_tools`, `schedule_cron`, and the iter-30
+        `tool_scope`, `allowed_tools`, `schedule_cron`, and the
         `trigger_on_sync_complete` flag (fire after every successful
         sync, in addition to any cron schedule). **Requires `full_access` scope.**
       requestBody:
@@ -2690,8 +2690,8 @@ paths:
         row. Status may be `success`, `error`, or `timeout`. Optional body
         accepts `prompt_prefix` (prepends operator context to the saved
         prompt for this fire only) and `prompt` (replaces the saved prompt
-        entirely for this fire — powers the iter-45 "Test this prompt"
-        button on the edit page). When both are set, `prompt` wins.
+        entirely for this fire — powers the "Test this prompt" button on
+        the edit page). When both are set, `prompt` wins.
         **Requires `full_access` scope.**
       requestBody:
         required: false

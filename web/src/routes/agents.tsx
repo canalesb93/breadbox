@@ -379,12 +379,6 @@ function LastRunCell({ run }: { run: AgentDefinition["last_run"] }) {
   );
 }
 
-// stopRowClick wraps inline interactive controls so clicking them
-// doesn't also bubble up to the row's "navigate to edit" handler.
-function stopRowClick<E extends Element>(e: React.MouseEvent<E>) {
-  e.stopPropagation();
-}
-
 function EnabledSwitchCell({ agent }: { agent: AgentDefinition }) {
   const toggle = useToggleAgent();
   const handleChange = (enable: boolean) => {
@@ -397,7 +391,7 @@ function EnabledSwitchCell({ agent }: { agent: AgentDefinition }) {
     );
   };
   return (
-    <div onClick={stopRowClick} className="inline-flex">
+    <div onClick={(e) => e.stopPropagation()} className="inline-flex">
       <Switch
         checked={agent.enabled}
         disabled={toggle.isPending}
@@ -417,7 +411,7 @@ function ActionsCell({
 }) {
   return (
     <div
-      onClick={stopRowClick}
+      onClick={(e) => e.stopPropagation()}
       className="flex items-center justify-end gap-1"
     >
       <RunNowDialog

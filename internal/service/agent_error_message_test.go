@@ -13,17 +13,10 @@ import (
 	"breadbox/internal/service"
 )
 
-// TestOrchestratorRunNow_PersistsErrorMessage pins the iter-34 bug: when
-// the runner returned a non-nil error (sidecar crash, scanner failure,
-// etc.), result.Err was populated but CompleteAgentRunDB didn't pass it
-// into agent_runs.error_message. The DB row showed status='error' with
-// NO error_message, leaving operators staring at a failed run with no
-// indication of *why* and forcing them to grep container logs.
-//
-// On a real Docker deploy this manifested as the breadbox-agent musl
-// binary failing to load libstdc++ — a clear "exit 127, missing library"
-// signal in stderr that never made it to the UI because the column
-// stayed NULL.
+// TestOrchestratorRunNow_PersistsErrorMessage pins that a runner error
+// (sidecar crash, scanner failure) reaches agent_runs.error_message via
+// CompleteAgentRunDB — without it, the row shows status='error' but no
+// reason, and operators have to grep container logs.
 func TestOrchestratorRunNow_PersistsErrorMessage(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)

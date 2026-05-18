@@ -13,11 +13,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// TestListAgentRuns_ScansNewColumns is a regression test for an iter-22
-// through iter-27 bug: ListAgentRuns' hand-rolled SELECT was missing
-// operator_note, prompt_prefix, and hit_cap, so the v2 SPA run history
-// never showed those pills even when the underlying row had them. The
-// fix landed in iter-31 (this iteration); this test pins it.
+// TestListAgentRuns_ScansNewColumns pins that ListAgentRuns' hand-rolled
+// SELECT includes operator_note, prompt_prefix, and hit_cap — the v2 SPA
+// run history relies on all three being on the list payload.
 func TestListAgentRuns_ScansNewColumns(t *testing.T) {
 	svc, q, _ := newService(t)
 	ctx := context.Background()
@@ -33,13 +31,13 @@ func TestListAgentRuns_ScansNewColumns(t *testing.T) {
 	}
 	if err := q.SetAgentRunPromptPrefix(ctx, db.SetAgentRunPromptPrefixParams{
 		ID:           row.ID,
-		PromptPrefix: pgtype.Text{String: "iter-23 prefix payload", Valid: true},
+		PromptPrefix: pgtype.Text{String: "prefix payload", Valid: true},
 	}); err != nil {
 		t.Fatalf("set prefix: %v", err)
 	}
 	if _, err := q.SetAgentRunNote(ctx, db.SetAgentRunNoteParams{
 		ID:           row.ID,
-		OperatorNote: pgtype.Text{String: "iter-22 note payload", Valid: true},
+		OperatorNote: pgtype.Text{String: "note payload", Valid: true},
 	}); err != nil {
 		t.Fatalf("set note: %v", err)
 	}
@@ -58,11 +56,11 @@ func TestListAgentRuns_ScansNewColumns(t *testing.T) {
 		t.Fatalf("expected 1 run, got %d", len(list.Runs))
 	}
 	got := list.Runs[0]
-	if got.PromptPrefix == nil || *got.PromptPrefix != "iter-23 prefix payload" {
-		t.Errorf("PromptPrefix from list = %v, want \"iter-23 prefix payload\"", got.PromptPrefix)
+	if got.PromptPrefix == nil || *got.PromptPrefix != "prefix payload" {
+		t.Errorf("PromptPrefix from list = %v, want \"prefix payload\"", got.PromptPrefix)
 	}
-	if got.OperatorNote == nil || *got.OperatorNote != "iter-22 note payload" {
-		t.Errorf("OperatorNote from list = %v, want \"iter-22 note payload\"", got.OperatorNote)
+	if got.OperatorNote == nil || *got.OperatorNote != "note payload" {
+		t.Errorf("OperatorNote from list = %v, want \"note payload\"", got.OperatorNote)
 	}
 	if got.HitCap == nil || *got.HitCap != "max_turns" {
 		t.Errorf("HitCap from list = %v, want \"max_turns\"", got.HitCap)

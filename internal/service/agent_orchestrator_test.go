@@ -402,12 +402,12 @@ func TestOrchestratorRunNow_CleanSuccess_LeavesHitCapNil(t *testing.T) {
 	}
 }
 
-// TestOrchestratorRunNow_TripleConcurrency exercises the iter-29 default
-// (max_concurrent=3). Fires 3 RunNow calls concurrently; all should
-// complete cleanly with no semaphore lockout. Verifies mint-and-revoke,
-// per-run row creation, and end-state run count all behave under
-// contention. The 4th concurrent attempt should still lock — the cap is
-// a real ceiling, not a no-op.
+// TestOrchestratorRunNow_TripleConcurrency exercises the default
+// max_concurrent=3. Fires 3 RunNow calls concurrently; all should complete
+// cleanly with no semaphore lockout. Verifies mint-and-revoke, per-run row
+// creation, and end-state run count all behave under contention. The 4th
+// concurrent attempt should still lock — the cap is a real ceiling, not a
+// no-op.
 func TestOrchestratorRunNow_TripleConcurrency(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)
@@ -484,10 +484,10 @@ func TestOrchestratorRunNow_TripleConcurrency(t *testing.T) {
 }
 
 // TestOrchestratorRunNowWith_PromptOverride_ReplacesDefPrompt pins the
-// iter-45 "Test this prompt" flow: when an operator passes
-// RunOverrides.PromptOverride, the sidecar receives THAT text as
-// spec.Prompt instead of def.Prompt. Operator can dry-fire an unsaved
-// edit-form prompt without round-tripping through Save.
+// "Test this prompt" flow: when an operator passes RunOverrides.PromptOverride,
+// the sidecar receives THAT text as spec.Prompt instead of def.Prompt.
+// Operator can dry-fire an unsaved edit-form prompt without round-tripping
+// through Save.
 func TestOrchestratorRunNowWith_PromptOverride_ReplacesDefPrompt(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)

@@ -17,13 +17,10 @@ export interface SidecarEvent {
 
 // Switch stdout to blocking mode at module load. Without this, writeSync on
 // a pipe whose kernel buffer is full throws EAGAIN (Bun pipes stdout in
-// O_NONBLOCK by default). We hit this in iter-47 dogfooding: an MCP tool
-// returned ~64 KB of JSON (list_categories), writeSync wrote up to the
-// pipe boundary and then threw EAGAIN on the next call — the line got
-// truncated at byte 65538 and the subsequent error event's bytes were
-// concatenated onto the tail with no newline, producing one corrupted
-// line that dropped the tool_result and made the viewer show the call
-// as "pending" forever.
+// O_NONBLOCK by default). A ~64 KB MCP tool result (e.g. list_categories)
+// hits the pipe boundary mid-write, the next writeSync throws EAGAIN, and
+// the NDJSON line gets truncated — concatenating the next event's bytes
+// onto the tail with no newline and dropping the tool_result.
 //
 // setBlocking(true) makes writeSync block until the kernel accepts every
 // byte — the natural single-writer behavior we want for an NDJSON stream

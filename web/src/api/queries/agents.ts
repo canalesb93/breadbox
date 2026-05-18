@@ -255,7 +255,7 @@ export interface RunAgentNowParams {
   slug: string;
   promptPrefix?: string; // operator-supplied per-run prefix; max 2000 chars
   // promptOverride replaces def.Prompt entirely for this fire; max 40000 chars.
-  // Powers the iter-45 "Test this prompt" button on the edit page. When both
+  // Powers the "Test this prompt" button on the edit page. When both
   // promptPrefix and promptOverride are set, override wins on the server.
   promptOverride?: string;
 }
@@ -312,8 +312,8 @@ export function useAgentRuns(
     enabled: Boolean(slug),
     // Poll while ANY visible run is in_progress so the row's status pill
     // flips to success/error as soon as the sidecar finishes (the
-    // orchestrator runs async post-iter-47 and doesn't push status into
-    // the cache). Stops automatically once no in-flight runs remain.
+    // orchestrator runs async and doesn't push status into the cache).
+    // Stops automatically once no in-flight runs remain.
     refetchInterval: (q) =>
       (q.state.data?.runs ?? []).some((r) => r.status === "in_progress")
         ? 2000

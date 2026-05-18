@@ -67,10 +67,9 @@ func TestSeedDefaults_PopulatesEmptyTable(t *testing.T) {
 		}
 	}
 
-	// iter-46: per-agent model tuning. The seed-row Model field must
-	// reach the DB unchanged; the defensive default-to-Opus path in
-	// SeedDefaults must NOT kick in when the seed entry sets Model
-	// explicitly (which all canonical seeds do as of iter-46).
+	// Per-agent model tuning. The seed-row Model field must reach the DB
+	// unchanged; the defensive default-to-Opus path in SeedDefaults must
+	// NOT kick in when the seed entry sets Model explicitly.
 	bySlug := make(map[string]string, len(defs))
 	for _, d := range defs {
 		bySlug[d.Slug] = d.Model

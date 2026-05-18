@@ -40,9 +40,8 @@ func TestFireSyncCompleteAgents_OnlyFiresEligible(t *testing.T) {
 	// Deterministic wait: we expect exactly 1 fire (only the eligible
 	// agent qualifies). Block until it lands or fail after a generous
 	// timeout. Then sweep the channel briefly to catch any unexpected
-	// extra fires the bug-this-test-pins might produce. Replaces the
-	// iter-30 time.After polling pattern flagged as LOW #6 in iter-32
-	// audit — the previous shape was timing-sensitive under CI load.
+	// extra fires. A polling-based wait would be timing-sensitive under
+	// CI load.
 	var got []string
 	select {
 	case agentID := <-fired:

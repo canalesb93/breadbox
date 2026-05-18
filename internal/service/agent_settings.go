@@ -61,7 +61,6 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte) (*AgentSe
 		return nil, fmt.Errorf("read anthropic api key: %w", err)
 	}
 
-	// Default lifted from 1 → 3 in iter-29; see serve.go for the rationale.
 	maxConcurrent := appconfig.Int(ctx, s.Queries, appconfig.KeyAgentMaxConcurrent, 3)
 	runtimePath := appconfig.String(ctx, s.Queries, appconfig.KeyAgentRuntimePath, "")
 	// Default matches serve.go fallback — keeps the Settings → Agents

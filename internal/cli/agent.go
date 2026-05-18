@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"breadbox/internal/agent"
 	"breadbox/internal/app"
@@ -329,7 +330,7 @@ func runAgentList(parent context.Context, jsonOut bool) error {
 	fmt.Fprintf(os.Stdout, "  %-*s  %-*s  %-9s  %-22s  %-21s  %s\n",
 		slugW, "slug", nameW, "name", "enabled", "model", "schedule", "next fire")
 	fmt.Fprintf(os.Stdout, "  %s\n",
-		dashes(slugW+nameW+9+22+21+25+12))
+		strings.Repeat("-", slugW+nameW+9+22+21+25+12))
 	for _, d := range defs {
 		schedule := "manual"
 		if d.ScheduleCron != nil && *d.ScheduleCron != "" {
@@ -350,10 +351,3 @@ func runAgentList(parent context.Context, jsonOut bool) error {
 	return nil
 }
 
-func dashes(n int) string {
-	out := make([]byte, n)
-	for i := range out {
-		out[i] = '-'
-	}
-	return string(out)
-}

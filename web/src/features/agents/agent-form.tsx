@@ -32,9 +32,9 @@ import { RuleDslHelp } from "./rule-dsl-help";
 // the typed payload — in create mode it's user-editable, in edit mode
 // the field is hidden but the existing value is carried through so the
 // schema validates either way. Numerics use z.preprocess instead of
-// z.coerce to dodge the iter-4 resolver bug where coerce.number left
-// the input type as `unknown`; preprocess converts string → number
-// explicitly at submit time while defaults stay typed.
+// z.coerce because coerce.number leaves the input type as `unknown` for
+// the RHF resolver; preprocess converts string → number explicitly at
+// submit time while defaults stay typed.
 const agentFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
   slug: z
