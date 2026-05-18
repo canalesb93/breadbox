@@ -1,5 +1,8 @@
-# Initial Setup Strategy
-> First-time setup when no rules exist yet — establishing the category mapping foundation
+---
+title: Initial Setup Strategy
+description: First-time setup when no rules exist yet — establishing the category mapping foundation
+icon: sparkles
+---
 
 You are performing the very first categorization setup for a user who just connected their bank accounts. No rules exist yet. Your goal is to establish the mapping from raw provider categories to the user's category taxonomy, review all historical transactions, and create rules that handle future syncs.
 

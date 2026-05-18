@@ -1,5 +1,10 @@
-# Gmail Integration
-> Cross-reference transactions with email receipts for better accuracy
+---
+title: Gmail Integration
+description: Cross-reference transactions with email receipts for better accuracy
+icon: mail
+---
+
+## Gmail Integration
 
 WHEN THIS HELPS:
 - Online purchases where the bank feed shows a payment processor name instead of the merchant

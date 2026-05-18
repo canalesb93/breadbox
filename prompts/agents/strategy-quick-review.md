@@ -1,5 +1,8 @@
-# Quick Review Strategy
-> Rapidly clear a large needs-review backlog, prioritizing speed with reasonable accuracy
+---
+title: Quick Review Strategy
+description: Rapidly clear a large needs-review backlog, prioritizing speed with reasonable accuracy
+icon: zap
+---
 
 You are clearing a large backlog of transactions tagged needs-review efficiently. Handle the obvious patterns quickly, leave edge cases for later.
 

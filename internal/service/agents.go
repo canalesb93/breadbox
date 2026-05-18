@@ -17,6 +17,7 @@ import (
 	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/prompts"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -26,6 +27,23 @@ import (
 // claude-opus-4-7 is the latest Opus (matches the agent_definitions
 // migration default).
 const DefaultAgentModel = "claude-opus-4-7"
+
+// defaultAgentSystemPrompt is the breadbox-flavored baseline injected
+// whenever a definition's system_prompt is empty. Embedded from
+// prompts/agents/default-system-prompt.md at build time. Resolved once
+// at package init — missing file is a programming error (the prompts
+// package panics on a missing embed). The prompt deliberately does NOT
+// repeat what the MCP server's own instructions already cover (resource
+// list, amount sign convention, short_id convention); it adds the
+// autonomous-agent persona + the safety invariants we want every run to
+// honor regardless of the user-supplied prompt.
+var defaultAgentSystemPrompt = func() string {
+	data, err := prompts.Agent("default-system-prompt")
+	if err != nil {
+		panic(fmt.Sprintf("service: load default agent system prompt: %v", err))
+	}
+	return strings.TrimSpace(string(data))
+}()
 
 // DefaultAgentMaxTurns is the per-run turn cap when a definition omits one.
 const DefaultAgentMaxTurns = 10
@@ -159,6 +177,25 @@ type AgentRunListResult struct {
 	Limit   int                `json:"limit"`
 	Offset  int                `json:"offset"`
 	HasMore bool               `json:"has_more"`
+}
+
+// AgentRunWithAgentResponse is the per-row shape for ListAllAgentRuns —
+// every field on AgentRunResponse, plus the parent agent's slug + name so
+// the global /agents/runs view can label each row without an extra fetch.
+type AgentRunWithAgentResponse struct {
+	AgentRunResponse
+	AgentSlug string `json:"agent_slug"`
+	AgentName string `json:"agent_name"`
+}
+
+// AgentRunListWithAgentResult is the paginated envelope for the global
+// (cross-agent) run list. Mirrors AgentRunListResult but the per-row type
+// carries agent identity.
+type AgentRunListWithAgentResult struct {
+	Runs    []AgentRunWithAgentResponse `json:"runs"`
+	Limit   int                         `json:"limit"`
+	Offset  int                         `json:"offset"`
+	HasMore bool                        `json:"has_more"`
 }
 
 // CreateAgentDefinitionParams holds validated inputs for definition creation.
@@ -679,6 +716,150 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 	}, nil
 }
 
+// AllAgentRunListParams carries the optional filters for ListAllAgentRuns.
+// Mirrors AgentRunListParams but adds AgentSlugOrID so the caller can
+// optionally narrow to one agent (e.g. the global view with an agent
+// chip selected); empty = every agent.
+type AllAgentRunListParams struct {
+	Limit         int
+	Offset        int
+	AgentSlugOrID string // "" | slug | UUID
+	Status        string
+	Trigger       string
+	HitCap        string
+	Start         *time.Time
+	End           *time.Time
+}
+
+// ListAllAgentRuns returns offset-paginated runs across every agent,
+// joined against agent_definitions so each row carries the agent's slug
+// and name. Powers /v2/agents/runs (the cross-agent global view).
+//
+// Same hand-rolled SQL pattern as ListAgentRuns — composable WHERE
+// clauses with positional params. We don't go through sqlc because the
+// filter combinatorics balloon the generated surface and offer no
+// type-safety win over scanning a known column list.
+func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams) (*AgentRunListWithAgentResult, error) {
+	limit := p.Limit
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := p.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	args := []any{}
+	where := []string{}
+	idx := 1
+
+	if p.AgentSlugOrID != "" {
+		def, err := s.resolveAgentDefinition(ctx, p.AgentSlugOrID)
+		if err != nil {
+			return nil, err
+		}
+		where = append(where, fmt.Sprintf("r.agent_definition_id = $%d", idx))
+		args = append(args, def.ID)
+		idx++
+	}
+	if p.Status != "" {
+		where = append(where, fmt.Sprintf("r.status = $%d", idx))
+		args = append(args, p.Status)
+		idx++
+	}
+	if p.Trigger != "" {
+		where = append(where, fmt.Sprintf(`r."trigger" = $%d`, idx))
+		args = append(args, p.Trigger)
+		idx++
+	}
+	switch p.HitCap {
+	case "max_turns", "max_budget":
+		where = append(where, fmt.Sprintf("r.hit_cap = $%d", idx))
+		args = append(args, p.HitCap)
+		idx++
+	case "any":
+		where = append(where, "r.hit_cap IS NOT NULL")
+	case "":
+		// no-op
+	}
+	if p.Start != nil {
+		where = append(where, fmt.Sprintf("r.started_at >= $%d", idx))
+		args = append(args, *p.Start)
+		idx++
+	}
+	if p.End != nil {
+		where = append(where, fmt.Sprintf("r.started_at <= $%d", idx))
+		args = append(args, *p.End)
+		idx++
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = "WHERE " + strings.Join(where, " AND ")
+	}
+
+	// Peek for has_more by asking for limit+1.
+	args = append(args, limit+1, offset)
+	query := fmt.Sprintf(`
+		SELECT r.id, r.short_id, r.agent_definition_id, r."trigger", r.status, r.started_at, r.completed_at,
+		       r.duration_ms, r.total_cost_usd, r.input_tokens, r.output_tokens, r.cache_read_tokens,
+		       r.cache_creation_tokens, r.turn_count, r.max_turns_used, r.num_tool_calls,
+		       r.error_message, r.transcript_path, r.session_id,
+		       r.operator_note, r.prompt_prefix, r.hit_cap,
+		       d.slug, d.name
+		FROM agent_runs r
+		JOIN agent_definitions d ON d.id = r.agent_definition_id
+		%s
+		ORDER BY r.started_at DESC
+		LIMIT $%d OFFSET $%d`,
+		whereClause, idx, idx+1)
+
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list all agent runs: %w", err)
+	}
+	defer rows.Close()
+
+	var out []AgentRunWithAgentResponse
+	for rows.Next() {
+		var r db.AgentRun
+		var slug, name string
+		if scanErr := rows.Scan(
+			&r.ID, &r.ShortID, &r.AgentDefinitionID, &r.Trigger, &r.Status,
+			&r.StartedAt, &r.CompletedAt, &r.DurationMs, &r.TotalCostUsd,
+			&r.InputTokens, &r.OutputTokens, &r.CacheReadTokens,
+			&r.CacheCreationTokens, &r.TurnCount, &r.MaxTurnsUsed,
+			&r.NumToolCalls, &r.ErrorMessage, &r.TranscriptPath, &r.SessionID,
+			&r.OperatorNote, &r.PromptPrefix, &r.HitCap,
+			&slug, &name,
+		); scanErr != nil {
+			return nil, fmt.Errorf("scan agent run: %w", scanErr)
+		}
+		out = append(out, AgentRunWithAgentResponse{
+			AgentRunResponse: agentRunFromRow(r),
+			AgentSlug:        slug,
+			AgentName:        name,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate agent runs: %w", err)
+	}
+
+	hasMore := len(out) > limit
+	if hasMore {
+		out = out[:limit]
+	}
+	if out == nil {
+		out = []AgentRunWithAgentResponse{}
+	}
+	return &AgentRunListWithAgentResult{
+		Runs:    out,
+		Limit:   limit,
+		Offset:  offset,
+		HasMore: hasMore,
+	}, nil
+}
+
 // AgentRunNoteMaxLen caps the operator note size both in the SPA textarea
 // and on the server. Free-form text but bounded so we don't accidentally
 // host arbitrarily-large blobs.
@@ -899,11 +1080,20 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		maxBudget = *def.MaxBudgetUSD
 	}
 
+	// SystemPrompt: caller-defined override wins; otherwise the breadbox
+	// baseline is injected. Without this fallback the SDK silently uses
+	// its built-in "Claude Code"-style persona, which is optimized for
+	// coding tasks rather than recurring data review.
+	systemPrompt := derefString(def.SystemPrompt)
+	if strings.TrimSpace(systemPrompt) == "" {
+		systemPrompt = defaultAgentSystemPrompt
+	}
+
 	spec := &agent.JobSpec{
 		RunID:             run.ID,
 		AgentDefinitionID: def.ID,
 		Prompt:            def.Prompt,
-		SystemPrompt:      derefString(def.SystemPrompt),
+		SystemPrompt:      systemPrompt,
 		Model:             def.Model,
 		MaxTurns:          def.MaxTurns,
 		MaxBudgetUsd:      maxBudget,

@@ -290,6 +290,76 @@ func ListAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// ListAllAgentRunsHandler returns paginated runs across every agent,
+// joined against agent_definitions so each row carries agent_slug +
+// agent_name. Powers the v2 SPA's global "/agents/runs" view. Supports
+// the same status/trigger/hit_cap/date filters as ListAgentRunsHandler,
+// plus an optional `agent=<slug|uuid>` filter to narrow to one definition
+// (a slimmer form of /agents/{slug}/runs that uses the same UI table).
+func ListAllAgentRunsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		limit, err := parseIntParam(q, "limit", 50, 1, 200)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+		offset, err := parseIntParam(q, "offset", 0, 0, 1<<20)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+		params := service.AllAgentRunListParams{
+			Limit:         limit,
+			Offset:        offset,
+			AgentSlugOrID: q.Get("agent"),
+			Status:        q.Get("status"),
+			Trigger:       q.Get("trigger"),
+			HitCap:        q.Get("hit_cap"),
+		}
+		if s := q.Get("start"); s != "" {
+			t, perr := parseDateOrRFC3339(s)
+			if perr != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start must be YYYY-MM-DD or RFC3339")
+				return
+			}
+			params.Start = &t
+		}
+		if s := q.Get("end"); s != "" {
+			t, perr := parseDateOrRFC3339(s)
+			if perr != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end must be YYYY-MM-DD or RFC3339")
+				return
+			}
+			if len(s) == 10 {
+				t = t.Add(24*time.Hour - time.Second)
+			}
+			params.End = &t
+		}
+		if !isAllowedRunStatus(params.Status) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"status must be one of: success, error, in_progress, skipped, timeout (empty = all)")
+			return
+		}
+		if !isAllowedRunTrigger(params.Trigger) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"trigger must be one of: cron, manual, webhook (empty = all)")
+			return
+		}
+		if !isAllowedRunHitCap(params.HitCap) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+				"hit_cap must be one of: max_turns, max_budget, any (empty = all)")
+			return
+		}
+		out, err := svc.ListAllAgentRuns(r.Context(), params)
+		if err != nil {
+			writeAgentError(w, err, "agent not found")
+			return
+		}
+		writeData(w, out)
+	}
+}
+
 func parseDateOrRFC3339(s string) (time.Time, error) {
 	if len(s) == 10 { // YYYY-MM-DD
 		return time.Parse("2006-01-02", s)
@@ -674,6 +744,23 @@ func ListRecentErroredAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 		if err != nil {
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR",
 				"Failed to list recent errored runs")
+			return
+		}
+		writeData(w, out)
+	}
+}
+
+// ListPromptBlocksHandler exposes the parsed agent prompt blocks under
+// prompts/agents/*.md to the v2 SPA. Backs the assembly-bench prompt
+// builder at /v2/prompts/build. The blocks themselves are embedded into
+// the binary at build time, so this is a read-only, side-effect-free
+// endpoint — no scope upgrade required.
+func ListPromptBlocksHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		out, err := svc.ListPromptBlocks(r.Context())
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR",
+				"Failed to list prompt blocks")
 			return
 		}
 		writeData(w, out)

@@ -1,5 +1,8 @@
-# Bulk Review Strategy
-> Thorough review of a large accumulated needs-review backlog
+---
+title: Bulk Review Strategy
+description: Thorough review of a large accumulated needs-review backlog
+icon: list-checks
+---
 
 You are reviewing a large backlog of transactions tagged needs-review that has accumulated over time. Rules from previous sessions likely cover some patterns already. Focus on what's still uncategorized.
 

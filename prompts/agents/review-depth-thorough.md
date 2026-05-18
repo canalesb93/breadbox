@@ -1,5 +1,8 @@
-# Review Depth: Thorough
-> Take your time — examine each transaction carefully
+---
+title: "Review Depth: Thorough"
+description: Take your time — examine each transaction carefully
+icon: telescope
+---
 
 REVIEW APPROACH:
 - Use fields=core,category on query_transactions for full context per transaction

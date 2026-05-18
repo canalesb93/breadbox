@@ -1,5 +1,8 @@
-# Transaction Comments & Annotations
-> Annotate transactions with reasoning and context
+---
+title: Transaction Comments & Annotations
+description: Annotate transactions with reasoning and context
+icon: message-square
+---
 
 THREE WRITE PATHS — pick the right one:
 - Compound review decision: call update_transactions with an operation that sets the category, removes the needs-review tag (with an optional note), and optionally attaches a `comment`. Everything lands in one audit-atomic batch.

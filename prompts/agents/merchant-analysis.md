@@ -1,5 +1,8 @@
-# Merchant Analysis
-> Identify spending patterns and recurring charges using merchant summaries
+---
+title: Merchant Analysis
+description: Identify spending patterns and recurring charges using merchant summaries
+icon: store
+---
 
 USE merchant_summary TO:
 - Get a compact index of merchants with transaction counts, totals, averages, and date ranges

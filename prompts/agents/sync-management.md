@@ -1,5 +1,8 @@
-# Sync Management
-> Check data freshness and trigger syncs when needed
+---
+title: Sync Management
+description: Check data freshness and trigger syncs when needed
+icon: refresh-cw
+---
 
 BEFORE STARTING WORK:
 - Call get_sync_status to check when each connection was last synced

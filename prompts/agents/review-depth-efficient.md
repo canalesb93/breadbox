@@ -1,5 +1,8 @@
-# Review Depth: Efficient
-> Move fast — confirm clear items quickly, skip ambiguous ones
+---
+title: "Review Depth: Efficient"
+description: Move fast — confirm clear items quickly, skip ambiguous ones
+icon: rabbit
+---
 
 REVIEW APPROACH:
 - Use fields=minimal on query_transactions (name, amount, date only) when fetching the backlog

@@ -2578,6 +2578,52 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /api/v1/agents/runs:
+    parameters:
+      - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      - { name: agent, in: query, schema: { type: string }, description: Optional slug or UUID to narrow to one definition }
+      - { name: status, in: query, schema: { type: string, enum: [success, error, in_progress, skipped, timeout] } }
+      - { name: trigger, in: query, schema: { type: string, enum: [cron, manual, webhook] } }
+      - { name: hit_cap, in: query, schema: { type: string, enum: [max_turns, max_budget, any] } }
+      - { name: start, in: query, schema: { type: string }, description: "YYYY-MM-DD or RFC3339; inclusive lower bound on started_at" }
+      - { name: end, in: query, schema: { type: string }, description: "YYYY-MM-DD or RFC3339; inclusive upper bound on started_at" }
+    get:
+      tags: [Agents]
+      summary: List runs across all agents
+      description: |
+        Cross-agent run history. Each row carries `agent_slug` + `agent_name`
+        in addition to the standard run fields, so callers can render an
+        agent column without a second fetch. Powers the v2 SPA's global
+        `/v2/agents/runs` view. Same filters as `/agents/{slug}/runs`,
+        plus the optional `agent=<slug>` narrowing filter.
+      responses:
+        "200":
+          description: Paginated runs envelope `{runs, limit, offset, has_more}` where each run includes `agent_slug` + `agent_name`.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/agents/prompt-blocks:
+    get:
+      tags: [Agents]
+      summary: List the embedded agent prompt-block library
+      description: |
+        Returns every parsed block under `prompts/agents/*.md` — id,
+        title, one-line description, taxonomic group (`strategy` /
+        `depth` / `integration` / `knowledge`), and full markdown
+        content. Backs the v2 SPA's assembly-bench prompt builder at
+        `/v2/prompts/build`. The block set is fixed at build time;
+        editing requires a redeploy. The `default-system-prompt` block
+        is excluded — it's injected by `AssembleJobSpec` as the SDK
+        system prompt, not composed into user prompts.
+      responses:
+        "200":
+          description: Bare JSON array of `{id, title, description, group, content}`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
   /api/v1/agents/runs/recent-errors:
     parameters:
       - { name: hours, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 168 } }

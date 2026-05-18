@@ -5,6 +5,7 @@ import {
   Bot,
   FileText,
   Key,
+  PenTool,
   Plug,
   Settings,
   Shapes,
@@ -74,6 +75,7 @@ export const NAV: NavGroup[] = [
     label: "System",
     items: [
       { kind: "link", title: "Agents", to: "/agents", icon: Bot },
+      { kind: "link", title: "Prompt builder", to: "/prompts/build", icon: PenTool },
       { kind: "link", title: "API keys", to: "/api-keys", icon: Key },
       { kind: "modal", title: "Settings", modalKey: "settings", icon: Settings },
     ],

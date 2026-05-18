@@ -1,5 +1,8 @@
-# Account Linking
-> Deduplication for shared credit cards across family members
+---
+title: Account Linking
+description: Deduplication for shared credit cards across family members
+icon: link-2
+---
 
 WHEN TO USE:
 When two family members connect the same credit card (e.g., primary cardholder + authorized user), transactions appear in both feeds with different IDs. Account linking deduplicates them.

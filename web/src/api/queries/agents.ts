@@ -109,6 +109,23 @@ export interface AgentRunListResult {
   has_more: boolean;
 }
 
+// AgentRunWithAgent extends AgentRun with the parent definition's slug
+// and name. Returned by GET /api/v1/agents/runs (the cross-agent global
+// list) so the v2 SPA can render an Agent column without a per-row
+// fetch. Per-agent endpoints (/agents/{slug}/runs) still return plain
+// AgentRun — the slug is in the URL.
+export interface AgentRunWithAgent extends AgentRun {
+  agent_slug: string;
+  agent_name: string;
+}
+
+export interface AgentRunWithAgentListResult {
+  runs: AgentRunWithAgent[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export interface AgentSettings {
   auth_mode: "subscription" | "api_key";
   subscription_token?: string | null; // masked
@@ -297,6 +314,37 @@ export function useAgentRuns(
     // flips to success/error as soon as the sidecar finishes (the
     // orchestrator runs async post-iter-47 and doesn't push status into
     // the cache). Stops automatically once no in-flight runs remain.
+    refetchInterval: (q) =>
+      (q.state.data?.runs ?? []).some((r) => r.status === "in_progress")
+        ? 2000
+        : false,
+  });
+}
+
+// useAllAgentRuns powers the v2 /agents/runs global view — every run
+// across every agent, ordered by started_at DESC. Filters mirror
+// useAgentRuns plus an optional `agent` slug filter. Polls every 2s
+// while any visible row is in_progress so freshly-fired runs update
+// their status in place.
+export function useAllAgentRuns(
+  filters: AgentRunsFilters & { agent?: string } = {},
+  limit = 50,
+  offset = 0,
+) {
+  return useQuery({
+    queryKey: ["agents", "runs", "all", { limit, offset, ...filters }],
+    queryFn: () => {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(limit));
+      qs.set("offset", String(offset));
+      if (filters.agent) qs.set("agent", filters.agent);
+      if (filters.status) qs.set("status", filters.status);
+      if (filters.trigger) qs.set("trigger", filters.trigger);
+      if (filters.hit_cap) qs.set("hit_cap", filters.hit_cap);
+      if (filters.start) qs.set("start", filters.start);
+      if (filters.end) qs.set("end", filters.end);
+      return api<AgentRunWithAgentListResult>(`/api/v1/agents/runs?${qs.toString()}`);
+    },
     refetchInterval: (q) =>
       (q.state.data?.runs ?? []).some((r) => r.status === "in_progress")
         ? 2000
