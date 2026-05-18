@@ -61,7 +61,8 @@ Each iteration:
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-ios-shell-polish** (subagent `ad462135`) — **MOBILE-29 (T1 — user-authorized SPA pitfalls sweep)**. iOS web-app meta tags (`apple-mobile-web-app-capable`, `status-bar-style`, `title`, `apple-touch-icon`) + cold-load splash inside `<div id="root">` (vanishes when React mounts) + global `-webkit-tap-highlight-color: transparent` in globals.css. PR # TBD.
+- **Deep SPA-pitfall audit** (Explore agent `a11a115d`) — read-only scout across 10 categories: touch interactions, form ergonomics, scroll behavior, auth redirect races beyond #1329, loading/perf, memory/lifecycle, offline/connectivity, cookie durability, standalone-mode edge cases, a11y + reduced-motion. Will fold findings into backlog for follow-up PRs.
 
 ## Completed (Phase 2 — direct-to-main)
 
