@@ -5,6 +5,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Eyebrow } from "@/components/eyebrow";
 import { isNavMatch, navKey, type NavGroup, type NavLeaf } from "@/lib/nav";
@@ -15,6 +16,13 @@ export function NavMain({ group }: { group: NavGroup }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { key: activeModal } = useActiveModal();
+  // Close the mobile sheet on tap so the destination is visible — matches the
+  // behaviour of every native iOS app where a nav tap dismisses the drawer.
+  // Desktop is unaffected because we only touch the mobile-only open state.
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeMobileSheet = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <SidebarGroup>
@@ -30,9 +38,11 @@ export function NavMain({ group }: { group: NavGroup }) {
             item={item}
             pathname={pathname}
             activeModal={activeModal}
-            onOpenModal={(modalKey) =>
-              navigate({ to: ".", search: openModal(modalKey) })
-            }
+            onOpenModal={(modalKey) => {
+              closeMobileSheet();
+              navigate({ to: ".", search: openModal(modalKey) });
+            }}
+            onNavigate={closeMobileSheet}
           />
         ))}
       </SidebarMenu>
@@ -68,9 +78,16 @@ interface NavRowProps {
   pathname: string;
   activeModal: string | null;
   onOpenModal: (modalKey: string) => void;
+  onNavigate: () => void;
 }
 
-function NavRow({ item, pathname, activeModal, onOpenModal }: NavRowProps) {
+function NavRow({
+  item,
+  pathname,
+  activeModal,
+  onOpenModal,
+  onNavigate,
+}: NavRowProps) {
   const Icon = item.icon;
 
   if (item.kind === "modal") {
@@ -97,7 +114,11 @@ function NavRow({ item, pathname, activeModal, onOpenModal }: NavRowProps) {
         tooltip={item.title}
         className={NAV_ROW_CLS}
       >
-        <Link to={item.to}>
+        {/* onClick lives on the <Link> directly: asChild forwards props via
+            Radix Slot, but attaching here is the unambiguous, easy-to-audit
+            shape and also fires when the user middle/cmd-clicks. The handler
+            is a no-op on desktop — it only closes the mobile sheet. */}
+        <Link to={item.to} onClick={onNavigate}>
           <Icon />
           <span>{item.title}</span>
         </Link>
