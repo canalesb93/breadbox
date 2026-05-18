@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -7,13 +7,15 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Copy,
   Eye,
   GripVertical,
   Plus,
-  RotateCcw,
   Search,
   Trash2,
+  Undo2,
   Wand2,
 } from "lucide-react";
 import {
@@ -75,10 +77,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ButtonGroup,
+  ButtonGroupSeparator,
+} from "@/components/ui/button-group";
 import { PageHeader } from "@/components/page-header";
 import { PageError } from "@/components/page-error";
 import { FloatingActionBar } from "@/components/floating-action-bar";
 import { DynamicIcon } from "@/lib/icon";
+import { useShortcut } from "@/lib/shortcuts";
 import {
   usePromptBlocks,
   type PromptBlock,
@@ -139,6 +146,78 @@ function joinCsv(parts: string[]): string | undefined {
 function rowKey(item: ComposedItem): string {
   return `${item.kind}:${item.id}`;
 }
+
+// Preset is a curated starting-point composition — one click replaces
+// the current selection with this preset's library blocks (in order).
+// Carried over from the v1 admin agent wizard's "agent types"
+// (`internal/prompts/config.go`): same labels, same block lists. Each
+// preset is Core + Default from the v1 config; Optional blocks are
+// left out so the preset is opinionated, not maximal.
+interface Preset {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  blockIds: string[];
+}
+
+const PRESETS: Preset[] = [
+  {
+    id: "initial-setup",
+    label: "Initial Setup",
+    description:
+      "First-time bulk categorization after connecting a new account.",
+    icon: "sparkles",
+    blockIds: ["strategy-initial-setup", "review-depth-efficient"],
+  },
+  {
+    id: "bulk-review",
+    label: "Bulk Review",
+    description: "Thorough review of a large pending queue.",
+    icon: "list-checks",
+    blockIds: ["strategy-bulk-review", "review-depth-thorough"],
+  },
+  {
+    id: "quick-review",
+    label: "Quick Review",
+    description: "Rapidly clear a large queue with batch operations.",
+    icon: "zap",
+    blockIds: ["strategy-quick-review", "review-depth-efficient"],
+  },
+  {
+    id: "routine-review",
+    label: "Routine Review",
+    description: "Daily or weekly review of recent transactions.",
+    icon: "calendar-check",
+    blockIds: [
+      "strategy-routine-review",
+      "review-depth-thorough",
+      "transaction-comments",
+    ],
+  },
+  {
+    id: "spending-report",
+    label: "Spending Report",
+    description: "Weekly or monthly spending summary with trends.",
+    icon: "chart-no-axes-column",
+    blockIds: [
+      "strategy-spending-report",
+      "category-system",
+      "merchant-analysis",
+    ],
+  },
+  {
+    id: "anomaly-detection",
+    label: "Anomaly Detection",
+    description: "Monitor for unusual charges, duplicates, spending spikes.",
+    icon: "siren",
+    blockIds: [
+      "strategy-anomaly-detection",
+      "merchant-analysis",
+      "account-linking",
+    ],
+  },
+];
 
 
 export function PromptsBuildPage() {
@@ -267,6 +346,13 @@ export function PromptsBuildPage() {
       setFilter({ knowledge: joinCsv(knowledge.filter((x) => x !== item.id)) });
   };
 
+  // pendingFocusId carries the id of a freshly-created empty block
+  // across the render that materializes its DOM. The matching effect
+  // below scrolls to it and focuses its textarea, then clears the ref.
+  // Stored as a ref (not state) so the effect doesn't re-trigger on
+  // unrelated re-renders.
+  const pendingFocusId = useRef<string | null>(null);
+
   // addCustomBlock takes the initial content directly (no title field
   // — title is derived from content at render time). The modal picker
   // collects content in its custom-form step before calling this.
@@ -281,12 +367,137 @@ export function PromptsBuildPage() {
     }
   };
 
+  // clearAll wipes every block out of the composition — both the
+  // URL-tracked library selections and the in-memory custom blocks.
+  // The component-level expansion/edits maps are not touched since
+  // they're keyed by item.id and will be naturally orphaned.
+  const clearAll = () => {
+    setFilter({
+      strategy: undefined,
+      depth: undefined,
+      integrations: undefined,
+      knowledge: undefined,
+    });
+    setCustoms([]);
+  };
+
+  // applyPreset replaces the current composition with the preset's
+  // block list. Each block ID is bucketed by its `group` (resolved via
+  // the loaded library) into the matching URL filter slot. Unknown
+  // IDs — e.g. a renamed prompt file — are silently dropped so a
+  // stale preset never errors. Customs are cleared on the same beat
+  // so applying a preset is a clean reset, not an additive op.
+  const applyPreset = (preset: Preset) => {
+    const next: Partial<PromptsBuildSearch> = {
+      strategy: undefined,
+      depth: undefined,
+      integrations: undefined,
+      knowledge: undefined,
+    };
+    const ints: string[] = [];
+    const knows: string[] = [];
+    for (const id of preset.blockIds) {
+      const b = blocksById.get(id);
+      if (!b) continue;
+      switch (b.group) {
+        case "strategy":
+          next.strategy = id;
+          break;
+        case "depth":
+          next.depth = id;
+          break;
+        case "integration":
+          ints.push(id);
+          break;
+        case "knowledge":
+          knows.push(id);
+          break;
+      }
+    }
+    next.integrations = joinCsv(ints);
+    next.knowledge = joinCsv(knows);
+    setFilter(next);
+    setCustoms([]);
+    setAddBlockOpen(false);
+  };
+
+  // addEmptyBlock appends an empty custom block to the composition and
+  // hands focus to it: expanded, textarea scrolled into view, cursor
+  // ready. Triggered both by the toolbar button and the "E" shortcut.
+  const addEmptyBlock = () => {
+    const id = `custom:${Date.now()}`;
+    setCustoms((cs) => [...cs, { id, content: "" }]);
+    setExpanded((e) => ({ ...e, [id]: true }));
+    pendingFocusId.current = id;
+  };
+
+  // After a render that included a newly-added empty block, locate its
+  // textarea by id, scroll it into the viewport, and focus it. Tied to
+  // `customs` so it fires once per add — guard with the ref so we
+  // don't re-focus on unrelated `customs` mutations (rename, delete).
+  // requestAnimationFrame defers the focus past React's commit phase
+  // and any in-flight click-event focus shuffling, otherwise the
+  // textarea immediately loses focus back to <body>.
+  useEffect(() => {
+    const id = pendingFocusId.current;
+    if (!id) return;
+    // The render where the new item lands in `effectiveOrder` is one
+    // commit AFTER the render where it lands in `customs` (the order
+    // sync is itself an effect). Wait for the row to actually appear
+    // in the DOM before clearing the ref.
+    const ta = document.getElementById(`content-${id}`);
+    if (!(ta instanceof HTMLTextAreaElement)) return;
+    pendingFocusId.current = null;
+    requestAnimationFrame(() => {
+      ta.scrollIntoView({ behavior: "smooth", block: "center" });
+      ta.focus();
+    });
+  }, [effectiveOrder, customs]);
+
   const composedText = useMemo(
     () => composePrompt(effectiveOrder, blocksById, edits, customs),
     [effectiveOrder, blocksById, edits, customs],
   );
 
   const isLoading = blocksQuery.isLoading;
+
+  // Expand-all toggle: true only when every row in the composition is
+  // currently expanded. Drives the "Collapse all" / "Expand all"
+  // button label so the action is always the opposite of the current
+  // state. An empty composition reports false so the button never
+  // renders in that branch (gated by effectiveOrder.length > 0).
+  const allExpanded = useMemo(() => {
+    if (effectiveOrder.length === 0) return false;
+    return effectiveOrder.every((i) => expanded[i.id]);
+  }, [effectiveOrder, expanded]);
+
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      setExpanded((e) => {
+        const next = { ...e };
+        for (const i of effectiveOrder) next[i.id] = false;
+        return next;
+      });
+    } else {
+      setExpanded((e) => {
+        const next = { ...e };
+        for (const i of effectiveOrder) next[i.id] = true;
+        return next;
+      });
+    }
+  };
+
+  // Page-level shortcuts registered with the global shortcut registry
+  // so they show up in the ⇧? shortcut sheet alongside the rest of the
+  // app's bindings. useShortcut handles the input/dialog guard for us.
+  useShortcut(["mod", "Enter"], () => setAddBlockOpen(true), {
+    label: "Add block",
+    group: "Prompt builder",
+  });
+  useShortcut(["shift", "mod", "Enter"], () => addEmptyBlock(), {
+    label: "Add empty block",
+    group: "Prompt builder",
+  });
 
   // Active-set helper for the dropdown — shows a ✓ next to library
   // items already in the composition.
@@ -321,40 +532,90 @@ export function PromptsBuildPage() {
               <Skeleton className="h-32 w-full" />
             </Card>
           ) : (
-            <ComposerTable
-              items={effectiveOrder}
-              onReorder={setOrder}
-              blocksById={blocksById}
-              customs={customs}
-              edits={edits}
-              expanded={expanded}
-              setExpanded={setExpanded}
-              setEdits={setEdits}
-              setCustoms={setCustoms}
-              onRemove={removeFromComposition}
-              addBlockEmptyTrigger={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoading}
-                  onClick={() => setAddBlockOpen(true)}
-                >
-                  <Plus className="size-4" />
-                  Add block
-                </Button>
-              }
-              addBlockGhostRow={
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => setAddBlockOpen(true)}
-                  className="text-muted-foreground hover:bg-accent/40 hover:text-foreground flex w-full items-center justify-center gap-2 py-3 text-sm transition-colors"
-                >
-                  <Plus className="size-4" />
-                  Add block
-                </button>
-              }
-            />
+            <>
+              <div className="flex items-center justify-end gap-1">
+                {effectiveOrder.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleExpandAll}
+                    className="text-muted-foreground hover:text-foreground h-8 px-2 text-xs"
+                  >
+                    {allExpanded ? (
+                      <>
+                        <ChevronsDownUp className="size-3.5" />
+                        Collapse all
+                      </>
+                    ) : (
+                      <>
+                        <ChevronsUpDown className="size-3.5" />
+                        Expand all
+                      </>
+                    )}
+                  </Button>
+                )}
+                <ButtonGroup>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={() => setAddBlockOpen(true)}
+                    className="h-8 px-3 text-xs"
+                  >
+                    <Plus className="size-3.5" />
+                    Add block
+                  </Button>
+                  {/* Visible hairline divider between the main action and
+                      the overflow trigger — `bg-input` is too low-contrast
+                      on the filled primary surface, so we lean on the
+                      primary-foreground tone the kbd pills used. */}
+                  <ButtonGroupSeparator className="bg-primary-foreground/25" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        aria-label="More add-block options"
+                        className="h-8 px-2"
+                      >
+                        <ChevronDown className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      <DropdownMenuItem onSelect={() => addEmptyBlock()}>
+                        <Plus className="size-4" />
+                        Add empty block
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </ButtonGroup>
+              </div>
+              <ComposerTable
+                items={effectiveOrder}
+                onReorder={setOrder}
+                blocksById={blocksById}
+                customs={customs}
+                edits={edits}
+                expanded={expanded}
+                setExpanded={setExpanded}
+                setEdits={setEdits}
+                setCustoms={setCustoms}
+                onRemove={removeFromComposition}
+                addBlockEmptyTrigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading}
+                    onClick={() => setAddBlockOpen(true)}
+                  >
+                    <Plus className="size-4" />
+                    Add block
+                  </Button>
+                }
+              />
+            </>
           )}
         </div>
       )}
@@ -364,11 +625,14 @@ export function PromptsBuildPage() {
           onOpenChange={setAddBlockOpen}
           blocksByGroup={blocksByGroup}
           activeIds={activeLibraryIds}
+          composedCount={effectiveOrder.length}
           onPickStrategy={pickStrategy}
           onPickDepth={pickDepth}
           onToggleIntegration={toggleIntegration}
           onToggleKnowledge={toggleKnowledge}
           onAddCustom={addCustomBlock}
+          onClearAll={clearAll}
+          onApplyPreset={applyPreset}
         />
       )}
       {effectiveOrder.length > 0 && (
@@ -391,11 +655,21 @@ interface AddBlockMenuProps {
   onOpenChange: (open: boolean) => void;
   blocksByGroup: Record<string, PromptBlock[]>;
   activeIds: Set<string>;
+  // composedCount is the total number of blocks currently in the
+  // composition (library + custom). Drives the footer count text and
+  // the disabled state of the Clear all action. Distinct from
+  // activeIds.size, which only counts library picks.
+  composedCount: number;
   onPickStrategy: (id: string) => void;
   onPickDepth: (id: string) => void;
   onToggleIntegration: (id: string) => void;
   onToggleKnowledge: (id: string) => void;
   onAddCustom: (content: string) => void;
+  onClearAll: () => void;
+  // onApplyPreset replaces the current composition with the preset's
+  // ordered block IDs. The page-level handler resolves each ID to its
+  // group via blocksById to decide which URL filter slot it lands in.
+  onApplyPreset: (preset: Preset) => void;
 }
 
 // AddBlockMenu is the modal "block library" — left rail of category
@@ -409,16 +683,22 @@ function AddBlockMenu({
   onOpenChange,
   blocksByGroup,
   activeIds,
+  composedCount,
   onPickStrategy,
   onPickDepth,
   onToggleIntegration,
   onToggleKnowledge,
   onAddCustom,
+  onClearAll,
+  onApplyPreset,
 }: AddBlockMenuProps) {
   const [mode, setMode] = useState<"pick" | "custom">("pick");
-  const [activeGroup, setActiveGroup] = useState<PromptBlockGroup | "all">(
-    "all",
-  );
+  // "presets" is a virtual category — it doesn't filter the block grid,
+  // it swaps the right pane for a preset-card view. Other values still
+  // drive the block filter as before.
+  const [activeGroup, setActiveGroup] = useState<
+    PromptBlockGroup | "all" | "presets"
+  >("all");
   const [query, setQuery] = useState("");
   const [customDraft, setCustomDraft] = useState("");
 
@@ -546,6 +826,13 @@ function AddBlockMenu({
             <div className="grid flex-1 grid-cols-[10rem_1fr] overflow-hidden">
               <nav className="bg-muted/30 overflow-y-auto border-r p-2">
                 <CategoryRailItem
+                  label="Presets"
+                  count={PRESETS.length}
+                  active={activeGroup === "presets"}
+                  onClick={() => setActiveGroup("presets")}
+                />
+                <div className="my-2 border-t" />
+                <CategoryRailItem
                   label="All"
                   count={counts.all}
                   active={activeGroup === "all"}
@@ -587,36 +874,33 @@ function AddBlockMenu({
                 </div>
               </nav>
 
-              {/* Scroller has NO top padding — if it did, sticky's
-                  top:0 would pin below the padding, leaving a strip
-                  above where scrolling content shows through. Each
-                  sticky header instead bakes the top breathing room
-                  into its own padding so the bg-background fills all
-                  the way to the literal top of the scroll viewport. */}
-              <div className="overflow-y-auto px-4 pb-2">
-                {filtered.length === 0 ? (
-                  <div className="text-muted-foreground flex h-full items-center justify-center pt-4 text-sm">
+              <div className="overflow-y-auto p-4">
+                {activeGroup === "presets" ? (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-muted-foreground text-xs">
+                      Picking a preset replaces the current composition with a
+                      curated set of blocks. You can edit, reorder, or remove
+                      any of them afterwards.
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      {PRESETS.map((preset) => (
+                        <PresetCard
+                          key={preset.id}
+                          preset={preset}
+                          onClick={() => onApplyPreset(preset)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
                     No blocks match {query ? `"${query}"` : "this filter"}.
                   </div>
                 ) : activeGroup === "all" ? (
-                  // Sections are flattened (Fragment, not wrapping div) so
-                  // each sticky header anchors to the scroll container —
-                  // the next header pushes the previous one out, instead
-                  // of each header being trapped at the bottom of its
-                  // own <section>.
-                  <>
-                    {sections.map((section, i) => (
-                      <Fragment key={section.group}>
-                        <div
-                          className={cn(
-                            "bg-background sticky top-0 z-10 -mx-4 flex items-baseline justify-between gap-2 px-4 pb-2",
-                            // First header pads to the top of the scroller
-                            // (covers the missing scroller pt-4). Later
-                            // headers get extra top space + own padding to
-                            // separate sections visually.
-                            i === 0 ? "pt-4" : "pt-6",
-                          )}
-                        >
+                  <div className="flex flex-col gap-6">
+                    {sections.map((section) => (
+                      <section key={section.group} className="flex flex-col gap-2">
+                        <div className="flex items-baseline justify-between gap-2">
                           <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
                             {section.label}
                           </h3>
@@ -634,11 +918,11 @@ function AddBlockMenu({
                             />
                           ))}
                         </div>
-                      </Fragment>
+                      </section>
                     ))}
-                  </>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3 pt-4 lg:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                     {filtered.map((block) => (
                       <BlockCard
                         key={block.id}
@@ -653,17 +937,29 @@ function AddBlockMenu({
             </div>
             <DialogFooter className="border-t p-3 sm:justify-between">
               <span className="text-muted-foreground self-center text-xs">
-                {activeIds.size === 0
+                {composedCount === 0
                   ? "Tap blocks to add — pick as many as you like."
-                  : `${activeIds.size} block${activeIds.size === 1 ? "" : "s"} in composition`}
+                  : `${composedCount} block${composedCount === 1 ? "" : "s"} in composition`}
               </span>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => handleOpenChange(false)}
-              >
-                Done
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={composedCount === 0}
+                  onClick={onClearAll}
+                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                >
+                  Clear all
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleOpenChange(false)}
+                >
+                  Done
+                </Button>
+              </div>
             </DialogFooter>
           </>
         ) : (
@@ -818,6 +1114,44 @@ function BlockCard({
   );
 }
 
+// PresetCard renders one preset as a tile. The "Includes N blocks"
+// subtitle hints at the scope without listing block names — keeps the
+// card compact and consistent with BlockCard's visual rhythm.
+function PresetCard({
+  preset,
+  onClick,
+}: {
+  preset: Preset;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group hover:border-primary/40 hover:bg-accent/40 relative flex h-full flex-col gap-2 rounded-lg border p-3 text-left transition-colors"
+    >
+      {preset.icon && (
+        <span className="bg-muted text-muted-foreground group-hover:text-foreground inline-flex size-8 items-center justify-center rounded-md">
+          <DynamicIcon name={preset.icon} className="size-4" />
+        </span>
+      )}
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium leading-tight">
+          {preset.label}
+        </span>
+        {preset.description && (
+          <span className="text-muted-foreground line-clamp-3 text-xs leading-snug">
+            {preset.description}
+          </span>
+        )}
+        <span className="text-muted-foreground/70 mt-1 text-[10px] tabular-nums uppercase tracking-wide">
+          Includes {preset.blockIds.length} blocks
+        </span>
+      </div>
+    </button>
+  );
+}
+
 interface ComposerTableProps {
   items: ComposedItem[];
   onReorder: (next: ComposedItem[]) => void;
@@ -833,11 +1167,6 @@ interface ComposerTableProps {
   // card. Just a button — it does NOT contain the dialog, which lives
   // at the parent so it survives the empty-state → table re-render.
   addBlockEmptyTrigger: React.ReactNode;
-  // addBlockGhostRow is the trigger rendered as a full-width ghost row
-  // at the bottom of the table when there are blocks. Subtle styling so
-  // it reads as "another row you could add" without competing with the
-  // real block rows above it.
-  addBlockGhostRow: React.ReactNode;
 }
 
 function ComposerTable({
@@ -852,7 +1181,6 @@ function ComposerTable({
   setCustoms,
   onRemove,
   addBlockEmptyTrigger,
-  addBlockGhostRow,
 }: ComposerTableProps) {
   // dnd-kit sensors: PointerSensor with a small activation distance so
   // a quick row click doesn't accidentally start a drag (only deliberate
@@ -951,11 +1279,6 @@ function ComposerTable({
                 />
               ))}
             </SortableContext>
-            <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={3} className="border-t border-dashed p-0">
-                {addBlockGhostRow}
-              </TableCell>
-            </TableRow>
           </TableBody>
         </Table>
       </DndContext>
@@ -1009,8 +1332,12 @@ function SortableRow({
   const title =
     library?.title ??
     (custom ? deriveCustomBlockTitle(custom.content) : "Unknown block");
-  const description = library?.description ?? "";
-  const icon = library?.icon ?? "";
+  const description =
+    library?.description ?? (custom ? "Custom block" : "");
+  // Library blocks bring their own icon from frontmatter; custom
+  // blocks fall back to a generic "you wrote this" pen-on-square mark
+  // so the row stays visually aligned with library rows.
+  const icon = library?.icon ?? (custom ? "square-pen" : "");
 
   const originalContent = library?.content ?? "";
   const editedContent = edits[item.id];
@@ -1096,7 +1423,7 @@ function SortableRow({
                   })
                 }
               >
-                <RotateCcw className="size-4" />
+                <Undo2 className="size-4" />
               </Button>
             )}
             <Button
@@ -1133,8 +1460,17 @@ function SortableRow({
                   setEdits((s) => ({ ...s, [item.id]: v }));
                 }
               }}
+              onKeyDown={(e) => {
+                // Escape blurs the textarea so page-level shortcuts
+                // (P, C, ⌘+Enter, etc.) become reachable again without
+                // having to click outside the row.
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
               aria-label="Block content"
-              className="bg-muted/20 block w-full resize-none rounded-none border-0 px-4 py-3 font-mono text-xs leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-muted/40"
+              className="bg-muted/60 border-border/60 block w-full resize-none rounded-none border-0 border-t px-4 py-3 font-mono text-xs leading-relaxed shadow-none focus-visible:border-0 focus-visible:border-t focus-visible:ring-0 dark:bg-black/30"
             />
           </TableCell>
         </TableRow>
@@ -1165,6 +1501,11 @@ function PreviewButton({
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useShortcut(["p"], () => setOpen((v) => !v), {
+    label: "Preview prompt",
+    group: "Prompt builder",
+    enabled: !disabled,
+  });
   return (
     <>
       <Button
@@ -1195,7 +1536,10 @@ function PreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b px-6 py-4">
+        <DialogHeader className="border-b py-4 pr-12 pl-6">
+          {/* pr-12 reserves room for shadcn's absolute-positioned X
+              close button on the right edge — without it the line/char
+              count sits behind the X and gets clipped. */}
           <div className="flex items-center justify-between gap-3">
             <DialogTitle>Preview</DialogTitle>
             <span className="text-muted-foreground text-xs tabular-nums">
@@ -1234,6 +1578,12 @@ function OutputActions({ text, disabled }: OutputActionsProps) {
       toast.error("Couldn't access the clipboard. Copy the preview manually.");
     }
   };
+
+  useShortcut(["c"], () => onCopy(), {
+    label: "Copy prompt",
+    group: "Prompt builder",
+    enabled: !disabled,
+  });
 
   const onUseInNewAgent = () => {
     navigate({

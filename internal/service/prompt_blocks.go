@@ -124,6 +124,10 @@ func parsePromptBlock(id, body string) PromptBlock {
 		block.Content = body
 		legacyParsePromptHeader(body, &block)
 	}
+	// Markdown sources usually end with one trailing newline (some
+	// with two). Strip them so the expansion editor doesn't surface
+	// phantom blank lines and the composed prompt joins cleanly.
+	block.Content = strings.TrimRight(block.Content, " \t\r\n")
 	if block.Title == "" {
 		block.Title = humanizeBlockID(id)
 	}
