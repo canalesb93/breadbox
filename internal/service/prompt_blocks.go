@@ -7,8 +7,26 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
+	"breadbox/internal/slugs"
 	"breadbox/prompts"
+)
+
+// PromptBlockGroup is the taxonomy classification used by the v2 SPA's
+// prompt-builder picker. The string union on the client mirrors these
+// constants — keep both sides in sync.
+type PromptBlockGroup string
+
+const (
+	// strategy — top-level approach. One selected; mutually exclusive.
+	GroupStrategy PromptBlockGroup = "strategy"
+	// depth — review intensity modifier. Zero or one; mutually exclusive.
+	GroupDepth PromptBlockGroup = "depth"
+	// integration — optional add-ons (gmail, sync, account-linking). Multi-select.
+	GroupIntegration PromptBlockGroup = "integration"
+	// knowledge — domain knowledge (categories, merchants, comments). Multi-select.
+	GroupKnowledge PromptBlockGroup = "knowledge"
 )
 
 // PromptBlock is one reusable agent-prompt building block — the parsed
@@ -26,20 +44,14 @@ import (
 //	<body markdown — sent to the model verbatim>
 //
 // Icon names are kebab-case Lucide identifiers (matching the React
-// `DynamicIcon` resolver). Group classifies the block by its filename
-// prefix and tells the UI how to render the picker:
-//
-//	strategy    — top-level approach. One selected; mutually exclusive.
-//	depth       — review intensity modifier. Zero or one; mutually exclusive.
-//	integration — optional add-ons (gmail, sync, account-linking). Multi-select.
-//	knowledge   — domain knowledge (category-system, merchants, comments). Multi-select.
+// `DynamicIcon` resolver).
 type PromptBlock struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Icon        string `json:"icon,omitempty"`
-	Group       string `json:"group"`
-	Content     string `json:"content"`
+	ID          string           `json:"id"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	Icon        string           `json:"icon,omitempty"`
+	Group       PromptBlockGroup `json:"group"`
+	Content     string           `json:"content"`
 }
 
 // Block IDs that the builder excludes from the user-facing palette.
@@ -50,15 +62,11 @@ var hiddenPromptBlockIDs = map[string]bool{
 	"default-system-prompt": true,
 }
 
-// ListPromptBlocks returns every block under prompts/agents/, parsed.
-// Reads from the embed.FS in `breadbox/prompts`, so the file set is
-// fixed at build time — no DB call, no I/O after init. Returned slice
-// is grouped + sorted within group for stable UI rendering.
-//
-// ctx is unused today (the embed.FS read is synchronous) but kept on
-// the signature so a future DB-backed override (user-authored custom
-// blocks) doesn't change the call sites.
-func (s *Service) ListPromptBlocks(_ context.Context) ([]PromptBlock, error) {
+// loadPromptBlocks reads + parses every file under prompts/agents/
+// once. The embed.FS contents are immutable at runtime, so the result
+// is cached forever via sync.OnceValues — the v2 SPA hits this on
+// every page mount, no reason to re-walk the FS each time.
+var loadPromptBlocks = sync.OnceValues(func() ([]PromptBlock, error) {
 	entries, err := prompts.FS.ReadDir("agents")
 	if err != nil {
 		return nil, fmt.Errorf("read prompts/agents: %w", err)
@@ -80,8 +88,7 @@ func (s *Service) ListPromptBlocks(_ context.Context) ([]PromptBlock, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read prompts/agents/%s: %w", name, err)
 		}
-		block := parsePromptBlock(id, string(data))
-		out = append(out, block)
+		out = append(out, parsePromptBlock(id, string(data)))
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Group != out[j].Group {
@@ -90,26 +97,18 @@ func (s *Service) ListPromptBlocks(_ context.Context) ([]PromptBlock, error) {
 		return out[i].ID < out[j].ID
 	})
 	return out, nil
+})
+
+// ListPromptBlocks returns the parsed library. ctx is unused today
+// (the embed.FS read is synchronous and cached) but kept on the
+// signature so a future DB-backed override (user-authored custom
+// blocks) doesn't change call sites.
+func (s *Service) ListPromptBlocks(_ context.Context) ([]PromptBlock, error) {
+	return loadPromptBlocks()
 }
 
 // parsePromptBlock splits a `prompts/agents/*.md` file into frontmatter
-// metadata and body. Format:
-//
-//	---
-//	title: ...
-//	description: ...
-//	icon: ...
-//	---
-//
-//	<body>
-//
-// Frontmatter values may be quoted with single or double quotes; quotes
-// are stripped if present. Unknown keys are ignored. The body is the
-// composed-prompt content — what the model actually reads — with
-// leading whitespace trimmed so the composer concatenates cleanly.
-// If the frontmatter block is missing or malformed, falls back to the
-// legacy `# Title` / `> Description` convention so a stray un-migrated
-// file doesn't disappear from the picker.
+// metadata and body. Format is documented on PromptBlock.
 func parsePromptBlock(id, body string) PromptBlock {
 	block := PromptBlock{
 		ID:    id,
@@ -120,16 +119,13 @@ func parsePromptBlock(id, body string) PromptBlock {
 		block.Description = meta["description"]
 		block.Icon = meta["icon"]
 		block.Content = strings.TrimLeft(content, "\n")
-	} else {
-		block.Content = body
-		legacyParsePromptHeader(body, &block)
 	}
 	// Markdown sources usually end with one trailing newline (some
 	// with two). Strip them so the expansion editor doesn't surface
 	// phantom blank lines and the composed prompt joins cleanly.
 	block.Content = strings.TrimRight(block.Content, " \t\r\n")
 	if block.Title == "" {
-		block.Title = humanizeBlockID(id)
+		block.Title = slugs.TitleCase(id)
 	}
 	return block
 }
@@ -170,71 +166,38 @@ func parsePromptFrontmatter(body string) (map[string]string, string, bool) {
 		}
 		meta[key] = val
 	}
-	// Reached EOF without a closing fence — treat as no frontmatter.
 	return nil, body, false
 }
 
-// legacyParsePromptHeader keeps the pre-frontmatter `# Title` and
-// `> Description` convention working as a fallback. Removable once
-// every file under prompts/agents/ has been migrated to frontmatter.
-func legacyParsePromptHeader(body string, block *PromptBlock) {
-	for _, line := range strings.SplitN(body, "\n", 5) {
-		trimmed := strings.TrimSpace(line)
-		if block.Title == "" && strings.HasPrefix(trimmed, "# ") {
-			block.Title = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
-			continue
-		}
-		if block.Description == "" && strings.HasPrefix(trimmed, "> ") {
-			block.Description = strings.TrimSpace(strings.TrimPrefix(trimmed, "> "))
-		}
-		if block.Title != "" && block.Description != "" {
-			return
-		}
-	}
-}
-
-// promptBlockGroupFor maps a block filename to its taxonomic group.
-// Anything that doesn't match a known prefix falls into "knowledge"
-// as the catch-all — better to surface an unknown block than hide it.
-func promptBlockGroupFor(id string) string {
+// promptBlockGroupFor infers the group from the block's filename. A
+// future migration could move this into frontmatter, but today every
+// block file follows one of these prefix/suffix conventions.
+func promptBlockGroupFor(id string) PromptBlockGroup {
 	switch {
 	case strings.HasPrefix(id, "strategy-"):
-		return "strategy"
+		return GroupStrategy
 	case strings.HasPrefix(id, "review-depth-"):
-		return "depth"
+		return GroupDepth
 	case strings.HasSuffix(id, "-integration"),
 		strings.HasSuffix(id, "-linking"),
 		strings.HasSuffix(id, "-management"):
-		return "integration"
+		return GroupIntegration
 	default:
-		return "knowledge"
+		return GroupKnowledge
 	}
 }
 
-func promptBlockGroupOrder(group string) int {
+func promptBlockGroupOrder(group PromptBlockGroup) int {
 	switch group {
-	case "strategy":
+	case GroupStrategy:
 		return 0
-	case "depth":
+	case GroupDepth:
 		return 1
-	case "integration":
+	case GroupIntegration:
 		return 2
-	case "knowledge":
+	case GroupKnowledge:
 		return 3
 	default:
 		return 4
 	}
-}
-
-// humanizeBlockID turns "strategy-routine-review" into "Strategy Routine
-// Review" for the rare case where a block file is missing a title.
-func humanizeBlockID(id string) string {
-	parts := strings.Split(id, "-")
-	for i, p := range parts {
-		if p == "" {
-			continue
-		}
-		parts[i] = strings.ToUpper(p[:1]) + p[1:]
-	}
-	return strings.Join(parts, " ")
 }
