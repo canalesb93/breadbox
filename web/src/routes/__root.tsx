@@ -58,9 +58,22 @@ function AuthenticatedGate({ pathname }: { pathname: string }) {
   const is401 = me.error instanceof ApiError && me.error.status === 401;
 
   useEffect(() => {
-    if (is401) {
-      navigate({ to: "/login", search: { redirect: pathname } });
+    if (!is401) return;
+    // Don't redirect while the page is hidden — bfcache restore briefly
+    // marks document.hidden=true; firing navigate here completes before
+    // the user re-engages and undoes the snapshot they were swiping back
+    // to. Pair with the pageshow handler in main.tsx (PR #1329).
+    if (document.visibilityState !== "visible") {
+      const onVisible = () => {
+        if (document.visibilityState === "visible") {
+          document.removeEventListener("visibilitychange", onVisible);
+          navigate({ to: "/login", search: { redirect: pathname } });
+        }
+      };
+      document.addEventListener("visibilitychange", onVisible);
+      return () => document.removeEventListener("visibilitychange", onVisible);
     }
+    navigate({ to: "/login", search: { redirect: pathname } });
   }, [is401, navigate, pathname]);
 
   // Gate: never render the authenticated shell until /me has resolved
