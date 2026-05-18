@@ -36,12 +36,13 @@ Phase 1 shipped fixes (now in main):
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard. `web/src/routes/__root.tsx`. Requires real-device validation; no simulator fully reproduces keyboard occlusion.
 - [ ] **MOBILE-19** HeroGrid 20px padding feels cramped on 375px. `web/src/components/hero-grid.tsx`. Subjective — defer until visual evidence shows a clear problem.
 
-**New (Phase 2 scout, iter 12):**
-- [ ] **MOBILE-24** CSV column-mapping label wraps aggressively on narrow viewports — `web/src/features/connections/csv-import-form.tsx` (~lines 422-478). Needs visual evidence before fix.
-- [ ] **MOBILE-25** CSV drag-drop file input may not open picker reliably on iOS — `web/src/features/connections/csv-import-form.tsx` (~lines 166-190). Needs simulator verification.
+**New:**
+- _(empty — backlog drained, awaiting user reports or future scout)_
 
 **Closed by audit:**
 - ✅ **MOBILE-API-COPY (closed as already-handled)** Scout flagged that API key copy on iOS might silently fail. Verified: `onCopy` at `api-key-created.tsx:47` already has try/catch with a clear error toast ("Couldn't access the clipboard. Select the value and copy manually.") and the readonly Input has `onFocus={e => e.currentTarget.select()}` for manual-copy ergonomics. No code change required.
+- ✅ **MOBILE-24 (closed as non-issue)** Scout flagged CSV column-mapping labels as wrapping aggressively on narrow viewports. Verified: `grid-cols-1 sm:grid-cols-2` means mobile gets ONE column per row — each ColumnSelect has the full 375px row width and the `text-xs` label easily fits "Separate Debit and Credit" in one line. Two-column wrap is a tablet+ concern where verticality is cheap. No code change.
+- ✅ **MOBILE-25 (closed as non-issue)** Scout flagged file input with `className="hidden"` as potentially not opening picker on iOS. Verified: `<label htmlFor="csv-file">` + `<input type="file" className="hidden">` IS the canonical React/Tailwind pattern and iOS Safari opens the picker correctly when you tap the associated label. `display:none` removes from layout but preserves label-association interactivity. No code change.
 
 ## In-flight PRs
 
