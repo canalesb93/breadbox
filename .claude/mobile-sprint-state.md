@@ -46,7 +46,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-header-and-footer-stack** (subagent `a6623977`) — bundles MOBILE-15 + MOBILE-16. PageHeader actions wrap on mobile (`flex-wrap`, `sm:flex-nowrap`); FormFooter stacks buttons full-width with primary on top via `flex-col-reverse sm:flex-row`. Composed-layer components (no ui/* edit). PR # TBD.
 
 ## Completed
 
