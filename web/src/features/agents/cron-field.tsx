@@ -32,7 +32,7 @@ interface CronFieldProps {
 }
 
 // CronField is the cron-input + live-preview + preset-picker combo used by
-// the agent edit form. Empty value reads as "Manual trigger only";
+// the agent edit form. Empty value reads as the "manual runs only" prose;
 // non-empty values are validated client-side via isValidCronExpr (a
 // permissive structural check — robfig is the canonical validator at
 // server registration time).

@@ -84,7 +84,7 @@ function parseSimpleCron(e: string): ParsedCron | null {
 }
 
 export function cronToProseLabel(expr: string | null | undefined): string {
-  if (!expr) return "Manual trigger only";
+  if (!expr) return "Manual runs only — fire from the agents list";
   const e = expr.trim();
 
   // Shortcut handling.
