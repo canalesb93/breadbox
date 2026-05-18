@@ -123,6 +123,14 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* iOS Safari tap highlight — disabled globally because our shadcn primitives
+     ship their own intentional focus / active states. The default
+     `rgba(0,0,0,0.4)` overlay on `<button>` / `<a>` / `[role=button]` was
+     layering on top of our pressed treatments and reading as a glitch on
+     touch. Keep `cursor: pointer` and `:focus-visible` for keyboard. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* shadcn's CardHeader is designed for title + description (stacked) with
