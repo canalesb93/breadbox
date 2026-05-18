@@ -44,6 +44,14 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			return
 		}
 
+		// Opt-in: when v2_default is set, the v1 admin root becomes a
+		// redirect to the v2 SPA. Bookmarks and deep links into other v1
+		// pages keep working — only `/` flips.
+		if appconfig.Bool(ctx, a.Queries, appconfig.KeyV2Default, false) {
+			http.Redirect(w, r, "/v2/", http.StatusSeeOther)
+			return
+		}
+
 		// Anchor every wall-clock decision (day buckets, "Today" hero
 		// counters, absolute-time tooltips) to the viewer's browser
 		// timezone via the bb_tz cookie. Falls back to server local when
