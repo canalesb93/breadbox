@@ -105,7 +105,7 @@ export function APIKeysPage() {
   const emptyState = renderEmptyState({ tab, query, newKeyButton });
 
   return (
-    <div className="flex flex-col gap-5">
+    <>
       <PageHeader
         eyebrow={eyebrow}
         title="API keys"
@@ -148,7 +148,7 @@ export function APIKeysPage() {
           emptyState={emptyState}
         />
       </div>
-    </div>
+    </>
   );
 }
 

@@ -57,7 +57,7 @@ export function CategoryDetailPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto flex max-w-5xl flex-col gap-5">
       <SoftBackButton to="/categories">Back to categories</SoftBackButton>
 
       {isLoading ? (

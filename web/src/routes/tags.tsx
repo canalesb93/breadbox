@@ -42,7 +42,7 @@ export function TagsPage() {
   })();
 
   return (
-    <div className="flex flex-col gap-5">
+    <>
       <PageHeader
         eyebrow={eyebrow}
         title="Tags"
@@ -96,6 +96,6 @@ export function TagsPage() {
           }
         />
       </div>
-    </div>
+    </>
   );
 }

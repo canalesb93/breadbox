@@ -6,7 +6,7 @@ import { APIKeyForm } from "@/features/api-keys/api-key-form";
 
 export function APIKeyNewPage() {
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <SoftBackButton to="/api-keys">Back to API keys</SoftBackButton>
       <PageHeader
         eyebrow="New credential"

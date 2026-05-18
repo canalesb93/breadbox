@@ -77,6 +77,7 @@ There's a living component gallery at `/v2/sandbox` (`web/src/sandbox/`, route i
 - **Tailwind classes only.** No inline `style={}` except dynamic values that can't be expressed in Tailwind (computed colors, animations).
 - Use shadcn theme variables (`bg-primary`, `text-muted-foreground`, `border-border`). Never raw colors (`bg-blue-500`).
 - Spacing: Tailwind defaults (`gap-2`, `p-4`).
+- **Page layout: `<main>` in `routes/__root.tsx` is `flex flex-col gap-5`.** Pages return a fragment (`<>`) so each section (PageHeader, toolbar, content, dialogs) sits as a direct child and inherits the 20px rhythm — do NOT wrap the page in your own `<div className="flex flex-col gap-*">`. The only exception is width-constrained pages (detail / form pages), which wrap once with `mx-auto flex max-w-{2xl,5xl} flex-col gap-5` so the constraint and the rhythm live on the same element. Never add `mb-*` to a direct child of the page wrapper — it stacks with the parent gap and produces a visible void.
 - **No CSS modules, no styled-components, no `@apply` outside `globals.css`.**
 - **Never import `static/css/styles.css`** or any v1 stylesheet. The v2 design system is shadcn theme tokens + Tailwind utilities. v1 grew unboundedly — we're not paying that cost again.
 - **Do not commit changes to `web/src/components/ui/*` styling.** If a primitive looks wrong, theme tokens in `globals.css` are the lever.

@@ -92,7 +92,7 @@ export function AccountDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto flex max-w-5xl flex-col gap-5">
       <SoftBackButton to="/accounts">Back to accounts</SoftBackButton>
 
       {acctQuery.isLoading ? (

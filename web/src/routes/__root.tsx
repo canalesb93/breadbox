@@ -162,7 +162,14 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             </div>
           </div>
         </header>
-        <main className="min-w-0 flex-1 p-3 sm:p-6">
+        {/* Page layout contract: <main> is a flex column with gap-5. Every
+            section a page renders (PageHeader, toolbars, content, dialogs)
+            becomes a direct child and inherits the 20px rhythm. Pages must
+            NOT add their own `flex flex-col gap-*` wrapper — return a
+            fragment (`<>`) so children sit directly under <main>. Pages that
+            need a width constraint (`mx-auto max-w-2xl|5xl`) wrap once and
+            apply `flex flex-col gap-5` on that wrapper themselves. */}
+        <main className="flex min-w-0 flex-1 flex-col gap-5 p-3 sm:p-6">
           <Outlet />
         </main>
       </SidebarInset>
