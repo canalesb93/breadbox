@@ -41,7 +41,11 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## Sprint status
 
-**SPRINT WRAP-UP PR OPEN: [#1326](https://github.com/canalesb93/breadbox/pull/1326)** (sprint/mobile-ios-safari → main). 11 fixes shipped (10 PRs merged into sprint branch + 1 follow-up dvw cleanup committed directly). Awaiting user review + merge.
+**SPRINT WRAP-UP PR OPEN: [#1326](https://github.com/canalesb93/breadbox/pull/1326)** (sprint/mobile-ios-safari → main). 12 fixes shipped (10 PRs merged into sprint branch + 2 follow-ups committed directly: dvw cleanup on sibling components, then settings-tab strip scroll). Awaiting user review + merge.
+
+## Completed (additions since wrap-up PR opened)
+
+- ✅ **MOBILE-21** Mobile settings tabs not h-scrollable — pushed directly to sprint branch (`6cb17938`). The `<ul>` had `w-max` so it grew past its parent `<nav>` (which has no overflow), making the `overflow-x-auto` on the ul itself a no-op. Removing `w-max` constrains the ul to parent width; the `shrink-0` pills inside then push horizontally as intended.
 
 ## Completed
 
