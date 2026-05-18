@@ -79,11 +79,20 @@ async function main() {
   let turnCount = 0;
   let numToolCalls = 0;
 
-  // SDK spawns `node cli.js` under the hood and fs.existsSync's the path.
-  // bun --compile bundles cli.js into bunfs which fs.existsSync can't read,
-  // so we extract to a tmp file first. See resolveCliPath above.
+  // SDK spawns `<executable> cli.js` under the hood and fs.existsSync's the
+  // path. bun --compile bundles cli.js into bunfs which fs.existsSync can't
+  // read, so we extract to a tmp file first. See resolveCliPath above.
   const pathToClaudeCodeExecutable = await resolveCliPath();
 
+  // Force the spawn executable to "node". The SDK defaults to
+  // isRunningWithBun() ? "bun" : "node" — and we ARE running under bun
+  // (this binary was built with `bun build --compile`), so it would
+  // otherwise pick "bun" and spawn ENOENT in the runtime image where
+  // only nodejs is installed. The ENOENT fires on an unhandled spawn
+  // error handler inside the SDK; the async iterator below then ends
+  // silently with zero messages, which we'd misclassify as a clean
+  // success with $0/0-turn metrics. Pinning to "node" makes the spawn
+  // deterministic and matches the runtime apk install in the Dockerfile.
   try {
     const stream = query({
       prompt: spec.prompt,
@@ -99,10 +108,13 @@ async function main() {
         permissionMode: "dontAsk",
         resume: spec.sessionId,
         pathToClaudeCodeExecutable,
+        executable: "node",
       },
     });
 
+    let messageCount = 0;
     for await (const message of stream as AsyncIterable<any>) {
+      messageCount += 1;
       const ts = Date.now();
       const rawType = (message?.type as string | undefined) ?? "system";
 
@@ -196,8 +208,27 @@ async function main() {
       }
     }
 
-    // Stream ended without a result event — treat as success with zero usage.
-    process.exit(0);
+    // Stream ended without ever emitting a `result` event. Historically
+    // this branch exited 0 with zero usage, which let SDK-side silent
+    // failures (e.g. spawn ENOENT on the cli.js subprocess because the
+    // configured executable isn't on PATH) sail through as phantom
+    // "successes" with empty transcripts. Surface as an explicit error
+    // event + non-zero exit so the orchestrator records something the
+    // operator can actually read in the transcript drawer.
+    if (messageCount === 0) {
+      emitError(
+        "agent SDK stream ended without yielding any messages — likely a subprocess spawn failure (executable not on PATH?) or an invalid auth credential",
+        undefined,
+        transcriptPath,
+      );
+    } else {
+      emitError(
+        `agent SDK stream ended after ${messageCount} message(s) without emitting a result event`,
+        undefined,
+        transcriptPath,
+      );
+    }
+    process.exit(1);
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
     emitError(e.message, e.stack, transcriptPath);
