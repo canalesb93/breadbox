@@ -57,6 +57,7 @@ import { DataTable } from "@/components/data-table";
 import { CategoryBadge } from "@/components/category-badge";
 import { CategoryIconTile } from "@/components/category-icon-tile";
 import { CategoryCommandList } from "@/components/category-command";
+import { CategoryPicker } from "@/components/category-picker";
 import { DateRangeFilter } from "@/components/date-range-filter";
 import type { DateRangeValue } from "@/components/date-range-filter";
 import { TagChip, TagList } from "@/components/tag-chip";
@@ -108,7 +109,7 @@ import { ProviderPicker } from "@/features/connections/provider-picker";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
-import { SandboxSection, Specimen } from "@/sandbox/kit";
+import { SandboxGroup, SandboxSection, Specimen } from "@/sandbox/kit";
 import {
   sampleTags,
   sampleTranscriptEvents,
@@ -164,9 +165,11 @@ export function ComponentsSection() {
 
   return (
     <SandboxSection
+      id="components"
       title="Components"
       description="Composed, reusable v2 components — the layer built on top of the primitives. Shared across the transactions list, detail page, and (soon) elsewhere."
     >
+      <SandboxGroup title="Page layout">
       <Specimen
         label="PageHeader"
         code="components/page-header"
@@ -427,7 +430,9 @@ export function ComponentsSection() {
           />
         </div>
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Pills & inline">
       <Specimen
         label="IdPill"
         code="components/id-pill"
@@ -716,7 +721,9 @@ export function ComponentsSection() {
           <ViewAllPill to="/">See all transactions</ViewAllPill>
         </div>
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Forms & overlays">
       <Specimen
         label="SearchInput"
         code="components/search-input"
@@ -1053,7 +1060,9 @@ export function ComponentsSection() {
           }}
         />
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Shells & states">
       <Specimen
         label="DangerZone"
         code="components/danger-zone"
@@ -1279,7 +1288,9 @@ export function ComponentsSection() {
           </div>
         </div>
       </Specimen>
+      </SandboxGroup>
 
+      <SandboxGroup title="Domain & data">
       <Specimen
         label="TimelineRail"
         code="components/timeline-rail"
@@ -1501,6 +1512,68 @@ export function ComponentsSection() {
           </div>
         ))}
       </Specimen>
+      </SandboxGroup>
+
+      <SandboxGroup title="Pickers & specialty">
+      <Specimen
+        label="CategoryPicker"
+        code="components/category-picker"
+        description="The inline category picker that lives in the transactions list's category column. Renders the assigned `CategoryBadge` (or a dashed `+ Category` empty pill) over a popover-hosted `CategoryCommandList`. Hover/focus reveals a small chevron + a 1px ring around the trigger so the affordance reads even when the badge already carries a coloured tint. The `onPick` override here keeps the sandbox a no-op — production wires it to the single-tx update mutation via `useCategoryEditor`."
+        className="block"
+      >
+        <div className="flex flex-wrap items-center gap-6 rounded-lg border p-4">
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Assigned
+            </div>
+            <CategoryPicker
+              transactionId="sandbox"
+              category={coffeeCategory ?? null}
+              onPick={(p) => {
+                toast.message(`Picked: ${p.category_slug ?? "—"}`);
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Override (ring)
+            </div>
+            <CategoryPicker
+              transactionId="sandbox"
+              category={gasCategory ?? null}
+              overridden
+              onPick={(p) => {
+                toast.message(`Picked: ${p.category_slug ?? "—"}`);
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              Uncategorized
+            </div>
+            <CategoryPicker
+              transactionId="sandbox"
+              category={null}
+              onPick={(p) => {
+                toast.message(`Picked: ${p.category_slug ?? "—"}`);
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              sm
+            </div>
+            <CategoryPicker
+              transactionId="sandbox"
+              category={coffeeCategory ?? null}
+              size="sm"
+              onPick={(p) => {
+                toast.message(`Picked: ${p.category_slug ?? "—"}`);
+              }}
+            />
+          </div>
+        </div>
+      </Specimen>
 
       <Specimen
         label="CategoryCommandList"
@@ -1702,6 +1775,7 @@ export function ComponentsSection() {
           />
         </div>
       </Specimen>
+      </SandboxGroup>
     </SandboxSection>
   );
 }

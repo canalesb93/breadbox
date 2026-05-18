@@ -124,3 +124,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* shadcn's CardHeader is designed for title + description (stacked) with
+   an optional trailing action that row-spans 2 to clear room for the
+   description. When the description is absent, those defaults leave a
+   phantom 8px gap below the title and pin both the title and the action
+   to the top of the band — so a header with an action looks visibly
+   top-heavy. Collapse to a single, vertically-centered row in that case.
+   Outside @layer base so it outranks Tailwind utility classes. */
+[data-slot="card-header"]:not(:has([data-slot="card-description"])) {
+  grid-template-rows: auto;
+  row-gap: 0;
+  align-items: center;
+}
+[data-slot="card-header"]:not(:has([data-slot="card-description"]))
+  [data-slot="card-action"] {
+  grid-row: auto;
+  align-self: center;
+}
+
+/* shadcn's Button primitive deliberately ships no cursor class, so it
+   inherits the underlying element's native cursor — `<button>` is
+   `default` in modern Chromium, which is what shadcn's docs assume. But
+   `asChild` swaps in `<a>` (e.g. `<Button asChild><Link/></Button>`),
+   which inherits the anchor's `pointer` and breaks the convention.
+   Pin the cursor on the slot itself so SoftBackButton, JumpToPill,
+   Button-as-Link, etc. all stay consistent with the rest of the app. */
+[data-slot="button"] {
+  cursor: default;
+}

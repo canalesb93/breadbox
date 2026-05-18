@@ -1,24 +1,54 @@
-import { Clock, Tag as TagIcon } from "lucide-react";
+import { Tag as TagIcon } from "lucide-react";
 import { CategoryIconTile } from "@/components/category-icon-tile";
-import { MetaBadge } from "@/components/meta-badge";
 import { TagList } from "@/components/tag-chip";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/api/types";
 
 interface TransactionPrimaryProps {
   transaction: Transaction;
+  /**
+   * When provided, the merchant title becomes a click target that fires
+   * this callback (and stops propagation so the surrounding row click
+   * — typically focus / enter-select — doesn't also fire). Used by the
+   * transactions list row to open the detail page from the title only.
+   */
+  onTitleClick?: (transaction: Transaction) => void;
   className?: string;
 }
 
 // Identity block for a transaction: category icon tile, bank description
-// with an inline `Pending` MetaBadge, and a secondary line of metadata
-// (account · member · tags). Pending rides MetaBadge so it joins the
-// secondary-state chip family (System / Hidden / Excluded / Linked /
-// Re-auth) instead of an orphan muted span.
+// with an inline muted `Pending` label, and a secondary line of metadata
+// (account · member · tags). Pending is plain text — it's the only
+// secondary signal in the primary line and the surrounding row already
+// hosts pill-shaped tags + category badges, so an additional pill here
+// just adds visual noise.
 export function TransactionPrimary({
   transaction: t,
+  onTitleClick,
   className,
 }: TransactionPrimaryProps) {
+  const titleClasses = "truncate font-medium";
+  const title = onTitleClick ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onTitleClick(t);
+      }}
+      // Subtle navigation hint: title underlines on its own hover AND when
+      // the surrounding row is hovered (the whole row is a click target
+      // that navigates to detail, so the title is the visual anchor for
+      // that affordance). `group-hover/row:` is set up on TableRow.
+      className={cn(
+        titleClasses,
+        "cursor-pointer underline-offset-2 decoration-muted-foreground/50 hover:underline group-hover/row:underline focus-visible:outline-none focus-visible:underline text-left",
+      )}
+    >
+      {t.provider_name}
+    </button>
+  ) : (
+    <span className={titleClasses}>{t.provider_name}</span>
+  );
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <CategoryIconTile
@@ -27,12 +57,12 @@ export function TransactionPrimary({
         size="sm"
       />
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium">{t.provider_name}</span>
+        <div className="flex items-center gap-2">
+          {title}
           {t.pending && (
-            <MetaBadge muted icon={Clock} className="shrink-0">
+            <span className="text-muted-foreground shrink-0 text-xs">
               Pending
-            </MetaBadge>
+            </span>
           )}
         </div>
         <TransactionMeta transaction={t} />
@@ -66,7 +96,7 @@ function TransactionMeta({ transaction: t }: { transaction: Transaction }) {
             {t.tags!.length}
           </span>
           <span className="hidden sm:inline-flex">
-            <TagList slugs={t.tags} max={2} size="sm" />
+            <TagList slugs={t.tags} max={2} size="xs" />
           </span>
         </>
       )}

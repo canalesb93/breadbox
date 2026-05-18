@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CategoryBadge } from "@/components/category-badge";
+import {
+  CATEGORY_BADGE_ICON,
+  CATEGORY_BADGE_SHAPE,
+  CategoryBadge,
+} from "@/components/category-badge";
 import {
   CategoryCommandList,
   useCategoryEditor,
@@ -19,6 +23,18 @@ interface CategoryPickerProps {
   category: TransactionCategory | null | undefined;
   /** True when the current category was set by a manual override. */
   overridden?: boolean;
+  /**
+   * Badge density. Defaults to `md` (h-6) — the picker only renders inside
+   * the transactions row's category column which is `hidden sm:table-cell`,
+   * so there's room for the comfier size. Pass `sm` for tighter rails.
+   */
+  size?: "sm" | "md";
+  /**
+   * Override the default behaviour (single-tx update mutation + toast).
+   * Used by the sandbox specimen and any future caller that wants to
+   * own the pick handler (bulk flows, dry-run previews, etc.).
+   */
+  onPick?: (pick: CategoryPick) => void | Promise<void>;
   className?: string;
 }
 
@@ -30,6 +46,8 @@ export function CategoryPicker({
   transactionId,
   category,
   overridden,
+  size = "md",
+  onPick: onPickOverride,
   className,
 }: CategoryPickerProps) {
   const [open, setOpen] = useState(false);
@@ -37,8 +55,14 @@ export function CategoryPicker({
 
   const onPick = async (pick: CategoryPick) => {
     setOpen(false);
-    await apply(pick);
+    await (onPickOverride ?? apply)(pick);
   };
+
+  const iconClass = CATEGORY_BADGE_ICON[size];
+  // Width tuned to end at the badge's text edge — wider eats into the
+  // label, narrower leaves the icon's right-side stroke peeking through.
+  const maskClass = size === "sm" ? "h-3 w-3.5" : "h-4 w-5";
+  const hasIcon = !!category?.icon;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -48,7 +72,9 @@ export function CategoryPicker({
           disabled={isPending}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "hover:bg-accent focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
+            "group/picker focus-visible:ring-ring relative inline-flex items-center rounded-md transition-shadow focus-visible:ring-2 focus-visible:outline-none disabled:cursor-wait disabled:opacity-50",
+            // Empty-state pill carries its own dashed border — no double-stroke.
+            category?.display_name && "hover:ring-1 hover:ring-border",
             className,
           )}
         >
@@ -56,15 +82,28 @@ export function CategoryPicker({
             <CategoryBadge
               category={category}
               overridden={overridden}
-              size="sm"
+              size={size}
             />
           ) : (
-            // Empty-state pill mirrors the sm CategoryBadge geometry (h-5,
-            // text-[11px], rounded-md) so the column doesn't shift when the
-            // user assigns or clears a category from the row.
-            <span className="text-muted-foreground border-border hover:text-foreground inline-flex h-5 items-center gap-0.5 rounded-md border border-dashed px-1.5 text-[11px]">
-              <Plus className="size-2.5" />
+            <span
+              className={cn(
+                "text-muted-foreground border-border inline-flex items-center rounded-md border border-dashed group-hover/picker:text-foreground group-hover/picker:border-foreground/40",
+                CATEGORY_BADGE_SHAPE[size],
+              )}
+            >
+              <Plus className={iconClass} />
               Category
+            </span>
+          )}
+          {hasIcon && (
+            <span
+              aria-hidden
+              className={cn(
+                "bg-secondary pointer-events-none absolute top-1/2 left-1 flex -translate-y-1/2 items-center justify-center rounded-[2px] opacity-0 transition-opacity group-hover/picker:opacity-100 group-focus-visible/picker:opacity-100",
+                maskClass,
+              )}
+            >
+              <Pencil className={cn("text-muted-foreground", iconClass)} />
             </span>
           )}
         </button>

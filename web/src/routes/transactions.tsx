@@ -97,6 +97,12 @@ export function TransactionsPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Gate on the live URL: if the user already navigated away (e.g. j/k +
+    // Enter into a transaction detail before the 300ms debounce fires),
+    // skip. Without this, `navigate({ to: "." })` resolves to this
+    // component's matched route (`/transactions`) and pushes us back to
+    // the list, flashing the URL away from the detail page we just opened.
+    if (!window.location.pathname.endsWith("/transactions")) return;
     const q = debounced.trim() || undefined;
     navigate({
       to: ".",
@@ -156,6 +162,12 @@ export function TransactionsPage() {
   // Keyboard-navigated row focus (j/k). Index into `rows`; null = no focus.
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
+  const openTransaction = useCallback(
+    (t: Transaction) =>
+      navigate({ to: "/transactions/$id", params: { id: t.short_id } }),
+    [navigate],
+  );
+
   const columns = useMemo(
     () => buildTransactionColumns({ selection: selectMode }),
     [selectMode],
@@ -169,7 +181,9 @@ export function TransactionsPage() {
   }, []);
 
   // In select mode a click anywhere on the row toggles its selection — the
-  // checkbox cell stops propagation so it doesn't double-toggle.
+  // checkbox cell stops propagation so it doesn't double-toggle. Outside
+  // select mode, the row body navigates (same as a title click) — see
+  // `onRowClick` below.
   const toggleRowSelection = useCallback((t: Transaction) => {
     setRowSelection((prev) => ({ ...prev, [t.id]: !prev[t.id] }));
   }, []);
@@ -205,18 +219,13 @@ export function TransactionsPage() {
           return next;
         });
       },
+      onOpenDetail: openTransaction,
     }),
-    [rows],
+    [rows, openTransaction],
   );
 
   const focusedRowId =
     focusedIndex != null ? rows[focusedIndex]?.id : undefined;
-
-  const openTransaction = useCallback(
-    (t: Transaction) =>
-      navigate({ to: "/transactions/$id", params: { id: t.short_id } }),
-    [navigate],
-  );
 
   // --- Keyboard shortcuts (registered while this page is mounted) ---
   useShortcut(
@@ -233,12 +242,12 @@ export function TransactionsPage() {
       setFocusedIndex((i) =>
         i == null ? 0 : Math.min(i + 1, rows.length - 1),
       ),
-    { label: "Move focus down", group: "Transactions" },
+    { label: "Move focus down", group: "Transactions", repeat: true },
   );
   useShortcut(
     ["k"],
     () => setFocusedIndex((i) => (i == null ? 0 : Math.max(i - 1, 0))),
-    { label: "Move focus up", group: "Transactions" },
+    { label: "Move focus up", group: "Transactions", repeat: true },
   );
   useShortcut(
     ["enter"],

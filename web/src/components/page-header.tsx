@@ -45,7 +45,7 @@ export function PageHeader({
         // comes from the parent layout. Adding `mb-*` here stacks with that
         // gap and produces a ~44px void on mobile (visible because the
         // action chip wraps below the description).
-        "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end sm:gap-4",
+        "flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start sm:gap-4",
         className,
       )}
     >

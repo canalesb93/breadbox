@@ -11,6 +11,8 @@ import type { Transaction } from "@/api/types";
 export interface TransactionTableMeta {
   onRangeSelect?: (toIndex: number) => void;
   setLastIndex?: (index: number) => void;
+  /** Fired from the merchant-title click in the description column. */
+  onOpenDetail?: (transaction: Transaction) => void;
 }
 
 const selectionColumn: ColumnDef<Transaction> = {
@@ -63,7 +65,15 @@ const baseColumns: ColumnDef<Transaction>[] = [
     // `truncate` actually clamp. Without this, a long merchant name expands
     // the column and pushes the amount off-screen on narrow viewports.
     meta: { className: "max-w-0 w-full" },
-    cell: ({ row }) => <TransactionPrimary transaction={row.original} />,
+    cell: ({ row, table }) => {
+      const meta = table.options.meta as TransactionTableMeta | undefined;
+      return (
+        <TransactionPrimary
+          transaction={row.original}
+          onTitleClick={meta?.onOpenDetail}
+        />
+      );
+    },
   },
   {
     id: "category",

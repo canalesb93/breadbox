@@ -108,7 +108,7 @@ function ThemeSubmenu() {
   const { theme, setTheme } = useTheme();
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger className="gap-2">
+      <DropdownMenuSubTrigger className="gap-2 [&>svg:last-child]:ml-0">
         <Palette className="text-muted-foreground" />
         <span>Theme</span>
         <span className="text-muted-foreground ml-auto text-[11px] capitalize">

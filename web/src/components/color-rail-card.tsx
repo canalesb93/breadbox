@@ -4,10 +4,12 @@ import { cn } from "@/lib/utils";
 
 interface ColorRailCardProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
-   * CSS color value for the 4px left rail. Pass a CSS variable
-   * (`"var(--destructive)"`) or a literal (`"#f97316"`). When omitted
-   * the rail collapses to `--muted` so the card still reads as a hero,
-   * but the colour stops carrying meaning.
+   * @deprecated The 4px coloured left rail was retired during the
+   * design-system polish pass — the eyebrow + icon tile carry enough of
+   * the meaning the rail used to encode, and a flat-edge hero card sits
+   * more quietly next to surrounding sections. Prop is kept as a no-op
+   * so callers don't have to be touched in the same change; clean up in
+   * a follow-up.
    */
   accent?: string | null;
   /** Optional class applied to the bordered card wrapper. */
@@ -24,28 +26,20 @@ interface ColorRailCardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 // ColorRailCard is the canonical "detail-page hero card" container — a
-// bordered card with a 4px coloured left rail that encodes meaning
-// (category color for transactions, accounting role for accounts,
-// category's own color on the category-detail page). Sibling of
-// `<SectionCard>` and `<ListCard>`; this is the third primitive in the
-// v2 design vocabulary established by iter 5 (TX-detail hero) and iter 6
-// (Account-detail hero, where the iter-5/6 drift note explicitly called
-// for extraction once a third surface adopts it).
+// bordered card that frames the hero content on transaction, account,
+// category, and connection detail pages plus the home stats and provider
+// tiles. The original implementation carried a 4px coloured left rail
+// (category color, accounting role, …) which was retired during a
+// design-system polish pass; the eyebrow + icon tile already carry the
+// meaning. Name kept because consumers reference it across the codebase
+// — rename in a follow-up if the rail-less treatment sticks.
 //
 // Visual contract:
-//   `bg-card relative overflow-hidden rounded-xl border`
-//     `<div aria-hidden className="absolute inset-y-0 left-0 w-1" />`  ← rail
+//   `bg-card overflow-hidden rounded-xl border`
 //     children
 //     optional `<div className="border-t bg-muted/20 ...">footer</div>`
-//
-// The colour-rail principle: the rail's tint encodes *meaning* (asset vs
-// liability, this transaction's category, this category's own colour),
-// not decoration. Excluded / muted states collapse to `--muted` so the
-// card reads "shelved" rather than "demands attention". Always pair the
-// rail with a small uppercase eyebrow so colour alone never carries the
-// signal.
 export function ColorRailCard({
-  accent,
+  accent: _accent,
   cardClassName,
   className,
   footer,
@@ -56,17 +50,12 @@ export function ColorRailCard({
   return (
     <div
       className={cn(
-        "bg-card relative overflow-hidden rounded-xl border",
+        "bg-card overflow-hidden rounded-xl border",
         cardClassName,
         className,
       )}
       {...rest}
     >
-      <div
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{ backgroundColor: accent ?? "var(--muted)" }}
-      />
       {children}
       {footer && (
         <div
@@ -105,14 +94,14 @@ export interface ColorRailCardSkeletonProps {
 }
 
 // ColorRailCardSkeleton mirrors the `<ColorRailCard>` wrapper for loading
-// states — the same `bg-card rounded-xl border` shell + 4px muted left
-// rail. The identity column on the left is a stable shape across every
-// detail-page hero (size-12 tile, eyebrow line, title line, meta line) so
-// it lives inside the primitive; the trailing column carries the
-// per-entity metric (amount / balance / count) and is a smaller shared
-// shape. Don't fork the look — consumers can hang an additional `body`
-// row off the bottom (e.g. TX-detail's secondary details grid) or opt in
-// to a `withFooter` strip when the loaded hero has a footer action bar.
+// states — the same `bg-card rounded-xl border` shell. The identity
+// column on the left is a stable shape across every detail-page hero
+// (size-12 tile, eyebrow line, title line, meta line) so it lives inside
+// the primitive; the trailing column carries the per-entity metric
+// (amount / balance / count) and is a smaller shared shape. Don't fork
+// the look — consumers can hang an additional `body` row off the bottom
+// (e.g. TX-detail's secondary details grid) or opt in to a `withFooter`
+// strip when the loaded hero has a footer action bar.
 export function ColorRailCardSkeleton({
   tileShape = "rounded-md",
   withFooter = false,
@@ -122,14 +111,10 @@ export function ColorRailCardSkeleton({
   return (
     <div
       className={cn(
-        "bg-card relative overflow-hidden rounded-xl border",
+        "bg-card overflow-hidden rounded-xl border",
         className,
       )}
     >
-      <div
-        aria-hidden
-        className="bg-muted absolute inset-y-0 left-0 w-1"
-      />
       <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7 sm:py-6 lg:grid-cols-[minmax(0,1fr)_auto]">
         {/* Identity column */}
         <div className="flex items-start gap-3 sm:gap-4">

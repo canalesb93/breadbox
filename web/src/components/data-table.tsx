@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -55,6 +55,16 @@ export interface DataTableProps<TData, TValue> {
   /** Optional row click handler — e.g. navigate to a detail page. */
   onRowClick?: (row: TData) => void;
   /**
+   * Whether to render the row body with a pointer cursor on hover.
+   * Defaults to `true` whenever an `onRowClick` is set — the right call
+   * for tables where row click is a navigation/CTA (tags, api-keys).
+   * Pass `false` for tables where the row body is a focus/select target
+   * and a specific child carries the navigation (transactions, where the
+   * merchant title is the deeplink) — a row-level pointer there would
+   * overpromise that any click anywhere navigates.
+   */
+  pointerRows?: boolean;
+  /**
    * Controlled row selection. Like sorting, the state lives in the calling
    * route; DataTable just renders it. `getRowId` should return a stable id
    * (not the array index) so a selection survives pagination/refetch.
@@ -101,6 +111,7 @@ export function DataTable<TData, TValue>({
   sorting,
   onSortingChange,
   onRowClick,
+  pointerRows,
   enableRowSelection,
   rowSelection,
   onRowSelectionChange,
@@ -114,6 +125,32 @@ export function DataTable<TData, TValue>({
   useEffect(() => {
     focusedRowRef.current?.scrollIntoView({ block: "nearest" });
   }, [focusedRowId]);
+
+  // Detect the sticky header's "stuck" state so the rounded top corners
+  // (which match the card while at rest) flatten once the band is
+  // floating under the app shell header, and the explicit bottom
+  // separator only renders while floating.
+  //
+  // Observe the `<thead>` directly with a `rootMargin` that excludes the
+  // 56px the shell header occupies: while the thead is below that line
+  // it's fully inside the (reduced) root → `ratio === 1` → not stuck.
+  // The moment it hits the line and `position:sticky` pins it at top:56,
+  // its top is above the root and `ratio < 1` → stuck. Sentinels don't
+  // work here — a `<div>` directly inside `<table>` gets relocated by
+  // the browser and ends up below the thead.
+  const headerRef = useRef<HTMLTableSectionElement>(null);
+  const [isStuck, setIsStuck] = useState(false);
+  useEffect(() => {
+    if (!stickyHeader) return;
+    const el = headerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsStuck(entry.intersectionRatio < 1),
+      { rootMargin: "-57px 0px 0px 0px", threshold: [1] },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [stickyHeader]);
 
   const table = useReactTable({
     data,
@@ -151,13 +188,30 @@ export function DataTable<TData, TValue>({
     >
       <Table containerClassName={stickyHeader ? "overflow-visible" : undefined}>
         <TableHeader
+          ref={headerRef}
           className={cn(
             stickyHeader &&
               // top-14 sits the band flush under the app shell's sticky
               // header (`h-14` in `__root.tsx`) so the column labels stay
               // visible without being obscured. z-10 keeps the band above
               // the table body but well below the app header (z-30).
-              "bg-muted/40 supports-[backdrop-filter]:bg-muted/30 sticky top-14 z-10 backdrop-blur-sm",
+              // Background + border are on the cells (not `<thead>`) so
+              // we can round the first/last cell's top corner to match
+              // the card's `rounded-lg` at rest, AND so the bottom
+              // separator stays visible while stickied (`<tr>` border-b
+              // is unreliable in default table-collapse mode).
+              "sticky top-14 z-10 [&>tr>th]:bg-muted/40 supports-[backdrop-filter]:[&>tr>th]:bg-muted/30 [&>tr>th]:backdrop-blur-sm [&>tr>th]:transition-[border-radius]",
+            // Flat top corners while stuck — the card has scrolled past
+            // so rounded ears would just clip into the shell-header bg.
+            stickyHeader &&
+              !isStuck &&
+              "[&>tr>th:first-child]:rounded-tl-lg [&>tr>th:last-child]:rounded-tr-lg",
+            // Add an explicit bottom separator only while stuck — at
+            // rest the inherited `<tr>` border-b renders fine, and
+            // doubling it produced a visibly heavier line.
+            stickyHeader &&
+              isStuck &&
+              "[&>tr>th]:shadow-[inset_0_-1px_0_0_var(--border)]",
           )}
         >
           {table.getHeaderGroups().map((headerGroup) => (
@@ -233,13 +287,24 @@ export function DataTable<TData, TValue>({
                     onRowClick ? () => onRowClick(row.original) : undefined
                   }
                   className={cn(
-                    onRowClick && "cursor-pointer",
+                    // `group/row` lets row children opt into a hover state
+                    // driven by the whole row (e.g. underline a title when
+                    // the row is hovered) via `group-hover/row:*`.
+                    "group/row",
+                    (pointerRows ?? !!onRowClick) && "cursor-pointer",
                     // Keyboard-focus indicator: a 3px primary accent bar on
                     // the left edge plus a faint primary tint, layered via
                     // inset box-shadow so it doesn't shift the row geometry
                     // or compete with the row's selected/hover background.
                     focused &&
                       "bg-primary/[0.04] shadow-[inset_3px_0_0_0_var(--primary)] outline-none",
+                    // `scroll-mt-*` so the `scrollIntoView({ block: "nearest" })`
+                    // below clears the chrome stacked above the scroll
+                    // container: 56px shell header always, +36px when the
+                    // table's own header is sticky on top of it. Without
+                    // this, scrolling up via `k` lands the focused row
+                    // behind the sticky bands.
+                    stickyHeader ? "scroll-mt-24" : "scroll-mt-16",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (

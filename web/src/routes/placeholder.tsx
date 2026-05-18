@@ -6,13 +6,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
 import { ComingSoonPill } from "@/components/coming-soon-pill";
 import { JumpToPill } from "@/components/jump-to-pill";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusPanel } from "@/components/status-panel";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { NAV_LEAVES } from "@/lib/nav";
 
 interface PlannedFeature {
@@ -96,10 +94,6 @@ const DEFAULT_CONTENT: PlaceholderContent = {
   related: [],
 };
 
-function openCommandPalette() {
-  window.dispatchEvent(new CustomEvent("breadbox:command-palette:open"));
-}
-
 // Placeholder is the canonical "page not yet implemented" surface used by
 // main.tsx for any nav leaf without a PAGE_OVERRIDES entry (today: Reports
 // and Agents). It is NOT an empty-state — `<EmptyState>` (in
@@ -134,28 +128,6 @@ export function Placeholder({ title }: { title: string }) {
         eyebrow={eyebrow}
         title={title}
         description={content.description}
-        actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openCommandPalette}
-              className="gap-2"
-            >
-              <span>Jump to…</span>
-              <KbdGroup>
-                <Kbd>⌘</Kbd>
-                <Kbd>K</Kbd>
-              </KbdGroup>
-            </Button>
-            <Button asChild size="sm">
-              <Link to="/">
-                Back to Home
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </>
-        }
       />
 
       <div className="flex flex-col gap-4">
