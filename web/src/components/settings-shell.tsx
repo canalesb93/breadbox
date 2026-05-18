@@ -57,7 +57,7 @@ export function SettingsShell() {
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex h-[600px] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogContent className="flex h-[min(720px,85vh)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>Manage your account and app preferences.</DialogDescription>
