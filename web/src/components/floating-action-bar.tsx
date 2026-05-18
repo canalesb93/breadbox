@@ -32,7 +32,7 @@ export function FloatingActionBar({
       <div
         data-state="open"
         className={cn(
-          "pointer-events-auto bg-popover/95 text-popover-foreground flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 shadow-xl backdrop-blur-sm",
+          "pointer-events-auto bg-popover/95 text-popover-foreground flex max-w-[calc(100dvw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 shadow-xl backdrop-blur-sm",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4 data-[state=open]:duration-200",
           className,
         )}

@@ -10,7 +10,16 @@ function Table({
   return (
     <div
       data-slot="table-container"
-      className={cn("relative w-full overflow-x-auto", containerClassName)}
+      className={cn(
+        // `scroll-shadow-x` (globals.css) layers a CSS-only gradient fade
+        // on each edge so a clipped table signals its scrollability on
+        // narrow viewports — without it iOS users see a flat right edge
+        // and assume the table is broken. `-webkit-overflow-scrolling:touch`
+        // is the implicit default on iOS 13+ but explicit beats implicit
+        // when this wrapper sits inside several nested scroll contexts.
+        "relative w-full overflow-x-auto scroll-shadow-x [-webkit-overflow-scrolling:touch]",
+        containerClassName,
+      )}
     >
       <table
         data-slot="table"

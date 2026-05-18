@@ -157,7 +157,16 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
         className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 -mx-px border-b px-2 backdrop-blur"
       >
         <ul
-          className="-mx-2 flex w-max flex-nowrap items-center gap-1 overflow-x-auto px-2 py-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // No `w-max`: the ul is parent-width so its `overflow-x-auto` actually
+          // has a scroll context. With `w-max` the ul itself overflowed its
+          // parent `<nav>` (which has no overflow), so the pill strip rendered
+          // past the viewport edge but couldn't be scrolled. Now the
+          // `shrink-0` pills inside push horizontally, and `overflow-x-auto`
+          // routes the gesture correctly. Scrollbar is hidden per the existing
+          // `scrollbar-width:none` / webkit-scrollbar rules — affordance comes
+          // from the always-truncated rightmost pill, matching the rest of the
+          // mobile chip rails.
+          className="-mx-2 flex flex-nowrap items-center gap-1 overflow-x-auto px-2 py-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {SETTINGS_SECTIONS.map((s) => {
             const Icon = s.icon;

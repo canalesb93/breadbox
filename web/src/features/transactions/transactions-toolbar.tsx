@@ -215,8 +215,16 @@ export function TransactionsToolbar({
         />
 
         {/* Filter pills — grouped so they wrap as a unit, independent of
-            the sort/select controls. */}
-        <div className="flex flex-wrap items-center gap-2">
+            the sort/select controls. On <640px the row becomes a horizontal-
+            scroll rail (with the `scroll-shadow-x` fade affordance from
+            globals.css) so the toolbar stays a single row instead of
+            consuming 4+ rows on a 375px viewport. At sm+ it reverts to the
+            original `flex-wrap` behavior — at desktop widths the pills fit
+            on one row, and on intermediate widths they wrap as before.
+            The toolbar lives on the page surface, so override the
+            scroll-shadow cover from --card (the Table default) to
+            --background so the fade blends with the page. */}
+        <div className="flex items-center gap-2 max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[--scroll-shadow-cover:var(--background)] max-sm:[-webkit-overflow-scrolling:touch] sm:flex-wrap">
           <FilterPill
             icon={Banknote}
             label="Account"

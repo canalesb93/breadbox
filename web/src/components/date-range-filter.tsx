@@ -166,7 +166,7 @@ export function DateRangeFilter({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="flex w-auto max-w-[calc(100vw-2rem)] flex-col p-0 sm:flex-row"
+        className="flex w-auto max-w-[calc(100dvw-2rem)] flex-col p-0 sm:flex-row"
       >
         <ul className="flex flex-wrap gap-1 p-2 sm:w-36 sm:flex-col sm:gap-0.5 sm:border-r sm:p-2">
           {PRESETS.map((preset) => (
