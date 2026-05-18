@@ -40,7 +40,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-empty-state-and-error-pre** (subagent `aaf9e92d`) — MOBILE-17 + MOBILE-18. `max-w-sm` → `max-w-xs` on empty-state description; `[-webkit-overflow-scrolling:touch]` added to error page `<pre>`. PR # TBD.
 
 ## Completed
 
