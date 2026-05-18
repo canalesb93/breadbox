@@ -189,3 +189,23 @@
 .dark .scroll-shadow-x {
   --scroll-shadow-color: rgb(0 0 0 / 0.35);
 }
+
+/* Respect the user's motion preferences globally — Apple HIG requirement and
+   a common reason iOS users disable our drawer/spinner/sheet animations via
+   Settings → Accessibility → Motion → Reduce Motion. Per the CSS-tricks
+   accessible-animation pattern, animations technically run but compress to
+   ~0ms, so JS code waiting on `animationend` / `transitionend` still fires
+   instead of hanging. `!important` is bounded by the media query, and the
+   pseudo-element selectors catch overlays like the #1317 tap-target zone.
+   The cold-load splash in `web/index.html` (#1332) has its own per-element
+   `animation: none` override that wins over this rule — no conflict. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
