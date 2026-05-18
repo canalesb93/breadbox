@@ -28,8 +28,6 @@ _(empty — both user-reported P0 bugs shipped)_
 ## Backlog (P0 — re-scout, post-fix issues)
 
 - [ ] **MOBILE-14** Agent form right card sinks below at 375px. `web/src/features/agents/agent-form.tsx` (~line 113). `grid-cols-1 md:grid-cols-3` plus `md:col-span-2` on the left card causes the right card (settings/model/budget) to fall far down at 375px. Add `sm:grid-cols-2` reflow or stack semantically until md.
-- [ ] **MOBILE-15** FormFooter buttons stack vertically on narrow mobile. `web/src/components/form-footer.tsx` (~line 56). `flex flex-wrap gap-2` lets "Cancel" + "Create category" wrap to two rows when text is long. Try `flex-nowrap` with text truncation, or short labels on mobile.
-- [ ] **MOBILE-16** PageHeader actions clip on mobile. `web/src/components/page-header.tsx` (~lines 48-66). Right-hand actions div has `shrink-0` so two buttons can overflow at 375px. Drop `shrink-0` or allow `flex-wrap` so actions can drop below the title.
 
 ## Backlog (P1 — re-scout)
 
@@ -46,7 +44,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-- **fix/mobile-header-and-footer-stack** (subagent `a6623977`) — bundles MOBILE-15 + MOBILE-16. PageHeader actions wrap on mobile (`flex-wrap`, `sm:flex-nowrap`); FormFooter stacks buttons full-width with primary on top via `flex-col-reverse sm:flex-row`. Composed-layer components (no ui/* edit). PR # TBD.
+_(none)_
 
 ## Completed
 
@@ -57,6 +55,7 @@ _(empty — both user-reported P0 bugs shipped)_
 - ✅ **MOBILE-7/9** iOS safe-area pass — PR #1318 merged (`78c814d9`). Added `viewport-fit=cover` to `web/index.html` (activates `env(safe-area-inset-*)`), per-side safe-area padding to `SheetContent`, mobile sidebar inner content respects bottom inset, and `pt-[env(safe-area-inset-top)]` on the sticky `<main>` header so it sits below the notch/Dynamic Island.
 - ✅ **MOBILE-11** Table scroll affordance — PR #1319 merged (`66d7d8d2`). Added `scroll-shadow-x` utility (4-layer CSS-only gradient, dark-mode aware) + `[-webkit-overflow-scrolling:touch]` to the `Table` primitive's container. Clipped tables now show a fade indicating scrollability; flat right edge confusion resolved.
 - ✅ **MOBILE-10/13** Dynamic viewport units — PR #1320 merged (`b3411af3`). Selection action bar swapped `100vw` → `100dvw` so it stays within the dynamic viewport as iOS chrome collapses; desktop sidebar swapped `h-svh` → `h-full` (parent-relative) so it fills exactly its container instead of the worst-case small-viewport height.
+- ✅ **MOBILE-15/16** Header + footer mobile stacking — PR #1321 merged (`669cfed6`). `PageHeader` actions cluster now wraps on mobile (`flex-wrap` + `sm:flex-nowrap sm:shrink-0`) so pages with multiple action buttons no longer overflow horizontally. `FormFooter` action cluster goes full-width column with primary on top (`flex-col-reverse w-full`) at <640px, restoring inline row on ≥640px — affirmative-on-top matches iOS / Material.
 
 ## Notes for next iteration
 
