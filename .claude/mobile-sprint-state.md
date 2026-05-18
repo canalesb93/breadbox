@@ -61,7 +61,13 @@ Each iteration:
 
 ## In-flight PRs
 
-- **fix/mobile-ios-swipe-back-bfcache** (subagent `af43354e`) — MOBILE-26 (T1). Adds `pageshow` handler that calls `router.invalidate()` + `queryClient.invalidateQueries()` on bfcache restore. Optional belt-and-suspenders to gate 401 redirect on `document.visibilityState`. PR # TBD.
+- **PR #1329** MOBILE-26 (T1) iOS swipe-back bfcache fix — retargeted to `main` per user auth, CI running, will merge when green.
+- **fix/mobile-navbar-no-blur** (subagent `ad2dc3ef`) — MOBILE-27 (T1, user-reported). Drops `backdrop-blur` + translucent bg on `<header>` at <640px; keeps the desktop glassy look. Eliminates the visible seam between solid safe-area zone and blurred header. PR # TBD.
+
+## Backlog additions
+
+- [x] **MOBILE-26** iOS swipe-back blank/freeze — fix in flight (#1329).
+- [x] **MOBILE-27** Mobile navbar glassy effect looks bad against safe-area gap — fix in flight.
 
 ## Completed (Phase 2)
 
