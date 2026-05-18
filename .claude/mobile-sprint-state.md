@@ -11,13 +11,25 @@
 Phase 1 shipped fixes (now in main):
 - Sidebar close-on-tap, popover/select/dropdown collision + width clamps, 44pt tap targets via `pointer-coarse:` pseudo, `viewport-fit=cover` + safe-area, table scroll-shadow + iOS momentum, dvw/dvh viewport units, PageHeader wrap + FormFooter stacking, agent-form CSS-order reshuffle, empty-state width + error pre momentum, transactions filter chip rail, settings tab scroll.
 
-## Workflow (unchanged)
+## Workflow — PROACTIVE MODE
 
-1. Loop wakes → sync branch → merge ready PRs → pick next backlog item.
-2. Spawn ONE subagent in worktree isolation. Brief includes file paths + iOS quirks.
-3. Subagent opens PR against this branch with `img402.dev` screenshots at 375×812 / 768×1024 / 1280×800.
-4. Orchestrator reviews next iteration. Merges when green. Never merge to `main` directly without explicit auth.
-5. When backlog is meaningfully accumulated (3+ merged), open a fresh `sprint → main` bundle PR.
+The loop NEVER reports idle. Every iteration must produce a merge, a dispatch, or a scout-then-dispatch chain.
+
+Priority ladder — try each tier until something dispatches:
+- **T1 User-reported bugs** (highest)
+- **T2 Backlog items in state doc** (P0/P1/P2 including deferred)
+- **T3 Fresh scout on a previously-unaudited surface** (rotate; don't repeat within 5 iterations)
+- **T4 Polish on existing patterns** — extend `scroll-shadow-x`, hunt straggler `100vh`/`100vw`, verify `pointer-coarse:` on icon-button consumers, safe-area on dialogs, FormFooter pattern on forms
+- **T5 Mobile a11y** — ARIA, focus traps, reduced-motion, contrast, screen-reader labels
+- **T6 Sandbox completeness** — every component+variant exercised in `web/src/sandbox/sections/*`
+- **T7 Documentation drift** — `.claude/rules/v2-frontend.md` codifies new patterns
+
+Each iteration:
+1. Sync sprint branch, merge ready PRs.
+2. Pick from priority ladder.
+3. Spawn ONE subagent in worktree isolation. Brief includes file paths + iOS quirks + visual evidence requirement via img402.dev.
+4. Record which tier the work came from in state doc.
+5. When backlog → main accumulates 3+ merged PRs, open a fresh `sprint → main` bundle PR.
 
 ## iOS Safari quirks reference
 
