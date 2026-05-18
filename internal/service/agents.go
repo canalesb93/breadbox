@@ -961,8 +961,16 @@ func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, ca
 // turn_count, which made every run look like a max-turns hit. The cap
 // itself never changes mid-run, so the orchestrator captures it
 // from def.MaxTurns at run-start and passes it through here.
+//
+// When result.Err is non-nil (status="error" or "timeout"), its message
+// is truncated and persisted to error_message so the transcript drawer
+// can show the operator *why* the run failed without grepping logs.
+// Sidecar crashes (e.g. exit 127) attach full stderr to result.Err,
+// which can easily reach several KB — capped at runErrorMessageMax to
+// keep the column readable in the UI and bounded in size.
 func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult, maxTurnsCap int) (db.AgentRun, error) {
 	costPtr := result.TotalCostUSD
+	errMsg := truncateRunError(result.Err)
 	return s.Queries.CompleteAgentRun(ctx, db.CompleteAgentRunParams{
 		ID:                  runID,
 		Status:              result.Status,
@@ -977,7 +985,26 @@ func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, res
 		NumToolCalls:        pgtype.Int4{Int32: int32(result.NumToolCalls), Valid: true},
 		TranscriptPath:      pgtype.Text{String: result.TranscriptPath, Valid: result.TranscriptPath != ""},
 		SessionID:           pgtype.Text{String: result.SessionID, Valid: result.SessionID != ""},
+		ErrorMessage:        pgtype.Text{String: errMsg, Valid: errMsg != ""},
 	})
+}
+
+// runErrorMessageMax bounds the persisted error_message length. Sidecar
+// stderr can be very long (musl-vs-glibc relocation dumps run into the
+// thousands of lines); the UI shows this verbatim in a scrollable pre,
+// so a few KB is enough for the operator to identify the failure mode
+// and grep server logs for the rest.
+const runErrorMessageMax = 4000
+
+func truncateRunError(err error) string {
+	if err == nil {
+		return ""
+	}
+	s := err.Error()
+	if len(s) > runErrorMessageMax {
+		return s[:runErrorMessageMax] + "\n…(truncated; see server logs)"
+	}
+	return s
 }
 
 // AgentRunFromRow is exported so the orchestrator (same package) can build
