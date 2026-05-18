@@ -28,6 +28,13 @@ interface SoftBackButtonProps {
 // No bottom margin — the page layout (<main> or a constrained-width wrapper)
 // is a flex column with gap-5 that owns the rhythm between the back-link and
 // the PageHeader below it. Don't fork the look — change this primitive instead.
+//
+// `self-start` is baked in because every consumer renders this inside a
+// `flex flex-col` parent (the app `<main>` or a `mx-auto flex max-w-* flex-col`
+// wrapper). Without it the flex default `align-items: stretch` blows the
+// inline-flex button out to full width — content stays centered but the
+// hover/focus surface and visual weight read as a banner instead of a link.
+// In non-flex parents `self-start` is a harmless no-op.
 export function SoftBackButton({
   to,
   children,
@@ -40,7 +47,7 @@ export function SoftBackButton({
       size="sm"
       asChild
       className={cn(
-        "text-muted-foreground hover:text-foreground -ml-2 h-7 px-2 text-xs",
+        "text-muted-foreground hover:text-foreground -ml-2 h-7 self-start px-2 text-xs",
         className,
       )}
     >
