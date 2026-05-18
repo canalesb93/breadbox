@@ -36,7 +36,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-table-scroll** (subagent `ae5b5b90`) — MOBILE-11 primary. Adds scroll-shadow gradient + iOS momentum to `Table` wrapper. May fold in MOBILE-10 (`100vw` → `100dvw`) and MOBILE-13 (`h-svh` → `h-full`/`h-dvh`) if diff stays ≤30 LOC. PR # TBD.
 
 ## Completed
 
