@@ -51,7 +51,6 @@ Each iteration:
 
 ## Backlog (T3 scout — rules / agents / prompts, iter ~17)
 
-- [ ] **MOBILE-36 (HIGH)** Prompts add-block `DialogFooter` doesn't use `flex-col-reverse` — secondary appears above primary on mobile. `web/src/routes/prompts.build.tsx` (~line 948). Apply same pattern as PR #1321 FormFooter.
 - [ ] **MOBILE-37 (HIGH)** Agent runs table column widths explode beyond viewport on iOS. `web/src/routes/agents.runs.tsx` (~lines 303-388). Rigid `w-[22%] min-w-[160px]` + 8 fixed columns ⇒ horizontal scroll required. Verify whether the existing `scroll-shadow-x` from Table primitive helps; if not, hide-on-mobile or collapse columns into a Metrics expander.
 - [ ] **MOBILE-38 (HIGH)** Prompts builder modal `grid-cols-[10rem_1fr]` doesn't reflow on iPhone landscape. `web/src/routes/prompts.build.tsx` (~line 825). Switch to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]` so the nav rail stacks on small screens.
 - [ ] **MOBILE-39 (MEDIUM)** Rules filter toolbar three fixed-width selects wrap awkwardly. `web/src/routes/rules.tsx` (~line 290). Apply chip-rail pattern from #1324 (`max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto`).
@@ -83,9 +82,7 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. Ships #1328+#1330+#1331+#1332+#1333. **Awaiting user merge** — splash is the highest-impact item for the user's "blank pages 1-2s" complaint on transactions list.
-- **fix/mobile-tx-lazy-category-picker** (subagent `a40a0938`) — **MOBILE-35 (perf)**. Defer per-row CategoryPicker content. PR # TBD.
-- **fix/mobile-prompts-dialog-footer** (subagent `ae93b950`) — **MOBILE-36 (T3 scout)**. Verify and fix the prompts add-block DialogFooter to use the `flex-col-reverse` pattern from #1321 if the audit's claim holds; otherwise close as non-issue. PR # TBD or no-op state commit.
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge.** Original scope was #1328+#1330+#1331+#1332+#1333; after the state-doc conflict was resolved (`858a75e1`) and #1335 + #1336 merged into sprint, the bundle now also includes the lazy-CategoryPicker perf fix and the prompts dialog-footer stacking fix.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -98,6 +95,8 @@ Each iteration:
 - ✅ **MOBILE-28** Viewport-unit polish (T4) — PR #1331 merged into sprint branch (`84bdb932`). 5 viewport-unit straggler swaps: `min-h-screen` → `min-h-dvh` on auth-shell wrapper + grid; `min-h-svh` → `min-h-dvh` on sidebar outer wrapper; `max-w-[calc(100vw-1rem)]` → `max-w-[calc(100dvw-1rem)]` in popover/select/dropdown content clamps. Finishes the dvh/dvw family.
 - ✅ **MOBILE-29** iOS web-app shell polish — PR #1332 merged into sprint branch (`658e69f6`). Adds iOS PWA meta tags (`apple-mobile-web-app-capable=yes`, `status-bar-style=black-translucent`, `apple-mobile-web-app-title=Breadbox`, `apple-touch-icon` → favicon.svg), inline cold-load splash in `<div id="root">` (auto-vanishes when React hydrates, respects `prefers-reduced-motion` and `prefers-color-scheme`), and global `-webkit-tap-highlight-color: transparent`.
 - ✅ **MOBILE-30** 401 visibility-gate — PR #1333 merged into sprint branch (`73e53940`). `AuthenticatedGate` in `__root.tsx` now defers the redirect-to-login while `document.visibilityState !== "visible"`, attaching a `visibilitychange` listener that fires the redirect when the user re-engages. Closes the residual bfcache-restore race left by PR #1329; cleanup-on-unmount included.
+- ✅ **MOBILE-35** Per-row CategoryPicker lazy body — PR #1335 merged into sprint branch (`fb8439c3`). Splits `CategoryPicker` into a lightweight always-mounted shell (just `useState(open)` + trigger) and a `PickerBody` that mounts only when `open === true` and owns `useCategoryEditor` (the mutation hook). Audit's actual finding: 50× `useMutation` observers per page (not popover content) were the leak. Reduces transactions-list React memory, improving iOS Safari bfcache eligibility.
+- ✅ **MOBILE-36** Prompts add-block dialog footer stacking — PR #1336 merged into sprint branch (`943dec09`). Inner action wrapper rewrapped as `flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center` so "Done" (affirmative) sits on top on mobile per the #1321 convention.
 
 ## Notes for next iteration
 
