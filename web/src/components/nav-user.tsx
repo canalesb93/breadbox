@@ -141,9 +141,14 @@ function ThemeSubmenu() {
 }
 
 export function NavUser({ me }: { me: Me | null }) {
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const logout = useLogout();
+  // Mirrors NavMain: tapping a nav target on mobile should dismiss the sheet so
+  // the destination is visible. Desktop is untouched.
+  const closeMobileSheet = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const onLogout = async () => {
     try {
@@ -153,6 +158,7 @@ export function NavUser({ me }: { me: Me | null }) {
       // gone client-side; surface a toast but don't block navigation.
       toast.error("Couldn't reach the server — signing out anyway.");
     }
+    closeMobileSheet();
     navigate({ to: "/login" });
   };
 
@@ -255,7 +261,7 @@ export function NavUser({ me }: { me: Me | null }) {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild className="gap-2">
-                <Link to="/sandbox">
+                <Link to="/sandbox" onClick={closeMobileSheet}>
                   <Palette className="text-muted-foreground" />
                   Design system
                 </Link>
