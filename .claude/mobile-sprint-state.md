@@ -29,14 +29,13 @@ _(empty — both user-reported P0 bugs shipped)_
 
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard / backdrop-blur glitches. `web/src/routes/__root.tsx` (`sticky top-0`). Validate in real device. (Header safe-area top inset handled in MOBILE-7 PR; keyboard-overlap concern still open.)
 - [ ] **MOBILE-10** `100vw` math in `selection-action-bar.tsx` causes occasional horizontal scroll on iOS. `web/src/features/connections/selection-action-bar.tsx` (line 121). Replace with `w-full` + parent constraint.
-- [ ] **MOBILE-11** Table horizontal scroll lacks touch affordance. `web/src/components/ui/table.tsx`, `web/src/components/data-table.tsx`. Add scroll-shadow indicator + `-webkit-overflow-scrolling: touch`.
 - [ ] **MOBILE-13** Sidebar uses `h-svh` instead of `h-full`. `web/src/components/ui/sidebar.tsx` (line 230). Switch to `h-full` with parent height constraint.
 
 > Items touching `web/src/components/ui/*` should be solved by composing over the primitive (wrap, prop-pass) — only edit `ui/*` if there is no other path. Use `/shadcn` skill to verify if a primitive can be upgraded via prop instead.
 
 ## In-flight PRs
 
-- **fix/mobile-table-scroll** (subagent `ae5b5b90`) — MOBILE-11 primary. Adds scroll-shadow gradient + iOS momentum to `Table` wrapper. May fold in MOBILE-10 (`100vw` → `100dvw`) and MOBILE-13 (`h-svh` → `h-full`/`h-dvh`) if diff stays ≤30 LOC. PR # TBD.
+_(none)_
 
 ## Completed
 
@@ -45,6 +44,7 @@ _(empty — both user-reported P0 bugs shipped)_
 - ✅ **MOBILE-5/12** 44pt tap targets — PR #1317 merged (`3b2f91f5`). Tailwind v4 `pointer-coarse:` variant adds invisible 44×44 tap zone via `::before` pseudo to all icon Button sizes; CommandInput bumps to `h-12` on touch. Desktop visuals unchanged (verified via mouse `pointer: fine`).
 - ✅ **MOBILE-6 (verified non-issue, closed)** Input font-size auto-zoom — `web/src/components/ui/input.tsx` and `textarea.tsx` already use `text-base` (16px) on mobile and `md:text-sm` (14px) at desktop ≥768px. iOS auto-zoom only fires on inputs <16px on mobile viewports; both meet the threshold. No code change required.
 - ✅ **MOBILE-7/9** iOS safe-area pass — PR #1318 merged (`78c814d9`). Added `viewport-fit=cover` to `web/index.html` (activates `env(safe-area-inset-*)`), per-side safe-area padding to `SheetContent`, mobile sidebar inner content respects bottom inset, and `pt-[env(safe-area-inset-top)]` on the sticky `<main>` header so it sits below the notch/Dynamic Island.
+- ✅ **MOBILE-11** Table scroll affordance — PR #1319 merged (`66d7d8d2`). Added `scroll-shadow-x` utility (4-layer CSS-only gradient, dark-mode aware) + `[-webkit-overflow-scrolling:touch]` to the `Table` primitive's container. Clipped tables now show a fade indicating scrollability; flat right edge confusion resolved.
 
 ## Notes for next iteration
 
