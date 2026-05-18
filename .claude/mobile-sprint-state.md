@@ -41,7 +41,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## Sprint status
 
-**10 PRs merged on `sprint/mobile-ios-safari`.** Awaiting user authorization to open a final `sprint/mobile-ios-safari → main` PR — explicit permission needed per memory `feedback_no_auto_merge.md` (auth to merge subagent PRs INTO the sprint branch ≠ auth to merge sprint INTO main).
+**SPRINT WRAP-UP PR OPEN: [#1326](https://github.com/canalesb93/breadbox/pull/1326)** (sprint/mobile-ios-safari → main). 11 fixes shipped (10 PRs merged into sprint branch + 1 follow-up dvw cleanup committed directly). Awaiting user review + merge.
 
 ## Completed
 
