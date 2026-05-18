@@ -155,15 +155,18 @@
 }
 
 /* Scroll-shadow indicator for horizontally-scrolling containers (used by
-   the Table primitive). Four layered backgrounds: two solid "cover" fades
-   that mask the shadow at the start/end (anchored to the local content
-   with `background-attachment: local` so they shrink as you scroll into
-   them), and two shadow gradients pinned to the viewport edges with
-   `scroll` so they fade in once the cover has scrolled away. Pure CSS,
-   no JS listener. Color uses --card so the cover blends with the
-   surrounding card surface; shadow color is themed for both modes so it
-   remains visible against the dark card. */
-.scroll-shadow-x {
+   the Table primitive and the mobile transactions-toolbar filter rail).
+   Four layered backgrounds: two solid "cover" fades that mask the shadow
+   at the start/end (anchored to the local content with
+   `background-attachment: local` so they shrink as you scroll into them),
+   and two shadow gradients pinned to the viewport edges with `scroll` so
+   they fade in once the cover has scrolled away. Pure CSS, no JS listener.
+   Cover defaults to `--card` (matches the Table primitive, which sits
+   inside a Card); consumers on the page surface override via Tailwind's
+   arbitrary-property syntax — e.g. `[--scroll-shadow-cover:var(--background)]`.
+   Declared as `@utility` so Tailwind variants
+   (`max-sm:scroll-shadow-x`, `dark:scroll-shadow-x`) compile to real rules. */
+@utility scroll-shadow-x {
   --scroll-shadow-cover: var(--card);
   --scroll-shadow-color: rgb(0 0 0 / 0.1);
   background:
