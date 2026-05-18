@@ -27,10 +27,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## Backlog (P1-P2 — scout-seeded)
 
-- [ ] **MOBILE-6** Input font-size triggers Safari auto-zoom. `web/src/components/ui/input.tsx` (`text-base` then `md:text-sm`). Keep ≥16px on mobile viewports.
-- [ ] **MOBILE-7** Viewport meta missing safe-area + zoom intent. `web/index.html`. Add `viewport-fit=cover`, leave `user-scalable=yes` (accessibility).
-- [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard / backdrop-blur glitches. `web/src/routes/__root.tsx` (`sticky top-0`). Validate in real device.
-- [ ] **MOBILE-9** Sheet content not safe-area aware. `web/src/components/ui/sheet.tsx` (lines 62-71). Add `env(safe-area-inset-*)` padding (compose, don't edit ui/*).
+- [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard / backdrop-blur glitches. `web/src/routes/__root.tsx` (`sticky top-0`). Validate in real device. (Header safe-area top inset handled in MOBILE-7 PR; keyboard-overlap concern still open.)
 - [ ] **MOBILE-10** `100vw` math in `selection-action-bar.tsx` causes occasional horizontal scroll on iOS. `web/src/features/connections/selection-action-bar.tsx` (line 121). Replace with `w-full` + parent constraint.
 - [ ] **MOBILE-11** Table horizontal scroll lacks touch affordance. `web/src/components/ui/table.tsx`, `web/src/components/data-table.tsx`. Add scroll-shadow indicator + `-webkit-overflow-scrolling: touch`.
 - [ ] **MOBILE-13** Sidebar uses `h-svh` instead of `h-full`. `web/src/components/ui/sidebar.tsx` (line 230). Switch to `h-full` with parent height constraint.
@@ -39,13 +36,14 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-safe-area** (subagent `a36a66a9`) — bundles MOBILE-7 + MOBILE-9 (+ sticky header top-inset). Adds `viewport-fit=cover`, safe-area padding to Sheet content per side, and `pt-[env(safe-area-inset-top)]` on the sticky `<main>` header. PR # TBD.
 
 ## Completed
 
 - ✅ **MOBILE-1** Sidebar close-on-tap — PR #1312 merged (`ab6dd40a`). `useSidebar().setOpenMobile(false)` wired into `NavMain` (link + modal) and `NavUser` (logout). Desktop unaffected.
 - ✅ **MOBILE-2/3/4** Popover/Select/DropdownMenu onscreen — PR #1316 merged (`cfd98db9`). Added `collisionPadding={8}` (overridable default), `max-w-[calc(100vw-1rem)]`, and `max-h-[min(60vh, available-height)]` to all three primitive Content components.
 - ✅ **MOBILE-5/12** 44pt tap targets — PR #1317 merged (`3b2f91f5`). Tailwind v4 `pointer-coarse:` variant adds invisible 44×44 tap zone via `::before` pseudo to all icon Button sizes; CommandInput bumps to `h-12` on touch. Desktop visuals unchanged (verified via mouse `pointer: fine`).
+- ✅ **MOBILE-6 (verified non-issue, closed)** Input font-size auto-zoom — `web/src/components/ui/input.tsx` and `textarea.tsx` already use `text-base` (16px) on mobile and `md:text-sm` (14px) at desktop ≥768px. iOS auto-zoom only fires on inputs <16px on mobile viewports; both meet the threshold. No code change required.
 
 ## Notes for next iteration
 
