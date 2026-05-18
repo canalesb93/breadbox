@@ -81,7 +81,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge.** Original scope was #1328+#1330+#1331+#1332+#1333; after the state-doc conflict was resolved (`858a75e1`) and #1335 + #1336 merged into sprint, the bundle now also includes the lazy-CategoryPicker perf fix and the prompts dialog-footer stacking fix.
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — `CLEAN` status; now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337 (state-doc merge included).
+- **fix/mobile-form-ergonomics** (subagent `a8a6bc0f`) — **MOBILE-32 + MOBILE-33 (T2 HIGH/MEDIUM)**. iOS keyboard hints (`inputmode`, `enterkeyhint`) across typed inputs + `autoCorrect="off" autoCapitalize="off" spellCheck={false}` on identifier fields (slugs, API key names). Prefer setting defaults on `SearchInput` so every search box benefits. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
