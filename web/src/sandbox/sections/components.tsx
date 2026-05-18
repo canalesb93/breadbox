@@ -74,6 +74,7 @@ import {
   ColorRailCardSkeleton,
 } from "@/components/color-rail-card";
 import { SectionCard } from "@/components/section-card";
+import { FormSection } from "@/components/form-section";
 import { IdPill } from "@/components/id-pill";
 import { Eyebrow } from "@/components/eyebrow";
 import { ActionPill } from "@/components/action-pill";
@@ -231,6 +232,43 @@ export function ComponentsSection() {
               <code>&lt;ViewAllPill&gt;</code> link to a fuller index.
             </p>
           </SectionCard>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="FormSection"
+        code="components/form-section"
+        description="The form-page sibling of `SectionCard`. Larger heading rhythm (15px semibold), optional sentence-long description below the title, comfortable `gap-4` field stack in the body. Stack multiple `<FormSection>` cards vertically inside a width-constrained form page (`mx-auto flex max-w-3xl flex-col gap-5`). The `headerAction` slot is for secondary CTAs — links to a builder or external tool, never the primary submit. Used by the agent form (Identity / Prompt / Triggers / Tool scope / Safety) and any future multi-section form page."
+        className="block"
+      >
+        <div className="max-w-lg">
+          <FormSection
+            title="Identity"
+            description="How this thing is named in the dashboard, runs list, and API."
+            icon={<Sparkles className="text-muted-foreground size-4" />}
+            headerAction={
+              <Button size="sm" variant="outline">
+                Open in builder
+              </Button>
+            }
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="sb-fs-name" className="text-sm">
+                Name
+              </Label>
+              <Input id="sb-fs-name" defaultValue="Weekly review" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="sb-fs-slug" className="text-sm">
+                Slug
+              </Label>
+              <Input
+                id="sb-fs-slug"
+                defaultValue="weekly-review"
+                className="font-mono text-sm"
+              />
+            </div>
+          </FormSection>
         </div>
       </Specimen>
 

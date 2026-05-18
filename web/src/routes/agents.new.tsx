@@ -61,12 +61,12 @@ export function AgentNewPage() {
   };
 
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <SoftBackButton to="/agents">Back to agents</SoftBackButton>
       <PageHeader
         eyebrow="Agent"
         title="New agent"
-        description="Define a recurring Claude Agent SDK run. All fields can be edited later — schedule, scope, and safety caps default to safe values."
+        description="Define a recurring Claude Agent SDK run. All fields can be edited later — schedule, scope, and safety caps default to sensible values."
       />
       <AgentForm
         mode="create"
@@ -78,6 +78,6 @@ export function AgentNewPage() {
         submitLabel={createAgent.isPending ? "Creating…" : "Create agent"}
         pending={createAgent.isPending}
       />
-    </>
+    </div>
   );
 }

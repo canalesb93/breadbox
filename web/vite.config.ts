@@ -40,6 +40,7 @@ export default defineConfig({
     proxy: {
       "/api": apiProxy,
       "/web/v1": apiProxy,
+      "/health": apiProxy,
     },
   },
   build: {

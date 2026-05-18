@@ -33,7 +33,7 @@ export function AgentEditPage() {
   }
   if (agentQuery.isLoading || !agentQuery.data) {
     return (
-      <>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
         <SoftBackButton to="/agents">Back to agents</SoftBackButton>
         <PageHeader
           eyebrow="Agent"
@@ -41,12 +41,11 @@ export function AgentEditPage() {
           description="Update prompt, schedule, model, and safety caps."
         />
         <div className="flex flex-col gap-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-1/2" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
         </div>
-      </>
+      </div>
     );
   }
   return <AgentEditFormView agent={agentQuery.data} slug={slug} />;
@@ -108,7 +107,7 @@ function AgentEditFormView({
   };
 
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <SoftBackButton to="/agents">Back to agents</SoftBackButton>
       <PageHeader
         eyebrow="Agent"
@@ -129,7 +128,7 @@ function AgentEditFormView({
           />
         )}
       />
-    </>
+    </div>
   );
 }
 
