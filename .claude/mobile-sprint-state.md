@@ -44,7 +44,6 @@ Each iteration:
 
 ## Backlog (Phase 2 — SPA-pitfall audit, iter ~14)
 
-- [ ] **MOBILE-30 (HIGH)** Visibility-gate 401 redirect — `web/src/routes/__root.tsx` (~line 60-64). `AuthenticatedGate` redirects to `/login` on any 401 without checking `document.hidden`. On bfcache restore where the page is briefly not visible, the redirect can fire before user re-engagement. Gate with `if (is401 && !document.hidden)`. Complements PR #1329 (bfcache fix).
 - [ ] **MOBILE-31 (HIGH)** Reduced-motion bundle — wrap `animate-spin`, sidebar `transition-[left,right,width]`, and other animations with `motion-safe:` variants OR add global `@media (prefers-reduced-motion: reduce)` override in `globals.css`. Affects spinners across the app + `web/src/components/ui/sidebar.tsx` line ~165.
 - [ ] **MOBILE-32 (HIGH)** iOS keyboard hints — add `inputmode="email|numeric|decimal"` to typed inputs and `enterkeyhint="go|search|done"` on form submit fields. Audit: `web/src/routes/login.tsx`, `web/src/features/settings/*`, any amount/number inputs.
 - [ ] **MOBILE-33 (MEDIUM)** Identifier-field autocapitalize/autocorrect — slug/API-key/agent-slug inputs need `autoCorrect="off" autoCapitalize="off"` so iOS doesn't mangle them. Files: `web/src/features/agents/agent-form.tsx` (slug field at create time), `web/src/routes/api-key-new.tsx` (key name).
@@ -74,7 +73,7 @@ Each iteration:
 
 ## In-flight PRs
 
-- **fix/mobile-401-visibility-gate** (subagent `a6a0df8b`) — MOBILE-30 (HIGH from audit). Gates the `__root.tsx` 401 redirect on `document.visibilityState === "visible"` so it doesn't fire during bfcache restore. Direct complement to PR #1329. PR # TBD.
+_(none)_
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -86,6 +85,7 @@ Each iteration:
 - ✅ **MOBILE-27** Mobile navbar blur — PR #1330 merged into sprint branch (`70f8518d`). `<header>` now uses solid `bg-background` at <640px (no `backdrop-blur`, no translucency), restoring the glassy look at sm+ via `sm:backdrop-blur` / `sm:bg-background/95`. Eliminates the visible seam between solid safe-area zone and previously-blurred header on iOS.
 - ✅ **MOBILE-28** Viewport-unit polish (T4) — PR #1331 merged into sprint branch (`84bdb932`). 5 viewport-unit straggler swaps: `min-h-screen` → `min-h-dvh` on auth-shell wrapper + grid; `min-h-svh` → `min-h-dvh` on sidebar outer wrapper; `max-w-[calc(100vw-1rem)]` → `max-w-[calc(100dvw-1rem)]` in popover/select/dropdown content clamps. Finishes the dvh/dvw family.
 - ✅ **MOBILE-29** iOS web-app shell polish — PR #1332 merged into sprint branch (`658e69f6`). Adds iOS PWA meta tags (`apple-mobile-web-app-capable=yes`, `status-bar-style=black-translucent`, `apple-mobile-web-app-title=Breadbox`, `apple-touch-icon` → favicon.svg), inline cold-load splash in `<div id="root">` (auto-vanishes when React hydrates, respects `prefers-reduced-motion` and `prefers-color-scheme`), and global `-webkit-tap-highlight-color: transparent`.
+- ✅ **MOBILE-30** 401 visibility-gate — PR #1333 merged into sprint branch (`73e53940`). `AuthenticatedGate` in `__root.tsx` now defers the redirect-to-login while `document.visibilityState !== "visible"`, attaching a `visibilitychange` listener that fires the redirect when the user re-engages. Closes the residual bfcache-restore race left by PR #1329; cleanup-on-unmount included.
 
 ## Notes for next iteration
 
