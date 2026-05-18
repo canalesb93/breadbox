@@ -42,7 +42,20 @@ Each iteration:
 - Mobile sheet is shadcn Sidebar's built-in behavior (`useSidebar().openMobile`).
 - Reuse `scroll-shadow-x` @utility from globals.css for any horizontal-scroll container.
 
-## Backlog (Phase 2)
+## Backlog (Phase 2 — SPA-pitfall audit, iter ~14)
+
+- [ ] **MOBILE-30 (HIGH)** Visibility-gate 401 redirect — `web/src/routes/__root.tsx` (~line 60-64). `AuthenticatedGate` redirects to `/login` on any 401 without checking `document.hidden`. On bfcache restore where the page is briefly not visible, the redirect can fire before user re-engagement. Gate with `if (is401 && !document.hidden)`. Complements PR #1329 (bfcache fix).
+- [ ] **MOBILE-31 (HIGH)** Reduced-motion bundle — wrap `animate-spin`, sidebar `transition-[left,right,width]`, and other animations with `motion-safe:` variants OR add global `@media (prefers-reduced-motion: reduce)` override in `globals.css`. Affects spinners across the app + `web/src/components/ui/sidebar.tsx` line ~165.
+- [ ] **MOBILE-32 (HIGH)** iOS keyboard hints — add `inputmode="email|numeric|decimal"` to typed inputs and `enterkeyhint="go|search|done"` on form submit fields. Audit: `web/src/routes/login.tsx`, `web/src/features/settings/*`, any amount/number inputs.
+- [ ] **MOBILE-33 (MEDIUM)** Identifier-field autocapitalize/autocorrect — slug/API-key/agent-slug inputs need `autoCorrect="off" autoCapitalize="off"` so iOS doesn't mangle them. Files: `web/src/features/agents/agent-form.tsx` (slug field at create time), `web/src/routes/api-key-new.tsx` (key name).
+- [ ] **MOBILE-34 (MEDIUM)** `overscroll-behavior: contain` on tables/lists — prevents iOS pull-to-refresh and parent rubber-band when scrolling inside `data-table.tsx`. Tailwind: `overscroll-contain`. One-line addition to the existing Table wrapper.
+
+## Deferred / low-value (won't fix without evidence)
+
+- **scroll-padding-top for anchor links** — niche, no anchor-link UX in the app today.
+- **Icon-only button aria-label audit** — already mostly correct; only outliers in `calendar.tsx` day grid (low impact, Radix handles).
+- **`role="alert"` on FormMessage** — Sonner toasts already announce form errors.
+- **`gcTime` tuning** — speculative; current 5min default is fine.
 
 **Carried over from Phase 1 (deferred):**
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard. `web/src/routes/__root.tsx`. Requires real-device validation; no simulator fully reproduces keyboard occlusion.
@@ -61,8 +74,7 @@ Each iteration:
 
 ## In-flight PRs
 
-- **fix/mobile-ios-shell-polish** (subagent `ad462135`) — **MOBILE-29 (T1 — user-authorized SPA pitfalls sweep)**. iOS web-app meta tags (`apple-mobile-web-app-capable`, `status-bar-style`, `title`, `apple-touch-icon`) + cold-load splash inside `<div id="root">` (vanishes when React mounts) + global `-webkit-tap-highlight-color: transparent` in globals.css. PR # TBD.
-- **Deep SPA-pitfall audit** (Explore agent `a11a115d`) — read-only scout across 10 categories: touch interactions, form ergonomics, scroll behavior, auth redirect races beyond #1329, loading/perf, memory/lifecycle, offline/connectivity, cookie durability, standalone-mode edge cases, a11y + reduced-motion. Will fold findings into backlog for follow-up PRs.
+- **fix/mobile-401-visibility-gate** (subagent `a6a0df8b`) — MOBILE-30 (HIGH from audit). Gates the `__root.tsx` 401 redirect on `document.visibilityState === "visible"` so it doesn't fire during bfcache restore. Direct complement to PR #1329. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -73,6 +85,7 @@ Each iteration:
 - ✅ **MOBILE-22/23** Button stacking polish — PR #1328 merged into sprint branch (`543599c8`). API-key Copy button gains `w-full sm:w-auto`; disconnect confirmation rewrapped as `flex-col-reverse sm:flex-row` with destructive Disconnect button on top + full-width-when-stacked. Follows the FormFooter pattern from #1321.
 - ✅ **MOBILE-27** Mobile navbar blur — PR #1330 merged into sprint branch (`70f8518d`). `<header>` now uses solid `bg-background` at <640px (no `backdrop-blur`, no translucency), restoring the glassy look at sm+ via `sm:backdrop-blur` / `sm:bg-background/95`. Eliminates the visible seam between solid safe-area zone and previously-blurred header on iOS.
 - ✅ **MOBILE-28** Viewport-unit polish (T4) — PR #1331 merged into sprint branch (`84bdb932`). 5 viewport-unit straggler swaps: `min-h-screen` → `min-h-dvh` on auth-shell wrapper + grid; `min-h-svh` → `min-h-dvh` on sidebar outer wrapper; `max-w-[calc(100vw-1rem)]` → `max-w-[calc(100dvw-1rem)]` in popover/select/dropdown content clamps. Finishes the dvh/dvw family.
+- ✅ **MOBILE-29** iOS web-app shell polish — PR #1332 merged into sprint branch (`658e69f6`). Adds iOS PWA meta tags (`apple-mobile-web-app-capable=yes`, `status-bar-style=black-translucent`, `apple-mobile-web-app-title=Breadbox`, `apple-touch-icon` → favicon.svg), inline cold-load splash in `<div id="root">` (auto-vanishes when React hydrates, respects `prefers-reduced-motion` and `prefers-color-scheme`), and global `-webkit-tap-highlight-color: transparent`.
 
 ## Notes for next iteration
 
