@@ -36,12 +36,18 @@ Phase 1 shipped fixes (now in main):
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard. `web/src/routes/__root.tsx`. Requires real-device validation; no simulator fully reproduces keyboard occlusion.
 - [ ] **MOBILE-19** HeroGrid 20px padding feels cramped on 375px. `web/src/components/hero-grid.tsx`. Subjective — defer until visual evidence shows a clear problem.
 
-**New (to be seeded by future scouts or user reports):**
-- _(empty — Phase 2 is reactive; new items added as users report bugs or scouts find issues)_
+**New (Phase 2 scout, iter 12):**
+- [ ] **MOBILE-22** API key copy button isn't full-width when stacked — `web/src/routes/api-key-created.tsx` (~lines 91-112). _(in flight, see below)_
+- [ ] **MOBILE-23** Disconnect confirmation buttons cramped on mobile — `web/src/routes/connection-detail.tsx` (~lines 379-401). _(in flight, see below)_
+- [ ] **MOBILE-24** CSV column-mapping label wraps aggressively on narrow viewports — `web/src/features/connections/csv-import-form.tsx` (~lines 422-478). Needs visual evidence before fix.
+- [ ] **MOBILE-25** CSV drag-drop file input may not open picker reliably on iOS — `web/src/features/connections/csv-import-form.tsx` (~lines 166-190). Needs simulator verification.
+
+**Closed by audit:**
+- ✅ **MOBILE-API-COPY (closed as already-handled)** Scout flagged that API key copy on iOS might silently fail. Verified: `onCopy` at `api-key-created.tsx:47` already has try/catch with a clear error toast ("Couldn't access the clipboard. Select the value and copy manually.") and the readonly Input has `onFocus={e => e.currentTarget.select()}` for manual-copy ergonomics. No code change required.
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-button-stacking-polish** (subagent `a0ad94fa`) — bundles MOBILE-22 + MOBILE-23. Adds `w-full sm:w-auto` to api-key Copy button; rewraps disconnect confirmation as `flex-col-reverse sm:flex-row` (destructive on top) with full-width-when-stacked buttons. Follows the FormFooter pattern from PR #1321. PR # TBD.
 
 ## Notes for next iteration
 
