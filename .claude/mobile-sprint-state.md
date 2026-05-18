@@ -28,7 +28,6 @@ _(empty — both user-reported P0 bugs shipped)_
 ## Backlog (P1 — re-scout)
 
 - [ ] **MOBILE-19** HeroGrid tight 20px padding on 375px. `web/src/components/hero-grid.tsx` (~lines 43-45). `px-5 sm:px-7` is fine but feels a touch cramped per scout. Subjective — defer until visual evidence shows a clear problem. May close as won't-fix.
-- [ ] **MOBILE-20** Transactions toolbar wraps pills above sort/select buttons. `web/src/features/transactions/transactions-toolbar.tsx` (~line 202). `flex flex-wrap` pushes sort/select to a third row when there are several filter chips. Consider horizontal-scroll chip rail on mobile or fixed positioning.
 
 ## Backlog (P1-P2 — scout-seeded)
 
@@ -38,7 +37,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-- **fix/mobile-transactions-toolbar-rail** (subagent `a858ae15`) — MOBILE-20. Converts transactions filter-pills container to horizontal-scroll chip rail on mobile (`max-sm:scroll-shadow-x max-sm:overflow-x-auto max-sm:flex-nowrap`); restores `flex-wrap` on sm+. Reuses `scroll-shadow-x` utility from PR #1319. PR # TBD.
+_(none)_
 
 ## Completed
 
@@ -52,6 +51,7 @@ _(empty — both user-reported P0 bugs shipped)_
 - ✅ **MOBILE-15/16** Header + footer mobile stacking — PR #1321 merged (`669cfed6`). `PageHeader` actions cluster now wraps on mobile (`flex-wrap` + `sm:flex-nowrap sm:shrink-0`) so pages with multiple action buttons no longer overflow horizontally. `FormFooter` action cluster goes full-width column with primary on top (`flex-col-reverse w-full`) at <640px, restoring inline row on ≥640px — affirmative-on-top matches iOS / Material.
 - ✅ **MOBILE-14** Agent form mobile order — PR #1322 merged (`1bad8159`). CSS `order-first` / `md:order-none` reorders the agent-form cards so the operational knobs card (Model, Schedule, Tool scope, Allowed tools, Max turns, Budget) appears ABOVE the long prompt body on <768px. DOM and tab order unchanged.
 - ✅ **MOBILE-17/18** Small polish — PR #1323 merged (`d053acaa`). Empty-state description `max-w-sm` → `max-w-xs` (no longer exceeds 375px viewport in worst-case parents); error page `<pre>` gains explicit `[-webkit-overflow-scrolling:touch]` for parity with the table primitive.
+- ✅ **MOBILE-20** Transactions filter rail — PR #1324 merged (`b169174b`). Filter pills become a horizontal-scroll chip rail on <640px (using the same `scroll-shadow-x` fade as the Table primitive); at sm+ they revert to wrap. Subagent also promoted `scroll-shadow-x` to a Tailwind `@utility` so variants (`max-sm:`, `dark:`) compile to real rules, and added a `--scroll-shadow-cover` CSS variable so consumers on the page surface (vs inside a Card) can override via `[--scroll-shadow-cover:var(--background)]`.
 
 ## Notes for next iteration
 
