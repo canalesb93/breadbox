@@ -1,6 +1,5 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusPanel } from "@/components/status-panel";
 import { cn } from "@/lib/utils";
 
 export type PageErrorVariant = "panel" | "inline";
@@ -16,40 +15,30 @@ interface PageErrorProps {
   retrying?: boolean;
   /**
    * Visual shell.
-   * - `panel` (default): bordered StatusPanel with the destructive rail.
-   *   Use for top-level page errors that own the whole route body.
+   * - `panel` (default): centred card with a destructive icon tile, heading,
+   *   body, and a retry CTA beneath. Use for top-level page errors that
+   *   own the whole route body.
    * - `inline`: chrome-less variant for nesting inside an existing bordered
-   *   host (a SectionCard body, a ListCard slot). Keeps the destructive icon
-   *   tile + heading + body + retry vocabulary, but drops the panel border +
-   *   rail so two nested borders don't read heavy.
+   *   host (a SectionCard body, a ListCard slot). Keeps the destructive tile
+   *   + heading + body + retry vocabulary, but drops the panel border so two
+   *   nested borders don't read heavy.
    */
   variant?: PageErrorVariant;
   className?: string;
 }
 
 // PageError renders the canonical page-level "this page couldn't fetch its
-// data" state — destructive-toned StatusPanel with an AlertTriangle icon, a
-// concrete heading, the error message (or a fallback), and an optional
-// inline Retry button.
+// data" state — destructive-toned card with an AlertTriangle icon, a concrete
+// heading, the error message (or a fallback), and an optional Retry button.
 //
-// Until iter 82 every page hand-rolled its own `<Alert variant="destructive">
-// + AlertTitle + AlertDescription` for this state. Six pages now route
-// through this primitive: accounts, connections, providers, rules, rule-form,
-// rule-detail. Don't fork — extend this primitive if a seventh consumer
-// needs a new variant.
+// The `panel` variant is shaped like an empty-state hero (centred,
+// generous padding, dashed border) but destructive-toned — a clear signal
+// that the surface is in a failure state, not just empty. The `inline`
+// variant strips the border so it can sit inside an already-bordered host
+// without doubling up chrome.
 //
-// The `panel` variant reuses the StatusPanel vocabulary (3px tone-tinted left
-// rail + tinted icon tile + heading + body + trailing slot) so destructive
-// page errors speak the same language as warnings, success notices, and
-// env-locked states (see iter 16). The retry button lands in StatusPanel's
-// `trailing` slot so it sits on the right edge, aligned with the icon row.
-//
-// The `inline` variant (iter 88) drops the panel chrome — same icon tile +
-// heading + body + retry, but no border / rail / muted background. Used by
-// the activity-timeline inside a SectionCard, where nesting a second
-// bordered destructive panel inside the section's bordered card read heavy.
-// Two nested borders → one tile + text block aligned with the rest of the
-// section body.
+// Sibling of `<EmptyState>` (no-data) and `<DetailPageSkeleton>` (loading).
+// Don't fork — extend this primitive.
 export function PageError({
   resource,
   error,
@@ -82,13 +71,8 @@ export function PageError({
 
   if (variant === "inline") {
     return (
-      <div
-        className={cn(
-          "flex items-start gap-3",
-          className,
-        )}
-      >
-        <span className="bg-destructive/10 text-destructive flex size-8 shrink-0 items-center justify-center rounded-md">
+      <div className={cn("flex items-start gap-3", className)}>
+        <span className="bg-destructive/10 text-destructive flex size-9 shrink-0 items-center justify-center rounded-xl">
           <AlertTriangle className="size-4" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -107,13 +91,21 @@ export function PageError({
   }
 
   return (
-    <StatusPanel
-      tone="destructive"
-      icon={AlertTriangle}
-      heading={`Couldn't load ${resource}`}
-      body={message}
-      trailing={retryButton ?? undefined}
-      className={className}
-    />
+    <div
+      className={cn(
+        "border-destructive/25 bg-destructive/[0.02] flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-10 text-center",
+        className,
+      )}
+      role="alert"
+    >
+      <div className="bg-destructive/10 text-destructive mb-2 flex size-11 items-center justify-center rounded-xl">
+        <AlertTriangle className="size-5" />
+      </div>
+      <h3 className="text-foreground text-sm font-medium">
+        {`Couldn't load ${resource}`}
+      </h3>
+      <p className="text-muted-foreground max-w-sm text-sm">{message}</p>
+      {retryButton && <div className="mt-3">{retryButton}</div>}
+    </div>
   );
 }
