@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2, Sparkles, StickyNote } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  Sparkles,
+  StickyNote,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -48,6 +54,10 @@ export function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {runDetail.data?.status === "error" &&
+            runDetail.data?.error_message && (
+              <RunErrorBlock message={runDetail.data.error_message} />
+            )}
           {runDetail.data?.prompt_prefix && (
             <PromptPrefixBlock prefix={runDetail.data.prompt_prefix} />
           )}
@@ -165,6 +175,25 @@ function OperatorNoteEditor({
           {draft === "" && storedNote !== "" ? "Clear note" : "Save note"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// RunErrorBlock surfaces the orchestrator's error_message at the top of
+// the transcript sheet for failed runs. Without this, a run shows up with
+// status=error but no human-readable reason — the operator has to grep
+// container logs to find out what happened (e.g. a sidecar crash before
+// any transcript events were emitted).
+function RunErrorBlock({ message }: { message: string }) {
+  return (
+    <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+      <div className="text-destructive mb-1 inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide">
+        <XCircle className="size-3.5" />
+        Run error
+      </div>
+      <pre className="text-foreground/90 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+        {message}
+      </pre>
     </div>
   );
 }

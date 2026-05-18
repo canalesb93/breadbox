@@ -73,7 +73,11 @@ FROM alpine:3.21
 # postgresql16-client: required by the /backups page for pg_dump and psql.
 #   Must match the server major version (postgres:16-alpine in compose) —
 #   pg_dump refuses to dump a newer server.
-RUN apk --no-cache add ca-certificates tzdata postgresql16-client
+# libstdc++, libgcc: required by the Bun-compiled breadbox-agent sidecar.
+#   Even with --target=bun-linux-*-musl the resulting binary dynamically
+#   links libstdc++.so.6 and libgcc_s.so.1, which aren't in alpine base.
+#   Without these, the sidecar exits 127 and every agent run fails.
+RUN apk --no-cache add ca-certificates tzdata postgresql16-client libstdc++ libgcc
 
 WORKDIR /app
 COPY --from=builder /breadbox /app/breadbox

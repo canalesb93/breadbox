@@ -40,7 +40,8 @@ SET status                = $2,
     max_turns_used        = $10,
     num_tool_calls        = $11,
     transcript_path       = $12,
-    session_id            = $13
+    session_id            = $13,
+    error_message         = $14
 WHERE id = $1
 RETURNING *;
 
