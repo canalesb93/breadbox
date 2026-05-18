@@ -36,7 +36,7 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-- **fix/mobile-safe-area** (subagent `a36a66a9`) — bundles MOBILE-7 + MOBILE-9 (+ sticky header top-inset). Adds `viewport-fit=cover`, safe-area padding to Sheet content per side, and `pt-[env(safe-area-inset-top)]` on the sticky `<main>` header. PR # TBD.
+_(none)_
 
 ## Completed
 
@@ -44,6 +44,7 @@ _(empty — both user-reported P0 bugs shipped)_
 - ✅ **MOBILE-2/3/4** Popover/Select/DropdownMenu onscreen — PR #1316 merged (`cfd98db9`). Added `collisionPadding={8}` (overridable default), `max-w-[calc(100vw-1rem)]`, and `max-h-[min(60vh, available-height)]` to all three primitive Content components.
 - ✅ **MOBILE-5/12** 44pt tap targets — PR #1317 merged (`3b2f91f5`). Tailwind v4 `pointer-coarse:` variant adds invisible 44×44 tap zone via `::before` pseudo to all icon Button sizes; CommandInput bumps to `h-12` on touch. Desktop visuals unchanged (verified via mouse `pointer: fine`).
 - ✅ **MOBILE-6 (verified non-issue, closed)** Input font-size auto-zoom — `web/src/components/ui/input.tsx` and `textarea.tsx` already use `text-base` (16px) on mobile and `md:text-sm` (14px) at desktop ≥768px. iOS auto-zoom only fires on inputs <16px on mobile viewports; both meet the threshold. No code change required.
+- ✅ **MOBILE-7/9** iOS safe-area pass — PR #1318 merged (`78c814d9`). Added `viewport-fit=cover` to `web/index.html` (activates `env(safe-area-inset-*)`), per-side safe-area padding to `SheetContent`, mobile sidebar inner content respects bottom inset, and `pt-[env(safe-area-inset-top)]` on the sticky `<main>` header so it sits below the notch/Dynamic Island.
 
 ## Notes for next iteration
 
