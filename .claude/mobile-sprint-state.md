@@ -35,7 +35,8 @@ _(empty — both user-reported P0 bugs shipped)_
 
 ## In-flight PRs
 
-_(none)_
+- **fix/mobile-viewport-units** (subagent) — bundles MOBILE-10 + MOBILE-13. Swaps `100vw` → `100dvw` in selection-action-bar; `h-svh` → `h-full`/`h-dvh` in sidebar. PR # TBD.
+- **Re-scout** (Explore agent) — auditing v2 SPA post-fixes for NEW mobile issues (forms, detail heroes, dialogs, toolbars, table columns, empty states). Will fold findings into backlog when done.
 
 ## Completed
 
