@@ -77,7 +77,14 @@ FROM alpine:3.21
 #   Even with --target=bun-linux-*-musl the resulting binary dynamically
 #   links libstdc++.so.6 and libgcc_s.so.1, which aren't in alpine base.
 #   Without these, the sidecar exits 127 and every agent run fails.
-RUN apk --no-cache add ca-certificates tzdata postgresql16-client libstdc++ libgcc
+# nodejs: required to spawn the Claude Agent SDK's bundled cli.js subprocess.
+#   The sidecar passes executable:"node" to query() so the SDK's
+#   isRunningWithBun() heuristic (which would otherwise pick "bun" because
+#   the sidecar binary IS bun) doesn't try to spawn a `bun` we don't ship.
+#   Without nodejs the spawn fires ENOENT on an unhandled error handler
+#   inside the SDK; the async iterator ends silently with zero messages
+#   and the run is misclassified as a 0-cost, 0-turn "success".
+RUN apk --no-cache add ca-certificates tzdata postgresql16-client libstdc++ libgcc nodejs
 
 WORKDIR /app
 COPY --from=builder /breadbox /app/breadbox
