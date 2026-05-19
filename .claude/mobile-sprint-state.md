@@ -72,7 +72,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347 (state-doc merge included).
+- **T3 providers+connections scout** (Explore agent `a50e7ae4`) — auditing `routes/providers.tsx`, `features/providers/*`, `features/connections/*` (plaid-link-button, teller-connect-button, connect-bank-sheet, reauth-sheet, sync-activity-bars, sync-history-list, family-tabs, etc.). Particularly Plaid/Teller SDK launch interactions on iOS. Findings will fold into backlog (or report clean).
 
 ## Closed scouts (iter 28)
 
