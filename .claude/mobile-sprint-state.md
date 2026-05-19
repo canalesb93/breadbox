@@ -44,13 +44,11 @@ Each iteration:
 
 ## Backlog (Phase 2 — SPA-pitfall audit, iter ~14)
 
-- [ ] **MOBILE-34 (MEDIUM)** `overscroll-behavior: contain` on tables/lists — prevents iOS pull-to-refresh and parent rubber-band when scrolling inside `data-table.tsx`. Tailwind: `overscroll-contain`. One-line addition to the existing Table wrapper.
 
 ## Backlog (T3 scout — rules / agents / prompts, iter ~17)
 
 - [ ] **MOBILE-37 (HIGH)** Agent runs table column widths explode beyond viewport on iOS. `web/src/routes/agents.runs.tsx` (~lines 303-388). Rigid `w-[22%] min-w-[160px]` + 8 fixed columns ⇒ horizontal scroll required. Verify whether the existing `scroll-shadow-x` from Table primitive helps; if not, hide-on-mobile or collapse columns into a Metrics expander.
 - [ ] **MOBILE-39 (MEDIUM)** Rules filter toolbar three fixed-width selects wrap awkwardly. `web/src/routes/rules.tsx` (~line 290). Apply chip-rail pattern from #1324 (`max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto`).
-- [ ] **MOBILE-40 (MEDIUM)** Transcript sheet nested scroll trap. `web/src/features/agents/transcript-viewer.tsx`. Inner `<pre max-h-48 overflow-auto>` inside sheet body creates two scroll contexts; iOS swipe-up in the pre triggers back-gesture instead of scrolling sheet. Fix: `overscroll-behavior-y: contain` on the pre + expand `max-h` so it doesn't compete with the sheet scroll.
 - [ ] **MOBILE-41 (LOW)** Command palette input `h-11` vs `h-12` threshold from #1317. `web/src/components/command-palette.tsx` (~line 218). Debatable; bumping to `h-12` for consistency.
 - [ ] **MOBILE-42 (LOW)** `detail-sheet-header.tsx` missing safe-area-top in iPhone landscape with notch. `web/src/components/detail-sheet-header.tsx` (~lines 54-59). `pt-5` → `pt-[calc(1.25rem+env(safe-area-inset-top))]`.
 
@@ -78,7 +76,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — `CLEAN` status; now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339 (state-doc merge included).
+- **fix/mobile-overscroll-contain** (subagent `a9ce28c0`) — **MOBILE-34 + MOBILE-40 (T2 MEDIUM bundle)**. Adds `overscroll-contain` to the Table primitive wrapper and the transcript-viewer `<pre>` to block iOS pull-to-refresh / back-swipe leaks from inner scroll containers. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
