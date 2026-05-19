@@ -9,6 +9,15 @@
          both block accessibility zoom on iOS. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
+    <!-- Disable iOS Safari's automatic phone-number detection. iOS scans
+         text for digit sequences that resemble phone numbers and rewrites
+         them into blue tap-to-call links — which mangles the numeric data
+         a finance app is full of: masked account numbers (••4523),
+         transaction reference IDs, routing numbers, even some amount /
+         date formats. We have no legitimate `tel:` links, so turning the
+         heuristic off globally is pure upside. -->
+    <meta name="format-detection" content="telephone=no" />
+
     <title>Breadbox — Self-hosted finance for households</title>
     <meta
       name="description"
