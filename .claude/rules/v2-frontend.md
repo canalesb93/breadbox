@@ -82,6 +82,74 @@ There's a living component gallery at `/v2/sandbox` (`web/src/sandbox/`, route i
 - **Never import `static/css/styles.css`** or any v1 stylesheet. The v2 design system is shadcn theme tokens + Tailwind utilities. v1 grew unboundedly — we're not paying that cost again.
 - **Do not commit changes to `web/src/components/ui/*` styling.** If a primitive looks wrong, theme tokens in `globals.css` are the lever.
 
+### Mobile / iOS Safari patterns
+
+The v2 SPA is browsed from iOS Safari as a first-class target (Add-to-Home-Screen workflow, swipe-back gestures, dynamic chrome). These patterns are already codified in `globals.css`, the `ui/*` primitives, and the call sites listed below — apply them consistently rather than reinventing each one.
+
+#### Viewport units — prefer dynamic
+
+iOS Safari's `100vh` / `100vw` refer to the *largest* viewport (URL bar collapsed), so layouts sized that way overflow when the chrome is visible. Use `100dvh` / `100dvw` (Tailwind: `min-h-dvh`, `max-w-[calc(100dvw-1rem)]`, etc.) for any full-page shell, sticky/sheet container, or floating-edge element. `svh` only when you specifically want the worst-case-anchored size (rare). Precedent: (#1320), (#1331).
+
+Picker / popover contents adopt the same pattern at narrow viewports — clamp the floating panel width with `w-[calc(100dvw-2rem)] sm:w-72` (or similar) so it doesn't overflow on phones but locks to a comfortable size at `sm`. Precedent: (#1346) icon-picker + color-picker.
+
+`CommandList` and other dropdown bodies cap their max-height against the dynamic viewport: `max-h-[min(300px,50dvh)]` keeps the list onscreen when the iOS keyboard is open and the available height collapses. Precedent: (#1347).
+
+#### Safe-area insets
+
+The viewport meta in `web/index.html` ships `viewport-fit=cover`, which activates `env(safe-area-inset-*)`. Any sticky or fixed element that sits at a viewport edge needs explicit padding for the home-indicator / notch — e.g. `pt-[env(safe-area-inset-top)]`, `pb-[env(safe-area-inset-bottom)]`, or combined with existing spacing via `pt-[calc(1.25rem+env(safe-area-inset-top))]`. The Sheet primitive (`ui/sheet.tsx`) already wires side-aware safe-area padding internally — consumers don't add it for Sheet content. Precedent: (#1318), (#1342).
+
+Floating bottom elements (FloatingActionBar primitive, similar absolutely-positioned bars) use `max()` so the offset never collapses below the existing rhythm on devices without a home indicator: `bottom-[max(1rem,env(safe-area-inset-bottom))]`. Precedent: (#1347).
+
+`DialogHeader` (the AlertDialog / Dialog sibling to SheetHeader) gets `mt-[env(safe-area-inset-top)]` to clear the notch on iPad-landscape full-screen dialogs. The Sheet variant uses padding-based safe-area (#1342); the Dialog variant uses margin-based — both are valid for their context (Sheet content scrolls under the inset; Dialog headers shift the entire chrome). Precedent: (#1350).
+
+#### Tap targets — 44pt minimum via `pointer-coarse:`
+
+The Button primitive (`ui/button.tsx`) attaches an invisible `::before` pseudo-element that extends icon-only buttons to a 44×44pt hit area on `(pointer: coarse)` (touch) devices, leaving visual size untouched on `pointer: fine` (mouse). Use `@media (pointer: coarse)` or Tailwind's `pointer-coarse:` variant for touch-only rules — **not** viewport-width queries, which both catch desktop windows resized small and miss iPads in landscape. Precedent: (#1317).
+
+For **raw `<button>` elements** that don't go through Button (e.g. the tag-chip × close button), apply the same recipe inline — the element must be `position: relative`:
+
+```tsx
+"... relative pointer-coarse:before:absolute pointer-coarse:before:left-1/2 pointer-coarse:before:top-1/2 pointer-coarse:before:size-11 pointer-coarse:before:-translate-x-1/2 pointer-coarse:before:-translate-y-1/2 pointer-coarse:before:content-['']"
+```
+
+Precedent: (#1349) tag-chip × button.
+
+#### Horizontal-scroll affordance — `scroll-shadow-x` utility
+
+`globals.css` defines a Tailwind `@utility scroll-shadow-x` that paints a fading gradient at the clipped edges of a horizontally-scrolling container. Apply via `className="scroll-shadow-x overflow-x-auto"` on any horizontal-scroll region so users see scrollability without a visible scrollbar. Override the cover color for non-card surfaces with `[--scroll-shadow-cover:var(--background)]`. Always pair with `[-webkit-overflow-scrolling:touch]` (default on iOS 13+, kept defensively) and `overscroll-contain` to block parent rubber-band / pull-to-refresh. Precedent: (#1319), (#1324), (#1340).
+
+#### Mobile reflow patterns
+
+- **Stack actions full-width, primary-on-top.** Action clusters with destructive or affirmative buttons use `flex flex-col-reverse w-full gap-2 sm:flex-row sm:w-auto sm:items-center` so the primary action ends up on top of the stack on mobile (matches iOS / Material guidance). Precedent: (#1321) FormFooter, (#1328) disconnect, (#1336) prompts dialog, (#1339) prompts builder. **AlertDialogFooter** already handles `flex-col-reverse` semantically — apply `w-full sm:w-auto` directly to `AlertDialogCancel` / `AlertDialogAction` instead of wrapping them. Precedent: (#1350) confirm dialogs, (#1348) connect-bank-sheet + reauth-sheet footers.
+- **CSS `order` to reshuffle for mobile-first content.** When source order needs to differ from visual order on mobile (e.g. operational knobs above a long prompt body), use `order-first md:order-none`. Tab/keyboard order continues to follow the DOM, so accessibility is preserved. Precedent: (#1322).
+- **Horizontal scroll-rail for filter pills.** Chip-style filter sets that wrap awkwardly switch to a single-row scroll rail on mobile via `max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:scroll-shadow-x`. Precedent: (#1324) transactions, (#1339) prompts builder.
+- **Stack-then-inline for narrow toolbars.** Toolbars with search + a couple of selects use `flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center`; if a wrapper would otherwise break a child's `ml-auto`, give the wrapper `display: contents` instead of a new flex context. Precedent: (#1341).
+- **Hide-on-mobile data table columns.** For wide tables, add `max-sm:hidden` to non-essential column `meta.className`. Keep 3–4 essential columns visible; row-tap opens detail. Precedent: (#1343).
+
+#### Form ergonomics — iOS keyboard hints
+
+Typed inputs surface the right iOS keyboard via `inputmode="email|numeric|decimal|search"`, and submit fields tint the return key via `enterkeyhint="go|search|send|done"`. Identifier fields (slugs, API key names, regex values) need `autoCorrect="off" autoCapitalize="none" spellCheck={false}` so iOS doesn't autocorrect technical strings. `SearchInput` ships these defaults so every consumer benefits without per-call-site work. Precedent: (#1338).
+
+Textareas wrapping a submit action (comment composer, etc.) get `enterKeyHint="send"` even though the textarea itself doesn't submit — it paints the iOS return key glyph as "send", making the affordance discoverable. Precedent: (#1349) comment-composer.
+
+#### bfcache & lifecycle
+
+A `pageshow` listener with `event.persisted === true` (lives in `main.tsx`, don't duplicate) invalidates router + queries on iOS Safari swipe-back restore. The 401-redirect in `__root.tsx` is visibility-gated (`document.visibilityState === "visible"`) so a stale 401 from a backgrounded tab doesn't fire mid-restore and bounce the user to login. Never add `beforeunload` / `unload` handlers — they disable bfcache entirely. Precedent: (#1329), (#1333).
+
+#### Reduced motion + tap highlight
+
+`globals.css` carries a global `@media (prefers-reduced-motion: reduce)` block that compresses all animations and transitions to 0.01ms — long enough for `animationend` to still fire, short enough to feel instant — so per-call-site `motion-safe:` variants aren't needed. The same file sets `-webkit-tap-highlight-color: transparent` on `html` so the default iOS blue tap overlay doesn't layer on top of shadcn focus/active states. Precedent: (#1337) motion, (#1332) tap-highlight.
+
+#### iOS web-app metadata
+
+`web/index.html` sets `apple-mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`, `apple-mobile-web-app-title`, and `apple-touch-icon` so "Add to Home Screen" launches the SPA standalone (no Safari chrome). A cold-load splash lives inside `<div id="root">` as synchronous HTML + inline CSS — it respects `prefers-color-scheme` and `prefers-reduced-motion`, and React's `createRoot` replaces it on first render, covering the JS-hydration gap. Precedent: (#1332).
+
+#### Accessibility patterns
+
+- **Skip-to-content link.** Every authenticated shell renders `<a href="#main" className="sr-only focus-visible:not-sr-only ...">Skip to main content</a>` at the top of the layout, paired with `<main id="main" tabIndex={-1}>`. Required for WCAG 2.4.1 (bypass blocks); also speeds up keyboard navigation past the sidebar. Precedent: (#1351).
+- **Form error announcements.** `FormMessage` (`ui/form.tsx`) conditionally applies `role="alert" aria-live="polite"` when an error is present, so VoiceOver / NVDA announce form validation errors as they appear. Required for WCAG 3.3.1. Don't re-implement per-field announcements — the primitive handles it. Precedent: (#1351).
+- **iOS keyboard `enterKeyHint` on textareas.** Textareas that submit on a keyboard action benefit from `enterKeyHint="send"` so the iOS return key glyph signals the affordance — already present on `SearchInput` via #1338, extended to `comment-composer` in (#1349).
+
 ### State
 
 - **Server state** → TanStack Query exclusively. Cache keys: `["resource", filter1, filter2, ...]`. One hook per resource in `api/queries/<resource>.ts`.

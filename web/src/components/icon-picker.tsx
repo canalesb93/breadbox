@@ -122,7 +122,7 @@ export function IconPicker({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
+      <PopoverContent className="w-[calc(100dvw-2rem)] p-0 sm:w-72" align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search icons…"

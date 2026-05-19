@@ -187,6 +187,7 @@ export function SetupAccountPage() {
                     type="password"
                     placeholder="Re-enter your password"
                     autoComplete="new-password"
+                    enterKeyHint="go"
                     {...field}
                   />
                 </FormControl>

@@ -159,6 +159,7 @@ export function LinkAccountSheet({
             <Input
               id="tolerance"
               type="number"
+              inputMode="numeric"
               min={0}
               max={30}
               value={toleranceDays}

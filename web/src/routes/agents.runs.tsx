@@ -309,7 +309,10 @@ function buildGlobalRunsColumns(): ColumnDef<AgentRunWithAgent>[] {
     {
       id: "agent",
       header: "Agent",
-      meta: { className: "w-[22%] min-w-[160px]" },
+      meta: {
+        className:
+          "w-[22%] min-w-[160px] max-sm:w-[40%] max-sm:min-w-[140px]",
+      },
       cell: ({ row }) => (
         <Link
           to="/agents/$slug/edit"
@@ -325,7 +328,7 @@ function buildGlobalRunsColumns(): ColumnDef<AgentRunWithAgent>[] {
     {
       id: "trigger",
       header: "Trigger",
-      meta: { className: "w-[90px]" },
+      meta: { className: "w-[90px] max-sm:hidden" },
       cell: ({ row }) => (
         <span className="text-muted-foreground text-xs uppercase tracking-wide">
           {row.original.trigger}
@@ -348,7 +351,7 @@ function buildGlobalRunsColumns(): ColumnDef<AgentRunWithAgent>[] {
     {
       id: "duration",
       header: "Duration",
-      meta: { className: "w-[80px] text-right tabular-nums" },
+      meta: { className: "w-[80px] text-right tabular-nums max-sm:hidden" },
       cell: ({ row }) => (
         <span className="text-muted-foreground text-sm">
           {formatDuration(row.original.duration_ms)}
@@ -358,7 +361,7 @@ function buildGlobalRunsColumns(): ColumnDef<AgentRunWithAgent>[] {
     {
       id: "cost",
       header: "Cost",
-      meta: { className: "w-[90px] text-right tabular-nums" },
+      meta: { className: "w-[90px] text-right tabular-nums max-sm:hidden" },
       cell: ({ row }) => (
         <span className="text-muted-foreground text-sm font-mono">
           {row.original.total_cost_usd != null
@@ -370,7 +373,7 @@ function buildGlobalRunsColumns(): ColumnDef<AgentRunWithAgent>[] {
     {
       id: "tools",
       header: "Tools",
-      meta: { className: "w-[70px] text-right tabular-nums" },
+      meta: { className: "w-[70px] text-right tabular-nums max-sm:hidden" },
       cell: ({ row }) => (
         <span className="text-muted-foreground text-sm">
           {row.original.num_tool_calls != null

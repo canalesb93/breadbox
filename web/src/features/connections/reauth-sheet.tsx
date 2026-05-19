@@ -235,12 +235,13 @@ export function ReauthSheet({
         </div>
 
         {conn && stage.kind === "confirm" && (
-          <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
+          <div className="bg-muted/20 flex flex-col-reverse items-stretch gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
               disabled={reauthStart.isPending}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
@@ -248,6 +249,7 @@ export function ReauthSheet({
               size="sm"
               onClick={onReconnect}
               disabled={reauthStart.isPending}
+              className="w-full sm:w-auto"
             >
               {reauthStart.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -258,11 +260,12 @@ export function ReauthSheet({
         )}
 
         {conn && stage.kind === "unsupported" && (
-          <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
+          <div className="bg-muted/20 flex flex-col-reverse items-stretch gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
+              className="w-full sm:w-auto"
             >
               Close
             </Button>

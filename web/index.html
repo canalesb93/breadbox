@@ -26,6 +26,31 @@
     <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
 
+    <!-- iOS web-app metadata.
+
+         `apple-mobile-web-app-capable=yes` lets the page run in
+         standalone mode (no Safari chrome) when "Add to Home Screen"
+         is used — the navbar / sticky header take over the top of
+         the screen as if it were a native app.
+
+         `apple-mobile-web-app-status-bar-style=black-translucent`
+         extends the app content under the iOS status bar; combined
+         with the `viewport-fit=cover` + safe-area padding we ship
+         in #1318, the content reads edge-to-edge.
+
+         `apple-mobile-web-app-title` is the icon label on the home
+         screen (defaults to the page title if missing).
+
+         `apple-touch-icon` is the home-screen icon. Reuse favicon.svg
+         for now — vector scales to any home-screen icon size iOS
+         wants. PNG variants at 180×180 (and 192/512 for Android) are
+         the canonical follow-up; defer to a future asset-generation
+         PR. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Breadbox" />
+    <link rel="apple-touch-icon" href="./favicon.svg" />
+
     <!-- Open Graph — Slack / Discord / iMessage / Linear link previews. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Breadbox" />
@@ -84,7 +109,36 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Cold-load splash: shown until the Vite bundle hydrates the SPA
+           (~200-500ms on cold mobile cache). React's createRoot replaces
+           the contents on first render, so this disappears automatically.
+           Uses raw hex values + media query (Tailwind isn't loaded yet)
+           and respects the `<html class="dark">` set by the no-flash
+           bootstrap script above. -->
+      <style>
+        .app-splash {
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          background: #fafafa;
+          color: #1a1a1a;
+        }
+        @media (prefers-color-scheme: dark) {
+          .app-splash { background: #1a1a1a; color: #fafafa; }
+        }
+        html.dark .app-splash { background: #1a1a1a; color: #fafafa; }
+        .app-splash svg { width: 32px; height: 32px; opacity: 0.4; animation: app-splash-spin 1s linear infinite; }
+        @keyframes app-splash-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .app-splash svg { animation: none; opacity: 0.6; } }
+      </style>
+      <div class="app-splash" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

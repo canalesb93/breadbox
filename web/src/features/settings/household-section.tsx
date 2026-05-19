@@ -401,6 +401,10 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
                 <FormControl>
                   <Input
                     type="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder="e.g. alex@example.com"
                     {...field}
                   />
@@ -540,7 +544,15 @@ function CreateLoginDialog({
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input type="email" autoFocus {...field} />
+                  <Input
+                    type="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoFocus
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

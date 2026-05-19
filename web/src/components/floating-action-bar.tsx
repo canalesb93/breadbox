@@ -25,7 +25,7 @@ export function FloatingActionBar({
 }: FloatingActionBarProps) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 sm:bottom-6"
+      className="pointer-events-none fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-4 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
       role={ariaLabel ? "toolbar" : undefined}
       aria-label={ariaLabel}
     >

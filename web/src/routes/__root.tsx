@@ -58,9 +58,22 @@ function AuthenticatedGate({ pathname }: { pathname: string }) {
   const is401 = me.error instanceof ApiError && me.error.status === 401;
 
   useEffect(() => {
-    if (is401) {
-      navigate({ to: "/login", search: { redirect: pathname } });
+    if (!is401) return;
+    // Don't redirect while the page is hidden — bfcache restore briefly
+    // marks document.hidden=true; firing navigate here completes before
+    // the user re-engages and undoes the snapshot they were swiping back
+    // to. Pair with the pageshow handler in main.tsx (PR #1329).
+    if (document.visibilityState !== "visible") {
+      const onVisible = () => {
+        if (document.visibilityState === "visible") {
+          document.removeEventListener("visibilitychange", onVisible);
+          navigate({ to: "/login", search: { redirect: pathname } });
+        }
+      };
+      document.addEventListener("visibilitychange", onVisible);
+      return () => document.removeEventListener("visibilitychange", onVisible);
     }
+    navigate({ to: "/login", search: { redirect: pathname } });
   }, [is401, navigate, pathname]);
 
   // Gate: never render the authenticated shell until /me has resolved
@@ -131,6 +144,16 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
 
   return (
     <SidebarProvider>
+      {/* Skip link — invisible until keyboard-focused, then jumps to <main>
+          so VoiceOver / keyboard users can bypass the sidebar nav
+          (WCAG 2.4.1 Bypass Blocks). The target <main> needs id="main" and
+          tabIndex={-1} to receive programmatic focus from the anchor. */}
+      <a
+        href="#main"
+        className="sr-only focus-visible:not-sr-only focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-ring focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:rounded-md focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:shadow-md focus-visible:ring-2"
+      >
+        Skip to main content
+      </a>
       <AppSidebar />
       {/* min-w-0: the inset is a flex child — without it, a wide page (e.g. a
           horizontally-scrolling table) grows the inset past the viewport
@@ -144,7 +167,7 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             border-box squeezes the 56px interactive area). The inset
             resolves to 0 elsewhere (desktop, Android, older iOS), so
             non-iPhone layouts are unchanged. */}
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
+        <header className="bg-background sticky top-0 z-30 flex min-h-14 shrink-0 items-center gap-2 border-b pt-[env(safe-area-inset-top)] sm:bg-background/95 sm:supports-[backdrop-filter]:bg-background/80 sm:backdrop-blur">
           <div className="flex w-full items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-1 h-4" />
@@ -177,7 +200,11 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             fragment (`<>`) so children sit directly under <main>. Pages that
             need a width constraint (`mx-auto max-w-2xl|5xl`) wrap once and
             apply `flex flex-col gap-5` on that wrapper themselves. */}
-        <main className="flex min-w-0 flex-1 flex-col gap-5 p-3 sm:p-6">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="flex min-w-0 flex-1 flex-col gap-5 p-3 sm:p-6"
+        >
           <Outlet />
         </main>
       </SidebarInset>

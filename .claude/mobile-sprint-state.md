@@ -42,14 +42,27 @@ Each iteration:
 - Mobile sheet is shadcn Sidebar's built-in behavior (`useSidebar().openMobile`).
 - Reuse `scroll-shadow-x` @utility from globals.css for any horizontal-scroll container.
 
-## Backlog (Phase 2)
+## Backlog (Phase 2 — SPA-pitfall audit, iter ~14)
+
+
+## Backlog (T3 scout — rules / agents / prompts, iter ~17)
+
+
+## Deferred / low-value (won't fix without evidence)
+
+- **scroll-padding-top for anchor links** — niche, no anchor-link UX in the app today.
+- **Icon-only button aria-label audit** — already mostly correct; only outliers in `calendar.tsx` day grid (low impact, Radix handles).
+- **`role="alert"` on FormMessage** — Sonner toasts already announce form errors.
+- **`gcTime` tuning** — speculative; current 5min default is fine.
 
 **Carried over from Phase 1 (deferred):**
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard. `web/src/routes/__root.tsx`. Requires real-device validation; no simulator fully reproduces keyboard occlusion.
-- [ ] **MOBILE-19** HeroGrid 20px padding feels cramped on 375px. `web/src/components/hero-grid.tsx`. Subjective — defer until visual evidence shows a clear problem.
 
-**New:**
-- _(empty — backlog drained, awaiting user reports or future scout)_
+**New (T1 — user-reported):**
+- [ ] **MOBILE-26** iOS Safari swipe-back gesture freezes / shows blank page. Tap-back works fine. _(in flight)_
+  - Likely cause: bfcache restore with no `pageshow` handler — TanStack Query refetches on focus, a stale-session 401 fires `navigate({ to: "/login" })` mid-swipe-animation. SPA is bfcache-eligible (no `unload`/WS/etc.) but doesn't react when restored.
+  - Files: `web/src/main.tsx`, `web/src/routes/__root.tsx` (401 handler).
+  - Fix: `pageshow` listener with `event.persisted` check that calls `router.invalidate()` + `queryClient.invalidateQueries()`; optionally gate the 401 redirect on `document.visibilityState === "visible"`.
 
 **Closed by audit:**
 - ✅ **MOBILE-API-COPY (closed as already-handled)** Scout flagged that API key copy on iOS might silently fail. Verified: `onCopy` at `api-key-created.tsx:47` already has try/catch with a clear error toast ("Couldn't access the clipboard. Select the value and copy manually.") and the readonly Input has `onFocus={e => e.currentTarget.select()}` for manual-copy ergonomics. No code change required.
@@ -58,11 +71,78 @@ Each iteration:
 
 ## In-flight PRs
 
-_(none)_
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 26 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350, #1351, #1352 + state-doc merges).
+- **fix/mobile-per-agent-routes** (subagent `a91963f2`) — **MOBILE-53/54/55 (T3 scout-found, HIGH/MEDIUM/MEDIUM bundle)**. per-agent runs columns get `max-sm:hidden` (#1343 pattern applied to local `buildPerAgentRunsColumns`); agents list agent-name column gets `max-sm:w-full max-sm:min-w-[140px]`; agent-form quiet-hours time grid gets `grid-cols-1 sm:grid-cols-2`. PR # TBD.
+
+## Closed scouts (iter 34)
+
+- ✅ **T3 per-agent routes scout** — 4 files audited. 3 actionable (above) + 1 CLEAN (agents.new.tsx — thin wrapper around AgentForm which inherits #1322 fix). agents.$slug.edit.tsx also clean (same wrapper).
+
+## Closed scouts (iter 32)
+
+- ✅ **T5 mobile-a11y audit** — most categories CLEAN: ARIA landmarks (header / main / nav semantically correct), icon-button aria-labels (row-actions / tag-chip / sidebar trigger / data-table / pagination all good), focus traps (Radix defaults retained), contrast on `pointer-coarse:` (AA passes light + dark), prefers-reduced-motion (PR #1337 rule confirmed at globals.css:202 — scout's HIGH finding here was a FALSE POSITIVE).
+- 2 actionable (above). 1 deferred LOW (sonner aria-live verification — speculative, can't verify from code).
+
+## Closed scouts (iter 31)
+
+- ✅ **T3 shared-components scout** — 14 files audited. 2 actionable above. 1 deferred (kbd-tooltip showing on touch — LOW polish, defer). 11 CLEAN (detail-list, list-card, status-panel, timeline-rail, soft-back-button, id-pill, eyebrow, brand-header, coming-soon-pill, color-rail-card, **hero-grid**).
+- ✅ **MOBILE-19** Hero-grid padding (deferred from Phase 1) — verified non-issue by scout. `px-5 sm:px-7` reads correctly at 375px; "feels cramped" was subjective and no visual evidence surfaced.
+
+## Closed scouts (iter 29)
+
+- ✅ **T3 providers+connections scout** — 20 files audited, 2 actionable (above), most CLEAN:
+  - family-tabs.tsx — already has the iter-24 horizontal-scroll fix
+  - plaid-link-button + teller-connect-button — render `null`, SDK launches in browser-native modals (no SPA-side mobile concern)
+  - sync-history-list, connection-row, connection-status-badge, connections-summary, env-locked-notice, provider-status, csv-card, plaid-card, teller-card — all good at 375px
+  - sync-activity-bars — acceptable as-is (fixed-height bar chart, 7+ bars fit)
+  - No Plaid/Teller SDK launch issues on iOS detected
+
+## Closed scouts (iter 28)
+
+- ✅ **T3 transaction-detail+features scout** — 7 findings, 2 actionable (above), 5 deferred:
+  - Comment composer keyboard hints (minor UX polish)
+  - ActivityTimeline max-height (design question, no clear bug)
+  - Pagination button sizes (likely already covered by `pointer-coarse:` tap zone from #1317 — verify before changing)
+  - CommentComposer label visibility on mobile (minor polish)
+  - Tag chip × button size (likely already covered by `pointer-coarse:` tap zone — verify before changing)
+
+## Closed scouts (iter 27)
+
+- ✅ **T3 categories+tags scout** — most surfaces (category-list rows, category-detail hero, tags table column hides, category-form layout) REPORTED CLEAN. Only the 2 picker popovers above had mobile width issues. Tags table already had `md:table-cell` column hides matching #1343 pattern.
+
+## Closed scouts (iter 25)
+
+- ✅ **T3 accounts scout** — `routes/accounts.tsx`, `routes/account-detail.tsx`, `features/accounts/*` reported CLEAN. Phase 1 + Phase 2 patterns already cover the surfaces present here. No new backlog items.
+
+## Completed (Phase 2 — direct-to-main)
+
+- ✅ **MOBILE-26** iOS swipe-back bfcache fix — PR #1329 merged into MAIN per user auth (`34dee658`). Adds `pageshow` listener that calls `router.invalidate()` + `queryClient.invalidateQueries()` on `event.persisted === true`, eliminating the freeze/blank-page race between bfcache restore and stale-query 401 redirect.
 
 ## Completed (Phase 2)
 
 - ✅ **MOBILE-22/23** Button stacking polish — PR #1328 merged into sprint branch (`543599c8`). API-key Copy button gains `w-full sm:w-auto`; disconnect confirmation rewrapped as `flex-col-reverse sm:flex-row` with destructive Disconnect button on top + full-width-when-stacked. Follows the FormFooter pattern from #1321.
+- ✅ **MOBILE-27** Mobile navbar blur — PR #1330 merged into sprint branch (`70f8518d`). `<header>` now uses solid `bg-background` at <640px (no `backdrop-blur`, no translucency), restoring the glassy look at sm+ via `sm:backdrop-blur` / `sm:bg-background/95`. Eliminates the visible seam between solid safe-area zone and previously-blurred header on iOS.
+- ✅ **MOBILE-28** Viewport-unit polish (T4) — PR #1331 merged into sprint branch (`84bdb932`). 5 viewport-unit straggler swaps: `min-h-screen` → `min-h-dvh` on auth-shell wrapper + grid; `min-h-svh` → `min-h-dvh` on sidebar outer wrapper; `max-w-[calc(100vw-1rem)]` → `max-w-[calc(100dvw-1rem)]` in popover/select/dropdown content clamps. Finishes the dvh/dvw family.
+- ✅ **MOBILE-29** iOS web-app shell polish — PR #1332 merged into sprint branch (`658e69f6`). Adds iOS PWA meta tags (`apple-mobile-web-app-capable=yes`, `status-bar-style=black-translucent`, `apple-mobile-web-app-title=Breadbox`, `apple-touch-icon` → favicon.svg), inline cold-load splash in `<div id="root">` (auto-vanishes when React hydrates, respects `prefers-reduced-motion` and `prefers-color-scheme`), and global `-webkit-tap-highlight-color: transparent`.
+- ✅ **MOBILE-30** 401 visibility-gate — PR #1333 merged into sprint branch (`73e53940`). `AuthenticatedGate` in `__root.tsx` now defers the redirect-to-login while `document.visibilityState !== "visible"`, attaching a `visibilitychange` listener that fires the redirect when the user re-engages. Closes the residual bfcache-restore race left by PR #1329; cleanup-on-unmount included.
+- ✅ **MOBILE-35** Per-row CategoryPicker lazy body — PR #1335 merged into sprint branch (`fb8439c3`). Splits `CategoryPicker` into a lightweight always-mounted shell (just `useState(open)` + trigger) and a `PickerBody` that mounts only when `open === true` and owns `useCategoryEditor` (the mutation hook). Audit's actual finding: 50× `useMutation` observers per page (not popover content) were the leak. Reduces transactions-list React memory, improving iOS Safari bfcache eligibility.
+- ✅ **MOBILE-36** Prompts add-block dialog footer stacking — PR #1336 merged into sprint branch (`943dec09`). Inner action wrapper rewrapped as `flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center` so "Done" (affirmative) sits on top on mobile per the #1321 convention.
+- ✅ **MOBILE-31** Global `prefers-reduced-motion` (T2 HIGH a11y) — PR #1337 merged into sprint branch (`46323665`). Adds one `@media (prefers-reduced-motion: reduce)` block to `globals.css` using the CSS-tricks pattern (compress animation/transition to 0.01ms so `animationend` handlers still fire). Covers ~51 `animate-spin` usages + all shadcn primitive transitions without touching call sites. Cold-load splash (#1332) retains its own per-element `animation: none` override.
+- ✅ **MOBILE-32/33** iOS form ergonomics (T2 HIGH/MEDIUM) — PR #1338 merged into sprint branch (`d00c6305`). `SearchInput` gets defaults (`inputMode="search"`, `enterKeyHint="search"`, `autoCapitalize="none"`, `autoCorrect="off"`, `spellCheck={false}`) so every search consumer benefits. Numeric inputs (agent `max_turns`, `budget_usd_cents`, link-account tolerance, rule values) get `inputMode="numeric|decimal"`. Identifier fields (API key name/prefix, rule values) get autocorrect/autocapitalize off.
+- ✅ **MOBILE-38** Prompts builder mobile layout (T2 HIGH) — PR #1339 merged into sprint branch (`d6ada115`). `grid grid-cols-[10rem_1fr]` swapped to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]`; nav becomes a horizontal scroll-shadow chip rail on `<sm` with dividers flipped from horizontal rules to vertical separators between pills. Pattern matches #1324 (transactions filter) / MOBILE-21 (settings tabs).
+- ✅ **MOBILE-34/40** iOS overscroll hygiene (T2 MEDIUM) — PR #1340 merged into sprint branch (`ba76a4f3`). Adds `overscroll-contain` to the Table primitive's scroll-shadow wrapper (blocks pull-to-refresh and parent rubber-band when scrolling tables) and to the transcript-viewer's `<pre>` code blocks (blocks back-swipe leakage from inner scroll).
+- ✅ **MOBILE-39** Rules filter toolbar mobile stack (T2 MEDIUM) — PR #1341 merged into sprint branch (`7e56b5ba`). At `<sm`, search takes full width on row 1, the two selects share row 2 via `flex-1`. At `sm+`, `display: contents` wrapper transparently passes through so `ml-auto` on the sort select keeps right-anchoring as before.
+- ✅ **MOBILE-41/42** LOW polish bundle — PR #1342 merged into sprint branch (`54b566eb`). Removed `[&_[cmdk-input]]:h-11` override from `command-palette.tsx` so the primitive's `h-9 pointer-coarse:h-12` adaptive defaults apply (#1317). Added `pt-[calc(*+env(safe-area-inset-top))]` to `detail-sheet-header.tsx` for iPhone landscape with notch (harmless on devices without one — env resolves to 0).
+- ✅ **MOBILE-37** Agent runs table mobile column collapse (T2 HIGH) — PR #1343 merged into sprint branch (`aa40ebc7`). Trigger / Duration / Cost / Tools columns gain `max-sm:hidden`; Agent column widens to `max-sm:w-[40%] max-sm:min-w-[140px]` so it dominates the remaining mobile view. DataTable already propagates `column.meta.className` to both TableHead and TableCell (no DataTable change needed). Power-user metrics remain accessible via row-tap → run detail sheet.
+- ✅ **T7 mobile-patterns canon** — PR #1344 merged into sprint branch (`eef5255a`). Adds a "Mobile / iOS Safari patterns" section to `.claude/rules/v2-frontend.md` codifying 9 pattern families (viewport units, safe-area, tap targets, scroll-shadow, mobile reflow, form ergonomics, bfcache/lifecycle, reduced-motion + tap-highlight, iOS web-app metadata) with PR citations. Future agents have the canon.
+- ✅ **T6 sandbox specimens** — PR #1345 merged into sprint branch (`97807c42`). Adds two specimens to `web/src/sandbox/sections/patterns.tsx`: `scroll-shadow-x utility` (card surface + page-surface cover override) and `Mobile reflow patterns` (button stack with primary-on-top, CSS `order` reshuffle, horizontal scroll-rail filter pills). Each cites the originating PR in code comments.
+- ✅ **MOBILE-43/44** Picker popover mobile widths — PR #1346 merged into sprint branch (`0aa00e0a`). Icon-picker (`w-72`) and color-picker (`w-64`) PopoverContents now use `w-[calc(100dvw-2rem)] sm:w-{72|64}` — full visible width minus 16px margin on mobile, locked to design size at sm+.
+- ✅ **MOBILE-45/46** FloatingActionBar safe-area-bottom + CommandList max-h adaptive — PR #1347 merged into sprint branch (`4ef34cd7`). FAB clears iPhone home indicator via `bottom-[max(1rem,env(safe-area-inset-bottom))]`; CommandList caps at `max-h-[min(300px,50dvh)]` so dropdowns adapt to shorter viewports (iOS keyboard open, landscape).
+- ✅ **MOBILE-47/48** connect/reauth sheet footers — PR #1348 merged into sprint branch (`8d37e803`). `connect-bank-sheet.tsx` (pick stage) and `reauth-sheet.tsx` (confirm stage) hand-rolled footers now follow the canonical `flex-col-reverse sm:flex-row` + `w-full sm:w-auto` pattern (matches #1321/#1328/#1336).
+- ✅ **T4 iter-28 followups** — PR #1349 merged into sprint branch (`ed1dbc5d`). Verified all 5 deferred items from iter 28: **fixed 2** (comment-composer textarea gets `enterKeyHint="send"` → iOS keyboard tints the return key; tag-chip × button gets the `pointer-coarse:` 44pt pseudo from #1317 since the raw `<button>` didn't inherit Button's TAP_TARGET); **closed 3 as non-issues** (ActivityTimeline page-scrolls naturally, PaginationLink already uses `buttonVariants({size:"icon"})` which inherits TAP_TARGET, CommentComposer button label is additive — spinner doesn't replace it).
+- ✅ **MOBILE-49/50** detail-dialog-header safe-area-top + confirm-dialog button widths — PR #1350 merged into sprint branch (`84b66052`). DialogHeader gets `mt-[env(safe-area-inset-top)]` (clean margin-shift approach; iPad-landscape notched device clearance). `AlertDialogCancel` + `AlertDialogAction` get `w-full sm:w-auto` so stacked buttons reach full tap width on 375px (AlertDialogFooter already had `flex-col-reverse` semantic — only the button widths were the gap).
+- ✅ **MOBILE-51/52** a11y form-alert + skip-link (T5 bundle) — PR #1351 merged into sprint branch (`cf94529a`). FormMessage gains `role="alert" aria-live="polite"` (conditional on error state) — VoiceOver / NVDA now announce form validation errors as they appear (WCAG 3.3.1). `__root.tsx` gains a `sr-only focus-visible:not-sr-only` skip-to-main-content link + `<main id="main" tabIndex={-1}>` so keyboard / VoiceOver users can bypass the sidebar (WCAG 2.4.1).
+- ✅ **T7 canon refresh** — PR #1352 merged into sprint branch (`ba87c056`). 6 additions to the "Mobile / iOS Safari patterns" section in `.claude/rules/v2-frontend.md` covering everything from PRs #1346 through #1351 (picker dvw widths, CommandList max-h-dvh, FAB safe-area-bottom, DialogHeader mt-env, AlertDialog button width, raw-button tap-zone recipe, textarea enterKeyHint, skip link, FormMessage alert). Canon is current.
 
 ## Notes for next iteration
 

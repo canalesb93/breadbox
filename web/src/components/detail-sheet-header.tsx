@@ -54,7 +54,9 @@ export function DetailSheetHeader({
     <SheetHeader
       className={cn(
         "gap-3 border-b",
-        isAccent ? "bg-muted/20 p-6" : "p-5",
+        isAccent
+          ? "bg-muted/20 px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top))]"
+          : "px-5 pb-5 pt-[calc(1.25rem+env(safe-area-inset-top))]",
         className,
       )}
     >

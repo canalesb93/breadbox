@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Card } from "@/components/ui/card";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { useShortcut } from "@/lib/shortcuts";
 import { displayKey } from "@/lib/kbd-display";
@@ -70,6 +71,22 @@ const FORMATTERS: { code: string; input: string; output: string }[] = [
 ];
 
 const KEY_TOKENS = ["mod", "shift", "alt", "ctrl", "enter", "esc", "k", "/"];
+
+// A long-enough chip list to force horizontal overflow inside a typical
+// list-page column so the scroll-shadow gradient is visible without
+// resizing the viewport.
+const SCROLL_RAIL_PILLS = [
+  "All",
+  "Inbox",
+  "Uncategorised",
+  "Food & Drink",
+  "Transport",
+  "Subscriptions",
+  "Housing",
+  "Travel",
+  "Health",
+  "Income",
+];
 
 export function PatternsSection() {
   const [debounceInput, setDebounceInput] = useState("");
@@ -253,6 +270,171 @@ export function PatternsSection() {
             useMediaQuery(min-width:1024px):{" "}
             <code className="text-foreground font-mono">{String(isWide)}</code>
           </span>
+        </div>
+      </Specimen>
+
+      {/*
+        Mobile / iOS Safari patterns — canon lives in
+        `.claude/rules/v2-frontend.md` ("Mobile / iOS Safari patterns",
+        #1344). These specimens demo the per-component techniques so future
+        contributors can see them in isolation. Globals (reduced-motion,
+        tap-highlight, web-app metadata, cold-load splash) intentionally
+        omitted — the rules doc is the canonical reference for those.
+      */}
+
+      <Specimen
+        label="scroll-shadow-x utility"
+        code="globals.css · @utility scroll-shadow-x"
+        description="A CSS-only gradient fade painted at the clipped edges of a horizontally-scrolling container so scrollability is visible without a scrollbar. Scroll the row below — the right edge fades; after scrolling, the left edge fades in. Default cover is `var(--card)` (matches the Table primitive); on non-card surfaces override with `[--scroll-shadow-cover:var(--background)]`. Pair with `[-webkit-overflow-scrolling:touch]` + `overscroll-contain` on iOS."
+        className="block"
+      >
+        {/* Card surface — default --scroll-shadow-cover (var(--card)) blends. */}
+        <div className="space-y-1">
+          <p className="text-muted-foreground text-xs">
+            On a <code className="font-mono">bg-card</code> surface — default
+            cover.
+          </p>
+          <Card className="p-2">
+            <div className="scroll-shadow-x flex gap-2 overflow-x-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+              {SCROLL_RAIL_PILLS.map((p) => (
+                <Button
+                  key={`card-${p}`}
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                >
+                  {p}
+                </Button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Page surface — override --scroll-shadow-cover to var(--background). */}
+        <div className="mt-4 space-y-1">
+          <p className="text-muted-foreground text-xs">
+            On a <code className="font-mono">bg-background</code> surface —
+            override via{" "}
+            <code className="font-mono">
+              [--scroll-shadow-cover:var(--background)]
+            </code>
+            .
+          </p>
+          <div className="scroll-shadow-x flex gap-2 overflow-x-auto overscroll-contain [-webkit-overflow-scrolling:touch] [--scroll-shadow-cover:var(--background)]">
+            {SCROLL_RAIL_PILLS.map((p) => (
+              <Button
+                key={`bg-${p}`}
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+              >
+                {p}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </Specimen>
+
+      <Specimen
+        label="Mobile reflow patterns"
+        code="flex-col-reverse · order-first · max-sm:scroll-shadow-x"
+        description="Three canonical techniques for reshaping desktop layouts on narrow viewports without forking the component. Each demo is wrapped in a deliberately narrow container so the mobile state is visible without resizing the window."
+        className="block"
+      >
+        {/* 1. Button stack with primary on top.
+            Canon: see PR #1321 (FormFooter) / #1328 (disconnect) / #1336 +
+            #1339 (prompts). The wrapper toggles `flex-col-reverse w-full`
+            (primary above secondary, full-width) to `sm:flex-row sm:w-auto`
+            (primary right-aligned). The DOM order stays {secondary, primary}
+            so tab order is preserved; `flex-col-reverse` only inverts the
+            visual axis. */}
+        <div className="w-full space-y-1">
+          <p className="text-muted-foreground text-xs">
+            <strong className="text-foreground">Button stack, primary on top.</strong>{" "}
+            Narrow widths get a full-width column with primary above
+            secondary; sm+ reverts to an inline row. DOM order preserved for
+            keyboard tab order.
+          </p>
+          <div className="bg-muted/30 max-w-[280px] rounded-md border p-3">
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+              <Button variant="outline" size="sm">
+                Cancel
+              </Button>
+              <Button size="sm">Save changes</Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. CSS `order` for mobile-first content.
+            Canon: see PR #1322 (agent-form mobile reorder). DOM order is
+            {Prompt, Controls} so keyboard tab order surfaces the long
+            textarea first; visual order on mobile flips so the operational
+            knobs sit above the prompt. `md:order-none` reverts both cards
+            to source order at md+. */}
+        <div className="mt-5 w-full space-y-1">
+          <p className="text-muted-foreground text-xs">
+            <strong className="text-foreground">CSS `order` to reshuffle visual order.</strong>{" "}
+            DOM is {`{Prompt, Controls}`}; visual order on mobile is{" "}
+            {`{Controls, Prompt}`} via{" "}
+            <code className="font-mono">order-first md:order-none</code>.
+            Tab/keyboard order still follows the DOM.
+          </p>
+          <div className="bg-muted/30 max-w-[420px] rounded-md border p-3">
+            <div className="grid gap-2 md:grid-cols-2">
+              <Card className="p-3 text-sm">
+                <div className="text-muted-foreground text-xs uppercase tracking-wider">
+                  Prompt (DOM 1)
+                </div>
+                <p className="text-foreground/80 mt-1 text-xs">
+                  Long body content — wants to live first in source order so
+                  screen readers and tab navigation reach it without a
+                  detour.
+                </p>
+              </Card>
+              <Card className="order-first p-3 text-sm md:order-none">
+                <div className="text-muted-foreground text-xs uppercase tracking-wider">
+                  Controls (DOM 2)
+                </div>
+                <p className="text-foreground/80 mt-1 text-xs">
+                  Operational knobs — visually first on mobile so users
+                  don't scroll past the long body to reach them.
+                </p>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Horizontal scroll-rail for filter pills.
+            Canon: see PR #1324 (transactions toolbar) / #1339 (prompts).
+            At sm+ the pills wrap normally; below sm they switch to a
+            single-row scroll rail with the scroll-shadow-x fade affordance.
+            Override the cover to --background because the rail sits on the
+            page surface, not on a card. */}
+        <div className="mt-5 w-full space-y-1">
+          <p className="text-muted-foreground text-xs">
+            <strong className="text-foreground">Horizontal scroll-rail for filter pills.</strong>{" "}
+            At sm+ the chips wrap; below sm they become a single-row scroll
+            rail via{" "}
+            <code className="font-mono">
+              max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:scroll-shadow-x
+            </code>
+            . Page surface, so cover is overridden to{" "}
+            <code className="font-mono">--background</code>.
+          </p>
+          <div className="bg-background max-w-[360px] rounded-md border p-3">
+            <div className="flex items-center gap-2 max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overscroll-contain max-sm:[--scroll-shadow-cover:var(--background)] max-sm:[-webkit-overflow-scrolling:touch] sm:flex-wrap">
+              {SCROLL_RAIL_PILLS.map((p) => (
+                <Button
+                  key={`rail-${p}`}
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                >
+                  {p}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
       </Specimen>
     </SandboxSection>

@@ -87,6 +87,11 @@ export function LoginPage() {
                     type="email"
                     placeholder="you@example.com"
                     autoComplete="username"
+                    inputMode="email"
+                    enterKeyHint="next"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     autoFocus
                     {...field}
                   />
@@ -106,6 +111,7 @@ export function LoginPage() {
                     type="password"
                     placeholder="••••••••"
                     autoComplete="current-password"
+                    enterKeyHint="go"
                     {...field}
                   />
                 </FormControl>
