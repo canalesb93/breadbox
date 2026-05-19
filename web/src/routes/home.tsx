@@ -87,14 +87,20 @@ export function HomePage() {
         isLoading={isLoadingShell}
       />
 
+      {/* CSS Grid items default to `min-width: auto`, which resolves to
+          `min-content` — that lets a child with `whitespace-nowrap` (like
+          the TransactionAmount column) force the grid track wider than its
+          declared width, pushing the card past the viewport on iPhone SE.
+          `min-w-0` on each grid item caps the track at its declared
+          fraction so `truncate` inside actually clips. */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="min-w-0 lg:col-span-2">
           <HomeRecentTransactions
             transactions={recent}
             isLoading={txQuery.isLoading}
           />
         </div>
-        <div className="lg:col-span-1">
+        <div className="min-w-0 lg:col-span-1">
           <HomeConnectionsPanel
             connections={connectionsQuery.data}
             isLoading={connectionsQuery.isLoading}
