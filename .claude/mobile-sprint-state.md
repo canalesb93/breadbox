@@ -73,7 +73,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344 (state-doc merge included).
-- **docs/sandbox-mobile-pattern-specimens** (subagent `a1ed71e0`) — **T6 sandbox completeness**. Adds sandbox demos for `scroll-shadow-x` utility, mobile reflow patterns (button stack, CSS order, chip-rail). Closes the gap where #1344's canon documented patterns but the sandbox had no specimens. PR # TBD.
 
 ## Closed scouts (iter 25)
 
@@ -100,6 +99,7 @@ Each iteration:
 - ✅ **MOBILE-41/42** LOW polish bundle — PR #1342 merged into sprint branch (`54b566eb`). Removed `[&_[cmdk-input]]:h-11` override from `command-palette.tsx` so the primitive's `h-9 pointer-coarse:h-12` adaptive defaults apply (#1317). Added `pt-[calc(*+env(safe-area-inset-top))]` to `detail-sheet-header.tsx` for iPhone landscape with notch (harmless on devices without one — env resolves to 0).
 - ✅ **MOBILE-37** Agent runs table mobile column collapse (T2 HIGH) — PR #1343 merged into sprint branch (`aa40ebc7`). Trigger / Duration / Cost / Tools columns gain `max-sm:hidden`; Agent column widens to `max-sm:w-[40%] max-sm:min-w-[140px]` so it dominates the remaining mobile view. DataTable already propagates `column.meta.className` to both TableHead and TableCell (no DataTable change needed). Power-user metrics remain accessible via row-tap → run detail sheet.
 - ✅ **T7 mobile-patterns canon** — PR #1344 merged into sprint branch (`eef5255a`). Adds a "Mobile / iOS Safari patterns" section to `.claude/rules/v2-frontend.md` codifying 9 pattern families (viewport units, safe-area, tap targets, scroll-shadow, mobile reflow, form ergonomics, bfcache/lifecycle, reduced-motion + tap-highlight, iOS web-app metadata) with PR citations. Future agents have the canon.
+- ✅ **T6 sandbox specimens** — PR #1345 merged into sprint branch (`97807c42`). Adds two specimens to `web/src/sandbox/sections/patterns.tsx`: `scroll-shadow-x utility` (card surface + page-surface cover override) and `Mobile reflow patterns` (button stack with primary-on-top, CSS `order` reshuffle, horizontal scroll-rail filter pills). Each cites the originating PR in code comments.
 
 ## Notes for next iteration
 
