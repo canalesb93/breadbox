@@ -49,7 +49,6 @@ Each iteration:
 ## Backlog (T3 scout — rules / agents / prompts, iter ~17)
 
 - [ ] **MOBILE-37 (HIGH)** Agent runs table column widths explode beyond viewport on iOS. `web/src/routes/agents.runs.tsx` (~lines 303-388). Rigid `w-[22%] min-w-[160px]` + 8 fixed columns ⇒ horizontal scroll required. Verify whether the existing `scroll-shadow-x` from Table primitive helps; if not, hide-on-mobile or collapse columns into a Metrics expander.
-- [ ] **MOBILE-38 (HIGH)** Prompts builder modal `grid-cols-[10rem_1fr]` doesn't reflow on iPhone landscape. `web/src/routes/prompts.build.tsx` (~line 825). Switch to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]` so the nav rail stacks on small screens.
 - [ ] **MOBILE-39 (MEDIUM)** Rules filter toolbar three fixed-width selects wrap awkwardly. `web/src/routes/rules.tsx` (~line 290). Apply chip-rail pattern from #1324 (`max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto`).
 - [ ] **MOBILE-40 (MEDIUM)** Transcript sheet nested scroll trap. `web/src/features/agents/transcript-viewer.tsx`. Inner `<pre max-h-48 overflow-auto>` inside sheet body creates two scroll contexts; iOS swipe-up in the pre triggers back-gesture instead of scrolling sheet. Fix: `overscroll-behavior-y: contain` on the pre + expand `max-h` so it doesn't compete with the sheet scroll.
 - [ ] **MOBILE-41 (LOW)** Command palette input `h-11` vs `h-12` threshold from #1317. `web/src/components/command-palette.tsx` (~line 218). Debatable; bumping to `h-12` for consistency.
@@ -80,7 +79,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — `CLEAN` status; now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338 (state-doc merge included).
-- **fix/mobile-prompts-builder-layout** (subagent `aa905e04`) — **MOBILE-38 (T2 HIGH)**. Stack prompts builder nav above content on mobile via `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]`; nav becomes horizontal scroll rail using `scroll-shadow-x` (same pattern as #1324). PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -97,6 +95,7 @@ Each iteration:
 - ✅ **MOBILE-36** Prompts add-block dialog footer stacking — PR #1336 merged into sprint branch (`943dec09`). Inner action wrapper rewrapped as `flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center` so "Done" (affirmative) sits on top on mobile per the #1321 convention.
 - ✅ **MOBILE-31** Global `prefers-reduced-motion` (T2 HIGH a11y) — PR #1337 merged into sprint branch (`46323665`). Adds one `@media (prefers-reduced-motion: reduce)` block to `globals.css` using the CSS-tricks pattern (compress animation/transition to 0.01ms so `animationend` handlers still fire). Covers ~51 `animate-spin` usages + all shadcn primitive transitions without touching call sites. Cold-load splash (#1332) retains its own per-element `animation: none` override.
 - ✅ **MOBILE-32/33** iOS form ergonomics (T2 HIGH/MEDIUM) — PR #1338 merged into sprint branch (`d00c6305`). `SearchInput` gets defaults (`inputMode="search"`, `enterKeyHint="search"`, `autoCapitalize="none"`, `autoCorrect="off"`, `spellCheck={false}`) so every search consumer benefits. Numeric inputs (agent `max_turns`, `budget_usd_cents`, link-account tolerance, rule values) get `inputMode="numeric|decimal"`. Identifier fields (API key name/prefix, rule values) get autocorrect/autocapitalize off.
+- ✅ **MOBILE-38** Prompts builder mobile layout (T2 HIGH) — PR #1339 merged into sprint branch (`d6ada115`). `grid grid-cols-[10rem_1fr]` swapped to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]`; nav becomes a horizontal scroll-shadow chip rail on `<sm` with dividers flipped from horizontal rules to vertical separators between pills. Pattern matches #1324 (transactions filter) / MOBILE-21 (settings tabs).
 
 ## Notes for next iteration
 
