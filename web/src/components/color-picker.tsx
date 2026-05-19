@@ -67,7 +67,7 @@ export function ColorPicker({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 space-y-3 p-3" align="start">
+      <PopoverContent className="w-[calc(100dvw-2rem)] space-y-3 p-3 sm:w-64" align="start">
         <div className="grid grid-cols-6 gap-1.5">
           {PRESET_COLORS.map((color) => {
             const selected = color === value;
