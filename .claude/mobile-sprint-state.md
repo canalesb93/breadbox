@@ -73,7 +73,11 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345 (state-doc merge included).
-- **T3 categories+tags scout** (Explore agent `ac9a04c6`) — auditing `routes/categor*`, `routes/tag*`, `features/categories/*`, `features/tags/*`, and the picker components for iOS issues. Findings will fold into backlog (or report clean).
+- **fix/mobile-picker-popover-widths** (subagent `a812ec23`) — **MOBILE-43 + MOBILE-44 (T3 scout-found)**. Widen icon-picker (`w-72`) and color-picker (`w-64`) popovers on mobile via `w-[calc(100dvw-2rem)] sm:w-72`. Same pattern as #1320 dvw + #1316 popover clamp. PR # TBD.
+
+## Closed scouts (iter 27)
+
+- ✅ **T3 categories+tags scout** — most surfaces (category-list rows, category-detail hero, tags table column hides, category-form layout) REPORTED CLEAN. Only the 2 picker popovers above had mobile width issues. Tags table already had `md:table-cell` column hides matching #1343 pattern.
 
 ## Closed scouts (iter 25)
 
