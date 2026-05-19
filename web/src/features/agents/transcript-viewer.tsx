@@ -561,7 +561,7 @@ function CodeJson({ value }: { value: unknown }) {
     }
   }, [value]);
   return (
-    <pre className="bg-muted max-h-48 overflow-auto rounded p-2 text-[11px] leading-tight">
+    <pre className="bg-muted max-h-48 overflow-auto overscroll-contain rounded p-2 text-[11px] leading-tight">
       {text}
     </pre>
   );
