@@ -75,6 +75,7 @@ export function AccountSettingsCard({ account: a }: AccountSettingsCardProps) {
               <Input
                 id="display-name"
                 autoFocus
+                autoComplete="off"
                 value={draft}
                 placeholder={a.name}
                 onChange={(e) => setDraft(e.target.value)}

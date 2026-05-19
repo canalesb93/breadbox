@@ -320,6 +320,7 @@ export function TranscriptViewer({
           type="search"
           inputMode="search"
           enterKeyHint="search"
+          autoComplete="off"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}

@@ -528,6 +528,7 @@ function CsvMapStage({
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
             placeholder="CSV Import"
+            autoComplete="off"
           />
           <p className="text-muted-foreground text-xs">
             Shown in the accounts list. You can rename it later.

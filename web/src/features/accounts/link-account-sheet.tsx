@@ -160,6 +160,7 @@ export function LinkAccountSheet({
               id="tolerance"
               type="number"
               inputMode="numeric"
+              autoComplete="off"
               min={0}
               max={30}
               value={toleranceDays}
