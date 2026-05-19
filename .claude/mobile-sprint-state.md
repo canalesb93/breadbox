@@ -77,7 +77,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339 (state-doc merge included).
-- **fix/mobile-overscroll-contain** (subagent `a9ce28c0`) — **MOBILE-34 + MOBILE-40 (T2 MEDIUM bundle)**. Adds `overscroll-contain` to the Table primitive wrapper and the transcript-viewer `<pre>` to block iOS pull-to-refresh / back-swipe leaks from inner scroll containers. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -95,6 +94,7 @@ Each iteration:
 - ✅ **MOBILE-31** Global `prefers-reduced-motion` (T2 HIGH a11y) — PR #1337 merged into sprint branch (`46323665`). Adds one `@media (prefers-reduced-motion: reduce)` block to `globals.css` using the CSS-tricks pattern (compress animation/transition to 0.01ms so `animationend` handlers still fire). Covers ~51 `animate-spin` usages + all shadcn primitive transitions without touching call sites. Cold-load splash (#1332) retains its own per-element `animation: none` override.
 - ✅ **MOBILE-32/33** iOS form ergonomics (T2 HIGH/MEDIUM) — PR #1338 merged into sprint branch (`d00c6305`). `SearchInput` gets defaults (`inputMode="search"`, `enterKeyHint="search"`, `autoCapitalize="none"`, `autoCorrect="off"`, `spellCheck={false}`) so every search consumer benefits. Numeric inputs (agent `max_turns`, `budget_usd_cents`, link-account tolerance, rule values) get `inputMode="numeric|decimal"`. Identifier fields (API key name/prefix, rule values) get autocorrect/autocapitalize off.
 - ✅ **MOBILE-38** Prompts builder mobile layout (T2 HIGH) — PR #1339 merged into sprint branch (`d6ada115`). `grid grid-cols-[10rem_1fr]` swapped to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]`; nav becomes a horizontal scroll-shadow chip rail on `<sm` with dividers flipped from horizontal rules to vertical separators between pills. Pattern matches #1324 (transactions filter) / MOBILE-21 (settings tabs).
+- ✅ **MOBILE-34/40** iOS overscroll hygiene (T2 MEDIUM) — PR #1340 merged into sprint branch (`ba76a4f3`). Adds `overscroll-contain` to the Table primitive's scroll-shadow wrapper (blocks pull-to-refresh and parent rubber-band when scrolling tables) and to the transcript-viewer's `<pre>` code blocks (blocks back-swipe leakage from inner scroll).
 
 ## Notes for next iteration
 
