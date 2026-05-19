@@ -42,6 +42,11 @@ export function CommentComposer({ transactionId }: CommentComposerProps) {
         onKeyDown={onKeyDown}
         placeholder="Add a note…"
         rows={2}
+        // `enterKeyHint="send"` paints the iOS keyboard return key as "send"
+        // so mobile users get a visible affordance for posting — the desktop
+        // `⌘ Enter` hint is hidden at <sm. The actual submit still requires
+        // the Post button or ⌘/Ctrl+Enter; the hint is purely cosmetic.
+        enterKeyHint="send"
         className="resize-none text-sm"
         disabled={update.isPending}
       />
