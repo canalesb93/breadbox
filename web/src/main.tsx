@@ -358,6 +358,12 @@ if (typeof window !== "undefined") {
   });
 }
 
+// Web Vitals listener — logs LCP / INP-proxy / CLS to the console when
+// `VITE_REPORT_VITALS` is enabled (defaults to on in dev, off in prod).
+// See `web/src/lib/web-vitals.ts`. Future iteration: pipe to a backend
+// `/api/v1/web-vitals` endpoint for real perf baseline tracking.
+void import("@/lib/web-vitals").then((m) => m.startWebVitals());
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

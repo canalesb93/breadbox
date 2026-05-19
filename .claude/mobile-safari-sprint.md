@@ -22,7 +22,8 @@ Perfect mobile support for the v2 SPA at `web/`, prioritizing iOS Safari (26.2+ 
 - ✅ Iter 4 (PR #1358 → sprint): PWA assets — 180/192/512 PNG icons rasterized from favicon.svg via `bun run generate-icons`, `manifest.webmanifest` with maskable variant, sized apple-touch-icon. 404 + error pages confirmed to have back-to-home links (no Safari chrome in standalone mode).
 - ✅ Iter 5 (PR #1359 → sprint): restore bfcache on iOS Safari swipe-back. Pulled `/v2/*` out of the session-middleware group in `internal/api/router.go` so the static SPA bundle stops carrying `Vary: Cookie` (which WebKit treats as a bfcache blocker). Tightened the `pageshow` handler in `web/src/main.tsx` to only re-validate `["me"]` instead of invalidating every cached query, eliminating the post-restore refetch storm. Verified via curl against a freshly-built binary: `Vary: Cookie` is gone from `/v2/` responses.
 - ✅ Iter 6 (PR #1360 → sprint): `bun run memory-sweep` — Playwright-based structural-leak detector. Drives list↔detail N=20 times under webkit, samples DOM node count + shadcn slot count at iter 1/5/10/15/20, reports verdict per flow. Baseline: `/v2/accounts` clean (0 growth across 20 iters); `/v2/transactions` clean iter 1-15 (1838→1742, attrition) then drops to 252 at iter 20 — likely session loss after rapid navigations; flagged for follow-up investigation. WebKit doesn't expose `performance.memory`, so this is a structural proxy; real iOS heap data needs Safari Web Inspector.
-- ✅ Iter 7 (PR pending → sprint): rolled `LeaveGuard` out to `tag-form`, `category-form`, `api-key-form`, and the password-change form in `account-section.tsx`. Each navigates only on success and now resets the form before navigating (so the guard doesn't intercept the post-save nav). The password form uses a custom title/description.
+- ✅ Iter 7 (PR #1361 → sprint): rolled `LeaveGuard` out to `tag-form`, `category-form`, `api-key-form`, and the password-change form in `account-section.tsx`. Each navigates only on success and now resets the form before navigating (so the guard doesn't intercept the post-save nav). The password form uses a custom title/description.
+- ✅ Iter 8 (PR pending → sprint): Web Vitals listener at `web/src/lib/web-vitals.ts`. Uses standard `PerformanceObserver` for `largest-contentful-paint`, `event` (INP-proxy), and `layout-shift` (CLS). Gated by `VITE_REPORT_VITALS` (defaults to on in dev, off in prod). Logs structured `[vitals] ✓ LCP=504 (good) path=/v2/sandbox`-style lines. Verified: LCP=504ms and INP=112ms captured live on `/v2/sandbox`.
 
 ## Queue (priority order)
 
@@ -32,25 +33,23 @@ Each iteration: pick the next item, branch off `mobile-safari/sprint`, ship a su
 
 2. **View Transitions wiring** — wrap `transactions list → detail` and `agents list → detail` route transitions with `startViewTransitionIfSupported`. Helper is in `lib/navigation/feature.ts`. Test fallback path (older browsers see instant navigation).
 
-3. **Web Vitals beacon** — small listener using Event Timing API + LCP (both new in Safari 26.2). Beacon INP/LCP/CLS to a `/api/v1/web-vitals` endpoint or `console.log` behind a `VITE_REPORT_VITALS` flag. Establishes perf baseline.
+3. **Detail-page sweep** — extend `mobile-sweep.ts` to scrape one ID per list route and visit the corresponding detail/edit/new pages. The current sweep only covers parameter-less routes.
 
-4. **Detail-page sweep** — extend `mobile-sweep.ts` to scrape one ID per list route and visit the corresponding detail/edit/new pages. The current sweep only covers parameter-less routes.
+4. **iPhone SE 1st-gen (320px) edge** — `/v2/api-keys` still shows ~55px overflow on the 320px profile. Consider `table-layout: fixed` opt-in on DataTable or other approaches. Lowest priority — 320px devices are ~8 years old.
 
-5. **iPhone SE 1st-gen (320px) edge** — `/v2/api-keys` still shows ~55px overflow on the 320px profile. Consider `table-layout: fixed` opt-in on DataTable or other approaches. Lowest priority — 320px devices are ~8 years old.
+5. **bfcache verification** — write a Playwright test that actually exercises bfcache restore (multi-page traversal + back gesture). Confirms the `pageshow` + `event.persisted` handler in `main.tsx` fires correctly.
 
-6. **bfcache verification** — write a Playwright test that actually exercises bfcache restore (multi-page traversal + back gesture). Confirms the `pageshow` + `event.persisted` handler in `main.tsx` fires correctly.
+6. **Form-field iOS keyboard audit** — verify every `<Input>` consumer passes appropriate `inputMode` / `enterKeyHint` / `autoCapitalize` defaults. `SearchInput` already does; others might not.
 
-7. **Form-field iOS keyboard audit** — verify every `<Input>` consumer passes appropriate `inputMode` / `enterKeyHint` / `autoCapitalize` defaults. `SearchInput` already does; others might not.
+7. **LeaveGuard — remaining settings sub-forms** — audit `household-section`, `backups-section`, `agents-section` for `useForm` instances that need LeaveGuard. Those files are 600+ lines each and likely contain multiple sub-forms; needs per-form judgment on whether the field is sensitive enough to warrant a guard.
 
-8. **LeaveGuard — remaining settings sub-forms** — audit `household-section`, `backups-section`, `agents-section` for `useForm` instances that need LeaveGuard. Those files are 600+ lines each and likely contain multiple sub-forms; needs per-form judgment on whether the field is sensitive enough to warrant a guard.
+8. **Memory phase — TanStack Query `gcTime` cap** — cache currently has no upper bound on retained queries. Set a sensible `gcTime` (5 min default is fine for most; consider `Infinity` for `["me"]` and shorter for paginated lists). Verify via `bun run memory-sweep`.
 
-9. **Memory phase — TanStack Query `gcTime` cap** — cache currently has no upper bound on retained queries. Set a sensible `gcTime` (5 min default is fine for most; consider `Infinity` for `["me"]` and shorter for paginated lists). Verify via `bun run memory-sweep`.
+9. **Memory phase — virtualize transactions list** — long-history households render the entire TanStack Table row tree in DOM (1800+ nodes at iter 1 of the memory sweep). Add `@tanstack/react-virtual` row windowing to DataTable when row count exceeds N. Defer if a profile shows no real iOS pain.
 
-10. **Memory phase — virtualize transactions list** — long-history households render the entire TanStack Table row tree in DOM (1800+ nodes at iter 1 of the memory sweep). Add `@tanstack/react-virtual` row windowing to DataTable when row count exceeds N. Defer if a profile shows no real iOS pain.
+10. **Memory phase — `useEffect` cleanup audit** — grep for `useEffect` returning no cleanup against patterns that hold a listener (`addEventListener`, `setInterval`, `IntersectionObserver`, `MutationObserver`, `ResizeObserver`). Trace common offenders in `features/transactions/*` and `components/data-table.tsx`.
 
-11. **Memory phase — `useEffect` cleanup audit** — grep for `useEffect` returning no cleanup against patterns that hold a listener (`addEventListener`, `setInterval`, `IntersectionObserver`, `MutationObserver`, `ResizeObserver`). Trace common offenders in `features/transactions/*` and `components/data-table.tsx`.
-
-12. **Transactions session-loss after rapid navigations** — `bun run memory-sweep` shows `/v2/transactions` dropping to 252 nodes at iter 20 (AuthSplash territory). Likely session lifetime or scs middleware behavior under hammered navs. Reproduce, then either bump session ttl on /v2 boundary or stabilize the auth gate.
+11. **Transactions session-loss after rapid navigations** — `bun run memory-sweep` shows `/v2/transactions` dropping to 252 nodes at iter 20 (AuthSplash territory). Likely session lifetime or scs middleware behavior under hammered navs. Reproduce, then either bump session ttl on /v2 boundary or stabilize the auth gate.
 
 ## Operating notes
 
