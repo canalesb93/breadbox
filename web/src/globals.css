@@ -130,6 +130,20 @@
      touch. Keep `cursor: pointer` and `:focus-visible` for keyboard. */
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Suppress iOS Safari's document-level pull-to-refresh. The app shell
+       is `min-h-dvh` (shadcn SidebarProvider), so the document itself
+       scrolls — which means a downward pull at the top of any page fires
+       Safari's native reload. For an SPA that's destructive: it drops the
+       TanStack Query cache, loses scroll position and in-memory UI state,
+       and re-shows the cold-load splash, all from an accidental
+       over-scroll while reading. `overscroll-behavior-y: contain` cancels
+       the pull-to-refresh (and scroll-chaining to the browser chrome)
+       while KEEPING the natural rubber-band bounce — the conservative
+       choice vs `none`, which would also kill the bounce. Vertical only,
+       so the horizontal iOS swipe-back gesture (and trackpad
+       back/forward) is untouched. Nested scroll containers already set
+       their own `overscroll-contain` (iter 30). */
+    overscroll-behavior-y: contain;
   }
   /* iOS double-tap-zoom suppression on interactive controls. iOS Safari
      treats a fast double-tap on a clickable element as a zoom gesture, so
