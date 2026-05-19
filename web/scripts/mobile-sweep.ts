@@ -50,8 +50,14 @@ const portFile = join(repoRoot, ".breadbox-port");
 
 async function probe(url: string): Promise<boolean> {
   try {
-    const res = await fetch(`${url}/health/live`, { signal: AbortSignal.timeout(800) });
-    return res.ok;
+    // /health/live exists on the Go backend; not on the Vite dev server.
+    // Fall back to /v2/ which both serve (Vite serves the SPA, the Go
+    // server serves the embedded SPA bundle).
+    for (const path of ["/health/live", "/v2/"]) {
+      const res = await fetch(`${url}${path}`, { signal: AbortSignal.timeout(800) });
+      if (res.ok) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -94,29 +100,48 @@ type RouteFinding = {
 };
 
 async function ensureUp() {
-  try {
-    const res = await fetch(`${baseUrl}/health/live`, { signal: AbortSignal.timeout(2000) });
-    if (!res.ok) throw new Error(`status ${res.status}`);
-  } catch (err) {
-    console.error(`✗ ${baseUrl} is not responding (${(err as Error).message}).`);
-    console.error(`  start it with: make dev   (or: make build && ./breadbox serve)`);
-    process.exit(1);
-  }
+  if (await probe(baseUrl)) return;
+  console.error(`✗ ${baseUrl} is not responding.`);
+  console.error(`  start it with: make dev   (or: make build && ./breadbox serve)`);
+  console.error(`  or set BASE_URL=http://localhost:<vite-port> against a vite dev server.`);
+  process.exit(1);
 }
 
 async function signIn(browser: Browser, viewport: Viewport): Promise<BrowserContext> {
   const ctx = await browser.newContext({ ...devices[viewport.device] });
   const page = await ctx.newPage();
-  await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded", timeout: 15_000 });
-  if (page.url().includes("/login")) {
-    await page.fill('input[name="username"], input[type="email"]', user);
-    await page.fill('input[name="password"]', pass);
-    await Promise.all([
-      page
-        .waitForURL((u) => !new URL(u).pathname.startsWith("/login"), { timeout: 10_000 })
-        .catch(() => {}),
-      page.click('form button[type="submit"]'),
-    ]);
+
+  // The Go backend serves /login (v1 admin); the Vite dev server only serves
+  // the v2 SPA at /v2/*. Try /v2/login first (works against both because the
+  // backend also routes /v2/login through the SPA), then fall back to /login.
+  const loginPaths = ["/v2/login", "/login"];
+  for (const path of loginPaths) {
+    try {
+      await page.goto(`${baseUrl}${path}`, {
+        waitUntil: "domcontentloaded",
+        timeout: 15_000,
+      });
+      const found = await page
+        .locator('input[name="username"], input[type="email"]')
+        .first()
+        .waitFor({ timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!found) continue;
+      await page.fill('input[name="username"], input[type="email"]', user);
+      await page.fill('input[name="password"]', pass);
+      await Promise.all([
+        page
+          .waitForURL((u) => !new URL(u).pathname.endsWith("/login"), {
+            timeout: 10_000,
+          })
+          .catch(() => {}),
+        page.click('form button[type="submit"]'),
+      ]);
+      break;
+    } catch {
+      // Try the next path.
+    }
   }
   await page.close();
   return ctx;

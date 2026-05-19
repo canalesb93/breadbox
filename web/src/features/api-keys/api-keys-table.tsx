@@ -45,8 +45,15 @@ export function APIKeysTable({
         header: "Name",
         meta: { className: "w-[32%]" },
         cell: ({ row }) => (
-          <div className="flex flex-col gap-1">
-            <span className="font-medium">{row.original.name}</span>
+          // Auto table-layout (the DataTable default) treats `w-[32%]` as a
+          // hint, not a cap — long agent-key names like
+          // `agent:test-manual-review:NOZTXIIT` blow out the column and push
+          // the trailing columns past the viewport on iPhone SE. The
+          // explicit `max-w-[50vw] sm:max-w-none` gives the inner div a
+          // hard cap on mobile that `truncate` can actually clip against,
+          // and removes the cap at `sm+` where the table fits naturally.
+          <div className="flex min-w-0 max-w-[50vw] flex-col gap-1 sm:max-w-none">
+            <span className="truncate font-medium">{row.original.name}</span>
             <IdPill
               value={`${row.original.key_prefix}…`}
               className="text-muted-foreground self-start"
@@ -112,7 +119,12 @@ export function APIKeysTable({
       {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
-        meta: { className: "w-px" },
+        // Hidden on mobile: the table is already at the iPhone SE width
+        // budget (name truncated + scope badge); the kebab pushes the
+        // viewport ~55px past the visible edge. Revoke is an admin task —
+        // surface it on the (forthcoming) per-key detail route, or from
+        // desktop. Tracked in docs/mobile-sweep-findings.md.
+        meta: { className: "w-px max-sm:hidden" },
         cell: ({ row }) => (
           <RowActionsMenu
             label={`Actions for ${row.original.name}`}
