@@ -147,6 +147,10 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   // Errored messages get a leading AlertCircle so validation reads
   // as a status signal, not as ordinary copy. Plain messages (passed
   // as children without an underlying field error) stay clean.
+  // role="alert" + aria-live="polite" make VoiceOver / NVDA announce
+  // validation errors when they appear (WCAG 3.3.1). Conditional so
+  // success/empty states don't claim to be alerts; polite queues the
+  // announcement instead of interrupting.
   return (
     <p
       data-slot="form-message"
@@ -156,6 +160,8 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
         error ? "text-destructive" : "text-muted-foreground",
         className
       )}
+      role={error ? "alert" : undefined}
+      aria-live={error ? "polite" : undefined}
       {...props}
     >
       {error ? (
