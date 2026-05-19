@@ -48,7 +48,6 @@ Each iteration:
 ## Backlog (T3 scout — rules / agents / prompts, iter ~17)
 
 - [ ] **MOBILE-37 (HIGH)** Agent runs table column widths explode beyond viewport on iOS. `web/src/routes/agents.runs.tsx` (~lines 303-388). Rigid `w-[22%] min-w-[160px]` + 8 fixed columns ⇒ horizontal scroll required. Verify whether the existing `scroll-shadow-x` from Table primitive helps; if not, hide-on-mobile or collapse columns into a Metrics expander.
-- [ ] **MOBILE-39 (MEDIUM)** Rules filter toolbar three fixed-width selects wrap awkwardly. `web/src/routes/rules.tsx` (~line 290). Apply chip-rail pattern from #1324 (`max-sm:scroll-shadow-x max-sm:flex-nowrap max-sm:overflow-x-auto`).
 - [ ] **MOBILE-41 (LOW)** Command palette input `h-11` vs `h-12` threshold from #1317. `web/src/components/command-palette.tsx` (~line 218). Debatable; bumping to `h-12` for consistency.
 - [ ] **MOBILE-42 (LOW)** `detail-sheet-header.tsx` missing safe-area-top in iPhone landscape with notch. `web/src/components/detail-sheet-header.tsx` (~lines 54-59). `pt-5` → `pt-[calc(1.25rem+env(safe-area-inset-top))]`.
 
@@ -77,7 +76,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340 (state-doc merge included).
-- **fix/mobile-rules-toolbar-stack** (subagent `ac4da836`) — **MOBILE-39 (T2 MEDIUM)**. Stack rules filter toolbar at <sm (search row 1 full-width, two selects share row 2 via `flex-1`); restore inline + `ml-auto` at sm+ using `display: contents` wrapper trick. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
@@ -96,6 +94,7 @@ Each iteration:
 - ✅ **MOBILE-32/33** iOS form ergonomics (T2 HIGH/MEDIUM) — PR #1338 merged into sprint branch (`d00c6305`). `SearchInput` gets defaults (`inputMode="search"`, `enterKeyHint="search"`, `autoCapitalize="none"`, `autoCorrect="off"`, `spellCheck={false}`) so every search consumer benefits. Numeric inputs (agent `max_turns`, `budget_usd_cents`, link-account tolerance, rule values) get `inputMode="numeric|decimal"`. Identifier fields (API key name/prefix, rule values) get autocorrect/autocapitalize off.
 - ✅ **MOBILE-38** Prompts builder mobile layout (T2 HIGH) — PR #1339 merged into sprint branch (`d6ada115`). `grid grid-cols-[10rem_1fr]` swapped to `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]`; nav becomes a horizontal scroll-shadow chip rail on `<sm` with dividers flipped from horizontal rules to vertical separators between pills. Pattern matches #1324 (transactions filter) / MOBILE-21 (settings tabs).
 - ✅ **MOBILE-34/40** iOS overscroll hygiene (T2 MEDIUM) — PR #1340 merged into sprint branch (`ba76a4f3`). Adds `overscroll-contain` to the Table primitive's scroll-shadow wrapper (blocks pull-to-refresh and parent rubber-band when scrolling tables) and to the transcript-viewer's `<pre>` code blocks (blocks back-swipe leakage from inner scroll).
+- ✅ **MOBILE-39** Rules filter toolbar mobile stack (T2 MEDIUM) — PR #1341 merged into sprint branch (`7e56b5ba`). At `<sm`, search takes full width on row 1, the two selects share row 2 via `flex-1`. At `sm+`, `display: contents` wrapper transparently passes through so `ml-auto` on the sort select keeps right-anchoring as before.
 
 ## Notes for next iteration
 
