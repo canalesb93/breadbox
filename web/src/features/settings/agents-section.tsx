@@ -256,7 +256,7 @@ export function AgentsSection() {
                         <a
                           href="https://console.anthropic.com"
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="underline-offset-2 hover:underline"
                         >
                           console.anthropic.com

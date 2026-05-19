@@ -168,7 +168,7 @@ export function Placeholder({ title }: { title: string }) {
                   <a
                     href="https://github.com/canalesb93/breadbox/issues"
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
                   >
                     <FileText className="size-3" />

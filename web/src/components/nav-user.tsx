@@ -270,7 +270,7 @@ export function NavUser({ me }: { me: Me | null }) {
                 <a
                   href="https://github.com/canalesb93/breadbox/issues/new/choose"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   <MessageSquareText className="text-muted-foreground" />
                   <span>Send feedback</span>
