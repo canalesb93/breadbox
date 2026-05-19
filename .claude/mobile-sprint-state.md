@@ -73,7 +73,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345 (state-doc merge included).
-- **fix/mobile-picker-popover-widths** (subagent `a812ec23`) — **MOBILE-43 + MOBILE-44 (T3 scout-found)**. Widen icon-picker (`w-72`) and color-picker (`w-64`) popovers on mobile via `w-[calc(100dvw-2rem)] sm:w-72`. Same pattern as #1320 dvw + #1316 popover clamp. PR # TBD.
 
 ## Closed scouts (iter 27)
 
@@ -105,6 +104,7 @@ Each iteration:
 - ✅ **MOBILE-37** Agent runs table mobile column collapse (T2 HIGH) — PR #1343 merged into sprint branch (`aa40ebc7`). Trigger / Duration / Cost / Tools columns gain `max-sm:hidden`; Agent column widens to `max-sm:w-[40%] max-sm:min-w-[140px]` so it dominates the remaining mobile view. DataTable already propagates `column.meta.className` to both TableHead and TableCell (no DataTable change needed). Power-user metrics remain accessible via row-tap → run detail sheet.
 - ✅ **T7 mobile-patterns canon** — PR #1344 merged into sprint branch (`eef5255a`). Adds a "Mobile / iOS Safari patterns" section to `.claude/rules/v2-frontend.md` codifying 9 pattern families (viewport units, safe-area, tap targets, scroll-shadow, mobile reflow, form ergonomics, bfcache/lifecycle, reduced-motion + tap-highlight, iOS web-app metadata) with PR citations. Future agents have the canon.
 - ✅ **T6 sandbox specimens** — PR #1345 merged into sprint branch (`97807c42`). Adds two specimens to `web/src/sandbox/sections/patterns.tsx`: `scroll-shadow-x utility` (card surface + page-surface cover override) and `Mobile reflow patterns` (button stack with primary-on-top, CSS `order` reshuffle, horizontal scroll-rail filter pills). Each cites the originating PR in code comments.
+- ✅ **MOBILE-43/44** Picker popover mobile widths — PR #1346 merged into sprint branch (`0aa00e0a`). Icon-picker (`w-72`) and color-picker (`w-64`) PopoverContents now use `w-[calc(100dvw-2rem)] sm:w-{72|64}` — full visible width minus 16px margin on mobile, locked to design size at sm+.
 
 ## Notes for next iteration
 
