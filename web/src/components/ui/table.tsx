@@ -17,7 +17,7 @@ function Table({
         // and assume the table is broken. `-webkit-overflow-scrolling:touch`
         // is the implicit default on iOS 13+ but explicit beats implicit
         // when this wrapper sits inside several nested scroll contexts.
-        "relative w-full overflow-x-auto scroll-shadow-x [-webkit-overflow-scrolling:touch]",
+        "relative w-full overflow-x-auto scroll-shadow-x overscroll-contain [-webkit-overflow-scrolling:touch]",
         containerClassName,
       )}
     >
