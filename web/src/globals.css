@@ -190,6 +190,32 @@
   --scroll-shadow-color: rgb(0 0 0 / 0.35);
 }
 
+/* iOS Safari focus-zoom prevention. When an `<input>` / `<textarea>` /
+   `<select>` is focused with a computed `font-size` below 16px, iOS
+   Safari triggers an automatic page zoom — the layout bounces and
+   doesn't reset on blur, breaking the UX. Bump every focusable form
+   control on touch devices to 16px so the zoom never fires.
+
+   `!important` is bounded by the `(pointer: coarse)` media query — it
+   only takes effect on touch, where the zoom-prevention requirement is
+   absolute and not a design preference. Desktop (`pointer: fine`)
+   keeps the compact `text-xs` / `text-sm` density our identifier
+   inputs (cron, slug, API key, DSL JSON) rely on.
+
+   The shadcn `Input` / `Textarea` primitives already ship the
+   `text-base md:text-sm` pattern that would have prevented this on the
+   default code path; this rule defends call sites that override to a
+   smaller class for density (cron-field, tag-form, agents-section,
+   household-section, api-key-created, rule-form, action-row, prompts
+   builder, etc.) without each remembering the iOS quirk. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Respect the user's motion preferences globally — Apple HIG requirement and
    a common reason iOS users disable our drawer/spinner/sheet animations via
    Settings → Accessibility → Motion → Reduce Motion. Per the CSS-tricks
