@@ -149,7 +149,7 @@ export function ErrorPage({ error, reset }: ErrorPageProps) {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="px-6 pb-6 sm:px-10">
-                  <pre className="bg-muted/40 text-muted-foreground max-h-[440px] overflow-auto rounded-md border p-3 text-[11px] leading-relaxed [-webkit-overflow-scrolling:touch]">
+                  <pre className="bg-muted/40 text-muted-foreground max-h-[440px] overflow-auto overscroll-contain rounded-md border p-3 text-[11px] leading-relaxed [-webkit-overflow-scrolling:touch]">
                     {stack}
                   </pre>
                 </div>
