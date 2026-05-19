@@ -72,7 +72,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343 (state-doc merge included).
+- **T3 accounts scout** (Explore agent `a4c578a0`) — auditing `routes/accounts.tsx`, `routes/account-detail.tsx`, `features/accounts/*` for iOS issues. Will fold findings into backlog when done.
 
 ## Completed (Phase 2 — direct-to-main)
 
