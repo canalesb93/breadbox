@@ -73,7 +73,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346 (state-doc merge included).
-- **fix/mobile-fab-and-commandlist** (subagent `a3c78774`) — **MOBILE-45 + MOBILE-46 (T3 scout-found, HIGH + MEDIUM)**. FloatingActionBar gains `bottom-[max(1rem,env(safe-area-inset-bottom))]` so it clears the iPhone home indicator. CommandList `max-h-[300px]` → `max-h-[min(300px,50dvh)]` so dropdowns don't push offscreen with iOS keyboard open. PR # TBD.
 
 ## Closed scouts (iter 28)
 
@@ -115,6 +114,7 @@ Each iteration:
 - ✅ **T7 mobile-patterns canon** — PR #1344 merged into sprint branch (`eef5255a`). Adds a "Mobile / iOS Safari patterns" section to `.claude/rules/v2-frontend.md` codifying 9 pattern families (viewport units, safe-area, tap targets, scroll-shadow, mobile reflow, form ergonomics, bfcache/lifecycle, reduced-motion + tap-highlight, iOS web-app metadata) with PR citations. Future agents have the canon.
 - ✅ **T6 sandbox specimens** — PR #1345 merged into sprint branch (`97807c42`). Adds two specimens to `web/src/sandbox/sections/patterns.tsx`: `scroll-shadow-x utility` (card surface + page-surface cover override) and `Mobile reflow patterns` (button stack with primary-on-top, CSS `order` reshuffle, horizontal scroll-rail filter pills). Each cites the originating PR in code comments.
 - ✅ **MOBILE-43/44** Picker popover mobile widths — PR #1346 merged into sprint branch (`0aa00e0a`). Icon-picker (`w-72`) and color-picker (`w-64`) PopoverContents now use `w-[calc(100dvw-2rem)] sm:w-{72|64}` — full visible width minus 16px margin on mobile, locked to design size at sm+.
+- ✅ **MOBILE-45/46** FloatingActionBar safe-area-bottom + CommandList max-h adaptive — PR #1347 merged into sprint branch (`4ef34cd7`). FAB clears iPhone home indicator via `bottom-[max(1rem,env(safe-area-inset-bottom))]`; CommandList caps at `max-h-[min(300px,50dvh)]` so dropdowns adapt to shorter viewports (iOS keyboard open, landscape).
 
 ## Notes for next iteration
 
