@@ -322,7 +322,17 @@ declare module "@tanstack/react-router" {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1 },
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      // Explicit gcTime — TanStack's default is 5min, but stating it
+      // here locks the contract: inactive (no observer) query data is
+      // dropped 5 minutes after the last component using it unmounts.
+      // Caps long-iOS-session memory growth; individual queries can
+      // override (e.g. `["me"]` uses `Infinity` because auth state is a
+      // single small object the auth gate reads on every render).
+      gcTime: 5 * 60 * 1000,
+    },
   },
 });
 

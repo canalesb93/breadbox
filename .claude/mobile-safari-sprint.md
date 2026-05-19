@@ -25,7 +25,8 @@ Perfect mobile support for the v2 SPA at `web/`, prioritizing iOS Safari (26.2+ 
 - ✅ Iter 7 (PR #1361 → sprint): rolled `LeaveGuard` out to `tag-form`, `category-form`, `api-key-form`, and the password-change form in `account-section.tsx`. Each navigates only on success and now resets the form before navigating (so the guard doesn't intercept the post-save nav). The password form uses a custom title/description.
 - ✅ Iter 8 (PR #1362 → sprint): Web Vitals listener at `web/src/lib/web-vitals.ts`. Uses standard `PerformanceObserver` for `largest-contentful-paint`, `event` (INP-proxy), and `layout-shift` (CLS). Gated by `VITE_REPORT_VITALS` (defaults to on in dev, off in prod). Logs structured `[vitals] ✓ LCP=504 (good) path=/v2/sandbox`-style lines. Verified: LCP=504ms and INP=112ms captured live on `/v2/sandbox`.
 - ✅ Iter 9 (PR #1363 → sprint): extended `mobile-sweep` to walk 7 detail/edit flows (transactions, accounts, categories, tags, connections, rules, agents-edit) after the static routes. Each flow scrapes one short_id from its list and inspects the resolved detail URL. **All 7 detail pages clean across iPhone SE 1st-gen, iPhone 13, and iPhone 15 Pro Max** — 0 overflow, no JS errors. Detail surfaces inherit the layout work from earlier iterations.
-- ✅ Iter 10 (PR pending → sprint): iOS keyboard-hint audit + targeted fixes. Added `autoCapitalize="none"` / `autoCorrect="off"` / `spellCheck={false}` to: `action-row.tsx` tag-slug input, `cron-field.tsx` cron-expression input, `account-section.tsx` 3 password fields. Added `type="search"` + `inputMode="search"` + `enterKeyHint="search"` + same anti-correction set to `transcript-viewer.tsx` search box. Audit cleared all other identifier-style inputs as already-handled.
+- ✅ Iter 10 (PR #1364 → sprint): iOS keyboard-hint audit + targeted fixes. Added `autoCapitalize="none"` / `autoCorrect="off"` / `spellCheck={false}` to: `action-row.tsx` tag-slug input, `cron-field.tsx` cron-expression input, `account-section.tsx` 3 password fields. Added `type="search"` + `inputMode="search"` + `enterKeyHint="search"` + same anti-correction set to `transcript-viewer.tsx` search box. Audit cleared all other identifier-style inputs as already-handled.
+- ✅ Iter 11 (PR pending → sprint): TanStack Query cache hygiene. Explicit `gcTime: 5 * 60 * 1000` on the QueryClient defaults (no functional change vs the implicit default but locks the contract). `gcTime: Infinity` on `["me"]` so the auth snapshot doesn't get GC'd during long iOS Safari sessions (would force a `/web/v1/me` refetch + auth-splash flicker on tab-away/return). Memory sweep + mobile sweep clean — no regressions.
 
 ## Queue (priority order)
 
@@ -41,13 +42,11 @@ Each iteration: pick the next item, branch off `mobile-safari/sprint`, ship a su
 
 5. **LeaveGuard — remaining settings sub-forms** — audit `household-section`, `backups-section`, `agents-section` for `useForm` instances that need LeaveGuard. Those files are 600+ lines each and likely contain multiple sub-forms; needs per-form judgment on whether the field is sensitive enough to warrant a guard.
 
-6. **Memory phase — TanStack Query `gcTime` cap** — cache currently has no upper bound on retained queries. Set a sensible `gcTime` (5 min default is fine for most; consider `Infinity` for `["me"]` and shorter for paginated lists). Verify via `bun run memory-sweep`.
+6. **Memory phase — virtualize transactions list** — long-history households render the entire TanStack Table row tree in DOM (1800+ nodes at iter 1 of the memory sweep). Add `@tanstack/react-virtual` row windowing to DataTable when row count exceeds N. Defer if a profile shows no real iOS pain.
 
-7. **Memory phase — virtualize transactions list** — long-history households render the entire TanStack Table row tree in DOM (1800+ nodes at iter 1 of the memory sweep). Add `@tanstack/react-virtual` row windowing to DataTable when row count exceeds N. Defer if a profile shows no real iOS pain.
+7. **Memory phase — `useEffect` cleanup audit** — grep for `useEffect` returning no cleanup against patterns that hold a listener (`addEventListener`, `setInterval`, `IntersectionObserver`, `MutationObserver`, `ResizeObserver`). Trace common offenders in `features/transactions/*` and `components/data-table.tsx`.
 
-8. **Memory phase — `useEffect` cleanup audit** — grep for `useEffect` returning no cleanup against patterns that hold a listener (`addEventListener`, `setInterval`, `IntersectionObserver`, `MutationObserver`, `ResizeObserver`). Trace common offenders in `features/transactions/*` and `components/data-table.tsx`.
-
-9. **Transactions session-loss after rapid navigations** — `bun run memory-sweep` shows `/v2/transactions` dropping to 252 nodes at iter 20 (AuthSplash territory). Likely session lifetime or scs middleware behavior under hammered navs. Reproduce, then either bump session ttl on /v2 boundary or stabilize the auth gate.
+8. **Transactions session-loss after rapid navigations** — `bun run memory-sweep` shows `/v2/transactions` dropping to 252 nodes at iter 20 (AuthSplash territory). Likely session lifetime or scs middleware behavior under hammered navs. Reproduce, then either bump session ttl on /v2 boundary or stabilize the auth gate.
 
 ## Operating notes
 
