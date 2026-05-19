@@ -72,7 +72,12 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 24 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350 + state-doc merges).
-- **T5 mobile-a11y audit** (Explore agent `aeb7dcd0`) — auditing ARIA landmarks, skip-to-content, icon-button aria-labels, focus traps, reduced-motion edge cases, VoiceOver flows. Findings or clean.
+- **fix/mobile-a11y-form-alert-and-skip-link** (subagent `abfb57bb`) — **MOBILE-51 + MOBILE-52 (T5 a11y bundle)**. FormMessage gains `role="alert" aria-live="polite"` so VoiceOver announces form errors proactively; `__root.tsx` gains a `sr-only focus-visible:not-sr-only` skip-to-main-content link that becomes visible on keyboard focus. PR # TBD.
+
+## Closed scouts (iter 32)
+
+- ✅ **T5 mobile-a11y audit** — most categories CLEAN: ARIA landmarks (header / main / nav semantically correct), icon-button aria-labels (row-actions / tag-chip / sidebar trigger / data-table / pagination all good), focus traps (Radix defaults retained), contrast on `pointer-coarse:` (AA passes light + dark), prefers-reduced-motion (PR #1337 rule confirmed at globals.css:202 — scout's HIGH finding here was a FALSE POSITIVE).
+- 2 actionable (above). 1 deferred LOW (sonner aria-live verification — speculative, can't verify from code).
 
 ## Closed scouts (iter 31)
 
