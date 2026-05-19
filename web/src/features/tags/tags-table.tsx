@@ -76,6 +76,13 @@ export function TagsTable({
       {
         id: "description",
         header: "Description",
+        // Description has no width cap and uses `line-clamp-1`, which limits
+        // visible lines but lets the cell expand to the natural single-line
+        // text width — that pushes the trailing actions column past the
+        // viewport on iPhone SE. Hidden below `sm` per the v2-frontend
+        // "Hide-on-mobile data table columns" pattern; row tap → detail
+        // page still surfaces it.
+        meta: { className: "max-sm:hidden" },
         cell: ({ row }) =>
           row.original.description ? (
             <span className="text-muted-foreground line-clamp-1 text-sm">
