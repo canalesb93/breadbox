@@ -249,6 +249,17 @@ func asArray(t *testing.T, label string, v any) []any {
 
 // --- Tests ---
 
+// decodeAnnotations unwraps the `{"annotations": [...]}` envelope returned by
+// list_annotations. The envelope exists because MCP's structuredContent slot
+// requires a JSON record (object), not an array — bare slices fail client-side
+// schema validation.
+func decodeAnnotations(t *testing.T, res *mcpsdk.CallToolResult, err error) []any {
+	t.Helper()
+	out := decodeToolResult[map[string]any](t, "list_annotations", res, err)
+	requireKeys(t, "list_annotations", out, "annotations")
+	return asArray(t, "list_annotations.annotations", out["annotations"])
+}
+
 // TestListAnnotationsResponseShape pins annotation event shape: generic `kind`
 // (comment | rule | tag | category) paired with an `action` field for the
 // specific event, actor split across actor_type/actor_name/actor_id (not a
@@ -258,7 +269,7 @@ func TestListAnnotationsResponseShape(t *testing.T) {
 	res, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,
 	})
-	out := decodeToolResult[[]any](t, "list_annotations", res, err)
+	out := decodeAnnotations(t, res, err)
 	if len(out) == 0 {
 		t.Fatal("expected at least one annotation (tag from seeding)")
 	}
@@ -309,7 +320,7 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,
 	})
-	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
+	all := decodeAnnotations(t, allRes, err)
 	if len(all) < 3 {
 		t.Fatalf("expected at least 3 annotations (tag added + tag removed + comment), got %d", len(all))
 	}
@@ -319,7 +330,7 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 		TransactionID: f.txnID,
 		Kinds:         []string{"comment"},
 	})
-	comments := decodeToolResult[[]any](t, "list_annotations", commentRes, err)
+	comments := decodeAnnotations(t, commentRes, err)
 	if len(comments) == 0 {
 		t.Fatal("kinds=['comment'] returned 0 rows; expected at least the seeded comment")
 	}
@@ -342,7 +353,7 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 		TransactionID: f.txnID,
 		Kinds:         []string{"tag"},
 	})
-	tags := decodeToolResult[[]any](t, "list_annotations", tagRes, err)
+	tags := decodeAnnotations(t, tagRes, err)
 	if len(tags) < 2 {
 		t.Fatalf("kinds=['tag'] expected to expand to add+remove (>=2 rows), got %d", len(tags))
 	}
@@ -538,7 +549,7 @@ func TestListAnnotationsActorTypesFilter(t *testing.T) {
 	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,
 	})
-	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
+	all := decodeAnnotations(t, allRes, err)
 	gotUser, gotAgent, gotSystem := 0, 0, 0
 	for _, raw := range all {
 		ann := asObject(t, "list_annotations[all]", raw)
@@ -570,7 +581,7 @@ func TestListAnnotationsActorTypesFilter(t *testing.T) {
 				TransactionID: f.txnID,
 				ActorTypes:    tc.actorTypes,
 			})
-			rows := decodeToolResult[[]any](t, "list_annotations", res, err)
+			rows := decodeAnnotations(t, res, err)
 			if len(rows) == 0 {
 				t.Fatalf("actor_types=%v returned 0 rows; expected at least one", tc.actorTypes)
 			}
@@ -588,7 +599,7 @@ func TestListAnnotationsActorTypesFilter(t *testing.T) {
 		TransactionID: f.txnID,
 		ActorTypes:    []string{"user", "agent"},
 	})
-	combined := decodeToolResult[[]any](t, "list_annotations", combinedRes, err)
+	combined := decodeAnnotations(t, combinedRes, err)
 	for i, raw := range combined {
 		ann := asObject(t, "list_annotations[user+agent]", raw)
 		if got, _ := ann["actor_type"].(string); got == "system" {
@@ -600,7 +611,7 @@ func TestListAnnotationsActorTypesFilter(t *testing.T) {
 	// strictly-smaller envelope than the unfiltered one. We log the byte
 	// delta so PR reviewers can eyeball the win.
 	allBytes := mustMarshal(t, all)
-	humansBytes := mustMarshal(t, decodeToolResult[[]any](t, "list_annotations",
+	humansBytes := mustMarshal(t, decodeAnnotations(t,
 		mustListAnnotations(t, f, listAnnotationsInput{TransactionID: f.txnID, ActorTypes: []string{"user"}}), nil))
 	if len(humansBytes) >= len(allBytes) {
 		t.Errorf("expected actor_types=['user'] envelope (%d bytes) to be smaller than unfiltered (%d bytes)", len(humansBytes), len(allBytes))
@@ -630,7 +641,7 @@ func TestListAnnotationsSinceFilter(t *testing.T) {
 	beforeRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,
 	})
-	before := decodeToolResult[[]any](t, "list_annotations", beforeRes, err)
+	before := decodeAnnotations(t, beforeRes, err)
 	baselineLen := len(before)
 	if baselineLen == 0 {
 		t.Fatal("baseline timeline empty")
@@ -661,7 +672,7 @@ func TestListAnnotationsSinceFilter(t *testing.T) {
 		TransactionID: f.txnID,
 		Since:         cursorTS.Format(time.RFC3339Nano),
 	})
-	delta := decodeToolResult[[]any](t, "list_annotations", deltaRes, err)
+	delta := decodeAnnotations(t, deltaRes, err)
 	if len(delta) != 3 {
 		t.Fatalf("since=%s expected 3 new rows, got %d", cursorTS.Format(time.RFC3339Nano), len(delta))
 	}
@@ -697,7 +708,7 @@ func TestListAnnotationsLimit(t *testing.T) {
 	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,
 	})
-	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
+	all := decodeAnnotations(t, allRes, err)
 	if len(all) < 6 {
 		t.Fatalf("expected >= 6 annotations to slice, got %d", len(all))
 	}
@@ -706,7 +717,7 @@ func TestListAnnotationsLimit(t *testing.T) {
 		TransactionID: f.txnID,
 		Limit:         3,
 	})
-	limited := decodeToolResult[[]any](t, "list_annotations", limitRes, err)
+	limited := decodeAnnotations(t, limitRes, err)
 	if len(limited) != 3 {
 		t.Fatalf("limit=3 expected 3 rows, got %d", len(limited))
 	}
@@ -726,7 +737,7 @@ func TestListAnnotationsLimit(t *testing.T) {
 		TransactionID: f.txnID,
 		Limit:         0,
 	})
-	zero := decodeToolResult[[]any](t, "list_annotations", zeroRes, err)
+	zero := decodeAnnotations(t, zeroRes, err)
 	if len(zero) != len(all) {
 		t.Errorf("limit=0 should match unfiltered: got %d, want %d", len(zero), len(all))
 	}

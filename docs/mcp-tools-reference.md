@@ -193,7 +193,7 @@ Use this to close a review entry: `set category + remove needs-review (with note
 
 ### list_annotations (Read)
 
-Return the activity timeline for a transaction. Each row carries a generic `kind` plus an `action` for the specific event:
+Return the activity timeline for a transaction. Rows are returned in a `{ "annotations": [...] }` envelope (the MCP `structuredContent` slot requires a JSON record, not a bare array — mirrors the REST `/transactions/{id}/annotations` shape). Each row carries a generic `kind` plus an `action` for the specific event:
 
 | `kind` | `action` values | Notes |
 |--------|-----------------|-------|

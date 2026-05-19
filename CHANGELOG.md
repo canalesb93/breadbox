@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP tool `list_annotations`** now wraps its response in a `{ "annotations": [...] }` envelope. The previous bare-array shape failed client-side schema validation on clients that strictly enforce the MCP spec — `structuredContent` is required to be a JSON record, not an array. The new envelope matches every other list tool (`list_accounts`, `list_categories`, `list_tags`, …) and the REST `/transactions/{id}/annotations` endpoint.
+
 ### Added
 
 - **`breadbox agent test` CLI** for diagnosing the agent subsystem end-to-end: verifies auth is configured, sidecar binary is discoverable, and a tiny "say OK" prompt round-trips through the SDK. Exit code 3 = no auth, 5 = no binary.
