@@ -71,7 +71,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 23 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349 + state-doc merges).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 24 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350 + state-doc merges).
+- **T5 mobile-a11y audit** (Explore agent `aeb7dcd0`) — auditing ARIA landmarks, skip-to-content, icon-button aria-labels, focus traps, reduced-motion edge cases, VoiceOver flows. Findings or clean.
 
 ## Closed scouts (iter 31)
 
