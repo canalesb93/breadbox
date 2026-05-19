@@ -220,15 +220,6 @@ export function AgentForm({
           </Card>
         </div>
 
-        {/*
-          Mobile reorder (MOBILE-14): the operational knobs card (Model,
-          Schedule, Tool scope, Allowed tools, Max turns, Budget) sits FIRST
-          on mobile so users don't scroll past the long prompt textarea to
-          reach the controls they tweak most. `order-first` only re-shuffles
-          visual position — DOM order and keyboard tab order are unchanged
-          (still Name → Slug → Prompt → … → Model → Schedule …). At md+ both
-          cards revert to source order via `md:order-none`.
-        */}
         <div className="order-first space-y-4 md:order-none">
           <Card className="space-y-4 p-4">
             <FormField
