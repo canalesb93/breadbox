@@ -59,7 +59,18 @@ export function DetailDialogHeader({
   className,
 }: DetailDialogHeaderProps) {
   return (
-    <DialogHeader className={cn("gap-3 sm:text-left", className)}>
+    <DialogHeader
+      className={cn(
+        "gap-3 sm:text-left",
+        // Push the header down when the device reports a safe-area-inset-top
+        // (e.g. iPad in landscape with a notch). The DialogContent surface
+        // sits under the notch otherwise. Resolves to 0 on portrait /
+        // non-notched devices — change is harmless there. Mirrors the sheet
+        // variant from #1342.
+        "mt-[env(safe-area-inset-top)]",
+        className,
+      )}
+    >
       <div className="flex items-start gap-3">
         <span
           aria-hidden
