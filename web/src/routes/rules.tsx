@@ -287,7 +287,7 @@ function RulesToolbar({
   onSortChange: (v: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <Input
         type="search"
         value={query}
@@ -298,30 +298,32 @@ function RulesToolbar({
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
-        className="h-9 max-w-xs"
+        className="h-9 sm:max-w-xs"
       />
-      <Select value={enabled ?? "all"} onValueChange={onEnabledChange}>
-        <SelectTrigger className="h-9 w-[140px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All states</SelectItem>
-          <SelectItem value="true">Enabled</SelectItem>
-          <SelectItem value="false">Disabled</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={sort} onValueChange={onSortChange}>
-        <SelectTrigger className="ml-auto h-9 w-[160px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="priority">Pipeline stage</SelectItem>
-          <SelectItem value="hit_count">Most hits</SelectItem>
-          <SelectItem value="last_hit_at">Recently active</SelectItem>
-          <SelectItem value="created_at">Newest first</SelectItem>
-          <SelectItem value="name">Name (A–Z)</SelectItem>
-        </SelectContent>
-      </Select>
+      <div className="flex gap-2 sm:contents">
+        <Select value={enabled ?? "all"} onValueChange={onEnabledChange}>
+          <SelectTrigger className="h-9 flex-1 sm:w-[140px] sm:flex-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All states</SelectItem>
+            <SelectItem value="true">Enabled</SelectItem>
+            <SelectItem value="false">Disabled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sort} onValueChange={onSortChange}>
+          <SelectTrigger className="h-9 flex-1 sm:ml-auto sm:w-[160px] sm:flex-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="priority">Pipeline stage</SelectItem>
+            <SelectItem value="hit_count">Most hits</SelectItem>
+            <SelectItem value="last_hit_at">Recently active</SelectItem>
+            <SelectItem value="created_at">Newest first</SelectItem>
+            <SelectItem value="name">Name (A–Z)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
