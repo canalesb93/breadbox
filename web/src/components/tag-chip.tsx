@@ -44,11 +44,16 @@ export function TagChip({
       {tag.icon && <DynamicIcon name={tag.icon} style={tint} />}
       <span style={tint}>{tag.display_name}</span>
       {onRemove && (
+        // The visible × stays small (10–12px) to fit inside the chip; on
+        // touch devices a centered 44pt invisible pseudo-element extends the
+        // hit area so the tap target meets Apple HIG. Same TAP_TARGET recipe
+        // as `Button`'s icon sizes — see `web/src/components/ui/button.tsx`
+        // and the iter-28 followup.
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${tag.display_name}`}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 -mr-0.5 ml-0.5 rounded-full focus-visible:ring-[3px] focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 -mr-0.5 ml-0.5 relative rounded-full focus-visible:ring-[3px] focus-visible:outline-none pointer-coarse:before:absolute pointer-coarse:before:left-1/2 pointer-coarse:before:top-1/2 pointer-coarse:before:size-11 pointer-coarse:before:-translate-x-1/2 pointer-coarse:before:-translate-y-1/2 pointer-coarse:before:content-['']"
         >
           <X className={size === "sm" ? "size-2.5" : "size-3"} />
         </button>
