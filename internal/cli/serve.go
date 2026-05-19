@@ -153,9 +153,6 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	a.SyncEngine.OnSyncComplete = func(ctx context.Context, _ pgtype.UUID) {
 		agentOrch.FireSyncCompleteAgents(ctx)
 	}
-	if err := agent.SeedDefaults(ctx, a.Queries, logger); err != nil {
-		logger.Warn("agent seed failed", "error", err)
-	}
 	agentSched.Start(ctx)
 	a.AgentOrchestrator = agentOrch
 	a.AgentScheduler = agentSched
