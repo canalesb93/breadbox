@@ -410,16 +410,22 @@ export function ConnectBankSheet({
         </div>
 
         {stage.kind === "pick" && (
-          <div className="bg-muted/20 flex items-center justify-end gap-2 border-t px-6 py-3">
+          <div className="bg-muted/20 flex flex-col-reverse items-stretch gap-2 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleSheetChange(false)}
               disabled={linkSession.isPending}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button size="sm" onClick={onContinue} disabled={continueDisabled}>
+            <Button
+              size="sm"
+              onClick={onContinue}
+              disabled={continueDisabled}
+              className="w-full sm:w-auto"
+            >
               {linkSession.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : null}
