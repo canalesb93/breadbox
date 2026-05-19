@@ -72,7 +72,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 23 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349 + state-doc merges).
-- **fix/mobile-detail-dialog-and-confirm** (subagent `a8ba22b7`) — **MOBILE-49 + MOBILE-50 (T3 scout-found)**. detail-dialog-header gets safe-area-top (mirror of #1342); confirm-dialog buttons get full-width-when-stacked (mirror of #1328). PR # TBD.
 
 ## Closed scouts (iter 31)
 
@@ -131,6 +130,7 @@ Each iteration:
 - ✅ **MOBILE-45/46** FloatingActionBar safe-area-bottom + CommandList max-h adaptive — PR #1347 merged into sprint branch (`4ef34cd7`). FAB clears iPhone home indicator via `bottom-[max(1rem,env(safe-area-inset-bottom))]`; CommandList caps at `max-h-[min(300px,50dvh)]` so dropdowns adapt to shorter viewports (iOS keyboard open, landscape).
 - ✅ **MOBILE-47/48** connect/reauth sheet footers — PR #1348 merged into sprint branch (`8d37e803`). `connect-bank-sheet.tsx` (pick stage) and `reauth-sheet.tsx` (confirm stage) hand-rolled footers now follow the canonical `flex-col-reverse sm:flex-row` + `w-full sm:w-auto` pattern (matches #1321/#1328/#1336).
 - ✅ **T4 iter-28 followups** — PR #1349 merged into sprint branch (`ed1dbc5d`). Verified all 5 deferred items from iter 28: **fixed 2** (comment-composer textarea gets `enterKeyHint="send"` → iOS keyboard tints the return key; tag-chip × button gets the `pointer-coarse:` 44pt pseudo from #1317 since the raw `<button>` didn't inherit Button's TAP_TARGET); **closed 3 as non-issues** (ActivityTimeline page-scrolls naturally, PaginationLink already uses `buttonVariants({size:"icon"})` which inherits TAP_TARGET, CommentComposer button label is additive — spinner doesn't replace it).
+- ✅ **MOBILE-49/50** detail-dialog-header safe-area-top + confirm-dialog button widths — PR #1350 merged into sprint branch (`84b66052`). DialogHeader gets `mt-[env(safe-area-inset-top)]` (clean margin-shift approach; iPad-landscape notched device clearance). `AlertDialogCancel` + `AlertDialogAction` get `w-full sm:w-auto` so stacked buttons reach full tap width on 375px (AlertDialogFooter already had `flex-col-reverse` semantic — only the button widths were the gap).
 
 ## Notes for next iteration
 
