@@ -109,7 +109,7 @@ export function LinkAccountSheet({
           description="Attribute matched transactions on a dependent account to its primary cardholder. The dependent account is excluded from totals so charges aren't double-counted."
         />
 
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-6">
           <div className="flex flex-col gap-2">
             <Eyebrow as="p">Primary (this account)</Eyebrow>
             <div className="bg-muted/40 rounded-md border px-3 py-2 text-sm">

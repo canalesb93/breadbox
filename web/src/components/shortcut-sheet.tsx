@@ -87,7 +87,7 @@ export function ShortcutSheet() {
         {/* Body — scrollable list of grouped cards. Each group is a bordered
             card with an uppercase eyebrow header + a divide-y body, mirroring
             the ListCard vocabulary used across the v2 surfaces. */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] px-5 py-4">
           {totalCount === 0 ? (
             <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-md border border-dashed py-10 text-sm">
               <span className="font-medium">No shortcuts registered</span>

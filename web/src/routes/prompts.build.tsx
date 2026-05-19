@@ -829,7 +829,7 @@ function AddBlockMenu({
                 Dividers flip from horizontal rules to vertical separators so
                 the visual grouping survives the rotation. */}
             <div className="flex flex-1 flex-col overflow-hidden sm:grid sm:grid-cols-[10rem_1fr]">
-              <nav className="bg-muted/30 border-b p-2 max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:overflow-x-auto max-sm:scroll-shadow-x max-sm:[--scroll-shadow-cover:var(--muted)] max-sm:[-webkit-overflow-scrolling:touch] sm:overflow-y-auto sm:border-r sm:border-b-0">
+              <nav className="bg-muted/30 border-b p-2 max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:overflow-x-auto max-sm:overscroll-contain max-sm:scroll-shadow-x max-sm:[--scroll-shadow-cover:var(--muted)] max-sm:[-webkit-overflow-scrolling:touch] sm:overflow-y-auto sm:overscroll-contain sm:border-r sm:border-b-0">
                 <CategoryRailItem
                   label="Presets"
                   count={PRESETS.length}
@@ -879,7 +879,7 @@ function AddBlockMenu({
                 </div>
               </nav>
 
-              <div className="overflow-y-auto p-4">
+              <div className="overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-4">
                 {activeGroup === "presets" ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-muted-foreground text-xs">
@@ -1546,7 +1546,7 @@ function PreviewDialog({
             The composed agent prompt as it will be sent to the model.
           </DialogDescription>
         </DialogHeader>
-        <pre className="bg-muted/30 flex-1 overflow-auto px-6 py-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+        <pre className="bg-muted/30 flex-1 overflow-auto overscroll-contain [-webkit-overflow-scrolling:touch] px-6 py-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
           {text || "Add blocks to see the composed prompt."}
         </pre>
       </DialogContent>

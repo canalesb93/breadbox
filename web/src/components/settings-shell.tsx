@@ -143,7 +143,7 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
             })}
           </ul>
         </nav>
-        <section className="flex-1 overflow-y-auto p-6">
+        <section className="flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-6">
           <SectionContent section={active} />
         </section>
       </div>
@@ -197,7 +197,7 @@ function SettingsBody({ active, onSelect, desktop }: SettingsBodyProps) {
           })}
         </ul>
       </nav>
-      <section className="flex-1 overflow-y-auto p-4">
+      <section className="flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-4">
         <SectionContent section={active} />
       </section>
     </div>

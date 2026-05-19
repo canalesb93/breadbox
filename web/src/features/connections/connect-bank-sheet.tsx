@@ -270,7 +270,7 @@ export function ConnectBankSheet({
           description={headerDescription}
         />
 
-        <div className="flex flex-1 flex-col overflow-y-auto p-6">
+        <div className="flex flex-1 flex-col overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-6">
           {stage.kind === "pick" && (
             <div className="flex flex-col gap-6">
               {providersQuery.isLoading ? (
