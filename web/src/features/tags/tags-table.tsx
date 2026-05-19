@@ -144,7 +144,11 @@ export function TagsTable({
         isError={isError}
         getRowId={(t) => t.id}
         onRowClick={(t) =>
-          navigate({ to: "/tags/$slug", params: { slug: t.slug } })
+          navigate({
+            to: "/tags/$slug",
+            params: { slug: t.slug },
+            viewTransition: true,
+          })
         }
         emptyState={emptyState}
         // Validates the iter-3 DataTable abstraction on a second list:

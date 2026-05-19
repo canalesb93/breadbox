@@ -194,7 +194,11 @@ export function AgentsPage() {
           isLoading={agentsQuery.isLoading}
           getRowId={(a) => a.id}
           onRowClick={(a) =>
-            navigate({ to: "/agents/$slug/edit", params: { slug: a.slug } })
+            navigate({
+              to: "/agents/$slug/edit",
+              params: { slug: a.slug },
+              viewTransition: true,
+            })
           }
           refinedHeader
           emptyState={
