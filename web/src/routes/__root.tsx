@@ -144,6 +144,16 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
 
   return (
     <SidebarProvider>
+      {/* Skip link — invisible until keyboard-focused, then jumps to <main>
+          so VoiceOver / keyboard users can bypass the sidebar nav
+          (WCAG 2.4.1 Bypass Blocks). The target <main> needs id="main" and
+          tabIndex={-1} to receive programmatic focus from the anchor. */}
+      <a
+        href="#main"
+        className="sr-only focus-visible:not-sr-only focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-ring focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-50 focus-visible:rounded-md focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:shadow-md focus-visible:ring-2"
+      >
+        Skip to main content
+      </a>
       <AppSidebar />
       {/* min-w-0: the inset is a flex child — without it, a wide page (e.g. a
           horizontally-scrolling table) grows the inset past the viewport
@@ -190,7 +200,11 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
             fragment (`<>`) so children sit directly under <main>. Pages that
             need a width constraint (`mx-auto max-w-2xl|5xl`) wrap once and
             apply `flex flex-col gap-5` on that wrapper themselves. */}
-        <main className="flex min-w-0 flex-1 flex-col gap-5 p-3 sm:p-6">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="flex min-w-0 flex-1 flex-col gap-5 p-3 sm:p-6"
+        >
           <Outlet />
         </main>
       </SidebarInset>
