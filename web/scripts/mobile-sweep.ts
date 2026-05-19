@@ -304,12 +304,30 @@ async function inspect(page: Page, route: string, viewport: Viewport): Promise<R
       const overflowX =
         document.documentElement.scrollWidth - document.documentElement.clientWidth;
 
-      // Tap-target check on touch (pointer-coarse). The Button primitive
-      // and other v2 surfaces attach an invisible `::before` pseudo-element
-      // that enlarges the hit area to 44pt while leaving the layout box
-      // small. Measure the EFFECTIVE hit area (rect ∪ ::before box) instead
-      // of just the bounding rect, otherwise we false-flag every icon-only
-      // button that already meets the spec.
+      // Tap-target check (touch device — Playwright iPhone profiles set
+      // pointer:coarse). Identify "protected" elements via known v2
+      // design-system attributes — those carry the
+      // `pointer-coarse:before:size-11` recipe that enlarges hit area to
+      // 44pt while leaving the layout box small. Earlier attempts using
+      // `getComputedStyle(el, "::before").width` were unreliable in
+      // webkit's Playwright build; switching to attribute-based gating.
+      //
+      // Protected (skipped from count):
+      //   - [data-slot="button"][data-size^="icon"]     — shadcn Button primitive icon variants
+      //   - [data-sidebar="trigger"]                    — SidebarTrigger uses size="icon"
+      //   - [data-slot="sidebar-trigger"]               — same, alt attribute
+      //   - parent of element matching the above        — caught via .closest()
+      //
+      // After filtering, remaining flags should be REAL accessibility
+      // concerns: raw <button>/<a> elements that didn't go through the
+      // primitive and have a hit area under 44pt.
+      const PROTECTED_SELECTOR =
+        '[data-slot="button"][data-size^="icon"], [data-sidebar="trigger"], [data-slot="sidebar-trigger"]';
+      // Also recognize the recipe applied inline via className substring —
+      // for raw `<button>` elements that opt in without going through the
+      // Button primitive (e.g. the command-palette trigger in __root.tsx).
+      const RECIPE_CLASSNAME = "pointer-coarse:before:size-11";
+
       const interactive = document.querySelectorAll<HTMLElement>(
         'button, a[href], [role="button"], input[type="checkbox"], input[type="radio"]',
       );
@@ -318,27 +336,35 @@ async function inspect(page: Page, route: string, viewport: Viewport): Promise<R
       interactive.forEach((el) => {
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
-
-        let effectiveW = rect.width;
-        let effectiveH = rect.height;
-        const before = window.getComputedStyle(el, "::before");
-        if (before.content !== "none" && before.content !== "") {
-          const beforeW = parseFloat(before.width);
-          const beforeH = parseFloat(before.height);
-          if (Number.isFinite(beforeW)) effectiveW = Math.max(effectiveW, beforeW);
-          if (Number.isFinite(beforeH)) effectiveH = Math.max(effectiveH, beforeH);
+        // sr-only / visually-hidden elements are keyboard/AT targets, not
+        // touch targets — exclude. shadcn-style `sr-only` collapses to
+        // 1x1 with clipping; we detect via the recognized className.
+        const cls = el.className.toString();
+        if (cls.includes("sr-only") && !cls.includes("focus-visible:not-sr-only")) {
+          // sr-only without a focus-visible reveal — never visible
+          return;
         }
+        if (rect.width <= 1 && rect.height <= 1) return; // collapsed sr-only
+        if (el.matches(PROTECTED_SELECTOR) || el.closest(PROTECTED_SELECTOR)) return;
+        if (cls.includes(RECIPE_CLASSNAME)) return; // inline recipe applied
+        if (rect.width >= 44 && rect.height >= 44) return;
 
-        if (effectiveW < 44 || effectiveH < 44) {
-          small += 1;
-          if (smallSelectors.length < 5) {
-            const id = el.id ? `#${el.id}` : "";
-            const aria = el.getAttribute("aria-label");
-            const txt = (el.textContent || "").trim().slice(0, 30);
-            smallSelectors.push(
-              `${el.tagName.toLowerCase()}${id} "${aria || txt}" (${Math.round(rect.width)}×${Math.round(rect.height)})`,
-            );
-          }
+        small += 1;
+        if (smallSelectors.length < 8) {
+          const id = el.id ? `#${el.id}` : "";
+          const dataSlot = el.getAttribute("data-slot");
+          const dataSize = el.getAttribute("data-size");
+          const aria = el.getAttribute("aria-label");
+          const txt = (el.textContent || "").trim().slice(0, 30);
+          const attrs = [
+            dataSlot ? `slot=${dataSlot}` : null,
+            dataSize ? `size=${dataSize}` : null,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          smallSelectors.push(
+            `${el.tagName.toLowerCase()}${id}${attrs ? ` [${attrs}]` : ""} "${aria || txt}" (${Math.round(rect.width)}×${Math.round(rect.height)})`,
+          );
         }
       });
 

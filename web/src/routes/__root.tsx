@@ -236,7 +236,13 @@ function CommandPaletteTrigger() {
     <button
       type="button"
       onClick={open}
-      className="text-muted-foreground hover:text-foreground hover:border-ring focus-visible:ring-ring/40 inline-flex h-8 items-center gap-2 rounded-md border bg-transparent px-2.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none sm:min-w-56"
+      // h-8 = 32px which is below Apple's 44pt touch target. On mobile the
+      // label collapses to icon-only (36×32), so the recipe enlarges the
+      // hit area without changing visual size — same pattern as Button
+      // primitive's size="icon" variants. `relative` + the invisible
+      // `before:` 44×44 pseudo-element widens the tap zone to 44pt only
+      // on pointer:coarse (touch) devices.
+      className="text-muted-foreground hover:text-foreground hover:border-ring focus-visible:ring-ring/40 relative inline-flex h-8 items-center gap-2 rounded-md border bg-transparent px-2.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none sm:min-w-56 pointer-coarse:before:absolute pointer-coarse:before:top-1/2 pointer-coarse:before:left-1/2 pointer-coarse:before:size-11 pointer-coarse:before:-translate-x-1/2 pointer-coarse:before:-translate-y-1/2 pointer-coarse:before:content-['']"
       aria-label="Open command palette"
     >
       <Search className="size-3.5 shrink-0" aria-hidden />
