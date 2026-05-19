@@ -92,6 +92,7 @@ export function APIKeyCreatedPage() {
               <Input
                 id="api-key-plaintext"
                 readOnly
+                autoComplete="off"
                 value={pending.plaintext}
                 onFocus={(e) => e.currentTarget.select()}
                 className="bg-muted/40 min-w-0 flex-1 truncate font-mono text-xs"

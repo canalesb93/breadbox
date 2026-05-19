@@ -134,6 +134,7 @@ export function TagForm({ mode, tag }: TagFormProps) {
                   <Input
                     placeholder="needs-review"
                     autoFocus
+                    autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}

@@ -295,6 +295,7 @@ function RulesToolbar({
         placeholder="Search rules…"
         inputMode="search"
         enterKeyHint="search"
+        autoComplete="off"
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}

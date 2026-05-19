@@ -167,6 +167,7 @@ export function AgentForm({
                     <FormControl>
                       <Input
                         placeholder="weekly-transaction-review"
+                        autoComplete="off"
                         autoCapitalize="none"
                         autoCorrect="off"
                         spellCheck={false}

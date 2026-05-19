@@ -237,6 +237,7 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
                 <Input
                   type="number"
                   inputMode="numeric"
+                  autoComplete="off"
                   {...field}
                   value={field.value ?? 0}
                 />

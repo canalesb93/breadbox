@@ -151,6 +151,7 @@ export function APIKeyForm() {
                 <Input
                   placeholder="e.g. Claude MCP, Mobile CLI"
                   autoFocus
+                  autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
                   {...field}
@@ -244,6 +245,7 @@ export function APIKeyForm() {
               <FormControl>
                 <Input
                   placeholder="Defaults to the key name"
+                  autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
                   {...field}
