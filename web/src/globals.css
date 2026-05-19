@@ -131,6 +131,28 @@
   html {
     -webkit-tap-highlight-color: transparent;
   }
+  /* iOS double-tap-zoom suppression on interactive controls. iOS Safari
+     treats a fast double-tap on a clickable element as a zoom gesture, so
+     rapidly re-tapping a button (numeric steppers, pagination, AND/OR and
+     filter-pill toggles) zooms the layout instead of firing the second
+     click — and the zoom doesn't reset on its own. `touch-action:
+     manipulation` opts these elements out of double-tap zoom: taps fire
+     immediately, rapid re-taps stay as clicks. Panning and pinch-zoom are
+     untouched. Scoped to controls only — content regions (tables, prose)
+     keep double-tap-zoom so users can still zoom in to read. */
+  button,
+  a,
+  label,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="switch"] {
+    touch-action: manipulation;
+  }
 }
 
 /* shadcn's CardHeader is designed for title + description (stacked) with
