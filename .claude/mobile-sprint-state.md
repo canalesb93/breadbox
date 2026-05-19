@@ -73,7 +73,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 22 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348 + state-doc merges).
-- **fix/mobile-iter28-followups** (subagent `a3a715a9`) — **T4 pattern polish**. Verify-and-fix the 5 deferred findings from iter 28's transaction-detail scout (comment-composer hints, ActivityTimeline max-h, pagination tap targets, comment-composer label visibility, tag-chip × size). Subagent decides FIX / NON-ISSUE / DEFERRED per item and PRs whatever's real. PR # TBD (or state-doc commit if all are non-issues).
 
 ## Closed scouts (iter 29)
 
@@ -126,6 +125,7 @@ Each iteration:
 - ✅ **MOBILE-43/44** Picker popover mobile widths — PR #1346 merged into sprint branch (`0aa00e0a`). Icon-picker (`w-72`) and color-picker (`w-64`) PopoverContents now use `w-[calc(100dvw-2rem)] sm:w-{72|64}` — full visible width minus 16px margin on mobile, locked to design size at sm+.
 - ✅ **MOBILE-45/46** FloatingActionBar safe-area-bottom + CommandList max-h adaptive — PR #1347 merged into sprint branch (`4ef34cd7`). FAB clears iPhone home indicator via `bottom-[max(1rem,env(safe-area-inset-bottom))]`; CommandList caps at `max-h-[min(300px,50dvh)]` so dropdowns adapt to shorter viewports (iOS keyboard open, landscape).
 - ✅ **MOBILE-47/48** connect/reauth sheet footers — PR #1348 merged into sprint branch (`8d37e803`). `connect-bank-sheet.tsx` (pick stage) and `reauth-sheet.tsx` (confirm stage) hand-rolled footers now follow the canonical `flex-col-reverse sm:flex-row` + `w-full sm:w-auto` pattern (matches #1321/#1328/#1336).
+- ✅ **T4 iter-28 followups** — PR #1349 merged into sprint branch (`ed1dbc5d`). Verified all 5 deferred items from iter 28: **fixed 2** (comment-composer textarea gets `enterKeyHint="send"` → iOS keyboard tints the return key; tag-chip × button gets the `pointer-coarse:` 44pt pseudo from #1317 since the raw `<button>` didn't inherit Button's TAP_TARGET); **closed 3 as non-issues** (ActivityTimeline page-scrolls naturally, PaginationLink already uses `buttonVariants({size:"icon"})` which inherits TAP_TARGET, CommentComposer button label is additive — spinner doesn't replace it).
 
 ## Notes for next iteration
 
