@@ -73,7 +73,16 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347 (state-doc merge included).
-- **T3 providers+connections scout** (Explore agent `a50e7ae4`) — auditing `routes/providers.tsx`, `features/providers/*`, `features/connections/*` (plaid-link-button, teller-connect-button, connect-bank-sheet, reauth-sheet, sync-activity-bars, sync-history-list, family-tabs, etc.). Particularly Plaid/Teller SDK launch interactions on iOS. Findings will fold into backlog (or report clean).
+- **fix/mobile-connect-reauth-sheet-footers** (subagent `ac020f11`) — **MOBILE-47 + MOBILE-48 (T3 scout-found, HIGH bundle)**. Stack `connect-bank-sheet.tsx` and `reauth-sheet.tsx` footer buttons on mobile via the established `flex-col-reverse sm:flex-row` + `w-full sm:w-auto` pattern (#1321/#1328/#1336). PR # TBD.
+
+## Closed scouts (iter 29)
+
+- ✅ **T3 providers+connections scout** — 20 files audited, 2 actionable (above), most CLEAN:
+  - family-tabs.tsx — already has the iter-24 horizontal-scroll fix
+  - plaid-link-button + teller-connect-button — render `null`, SDK launches in browser-native modals (no SPA-side mobile concern)
+  - sync-history-list, connection-row, connection-status-badge, connections-summary, env-locked-notice, provider-status, csv-card, plaid-card, teller-card — all good at 375px
+  - sync-activity-bars — acceptable as-is (fixed-height bar chart, 7+ bars fit)
+  - No Plaid/Teller SDK launch issues on iOS detected
 
 ## Closed scouts (iter 28)
 
