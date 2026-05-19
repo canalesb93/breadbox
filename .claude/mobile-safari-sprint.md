@@ -20,7 +20,8 @@ Perfect mobile support for the v2 SPA at `web/`, prioritizing iOS Safari (26.2+ 
 - ✅ Phase 2 (PR #1356 → sprint): overflow fixes on `/v2/tags`, `/v2/api-keys`, `/v2/agents`, `/v2/categories`. All at 0px overflow on iPhone 13 / 15 Pro Max.
 - ✅ Iter 3 (PR #1357 → sprint): `LeaveGuard` component + wired to `agent-form.tsx` and `rule-form.tsx`.
 - ✅ Iter 4 (PR #1358 → sprint): PWA assets — 180/192/512 PNG icons rasterized from favicon.svg via `bun run generate-icons`, `manifest.webmanifest` with maskable variant, sized apple-touch-icon. 404 + error pages confirmed to have back-to-home links (no Safari chrome in standalone mode).
-- ✅ Iter 5 (PR pending → sprint): restore bfcache on iOS Safari swipe-back. Pulled `/v2/*` out of the session-middleware group in `internal/api/router.go` so the static SPA bundle stops carrying `Vary: Cookie` (which WebKit treats as a bfcache blocker). Tightened the `pageshow` handler in `web/src/main.tsx` to only re-validate `["me"]` instead of invalidating every cached query, eliminating the post-restore refetch storm. Verified via curl against a freshly-built binary: `Vary: Cookie` is gone from `/v2/` responses.
+- ✅ Iter 5 (PR #1359 → sprint): restore bfcache on iOS Safari swipe-back. Pulled `/v2/*` out of the session-middleware group in `internal/api/router.go` so the static SPA bundle stops carrying `Vary: Cookie` (which WebKit treats as a bfcache blocker). Tightened the `pageshow` handler in `web/src/main.tsx` to only re-validate `["me"]` instead of invalidating every cached query, eliminating the post-restore refetch storm. Verified via curl against a freshly-built binary: `Vary: Cookie` is gone from `/v2/` responses.
+- ✅ Iter 6 (PR pending → sprint): `bun run memory-sweep` — Playwright-based structural-leak detector. Drives list↔detail N=20 times under webkit, samples DOM node count + shadcn slot count at iter 1/5/10/15/20, reports verdict per flow. Baseline: `/v2/accounts` clean (0 growth across 20 iters); `/v2/transactions` clean iter 1-15 (1838→1742, attrition) then drops to 252 at iter 20 — likely session loss after rapid navigations; flagged for follow-up investigation. WebKit doesn't expose `performance.memory`, so this is a structural proxy; real iOS heap data needs Safari Web Inspector.
 
 ## Queue (priority order)
 
@@ -41,6 +42,14 @@ Each iteration: pick the next item, branch off `mobile-safari/sprint`, ship a su
 7. **Form-field iOS keyboard audit** — verify every `<Input>` consumer passes appropriate `inputMode` / `enterKeyHint` / `autoCapitalize` defaults. `SearchInput` already does; others might not.
 
 8. **LeaveGuard for other forms** — apply LeaveGuard to remaining dirty-state forms: category-form, tag-form, settings forms, API key new form.
+
+9. **Memory phase — TanStack Query `gcTime` cap** — cache currently has no upper bound on retained queries. Set a sensible `gcTime` (5 min default is fine for most; consider `Infinity` for `["me"]` and shorter for paginated lists). Verify via `bun run memory-sweep`.
+
+10. **Memory phase — virtualize transactions list** — long-history households render the entire TanStack Table row tree in DOM (1800+ nodes at iter 1 of the memory sweep). Add `@tanstack/react-virtual` row windowing to DataTable when row count exceeds N. Defer if a profile shows no real iOS pain.
+
+11. **Memory phase — `useEffect` cleanup audit** — grep for `useEffect` returning no cleanup against patterns that hold a listener (`addEventListener`, `setInterval`, `IntersectionObserver`, `MutationObserver`, `ResizeObserver`). Trace common offenders in `features/transactions/*` and `components/data-table.tsx`.
+
+12. **Transactions session-loss after rapid navigations** — `bun run memory-sweep` shows `/v2/transactions` dropping to 252 nodes at iter 20 (AuthSplash territory). Likely session lifetime or scs middleware behavior under hammered navs. Reproduce, then either bump session ttl on /v2 boundary or stabilize the auth gate.
 
 ## Operating notes
 
