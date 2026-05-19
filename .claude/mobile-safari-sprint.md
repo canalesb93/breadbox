@@ -19,7 +19,8 @@ Perfect mobile support for the v2 SPA at `web/`, prioritizing iOS Safari (26.2+ 
 - ✅ Phase 1.5: Mobile sweep tool (`bun run mobile-sweep`) + `docs/mobile-sweep-findings.md`.
 - ✅ Phase 2 (PR #1356 → sprint): overflow fixes on `/v2/tags`, `/v2/api-keys`, `/v2/agents`, `/v2/categories`. All at 0px overflow on iPhone 13 / 15 Pro Max.
 - ✅ Iter 3 (PR #1357 → sprint): `LeaveGuard` component + wired to `agent-form.tsx` and `rule-form.tsx`.
-- ✅ Iter 4 (PR pending → sprint): PWA assets — 180/192/512 PNG icons rasterized from favicon.svg via `bun run generate-icons`, `manifest.webmanifest` with maskable variant, sized apple-touch-icon. 404 + error pages confirmed to have back-to-home links (no Safari chrome in standalone mode).
+- ✅ Iter 4 (PR #1358 → sprint): PWA assets — 180/192/512 PNG icons rasterized from favicon.svg via `bun run generate-icons`, `manifest.webmanifest` with maskable variant, sized apple-touch-icon. 404 + error pages confirmed to have back-to-home links (no Safari chrome in standalone mode).
+- ✅ Iter 5 (PR pending → sprint): restore bfcache on iOS Safari swipe-back. Pulled `/v2/*` out of the session-middleware group in `internal/api/router.go` so the static SPA bundle stops carrying `Vary: Cookie` (which WebKit treats as a bfcache blocker). Tightened the `pageshow` handler in `web/src/main.tsx` to only re-validate `["me"]` instead of invalidating every cached query, eliminating the post-restore refetch storm. Verified via curl against a freshly-built binary: `Vary: Cookie` is gone from `/v2/` responses.
 
 ## Queue (priority order)
 

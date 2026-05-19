@@ -306,12 +306,20 @@ func NewRouter(a *app.App, version string) http.Handler {
 					webui.MountBackupRoutes(r, a, sm)
 				})
 			})
-			// /v2/* — embedded SPA static bundle. The session middleware lets
-			// the SPA shell load on /login, but the SPA's own queries
-			// (/web/v1/me) gate the authenticated content.
-			r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
-			r.Handle("/v2/*", webui.Handler())
 		})
+		// /v2/* — embedded SPA static bundle. Deliberately NOT inside the
+		// session-middleware group above: `sm.LoadAndSave` appends
+		// `Vary: Cookie` to every response, and `Vary: Cookie` is one of
+		// the canonical reasons WebKit (and Chrome) refuse to bfcache a
+		// page. With bfcache disabled, iOS Safari swipe-back triggers a
+		// full SPA cold-reload (blank page + ~1-2s freeze) instead of
+		// instantly restoring the previous DOM from memory. The SPA's
+		// authenticated content is gated by its own /web/v1/me query, which
+		// loads the session through scs separately — so dropping middleware
+		// here just affects the static asset response, never the auth
+		// boundary.
+		r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
+		r.Handle("/v2/*", webui.Handler())
 
 		tr, err := admin.NewTemplateRenderer(sm)
 		if err != nil {

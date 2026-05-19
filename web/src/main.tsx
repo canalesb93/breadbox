@@ -329,16 +329,31 @@ const queryClient = new QueryClient({
 // iOS Safari restores the SPA from bfcache on swipe-back: the DOM snapshot is
 // reconstituted and JS resumes mid-state. Without intervention the stale React
 // + React-Query state can trigger a 401-refetch → /login redirect race during
-// Safari's restore animation, presenting as a frozen / blank page. Invalidate
-// the router (re-runs loaders + search validation) and mark queries stale (so
-// they refetch fresh data without flashing skeletons) on `pageshow.persisted`.
+// Safari's restore animation, presenting as a frozen / blank page. The fix
+// has two parts:
+//
+//  1. Re-validate the session (`["me"]`) so a 401 fires from a cold loader
+//     state instead of mid-restore animation; the auth gate in `__root.tsx`
+//     waits for `document.visibilityState === "visible"` before redirecting.
+//
+//  2. Invalidate the router so route loaders + search-param validation re-run
+//     against the now-restored DOM.
+//
+// We deliberately do NOT call `queryClient.invalidateQueries()` (no args) —
+// that fires a refetch storm against every cached query on the visible page
+// (transactions list alone has 10+), producing a measurable 1-2s freeze
+// after the restore. TanStack Query's 30s staleTime already handles freshness
+// for normal data; the bfcache restore window is usually shorter than that.
+// Routes that need stricter freshness can opt into their own `pageshow`
+// handler or use a shorter staleTime.
+//
 // Don't `queryClient.clear()` — that drops cached data instantly. Don't add a
 // `beforeunload`/`unload` handler — that would disable bfcache entirely.
 if (typeof window !== "undefined") {
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) {
       router.invalidate();
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: ["me"] });
     }
   });
 }
