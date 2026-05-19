@@ -125,8 +125,21 @@ export function AgentForm({
           collapses to ~155px and the inputs become unreadable. Defer the
           3-col layout to `lg` (1024px) so iPad portrait gets the same
           stacked layout as phones. */}
+      {/* `md` breakpoint at 768px tries to split into a 2:1 grid, but on
+          iPad portrait (768) with the sidebar visible the right column
+          collapses to ~155px and the inputs become unreadable. Defer the
+          3-col layout to `lg` (1024px) so iPad portrait gets the same
+          stacked layout as phones.
+
+          `min-w-0` on each grid item: CSS Grid items default to
+          `min-width: auto` (= `min-content`), which lets a long
+          unbreakable token like "Claude Sonnet 4.6 (balanced)" force the
+          track wider than its declared fraction — see iter-15 for the
+          same fix on the home page. Without this, iPad landscape (1024)
+          overflows by ~11px because the right-column track grows past
+          its 1fr share. */}
       <form onSubmit={submit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2 lg:order-none">
+        <div className="min-w-0 space-y-4 lg:col-span-2 lg:order-none">
           <Card className="space-y-4 p-4">
             <FormField
               control={form.control}
@@ -244,17 +257,35 @@ export function AgentForm({
           (still Name → Slug → Prompt → … → Model → Schedule …). At md+ both
           cards revert to source order via `md:order-none`.
         */}
-        <div className="order-first space-y-4 lg:order-none">
-          <Card className="space-y-4 p-4">
+        <div className="order-first min-w-0 space-y-4 lg:order-none">
+          {/* `min-w-0` on the Card too: it's a flex container whose
+              default `min-width: auto` resolves to `min-content`, and a
+              child with `whitespace-nowrap` (the Model SelectTrigger's
+              "Claude Sonnet 4.6 (balanced)" string) was forcing the Card
+              past its grid track on iPad landscape. Belt-and-suspenders
+              with the grid-item `min-w-0` above. */}
+          <Card className="min-w-0 space-y-4 p-4">
             <FormField
               control={form.control}
               name="model"
               render={({ field }) => (
-                <FormItem>
+                // `min-w-0` on FormItem (it's a nested `grid` per shadcn
+                // form primitive): without it, the inner grid track
+                // expands to the SelectTrigger's min-content
+                // (whitespace-nowrap "Claude Sonnet 4.6 (balanced)" ≈
+                // 242px) which propagates up past the parent column's
+                // 1fr share, overflowing iPad landscape by 11px.
+                <FormItem className="min-w-0">
                   <FormLabel>Model</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      {/* `w-full` overrides the shadcn SelectTrigger default
+                          `w-fit` which sizes to content — "Claude Sonnet 4.6
+                          (balanced)" was extending past the iPad-landscape
+                          right-column track (242px content vs ~232px
+                          available). Matches the pattern used in
+                          plaid-card / teller-card / backups-section. */}
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
@@ -296,7 +327,8 @@ export function AgentForm({
                   <FormLabel>Tool scope</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      {/* `w-full` — same override as Model above. */}
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
