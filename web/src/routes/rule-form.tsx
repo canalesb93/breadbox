@@ -140,3 +140,15 @@ export function RuleFormPage({ mode }: RuleFormPageProps) {
     </>
   );
 }
+
+// Mode-specific wrappers exported so `lazyRouteComponent` in main.tsx can
+// import a single module and pick the right entry point — the heavy
+// RuleForm + zod schema + field-array logic stays in this chunk and
+// loads only when the user opens /rules/new or /rules/$id/edit.
+export function RuleNewPage() {
+  return <RuleFormPage mode="create" />;
+}
+
+export function RuleEditPage() {
+  return <RuleFormPage mode="edit" />;
+}
