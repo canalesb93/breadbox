@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AlertTriangle, Loader2, RefreshCw, Search } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandPalette } from "@/components/command-palette";
+import { IOSVersionBanner } from "@/components/ios-version-banner";
 import { SettingsShell } from "@/components/settings-shell";
 import { ShortcutSheet } from "@/components/shortcut-sheet";
 import {
@@ -205,6 +206,13 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
           tabIndex={-1}
           className="flex min-w-0 flex-1 flex-col gap-5 p-3 sm:p-6"
         >
+          {/* Advisory banner for users on iOS Safari builds older than 26.2.
+              Renders nothing on modern iOS / non-iOS browsers (see
+              `detectIOSSafariVersion`), so its position as a direct child of
+              <main> is invisible to most users. Sits as a normal flex child
+              so the gap-5 rhythm separates it from page content; safe-area
+              inset is already absorbed by the sticky header above. */}
+          <IOSVersionBanner />
           <Outlet />
         </main>
       </SidebarInset>

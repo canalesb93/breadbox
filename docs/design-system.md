@@ -945,3 +945,28 @@ Failure messages include `path:line[-end]` so the offender can be extracted dire
 ### Reference implementation
 
 `static/js/admin/components/prompt_builder.js` + `internal/templates/components/pages/prompt_builder.templ` (the `/agent-wizard/{type}` page). Copy this shape for any new Alpine page component.
+
+## 15. Mobile baseline
+
+The v2 SPA targets **iOS 26.2 / iPadOS 26.2 and the latest desktop Safari**. Anything older than the baseline still loads, but renders a soft-warn banner at the top of the shell prompting the user to update (component placeholder: `web/src/components/ios-version-banner.tsx` — to be wired up when the banner lands).
+
+**Why 26.2.** Safari 26.2 closed several long-standing iOS bugs we used to work around at the component level — sticky-positioned elements decoupling during rubber-band overscroll, the keyboard not revealing focused elements that needed it, and `scrollRectToVisible` mis-targeting when the on-screen keyboard was open. It also ships the platform APIs the v2 SPA leans on:
+
+- **`field-sizing: content`** — inputs and textareas size to their content without JS measurement.
+- **`scrollend` event** — settle-aware infinite-scroll and analytics, no more `setTimeout` after `scroll` ticks.
+- **`scrollbar-color`** — themable scrollbars that match the shadcn palette without WebKit-specific CSS.
+- **Event Timing API + LCP** — Core Web Vitals reporting from Safari now matches Chromium, so perf budgets compare apples-to-apples.
+- **View Transitions API improvements** — same-document transitions work consistently on iOS, used in the route-change crossfade.
+
+**Patterns.** All mobile / iOS Safari patterns — dynamic viewport units, safe-area insets, 44pt tap targets via `pointer-coarse:`, `scroll-shadow-x`, mobile reflow, iOS keyboard hints, bfcache lifecycle, reduced motion, web-app metadata, accessibility — are canonicalized in `.claude/rules/v2-frontend.md` under **Mobile / iOS Safari patterns**. Apply them from there; do not duplicate the guidance here.
+
+**Manual QA.** Run the matrix in [`docs/mobile-qa-matrix.md`](mobile-qa-matrix.md) before tagging a release. Routes × viewports (iPhone SE / 13 / 15 Pro Max / iPad Mini) with interaction checks for safe-area, tap targets, keyboard, bfcache, and Add-to-Home-Screen.
+
+**Automated QA.** The Playwright suite includes mobile-safari projects at iPhone SE (375×667), iPhone 13 (390×844), iPhone 15 Pro Max (430×932), and iPad Mini (768×1024). Run from the worktree:
+
+```sh
+cd web
+bun run e2e
+```
+
+For ad-hoc responsive evidence on a single route, `bun run validate <path>` captures the desktop / tablet / mobile composite used in PR descriptions.
