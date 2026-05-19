@@ -76,7 +76,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340 (state-doc merge included).
+- **fix/mobile-rules-toolbar-stack** (subagent `ac4da836`) — **MOBILE-39 (T2 MEDIUM)**. Stack rules filter toolbar at <sm (search row 1 full-width, two selects share row 2 via `flex-1`); restore inline + `ml-auto` at sm+ using `display: contents` wrapper trick. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
