@@ -3,6 +3,11 @@ node_modules
 *.log
 .vite
 
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
 # Build output: dist/ is gitignored, except .gitkeep which keeps the
 # directory present so //go:embed all:dist always finds at least one file.
 # Real builds populate dist/index.html and dist/assets/*; the Go handler
