@@ -72,7 +72,11 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 26 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350, #1351, #1352 + state-doc merges).
-- **T3 per-agent routes scout** (Explore agent `ae03f6ba`) — auditing agents.$slug.edit, agents.$slug.runs, agents.tsx (list), agents.new. Verifying whether they inherited #1322 (form order) + #1343 (runs columns) or have their own layouts that skipped the fixes.
+- **fix/mobile-per-agent-routes** (subagent `a91963f2`) — **MOBILE-53/54/55 (T3 scout-found, HIGH/MEDIUM/MEDIUM bundle)**. per-agent runs columns get `max-sm:hidden` (#1343 pattern applied to local `buildPerAgentRunsColumns`); agents list agent-name column gets `max-sm:w-full max-sm:min-w-[140px]`; agent-form quiet-hours time grid gets `grid-cols-1 sm:grid-cols-2`. PR # TBD.
+
+## Closed scouts (iter 34)
+
+- ✅ **T3 per-agent routes scout** — 4 files audited. 3 actionable (above) + 1 CLEAN (agents.new.tsx — thin wrapper around AgentForm which inherits #1322 fix). agents.$slug.edit.tsx also clean (same wrapper).
 
 ## Closed scouts (iter 32)
 
