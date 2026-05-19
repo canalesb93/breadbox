@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LeaveGuard } from "@/components/leave-guard";
 import { AGENT_MODELS, TOOL_SCOPES } from "./agent-constants";
 import { CronField } from "./cron-field";
 import { RuleDslHelp } from "./rule-dsl-help";
@@ -106,10 +107,19 @@ export function AgentForm({
   const form = useAgentForm(initialValues);
   const submit = form.handleSubmit(async (values) => {
     await onSubmit(values);
+    // After a successful save, clear the dirty state so the LeaveGuard
+    // doesn't intercept the navigation that the parent route triggers
+    // (e.g. edit → back to list, create → into the new agent).
+    form.reset(values);
   });
 
   return (
     <Form {...form}>
+      {/* LeaveGuard listens for in-app navigation (Navigation API,
+          Safari 26.2+) and tab-close (beforeunload). Suppressed during
+          submit because the form is intentionally navigating away after
+          save. */}
+      <LeaveGuard when={form.formState.isDirty && !form.formState.isSubmitting} />
       <form onSubmit={submit} className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="space-y-4 md:col-span-2 md:order-none">
           <Card className="space-y-4 p-4">

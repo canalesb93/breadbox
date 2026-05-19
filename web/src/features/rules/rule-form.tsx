@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { LeaveGuard } from "@/components/leave-guard";
 import { StatusPanel } from "@/components/status-panel";
 import {
   Collapsible,
@@ -282,10 +283,18 @@ export function RuleForm({
       conditions: conditionsPayload,
       actions: formToActions(values.actions as ActionRow[]),
     });
+    // Mark current values as the new baseline so the LeaveGuard doesn't
+    // intercept the parent's post-save navigation. Safe to call before
+    // the mutation settles: if it fails the user stays on the page and
+    // any further edits re-dirty the form.
+    form.reset(values);
   });
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <LeaveGuard
+        when={form.formState.isDirty && !form.formState.isSubmitting}
+      />
       <Form {...form}>
         <form
           onSubmit={submitHandler}

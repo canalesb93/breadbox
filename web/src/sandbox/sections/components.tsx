@@ -99,6 +99,7 @@ import { StatusPanel } from "@/components/status-panel";
 import { FormFooter } from "@/components/form-footer";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { LeaveGuard } from "@/components/leave-guard";
 import { DangerZone } from "@/components/danger-zone";
 import { PaginationBar } from "@/components/pagination-bar";
 import { ViewAllPill } from "@/components/view-all-pill";
@@ -159,6 +160,7 @@ export function ComponentsSection() {
   const [dateRange, setDateRange] = useState<DateRangeValue>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmPending, setConfirmPending] = useState(false);
+  const [leaveGuardDirty, setLeaveGuardDirty] = useState(false);
   const [dangerPending, setDangerPending] = useState(false);
   const [paginationPage, setPaginationPage] = useState(3);
   const [pageErrorRetrying, setPageErrorRetrying] = useState(false);
@@ -1059,6 +1061,27 @@ export function ComponentsSection() {
             }, 900);
           }}
         />
+      </Specimen>
+
+      <Specimen
+        label="LeaveGuard"
+        code="components/leave-guard"
+        description="Renders a `ConfirmDialog` when the user tries to navigate away while `when={true}` — pair with React Hook Form's `formState.isDirty` to protect unsaved form edits. Backed by the `useConfirmLeave` hook: Navigation API `navigate` event (Safari 26.2+, Chrome, Firefox) + `beforeunload` for tab-close. The hook captures the destination URL and replays it after the user confirms. Toggle below, then try to click a sidebar link — you'll see the dialog. Stay or discard."
+      >
+        <div className="flex items-center gap-3">
+          <Button
+            variant={leaveGuardDirty ? "destructive" : "outline"}
+            onClick={() => setLeaveGuardDirty((v) => !v)}
+          >
+            {leaveGuardDirty ? "Mark form clean" : "Mark form dirty"}
+          </Button>
+          <span className="text-muted-foreground text-sm">
+            {leaveGuardDirty
+              ? "Guard armed — try clicking a nav link"
+              : "Guard idle"}
+          </span>
+        </div>
+        <LeaveGuard when={leaveGuardDirty} />
       </Specimen>
       </SandboxGroup>
 
