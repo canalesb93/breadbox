@@ -251,7 +251,10 @@ function buildColumns({
     {
       id: "name",
       header: "Agent",
-      meta: { className: "w-[28%] min-w-[200px]" },
+      meta: {
+        className:
+          "w-[28%] min-w-[200px] max-sm:w-full max-sm:min-w-[140px]",
+      },
       cell: ({ row }) => {
         const a = row.original;
         return (
