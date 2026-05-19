@@ -10,6 +10,7 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
@@ -25,6 +26,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// init registers MIME types Go's net/http doesn't know about by default
+// but the v2 SPA serves. `.webmanifest` is the canonical extension for
+// the Web App Manifest (PWA); without this iOS Safari's
+// Add-to-Home-Screen flow gets a `text/plain` response and silently
+// ignores the manifest.
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 //go:embed all:dist
 var distFS embed.FS
