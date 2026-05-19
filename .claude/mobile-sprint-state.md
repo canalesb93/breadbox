@@ -71,7 +71,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 24 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350 + state-doc merges).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 25 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350, #1351 + state-doc merges).
+- **docs/mobile-patterns-canon-refresh** (subagent `a0aa29f8`) — **T7 documentation drift**. Refresh `.claude/rules/v2-frontend.md` "Mobile / iOS Safari patterns" with 6 additions covering #1346 (picker dvw widths), #1347 (FAB safe-area-bottom + CommandList max-h-dvh), #1348 (sheet footer stacking), #1349 (raw-button tap-zone recipe + textarea enterKeyHint), #1350 (Dialog header mt-env + AlertDialog buttons), #1351 (skip link + FormMessage alert). Pure docs. PR # TBD.
 
 ## Closed scouts (iter 32)
 
