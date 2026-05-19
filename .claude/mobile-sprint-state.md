@@ -72,7 +72,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344 (state-doc merge included).
+- **docs/sandbox-mobile-pattern-specimens** (subagent `a1ed71e0`) — **T6 sandbox completeness**. Adds sandbox demos for `scroll-shadow-x` utility, mobile reflow patterns (button stack, CSS order, chip-rail). Closes the gap where #1344's canon documented patterns but the sandbox had no specimens. PR # TBD.
 
 ## Closed scouts (iter 25)
 
