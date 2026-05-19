@@ -21,7 +21,8 @@ Perfect mobile support for the v2 SPA at `web/`, prioritizing iOS Safari (26.2+ 
 - ✅ Iter 3 (PR #1357 → sprint): `LeaveGuard` component + wired to `agent-form.tsx` and `rule-form.tsx`.
 - ✅ Iter 4 (PR #1358 → sprint): PWA assets — 180/192/512 PNG icons rasterized from favicon.svg via `bun run generate-icons`, `manifest.webmanifest` with maskable variant, sized apple-touch-icon. 404 + error pages confirmed to have back-to-home links (no Safari chrome in standalone mode).
 - ✅ Iter 5 (PR #1359 → sprint): restore bfcache on iOS Safari swipe-back. Pulled `/v2/*` out of the session-middleware group in `internal/api/router.go` so the static SPA bundle stops carrying `Vary: Cookie` (which WebKit treats as a bfcache blocker). Tightened the `pageshow` handler in `web/src/main.tsx` to only re-validate `["me"]` instead of invalidating every cached query, eliminating the post-restore refetch storm. Verified via curl against a freshly-built binary: `Vary: Cookie` is gone from `/v2/` responses.
-- ✅ Iter 6 (PR pending → sprint): `bun run memory-sweep` — Playwright-based structural-leak detector. Drives list↔detail N=20 times under webkit, samples DOM node count + shadcn slot count at iter 1/5/10/15/20, reports verdict per flow. Baseline: `/v2/accounts` clean (0 growth across 20 iters); `/v2/transactions` clean iter 1-15 (1838→1742, attrition) then drops to 252 at iter 20 — likely session loss after rapid navigations; flagged for follow-up investigation. WebKit doesn't expose `performance.memory`, so this is a structural proxy; real iOS heap data needs Safari Web Inspector.
+- ✅ Iter 6 (PR #1360 → sprint): `bun run memory-sweep` — Playwright-based structural-leak detector. Drives list↔detail N=20 times under webkit, samples DOM node count + shadcn slot count at iter 1/5/10/15/20, reports verdict per flow. Baseline: `/v2/accounts` clean (0 growth across 20 iters); `/v2/transactions` clean iter 1-15 (1838→1742, attrition) then drops to 252 at iter 20 — likely session loss after rapid navigations; flagged for follow-up investigation. WebKit doesn't expose `performance.memory`, so this is a structural proxy; real iOS heap data needs Safari Web Inspector.
+- ✅ Iter 7 (PR pending → sprint): rolled `LeaveGuard` out to `tag-form`, `category-form`, `api-key-form`, and the password-change form in `account-section.tsx`. Each navigates only on success and now resets the form before navigating (so the guard doesn't intercept the post-save nav). The password form uses a custom title/description.
 
 ## Queue (priority order)
 
@@ -41,7 +42,7 @@ Each iteration: pick the next item, branch off `mobile-safari/sprint`, ship a su
 
 7. **Form-field iOS keyboard audit** — verify every `<Input>` consumer passes appropriate `inputMode` / `enterKeyHint` / `autoCapitalize` defaults. `SearchInput` already does; others might not.
 
-8. **LeaveGuard for other forms** — apply LeaveGuard to remaining dirty-state forms: category-form, tag-form, settings forms, API key new form.
+8. **LeaveGuard — remaining settings sub-forms** — audit `household-section`, `backups-section`, `agents-section` for `useForm` instances that need LeaveGuard. Those files are 600+ lines each and likely contain multiple sub-forms; needs per-form judgment on whether the field is sensitive enough to warrant a guard.
 
 9. **Memory phase — TanStack Query `gcTime` cap** — cache currently has no upper bound on retained queries. Set a sensible `gcTime` (5 min default is fine for most; consider `Infinity` for `["me"]` and shorter for paginated lists). Verify via `bun run memory-sweep`.
 

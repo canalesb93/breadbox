@@ -16,6 +16,7 @@ import { useMe } from "@/api/queries/me";
 import { useChangePassword } from "@/api/queries/account";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
+import { LeaveGuard } from "@/components/leave-guard";
 
 const schema = z
   .object({
@@ -66,6 +67,12 @@ export function AccountSection() {
           description="At least 8 characters. You'll stay signed in."
         />
         <Form {...form}>
+          <LeaveGuard
+            when={form.formState.isDirty && !form.formState.isSubmitting}
+            title="Discard your password change?"
+            description="You've started typing a new password but haven't saved it. Leaving will lose what you typed."
+            confirmLabel="Discard"
+          />
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
