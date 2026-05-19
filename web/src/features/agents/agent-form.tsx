@@ -120,8 +120,13 @@ export function AgentForm({
           submit because the form is intentionally navigating away after
           save. */}
       <LeaveGuard when={form.formState.isDirty && !form.formState.isSubmitting} />
-      <form onSubmit={submit} className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="space-y-4 md:col-span-2 md:order-none">
+      {/* `md` breakpoint at 768px tries to split into a 2:1 grid, but on
+          iPad portrait (768) with the sidebar visible the right column
+          collapses to ~155px and the inputs become unreadable. Defer the
+          3-col layout to `lg` (1024px) so iPad portrait gets the same
+          stacked layout as phones. */}
+      <form onSubmit={submit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2 lg:order-none">
           <Card className="space-y-4 p-4">
             <FormField
               control={form.control}
@@ -239,7 +244,7 @@ export function AgentForm({
           (still Name → Slug → Prompt → … → Model → Schedule …). At md+ both
           cards revert to source order via `md:order-none`.
         */}
-        <div className="order-first space-y-4 md:order-none">
+        <div className="order-first space-y-4 lg:order-none">
           <Card className="space-y-4 p-4">
             <FormField
               control={form.control}

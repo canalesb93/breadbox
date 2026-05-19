@@ -69,7 +69,11 @@ export function APIKeysTable({
       {
         id: "actor",
         header: "Actor",
-        meta: { className: "hidden md:table-cell" },
+        // Hidden below `lg` (1024px). At iPad portrait (768) the actor
+        // role badge + actor_name sub-label combined extend past the
+        // remaining track width once name + scope + actions are placed,
+        // pushing the trailing kebab off-screen. Defer to desktop.
+        meta: { className: "hidden lg:table-cell" },
         cell: ({ row }) => (
           <ActorBadge
             type={row.original.actor_type}
