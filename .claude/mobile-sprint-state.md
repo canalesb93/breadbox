@@ -72,7 +72,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 22 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348 + state-doc merges).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 23 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349 + state-doc merges).
+- **T3 shared-components scout** (Explore agent `a4e586be`) — auditing detail-list, list-card, status-panel, timeline-rail, soft-back-button, id-pill, kbd-tooltip, eyebrow, brand-header, hero-grid, coming-soon-pill, color-rail-card, **confirm-dialog (button stacking?)**, **detail-dialog-header (safe-area-top?)**. Findings or clean.
 
 ## Closed scouts (iter 29)
 
