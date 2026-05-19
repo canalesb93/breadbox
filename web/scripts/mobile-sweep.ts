@@ -45,6 +45,122 @@ const STATIC_ROUTES = [
   "/v2/sandbox",
 ];
 
+// Detail-page flows. For each, walk the list to scrape one short_id, then
+// inspect the resolved detail URL. Most lists render `<Link to="/<resource>/$id">`
+// rows, so a simple href-substring selector works; transactions deliberately
+// uses programmatic `onRowClick` so we click the first row instead.
+type DetailFlow = {
+  label: string;
+  listPath: string;
+  detailPath: (id: string) => string;
+  // Picker returns the short_id string or null. Receives a page already
+  // landed on listPath with networkidle reached.
+  pickId: (page: Page) => Promise<string | null>;
+};
+
+const DETAIL_FLOWS: DetailFlow[] = [
+  {
+    label: "/v2/transactions/$id",
+    listPath: "/v2/transactions",
+    detailPath: (id) => `/v2/transactions/${id}`,
+    // DataTable rows use onRowClick, no per-row anchor. Click the first
+    // body row and read the resulting URL.
+    pickId: async (p) => {
+      const row = p.locator("tbody tr").first();
+      await row.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+      const before = p.url();
+      await row.click().catch(() => {});
+      await p
+        .waitForURL(
+          (u) => u !== before && /\/v2\/transactions\/[^/?#]+/.test(u),
+          { timeout: 5_000 },
+        )
+        .catch(() => {});
+      return p.url().match(/\/v2\/transactions\/([^/?#]+)/)?.[1] ?? null;
+    },
+  },
+  {
+    label: "/v2/accounts/$id",
+    listPath: "/v2/accounts",
+    detailPath: (id) => `/v2/accounts/${id}`,
+    pickId: async (p) =>
+      await p.evaluate(() => {
+        const a = document.querySelector(
+          'a[href*="/v2/accounts/"]:not([href$="/accounts"])',
+        ) as HTMLAnchorElement | null;
+        return a?.href.match(/\/v2\/accounts\/([^/?#]+)/)?.[1] ?? null;
+      }),
+  },
+  {
+    label: "/v2/categories/$id",
+    listPath: "/v2/categories",
+    detailPath: (id) => `/v2/categories/${id}`,
+    pickId: async (p) =>
+      await p.evaluate(() => {
+        const a = document.querySelector(
+          'a[href*="/v2/categories/"]:not([href$="/categories"]):not([href$="/category/new"])',
+        ) as HTMLAnchorElement | null;
+        return a?.href.match(/\/v2\/categories\/([^/?#]+)/)?.[1] ?? null;
+      }),
+  },
+  {
+    label: "/v2/tags/$slug",
+    listPath: "/v2/tags",
+    detailPath: (slug) => `/v2/tags/${slug}`,
+    pickId: async (p) =>
+      await p.evaluate(() => {
+        const a = document.querySelector(
+          'a[href*="/v2/tags/"]:not([href$="/tags"]):not([href$="/tag/new"])',
+        ) as HTMLAnchorElement | null;
+        return a?.href.match(/\/v2\/tags\/([^/?#]+)/)?.[1] ?? null;
+      }),
+  },
+  {
+    label: "/v2/connections/$id",
+    listPath: "/v2/connections",
+    detailPath: (id) => `/v2/connections/${id}`,
+    pickId: async (p) =>
+      await p.evaluate(() => {
+        const a = document.querySelector(
+          'a[href*="/v2/connections/"]:not([href$="/connections"])',
+        ) as HTMLAnchorElement | null;
+        return a?.href.match(/\/v2\/connections\/([^/?#]+)/)?.[1] ?? null;
+      }),
+  },
+  {
+    label: "/v2/rules/$id",
+    listPath: "/v2/rules",
+    detailPath: (id) => `/v2/rules/${id}`,
+    pickId: async (p) =>
+      await p.evaluate(() => {
+        const a = document.querySelector(
+          'a[href*="/v2/rules/"]:not([href$="/rules"])',
+        ) as HTMLAnchorElement | null;
+        return a?.href.match(/\/v2\/rules\/([^/?#]+)/)?.[1] ?? null;
+      }),
+  },
+  {
+    label: "/v2/agents/$slug/edit",
+    listPath: "/v2/agents",
+    detailPath: (slug) => `/v2/agents/${slug}/edit`,
+    // Agents list uses DataTable + onRowClick like transactions — no per-row
+    // anchor. Click the first body row, capture the resulting URL.
+    pickId: async (p) => {
+      const row = p.locator("tbody tr").first();
+      await row.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+      const before = p.url();
+      await row.click().catch(() => {});
+      await p
+        .waitForURL(
+          (u) => u !== before && /\/v2\/agents\/[^/]+\/edit/.test(u),
+          { timeout: 5_000 },
+        )
+        .catch(() => {});
+      return p.url().match(/\/v2\/agents\/([^/]+)\/edit/)?.[1] ?? null;
+    },
+  },
+];
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const portFile = join(repoRoot, ".breadbox-port");
 
@@ -335,7 +451,7 @@ async function main() {
   console.log(`base: ${baseUrl}`);
   console.log(`out:  ${outDir}`);
   console.log(`viewports: ${VIEWPORTS.map((v) => v.name).join(", ")}`);
-  console.log(`routes: ${STATIC_ROUTES.length}`);
+  console.log(`static routes: ${STATIC_ROUTES.length}, detail flows: ${DETAIL_FLOWS.length}`);
   console.log("");
 
   const browser = await webkit.launch({ headless: true });
@@ -357,6 +473,39 @@ async function main() {
           finding.ok ? null : "navfail",
         ].filter(Boolean);
         console.log(tags.length === 0 ? "ok" : tags.join(" "));
+      }
+      // Detail flows: scrape an id from each list, then inspect the resolved
+      // detail/edit page like any other route.
+      for (const flow of DETAIL_FLOWS) {
+        process.stdout.write(`  [${viewport.name}] ${flow.label} ... `);
+        try {
+          await page.goto(`${baseUrl}${flow.listPath}`, {
+            waitUntil: "domcontentloaded",
+            timeout: 10_000,
+          });
+          await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+          await page.waitForTimeout(300);
+          const id = await flow.pickId(page);
+          if (!id) {
+            console.log("skipped (no id found on list)");
+            continue;
+          }
+          const finding = await inspect(page, flow.detailPath(id), viewport);
+          // Mark the route label as the templated path (not the resolved
+          // one) so reports across runs are comparable.
+          finding.route = flow.label;
+          findings.push(finding);
+          const tags = [
+            finding.overflowPx > 0 ? `overflow=${finding.overflowPx}px` : null,
+            finding.smallTapTargets > 0 ? `taps=${finding.smallTapTargets}` : null,
+            finding.consoleErrors.length > 0 ? `js=${finding.consoleErrors.length}` : null,
+            finding.pageErrors.length > 0 ? `pe=${finding.pageErrors.length}` : null,
+            finding.ok ? null : "navfail",
+          ].filter(Boolean);
+          console.log(tags.length === 0 ? "ok" : tags.join(" "));
+        } catch (err) {
+          console.log(`error: ${(err as Error).message}`);
+        }
       }
       await ctx.close();
     }
