@@ -73,7 +73,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342 (state-doc merge included).
+- **fix/mobile-agent-runs-columns** (subagent `aaa7e078`) — **MOBILE-37 (T2 HIGH, last meaningful HIGH)**. Hide Trigger / Duration / Cost / Tools columns on `<sm` via `max-sm:hidden` in column meta.className; keep Status / Agent / Started / Flags. Mobile users tap the row to open the full run detail. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
