@@ -317,6 +317,12 @@ export function TranscriptViewer({
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="Search transcript (assistant text, tool names, args, results)…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
