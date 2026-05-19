@@ -72,7 +72,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 25 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350, #1351 + state-doc merges).
-- **docs/mobile-patterns-canon-refresh** (subagent `a0aa29f8`) — **T7 documentation drift**. Refresh `.claude/rules/v2-frontend.md` "Mobile / iOS Safari patterns" with 6 additions covering #1346 (picker dvw widths), #1347 (FAB safe-area-bottom + CommandList max-h-dvh), #1348 (sheet footer stacking), #1349 (raw-button tap-zone recipe + textarea enterKeyHint), #1350 (Dialog header mt-env + AlertDialog buttons), #1351 (skip link + FormMessage alert). Pure docs. PR # TBD.
 
 ## Closed scouts (iter 32)
 
@@ -138,6 +137,7 @@ Each iteration:
 - ✅ **T4 iter-28 followups** — PR #1349 merged into sprint branch (`ed1dbc5d`). Verified all 5 deferred items from iter 28: **fixed 2** (comment-composer textarea gets `enterKeyHint="send"` → iOS keyboard tints the return key; tag-chip × button gets the `pointer-coarse:` 44pt pseudo from #1317 since the raw `<button>` didn't inherit Button's TAP_TARGET); **closed 3 as non-issues** (ActivityTimeline page-scrolls naturally, PaginationLink already uses `buttonVariants({size:"icon"})` which inherits TAP_TARGET, CommentComposer button label is additive — spinner doesn't replace it).
 - ✅ **MOBILE-49/50** detail-dialog-header safe-area-top + confirm-dialog button widths — PR #1350 merged into sprint branch (`84b66052`). DialogHeader gets `mt-[env(safe-area-inset-top)]` (clean margin-shift approach; iPad-landscape notched device clearance). `AlertDialogCancel` + `AlertDialogAction` get `w-full sm:w-auto` so stacked buttons reach full tap width on 375px (AlertDialogFooter already had `flex-col-reverse` semantic — only the button widths were the gap).
 - ✅ **MOBILE-51/52** a11y form-alert + skip-link (T5 bundle) — PR #1351 merged into sprint branch (`cf94529a`). FormMessage gains `role="alert" aria-live="polite"` (conditional on error state) — VoiceOver / NVDA now announce form validation errors as they appear (WCAG 3.3.1). `__root.tsx` gains a `sr-only focus-visible:not-sr-only` skip-to-main-content link + `<main id="main" tabIndex={-1}>` so keyboard / VoiceOver users can bypass the sidebar (WCAG 2.4.1).
+- ✅ **T7 canon refresh** — PR #1352 merged into sprint branch (`ba87c056`). 6 additions to the "Mobile / iOS Safari patterns" section in `.claude/rules/v2-frontend.md` covering everything from PRs #1346 through #1351 (picker dvw widths, CommandList max-h-dvh, FAB safe-area-bottom, DialogHeader mt-env, AlertDialog button width, raw-button tap-zone recipe, textarea enterKeyHint, skip link, FormMessage alert). Canon is current.
 
 ## Notes for next iteration
 
