@@ -119,8 +119,21 @@ export function ConfirmDialog({
           {body && <div className="text-sm sm:text-left">{body}</div>}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
+          {/* AlertDialogFooter already stacks via flex-col-reverse on mobile
+              and flex-row at sm+. The shadcn Button primitive is
+              `inline-flex shrink-0` though, so without an explicit width the
+              stacked buttons sit as narrow column-aligned pills on 375px.
+              Force full-width tap targets at mobile, restore inline at sm+ —
+              same pattern as FormFooter (#1321) and disconnect-confirmation
+              (#1328). */}
+          <AlertDialogCancel
+            className="w-full sm:w-auto"
+            disabled={pending}
+          >
+            {cancelLabel}
+          </AlertDialogCancel>
           <AlertDialogAction
+            className="w-full sm:w-auto"
             variant={actionVariant}
             disabled={pending}
             onClick={(e) => {
