@@ -57,7 +57,6 @@ Each iteration:
 
 **Carried over from Phase 1 (deferred):**
 - [ ] **MOBILE-8** Sticky `<main>` header may overlap iOS keyboard. `web/src/routes/__root.tsx`. Requires real-device validation; no simulator fully reproduces keyboard occlusion.
-- [ ] **MOBILE-19** HeroGrid 20px padding feels cramped on 375px. `web/src/components/hero-grid.tsx`. Subjective — defer until visual evidence shows a clear problem.
 
 **New (T1 — user-reported):**
 - [ ] **MOBILE-26** iOS Safari swipe-back gesture freezes / shows blank page. Tap-back works fine. _(in flight)_
@@ -73,7 +72,12 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 23 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349 + state-doc merges).
-- **T3 shared-components scout** (Explore agent `a4e586be`) — auditing detail-list, list-card, status-panel, timeline-rail, soft-back-button, id-pill, kbd-tooltip, eyebrow, brand-header, hero-grid, coming-soon-pill, color-rail-card, **confirm-dialog (button stacking?)**, **detail-dialog-header (safe-area-top?)**. Findings or clean.
+- **fix/mobile-detail-dialog-and-confirm** (subagent `a8ba22b7`) — **MOBILE-49 + MOBILE-50 (T3 scout-found)**. detail-dialog-header gets safe-area-top (mirror of #1342); confirm-dialog buttons get full-width-when-stacked (mirror of #1328). PR # TBD.
+
+## Closed scouts (iter 31)
+
+- ✅ **T3 shared-components scout** — 14 files audited. 2 actionable above. 1 deferred (kbd-tooltip showing on touch — LOW polish, defer). 11 CLEAN (detail-list, list-card, status-panel, timeline-rail, soft-back-button, id-pill, eyebrow, brand-header, coming-soon-pill, color-rail-card, **hero-grid**).
+- ✅ **MOBILE-19** Hero-grid padding (deferred from Phase 1) — verified non-issue by scout. `px-5 sm:px-7` reads correctly at 375px; "feels cramped" was subjective and no visual evidence surfaced.
 
 ## Closed scouts (iter 29)
 
