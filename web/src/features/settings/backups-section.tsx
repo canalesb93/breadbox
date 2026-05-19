@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { LeaveGuard } from "@/components/leave-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -342,7 +343,7 @@ function ScheduleForm({
   });
 
   const onSubmit = async (values: ScheduleValues) => {
-    await withMutationToast(
+    const ok = await withMutationToast(
       () =>
         save.mutateAsync({
           schedule: values.schedule === "off" ? "" : values.schedule,
@@ -350,10 +351,16 @@ function ScheduleForm({
         }),
       { success: "Schedule saved." },
     );
+    // Reset on success so the LeaveGuard doesn't intercept the next
+    // navigation if the form happens to be visible elsewhere later.
+    if (ok) form.reset(values);
   };
 
   return (
     <Form {...form}>
+      <LeaveGuard
+        when={form.formState.isDirty && !form.formState.isSubmitting}
+      />
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="space-y-4"
