@@ -822,15 +822,21 @@ function AddBlockMenu({
               </div>
             </DialogHeader>
 
-            <div className="grid flex-1 grid-cols-[10rem_1fr] overflow-hidden">
-              <nav className="bg-muted/30 overflow-y-auto border-r p-2">
+            {/* On mobile the 160px sidebar would eat ~43% of a 375px viewport,
+                leaving the block grid cramped. Stack the nav above the content
+                as a horizontal-scroll chip rail at <sm (same pattern as the
+                transactions filter rail in #1324 / settings tabs in MOBILE-21).
+                Dividers flip from horizontal rules to vertical separators so
+                the visual grouping survives the rotation. */}
+            <div className="flex flex-1 flex-col overflow-hidden sm:grid sm:grid-cols-[10rem_1fr]">
+              <nav className="bg-muted/30 border-b p-2 max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:overflow-x-auto max-sm:scroll-shadow-x max-sm:[--scroll-shadow-cover:var(--muted)] max-sm:[-webkit-overflow-scrolling:touch] sm:overflow-y-auto sm:border-r sm:border-b-0">
                 <CategoryRailItem
                   label="Presets"
                   count={PRESETS.length}
                   active={activeGroup === "presets"}
                   onClick={() => setActiveGroup("presets")}
                 />
-                <div className="my-2 border-t" />
+                <div className="max-sm:mx-1 max-sm:h-5 max-sm:shrink-0 max-sm:border-l sm:my-2 sm:border-t" />
                 <CategoryRailItem
                   label="All"
                   count={counts.all}
@@ -861,11 +867,11 @@ function AddBlockMenu({
                   active={activeGroup === "knowledge"}
                   onClick={() => setActiveGroup("knowledge")}
                 />
-                <div className="mt-2 border-t pt-2">
+                <div className="max-sm:mx-1 max-sm:h-5 max-sm:shrink-0 max-sm:border-l sm:mt-2 sm:border-t sm:pt-2">
                   <button
                     type="button"
                     onClick={openCustomForm}
-                    className="hover:bg-accent text-muted-foreground hover:text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors"
+                    className="hover:bg-accent text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors max-sm:shrink-0 max-sm:whitespace-nowrap sm:w-full"
                   >
                     <Plus className="size-3.5" />
                     Custom block
@@ -1061,7 +1067,10 @@ function CategoryRailItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "hover:bg-accent flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+        // On mobile the rail flows horizontally — pills must not shrink or
+        // wrap, and they don't span the full row. sm+ restores the original
+        // full-width vertical list layout (label left, count right).
+        "hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors max-sm:shrink-0 max-sm:whitespace-nowrap sm:w-full sm:justify-between",
         active
           ? "bg-accent text-foreground font-medium"
           : "text-muted-foreground hover:text-foreground",
