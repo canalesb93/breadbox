@@ -18,7 +18,8 @@ Perfect mobile support for the v2 SPA at `web/`, prioritizing iOS Safari (26.2+ 
 - ✅ Phase 1 (PR #1355 → main): Playwright webkit infra, iOS 26.2 banner, Nav API foundations (`useConfirmLeave`, `startViewTransitionIfSupported`), docs.
 - ✅ Phase 1.5: Mobile sweep tool (`bun run mobile-sweep`) + `docs/mobile-sweep-findings.md`.
 - ✅ Phase 2 (PR #1356 → sprint): overflow fixes on `/v2/tags`, `/v2/api-keys`, `/v2/agents`, `/v2/categories`. All at 0px overflow on iPhone 13 / 15 Pro Max.
-- ✅ Iter 3 (PR pending → sprint): `LeaveGuard` component + wired to `agent-form.tsx` and `rule-form.tsx`.
+- ✅ Iter 3 (PR #1357 → sprint): `LeaveGuard` component + wired to `agent-form.tsx` and `rule-form.tsx`.
+- ✅ Iter 4 (PR pending → sprint): PWA assets — 180/192/512 PNG icons rasterized from favicon.svg via `bun run generate-icons`, `manifest.webmanifest` with maskable variant, sized apple-touch-icon. 404 + error pages confirmed to have back-to-home links (no Safari chrome in standalone mode).
 
 ## Queue (priority order)
 
@@ -28,19 +29,17 @@ Each iteration: pick the next item, branch off `mobile-safari/sprint`, ship a su
 
 2. **View Transitions wiring** — wrap `transactions list → detail` and `agents list → detail` route transitions with `startViewTransitionIfSupported`. Helper is in `lib/navigation/feature.ts`. Test fallback path (older browsers see instant navigation).
 
-3. **PWA assets** — 180×180, 192×192, 512×512 PNG icons + `manifest.webmanifest` (name, short_name, theme_color, display=standalone, start_url=`/v2/`). Standalone-mode dead-end audit (404/error pages need clear back-to-home — no Safari back button in PWA).
+3. **Web Vitals beacon** — small listener using Event Timing API + LCP (both new in Safari 26.2). Beacon INP/LCP/CLS to a `/api/v1/web-vitals` endpoint or `console.log` behind a `VITE_REPORT_VITALS` flag. Establishes perf baseline.
 
-4. **Web Vitals beacon** — small listener using Event Timing API + LCP (both new in Safari 26.2). Beacon INP/LCP/CLS to a `/api/v1/web-vitals` endpoint or `console.log` behind a `VITE_REPORT_VITALS` flag. Establishes perf baseline.
+4. **Detail-page sweep** — extend `mobile-sweep.ts` to scrape one ID per list route and visit the corresponding detail/edit/new pages. The current sweep only covers parameter-less routes.
 
-5. **Detail-page sweep** — extend `mobile-sweep.ts` to scrape one ID per list route and visit the corresponding detail/edit/new pages. The current sweep only covers parameter-less routes.
+5. **iPhone SE 1st-gen (320px) edge** — `/v2/api-keys` still shows ~55px overflow on the 320px profile. Consider `table-layout: fixed` opt-in on DataTable or other approaches. Lowest priority — 320px devices are ~8 years old.
 
-6. **iPhone SE 1st-gen (320px) edge** — `/v2/api-keys` still shows ~55px overflow on the 320px profile. Consider `table-layout: fixed` opt-in on DataTable or other approaches. Lowest priority — 320px devices are ~8 years old.
+6. **bfcache verification** — write a Playwright test that actually exercises bfcache restore (multi-page traversal + back gesture). Confirms the `pageshow` + `event.persisted` handler in `main.tsx` fires correctly.
 
-7. **bfcache verification** — write a Playwright test that actually exercises bfcache restore (multi-page traversal + back gesture). Confirms the `pageshow` + `event.persisted` handler in `main.tsx` fires correctly.
+7. **Form-field iOS keyboard audit** — verify every `<Input>` consumer passes appropriate `inputMode` / `enterKeyHint` / `autoCapitalize` defaults. `SearchInput` already does; others might not.
 
-8. **Form-field iOS keyboard audit** — verify every `<Input>` consumer passes appropriate `inputMode` / `enterKeyHint` / `autoCapitalize` defaults. `SearchInput` already does; others might not.
-
-9. **LeaveGuard for other forms** — apply LeaveGuard to remaining dirty-state forms: category-form, tag-form, settings forms, API key new form.
+8. **LeaveGuard for other forms** — apply LeaveGuard to remaining dirty-state forms: category-form, tag-form, settings forms, API key new form.
 
 ## Operating notes
 

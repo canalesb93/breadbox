@@ -22,6 +22,9 @@
          `BrandHeader` lockup so the tab icon reads as a smaller copy
          of the in-app brand mark. -->
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- PNG fallback for legacy / mail clients that don't render SVG favicons.
+         32 = browser tab. 180 = iOS home screen (apple-touch-icon below). -->
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
     <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
@@ -41,15 +44,21 @@
          `apple-mobile-web-app-title` is the icon label on the home
          screen (defaults to the page title if missing).
 
-         `apple-touch-icon` is the home-screen icon. Reuse favicon.svg
-         for now — vector scales to any home-screen icon size iOS
-         wants. PNG variants at 180×180 (and 192/512 for Android) are
-         the canonical follow-up; defer to a future asset-generation
-         PR. -->
+         `apple-touch-icon` is the home-screen icon. iOS Safari prefers a
+         PNG at exactly 180×180 over the SVG fallback (iOS 14+ ignores
+         non-PNG apple-touch-icons in some cases). Both are declared so
+         every browser picks the format it likes; vector ships as the
+         universal fallback. `manifest.webmanifest` carries the 192/512
+         PNGs Android + the PWA install prompt need.
+
+         Icons regenerate via `bun run generate-icons` whenever
+         `favicon.svg` changes. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Breadbox" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png" />
     <link rel="apple-touch-icon" href="./favicon.svg" />
+    <link rel="manifest" href="./manifest.webmanifest" />
 
     <!-- Open Graph — Slack / Discord / iMessage / Linear link previews. -->
     <meta property="og:type" content="website" />
