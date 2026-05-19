@@ -71,7 +71,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 25 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350, #1351 + state-doc merges).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 26 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348, #1349, #1350, #1351, #1352 + state-doc merges).
+- **T3 per-agent routes scout** (Explore agent `ae03f6ba`) — auditing agents.$slug.edit, agents.$slug.runs, agents.tsx (list), agents.new. Verifying whether they inherited #1322 (form order) + #1343 (runs columns) or have their own layouts that skipped the fixes.
 
 ## Closed scouts (iter 32)
 
