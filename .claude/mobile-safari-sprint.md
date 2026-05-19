@@ -3,7 +3,7 @@
 **Sprint branch (persistent, accumulates all iterations):** `mobile-safari/sprint`
 **Worktree:** `.claude/worktrees/mobile-safari-playwright`
 **Started:** 2026-05-19 off origin/main @ 5d16af1a (Phase 1) + e45aa673 (Phase 2)
-**Loop cron:** `13,43 * * * *` (every 30 min; job id 806b1497)
+**Loop cron:** `13,43 * * * *` (every 30 min; job id 109e97f4, durable)
 **Authorization & workflow:** Ricardo has granted standing approval to open AND squash-merge iteration PRs INTO the sprint branch (NOT into main). At end of sprint, ONE final PR opens from `mobile-safari/sprint` → `main` for Ricardo to review the full feature in one place. **Do not enable GitHub auto-merge.** **Do not merge to main.**
 **Per-iteration branches:** each iteration creates `mobile-safari/iter-N-<slug>` (e.g. `mobile-safari/iter-3-confirm-leave`) off the sprint branch, opens a PR into the sprint branch, merges, and is auto-deleted on merge. The sprint branch is never deleted.
 **Driver:** `/loop 30m` autonomous continuation (cron job set up 2026-05-19).
