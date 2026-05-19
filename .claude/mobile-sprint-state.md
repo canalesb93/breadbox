@@ -73,7 +73,6 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347 (state-doc merge included).
-- **fix/mobile-connect-reauth-sheet-footers** (subagent `ac020f11`) — **MOBILE-47 + MOBILE-48 (T3 scout-found, HIGH bundle)**. Stack `connect-bank-sheet.tsx` and `reauth-sheet.tsx` footer buttons on mobile via the established `flex-col-reverse sm:flex-row` + `w-full sm:w-auto` pattern (#1321/#1328/#1336). PR # TBD.
 
 ## Closed scouts (iter 29)
 
@@ -125,6 +124,7 @@ Each iteration:
 - ✅ **T6 sandbox specimens** — PR #1345 merged into sprint branch (`97807c42`). Adds two specimens to `web/src/sandbox/sections/patterns.tsx`: `scroll-shadow-x utility` (card surface + page-surface cover override) and `Mobile reflow patterns` (button stack with primary-on-top, CSS `order` reshuffle, horizontal scroll-rail filter pills). Each cites the originating PR in code comments.
 - ✅ **MOBILE-43/44** Picker popover mobile widths — PR #1346 merged into sprint branch (`0aa00e0a`). Icon-picker (`w-72`) and color-picker (`w-64`) PopoverContents now use `w-[calc(100dvw-2rem)] sm:w-{72|64}` — full visible width minus 16px margin on mobile, locked to design size at sm+.
 - ✅ **MOBILE-45/46** FloatingActionBar safe-area-bottom + CommandList max-h adaptive — PR #1347 merged into sprint branch (`4ef34cd7`). FAB clears iPhone home indicator via `bottom-[max(1rem,env(safe-area-inset-bottom))]`; CommandList caps at `max-h-[min(300px,50dvh)]` so dropdowns adapt to shorter viewports (iOS keyboard open, landscape).
+- ✅ **MOBILE-47/48** connect/reauth sheet footers — PR #1348 merged into sprint branch (`8d37e803`). `connect-bank-sheet.tsx` (pick stage) and `reauth-sheet.tsx` (confirm stage) hand-rolled footers now follow the canonical `flex-col-reverse sm:flex-row` + `w-full sm:w-auto` pattern (matches #1321/#1328/#1336).
 
 ## Notes for next iteration
 
