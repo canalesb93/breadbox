@@ -215,19 +215,11 @@ async function main() {
     // "successes" with empty transcripts. Surface as an explicit error
     // event + non-zero exit so the orchestrator records something the
     // operator can actually read in the transcript drawer.
-    if (messageCount === 0) {
-      emitError(
-        "agent SDK stream ended without yielding any messages — likely a subprocess spawn failure (executable not on PATH?) or an invalid auth credential",
-        undefined,
-        transcriptPath,
-      );
-    } else {
-      emitError(
-        `agent SDK stream ended after ${messageCount} message(s) without emitting a result event`,
-        undefined,
-        transcriptPath,
-      );
-    }
+    const reason =
+      messageCount === 0
+        ? "without yielding any messages — likely a subprocess spawn failure (executable not on PATH?) or an invalid auth credential"
+        : `after ${messageCount} message(s) without emitting a result event`;
+    emitError(`agent SDK stream ended ${reason}`, undefined, transcriptPath);
     process.exit(1);
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
