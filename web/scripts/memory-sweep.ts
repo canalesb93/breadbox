@@ -128,18 +128,34 @@ async function runFlow(
       timeout: 10_000,
     });
     await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
-    // Wait until the list has actually rendered rows (not the empty/loading
-    // skeleton). Without this, fast navigations on a slow query-cache
-    // refetch catch the page mid-render and we'd report misleading drops.
-    await page.locator("tbody tr").first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+    // Wait until the list has actually rendered LOADED rows (not skeletons).
+    // After many rapid invalidations the cache refetch can lag; without
+    // this poll the script captures a skeleton page (~250 DOM nodes) and
+    // reports a misleading drop. Poll for full-tree DOM count instead of
+    // a specific selector — works across list types (table, divider-list).
+    await page
+      .waitForFunction(
+        () => document.getElementsByTagName("*").length > 600,
+        null,
+        { timeout: 8_000 },
+      )
+      .catch(() => {});
     await page.waitForTimeout(150);
 
     if (SAMPLE_AT.includes(i)) {
       const snap = await snapshot(page, i);
       snapshots.push(snap);
+      const curUrl = page.url();
       console.log(
-        `  iter ${i}: dom=${snap.domNodes} slots=${snap.shadcnSlots} closed=${snap.detachedTriggers}`,
+        `  iter ${i}: dom=${snap.domNodes} slots=${snap.shadcnSlots} closed=${snap.detachedTriggers} url=${curUrl}`,
       );
+      // If the DOM count is suspiciously low (clear AuthSplash territory),
+      // capture a debug screenshot so we can see what's on the page.
+      if (snap.domNodes < 600) {
+        const slug = `memory-sweep-${stamp}__${flow.name.replace(/\W+/g, "_")}__iter${i}.png`;
+        await page.screenshot({ path: join(tmpDir, slug), fullPage: false });
+        console.log(`    → saved ${slug} (low DOM count)`);
+      }
     }
   }
 
