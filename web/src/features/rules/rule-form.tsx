@@ -391,6 +391,7 @@ export function RuleForm({
                               type="button"
                               onClick={() => field.onChange(preset.value)}
                               title={preset.hint}
+                              aria-pressed={field.value === preset.value}
                               className={cn(
                                 "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none flex-1 rounded-lg px-2 py-1 text-xs font-medium",
                                 field.value === preset.value
@@ -450,6 +451,7 @@ export function RuleForm({
                     <button
                       type="button"
                       onClick={() => form.setValue("logic", "and")}
+                      aria-pressed={watchedLogic === "and"}
                       className={cn(
                         "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none rounded-md px-2.5 py-0.5 text-xs font-medium",
                         watchedLogic === "and"
@@ -462,6 +464,7 @@ export function RuleForm({
                     <button
                       type="button"
                       onClick={() => form.setValue("logic", "or")}
+                      aria-pressed={watchedLogic === "or"}
                       className={cn(
                         "focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none rounded-md px-2.5 py-0.5 text-xs font-medium",
                         watchedLogic === "or"
