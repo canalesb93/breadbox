@@ -72,7 +72,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes 22 PRs (#1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346, #1347, #1348 + state-doc merges).
+- **fix/mobile-iter28-followups** (subagent `a3a715a9`) — **T4 pattern polish**. Verify-and-fix the 5 deferred findings from iter 28's transaction-detail scout (comment-composer hints, ActivityTimeline max-h, pagination tap targets, comment-composer label visibility, tag-chip × size). Subagent decides FIX / NON-ISSUE / DEFERRED per item and PRs whatever's real. PR # TBD (or state-doc commit if all are non-issues).
 
 ## Closed scouts (iter 29)
 
