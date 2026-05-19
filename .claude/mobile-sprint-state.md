@@ -79,7 +79,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — `CLEAN` status; now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — `CLEAN` status; now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338 (state-doc merge included).
+- **fix/mobile-prompts-builder-layout** (subagent `aa905e04`) — **MOBILE-38 (T2 HIGH)**. Stack prompts builder nav above content on mobile via `flex flex-col sm:grid sm:grid-cols-[10rem_1fr]`; nav becomes horizontal scroll rail using `scroll-shadow-x` (same pattern as #1324). PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
