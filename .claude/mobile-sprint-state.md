@@ -75,7 +75,8 @@ Each iteration:
 
 ## In-flight PRs
 
-- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340 (state-doc merge included).
+- **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341 (state-doc merge included).
+- **fix/mobile-palette-and-sheet-header-polish** (subagent `a62c8837`) — **MOBILE-41 + MOBILE-42 (T2 LOW bundle)**. Remove `[&_[cmdk-input]]:h-11` override in `command-palette.tsx` so the primitive's `h-9 pointer-coarse:h-12` adaptive defaults apply (#1317). Add `pt-[calc(*+env(safe-area-inset-top))]` to `detail-sheet-header.tsx` for iPhone landscape with notch. PR # TBD.
 
 ## Completed (Phase 2 — direct-to-main)
 
