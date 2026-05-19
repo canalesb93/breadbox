@@ -51,10 +51,6 @@ Every run mints a scoped `actor_type='agent'` API key (name format `agent:<slug>
 
 Don't blur these. Cron callers must use `RunOrSkip`; HTTP callers must use `RunNow`.
 
-### Seed-on-empty, never-overwrite
-
-`agent.SeedDefaults` runs ONLY when `agent_definitions` is empty (fresh install). User edits to seeded agents, custom agents, and renamed agents must survive every restart. Never add an "upsert" path here — that would silently undo user customization.
-
 ### Fresh-ctx revocation
 
 `Orchestrator.runLocked` defers the API key revoke with `context.WithTimeout(context.Background(), 10*time.Second)` — a NEW root context, not the request ctx. A cancelled parent (user closed the run-now request, scheduler restart, server shutdown) must NOT prevent revocation.
@@ -63,19 +59,10 @@ Don't blur these. Cron callers must use `RunOrSkip`; HTTP callers must use `RunN
 
 CRUD mutations on agent_definitions call `svc.OnDefinitionChanged()` which the orchestrator wires to `AgentScheduler.Reload(ctx)`. The full sequence: service method updates DB → notifies hook → scheduler removes all per-agent entries → re-registers from DB. Don't add new mutation paths without calling the hook.
 
-## Adding a new starter agent
-
-1. Drop the markdown prompt at `prompts/agents/strategy-<slug>.md`.
-2. Add an entry to `agent.DefaultSeed` in `internal/agent/seed.go`.
-3. Existing installs are unaffected (seed is fresh-install-only). New installs get it on next boot.
-
-That's the whole flow.
-
 ## Tests + CI
 
 - Service-layer integration tests: `internal/service/agents_test.go`, `agent_orchestrator_test.go` (one TestMain shared with the rest of `service_test`).
 - Schema + sqlc integration tests: `internal/db/agent_tables_integration_test.go`, `agent_queries_integration_test.go`.
-- Seed tests: `internal/agent/seed_test.go`.
 - Runner unit tests: `internal/agent/sidecar_test.go` (no DB; uses a fake shell-script sidecar).
 - OpenAPI drift: every new HTTP route MUST land in `openapi.yaml` in the same PR, or `TestOpenAPIDrift` will red-fail CI.
 - Iteration PRs on the agents sprint branch get the full CI matrix because the branch is in `.github/workflows/ci.yml::pull_request.branches`.
@@ -101,7 +88,6 @@ Every legacy admin agent URL 302s to `/v2/agents`. Symbols (`AgentsPageHandler`,
 ## Do not
 
 - Don't call `RunNow` from a cron callback — it skips the skipped-row semantics.
-- Don't add an upsert path to `SeedDefaults`.
 - Don't return the full plaintext of `subscription_token` or `anthropic_api_key` from any endpoint. The mask helper in `agent_settings.go::maskToken` is the only shape that leaves the server.
 - Don't bypass the concurrency semaphore (e.g., a "force run" debug endpoint). One safety net should not be optional.
 - Don't store the per-run minted API key in `agent_runs`. It's deliberately ephemeral — `actor_type='agent'` + the `agent:<slug>:<runID>` name in `api_keys` is the audit trail.
