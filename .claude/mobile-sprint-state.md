@@ -73,7 +73,16 @@ Each iteration:
 ## In-flight PRs
 
 - **PR #1334** sprint→main Phase 2 bundle. **Awaiting user merge** — now includes #1328, #1330, #1331, #1332, #1333, #1335, #1336, #1337, #1338, #1339, #1340, #1341, #1342, #1343, #1344, #1345, #1346 (state-doc merge included).
-- **T3 transaction-detail+features scout** (Explore agent `af710cb7`) — auditing transaction-detail, activity-timeline, comment-composer, tag-manager, category-editor, pagination, selection-action-bar buttons, row skeleton. Findings will fold into backlog (or report clean).
+- **fix/mobile-fab-and-commandlist** (subagent `a3c78774`) — **MOBILE-45 + MOBILE-46 (T3 scout-found, HIGH + MEDIUM)**. FloatingActionBar gains `bottom-[max(1rem,env(safe-area-inset-bottom))]` so it clears the iPhone home indicator. CommandList `max-h-[300px]` → `max-h-[min(300px,50dvh)]` so dropdowns don't push offscreen with iOS keyboard open. PR # TBD.
+
+## Closed scouts (iter 28)
+
+- ✅ **T3 transaction-detail+features scout** — 7 findings, 2 actionable (above), 5 deferred:
+  - Comment composer keyboard hints (minor UX polish)
+  - ActivityTimeline max-height (design question, no clear bug)
+  - Pagination button sizes (likely already covered by `pointer-coarse:` tap zone from #1317 — verify before changing)
+  - CommentComposer label visibility on mobile (minor polish)
+  - Tag chip × button size (likely already covered by `pointer-coarse:` tap zone — verify before changing)
 
 ## Closed scouts (iter 27)
 
