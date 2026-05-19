@@ -19,9 +19,19 @@ import { fileURLToPath } from "node:url";
 type Viewport = { name: string; device: keyof typeof devices };
 
 const VIEWPORTS: Viewport[] = [
+  // Phones — portrait. iPhone SE 1st-gen (320px) is the narrowest realistic
+  // device; iPhone 13 sits at the median; 15 Pro Max is the widest.
   { name: "iphone-se", device: "iPhone SE" },
   { name: "iphone-13", device: "iPhone 13" },
   { name: "iphone-15-pro-max", device: "iPhone 15 Pro Max" },
+  // Phone landscape — very short height (342px) where safe-area top + sticky
+  // header eat most of the vertical budget. Useful regression check for
+  // dvh-based layout and dropdown clipping.
+  { name: "iphone-13-landscape", device: "iPhone 13 landscape" },
+  // Tablet — portrait + landscape. iPad Mini is the smallest current iPad
+  // size; the breakpoint maths differ at 768/1024 vs the phone breakpoints.
+  { name: "ipad-mini", device: "iPad Mini" },
+  { name: "ipad-mini-landscape", device: "iPad Mini landscape" },
 ];
 
 // Parameter-less routes; detail/edit routes get appended dynamically after
