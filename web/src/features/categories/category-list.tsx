@@ -150,7 +150,13 @@ function CategoryRow({
               variant="ghost"
               size="icon"
               asChild
-              className="text-muted-foreground hover:text-foreground size-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              // `pointer-coarse:opacity-100` keeps the edit affordance
+              // visible on touch devices where hover doesn't fire — without
+              // it, iOS users see no edit shortcut and have to tap the row
+              // (still works, but the icon is meant to be the discoverable
+              // entry point). Same intent as the `pointer-coarse:` Tap
+              // targets pattern in v2-frontend rules.
+              className="text-muted-foreground hover:text-foreground size-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
             >
               <Link
                 to="/categories/$id"
