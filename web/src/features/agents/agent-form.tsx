@@ -124,11 +124,6 @@ export function AgentForm({
           iPad portrait (768) with the sidebar visible the right column
           collapses to ~155px and the inputs become unreadable. Defer the
           3-col layout to `lg` (1024px) so iPad portrait gets the same
-          stacked layout as phones. */}
-      {/* `md` breakpoint at 768px tries to split into a 2:1 grid, but on
-          iPad portrait (768) with the sidebar visible the right column
-          collapses to ~155px and the inputs become unreadable. Defer the
-          3-col layout to `lg` (1024px) so iPad portrait gets the same
           stacked layout as phones.
 
           `min-w-0` on each grid item: CSS Grid items default to
