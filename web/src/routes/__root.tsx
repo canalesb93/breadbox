@@ -37,6 +37,19 @@ function isUnauthenticatedPath(pathname: string): boolean {
   return UNAUTHENTICATED_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
+// Lift the (bottom-anchored) sonner toast stack above the iOS home
+// indicator. Sonner pins it at a fixed `bottom` — 24px on desktop, 16px
+// on its <600px mobile layout — both of which land inside the
+// home-indicator gesture strip on edge-to-edge iPhones (the iPad uses the
+// desktop value). `max(<default>, env(safe-area-inset-bottom))` keeps the
+// default spacing where there's no inset (desktop / Android / non-notched
+// iOS → env resolves to 0) and clears the indicator where there is one.
+// Passed at the call site so `ui/sonner.tsx` stays the unmodified shadcn
+// wrapper; only `bottom` is overridden, sonner fills the other sides.
+// Mirrors the FloatingActionBar recipe (`bottom-[max(1rem,env(...))]`).
+const TOAST_OFFSET = { bottom: "max(24px, env(safe-area-inset-bottom))" };
+const TOAST_MOBILE_OFFSET = { bottom: "max(16px, env(safe-area-inset-bottom))" };
+
 export function RootLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -44,7 +57,7 @@ export function RootLayout() {
     return (
       <>
         <Outlet />
-        <Toaster />
+        <Toaster offset={TOAST_OFFSET} mobileOffset={TOAST_MOBILE_OFFSET} />
       </>
     );
   }
@@ -219,7 +232,7 @@ function AuthenticatedShell({ pathname }: { pathname: string }) {
       <CommandPalette />
       <ShortcutSheet />
       <SettingsShell />
-      <Toaster />
+      <Toaster offset={TOAST_OFFSET} mobileOffset={TOAST_MOBILE_OFFSET} />
     </SidebarProvider>
   );
 }
