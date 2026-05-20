@@ -77,7 +77,7 @@ func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolR
 		}
 		return errorResult(err), nil, nil
 	}
-	return jsonResult(toMCPAnnotations(annotations))
+	return jsonResult(map[string]any{"annotations": toMCPAnnotations(annotations)})
 }
 
 // validateActorTypes rejects unknown values at the MCP boundary so agents
