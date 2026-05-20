@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -19,43 +18,29 @@ import { SetupAccountPage } from "@/routes/setup-account";
 import { Placeholder } from "@/routes/placeholder";
 import { NotFoundPage } from "@/routes/not-found";
 import { ErrorPage } from "@/routes/error";
+// List pages are eager (most-visited on initial load); detail / edit /
+// new / form pages lazy-load via `lazyRouteComponent` so they stay out
+// of the boot chunk. Search-param schemas stay imported because the
+// router needs them to validate URLs even before the lazy component
+// resolves. Pattern matches the existing sandbox route.
 import { TransactionsPage, transactionsSearchSchema } from "@/routes/transactions";
-import { TransactionDetailPage } from "@/routes/transaction-detail";
 import { CategoriesPage } from "@/routes/categories";
-import { CategoryNewPage } from "@/routes/category-new";
-import { CategoryDetailPage } from "@/routes/category-detail";
 import { TagsPage } from "@/routes/tags";
-import { TagNewPage } from "@/routes/tag-new";
-import { TagDetailPage } from "@/routes/tag-detail";
 import {
   ConnectionsPage,
   connectionsSearchSchema,
 } from "@/routes/connections";
-import {
-  ConnectionDetailPage,
-  connectionDetailSearchSchema,
-} from "@/routes/connection-detail";
+import { connectionDetailSearchSchema } from "@/routes/connection-detail";
 import { APIKeysPage, apiKeysSearchSchema } from "@/routes/api-keys";
-import { APIKeyNewPage } from "@/routes/api-key-new";
-import { APIKeyCreatedPage } from "@/routes/api-key-created";
 import { ProvidersPage } from "@/routes/providers";
 import { AccountsPage, accountsSearchSchema } from "@/routes/accounts";
-import {
-  AccountDetailPage,
-  accountDetailSearchSchema,
-} from "@/routes/account-detail";
+import { accountDetailSearchSchema } from "@/routes/account-detail";
 import { RulesPage, rulesSearchSchema } from "@/routes/rules";
 import { AgentsPage } from "@/routes/agents";
-import { AgentNewPage, agentsNewSearchSchema } from "@/routes/agents.new";
-import { AgentsRunsPage, agentsRunsSearchSchema } from "@/routes/agents.runs";
-import { AgentEditPage } from "@/routes/agents.$slug.edit";
-import { AgentRunsPage, agentRunsSearchSchema } from "@/routes/agents.$slug.runs";
-import {
-  PromptsBuildPage,
-  promptsBuildSearchSchema,
-} from "@/routes/prompts.build";
-import { RuleDetailPage } from "@/routes/rule-detail";
-import { RuleFormPage } from "@/routes/rule-form";
+import { agentsNewSearchSchema } from "@/routes/agents.new";
+import { agentsRunsSearchSchema } from "@/routes/agents.runs";
+import { agentRunsSearchSchema } from "@/routes/agents.$slug.runs";
+import { promptsBuildSearchSchema } from "@/routes/prompts.build";
 import { NAV_LEAVES } from "@/lib/nav";
 import { baseSearchSchema } from "@/lib/modals";
 import { z } from "zod";
@@ -96,7 +81,9 @@ const setupAccountRoute = createRoute({
 // override *replaces* the placeholder rather than adding a second route, so
 // there's no way to silently shadow a real page.
 interface PageOverride {
-  component: () => ReactNode;
+  // Accepts both eager components and `lazyRouteComponent` (async) shapes —
+  // mirrors what `createRoute({ component })` itself accepts.
+  component: Parameters<typeof createRoute>[0]["component"];
   validateSearch?: Parameters<typeof createRoute>[0]["validateSearch"];
 }
 
@@ -134,7 +121,10 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
     component: AgentsPage,
   },
   "/prompts/build": {
-    component: PromptsBuildPage,
+    component: lazyRouteComponent(
+      () => import("@/routes/prompts.build"),
+      "PromptsBuildPage",
+    ),
     validateSearch: promptsBuildSearchSchema,
   },
 };
@@ -145,31 +135,43 @@ const PAGE_OVERRIDES: Record<string, PageOverride> = {
 const transactionDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/transactions/$id",
-  component: TransactionDetailPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/transaction-detail"),
+    "TransactionDetailPage",
+  ),
 });
 
 const categoryNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/categories/new",
-  component: CategoryNewPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/category-new"),
+    "CategoryNewPage",
+  ),
 });
 
 const categoryDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/categories/$id",
-  component: CategoryDetailPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/category-detail"),
+    "CategoryDetailPage",
+  ),
 });
 
 const tagNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tags/new",
-  component: TagNewPage,
+  component: lazyRouteComponent(() => import("@/routes/tag-new"), "TagNewPage"),
 });
 
 const tagDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tags/$slug",
-  component: TagDetailPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/tag-detail"),
+    "TagDetailPage",
+  ),
 });
 
 // The design-system sandbox — a dev/reference gallery, not a nav leaf.
@@ -183,7 +185,10 @@ const sandboxRoute = createRoute({
 const connectionDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/connections/$id",
-  component: ConnectionDetailPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/connection-detail"),
+    "ConnectionDetailPage",
+  ),
   validateSearch: connectionDetailSearchSchema,
 });
 
@@ -193,41 +198,61 @@ const connectionDetailRoute = createRoute({
 const apiKeyNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/api-keys/new",
-  component: APIKeyNewPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/api-key-new"),
+    "APIKeyNewPage",
+  ),
 });
 
 const apiKeyCreatedRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/api-keys/created",
-  component: APIKeyCreatedPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/api-key-created"),
+    "APIKeyCreatedPage",
+  ),
 });
 
 const accountDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/accounts/$id",
-  component: AccountDetailPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/account-detail"),
+    "AccountDetailPage",
+  ),
   validateSearch: accountDetailSearchSchema,
 });
 
 // /rules/new and /rules/$id/edit share one form component (RuleFormPage) —
-// the `mode` distinguishes them. Declared before /rules/$id so the more
-// specific path wins the route match.
+// the `mode` distinguishes them. Mode-specific wrappers exported from
+// rule-form.tsx (`RuleNewPage` / `RuleEditPage`) so lazyRouteComponent
+// can import a single module per entry point. Declared before /rules/$id
+// so the more specific path wins the route match.
 const ruleNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/rules/new",
-  component: () => <RuleFormPage mode="create" />,
+  component: lazyRouteComponent(
+    () => import("@/routes/rule-form"),
+    "RuleNewPage",
+  ),
 });
 
 const ruleEditRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/rules/$id/edit",
-  component: () => <RuleFormPage mode="edit" />,
+  component: lazyRouteComponent(
+    () => import("@/routes/rule-form"),
+    "RuleEditPage",
+  ),
 });
 
 const ruleDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/rules/$id",
-  component: RuleDetailPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/rule-detail"),
+    "RuleDetailPage",
+  ),
 });
 
 // /agents/new, /agents/runs, /agents/$slug/edit and /agents/$slug/runs —
@@ -237,27 +262,39 @@ const ruleDetailRoute = createRoute({
 const agentNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents/new",
-  component: AgentNewPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/agents.new"),
+    "AgentNewPage",
+  ),
   validateSearch: agentsNewSearchSchema,
 });
 
 const agentsRunsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents/runs",
-  component: AgentsRunsPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/agents.runs"),
+    "AgentsRunsPage",
+  ),
   validateSearch: agentsRunsSearchSchema,
 });
 
 const agentEditRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents/$slug/edit",
-  component: AgentEditPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/agents.$slug.edit"),
+    "AgentEditPage",
+  ),
 });
 
 const agentRunsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents/$slug/runs",
-  component: AgentRunsPage,
+  component: lazyRouteComponent(
+    () => import("@/routes/agents.$slug.runs"),
+    "AgentRunsPage",
+  ),
   validateSearch: agentRunsSearchSchema,
 });
 
@@ -322,26 +359,57 @@ declare module "@tanstack/react-router" {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1 },
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      // Explicit gcTime — TanStack's default is 5min, but stating it
+      // here locks the contract: inactive (no observer) query data is
+      // dropped 5 minutes after the last component using it unmounts.
+      // Caps long-iOS-session memory growth; individual queries can
+      // override (e.g. `["me"]` uses `Infinity` because auth state is a
+      // single small object the auth gate reads on every render).
+      gcTime: 5 * 60 * 1000,
+    },
   },
 });
 
 // iOS Safari restores the SPA from bfcache on swipe-back: the DOM snapshot is
 // reconstituted and JS resumes mid-state. Without intervention the stale React
 // + React-Query state can trigger a 401-refetch → /login redirect race during
-// Safari's restore animation, presenting as a frozen / blank page. Invalidate
-// the router (re-runs loaders + search validation) and mark queries stale (so
-// they refetch fresh data without flashing skeletons) on `pageshow.persisted`.
+// Safari's restore animation, presenting as a frozen / blank page. The fix
+// has two parts:
+//
+//  1. Re-validate the session (`["me"]`) so a 401 fires from a cold loader
+//     state instead of mid-restore animation; the auth gate in `__root.tsx`
+//     waits for `document.visibilityState === "visible"` before redirecting.
+//
+//  2. Invalidate the router so route loaders + search-param validation re-run
+//     against the now-restored DOM.
+//
+// We deliberately do NOT call `queryClient.invalidateQueries()` (no args) —
+// that fires a refetch storm against every cached query on the visible page
+// (transactions list alone has 10+), producing a measurable 1-2s freeze
+// after the restore. TanStack Query's 30s staleTime already handles freshness
+// for normal data; the bfcache restore window is usually shorter than that.
+// Routes that need stricter freshness can opt into their own `pageshow`
+// handler or use a shorter staleTime.
+//
 // Don't `queryClient.clear()` — that drops cached data instantly. Don't add a
 // `beforeunload`/`unload` handler — that would disable bfcache entirely.
 if (typeof window !== "undefined") {
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) {
       router.invalidate();
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: ["me"] });
     }
   });
 }
+
+// Web Vitals listener — logs LCP / INP-proxy / CLS to the console when
+// `VITE_REPORT_VITALS` is enabled (defaults to on in dev, off in prod).
+// See `web/src/lib/web-vitals.ts`. Future iteration: pipe to a backend
+// `/api/v1/web-vitals` endpoint for real perf baseline tracking.
+void import("@/lib/web-vitals").then((m) => m.startWebVitals());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

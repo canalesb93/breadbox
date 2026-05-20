@@ -53,7 +53,7 @@ export function TranscriptSheet({ shortId, onClose }: TranscriptSheetProps) {
             ) : null}
           </SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] px-6 py-4">
           {runDetail.data?.status === "error" &&
             runDetail.data?.error_message && (
               <RunErrorBlock message={runDetail.data.error_message} />
@@ -191,7 +191,7 @@ function RunErrorBlock({ message }: { message: string }) {
         <XCircle className="size-3.5" />
         Run error
       </div>
-      <pre className="text-foreground/90 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+      <pre className="text-foreground/90 max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
         {message}
       </pre>
     </div>

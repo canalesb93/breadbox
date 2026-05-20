@@ -191,16 +191,22 @@ export function DataTable<TData, TValue>({
           ref={headerRef}
           className={cn(
             stickyHeader &&
-              // top-14 sits the band flush under the app shell's sticky
-              // header (`h-14` in `__root.tsx`) so the column labels stay
-              // visible without being obscured. z-10 keeps the band above
-              // the table body but well below the app header (z-30).
-              // Background + border are on the cells (not `<thead>`) so
-              // we can round the first/last cell's top corner to match
-              // the card's `rounded-lg` at rest, AND so the bottom
-              // separator stays visible while stickied (`<tr>` border-b
-              // is unreliable in default table-collapse mode).
-              "sticky top-14 z-10 [&>tr>th]:bg-muted/40 supports-[backdrop-filter]:[&>tr>th]:bg-muted/30 [&>tr>th]:backdrop-blur-sm [&>tr>th]:transition-[border-radius]",
+              // Pin the band flush under the app shell's sticky header so
+              // the column labels stay visible without being obscured.
+              // The shell header is `min-h-14` PLUS `pt-[env(safe-area-
+              // inset-top)]` (`__root.tsx`), so on notched iPhones it
+              // grows past 56px by the inset — a plain `top-14` would pin
+              // the labels *behind* the taller shell header. Match its
+              // real bottom edge with `calc(3.5rem + env(safe-area-inset-
+              // top))`; the inset resolves to 0 on desktop / Android /
+              // non-notched iOS, so those layouts stay at top-14. z-10
+              // keeps the band above the table body but below the app
+              // header (z-30). Background + border live on the cells (not
+              // `<thead>`) so we can round the first/last cell's top
+              // corner to match the card's `rounded-lg` at rest AND keep
+              // the bottom separator visible while stickied (`<tr>`
+              // border-b is unreliable in default table-collapse mode).
+              "sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 [&>tr>th]:bg-muted/40 supports-[backdrop-filter]:[&>tr>th]:bg-muted/30 [&>tr>th]:backdrop-blur-sm [&>tr>th]:transition-[border-radius]",
             // Flat top corners while stuck — the card has scrolled past
             // so rounded ears would just clip into the shell-header bg.
             stickyHeader &&
@@ -300,11 +306,19 @@ export function DataTable<TData, TValue>({
                       "bg-primary/[0.04] shadow-[inset_3px_0_0_0_var(--primary)] outline-none",
                     // `scroll-mt-*` so the `scrollIntoView({ block: "nearest" })`
                     // below clears the chrome stacked above the scroll
-                    // container: 56px shell header always, +36px when the
+                    // container: the 56px shell header always, +36px when the
                     // table's own header is sticky on top of it. Without
                     // this, scrolling up via `k` lands the focused row
-                    // behind the sticky bands.
-                    stickyHeader ? "scroll-mt-24" : "scroll-mt-16",
+                    // behind the sticky bands. The shell header also carries
+                    // `pt-[env(safe-area-inset-top)]` (`__root.tsx`), so on
+                    // notched iPhones it (and the sticky thead pinned under
+                    // it, see the `top-[calc(...)]` above) grows by the
+                    // inset — fold the same `env(safe-area-inset-top)` into
+                    // the scroll margin so the focused row clears the real
+                    // chrome height there too. Resolves to 0 elsewhere.
+                    stickyHeader
+                      ? "scroll-mt-[calc(6rem+env(safe-area-inset-top))]"
+                      : "scroll-mt-[calc(4rem+env(safe-area-inset-top))]",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (

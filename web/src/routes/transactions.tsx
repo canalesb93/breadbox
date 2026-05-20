@@ -164,7 +164,15 @@ export function TransactionsPage() {
 
   const openTransaction = useCallback(
     (t: Transaction) =>
-      navigate({ to: "/transactions/$id", params: { id: t.short_id } }),
+      // `viewTransition: true` opts into the browser's View Transitions API
+      // on Safari 26.2+, Chrome, and Firefox — list → detail gets a
+      // cross-fade instead of an instant swap. TanStack Router gates on
+      // `document.startViewTransition` so older browsers see plain nav.
+      navigate({
+        to: "/transactions/$id",
+        params: { id: t.short_id },
+        viewTransition: true,
+      }),
     [navigate],
   );
 

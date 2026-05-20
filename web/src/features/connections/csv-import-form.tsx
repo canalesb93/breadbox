@@ -162,7 +162,7 @@ function CsvDropStage({
   const [dragOver, setDragOver] = useState(false);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+    <div className="flex flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
       <label
         htmlFor="csv-file"
         onDragOver={(e) => {
@@ -384,7 +384,7 @@ function CsvMapStage({
   const fileSizeKb = Math.max(1, Math.round(file.size / 1024));
 
   return (
-    <div className="flex flex-1 flex-col gap-5 overflow-y-auto">
+    <div className="flex flex-1 flex-col gap-5 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
       {/* File pill — replaces the misused Alert. Filename + meta on one
           line so the eye keeps scanning down to the mapping. */}
       <div className="bg-muted/20 flex items-start gap-3 rounded-md border px-3.5 py-2.5">
@@ -528,6 +528,7 @@ function CsvMapStage({
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
             placeholder="CSV Import"
+            autoComplete="off"
           />
           <p className="text-muted-foreground text-xs">
             Shown in the accounts list. You can rename it later.
@@ -543,7 +544,7 @@ function CsvMapStage({
             rows
           </span>
         </div>
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-md border">
           <Table className="text-xs">
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">

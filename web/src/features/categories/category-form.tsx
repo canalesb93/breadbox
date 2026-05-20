@@ -36,6 +36,7 @@ import {
 import { FormFooter } from "@/components/form-footer";
 import { IconPicker } from "@/components/icon-picker";
 import { ColorPicker } from "@/components/color-picker";
+import { LeaveGuard } from "@/components/leave-guard";
 import { DynamicIcon } from "@/lib/icon";
 import {
   useCategories,
@@ -99,7 +100,12 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
           }),
         { success: "Category created." },
       );
-      if (ok) navigate({ to: "/categories" });
+      if (ok) {
+        // Reset before navigating so LeaveGuard doesn't intercept the
+        // parent's post-save nav. Reset only on success.
+        form.reset(values);
+        navigate({ to: "/categories" });
+      }
     } else if (category) {
       const ok = await withMutationToast(
         () =>
@@ -115,7 +121,10 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
           }),
         { success: "Category updated." },
       );
-      if (ok) navigate({ to: "/categories" });
+      if (ok) {
+        form.reset(values);
+        navigate({ to: "/categories" });
+      }
     }
   };
 
@@ -124,6 +133,9 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
 
   return (
     <Form {...form}>
+      <LeaveGuard
+        when={form.formState.isDirty && !form.formState.isSubmitting}
+      />
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
@@ -225,6 +237,7 @@ export function CategoryForm({ mode, category }: CategoryFormProps) {
                 <Input
                   type="number"
                   inputMode="numeric"
+                  autoComplete="off"
                   {...field}
                   value={field.value ?? 0}
                 />

@@ -45,5 +45,36 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Vendor chunking. Splits heavy node_modules into stable chunks that
+    // cache independently of app code — when app code changes, the user's
+    // browser keeps the cached `react`, `tanstack`, `radix` files and only
+    // re-downloads the small app delta. Material win for mobile cellular
+    // users on repeat visits.
+    //
+    // Grouping rationale:
+    // - `react`: react + react-dom (always loaded; tightest coupling).
+    // - `tanstack`: query + router + table — large, change less often than
+    //   app code, used across the SPA.
+    // - `radix`: every shadcn primitive depends on one of these; bundling
+    //   together avoids many small chunks.
+    // - Everything else (including `lucide-react`, which icon-picker
+    //   dynamically imports per-icon — DON'T group it, Vite auto-splits
+    //   each icon into its own ~1 KB chunk that the icon-picker route
+    //   pulls in on demand) falls through into the app `index` chunk.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("/react-dom/") || id.match(/[\\/]react[\\/]/)) {
+            return "vendor-react";
+          }
+          if (id.includes("@tanstack/")) return "vendor-tanstack";
+          if (id.includes("@radix-ui/") || id.includes("/radix-ui/")) {
+            return "vendor-radix";
+          }
+          return undefined;
+        },
+      },
+    },
   },
 });

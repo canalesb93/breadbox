@@ -381,7 +381,7 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. Alex Canales" autoFocus {...field} />
+                  <Input placeholder="e.g. Alex Canales" autoComplete="name" autoFocus {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -402,6 +402,7 @@ function AddMemberDialog({ onDone }: { onDone: () => void }) {
                   <Input
                     type="email"
                     inputMode="email"
+                    autoComplete="email"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -547,6 +548,7 @@ function CreateLoginDialog({
                   <Input
                     type="email"
                     inputMode="email"
+                    autoComplete="username"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -654,6 +656,7 @@ function SetupLinkBox({ token }: { token: string }) {
         <Input
           value={url}
           readOnly
+          autoComplete="off"
           className="bg-muted/40 font-mono text-xs"
           onFocus={(e) => e.currentTarget.select()}
         />

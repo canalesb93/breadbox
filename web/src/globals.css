@@ -130,6 +130,42 @@
      touch. Keep `cursor: pointer` and `:focus-visible` for keyboard. */
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Suppress iOS Safari's document-level pull-to-refresh. The app shell
+       is `min-h-dvh` (shadcn SidebarProvider), so the document itself
+       scrolls — which means a downward pull at the top of any page fires
+       Safari's native reload. For an SPA that's destructive: it drops the
+       TanStack Query cache, loses scroll position and in-memory UI state,
+       and re-shows the cold-load splash, all from an accidental
+       over-scroll while reading. `overscroll-behavior-y: contain` cancels
+       the pull-to-refresh (and scroll-chaining to the browser chrome)
+       while KEEPING the natural rubber-band bounce — the conservative
+       choice vs `none`, which would also kill the bounce. Vertical only,
+       so the horizontal iOS swipe-back gesture (and trackpad
+       back/forward) is untouched. Nested scroll containers already set
+       their own `overscroll-contain` (iter 30). */
+    overscroll-behavior-y: contain;
+  }
+  /* iOS double-tap-zoom suppression on interactive controls. iOS Safari
+     treats a fast double-tap on a clickable element as a zoom gesture, so
+     rapidly re-tapping a button (numeric steppers, pagination, AND/OR and
+     filter-pill toggles) zooms the layout instead of firing the second
+     click — and the zoom doesn't reset on its own. `touch-action:
+     manipulation` opts these elements out of double-tap zoom: taps fire
+     immediately, rapid re-taps stay as clicks. Panning and pinch-zoom are
+     untouched. Scoped to controls only — content regions (tables, prose)
+     keep double-tap-zoom so users can still zoom in to read. */
+  button,
+  a,
+  label,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="switch"] {
+    touch-action: manipulation;
   }
 }
 
@@ -188,6 +224,32 @@
 }
 .dark .scroll-shadow-x {
   --scroll-shadow-color: rgb(0 0 0 / 0.35);
+}
+
+/* iOS Safari focus-zoom prevention. When an `<input>` / `<textarea>` /
+   `<select>` is focused with a computed `font-size` below 16px, iOS
+   Safari triggers an automatic page zoom — the layout bounces and
+   doesn't reset on blur, breaking the UX. Bump every focusable form
+   control on touch devices to 16px so the zoom never fires.
+
+   `!important` is bounded by the `(pointer: coarse)` media query — it
+   only takes effect on touch, where the zoom-prevention requirement is
+   absolute and not a design preference. Desktop (`pointer: fine`)
+   keeps the compact `text-xs` / `text-sm` density our identifier
+   inputs (cron, slug, API key, DSL JSON) rely on.
+
+   The shadcn `Input` / `Textarea` primitives already ship the
+   `text-base md:text-sm` pattern that would have prevented this on the
+   default code path; this rule defends call sites that override to a
+   smaller class for density (cron-field, tag-form, agents-section,
+   household-section, api-key-created, rule-form, action-row, prompts
+   builder, etc.) without each remembering the iOS quirk. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 /* Respect the user's motion preferences globally — Apple HIG requirement and

@@ -192,6 +192,8 @@ function IconTile({
       type="button"
       onClick={onPick}
       title={name}
+      aria-label={name}
+      aria-pressed={selected}
       className={cn(
         "hover:bg-accent flex size-8 items-center justify-center rounded-md transition",
         // Shared focus-visible recipe (matches Button primitive) so keyboard

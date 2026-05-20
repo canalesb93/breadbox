@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { FormFooter } from "@/components/form-footer";
 import { IconPicker } from "@/components/icon-picker";
 import { ColorPicker } from "@/components/color-picker";
+import { LeaveGuard } from "@/components/leave-guard";
 import { useCreateTag, useUpdateTag } from "@/api/queries/tags";
 import { withMutationToast } from "@/lib/mutation-toast";
 import type { Tag } from "@/api/types";
@@ -85,7 +86,13 @@ export function TagForm({ mode, tag }: TagFormProps) {
           }),
         { success: "Tag created." },
       );
-      if (ok) navigate({ to: "/tags" });
+      if (ok) {
+        // Reset before navigating so LeaveGuard doesn't intercept the
+        // parent's post-save nav. Reset only on success — failed saves
+        // should keep the form dirty so the user's edits are protected.
+        form.reset(values);
+        navigate({ to: "/tags" });
+      }
     } else if (tag) {
       const ok = await withMutationToast(
         () =>
@@ -100,7 +107,10 @@ export function TagForm({ mode, tag }: TagFormProps) {
           }),
         { success: "Tag updated." },
       );
-      if (ok) navigate({ to: "/tags" });
+      if (ok) {
+        form.reset(values);
+        navigate({ to: "/tags" });
+      }
     }
   };
 
@@ -109,6 +119,9 @@ export function TagForm({ mode, tag }: TagFormProps) {
 
   return (
     <Form {...form}>
+      <LeaveGuard
+        when={form.formState.isDirty && !form.formState.isSubmitting}
+      />
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {mode === "create" ? (
           <FormField
@@ -121,6 +134,7 @@ export function TagForm({ mode, tag }: TagFormProps) {
                   <Input
                     placeholder="needs-review"
                     autoFocus
+                    autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}

@@ -58,6 +58,10 @@ export function CronField({
           onBlur={onBlur}
           className="pr-10 font-mono text-sm"
           aria-invalid={!valid}
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
         />
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>

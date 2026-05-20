@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SettingsSectionHeader } from "@/components/settings-section-header";
 import { SectionCard } from "@/components/section-card";
+import { LeaveGuard } from "@/components/leave-guard";
 import { Eyebrow } from "@/components/eyebrow";
 import { withMutationToast } from "@/lib/mutation-toast";
 import { cn } from "@/lib/utils";
@@ -119,8 +120,16 @@ export function AgentsSection() {
     if (ok) {
       setTokenDraft("");
       setApiKeyDraft("");
+      // Reset baseline so LeaveGuard sees the form as clean post-save.
+      form.reset(values);
     }
   });
+
+  // The form's `isDirty` only tracks RHF-controlled fields; the masked
+  // credential inputs use local `tokenDraft` / `apiKeyDraft` state, so
+  // OR them in for a full dirty signal that LeaveGuard can react to.
+  const isDirty =
+    form.formState.isDirty || tokenDraft !== "" || apiKeyDraft !== "";
 
   const clearToken = (kind: "subscription_token" | "anthropic_api_key") => {
     void withMutationToast(
@@ -182,6 +191,7 @@ export function AgentsSection() {
         <LoadingSkeleton />
       ) : settings ? (
         <Form {...form}>
+          <LeaveGuard when={isDirty && !form.formState.isSubmitting} />
           <form onSubmit={onSubmit} className="space-y-5">
             <SectionCard
               title="Connection"
@@ -246,7 +256,7 @@ export function AgentsSection() {
                         <a
                           href="https://console.anthropic.com"
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="underline-offset-2 hover:underline"
                         >
                           console.anthropic.com

@@ -144,6 +144,10 @@ export function ActionRowFields({
             className="bg-background h-8"
             placeholder="needs-review, subscription:monthly, …"
             pattern="^[a-z0-9][a-z0-9\-:]*[a-z0-9]$"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             aria-invalid={tagInvalid}
             aria-describedby={`action-${index}-hint`}
           />

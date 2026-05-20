@@ -291,6 +291,7 @@ export function TransactionsToolbar({
                   type="number"
                   inputMode="decimal"
                   placeholder="0.00"
+                  autoComplete="off"
                   value={search.min ?? ""}
                   onChange={(e) =>
                     onChange({
@@ -307,6 +308,7 @@ export function TransactionsToolbar({
                   type="number"
                   inputMode="decimal"
                   placeholder="0.00"
+                  autoComplete="off"
                   value={search.max ?? ""}
                   onChange={(e) =>
                     onChange({

@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FormFooter } from "@/components/form-footer";
+import { LeaveGuard } from "@/components/leave-guard";
 import { cn } from "@/lib/utils";
 import { useCreateAPIKey } from "@/api/queries/api-keys";
 import { storePendingPlaintextKey } from "@/features/api-keys/plaintext-store";
@@ -123,6 +124,9 @@ export function APIKeyForm() {
         plaintext: created.plaintext_key,
       });
       toast.success(`Created "${values.name}".`);
+      // Reset before navigating so LeaveGuard doesn't intercept the
+      // post-save nav to /api-keys/created. Only on success.
+      form.reset(values);
       navigate({ to: "/api-keys/created" });
     } catch (err) {
       const msg =
@@ -133,6 +137,9 @@ export function APIKeyForm() {
 
   return (
     <Form {...form}>
+      <LeaveGuard
+        when={form.formState.isDirty && !form.formState.isSubmitting}
+      />
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <FormField
           control={form.control}
@@ -144,6 +151,7 @@ export function APIKeyForm() {
                 <Input
                   placeholder="e.g. Claude MCP, Mobile CLI"
                   autoFocus
+                  autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
                   {...field}
@@ -237,6 +245,7 @@ export function APIKeyForm() {
               <FormControl>
                 <Input
                   placeholder="Defaults to the key name"
+                  autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
                   {...field}

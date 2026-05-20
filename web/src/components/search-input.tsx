@@ -46,6 +46,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           // can still override any of these via props.
           inputMode="search"
           enterKeyHint="search"
+          autoComplete="off"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}

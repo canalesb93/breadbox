@@ -194,7 +194,11 @@ export function AgentsPage() {
           isLoading={agentsQuery.isLoading}
           getRowId={(a) => a.id}
           onRowClick={(a) =>
-            navigate({ to: "/agents/$slug/edit", params: { slug: a.slug } })
+            navigate({
+              to: "/agents/$slug/edit",
+              params: { slug: a.slug },
+              viewTransition: true,
+            })
           }
           refinedHeader
           emptyState={
@@ -258,11 +262,17 @@ function buildColumns({
       cell: ({ row }) => {
         const a = row.original;
         return (
-          <div className="flex items-center gap-2">
-            <span className="font-medium leading-tight">{a.name}</span>
+          // `min-w-0` + `truncate` keep long agent names from blowing out
+          // the column width on iPhone SE (which showed names truncated to
+          // 3-5 chars like "M...", "Spe..." because peer badges were
+          // stealing the space).
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-medium leading-tight">
+              {a.name}
+            </span>
             {a.trigger_on_sync_complete && (
               <span
-                className="text-blue-600 dark:text-blue-400"
+                className="text-blue-600 dark:text-blue-400 shrink-0"
                 title="Also fires after every successful bank sync"
               >
                 <Zap className="size-3.5" />

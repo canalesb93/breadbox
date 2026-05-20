@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pause, Play, RefreshCw, Unplug, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { FloatingActionBar } from "@/components/floating-action-bar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { KbdTooltip } from "@/components/kbd-tooltip";
@@ -117,87 +118,85 @@ export function SelectionActionBar({
 
   return (
     <>
-      <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
-        <div className="bg-popover text-popover-foreground flex max-w-[calc(100dvw-2rem)] items-center gap-1 overflow-hidden rounded-full border p-1 pl-3 shadow-lg">
-          <span className="text-sm font-medium whitespace-nowrap">
-            {selected.length} selected
-          </span>
-          <Separator orientation="vertical" className="mx-1 h-5" />
+      <FloatingActionBar ariaLabel="Bulk connection actions" className="pl-3">
+        <span className="text-sm font-medium whitespace-nowrap">
+          {selected.length} selected
+        </span>
+        <Separator orientation="vertical" className="mx-1 h-5" />
 
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 rounded-full"
+          onClick={onSync}
+          disabled={isPending || syncable.length === 0}
+          title={
+            syncable.length === 0
+              ? "No active bank connections selected"
+              : `Sync ${syncable.length} active connection${syncable.length === 1 ? "" : "s"}`
+          }
+        >
+          <RefreshCw className="size-4" />
+          <span className="hidden sm:inline">Sync</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 rounded-full"
+          onClick={onPause}
+          disabled={isPending || pausable.length === 0}
+          title={
+            pausable.length === 0
+              ? "No active connections to pause"
+              : `Pause ${pausable.length} active connection${pausable.length === 1 ? "" : "s"}`
+          }
+        >
+          <Pause className="size-4" />
+          <span className="hidden sm:inline">Pause</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 rounded-full"
+          onClick={onResume}
+          disabled={isPending || resumable.length === 0}
+          title={
+            resumable.length === 0
+              ? "No paused or errored connections to resume"
+              : `Resume ${resumable.length} connection${resumable.length === 1 ? "" : "s"}`
+          }
+        >
+          <Play className="size-4" />
+          <span className="hidden sm:inline">Resume</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 gap-1.5 rounded-full"
+          onClick={() => setConfirmOpen(true)}
+          disabled={isPending || selected.length === 0}
+          title={`Disconnect ${selected.length} connection${selected.length === 1 ? "" : "s"}`}
+        >
+          <Unplug className="size-4" />
+          <span className="hidden sm:inline">Disconnect…</span>
+        </Button>
+
+        <Separator orientation="vertical" className="mx-1 h-5" />
+        <KbdTooltip label="Clear selection" keys={["Esc"]} side="top">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 rounded-full"
-            onClick={onSync}
-            disabled={isPending || syncable.length === 0}
-            title={
-              syncable.length === 0
-                ? "No active bank connections selected"
-                : `Sync ${syncable.length} active connection${syncable.length === 1 ? "" : "s"}`
-            }
+            size="icon"
+            className="size-8 rounded-full"
+            onClick={onClear}
+            aria-label="Clear selection"
           >
-            <RefreshCw className="size-4" />
-            <span className="hidden sm:inline">Sync</span>
+            <X className="size-4" />
           </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 rounded-full"
-            onClick={onPause}
-            disabled={isPending || pausable.length === 0}
-            title={
-              pausable.length === 0
-                ? "No active connections to pause"
-                : `Pause ${pausable.length} active connection${pausable.length === 1 ? "" : "s"}`
-            }
-          >
-            <Pause className="size-4" />
-            <span className="hidden sm:inline">Pause</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 rounded-full"
-            onClick={onResume}
-            disabled={isPending || resumable.length === 0}
-            title={
-              resumable.length === 0
-                ? "No paused or errored connections to resume"
-                : `Resume ${resumable.length} connection${resumable.length === 1 ? "" : "s"}`
-            }
-          >
-            <Play className="size-4" />
-            <span className="hidden sm:inline">Resume</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive h-8 gap-1.5 rounded-full"
-            onClick={() => setConfirmOpen(true)}
-            disabled={isPending || selected.length === 0}
-            title={`Disconnect ${selected.length} connection${selected.length === 1 ? "" : "s"}`}
-          >
-            <Unplug className="size-4" />
-            <span className="hidden sm:inline">Disconnect…</span>
-          </Button>
-
-          <Separator orientation="vertical" className="mx-1 h-5" />
-          <KbdTooltip label="Clear selection" keys={["Esc"]} side="top">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-full"
-              onClick={onClear}
-              aria-label="Clear selection"
-            >
-              <X className="size-4" />
-            </Button>
-          </KbdTooltip>
-        </div>
-      </div>
+        </KbdTooltip>
+      </FloatingActionBar>
 
       <ConfirmDialog
         open={confirmOpen}

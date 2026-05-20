@@ -168,7 +168,7 @@ export function ReauthSheet({
           description="Reconnect to the bank to resume syncing this connection."
         />
 
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-6">
           {connQuery.isLoading ? (
             <div className="text-muted-foreground flex flex-1 items-center justify-center gap-2 text-sm">
               <Loader2 className="size-4 animate-spin" /> Loading connection…
