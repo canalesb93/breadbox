@@ -306,11 +306,19 @@ export function DataTable<TData, TValue>({
                       "bg-primary/[0.04] shadow-[inset_3px_0_0_0_var(--primary)] outline-none",
                     // `scroll-mt-*` so the `scrollIntoView({ block: "nearest" })`
                     // below clears the chrome stacked above the scroll
-                    // container: 56px shell header always, +36px when the
+                    // container: the 56px shell header always, +36px when the
                     // table's own header is sticky on top of it. Without
                     // this, scrolling up via `k` lands the focused row
-                    // behind the sticky bands.
-                    stickyHeader ? "scroll-mt-24" : "scroll-mt-16",
+                    // behind the sticky bands. The shell header also carries
+                    // `pt-[env(safe-area-inset-top)]` (`__root.tsx`), so on
+                    // notched iPhones it (and the sticky thead pinned under
+                    // it, see the `top-[calc(...)]` above) grows by the
+                    // inset — fold the same `env(safe-area-inset-top)` into
+                    // the scroll margin so the focused row clears the real
+                    // chrome height there too. Resolves to 0 elsewhere.
+                    stickyHeader
+                      ? "scroll-mt-[calc(6rem+env(safe-area-inset-top))]"
+                      : "scroll-mt-[calc(4rem+env(safe-area-inset-top))]",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
