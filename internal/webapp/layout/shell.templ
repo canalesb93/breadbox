@@ -10,8 +10,11 @@ import "breadbox/internal/webapp/components"
 // while #main-content cross-fades (see app.css).
 templ Shell(d ShellData) {
 	@Base(d.Base()) {
-		<input type="checkbox" id="nav-toggle" class="peer/nav hidden"/>
 		<div class="flex min-h-dvh">
+			// #nav-toggle must be a *sibling* of the elements that key off it
+			// (the backdrop label and the sidebar) — Tailwind's peer-checked uses
+			// the general-sibling `~` combinator, which never reaches descendants.
+			<input type="checkbox" id="nav-toggle" class="peer/nav hidden"/>
 			<!-- mobile backdrop -->
 			<label for="nav-toggle" aria-hidden="true" class="fixed inset-0 z-30 hidden bg-black/50 backdrop-blur-sm peer-checked/nav:block md:hidden"></label>
 			@sidebar(d)

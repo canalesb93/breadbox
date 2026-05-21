@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch webapp-js
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch webapp-js webapp-e2e
 
 PORT ?= 8080
 
@@ -175,6 +175,16 @@ web: web-install
 VITE_PORT ?= $(shell echo $$(($(PORT) + 1000)))
 web-dev: web-install
 	cd web && BREADBOX_BACKEND_PORT=$(PORT) VITE_PORT=$(VITE_PORT) bun run dev
+
+# webapp-e2e: Playwright e2e suite for the v3 browser-native MPA at /app.
+# Distinct from the SPA suite (web/e2e/*.spec.ts → /v2). Requires a running
+# server: `SERVER_PORT=<port> ./breadbox serve` (env from .local.env), then
+# `make webapp-e2e SERVER_PORT=<port>`. Installs Chromium on first run.
+# Login: admin@example.com / password (override BB_USER/BB_PASS).
+SERVER_PORT ?= $(PORT)
+webapp-e2e: web-install
+	cd web && npx playwright install chromium >/dev/null 2>&1 || true
+	cd web && SERVER_PORT=$(SERVER_PORT) npx playwright test --config=e2e/app/playwright.config.ts
 
 # agent-sidecar: build the standalone breadbox-agent binary that the Go
 # server exec's per Claude Agent SDK run. Output is bin/breadbox-agent —
