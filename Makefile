@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch webapp-js webapp-e2e
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch webapp-js webapp-assets webapp-e2e
 
 PORT ?= 8080
 
@@ -16,6 +16,13 @@ WEBAPP_CSS_OUT := internal/webapp/static/css/app.css
 # and regenerates the manifest.go map used by layout.IslandSrc.
 WEBAPP_JS_SRC := $(wildcard internal/webapp/assets/js/islands/*.ts)
 WEBAPP_JS_DIR := internal/webapp/static/js/islands
+
+# v3 webapp top-level asset fingerprinting — content-hashes app.css + app.js so
+# deploys never serve stale CSS/JS (internal/webapp/cmd/fingerprint). Reads the two
+# built files, emits app-<hash>.css / app-<hash>.js, and regenerates the manifest
+# resolved by layout.AssetURL.
+WEBAPP_APP_JS := internal/webapp/static/js/app.js
+WEBAPP_ASSETS_MANIFEST := internal/webapp/layout/assets_manifest.go
 
 # generate ensures gitignored build artifacts exist and are up to date.
 # - sqlc: only rebuilds if the generated models file is missing (queries are
@@ -31,6 +38,7 @@ generate: templ
 	@if [ ! -f static/css/styles.css ] || [ input.css -nt static/css/styles.css ]; then $(MAKE) css; fi
 	@if [ ! -s $(WEBAPP_CSS_OUT) ] || [ $(WEBAPP_CSS_IN) -nt $(WEBAPP_CSS_OUT) ]; then $(MAKE) webapp-css; fi
 	@if [ -n "$(WEBAPP_JS_SRC)" ] && { ! ls $(WEBAPP_JS_DIR)/*.js >/dev/null 2>&1 || [ -n "$$(find $(WEBAPP_JS_SRC) -newer $(WEBAPP_JS_DIR)/manifest.go 2>/dev/null)" ]; }; then $(MAKE) webapp-js; fi
+	@if [ ! -s $(WEBAPP_ASSETS_MANIFEST) ] || [ $(WEBAPP_CSS_OUT) -nt $(WEBAPP_ASSETS_MANIFEST) ] || [ $(WEBAPP_APP_JS) -nt $(WEBAPP_ASSETS_MANIFEST) ]; then $(MAKE) webapp-assets; fi
 
 # templ-install pulls the templ CLI if it's missing. Pinned via go.mod so the
 # version the CLI understands always matches the runtime lib the binary
@@ -68,6 +76,13 @@ webapp-css-watch: css-install
 # content-hashed bundles + a regenerated manifest.go. No-ops if there are no .ts entrypoints.
 webapp-js:
 	go run ./internal/webapp/cmd/buildjs
+
+# webapp-assets content-hashes the top-level app.css + app.js (Node-free, pure Go
+# file ops) and regenerates layout/assets_manifest.go. Run after webapp-css/webapp-js
+# so it hashes the freshly built files; production then serves immutable-cached
+# app-<hash>.{css,js} via layout.AssetURL.
+webapp-assets:
+	go run ./internal/webapp/cmd/fingerprint
 
 # templ-check fails if generated files are stale. Used in CI so a PR cannot
 # land with hand-edited .templ files that nobody regenerated.
@@ -118,6 +133,7 @@ dev-watch: generate air-install
 		$(TAILWIND_BIN) -i $(WEBAPP_CSS_IN) -o $(WEBAPP_CSS_OUT) --watch & \
 		( while true; do \
 			if [ -n "$$(find internal/webapp/assets/js/islands -name '*.ts' -newer $(WEBAPP_JS_DIR)/manifest.go 2>/dev/null)" ]; then $(MAKE) webapp-js; fi; \
+			if [ $(WEBAPP_CSS_OUT) -nt $(WEBAPP_ASSETS_MANIFEST) ] || [ $(WEBAPP_APP_JS) -nt $(WEBAPP_ASSETS_MANIFEST) ]; then $(MAKE) webapp-assets; fi; \
 			sleep 1; \
 		done ) & \
 		BREADBOX_DEV_RELOAD=1 SERVER_PORT=$(PORT) air -c .air.toml; \

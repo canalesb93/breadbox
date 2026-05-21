@@ -54,8 +54,10 @@ func looksFingerprinted(p string) bool {
 	if dash < 0 || len(stem)-dash < 9 {
 		return false
 	}
+	// Accept both our hex hashes (app-<hex>.css) and esbuild's base32-uppercase
+	// island hashes (palette-SYBGVEW7.js) so all fingerprinted assets get immutable caching.
 	for _, c := range stem[dash+1:] {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
 			return false
 		}
 	}

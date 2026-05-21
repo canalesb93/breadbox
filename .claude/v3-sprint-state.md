@@ -54,6 +54,8 @@ Core surfaces AT PARITY. Reports/Insights/Reviews are PLACEHOLDER-MATCHED (SPA a
 **Loop end-state also:** #15 drag-drop rule builder + asset fingerprinting; confirm()→<dialog> on api-key revoke; Playwright suite + mobile pass.
 
 ## Progress log (newest first)
+- 2026-05-21 06:0x — Heartbeat. 11 PRs; review-ready. Next unit (delegated): asset fingerprinting for app.css/app.js (extend the islands manifest+IslandSrc pattern to a general AssetURL resolver; embed.go already long-caches fingerprinted names via looksFingerprinted). Fixes stale-CSS-on-deploy. Then drag-drop rule builder, Tier 3/4.
+- 2026-05-21 05:1x — Polish batch MERGED (PR #1412): native <dialog> for api-key revoke (no confirm()), mobile tx-filter collapse (<details>). 11 PRs total. Validated. NOTE: stale-CSS cache bit validation a 3rd time (had to hard-reload to see new .dialog styles) — **asset fingerprinting (#15) is now the top remaining item** (deploy correctness; islands already fingerprinted, app.css/app.js are not). Next cron cycle: do fingerprinting, then drag-drop builder, then Tier 3/4. Cutover still awaiting Ricardo.
 - 2026-05-21 05:0x — Heartbeat. 10 PRs merged; cutover proposal awaiting Ricardo. Next unit (delegated): polish batch — (1) confirm()→native <dialog> on api-key revoke (per no-blocking-dialogs convention), (2) collapse tx filter bar behind <details> on mobile. Then #15 (drag-drop builder + asset fingerprinting) + Tier 3/4 remain.
 - 2026-05-21 04:2x — Playwright e2e suite + CRITICAL mobile-drawer fix MERGED (PR #1411). 10 PRs total. Playwright (`make webapp-e2e`) 15 pass/1 skip. The mobile drawer was fully broken (peer-checked couldn't reach nested aside) — fixed + validated. Verified the 1 skipped scroll-restoration test is a HEADLESS artifact (headed Chrome restores correctly 2000→2000); core promise holds. Wrote **cutover proposal** for Ricardo: `~/Documents/obsidian/Breadbox/planned-features/v3-cutover-proposal.md`. Phase 6 cutover gated on his review (do NOT auto-retire SPA). Loop continues with minor polish: confirm()→<dialog> on api-key revoke, mobile tx-filter collapse, #15 (drag-drop builder + asset fingerprinting), Tier 3/4.
 - 2026-05-21 04:0x — Heartbeat. Full parity holds (9 PRs). Next unit: delegating #21 Playwright e2e suite for /app (back/forward/scroll/deep-link/iOS-emulated across key surfaces; reuse web/e2e harness, install deps if needed per standing perms). Then remaining polish (confirm()→<dialog>, mobile filter collapse, #15) + cutover proposal.
@@ -102,5 +104,5 @@ Once /app reaches functional+flow parity with the SPA and the foundation is soli
    improve mobile responsiveness. Iterate until clean.
 
 ## Notifications
-- last_notified_epoch: 1779361071  (2026-05-21 ~05:0x — heartbeat; pushed "10 PRs, e2e+mobile fix, cutover proposal ready")
+- last_notified_epoch: 1779364689  (2026-05-21 ~06:0x — heartbeat; pushed "11 PRs, review-ready, fingerprinting next")
 - cadence: hourly at :37 via cron job `aecc8a60` (re-anchors plan + sends push + continues work)

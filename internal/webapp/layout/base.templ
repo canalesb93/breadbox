@@ -12,8 +12,8 @@ templ Base(d BaseData) {
 			<meta name="color-scheme" content="light dark"/>
 			<title>{ pageTitle(d.Title) }</title>
 			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
-			<link rel="stylesheet" href="/app/static/css/app.css"/>
-			<script defer src="/app/static/js/app.js"></script>
+			<link rel="stylesheet" href={ AssetURL("app.css") }/>
+			<script defer src={ AssetURL("app.js") }></script>
 			// ⌘K command palette island (esbuild-via-Go bundle; hashed name resolved from the manifest).
 			// type=module + defer-by-default; degrades to nothing without JS — every destination
 			// stays reachable via the sidebar.
