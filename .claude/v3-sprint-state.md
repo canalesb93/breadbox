@@ -28,15 +28,26 @@ subagents, validate every surface with Chrome DevTools, merge PRs into this spri
 - Theme: SPA uses localStorage `breadbox:theme`+`.dark`; webapp adds a server-read cookie to avoid flash.
 
 ## Phase status
-- [ ] Phase 1 — Foundation (build pipeline, package, shell, primitives, login, Accounts slice, validate, rules)
-- [ ] Phase 2 — Read surfaces
+- [x] Phase 1 — Foundation **DONE & MERGED** (PR #1402 → worktree-v3-mpa). /app shell, Accounts slice,
+      login gate, Node-free build, app-mpa.md rule. Validated desktop+mobile+dark, no console errors.
+- [x] Phase 2 — Read surfaces **DONE** (transactions, connections, providers, categories, tags, rules,
+      api-keys, agents+runs, placeholders). Built via 4 fanned-out subagents, integrated, Chrome-validated.
 - [ ] Phase 3 — Write surfaces/forms + settings
 - [ ] Phase 4 — Islands (⌘K, dnd)
 - [ ] Phase 5 — Streaming (Datastar+SSE)
 - [ ] Phase 6 — Cutover + parity audit
 
 ## Progress log (newest first)
+- 2026-05-21 01:0x — Phase 2 read surfaces DONE & validated (no console errors). 9 surfaces live under /app. Fixed missing </div> in categories/tags templ from subagents. templ+build+vet green. Opening Phase 2 PR. Next: Phase 3 write surfaces/forms (+ real settings).
+- 2026-05-21 00:57 — Phase 2 in flight. 4 subagents fanned out per read surface. Done: Transactions (registerTransactions), Connections+Providers (registerConnections/registerProviders), Categories+Tags (registerCategories/registerTags). Pending: Rules+APIKeys+Agents+placeholders. Next: wire registrars into handler.go Router(), templ generate, build, fix collisions (watch `detailRow` helper), Chrome-validate, PR. Registrars NOT yet wired.
+- 2026-05-21 00:53 — Phase 1 foundation MERGED (PR #1402). Server runs on :8088 (worktree). Chrome-validated login→accounts→detail→back, mobile+dark. Fixed pre-existing sqlc drift (worktreeinclude stale agent_runs). Starting Phase 2: fanning out subagents per read surface.
 - 2026-05-21 00:21 — Sprint init: worktree created, decisions locked, integration mapped, tasks #1–13 created. Starting Phase 1.
+
+## Dev server (for validation)
+- Run: `bash /Users/canales/.claude/jobs/31d11a34/run-server.sh 8088` (background). Login: admin@example.com / password.
+- Theme cookie: `bb_theme=dark`. Screenshots → `.shots/` (gitignored) → upload `curl -F image=@f.jpeg https://img402.dev/api/free`.
+- Chrome MCP profile can lock; kill: `pkill -f chrome-devtools-mcp/chrome-profile` (sandbox-disabled).
+- git/PR ops need dangerouslyDisableSandbox (worktree .git lives in main repo, sandbox-blocked).
 
 ## Execution rules (from Ricardo)
 - Deploy subagents wherever reasonable (parallelize per-resource; keep orchestrator context lean).
@@ -63,5 +74,5 @@ Once /app reaches functional+flow parity with the SPA and the foundation is soli
    improve mobile responsiveness. Iterate until clean.
 
 ## Notifications
-- last_notified_epoch: 1779348104  (2026-05-21 00:21 — sprint start)
+- last_notified_epoch: 1779350260  (2026-05-21 00:57 — Phase 2 heartbeat)
 - cadence: hourly at :37 via cron job `aecc8a60` (re-anchors plan + sends push + continues work)

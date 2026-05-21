@@ -1,0 +1,141 @@
+package pages
+
+import (
+	"strconv"
+
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// CategoriesList renders the category hierarchy: top-level (primary) categories,
+// each with their sub-categories listed beneath. Every category is a real link
+// to its detail page.
+templ CategoriesList(d layout.ShellData, cats []service.CategoryResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("Categories", "How transactions are grouped across your household") {
+		}
+		if len(cats) == 0 {
+			@components.EmptyState("No categories yet", "Categories appear as transactions sync and rules run.") {
+			}
+		} else {
+			<div class="space-y-6">
+				for _, c := range cats {
+					<section class="card overflow-hidden">
+						<a href={ templ.SafeURL("/app/categories/" + c.Slug) } class="flex items-center gap-3 border-b px-4 py-3 transition-colors hover:bg-accent/40">
+							@categorySwatch(c)
+							<span class="min-w-0 flex-1 truncate font-medium">{ c.DisplayName }</span>
+							if len(c.Children) > 0 {
+								<span class="kbd shrink-0">{ catChildCount(c) }</span>
+							}
+						</a>
+						if len(c.Children) > 0 {
+							<ul class="divide-y">
+								for _, sub := range c.Children {
+									<li>
+										<a href={ templ.SafeURL("/app/categories/" + sub.Slug) } class="flex items-center gap-3 px-4 py-2.5 pl-8 transition-colors hover:bg-accent/40">
+											@categorySwatch(sub)
+											<span class="min-w-0 flex-1 truncate text-sm">{ sub.DisplayName }</span>
+											if sub.Hidden {
+												@components.Badge("secondary", "Hidden")
+											}
+										</a>
+									</li>
+								}
+							</ul>
+						}
+					</section>
+				}
+			</div>
+		}
+	}
+}
+
+// CategoryDetail shows one category with its slug, parent, color, and icon.
+templ CategoryDetail(d layout.ShellData, c *service.CategoryResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/categories" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Categories
+			</a>
+		</div>
+		@components.PageHeader(c.DisplayName, categorySubtitle(c)) {
+			if c.IsSystem {
+				@components.Badge("outline", "System")
+			}
+			if c.Hidden {
+				@components.Badge("secondary", "Hidden")
+			}
+		}
+		<div class="card divide-y">
+			@detailRow("Slug") {
+				<code class="text-sm">{ c.Slug }</code>
+			}
+			@detailRow("Display name") {
+				{ c.DisplayName }
+			}
+			@detailRow("Parent") {
+				if c.ParentSlug != nil && *c.ParentSlug != "" {
+					<a href={ templ.SafeURL("/app/categories/" + *c.ParentSlug) } class="hover:underline">
+						{ Deref(c.ParentDisplayName, *c.ParentSlug) }
+					</a>
+				} else {
+					<span class="text-muted-foreground">Top level</span>
+				}
+			}
+			@detailRow("Color") {
+				if c.Color != nil && *c.Color != "" {
+					<span class="inline-flex items-center gap-2">
+						@swatchDot(*c.Color)
+						<code class="text-sm">{ *c.Color }</code>
+					</span>
+				} else {
+					<span class="text-muted-foreground">—</span>
+				}
+			}
+			@detailRow("Icon") {
+				<span class="text-sm">{ Deref(c.Icon, "—") }</span>
+			}
+		</div>
+	}
+}
+
+// categorySwatch renders the category's color dot (falling back to a neutral dot).
+templ categorySwatch(c service.CategoryResponse) {
+	if c.Color != nil && *c.Color != "" {
+		@swatchDot(*c.Color)
+	} else {
+		<span class="size-3 shrink-0 rounded-full bg-muted-foreground/40"></span>
+	}
+}
+
+// swatchDot is a small color dot driven by an arbitrary CSS color value.
+templ swatchDot(color string) {
+	<span class="size-3 shrink-0 rounded-full ring-1 ring-border" style={ "background-color: " + color }></span>
+}
+
+// detailRow is a label/value row used in detail grids.
+templ detailRow(label string) {
+	<div class="flex items-start justify-between gap-4 px-4 py-3">
+		<span class="text-sm text-muted-foreground">{ label }</span>
+		<span class="text-right">
+			{ children... }
+		</span>
+	</div>
+}
+
+func categorySubtitle(c *service.CategoryResponse) string {
+	if c.ParentDisplayName != nil && *c.ParentDisplayName != "" {
+		return "Sub-category of " + *c.ParentDisplayName
+	}
+	return "Top-level category"
+}
+
+func catChildCount(c service.CategoryResponse) string {
+	n := len(c.Children)
+	if n == 1 {
+		return "1 sub"
+	}
+	return strconv.Itoa(n) + " subs"
+}

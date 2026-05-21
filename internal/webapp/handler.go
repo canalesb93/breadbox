@@ -50,6 +50,17 @@ func (h *Handler) Router() http.Handler {
 
 			r.Get("/accounts", h.accountsList)
 			r.Get("/accounts/{id}", h.accountDetail)
+
+			// Phase 2 read surfaces (each registrar lives in its own *_handlers.go).
+			h.registerTransactions(r)
+			h.registerConnections(r)
+			h.registerProviders(r)
+			h.registerCategories(r)
+			h.registerTags(r)
+			h.registerRules(r)
+			h.registerAPIKeys(r)
+			h.registerAgents(r)
+			h.registerPlaceholders(r)
 		})
 	})
 

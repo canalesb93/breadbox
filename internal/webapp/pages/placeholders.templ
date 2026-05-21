@@ -1,0 +1,21 @@
+package pages
+
+import (
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// Placeholder is the "coming soon" page for nav leaves not yet built (Reports,
+// Reviews, Insights, Settings). It renders inside the shell so nav stays usable.
+templ Placeholder(d layout.ShellData, title, message string) {
+	@layout.Shell(d) {
+		@components.PageHeader(title, "") {
+		}
+		@components.Card() {
+			<div class="flex flex-col items-center justify-center p-12 text-center">
+				<span class="badge-secondary mb-4">Coming soon</span>
+				<p class="max-w-md text-sm text-muted-foreground">{ message }</p>
+			</div>
+		}
+	}
+}

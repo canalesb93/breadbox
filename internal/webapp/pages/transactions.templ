@@ -1,0 +1,285 @@
+package pages
+
+import (
+	"net/url"
+	"strconv"
+
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// TxFilters holds the sticky filter + pagination values for the transactions list.
+// Every field is query-param driven — the filter bar is a native GET form, so these
+// values round-trip through the URL with no JS.
+type TxFilters struct {
+	Search   string // ?search=
+	Account  string // ?account= (account short_id)
+	Category string // ?category= (category slug)
+	Start    string // ?start= (YYYY-MM-DD)
+	End      string // ?end= (YYYY-MM-DD)
+	Offset   int    // ?offset=
+	Limit    int    // page size
+}
+
+// TransactionsList is a server-rendered data-table with a query-param filter bar and
+// real prev/next pagination links. No client router, no JS — every nav is a document.
+templ TransactionsList(d layout.ShellData, result *service.TransactionListResult, filters TxFilters) {
+	@layout.Shell(d) {
+		@components.PageHeader("Transactions", "Every transaction synced into your household") {
+		}
+		<form method="get" action="/app/transactions" class="card mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
+			<div class="flex flex-col gap-1 lg:col-span-2">
+				<label for="tx-search" class="text-xs font-medium text-muted-foreground">Search</label>
+				<input
+					type="search"
+					id="tx-search"
+					name="search"
+					value={ filters.Search }
+					placeholder="Description or merchant"
+					class="input"
+					enterkeyhint="search"
+					autocomplete="off"
+				/>
+			</div>
+			<div class="flex flex-col gap-1">
+				<label for="tx-account" class="text-xs font-medium text-muted-foreground">Account</label>
+				<input type="text" id="tx-account" name="account" value={ filters.Account } placeholder="Account ID" class="input" autocomplete="off"/>
+			</div>
+			<div class="flex flex-col gap-1">
+				<label for="tx-category" class="text-xs font-medium text-muted-foreground">Category</label>
+				<input type="text" id="tx-category" name="category" value={ filters.Category } placeholder="Category slug" class="input" autocomplete="off"/>
+			</div>
+			<div class="flex flex-col gap-1">
+				<label for="tx-start" class="text-xs font-medium text-muted-foreground">From</label>
+				<input type="date" id="tx-start" name="start" value={ filters.Start } class="input"/>
+			</div>
+			<div class="flex flex-col gap-1">
+				<label for="tx-end" class="text-xs font-medium text-muted-foreground">To</label>
+				<input type="date" id="tx-end" name="end" value={ filters.End } class="input"/>
+			</div>
+			<div class="flex items-end gap-2 sm:col-span-2 lg:col-span-5">
+				<button type="submit" class="btn-primary">Filter</button>
+				<a href="/app/transactions" class="btn-ghost">Reset</a>
+			</div>
+		</form>
+		if result == nil || len(result.Transactions) == 0 {
+			@components.EmptyState("No transactions", "Nothing matches these filters yet.") {
+			}
+		} else {
+			<div class="card overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="data-table">
+						<thead>
+							<tr>
+								<th>Date</th>
+								<th>Description</th>
+								<th>Account</th>
+								<th>Category</th>
+								<th class="text-right">Amount</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, t := range result.Transactions {
+								<tr>
+									<td class="whitespace-nowrap text-muted-foreground">{ t.Date }</td>
+									<td>
+										<a href={ templ.SafeURL("/app/transactions/" + t.ShortID) } class="hover:underline">
+											{ txnDisplayName(t) }
+										</a>
+										if t.Pending {
+											<span class="badge-secondary ml-2">Pending</span>
+										}
+									</td>
+									<td class="whitespace-nowrap text-muted-foreground">{ Deref(t.AccountName, "—") }</td>
+									<td class="whitespace-nowrap text-muted-foreground">{ txnCategoryName(t) }</td>
+									<td class="whitespace-nowrap text-right font-medium tabular-nums">{ Money(&t.Amount, t.IsoCurrencyCode) }</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="mt-4 flex items-center justify-between gap-3">
+				<p class="text-sm text-muted-foreground">{ txnPageLabel(filters, len(result.Transactions)) }</p>
+				<div class="flex items-center gap-2">
+					if filters.Offset > 0 {
+						<a href={ templ.SafeURL(txnPageURL(filters, txnPrevOffset(filters))) } class="btn-outline btn-sm">
+							@components.Icon("back")
+							Previous
+						</a>
+					} else {
+						<span class="btn-outline btn-sm pointer-events-none opacity-50" aria-disabled="true">
+							@components.Icon("back")
+							Previous
+						</span>
+					}
+					if result.HasMore {
+						<a href={ templ.SafeURL(txnPageURL(filters, filters.Offset+filters.Limit)) } class="btn-outline btn-sm">Next</a>
+					} else {
+						<span class="btn-outline btn-sm pointer-events-none opacity-50" aria-disabled="true">Next</span>
+					}
+				</div>
+			</div>
+		}
+	}
+}
+
+// TransactionDetail shows one transaction with its amount header and a definition grid.
+templ TransactionDetail(d layout.ShellData, t *service.TransactionResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/transactions" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Transactions
+			</a>
+		</div>
+		@components.PageHeader(txnDisplayName(*t), t.Date) {
+			if t.Pending {
+				<span class="badge-secondary">Pending</span>
+			}
+		}
+		<div class="grid gap-3 sm:grid-cols-3">
+			@components.StatCard("Amount", Money(&t.Amount, t.IsoCurrencyCode), txnAmountDirection(t.Amount))
+			@components.StatCard("Date", t.Date, "")
+			@components.StatCard("Category", txnCategoryName(*t), "")
+		</div>
+		<div class="mt-6">
+			@components.Card() {
+				<dl class="divide-y">
+					@txnDetailRow("Description", t.ProviderName)
+					if t.ProviderMerchantName != nil && *t.ProviderMerchantName != "" {
+						@txnDetailRow("Merchant", *t.ProviderMerchantName)
+					}
+					<div class="flex items-baseline justify-between gap-4 px-5 py-3">
+						<dt class="text-sm text-muted-foreground">Account</dt>
+						<dd class="text-sm font-medium text-right">
+							if t.AccountID != nil && *t.AccountID != "" {
+								<a href={ templ.SafeURL("/app/accounts/" + *t.AccountID) } class="hover:underline">{ Deref(t.AccountName, *t.AccountID) }</a>
+							} else {
+								{ Deref(t.AccountName, "—") }
+							}
+						</dd>
+					</div>
+					@txnDetailRow("Currency", txnCurrency(t.IsoCurrencyCode))
+					@txnDetailRow("Pending", txnBool(t.Pending))
+					if t.UserName != nil && *t.UserName != "" {
+						@txnDetailRow("Attributed to", *t.UserName)
+					}
+					if t.ProviderCategoryPrimary != nil && *t.ProviderCategoryPrimary != "" {
+						@txnDetailRow("Provider category", txnProviderCategory(t))
+					}
+					if t.ProviderPaymentChannel != nil && *t.ProviderPaymentChannel != "" {
+						@txnDetailRow("Payment channel", TitleCase(*t.ProviderPaymentChannel))
+					}
+					if len(t.Tags) > 0 {
+						<div class="flex items-baseline justify-between gap-4 px-5 py-3">
+							<dt class="text-sm text-muted-foreground">Tags</dt>
+							<dd class="flex flex-wrap justify-end gap-1.5">
+								for _, tag := range t.Tags {
+									<span class="badge-outline">{ tag }</span>
+								}
+							</dd>
+						</div>
+					}
+				</dl>
+			}
+		</div>
+	}
+}
+
+templ txnDetailRow(label, value string) {
+	<div class="flex items-baseline justify-between gap-4 px-5 py-3">
+		<dt class="text-sm text-muted-foreground">{ label }</dt>
+		<dd class="text-sm font-medium text-right">{ value }</dd>
+	</div>
+}
+
+func txnDisplayName(t service.TransactionResponse) string {
+	if t.ProviderMerchantName != nil && *t.ProviderMerchantName != "" {
+		return *t.ProviderMerchantName
+	}
+	return t.ProviderName
+}
+
+func txnCategoryName(t service.TransactionResponse) string {
+	if t.Category != nil && t.Category.DisplayName != nil && *t.Category.DisplayName != "" {
+		return *t.Category.DisplayName
+	}
+	return "—"
+}
+
+func txnProviderCategory(t *service.TransactionResponse) string {
+	primary := TitleCase(*t.ProviderCategoryPrimary)
+	if t.ProviderCategoryDetailed != nil && *t.ProviderCategoryDetailed != "" {
+		return primary + " · " + TitleCase(*t.ProviderCategoryDetailed)
+	}
+	return primary
+}
+
+func txnCurrency(cur *string) string {
+	if cur == nil || *cur == "" {
+		return "USD"
+	}
+	return *cur
+}
+
+func txnBool(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
+}
+
+// txnAmountDirection labels the sign convention: positive = money out, negative = money in.
+func txnAmountDirection(amount float64) string {
+	switch {
+	case amount > 0:
+		return "Money out"
+	case amount < 0:
+		return "Money in"
+	default:
+		return ""
+	}
+}
+
+func txnPrevOffset(f TxFilters) int {
+	o := f.Offset - f.Limit
+	if o < 0 {
+		return 0
+	}
+	return o
+}
+
+// txnPageURL rebuilds the list URL preserving every active filter at a new offset.
+func txnPageURL(f TxFilters, offset int) string {
+	q := url.Values{}
+	if f.Search != "" {
+		q.Set("search", f.Search)
+	}
+	if f.Account != "" {
+		q.Set("account", f.Account)
+	}
+	if f.Category != "" {
+		q.Set("category", f.Category)
+	}
+	if f.Start != "" {
+		q.Set("start", f.Start)
+	}
+	if f.End != "" {
+		q.Set("end", f.End)
+	}
+	if offset > 0 {
+		q.Set("offset", strconv.Itoa(offset))
+	}
+	if len(q) == 0 {
+		return "/app/transactions"
+	}
+	return "/app/transactions?" + q.Encode()
+}
+
+func txnPageLabel(f TxFilters, count int) string {
+	start := f.Offset + 1
+	end := f.Offset + count
+	return "Showing " + strconv.Itoa(start) + "–" + strconv.Itoa(end)
+}

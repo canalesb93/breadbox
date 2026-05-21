@@ -1,0 +1,115 @@
+package pages
+
+import (
+	"strconv"
+
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// ConnectionsList renders every bank connection as a card, each a real link to
+// its detail page. Status renders as a Badge mapped from the connection enum.
+templ ConnectionsList(d layout.ShellData, conns []service.ConnectionResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("Connections", "Banks and providers syncing into your household") {
+		}
+		if len(conns) == 0 {
+			@components.EmptyState("No connections yet", "Link a bank or import a CSV to start syncing.") {
+				<a href="/app/providers" class="btn-primary mt-4">View providers</a>
+			}
+		} else {
+			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				for _, c := range conns {
+					<a href={ templ.SafeURL("/app/connections/" + c.ShortID) } class="card flex flex-col p-4 transition-colors hover:bg-accent/40">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="truncate font-medium">{ connInstitution(c) }</p>
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">{ TitleCase(c.Provider) }</p>
+							</div>
+							@components.Badge(connStatusVariant(c.Status), connStatusLabel(c.Status))
+						</div>
+						<p class="mt-4 text-xs text-muted-foreground">
+							Last sync { Deref(c.LastSyncedAt, "never") }
+						</p>
+					</a>
+				}
+			</div>
+		}
+	}
+}
+
+// ConnectionDetail shows one connection's header, a detail grid, and its accounts.
+templ ConnectionDetail(d layout.ShellData, c *service.ConnectionDetailResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/connections" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Connections
+			</a>
+		</div>
+		@components.PageHeader(connDetailInstitution(c), TitleCase(c.Provider)) {
+			@components.Badge(connStatusVariant(c.Status), connStatusLabel(c.Status))
+		}
+		if c.ErrorMessage != nil && *c.ErrorMessage != "" {
+			<div class="card mb-4 border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+				{ *c.ErrorMessage }
+			</div>
+		}
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			@components.StatCard("Provider", TitleCase(c.Provider), "")
+			@components.StatCard("Status", connStatusLabel(c.Status), "")
+			@components.StatCard("Last sync", Deref(c.LastSyncedAt, "never"), "")
+			@components.StatCard("Accounts", strconv.Itoa(c.AccountCount), "")
+		</div>
+		<div class="mt-6 card overflow-hidden">
+			<dl class="divide-y">
+				@connDetailRow("Institution", connDetailInstitution(c))
+				@connDetailRow("Created", c.CreatedAt)
+				@connDetailRow("Updated", c.UpdatedAt)
+				if c.UserName != nil && *c.UserName != "" {
+					@connDetailRow("Member", *c.UserName)
+				}
+			</dl>
+		</div>
+	}
+}
+
+templ connDetailRow(label, value string) {
+	<div class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+		<dt class="text-muted-foreground">{ label }</dt>
+		<dd class="truncate font-medium">{ value }</dd>
+	</div>
+}
+
+func connInstitution(c service.ConnectionResponse) string {
+	if c.InstitutionName != nil && *c.InstitutionName != "" {
+		return *c.InstitutionName
+	}
+	return TitleCase(c.Provider)
+}
+
+func connDetailInstitution(c *service.ConnectionDetailResponse) string {
+	if c.InstitutionName != nil && *c.InstitutionName != "" {
+		return *c.InstitutionName
+	}
+	return TitleCase(c.Provider)
+}
+
+// connStatusVariant maps the connection status enum to a Badge variant.
+func connStatusVariant(status string) string {
+	switch status {
+	case "active":
+		return "success"
+	case "error":
+		return "destructive"
+	case "pending_reauth":
+		return "secondary"
+	default: // disconnected
+		return "outline"
+	}
+}
+
+func connStatusLabel(status string) string {
+	return TitleCase(status)
+}
