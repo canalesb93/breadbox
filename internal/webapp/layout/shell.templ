@@ -59,6 +59,13 @@ templ topbar(d ShellData) {
 			@components.Icon("menu")
 		</label>
 		<div class="flex-1"></div>
+		// ⌘K palette trigger — progressive enhancement: the palette island wires the click.
+		// Hidden on touch (no physical ⌘K), where the hint is meaningless.
+		<button type="button" data-palette-open class="hidden items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted [@media(pointer:fine)]:flex" aria-label="Open command palette">
+			@components.Icon("search")
+			<span class="hidden lg:inline">Search…</span>
+			<kbd class="kbd">⌘K</kbd>
+		</button>
 		<button type="button" class="btn-icon btn-ghost" data-theme-set="dark" aria-label="Toggle theme">
 			@components.Icon("sun")
 		</button>

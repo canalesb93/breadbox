@@ -110,6 +110,42 @@ Validate in a real browser before reporting done; attach screenshots to the PR.
   for errors. Upload via the `github-image-hosting` skill (img402) — never the GitHub release-asset CDN.
 - Inline images in PR bodies with bounded width: `<img src="https://i.img402.dev/<id>.jpg" width="800">`.
 
+## JS islands (esbuild-via-Go, Node-free)
+
+JS is a last resort, scoped to **named islands**: tiny, dependency-free TS modules that hydrate
+server-rendered DOM and wire *behavior only*. An island must never own navigation — it only
+triggers real `location.href` navigations, so the browser keeps owning history/scroll/bfcache.
+With JS off, the island simply doesn't appear and everything stays reachable (pure progressive
+enhancement). First island shipped: the ⌘K command palette.
+
+**Where things live**
+- Source TS: `internal/webapp/assets/js/islands/<name>.ts` (one entrypoint per island).
+- Build program: `internal/webapp/cmd/buildjs` (own `package main`) — uses esbuild's Go API
+  (`github.com/evanw/esbuild/pkg/api`), no Node/npm.
+- Built bundles: `internal/webapp/static/js/islands/<name>-<hash>.js` (content-hashed, **committed**,
+  like `static/css/app.css`). Embedded via `//go:embed all:static`.
+- Manifest: `internal/webapp/static/js/islands/manifest.go` (`package islands`, generated, committed)
+  — a `map[string]string` of logical name → hashed filename. Resolve URLs in templ via
+  `layout.IslandSrc("<name>")` (`internal/webapp/layout/islands.go`), which falls back to
+  `<name>.js` if the manifest has no entry yet.
+
+**Build / caching**
+- `make webapp-js` runs the buildjs program (bundle + minify + hash + regenerate manifest.go).
+- Folded into `make generate` (rebuilds when any `*.ts` is newer than `manifest.go`), into `make
+  build` (transitively via `generate`), and into `make dev-watch` (a 1s poll rebuilds on TS edits).
+- Content-hashed names get `Cache-Control: immutable` automatically — `embed.go::looksFingerprinted`
+  already special-cases `…-<hash>.js`. That's why we hash instead of using stable names.
+- The `<script type="module" src={ IslandSrc("...") }>` tag lives in `layout/base.templ`.
+
+**Adding another island** (e.g. the drag-drop rule builder)
+1. Write `internal/webapp/assets/js/islands/<name>.ts` — tiny, no npm deps, hydrate a server
+   element, never hijack link nav.
+2. Add the `<script type="module" src={ IslandSrc("<name>") }>` to `base.templ` (global) or the
+   specific page's templ (scoped).
+3. Add any `.<name>*` styles to `assets/css/input.css` using design tokens (never raw colors).
+4. Run `make webapp-js` (or `make generate`) — it bundles, hashes, and regenerates `manifest.go`.
+   Commit the new bundle + the updated manifest alongside your `.templ`/CSS changes.
+
 ## Do not
 
 - Don't import or reuse v1 admin (`internal/admin`, `internal/templates`) markup/CSS. Clean start.
