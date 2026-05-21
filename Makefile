@@ -3,13 +3,19 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch webapp-js
 
 PORT ?= 8080
 
 # v3 webapp (internal/webapp) — Node-free Tailwind v4 build via the standalone CLI.
 WEBAPP_CSS_IN := internal/webapp/assets/css/input.css
 WEBAPP_CSS_OUT := internal/webapp/static/css/app.css
+
+# v3 webapp JS islands — Node-free esbuild via the Go API (internal/webapp/cmd/buildjs).
+# Bundles+minifies internal/webapp/assets/js/islands/*.ts → static/js/islands/<name>-<hash>.js
+# and regenerates the manifest.go map used by layout.IslandSrc.
+WEBAPP_JS_SRC := $(wildcard internal/webapp/assets/js/islands/*.ts)
+WEBAPP_JS_DIR := internal/webapp/static/js/islands
 
 # generate ensures gitignored build artifacts exist and are up to date.
 # - sqlc: only rebuilds if the generated models file is missing (queries are
@@ -24,6 +30,7 @@ generate: templ
 	@if [ ! -f internal/db/models.go ]; then $(MAKE) sqlc; fi
 	@if [ ! -f static/css/styles.css ] || [ input.css -nt static/css/styles.css ]; then $(MAKE) css; fi
 	@if [ ! -s $(WEBAPP_CSS_OUT) ] || [ $(WEBAPP_CSS_IN) -nt $(WEBAPP_CSS_OUT) ]; then $(MAKE) webapp-css; fi
+	@if [ -n "$(WEBAPP_JS_SRC)" ] && { ! ls $(WEBAPP_JS_DIR)/*.js >/dev/null 2>&1 || [ -n "$$(find $(WEBAPP_JS_SRC) -newer $(WEBAPP_JS_DIR)/manifest.go 2>/dev/null)" ]; }; then $(MAKE) webapp-js; fi
 
 # templ-install pulls the templ CLI if it's missing. Pinned via go.mod so the
 # version the CLI understands always matches the runtime lib the binary
@@ -56,6 +63,11 @@ webapp-css: css-install
 
 webapp-css-watch: css-install
 	$(TAILWIND_BIN) -i $(WEBAPP_CSS_IN) -o $(WEBAPP_CSS_OUT) --watch
+
+# webapp-js bundles the v3 JS islands (Node-free, esbuild via the Go API). Emits
+# content-hashed bundles + a regenerated manifest.go. No-ops if there are no .ts entrypoints.
+webapp-js:
+	go run ./internal/webapp/cmd/buildjs
 
 # templ-check fails if generated files are stale. Used in CI so a PR cannot
 # land with hand-edited .templ files that nobody regenerated.
@@ -104,6 +116,10 @@ dev-watch: generate air-install
 	@trap 'rm -f .breadbox-port; kill 0' EXIT INT TERM; \
 		$(TAILWIND_BIN) -i input.css -o static/css/styles.css --watch & \
 		$(TAILWIND_BIN) -i $(WEBAPP_CSS_IN) -o $(WEBAPP_CSS_OUT) --watch & \
+		( while true; do \
+			if [ -n "$$(find internal/webapp/assets/js/islands -name '*.ts' -newer $(WEBAPP_JS_DIR)/manifest.go 2>/dev/null)" ]; then $(MAKE) webapp-js; fi; \
+			sleep 1; \
+		done ) & \
 		BREADBOX_DEV_RELOAD=1 SERVER_PORT=$(PORT) air -c .air.toml; \
 		wait
 

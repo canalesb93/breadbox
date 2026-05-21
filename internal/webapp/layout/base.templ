@@ -11,8 +11,13 @@ templ Base(d BaseData) {
 			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 			<meta name="color-scheme" content="light dark"/>
 			<title>{ pageTitle(d.Title) }</title>
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
 			<link rel="stylesheet" href="/app/static/css/app.css"/>
 			<script defer src="/app/static/js/app.js"></script>
+			// ⌘K command palette island (esbuild-via-Go bundle; hashed name resolved from the manifest).
+			// type=module + defer-by-default; degrades to nothing without JS — every destination
+			// stays reachable via the sidebar.
+			<script type="module" src={ IslandSrc("palette") }></script>
 			// Prerender same-origin /app links on hover/intent — the native equivalent
 			// of the SPA's defaultPreload:"intent". No-ops where unsupported.
 			<script type="speculationrules">
