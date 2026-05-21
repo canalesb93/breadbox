@@ -44,6 +44,13 @@ test.describe("deep-link refresh + filters/sort", () => {
   test("filter form submit round-trips query params", async ({ page }) => {
     await page.goto("/app/transactions", { waitUntil: "domcontentloaded" });
 
+    // The filter form lives inside a <details> disclosure (#1412). On desktop
+    // CSS forces the form's display, but a closed <details> still hides its
+    // content via ::details-content (content-visibility:hidden), so the controls
+    // aren't actionable until the disclosure is opened. Open it explicitly —
+    // matches the real interaction (the summary is the desktop-hidden toggle).
+    await page.locator("details.tx-filters").evaluate((d) => ((d as HTMLDetailsElement).open = true));
+
     // Set the sort_by select and submit the GET filter form.
     await page.selectOption('select[name="sort_by"]', "amount");
     await page.selectOption('select[name="sort_order"]', "asc");
