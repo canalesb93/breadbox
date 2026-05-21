@@ -1,0 +1,122 @@
+package pages
+
+import (
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// SettingsAccountData drives the account settings page: read-only identity plus the
+// password-change form. Errors is keyed by field name (current_password, new_password,
+// confirm_password) plus the reserved "form" key for a top-level banner. Saved flips the
+// success banner after a post-redirect-get (the form 303s to ?saved=1 on success).
+type SettingsAccountData struct {
+	Username string
+	RoleName string
+	Errors   map[string]string
+	Saved    bool
+}
+
+// SettingsAccount renders the account settings section: username/role (read-only) and a
+// password-change form. The left-nav is a stub for future sections (only Account exists
+// today) so the IA can grow without reflowing the page.
+templ SettingsAccount(d layout.ShellData, f SettingsAccountData) {
+	@layout.Shell(d) {
+		@components.PageHeader("Settings", "Manage your account and preferences") {
+		}
+		<div class="flex flex-col gap-6 lg:flex-row">
+			@settingsNav("account")
+			<div class="min-w-0 flex-1 space-y-6">
+				<section class="card max-w-xl">
+					<div class="card-header">
+						<h2 class="text-lg font-semibold tracking-tight">Account</h2>
+						<p class="card-desc">Your sign-in identity. Contact an administrator to change your role.</p>
+					</div>
+					<div class="card-content divide-y">
+						@settingsRow("Username") {
+							<span class="text-sm">{ f.Username }</span>
+						}
+						@settingsRow("Role") {
+							@components.Badge("secondary", f.RoleName)
+						}
+					</div>
+				</section>
+				<section class="card max-w-xl">
+					<div class="card-header">
+						<h2 class="text-lg font-semibold tracking-tight">Password</h2>
+						<p class="card-desc">Choose a strong password of at least 8 characters.</p>
+					</div>
+					<div class="card-content space-y-5">
+						if f.Saved {
+							<div role="status" class="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+								Password updated.
+							</div>
+						}
+						<form method="post" action="/app/settings/password" class="space-y-5">
+							@components.FormError(f.Errors["form"])
+							@components.FieldAttrs("current_password", "Current password", "", f.Errors["current_password"], templ.Attributes{
+								"type":         "password",
+								"autocomplete": "current-password",
+								"required":     true,
+							})
+							@components.FieldAttrs("new_password", "New password", "", f.Errors["new_password"], templ.Attributes{
+								"type":         "password",
+								"autocomplete": "new-password",
+								"minlength":    "8",
+								"required":     true,
+							})
+							@components.FieldAttrs("confirm_password", "Confirm new password", "", f.Errors["confirm_password"], templ.Attributes{
+								"type":         "password",
+								"autocomplete": "new-password",
+								"minlength":    "8",
+								"required":     true,
+								"enterkeyhint": "go",
+							})
+							@components.FormActions() {
+								<button type="submit" class="btn-primary btn-sm">Update password</button>
+							}
+						</form>
+					</div>
+				</section>
+			</div>
+		</div>
+	}
+}
+
+// settingsNav is the section sidebar within /app/settings. Only Account exists today;
+// it's a list so future sections (Household, Appearance) slot in without a redesign.
+templ settingsNav(active string) {
+	<nav class="shrink-0 lg:w-48">
+		<ul class="flex gap-1 lg:flex-col">
+			<li>
+				<a href="/app/settings/account" class={ settingsNavClass(active == "account") } aria-current={ settingsAriaCurrent(active == "account") }>
+					Account
+				</a>
+			</li>
+		</ul>
+	</nav>
+}
+
+// settingsRow is a label/value row used in the read-only account grid.
+templ settingsRow(label string) {
+	<div class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+		<span class="text-sm text-muted-foreground">{ label }</span>
+		<span class="text-right">
+			{ children... }
+		</span>
+	</div>
+}
+
+func settingsNavClass(active bool) string {
+	base := "block rounded-md px-2.5 py-2 text-sm font-medium transition-colors "
+	if active {
+		return base + "bg-accent text-accent-foreground"
+	}
+	return base + "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
+}
+
+func settingsAriaCurrent(active bool) string {
+	if active {
+		return "page"
+	}
+	return "false"
+}

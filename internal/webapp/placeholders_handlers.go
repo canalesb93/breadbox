@@ -16,7 +16,7 @@ func (h *Handler) registerPlaceholders(r chi.Router) {
 	r.Get("/reports", h.placeholder("Reports", "Spending reports and trends over time are coming to v3 soon."))
 	r.Get("/reviews", h.placeholder("Reviews", "Your transaction review queue will live here soon."))
 	r.Get("/insights", h.placeholder("Insights", "Charts and insights into your household finances are on the way."))
-	r.Get("/settings", h.placeholder("Settings", "Household and app settings are coming to v3 soon."))
+	// /settings is a real surface now (see registerSettings); no placeholder here.
 }
 
 // placeholder returns a handler that renders the coming-soon page with the given

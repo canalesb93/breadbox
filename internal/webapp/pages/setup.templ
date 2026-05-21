@@ -1,0 +1,64 @@
+package pages
+
+import "breadbox/internal/webapp/layout"
+
+// SetupAccountData drives the token-invite set-password page. When Invalid is non-empty
+// the form is suppressed and only the message is shown (bad/expired/already-used token).
+// Errors is keyed by field name (password, confirm_password). Username greets the invitee.
+type SetupAccountData struct {
+	Token    string
+	Username string
+	Invalid  string // non-empty → render the invalid-token message instead of the form
+	Errors   map[string]string
+}
+
+// SetupAccount is a standalone page (no app shell, like Login) where a token-invited
+// member sets their first password. Native form POST to /app/setup-account/{token}.
+templ SetupAccount(themeClass string, f SetupAccountData) {
+	@layout.Base(layout.BaseData{Title: "Set your password", ThemeClass: themeClass}) {
+		<div class="flex min-h-dvh items-center justify-center px-4 py-12">
+			<div class="card w-full max-w-sm">
+				if f.Invalid != "" {
+					<div class="card-header text-center">
+						<h1 class="text-xl font-semibold tracking-tight">Setup link unavailable</h1>
+					</div>
+					<div class="card-content space-y-4">
+						<div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+							{ f.Invalid }
+						</div>
+						<a href="/app/login" class="btn-outline w-full">Go to sign in</a>
+					</div>
+				} else {
+					<div class="card-header text-center">
+						<h1 class="text-xl font-semibold tracking-tight">Set your password</h1>
+						<p class="card-desc">Choose a password for { f.Username }</p>
+					</div>
+					<div class="card-content">
+						if f.Errors["form"] != "" {
+							<div role="alert" class="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+								{ f.Errors["form"] }
+							</div>
+						}
+						<form method="post" action={ templ.SafeURL("/app/setup-account/" + f.Token) } class="space-y-4">
+							<div class="space-y-1.5">
+								<label for="password" class="label">New password</label>
+								<input id="password" name="password" type="password" autocomplete="new-password" minlength="8" enterkeyhint="next" required autofocus class="input"/>
+								if f.Errors["password"] != "" {
+									<p class="field-error">{ f.Errors["password"] }</p>
+								}
+							</div>
+							<div class="space-y-1.5">
+								<label for="confirm_password" class="label">Confirm password</label>
+								<input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" enterkeyhint="go" required class="input"/>
+								if f.Errors["confirm_password"] != "" {
+									<p class="field-error">{ f.Errors["confirm_password"] }</p>
+								}
+							</div>
+							<button type="submit" class="btn-primary w-full">Set password</button>
+						</form>
+					</div>
+				}
+			</div>
+		</div>
+	}
+}

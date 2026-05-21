@@ -8,12 +8,27 @@ import (
 	"breadbox/internal/webapp/layout"
 )
 
+// agentToolScopeOptions are the read_only / read_write choices for the MCP
+// tool-scope select. Mirrors the canonical tool_scope enum.
+var agentToolScopeOptions = []components.Option{
+	{Value: "read_write", Label: "Read & write"},
+	{Value: "read_only", Label: "Read only"},
+}
+
+// agentAuthModeOptions are the credential-source choices for agent settings.
+var agentAuthModeOptions = []components.Option{
+	{Value: "subscription", Label: "Subscription (Claude Code OAuth token)"},
+	{Value: "api_key", Label: "Anthropic API key"},
+}
+
 // AgentsList renders agent definitions as cards. Secrets (subscription token,
 // Anthropic API key) are never part of AgentDefinitionResponse and are never rendered.
 templ AgentsList(d layout.ShellData, agents []service.AgentDefinitionResponse) {
 	@layout.Shell(d) {
 		@components.PageHeader("Agents", "Scheduled AI runs over your financial data") {
+			<a href="/app/agents/settings" class="btn-outline btn-sm">Settings</a>
 			<a href="/app/agents/runs" class="btn-outline btn-sm">All runs</a>
+			<a href="/app/agents/new" class="btn-primary btn-sm">New agent</a>
 		}
 		if len(agents) == 0 {
 			@components.EmptyState("No agents yet", "Agents run on a schedule and call Breadbox over MCP.") {
@@ -53,6 +68,7 @@ templ AgentRuns(d layout.ShellData, agent *service.AgentDefinitionResponse, runs
 		</div>
 		@components.PageHeader(agent.Name+" runs", agentScheduleLabel(*agent)) {
 			@components.Badge(agentEnabledVariant(agent.Enabled), agentEnabledLabel(agent.Enabled))
+			<a href={ templ.SafeURL("/app/agents/" + agent.Slug + "/edit") } class="btn-outline btn-sm">Edit</a>
 		}
 		@agentRunsTable(runs)
 	}
@@ -217,4 +233,242 @@ func agentRunTokens(in, out *int) string {
 		o = *out
 	}
 	return fmt.Sprintf("%d↓ %d↑", i, o)
+}
+
+// ----------------------------------------------------------------------------
+// Create / edit agent form
+// ----------------------------------------------------------------------------
+
+// AgentFormData drives the create/edit agent form. One struct, both modes:
+// Mode flips the title, submit label, and whether slug is editable (the service
+// allows slug renames, but we pin it on edit to match the categories convention
+// and avoid breaking ShortID-based run URLs). Errors is keyed by field name
+// (name, slug, prompt, schedule_cron, model, max_turns, max_budget_usd,
+// quiet_hours_start, quiet_hours_end) plus the reserved "form" banner key.
+// No secret ever appears here — agent definitions carry none.
+type AgentFormData struct {
+	Mode      string // "create" or "edit"
+	ActionURL string // POST target
+	CancelURL string // link back to list (create) or runs (edit)
+	Values    AgentFormValues
+	Errors    map[string]string
+}
+
+// AgentFormValues is the editable field set, pre-filled on edit and on error re-render.
+type AgentFormValues struct {
+	Name                  string
+	Slug                  string
+	Prompt                string
+	SystemPrompt          string
+	ScheduleCron          string
+	ToolScope             string
+	Model                 string
+	MaxTurns              string
+	MaxBudgetUSD          string
+	QuietHoursStart       string
+	QuietHoursEnd         string
+	Enabled               bool
+	TriggerOnSyncComplete bool
+}
+
+func (f AgentFormData) agentIsEdit() bool { return f.Mode == "edit" }
+
+func (f AgentFormData) agentTitle() string {
+	if f.agentIsEdit() {
+		return "Edit agent"
+	}
+	return "New agent"
+}
+
+func (f AgentFormData) agentSubmitLabel() string {
+	if f.agentIsEdit() {
+		return "Save changes"
+	}
+	return "Create agent"
+}
+
+// AgentForm renders the create/edit agent definition form as a native POST.
+// Slug is editable only on create. Per-field errors come from f.Errors; the
+// "form" key renders a banner. The prompt is the agent's task instructions;
+// the optional system prompt overrides the breadbox baseline persona.
+templ AgentForm(d layout.ShellData, f AgentFormData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Cancel
+			</a>
+		</div>
+		@components.PageHeader(f.agentTitle(), "") {
+		}
+		<form method="post" action={ templ.SafeURL(f.ActionURL) } class="card max-w-2xl space-y-5 p-6">
+			@components.FormError(f.Errors["form"])
+			@components.FieldAttrs("name", "Name", f.Values.Name, f.Errors["name"], templ.Attributes{
+				"type":      "text",
+				"required":  true,
+				"autofocus": true,
+				"maxlength": "100",
+			})
+			if f.agentIsEdit() {
+				<div class="space-y-1.5">
+					<span class="label">Slug</span>
+					<input type="text" value={ f.Values.Slug } class="input" disabled readonly/>
+					<p class="text-xs text-muted-foreground">The slug is permanent once an agent is created.</p>
+				</div>
+			} else {
+				@components.FieldAttrs("slug", "Slug", f.Values.Slug, f.Errors["slug"], templ.Attributes{
+					"type":        "text",
+					"required":    true,
+					"pattern":     "[a-z0-9][a-z0-9-]*",
+					"placeholder": "weekly-review",
+					"inputmode":   "text",
+				})
+			}
+			@components.Textarea("prompt", "Prompt", f.Values.Prompt, f.Errors["prompt"])
+			@components.Textarea("system_prompt", "System prompt (optional)", f.Values.SystemPrompt, f.Errors["system_prompt"])
+			@components.SelectField("tool_scope", "MCP tool scope", agentToolScopeOptions, f.Values.ToolScope, "", f.Errors["tool_scope"])
+			@components.FieldAttrs("model", "Model", f.Values.Model, f.Errors["model"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "claude-opus-4-7",
+			})
+			@components.FieldAttrs("schedule_cron", "Schedule (cron)", f.Values.ScheduleCron, f.Errors["schedule_cron"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "0 9 * * 1  (5 fields; leave blank for manual only)",
+			})
+			<div class="grid gap-4 sm:grid-cols-2">
+				@components.FieldAttrs("max_turns", "Max turns", f.Values.MaxTurns, f.Errors["max_turns"], templ.Attributes{
+					"type":        "number",
+					"min":         "0",
+					"max":         "100",
+					"inputmode":   "numeric",
+					"placeholder": "0 = default",
+				})
+				@components.FieldAttrs("max_budget_usd", "Max budget (USD)", f.Values.MaxBudgetUSD, f.Errors["max_budget_usd"], templ.Attributes{
+					"type":        "number",
+					"min":         "0",
+					"max":         "1000",
+					"step":        "0.01",
+					"inputmode":   "decimal",
+					"placeholder": "1.00",
+				})
+			</div>
+			<div class="grid gap-4 sm:grid-cols-2">
+				@components.FieldAttrs("quiet_hours_start", "Quiet hours start", f.Values.QuietHoursStart, f.Errors["quiet_hours_start"], templ.Attributes{
+					"type":        "text",
+					"pattern":     "[0-2][0-9]:[0-5][0-9]",
+					"placeholder": "HH:MM",
+				})
+				@components.FieldAttrs("quiet_hours_end", "Quiet hours end", f.Values.QuietHoursEnd, f.Errors["quiet_hours_end"], templ.Attributes{
+					"type":        "text",
+					"pattern":     "[0-2][0-9]:[0-5][0-9]",
+					"placeholder": "HH:MM",
+				})
+			</div>
+			<div class="space-y-2">
+				@components.CheckboxField("enabled", "Enabled (eligible to run on its schedule)", f.Values.Enabled)
+				@components.CheckboxField("trigger_on_sync_complete", "Run after every successful sync", f.Values.TriggerOnSyncComplete)
+			</div>
+			@components.FormActions() {
+				<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn-primary btn-sm">{ f.agentSubmitLabel() }</button>
+			}
+		</form>
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Agent settings form (token storage)
+// ----------------------------------------------------------------------------
+
+// AgentSettingsFormData drives the agent settings form. Token fields render the
+// MASKED value (from the service's maskToken helper) only as a placeholder —
+// the plaintext never leaves the server. An empty token submit means "keep the
+// existing value", never "clear", which the handler enforces by not sending a
+// nil/empty pointer for an untouched field. Errors keyed by field name plus
+// the "form" banner key.
+type AgentSettingsFormData struct {
+	ActionURL string
+	CancelURL string
+	Values    AgentSettingsFormValues
+	Errors    map[string]string
+}
+
+// AgentSettingsFormValues holds the non-secret settings plus the masked token
+// previews. SubscriptionTokenMask / AnthropicAPIKeyMask are display-only.
+type AgentSettingsFormValues struct {
+	AuthMode               string
+	SubscriptionTokenMask  string // masked preview, "" when unset
+	AnthropicAPIKeyMask    string // masked preview, "" when unset
+	MaxConcurrent          string
+	GlobalMaxBudgetUSD     string
+	RuntimePath            string
+	TranscriptDir          string
+}
+
+// AgentSettings renders the agent subsystem settings as a native POST. Token
+// fields are password inputs whose placeholder shows the masked stored value;
+// leaving them blank keeps the existing secret. We NEVER render plaintext.
+templ AgentSettings(d layout.ShellData, f AgentSettingsFormData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Agents
+			</a>
+		</div>
+		@components.PageHeader("Agent settings", "Credentials and runtime limits for scheduled agent runs") {
+		}
+		<form method="post" action={ templ.SafeURL(f.ActionURL) } class="card max-w-2xl space-y-5 p-6">
+			@components.FormError(f.Errors["form"])
+			@components.SelectField("auth_mode", "Authentication mode", agentAuthModeOptions, f.Values.AuthMode, "", f.Errors["auth_mode"])
+			@components.FieldAttrs("subscription_token", "Subscription token", "", f.Errors["subscription_token"], templ.Attributes{
+				"type":          "password",
+				"autocomplete":  "off",
+				"placeholder":   agentTokenPlaceholder(f.Values.SubscriptionTokenMask),
+			})
+			@components.FieldAttrs("anthropic_api_key", "Anthropic API key", "", f.Errors["anthropic_api_key"], templ.Attributes{
+				"type":          "password",
+				"autocomplete":  "off",
+				"placeholder":   agentTokenPlaceholder(f.Values.AnthropicAPIKeyMask),
+			})
+			<p class="text-xs text-muted-foreground">Leave a credential blank to keep the stored value. The masked preview never reveals the secret.</p>
+			<div class="grid gap-4 sm:grid-cols-2">
+				@components.FieldAttrs("max_concurrent", "Max concurrent runs", f.Values.MaxConcurrent, f.Errors["max_concurrent"], templ.Attributes{
+					"type":      "number",
+					"min":       "1",
+					"max":       "50",
+					"inputmode": "numeric",
+				})
+				@components.FieldAttrs("global_max_budget_usd", "Global max budget (USD)", f.Values.GlobalMaxBudgetUSD, f.Errors["global_max_budget_usd"], templ.Attributes{
+					"type":        "number",
+					"min":         "0",
+					"max":         "1000",
+					"step":        "0.01",
+					"inputmode":   "decimal",
+					"placeholder": "optional ceiling per run",
+				})
+			</div>
+			@components.FieldAttrs("runtime_path", "Runtime path", f.Values.RuntimePath, f.Errors["runtime_path"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "path to breadbox-agent binary (blank = auto-locate)",
+			})
+			@components.FieldAttrs("transcript_dir", "Transcript directory", f.Values.TranscriptDir, f.Errors["transcript_dir"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "transcripts/agents",
+			})
+			@components.FormActions() {
+				<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn-primary btn-sm">Save settings</button>
+			}
+		</form>
+	}
+}
+
+// agentTokenPlaceholder shows the masked stored secret as a placeholder, or a
+// neutral hint when nothing is stored. Never the plaintext.
+func agentTokenPlaceholder(mask string) string {
+	if mask == "" {
+		return "not set"
+	}
+	return "stored: " + mask
 }

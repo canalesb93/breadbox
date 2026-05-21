@@ -13,6 +13,7 @@ import (
 templ RulesList(d layout.ShellData, rules []service.TransactionRuleResponse) {
 	@layout.Shell(d) {
 		@components.PageHeader("Rules", "Automations applied to your transactions") {
+			<a href="/app/rules/new" class="btn-primary btn-sm">New rule</a>
 		}
 		if len(rules) == 0 {
 			@components.EmptyState("No rules yet", "Rules categorize and tag transactions automatically as they sync.") {
@@ -63,6 +64,7 @@ templ RuleDetail(d layout.ShellData, rule *service.TransactionRuleResponse) {
 		</div>
 		@components.PageHeader(rule.Name, ruleDetailSubtitle(rule)) {
 			@components.Badge(ruleEnabledVariant(rule.Enabled), ruleEnabledLabel(rule.Enabled))
+			<a href={ templ.SafeURL("/app/rules/" + rule.ShortID + "/edit") } class="btn-outline btn-sm">Edit</a>
 		}
 		<div class="grid gap-6 lg:grid-cols-2">
 			<div>
@@ -223,4 +225,230 @@ func ruleDetailSubtitle(r *service.TransactionRuleResponse) string {
 		parts = append(parts, "by "+r.CreatedByName)
 	}
 	return strings.Join(parts, " · ")
+}
+
+// ruleFormConditionRows is how many blank condition slots the no-JS form renders.
+// Conditions authored here are ANDed together (the common case); the rich
+// nested/OR/NOT builder is Phase 4. Blank rows are skipped server-side.
+const ruleFormConditionRows = 5
+
+// ruleFormActionRows is how many action slots the form renders.
+const ruleFormActionRows = 4
+
+// RuleFormRow is a single condition row's submitted/prefilled values.
+type RuleFormRow struct {
+	Field string
+	Op    string
+	Value string
+}
+
+// RuleFormAction is a single action row's submitted/prefilled values. Target is
+// the slug (set_category/add_tag/remove_tag) or the comment text (add_comment).
+type RuleFormAction struct {
+	Type   string
+	Target string
+}
+
+// RuleFormValues is the editable field set, pre-filled on edit and on error re-render.
+type RuleFormValues struct {
+	Name       string
+	Enabled    bool
+	Trigger    string
+	Priority   string
+	Conditions []RuleFormRow
+	Actions    []RuleFormAction
+}
+
+// RuleFormData drives the create/edit rule form. Mode flips the title + verbs.
+// Errors is keyed by field name ("name", "trigger", "priority", "actions") plus
+// the reserved "form" key for a top-level banner. CategoryOptions/TagOptions feed
+// the per-row target selects (when present); otherwise the row falls back to a
+// free-text target input.
+type RuleFormData struct {
+	Mode            string // "create" or "edit"
+	ActionURL       string
+	CancelURL       string
+	Values          RuleFormValues
+	Errors          map[string]string
+	CategoryOptions []components.Option
+}
+
+func (f RuleFormData) isEdit() bool { return f.Mode == "edit" }
+
+func (f RuleFormData) title() string {
+	if f.isEdit() {
+		return "Edit rule"
+	}
+	return "New rule"
+}
+
+func (f RuleFormData) submitLabel() string {
+	if f.isEdit() {
+		return "Save changes"
+	}
+	return "Create rule"
+}
+
+// padRows ensures the form always renders ruleFormConditionRows condition slots,
+// pre-filling the first ones from existing values.
+func (f RuleFormData) conditionRows() []RuleFormRow {
+	return padConditionRows(f.Values.Conditions)
+}
+
+func (f RuleFormData) actionRows() []RuleFormAction {
+	return padActionRows(f.Values.Actions)
+}
+
+func padConditionRows(rows []RuleFormRow) []RuleFormRow {
+	out := make([]RuleFormRow, ruleFormConditionRows)
+	copy(out, rows)
+	return out
+}
+
+func padActionRows(rows []RuleFormAction) []RuleFormAction {
+	out := make([]RuleFormAction, ruleFormActionRows)
+	copy(out, rows)
+	return out
+}
+
+func ruleFieldOptions() []components.Option {
+	return []components.Option{
+		{Value: "provider_name", Label: "Transaction name"},
+		{Value: "provider_merchant_name", Label: "Merchant name"},
+		{Value: "amount", Label: "Amount"},
+		{Value: "provider_category_primary", Label: "Provider category (primary)"},
+		{Value: "provider_category_detailed", Label: "Provider category (detailed)"},
+		{Value: "category", Label: "Assigned category"},
+		{Value: "pending", Label: "Pending"},
+		{Value: "provider", Label: "Provider"},
+		{Value: "account_name", Label: "Account name"},
+		{Value: "user_name", Label: "User name"},
+		{Value: "tags", Label: "Tags"},
+	}
+}
+
+func ruleOpOptions() []components.Option {
+	return []components.Option{
+		{Value: "eq", Label: "is"},
+		{Value: "neq", Label: "is not"},
+		{Value: "contains", Label: "contains"},
+		{Value: "not_contains", Label: "does not contain"},
+		{Value: "matches", Label: "matches (regex)"},
+		{Value: "in", Label: "in (comma-separated)"},
+		{Value: "gt", Label: "> (greater than)"},
+		{Value: "gte", Label: ">= (at least)"},
+		{Value: "lt", Label: "< (less than)"},
+		{Value: "lte", Label: "<= (at most)"},
+	}
+}
+
+func ruleTriggerOptions() []components.Option {
+	return []components.Option{
+		{Value: "on_create", Label: "On create (new transactions)"},
+		{Value: "on_change", Label: "On change (re-synced transactions)"},
+		{Value: "always", Label: "Always (create and change)"},
+	}
+}
+
+func ruleActionTypeOptions() []components.Option {
+	return []components.Option{
+		{Value: "set_category", Label: "Set category"},
+		{Value: "add_tag", Label: "Add tag"},
+		{Value: "remove_tag", Label: "Remove tag"},
+		{Value: "add_comment", Label: "Add comment"},
+	}
+}
+
+// RuleForm renders the create/edit rule form as a native POST. Conditions are
+// authored as a flat list of leaf rows ANDed together; actions are a flat list.
+// The nested/OR/NOT drag-drop builder is Phase 4.
+templ RuleForm(d layout.ShellData, f RuleFormData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Cancel
+			</a>
+		</div>
+		@components.PageHeader(f.title(), "") {
+		}
+		<form method="post" action={ templ.SafeURL(f.ActionURL) } class="card max-w-2xl space-y-6 p-6">
+			@components.FormError(f.Errors["form"])
+			@components.FieldAttrs("name", "Name", f.Values.Name, f.Errors["name"], templ.Attributes{
+				"type":      "text",
+				"required":  true,
+				"autofocus": true,
+				"maxlength": "200",
+			})
+			<div class="grid gap-4 sm:grid-cols-2">
+				@components.SelectField("trigger", "Trigger", ruleTriggerOptions(), f.Values.Trigger, "", f.Errors["trigger"])
+				@components.FieldAttrs("priority", "Priority", f.Values.Priority, f.Errors["priority"], templ.Attributes{
+					"type":        "number",
+					"inputmode":   "numeric",
+					"min":         "0",
+					"placeholder": "0",
+				})
+			</div>
+			@components.CheckboxField("enabled", "Enabled", f.Values.Enabled)
+			<div class="space-y-3">
+				<div>
+					<h2 class="text-sm font-medium">Conditions</h2>
+					<p class="text-xs text-muted-foreground">All conditions must match (AND). Leave a row blank to skip it. Nested AND/OR groups are a later phase.</p>
+				</div>
+				if f.Errors["conditions"] != "" {
+					@components.FormError(f.Errors["conditions"])
+				}
+				for i, row := range f.conditionRows() {
+					<div class="grid gap-2 sm:grid-cols-[1fr_1fr_1.5fr]">
+						<select name="condition_field[]" class="input" aria-label={ fmt.Sprintf("Condition %d field", i+1) }>
+							<option value="" selected?={ row.Field == "" }>—</option>
+							for _, o := range ruleFieldOptions() {
+								<option value={ o.Value } selected?={ o.Value == row.Field }>{ o.Label }</option>
+							}
+						</select>
+						<select name="condition_op[]" class="input" aria-label={ fmt.Sprintf("Condition %d operator", i+1) }>
+							for _, o := range ruleOpOptions() {
+								<option value={ o.Value } selected?={ o.Value == row.Op }>{ o.Label }</option>
+							}
+						</select>
+						<input type="text" name="condition_value[]" value={ row.Value } class="input" placeholder="value" aria-label={ fmt.Sprintf("Condition %d value", i+1) }/>
+					</div>
+				}
+			</div>
+			<div class="space-y-3">
+				<div>
+					<h2 class="text-sm font-medium">Actions</h2>
+					<p class="text-xs text-muted-foreground">At least one action is required. Target is a category slug, tag slug, or comment text depending on the action.</p>
+				</div>
+				if f.Errors["actions"] != "" {
+					@components.FormError(f.Errors["actions"])
+				}
+				for i, act := range f.actionRows() {
+					<div class="grid gap-2 sm:grid-cols-[1fr_2fr]">
+						<select name="action_type[]" class="input" aria-label={ fmt.Sprintf("Action %d type", i+1) }>
+							<option value="" selected?={ act.Type == "" }>—</option>
+							for _, o := range ruleActionTypeOptions() {
+								<option value={ o.Value } selected?={ o.Value == act.Type }>{ o.Label }</option>
+							}
+						</select>
+						<input type="text" name="action_value[]" value={ act.Target } class="input" placeholder="category/tag slug or comment text" aria-label={ fmt.Sprintf("Action %d target", i+1) }/>
+					</div>
+				}
+				if len(f.CategoryOptions) > 0 {
+					<details class="text-xs text-muted-foreground">
+						<summary class="cursor-pointer">Available category slugs</summary>
+						<div class="mt-2 flex flex-wrap gap-1.5">
+							for _, o := range f.CategoryOptions {
+								<code class="rounded bg-muted px-1.5 py-0.5">{ o.Value }</code>
+							}
+						</div>
+					</details>
+				}
+			</div>
+			@components.FormActions() {
+				<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn-primary btn-sm">{ f.submitLabel() }</button>
+			}
+		</form>
+	}
 }
