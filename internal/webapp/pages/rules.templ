@@ -229,11 +229,13 @@ func ruleDetailSubtitle(r *service.TransactionRuleResponse) string {
 
 // ruleFormConditionRows is how many blank condition slots the no-JS form renders.
 // Conditions authored here are ANDed together (the common case); the rich
-// nested/OR/NOT builder is Phase 4. Blank rows are skipped server-side.
-const ruleFormConditionRows = 5
+// nested/OR/NOT builder is Phase 4. Blank rows are skipped server-side. The
+// rule-builder island (assets/js/islands/rule-builder.ts) adds/removes rows past
+// this count when JS is on — these are just the always-present no-JS defaults.
+const ruleFormConditionRows = 3
 
 // ruleFormActionRows is how many action slots the form renders.
-const ruleFormActionRows = 4
+const ruleFormActionRows = 2
 
 // RuleFormRow is a single condition row's submitted/prefilled values.
 type RuleFormRow struct {
@@ -359,10 +361,54 @@ func ruleActionTypeOptions() []components.Option {
 	}
 }
 
+// conditionRow renders one condition leaf row. label seeds the aria-label index for
+// server-rendered rows; the island's cloned rows reuse this exact markup (via the
+// hidden <template>) so the []-names stay identical and parseRuleForm is unchanged.
+// The drag handle slot is omitted — condition order is cosmetic (ANDed leaves).
+templ conditionRow(label string, row RuleFormRow) {
+	<div class="rule-row grid items-center gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto]" data-rule-row>
+		<select name="condition_field[]" class="input" aria-label={ label + " field" }>
+			<option value="" selected?={ row.Field == "" }>—</option>
+			for _, o := range ruleFieldOptions() {
+				<option value={ o.Value } selected?={ o.Value == row.Field }>{ o.Label }</option>
+			}
+		</select>
+		<select name="condition_op[]" class="input" aria-label={ label + " operator" }>
+			for _, o := range ruleOpOptions() {
+				<option value={ o.Value } selected?={ o.Value == row.Op }>{ o.Label }</option>
+			}
+		</select>
+		<input type="text" name="condition_value[]" value={ row.Value } class="input" placeholder="value" aria-label={ label + " value" }/>
+		<button type="button" class="btn-ghost btn-icon shrink-0 text-lg leading-none text-muted-foreground" data-rule-remove aria-label={ "Remove " + label } hidden data-rule-jsonly>×</button>
+	</div>
+}
+
+// actionRow renders one action row. Action order can matter, so each row carries a
+// drag handle the island activates (native HTML5 DnD). Same []-name contract as above.
+templ actionRow(label string, act RuleFormAction) {
+	<div class="rule-row grid items-center gap-2 sm:grid-cols-[auto_1fr_2fr_auto]" data-rule-row>
+		<span class="hidden cursor-grab select-none px-1 text-muted-foreground sm:inline" data-rule-drag data-rule-jsonly hidden aria-hidden="true" title="Drag to reorder">⋮⋮</span>
+		<select name="action_type[]" class="input" aria-label={ label + " type" }>
+			<option value="" selected?={ act.Type == "" }>—</option>
+			for _, o := range ruleActionTypeOptions() {
+				<option value={ o.Value } selected?={ o.Value == act.Type }>{ o.Label }</option>
+			}
+		</select>
+		<input type="text" name="action_value[]" value={ act.Target } class="input" placeholder="category/tag slug or comment text" aria-label={ label + " target" }/>
+		<button type="button" class="btn-ghost btn-icon shrink-0 text-lg leading-none text-muted-foreground" data-rule-remove aria-label={ "Remove " + label } hidden data-rule-jsonly>×</button>
+	</div>
+}
+
 // RuleForm renders the create/edit rule form as a native POST. Conditions are
 // authored as a flat list of leaf rows ANDed together; actions are a flat list.
-// The nested/OR/NOT drag-drop builder is Phase 4.
+//
+// Progressive enhancement: the rows below render server-side and submit as-is with no
+// JS. The page-scoped rule-builder island (assets/js/islands/rule-builder.ts) hydrates
+// the [data-rule-group] wrappers to add/remove rows (cloning the hidden <template>) and
+// drag-reorder action rows — all keeping the []-names so parseRuleForm is untouched.
+// The nested/OR/NOT condition builder is still Phase 4.
 templ RuleForm(d layout.ShellData, f RuleFormData) {
+	<script type="module" src={ layout.IslandSrc("rule-builder") }></script>
 	@layout.Shell(d) {
 		<div class="mb-4">
 			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
@@ -390,7 +436,7 @@ templ RuleForm(d layout.ShellData, f RuleFormData) {
 				})
 			</div>
 			@components.CheckboxField("enabled", "Enabled", f.Values.Enabled)
-			<div class="space-y-3">
+			<div class="space-y-3" data-rule-group="condition">
 				<div>
 					<h2 class="text-sm font-medium">Conditions</h2>
 					<p class="text-xs text-muted-foreground">All conditions must match (AND). Leave a row blank to skip it. Nested AND/OR groups are a later phase.</p>
@@ -398,42 +444,33 @@ templ RuleForm(d layout.ShellData, f RuleFormData) {
 				if f.Errors["conditions"] != "" {
 					@components.FormError(f.Errors["conditions"])
 				}
-				for i, row := range f.conditionRows() {
-					<div class="grid gap-2 sm:grid-cols-[1fr_1fr_1.5fr]">
-						<select name="condition_field[]" class="input" aria-label={ fmt.Sprintf("Condition %d field", i+1) }>
-							<option value="" selected?={ row.Field == "" }>—</option>
-							for _, o := range ruleFieldOptions() {
-								<option value={ o.Value } selected?={ o.Value == row.Field }>{ o.Label }</option>
-							}
-						</select>
-						<select name="condition_op[]" class="input" aria-label={ fmt.Sprintf("Condition %d operator", i+1) }>
-							for _, o := range ruleOpOptions() {
-								<option value={ o.Value } selected?={ o.Value == row.Op }>{ o.Label }</option>
-							}
-						</select>
-						<input type="text" name="condition_value[]" value={ row.Value } class="input" placeholder="value" aria-label={ fmt.Sprintf("Condition %d value", i+1) }/>
-					</div>
-				}
+				<div class="space-y-2" data-rule-rows>
+					for i, row := range f.conditionRows() {
+						@conditionRow(fmt.Sprintf("Condition %d", i+1), row)
+					}
+				</div>
+				<template data-rule-rowtpl>
+					@conditionRow("Condition", RuleFormRow{})
+				</template>
+				<button type="button" class="btn-outline btn-sm" data-rule-add hidden data-rule-jsonly>Add condition</button>
 			</div>
-			<div class="space-y-3">
+			<div class="space-y-3" data-rule-group="action">
 				<div>
 					<h2 class="text-sm font-medium">Actions</h2>
-					<p class="text-xs text-muted-foreground">At least one action is required. Target is a category slug, tag slug, or comment text depending on the action.</p>
+					<p class="text-xs text-muted-foreground">At least one action is required. Target is a category slug, tag slug, or comment text depending on the action. Drag to reorder.</p>
 				</div>
 				if f.Errors["actions"] != "" {
 					@components.FormError(f.Errors["actions"])
 				}
-				for i, act := range f.actionRows() {
-					<div class="grid gap-2 sm:grid-cols-[1fr_2fr]">
-						<select name="action_type[]" class="input" aria-label={ fmt.Sprintf("Action %d type", i+1) }>
-							<option value="" selected?={ act.Type == "" }>—</option>
-							for _, o := range ruleActionTypeOptions() {
-								<option value={ o.Value } selected?={ o.Value == act.Type }>{ o.Label }</option>
-							}
-						</select>
-						<input type="text" name="action_value[]" value={ act.Target } class="input" placeholder="category/tag slug or comment text" aria-label={ fmt.Sprintf("Action %d target", i+1) }/>
-					</div>
-				}
+				<div class="space-y-2" data-rule-rows>
+					for i, act := range f.actionRows() {
+						@actionRow(fmt.Sprintf("Action %d", i+1), act)
+					}
+				</div>
+				<template data-rule-rowtpl>
+					@actionRow("Action", RuleFormAction{})
+				</template>
+				<button type="button" class="btn-outline btn-sm" data-rule-add hidden data-rule-jsonly>Add action</button>
 				if len(f.CategoryOptions) > 0 {
 					<details class="text-xs text-muted-foreground">
 						<summary class="cursor-pointer">Available category slugs</summary>

@@ -54,6 +54,8 @@ Core surfaces AT PARITY. Reports/Insights/Reviews are PLACEHOLDER-MATCHED (SPA a
 **Loop end-state also:** #15 drag-drop rule builder + asset fingerprinting; confirm()→<dialog> on api-key revoke; Playwright suite + mobile pass.
 
 ## Progress log (newest first)
+- 2026-05-21 07:0x — Heartbeat. 12 PRs; review-ready + deploy-correct. Next unit (delegated): drag-drop rule builder island (#15) — richer than the Phase 3 form editor (nested AND/OR/NOT + category/tag pickers). It's the last marquee parity nicety; will only merge if it's clean (form editor stays as the solid fallback). After this, only Tier 3/4 minor items + cutover (Ricardo) remain — loop is winding toward done.
+- 2026-05-21 06:1x — Asset fingerprinting MERGED (PR #1413): app.css/app.js content-hashed + immutable; islands now immutable too (fixed looksFingerprinted for base32). Stale-CSS-on-deploy SOLVED. 12 PRs total. Remaining loop items: drag-drop rule builder island (#15; fingerprinting half now done); Tier 3/4 (settings modals-vs-pages, prompt builder, backups, household). Cutover proposal still awaiting Ricardo.
 - 2026-05-21 06:0x — Heartbeat. 11 PRs; review-ready. Next unit (delegated): asset fingerprinting for app.css/app.js (extend the islands manifest+IslandSrc pattern to a general AssetURL resolver; embed.go already long-caches fingerprinted names via looksFingerprinted). Fixes stale-CSS-on-deploy. Then drag-drop rule builder, Tier 3/4.
 - 2026-05-21 05:1x — Polish batch MERGED (PR #1412): native <dialog> for api-key revoke (no confirm()), mobile tx-filter collapse (<details>). 11 PRs total. Validated. NOTE: stale-CSS cache bit validation a 3rd time (had to hard-reload to see new .dialog styles) — **asset fingerprinting (#15) is now the top remaining item** (deploy correctness; islands already fingerprinted, app.css/app.js are not). Next cron cycle: do fingerprinting, then drag-drop builder, then Tier 3/4. Cutover still awaiting Ricardo.
 - 2026-05-21 05:0x — Heartbeat. 10 PRs merged; cutover proposal awaiting Ricardo. Next unit (delegated): polish batch — (1) confirm()→native <dialog> on api-key revoke (per no-blocking-dialogs convention), (2) collapse tx filter bar behind <details> on mobile. Then #15 (drag-drop builder + asset fingerprinting) + Tier 3/4 remain.
@@ -104,5 +106,5 @@ Once /app reaches functional+flow parity with the SPA and the foundation is soli
    improve mobile responsiveness. Iterate until clean.
 
 ## Notifications
-- last_notified_epoch: 1779364689  (2026-05-21 ~06:0x — heartbeat; pushed "11 PRs, review-ready, fingerprinting next")
+- last_notified_epoch: 1779368309  (2026-05-21 ~07:0x — heartbeat; pushed "12 PRs, fingerprinted, drag-drop builder next")
 - cadence: hourly at :37 via cron job `aecc8a60` (re-anchors plan + sends push + continues work)

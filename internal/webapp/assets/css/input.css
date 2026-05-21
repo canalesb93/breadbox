@@ -184,6 +184,10 @@
   .palette-item.is-active { @apply bg-accent text-accent-foreground; }
   .palette-empty { @apply px-3.5 py-6 text-center text-sm text-muted-foreground; }
 
+  /* ---- Rule-builder island (assets/js/islands/rule-builder.ts) ---- */
+  /* The dragged action row dims while reordering; the rest is plain grid layout. */
+  .rule-row-dragging { @apply opacity-50; }
+
   /* ---- Native <dialog> confirmation (e.g. API-key revoke) ---- */
   /* showModal() gives us focus trap + Esc + backdrop for free; styling only here. */
   .dialog { @apply inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border bg-popover p-0 text-popover-foreground shadow-2xl; }

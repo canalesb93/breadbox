@@ -7,6 +7,6 @@ package layout
 // Assets maps a logical top-level asset name (e.g. "app.css") to its
 // content-hashed public URL under /app/static/. Resolve URLs via AssetURL.
 var Assets = map[string]string{
-	"app.css": "/app/static/css/app-e5a7c0a2.css",
+	"app.css": "/app/static/css/app-6adc981c.css",
 	"app.js": "/app/static/js/app-9ec62772.js",
 }
