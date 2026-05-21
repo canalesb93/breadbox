@@ -54,12 +54,17 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
 RUN go install github.com/a-h/templ/cmd/templ@latest \
     && /go/bin/templ generate
 
-# Build CSS: download tailwindcss-extra (musl variant for Alpine) and compile input.css
+# Build CSS: download tailwindcss-extra (musl variant for Alpine) and compile
+# both the v1 admin stylesheet (input.css → static/css/styles.css) and the v3
+# webapp stylesheet (internal/webapp/assets/css/input.css → .../static/css/app.css).
+# app.css is committed, but rebuilding here guarantees the deployed image embeds
+# CSS freshly compiled from the source input.css.
 RUN apk add --no-cache libstdc++ libgcc \
     && ARCH=$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/') \
     && wget -qO tailwindcss-extra "https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-linux-${ARCH}-musl" \
     && chmod +x tailwindcss-extra \
-    && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify
+    && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify \
+    && ./tailwindcss-extra -i internal/webapp/assets/css/input.css -o internal/webapp/static/css/app.css --minify
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \

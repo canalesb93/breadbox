@@ -101,8 +101,12 @@ jobs:
         run: |
           templ generate
           # Prepend //go:build !headless && !lite to every generated templ
-          # file in internal/templates/components. Mirrors `make templ`.
-          find internal/templates/components -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do
+          # file in internal/templates/components AND internal/webapp (the v3
+          # MPA). Mirrors `make templ` (which globs both dirs). Without the
+          # webapp glob, its *_templ.go would be untagged in CI and would
+          # compile under -tags=headless/-tags=lite, dragging in excluded
+          # packages and reddening those matrix cells.
+          find internal/templates/components internal/webapp -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do
             if ! head -1 "$f" | grep -q '^//go:build'; then
               printf '//go:build !headless && !lite\n\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
             fi
@@ -116,7 +120,13 @@ jobs:
           fi
 
       - name: Build CSS
-        run: make css
+        # webapp-css builds internal/webapp/static/css/app.css, embedded via
+        # //go:embed all:static in the v3 MPA. It is committed, so the default
+        # build compiles without it — but rebuilding keeps the embed in sync
+        # with assets/css/input.css for the jobs that compile internal/webapp.
+        run: |
+          make css
+          make webapp-css
 
       # The v2 SPA bundle is intentionally NOT built here: //go:embed
       # all:dist is satisfied by the committed web/dist/.gitkeep, and
@@ -193,7 +203,10 @@ jobs:
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
           templ generate
-          find internal/templates/components -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do
+          # Tag both internal/templates/components AND internal/webapp. Under
+          # -tags=headless the webapp *_templ.go MUST carry !headless or they
+          # compile here and pull in dashboard-only deps, reddening this job.
+          find internal/templates/components internal/webapp -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do
             if ! head -1 "$f" | grep -q '^//go:build'; then
               printf '//go:build !headless && !lite\n\n' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
             fi
@@ -204,7 +217,9 @@ jobs:
         # favicon) still needs static/css/styles.css to exist for the
         # `//go:embed all:css` directive to resolve. Headless builds don't
         # serve the CSS at runtime — but the file has to be present to
-        # compile.
+        # compile. The v3 webapp's app.css is not needed here: every webapp
+        # .go (incl. the //go:embed file) is excluded by !headless, so it is
+        # not in the headless build graph (stubs_headless.go embeds nothing).
         run: make css
 
       - name: go build -tags=headless
@@ -333,6 +348,15 @@ jobs:
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
           templ generate
+
+      - name: Build CSS (v1 admin + v3 webapp)
+        # The released default binary embeds both static/css/styles.css
+        # (//go:embed all:css, gitignored) and internal/webapp/static/css/app.css
+        # (//go:embed all:static). Build both from source via the standalone
+        # Tailwind CLI (mirrors `make css` + `make webapp-css`).
+        run: |
+          make css
+          make webapp-css
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
