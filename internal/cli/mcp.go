@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"breadbox/internal/app"
@@ -75,15 +76,17 @@ func runMCPStdio(parent context.Context, version string) error {
 	}
 	defer a.DB.Close()
 
-	// Ensure a system-actor API key row exists so ContextWithAPIKey can
-	// point at a real `actor_type='system'` record. The plaintext is never
-	// exposed externally — this row is purely a DB-side anchor for the
-	// audit trail.
-	systemKey, err := ensureStdioSystemKey(ctx, a.Queries)
+	// Resolve the actor: if BREADBOX_API_KEY is set in the env and validates
+	// against a live row, use it — this is how the in-app agent orchestrator
+	// attributes annotations to the per-run agent key (actor_type='agent',
+	// actor_name=<slug>) instead of the stdio singleton. Otherwise fall back
+	// to the system-actor singleton row so Claude Desktop and other plain
+	// stdio clients still get a real `api_keys` row to point at.
+	actorKey, scope, err := resolveStdioActorKey(ctx, a.Service, a.Queries)
 	if err != nil {
-		return fmt.Errorf("ensure stdio system key: %w", err)
+		return fmt.Errorf("resolve stdio actor key: %w", err)
 	}
-	ctx = service.ContextWithAPIKey(ctx, systemKey)
+	ctx = service.ContextWithAPIKey(ctx, actorKey)
 
 	mcpServer := breadboxmcp.NewMCPServer(a.Service, version)
 
@@ -100,7 +103,7 @@ func runMCPStdio(parent context.Context, version string) error {
 		Mode:          mcpCfg.Mode,
 		DisabledTools: mcpCfg.DisabledTools,
 		Instructions:  mcpCfg.Instructions,
-		APIKeyScope:   "full_access", // stdio has no API key surface
+		APIKeyScope:   scope,
 	})
 
 	sigCh := make(chan os.Signal, 1)
@@ -112,6 +115,33 @@ func runMCPStdio(parent context.Context, version string) error {
 
 	logger.Info("starting MCP stdio server", "version", version)
 	return server.Run(ctx, &mcpsdk.StdioTransport{})
+}
+
+// resolveStdioActorKey picks the api_keys row that should be attached to
+// the stdio session's context. When BREADBOX_API_KEY is set and validates
+// (the orchestrator passes its per-run agent key here), use that row so
+// annotations and audit events are attributed to the agent. Falls back to
+// the stdio singleton (actor_type='system', actor_name='stdio') for
+// unauthenticated callers like a developer's Claude Desktop pointing at
+// the binary directly. Returns the resolved key plus the scope BuildServer
+// should advertise (so a read_only agent key narrows the exposed toolset).
+func resolveStdioActorKey(ctx context.Context, svc *service.Service, q *db.Queries) (*db.ApiKey, string, error) {
+	if token := strings.TrimSpace(os.Getenv("BREADBOX_API_KEY")); token != "" {
+		key, err := svc.ValidateAPIKey(ctx, token)
+		if err == nil {
+			return key, key.Scope, nil
+		}
+		// Fall through to the singleton on validation failure so a
+		// stale/typo'd env var doesn't break the stdio entry point.
+		// The MCP child can still serve read-only tools under the
+		// system actor; the orchestrator's mint-and-revoke contract
+		// means a valid agent key is always present for real runs.
+	}
+	key, err := ensureStdioSystemKey(ctx, q)
+	if err != nil {
+		return nil, "", err
+	}
+	return key, "full_access", nil
 }
 
 // stdioSystemKeyPrefix is the unique prefix of the singleton stdio key
