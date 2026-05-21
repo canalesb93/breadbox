@@ -35,8 +35,16 @@ subagents, validate every surface with Chrome DevTools, merge PRs into this spri
 - [x] Phase 3 — Write surfaces/forms + settings **DONE & MERGED** (PR #1404). Forms for category/tag/
       api-key/rule/agent + agent settings + real /app/settings + setup-account. Validated (creates persist).
 - [ ] Phase 4 — Islands (⌘K, dnd)
-- [ ] Phase 5 — Streaming (Datastar+SSE)
-- [ ] Phase 6 — Cutover + parity audit
+- [x] Phase 5 — Streaming **DONE & MERGED** (PR #1407): agent-run live transcript via SSE + static fallback. Follow-ups: sync-progress + activity-timeline streaming.
+- [ ] Phase 6 — Cutover + parity audit (do NOT retire SPA until parity audited)
+
+## Parity gaps remaining (vs v2 SPA)
+- Home/overview dashboard: v3 Home is a placeholder; SPA has metrics/charts (task #16, building). Main visible gap.
+- Reports/Reviews/Insights: v3 placeholders. VERIFY whether the SPA also stubs these (plan said "match SPA's placeholder state" — if so, already at parity). Audit in Phase 6.
+- Drag-drop rule builder (#15): v3 has form-based rule editor (functional parity); SPA had @dnd-kit interaction.
+- Sync-progress + activity-timeline SSE streaming (Phase 5 follow-ups).
+- Asset fingerprinting for app.css/app.js (#15); confirm()→<dialog> on api-key revoke.
+- Mobile polish + Playwright suite (loop end-state #3).
 
 ## Progress log (newest first)
 - 2026-05-21 02:2x — Phase 4 islands MERGED (PR #1406): esbuild-via-Go pipeline + ⌘K command palette (validated, centered, no console errors). 5 PRs merged; v3 is a near-complete deploy-ready app. Deferred (task #15): drag-drop rule builder island + app.css/js fingerprinting (currently max-age=3600 → stale CSS up to 1h post-deploy; the islands manifest already fingerprints). NEXT: Phase 5 streaming (Datastar+SSE: sync progress, agent run live transcript, activity timeline) — delegated. Then parity audit → Phase 6 cutover (302 /v2→/app) → loop end-state (deprecate v1+SPA, Playwright polish/mobile). NOTE: do NOT retire the SPA until parity (incl. streaming) is reached + audited; SPA still has streaming/charts/reviews v3 lacks.
