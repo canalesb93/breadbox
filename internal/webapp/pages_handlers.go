@@ -5,6 +5,7 @@ package webapp
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,10 +13,50 @@ import (
 	"breadbox/internal/webapp/pages"
 )
 
-// home is the authenticated overview landing. Full overview content lands in Phase 2;
-// for now it confirms the shell + auth + nav loop works end to end.
+// home is the authenticated overview landing: a real dashboard composed from the
+// same service methods the SPA/MCP use — net position, recent spending, a
+// spending-by-category breakdown, and recent activity. Multi-currency safe
+// (balances are bucketed by currency; we surface the dominant bucket and never
+// sum across iso_currency_code).
 func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
-	render(w, r, http.StatusOK, pages.Home(h.shellData(r, "Home")))
+	ctx := r.Context()
+	svc := h.app.Service
+
+	vm := pages.HomeView{}
+
+	// Dataset scope + freshness (transaction count, errored connections, etc.).
+	if stats, err := svc.GetOverviewStats(ctx); err == nil {
+		vm.TransactionCount = stats.Scope.TransactionCount
+		vm.NeedsReviewCount = stats.Backlog.NeedsReviewCount
+		vm.ErroredConnections = stats.Freshness.ErroredConnectionCount
+		if stats.Freshness.LastSyncAt != nil {
+			vm.LastSyncAt = *stats.Freshness.LastSyncAt
+		}
+	}
+
+	// Balances → net position bucketed by currency (depository minus credit/loan).
+	// Dependent-linked accounts are excluded from totals, matching the SPA/MCP.
+	if accounts, err := svc.ListAccounts(ctx, nil); err == nil {
+		vm.FillBalances(accounts)
+	}
+
+	// Current-month spending-by-category (SpendingOnly = positive amounts = money
+	// out). GroupBy=category already excludes dependent-linked rows and pending.
+	monthStart := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+	if cat, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		StartDate:    &monthStart,
+		GroupBy:      "category",
+		SpendingOnly: true,
+	}); err == nil {
+		vm.FillSpending(cat)
+	}
+
+	// Recent activity: latest transactions (default sort = date desc).
+	if list, err := svc.ListTransactions(ctx, service.TransactionListParams{Limit: 8}); err == nil {
+		vm.Recent = list.Transactions
+	}
+
+	render(w, r, http.StatusOK, pages.Home(h.shellData(r, "Home"), vm))
 }
 
 // accountsList renders all accounts (the first ported read surface).

@@ -1,25 +1,332 @@
 package pages
 
 import (
+	"sort"
+	"strconv"
+
+	"breadbox/internal/service"
+	"breadbox/internal/timefmt"
 	"breadbox/internal/webapp/components"
 	"breadbox/internal/webapp/layout"
 )
 
-// Home is the authenticated landing. Real overview content arrives in Phase 2; this
-// proves the shell + auth + nav + View Transition loop.
-templ Home(d layout.ShellData) {
-	@layout.Shell(d) {
-		@components.PageHeader("Home", "Your household at a glance") {
+// HomeView is the overview dashboard's view model. The handler fills it from the
+// shared service layer (GetOverviewStats, ListAccounts, GetTransactionSummary,
+// ListTransactions) and the page renders it. All money is bucketed per currency
+// — we never sum across iso_currency_code; the dominant bucket is surfaced and a
+// "+N currencies" hint flags the rest.
+type HomeView struct {
+	// Scope / freshness.
+	TransactionCount   int64
+	NeedsReviewCount   int64
+	ErroredConnections int
+	LastSyncAt         string // RFC3339, or "" when nothing has synced
+
+	// Net position (depository minus credit/loan), dominant currency bucket.
+	NetAmount      float64
+	NetCurrency    string
+	CashAmount     float64
+	CreditAmount   float64
+	ActiveAccounts int
+	CurrencyCount  int
+
+	// Current-month spending.
+	MonthSpend         float64
+	MonthSpendCurrency string
+	MonthSpendMixed    bool // true when spending spans multiple currencies
+	SpendingRows       []spendRow
+
+	// Recent activity.
+	Recent []service.TransactionResponse
+}
+
+type spendRow struct {
+	Label    string
+	Amount   float64
+	Currency string
+	Color    string
+}
+
+// fillBalances aggregates account balances into per-currency net/cash/credit
+// buckets, then picks the dominant currency (largest absolute net). Mirrors the
+// SPA's HomeStats logic: depository adds to net, credit/loan subtracts; dependent
+// linked accounts are excluded from the household totals.
+func (v *HomeView) FillBalances(accounts []service.AccountResponse) {
+	net := map[string]float64{}
+	cash := map[string]float64{}
+	credit := map[string]float64{}
+	for _, a := range accounts {
+		if a.IsDependentLinked || a.BalanceCurrent == nil {
+			continue
 		}
-		<div class="card p-6">
-			<p class="text-sm text-muted-foreground">
-				Welcome to the new Breadbox app. Navigation, history, scroll restoration and
-				page transitions are owned by the browser — try the sidebar and the back button.
-			</p>
-			<p class="mt-2 text-sm text-muted-foreground">
-				Overview metrics and charts land in Phase 2. Start with
-				<a href="/app/accounts" class="font-medium text-foreground underline underline-offset-4">Accounts</a>.
-			</p>
+		v.ActiveAccounts++
+		cur := "USD"
+		if a.IsoCurrencyCode != nil && *a.IsoCurrencyCode != "" {
+			cur = *a.IsoCurrencyCode
+		}
+		bal := *a.BalanceCurrent
+		switch a.Type {
+		case "depository":
+			cash[cur] += bal
+			net[cur] += bal
+		case "credit", "loan":
+			credit[cur] += bal
+			net[cur] -= bal
+		}
+	}
+	v.CurrencyCount = len(net)
+	// Dominant currency = largest |net|.
+	best := ""
+	bestAbs := -1.0
+	for cur, amt := range net {
+		if abs(amt) > bestAbs {
+			bestAbs = abs(amt)
+			best = cur
+		}
+	}
+	if best == "" {
+		best = "USD"
+	}
+	v.NetCurrency = best
+	v.NetAmount = net[best]
+	v.CashAmount = cash[best]
+	v.CreditAmount = credit[best]
+}
+
+// fillSpending takes a GroupBy=category SpendingOnly summary and keeps the top
+// rows for the chart, plus the dominant-currency month total. Summary rows are
+// already ordered by SUM(amount) DESC. Multi-currency datasets get a flag rather
+// than a bogus cross-currency sum.
+func (v *HomeView) FillSpending(res *service.TransactionSummaryResult) {
+	if res == nil {
+		return
+	}
+	// Per-currency totals so we never sum across currencies.
+	byCur := map[string]float64{}
+	for _, row := range res.Summary {
+		byCur[row.IsoCurrencyCode] += row.TotalAmount
+	}
+	v.MonthSpendMixed = len(byCur) > 1
+	best := ""
+	bestVal := -1.0
+	for cur, amt := range byCur {
+		if amt > bestVal {
+			bestVal = amt
+			best = cur
+		}
+	}
+	if best == "" {
+		best = "USD"
+	}
+	v.MonthSpendCurrency = best
+	v.MonthSpend = byCur[best]
+
+	// Chart rows: top categories in the dominant currency (positive spend only).
+	rows := make([]spendRow, 0, len(res.Summary))
+	for _, r := range res.Summary {
+		if r.IsoCurrencyCode != best || r.TotalAmount <= 0 {
+			continue
+		}
+		label := "Uncategorized"
+		if r.Category != nil && *r.Category != "" {
+			label = *r.Category
+		}
+		color := ""
+		if r.CategoryColor != nil {
+			color = *r.CategoryColor
+		}
+		rows = append(rows, spendRow{Label: label, Amount: r.TotalAmount, Currency: best, Color: color})
+	}
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Amount > rows[j].Amount })
+	if len(rows) > 6 {
+		rows = rows[:6]
+	}
+	v.SpendingRows = rows
+}
+
+func abs(f float64) float64 {
+	if f < 0 {
+		return -f
+	}
+	return f
+}
+
+// maxSpend returns the largest category amount, used to scale bar fractions.
+func (v HomeView) maxSpend() float64 {
+	m := 0.0
+	for _, r := range v.SpendingRows {
+		if r.Amount > m {
+			m = r.Amount
+		}
+	}
+	return m
+}
+
+// netTone selects the value color token based on solvency.
+func (v HomeView) netTone() string {
+	if v.NetAmount >= 0 {
+		return "text-success"
+	}
+	return "text-destructive"
+}
+
+func (v HomeView) accountsHint() string {
+	n := strconv.Itoa(v.ActiveAccounts)
+	noun := "accounts"
+	if v.ActiveAccounts == 1 {
+		noun = "account"
+	}
+	hint := n + " " + noun
+	if v.CurrencyCount > 1 {
+		hint += " · " + strconv.Itoa(v.CurrencyCount) + " currencies"
+	}
+	return hint
+}
+
+// barRows converts the spending rows into the chart's BarRow shape, scaling each
+// to the largest category for the bar fill.
+func (v HomeView) barRows() []components.BarRow {
+	max := v.maxSpend()
+	out := make([]components.BarRow, 0, len(v.SpendingRows))
+	for _, r := range v.SpendingRows {
+		frac := 0.0
+		if max > 0 {
+			frac = r.Amount / max
+		}
+		amt := r.Amount
+		out = append(out, components.BarRow{
+			Label: r.Label,
+			Value: Money(&amt, &r.Currency),
+			Frac:  frac,
+			Color: r.Color,
+		})
+	}
+	return out
+}
+
+// Home is the authenticated overview dashboard.
+templ Home(d layout.ShellData, v HomeView) {
+	@layout.Shell(d) {
+		@components.PageHeader("Overview", "Balances, recent activity, and where your money went this month") {
+			<a href="/app/transactions" class="btn-outline btn-sm">
+				@components.Icon("transactions")
+				Transactions
+			</a>
+		}
+		if v.ErroredConnections > 0 {
+			<div class="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+				<span class="font-medium text-destructive">
+					{ strconv.Itoa(v.ErroredConnections) } { plural(v.ErroredConnections, "connection needs", "connections need") } attention.
+				</span>
+				<a href="/app/connections" class="ml-1 underline underline-offset-4">Review connections</a>
+			</div>
+		}
+		<!-- Metric row -->
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			<div class="card p-5">
+				<p class="text-sm text-muted-foreground">Net position</p>
+				<p class={ "mt-1 text-2xl font-semibold tracking-tight tabular-nums", v.netTone() }>
+					{ Money(&v.NetAmount, &v.NetCurrency) }
+				</p>
+				<p class="mt-1 text-xs text-muted-foreground">{ v.accountsHint() }</p>
+			</div>
+			@components.StatCard("Cash", Money(&v.CashAmount, &v.NetCurrency), "Depository balances")
+			@components.StatCard("Credit & loans", Money(&v.CreditAmount, &v.NetCurrency), "Outstanding balances")
+			@components.StatCard(monthSpendLabel(v), monthSpendValue(v), monthSpendSub(v))
+		</div>
+		<!-- Chart + recent activity -->
+		<div class="mt-6 grid gap-6 lg:grid-cols-3">
+			<div class="min-w-0 lg:col-span-2">
+				<div class="card p-5">
+					<div class="mb-4 flex items-center justify-between gap-3">
+						<h2 class="text-sm font-medium">Spending by category</h2>
+						<span class="text-xs text-muted-foreground">This month</span>
+					</div>
+					if len(v.SpendingRows) == 0 {
+						<p class="py-8 text-center text-sm text-muted-foreground">No spending recorded this month yet.</p>
+					} else {
+						@components.HBarChart(v.barRows())
+					}
+				</div>
+			</div>
+			<div class="min-w-0">
+				<div class="card p-5">
+					<div class="mb-4 flex items-center justify-between gap-3">
+						<h2 class="text-sm font-medium">Recent activity</h2>
+						<a href="/app/transactions" class="text-xs text-muted-foreground hover:underline">View all</a>
+					</div>
+					if len(v.Recent) == 0 {
+						<p class="py-8 text-center text-sm text-muted-foreground">No transactions yet.</p>
+					} else {
+						<ul class="-my-2 divide-y divide-border">
+							for _, t := range v.Recent {
+								<li>
+									<a href={ templ.SafeURL("/app/transactions/" + t.ShortID) } class="flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-accent/40">
+										<div class="min-w-0">
+											<p class="truncate text-sm font-medium">{ txName(t) }</p>
+											<p class="truncate text-xs text-muted-foreground">
+												{ t.Date }
+												if t.Pending {
+													· Pending
+												}
+											</p>
+										</div>
+										<span class="shrink-0 text-sm font-medium tabular-nums">{ Money(&t.Amount, t.IsoCurrencyCode) }</span>
+									</a>
+								</li>
+							}
+						</ul>
+					}
+				</div>
+			</div>
+		</div>
+		<!-- Dataset summary -->
+		<div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+			<span>{ strconv.FormatInt(v.TransactionCount, 10) } { plural64(v.TransactionCount, "transaction", "transactions") } tracked</span>
+			if v.NeedsReviewCount > 0 {
+				<span>·</span>
+				<a href="/app/transactions" class="hover:underline">
+					{ strconv.FormatInt(v.NeedsReviewCount, 10) } { plural64(v.NeedsReviewCount, "needs review", "need review") }
+				</a>
+			}
+			if v.LastSyncAt != "" {
+				<span>·</span>
+				<span>Last sync { timefmt.RelativeRFC3339(v.LastSyncAt) }</span>
+			}
 		</div>
 	}
+}
+
+// monthSpendLabel/Value present the month spend with a multi-currency hint when
+// spending spans more than one currency (we never sum across currencies).
+func monthSpendLabel(v HomeView) string {
+	if v.MonthSpendMixed {
+		return "Spent (top currency)"
+	}
+	return "Spent this month"
+}
+
+func monthSpendValue(v HomeView) string {
+	return Money(&v.MonthSpend, &v.MonthSpendCurrency)
+}
+
+func monthSpendSub(v HomeView) string {
+	if v.MonthSpendMixed {
+		return "Multiple currencies — top shown"
+	}
+	return "Spending this month"
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
+func plural64(n int64, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
