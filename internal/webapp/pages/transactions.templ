@@ -13,13 +13,18 @@ import (
 // Every field is query-param driven — the filter bar is a native GET form, so these
 // values round-trip through the URL with no JS.
 type TxFilters struct {
-	Search   string // ?search=
-	Account  string // ?account= (account short_id)
-	Category string // ?category= (category slug)
-	Start    string // ?start= (YYYY-MM-DD)
-	End      string // ?end= (YYYY-MM-DD)
-	Offset   int    // ?offset=
-	Limit    int    // page size
+	Search    string // ?search=
+	Account   string // ?account= (account short_id)
+	Category  string // ?category= (category slug)
+	Start     string // ?start= (YYYY-MM-DD)
+	End       string // ?end= (YYYY-MM-DD)
+	MinAmount string // ?min_amount=
+	MaxAmount string // ?max_amount=
+	Pending   string // ?pending= ("" all | "pending" | "posted")
+	SortBy    string // ?sort_by= ("date" | "amount")
+	SortOrder string // ?sort_order= ("desc" | "asc")
+	Offset    int    // ?offset=
+	Limit     int    // page size
 }
 
 // TransactionsList is a server-rendered data-table with a query-param filter bar and
@@ -58,6 +63,17 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 				<label for="tx-end" class="text-xs font-medium text-muted-foreground">To</label>
 				<input type="date" id="tx-end" name="end" value={ filters.End } class="input"/>
 			</div>
+			<div class="flex flex-col gap-1">
+				<label for="tx-min" class="text-xs font-medium text-muted-foreground">Min amount</label>
+				<input type="number" step="0.01" id="tx-min" name="min_amount" value={ filters.MinAmount } placeholder="0.00" class="input" inputmode="decimal" autocomplete="off"/>
+			</div>
+			<div class="flex flex-col gap-1">
+				<label for="tx-max" class="text-xs font-medium text-muted-foreground">Max amount</label>
+				<input type="number" step="0.01" id="tx-max" name="max_amount" value={ filters.MaxAmount } placeholder="0.00" class="input" inputmode="decimal" autocomplete="off"/>
+			</div>
+			@components.SelectField("pending", "Status", txnPendingOptions(), filters.Pending, "All", "")
+			@components.SelectField("sort_by", "Sort by", txnSortByOptions(), filters.SortBy, "", "")
+			@components.SelectField("sort_order", "Order", txnSortOrderOptions(), filters.SortOrder, "", "")
 			<div class="flex items-end gap-2 sm:col-span-2 lg:col-span-5">
 				<button type="submit" class="btn-primary">Filter</button>
 				<a href="/app/transactions" class="btn-ghost">Reset</a>
@@ -72,11 +88,25 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 					<table class="data-table">
 						<thead>
 							<tr>
-								<th>Date</th>
+								<th>
+									<a href={ templ.SafeURL(txnSortURL(filters, "date")) } class="inline-flex items-center gap-1 hover:underline">
+										Date
+										if filters.SortBy == "date" {
+							<span class="text-muted-foreground">{ txnSortArrow(filters.SortOrder) }</span>
+									}
+									</a>
+								</th>
 								<th>Description</th>
 								<th>Account</th>
 								<th>Category</th>
-								<th class="text-right">Amount</th>
+								<th class="text-right">
+									<a href={ templ.SafeURL(txnSortURL(filters, "amount")) } class="inline-flex items-center gap-1 hover:underline">
+										Amount
+										if filters.SortBy == "amount" {
+							<span class="text-muted-foreground">{ txnSortArrow(filters.SortOrder) }</span>
+									}
+									</a>
+								</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -125,8 +155,10 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 	}
 }
 
-// TransactionDetail shows one transaction with its amount header and a definition grid.
-templ TransactionDetail(d layout.ShellData, t *service.TransactionResponse) {
+// TransactionDetail shows one transaction with its amount header, a definition
+// grid, and a vertical activity timeline (comments, rule applications, tag /
+// category changes) sourced from service.ListAnnotations.
+templ TransactionDetail(d layout.ShellData, t *service.TransactionResponse, annotations []service.Annotation) {
 	@layout.Shell(d) {
 		<div class="mb-4">
 			<a href="/app/transactions" class="btn-ghost btn-sm -ml-2">
@@ -185,7 +217,63 @@ templ TransactionDetail(d layout.ShellData, t *service.TransactionResponse) {
 				</dl>
 			}
 		</div>
+		<div class="mt-6">
+			<h2 class="mb-3 text-sm font-semibold text-foreground">Activity</h2>
+			@components.Card() {
+				if len(annotations) == 0 {
+					<p class="px-5 py-4 text-sm text-muted-foreground">No activity yet.</p>
+				} else {
+					<ol class="px-5 py-4">
+						for i, a := range annotations {
+							@txnTimelineRow(a, i == len(annotations)-1)
+						}
+					</ol>
+				}
+			}
+		</div>
 	}
+}
+
+// txnTimelineRow renders one annotation as a vertical timeline entry: a dot +
+// connector rail on the left, then actor + relative description + timestamp.
+templ txnTimelineRow(a service.Annotation, last bool) {
+	<li class="relative flex gap-3 pb-4 last:pb-0">
+		<div class="flex flex-col items-center">
+			<span class={ "mt-1 size-2.5 shrink-0 rounded-full", templ.KV("bg-muted-foreground/40", a.IsDeleted), templ.KV("bg-primary", !a.IsDeleted) }></span>
+			if !last {
+				<span class="mt-1 w-px grow bg-border"></span>
+			}
+		</div>
+		<div class="min-w-0 flex-1">
+			<p class={ "text-sm", templ.KV("text-muted-foreground line-through", a.IsDeleted), templ.KV("text-foreground", !a.IsDeleted) }>
+				{ txnTimelineText(a) }
+			</p>
+			<p class="mt-0.5 text-xs text-muted-foreground">
+				{ a.ActorName }
+				if a.CreatedAt != "" {
+					{ " · " + a.CreatedAt }
+				}
+			</p>
+		</div>
+	</li>
+}
+
+// txnTimelineText prefers the enriched Summary; falls back to the comment body
+// or a kind-derived label so a row is never blank.
+func txnTimelineText(a service.Annotation) string {
+	if a.IsDeleted {
+		return a.ActorName + " deleted a comment"
+	}
+	if a.Summary != "" {
+		return a.Summary
+	}
+	if a.Content != "" {
+		return a.Content
+	}
+	if a.Kind != "" {
+		return TitleCase(a.Kind)
+	}
+	return "Activity"
 }
 
 templ txnDetailRow(label, value string) {
@@ -251,8 +339,9 @@ func txnPrevOffset(f TxFilters) int {
 	return o
 }
 
-// txnPageURL rebuilds the list URL preserving every active filter at a new offset.
-func txnPageURL(f TxFilters, offset int) string {
+// txnQuery collects every active filter (sans offset) into url.Values so the
+// pagination and sort-header links round-trip the full filter state.
+func txnQuery(f TxFilters) url.Values {
 	q := url.Values{}
 	if f.Search != "" {
 		q.Set("search", f.Search)
@@ -269,6 +358,29 @@ func txnPageURL(f TxFilters, offset int) string {
 	if f.End != "" {
 		q.Set("end", f.End)
 	}
+	if f.MinAmount != "" {
+		q.Set("min_amount", f.MinAmount)
+	}
+	if f.MaxAmount != "" {
+		q.Set("max_amount", f.MaxAmount)
+	}
+	if f.Pending != "" {
+		q.Set("pending", f.Pending)
+	}
+	// Only persist sort when it differs from the service default (date desc),
+	// keeping clean URLs for the common case.
+	if f.SortBy != "" && f.SortBy != "date" {
+		q.Set("sort_by", f.SortBy)
+	}
+	if f.SortOrder != "" && f.SortOrder != "desc" {
+		q.Set("sort_order", f.SortOrder)
+	}
+	return q
+}
+
+// txnPageURL rebuilds the list URL preserving every active filter at a new offset.
+func txnPageURL(f TxFilters, offset int) string {
+	q := txnQuery(f)
 	if offset > 0 {
 		q.Set("offset", strconv.Itoa(offset))
 	}
@@ -276,6 +388,59 @@ func txnPageURL(f TxFilters, offset int) string {
 		return "/app/transactions"
 	}
 	return "/app/transactions?" + q.Encode()
+}
+
+// txnSortURL builds the URL for clicking a sortable column header: selecting a
+// new column sorts it descending; re-clicking the active column flips the
+// direction. Offset resets to page 1 since the ordering changed.
+func txnSortURL(f TxFilters, col string) string {
+	order := "desc"
+	if f.SortBy == col && f.SortOrder == "desc" {
+		order = "asc"
+	}
+	q := txnQuery(f)
+	if col != "date" {
+		q.Set("sort_by", col)
+	} else {
+		q.Del("sort_by")
+	}
+	if order != "desc" {
+		q.Set("sort_order", order)
+	} else {
+		q.Del("sort_order")
+	}
+	if len(q) == 0 {
+		return "/app/transactions"
+	}
+	return "/app/transactions?" + q.Encode()
+}
+
+func txnSortArrow(order string) string {
+	if order == "asc" {
+		return "↑"
+	}
+	return "↓"
+}
+
+func txnPendingOptions() []components.Option {
+	return []components.Option{
+		{Value: "pending", Label: "Pending"},
+		{Value: "posted", Label: "Posted"},
+	}
+}
+
+func txnSortByOptions() []components.Option {
+	return []components.Option{
+		{Value: "date", Label: "Date"},
+		{Value: "amount", Label: "Amount"},
+	}
+}
+
+func txnSortOrderOptions() []components.Option {
+	return []components.Option{
+		{Value: "desc", Label: "Newest / Highest"},
+		{Value: "asc", Label: "Oldest / Lowest"},
+	}
 }
 
 func txnPageLabel(f TxFilters, count int) string {

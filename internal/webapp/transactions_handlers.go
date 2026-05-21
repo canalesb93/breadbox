@@ -33,19 +33,38 @@ func (h *Handler) transactionsList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Normalize sort inputs to the values the service accepts. sort_by:
+	// date (default) | amount; sort_order: desc (default) | asc. Anything else
+	// falls back to the default so a hand-edited URL can't break the query.
+	sortBy := q.Get("sort_by")
+	if sortBy != "amount" {
+		sortBy = "date"
+	}
+	sortOrder := q.Get("sort_order")
+	if sortOrder != "asc" {
+		sortOrder = "desc"
+	}
+
 	filters := pages.TxFilters{
-		Search:   q.Get("search"),
-		Account:  q.Get("account"),
-		Category: q.Get("category"),
-		Start:    q.Get("start"),
-		End:      q.Get("end"),
-		Offset:   offset,
-		Limit:    limit,
+		Search:    q.Get("search"),
+		Account:   q.Get("account"),
+		Category:  q.Get("category"),
+		Start:     q.Get("start"),
+		End:       q.Get("end"),
+		MinAmount: q.Get("min_amount"),
+		MaxAmount: q.Get("max_amount"),
+		Pending:   q.Get("pending"),
+		SortBy:    sortBy,
+		SortOrder: sortOrder,
+		Offset:    offset,
+		Limit:     limit,
 	}
 
 	params := service.TransactionListParams{
-		Offset: offset,
-		Limit:  limit,
+		Offset:    offset,
+		Limit:     limit,
+		SortBy:    &sortBy,
+		SortOrder: &sortOrder,
 	}
 	if filters.Search != "" {
 		s := filters.Search
@@ -64,6 +83,20 @@ func (h *Handler) transactionsList(w http.ResponseWriter, r *http.Request) {
 	}
 	if t, ok := parseTxnDate(filters.End); ok {
 		params.EndDate = &t
+	}
+	if v, err := strconv.ParseFloat(filters.MinAmount, 64); err == nil && filters.MinAmount != "" {
+		params.MinAmount = &v
+	}
+	if v, err := strconv.ParseFloat(filters.MaxAmount, 64); err == nil && filters.MaxAmount != "" {
+		params.MaxAmount = &v
+	}
+	switch filters.Pending {
+	case "pending":
+		p := true
+		params.Pending = &p
+	case "posted":
+		p := false
+		params.Pending = &p
 	}
 
 	result, err := h.app.Service.ListTransactions(r.Context(), params)
@@ -86,7 +119,14 @@ func (h *Handler) transactionDetail(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	render(w, r, http.StatusOK, pages.TransactionDetail(h.shellData(r, txnTitle(t)), t))
+	// Activity timeline: enriched annotations (comments, rule applications,
+	// tag/category changes) ordered created_at ASC. Best-effort — a timeline
+	// fetch error must not 500 the whole detail page, so we render with nil.
+	annotations, annErr := h.app.Service.ListAnnotations(r.Context(), id, service.ListAnnotationsParams{})
+	if annErr != nil {
+		annotations = nil
+	}
+	render(w, r, http.StatusOK, pages.TransactionDetail(h.shellData(r, txnTitle(t)), t, annotations))
 }
 
 // registerTransactions wires the transactions read surface onto the authed subrouter.
