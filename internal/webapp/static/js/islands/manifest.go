@@ -9,4 +9,5 @@ package islands
 var Manifest = map[string]string{
 	"agent-run-stream": "agent-run-stream-7LQUBZ2S.js",
 	"palette": "palette-SYBGVEW7.js",
+	"transactions": "transactions-2HEIQJG4.js",
 }
