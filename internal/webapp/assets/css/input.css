@@ -183,6 +183,27 @@
   .palette-item { @apply cursor-pointer rounded-md px-2.5 py-2 text-sm; }
   .palette-item.is-active { @apply bg-accent text-accent-foreground; }
   .palette-empty { @apply px-3.5 py-6 text-center text-sm text-muted-foreground; }
+
+  /* ---- Native <dialog> confirmation (e.g. API-key revoke) ---- */
+  /* showModal() gives us focus trap + Esc + backdrop for free; styling only here. */
+  .dialog { @apply inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border bg-popover p-0 text-popover-foreground shadow-2xl; }
+  .dialog::backdrop { @apply bg-black/40 backdrop-blur-sm; }
+  .dialog-panel { @apply p-5; }
+
+  /* ---- Transactions filter bar: collapsible on mobile, always-open on desktop ---- */
+  /* Mobile: a real <details> disclosure. Desktop (md+): force the form visible
+   * regardless of the [open] attribute and drop the summary, so the layout is
+   * identical to the pre-collapse design. Pure CSS — no JS. */
+  .tx-filters > summary { list-style: none; }
+  .tx-filters > summary::-webkit-details-marker { display: none; }
+  /* Rotate the chevron (the "back" icon points left; rotate to a downward caret
+   * when collapsed, upward when open) for an at-a-glance open/closed cue. */
+  .tx-filters > summary svg { @apply size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform; }
+  .tx-filters[open] > summary svg { @apply rotate-90; }
+  @media (width >= 48rem) {
+    /* md+: behave as if always open; the summary is already display:none via md:hidden. */
+    .tx-filters > form { display: grid !important; }
+  }
 }
 
 /* ---- Cross-document View Transitions: the SPA-smooth feel, zero JS. ---- */
