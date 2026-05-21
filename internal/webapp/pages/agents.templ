@@ -1,0 +1,220 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// AgentsList renders agent definitions as cards. Secrets (subscription token,
+// Anthropic API key) are never part of AgentDefinitionResponse and are never rendered.
+templ AgentsList(d layout.ShellData, agents []service.AgentDefinitionResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("Agents", "Scheduled AI runs over your financial data") {
+			<a href="/app/agents/runs" class="btn-outline btn-sm">All runs</a>
+		}
+		if len(agents) == 0 {
+			@components.EmptyState("No agents yet", "Agents run on a schedule and call Breadbox over MCP.") {
+			}
+		} else {
+			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				for _, ag := range agents {
+					<a href={ templ.SafeURL("/app/agents/" + ag.Slug + "/runs") } class="card flex flex-col p-4 transition-colors hover:bg-accent/40">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="truncate font-medium">{ ag.Name }</p>
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">{ ag.Slug }</p>
+							</div>
+							@components.Badge(agentEnabledVariant(ag.Enabled), agentEnabledLabel(ag.Enabled))
+						</div>
+						<p class="mt-4 text-sm text-muted-foreground">{ agentScheduleLabel(ag) }</p>
+						if ag.LastRun != nil {
+							<p class="mt-1 text-xs text-muted-foreground">
+								Last run: { ag.LastRun.StartedAt } · { TitleCase(ag.LastRun.Status) }
+							</p>
+						}
+					</a>
+				}
+			</div>
+		}
+	}
+}
+
+// AgentRuns renders the run history for one agent definition.
+templ AgentRuns(d layout.ShellData, agent *service.AgentDefinitionResponse, runs []service.AgentRunResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/agents" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Agents
+			</a>
+		</div>
+		@components.PageHeader(agent.Name+" runs", agentScheduleLabel(*agent)) {
+			@components.Badge(agentEnabledVariant(agent.Enabled), agentEnabledLabel(agent.Enabled))
+		}
+		@agentRunsTable(runs)
+	}
+}
+
+// AllAgentRuns renders runs across every agent, labeled with the parent agent.
+templ AllAgentRuns(d layout.ShellData, runs []service.AgentRunWithAgentResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/agents" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Agents
+			</a>
+		</div>
+		@components.PageHeader("All runs", "Every agent run across your household") {
+		}
+		if len(runs) == 0 {
+			@components.EmptyState("No runs yet", "Agent runs appear here once an agent fires.") {
+			}
+		} else {
+			<div class="card overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="data-table">
+						<thead>
+							<tr>
+								<th>Agent</th>
+								<th>Status</th>
+								<th>Started</th>
+								<th class="text-right">Duration</th>
+								<th class="text-right">Cost</th>
+								<th class="text-right">Tokens</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, run := range runs {
+								<tr>
+									<td>
+										<a href={ templ.SafeURL("/app/agents/" + run.AgentSlug + "/runs") } class="font-medium hover:underline">
+											{ run.AgentName }
+										</a>
+									</td>
+									<td class="whitespace-nowrap">
+										@components.Badge(agentRunStatusVariant(run.Status), TitleCase(run.Status))
+									</td>
+									<td class="whitespace-nowrap text-muted-foreground">{ run.StartedAt }</td>
+									<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunDuration(run.DurationMs) }</td>
+									<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunCost(run.TotalCostUSD) }</td>
+									<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunTokens(run.InputTokens, run.OutputTokens) }</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		}
+	}
+}
+
+// agentRunsTable is the shared per-agent runs table body.
+templ agentRunsTable(runs []service.AgentRunResponse) {
+	if len(runs) == 0 {
+		@components.EmptyState("No runs yet", "This agent hasn't run yet.") {
+		}
+	} else {
+		<div class="card overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="data-table">
+					<thead>
+						<tr>
+							<th>Status</th>
+							<th>Trigger</th>
+							<th>Started</th>
+							<th class="text-right">Duration</th>
+							<th class="text-right">Cost</th>
+							<th class="text-right">Tokens</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, run := range runs {
+							<tr>
+								<td class="whitespace-nowrap">
+									@components.Badge(agentRunStatusVariant(run.Status), TitleCase(run.Status))
+								</td>
+								<td class="whitespace-nowrap text-muted-foreground">{ TitleCase(run.Trigger) }</td>
+								<td class="whitespace-nowrap text-muted-foreground">{ run.StartedAt }</td>
+								<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunDuration(run.DurationMs) }</td>
+								<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunCost(run.TotalCostUSD) }</td>
+								<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunTokens(run.InputTokens, run.OutputTokens) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}
+
+func agentEnabledLabel(enabled bool) string {
+	if enabled {
+		return "Enabled"
+	}
+	return "Disabled"
+}
+
+func agentEnabledVariant(enabled bool) string {
+	if enabled {
+		return "success"
+	}
+	return "secondary"
+}
+
+func agentScheduleLabel(a service.AgentDefinitionResponse) string {
+	if a.ScheduleCron != nil && *a.ScheduleCron != "" {
+		return "Cron: " + *a.ScheduleCron
+	}
+	if a.TriggerOnSyncComplete {
+		return "On sync complete"
+	}
+	return "Manual only"
+}
+
+func agentRunStatusVariant(status string) string {
+	switch status {
+	case "success":
+		return "success"
+	case "error", "timeout":
+		return "destructive"
+	case "in_progress":
+		return "default"
+	default:
+		return "secondary"
+	}
+}
+
+func agentRunDuration(ms *int) string {
+	if ms == nil {
+		return "—"
+	}
+	secs := float64(*ms) / 1000.0
+	if secs < 60 {
+		return fmt.Sprintf("%.1fs", secs)
+	}
+	return fmt.Sprintf("%.1fm", secs/60.0)
+}
+
+func agentRunCost(cost *float64) string {
+	if cost == nil {
+		return "—"
+	}
+	return fmt.Sprintf("$%.4f", *cost)
+}
+
+func agentRunTokens(in, out *int) string {
+	if in == nil && out == nil {
+		return "—"
+	}
+	var i, o int
+	if in != nil {
+		i = *in
+	}
+	if out != nil {
+		o = *out
+	}
+	return fmt.Sprintf("%d↓ %d↑", i, o)
+}

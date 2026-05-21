@@ -1,0 +1,93 @@
+package pages
+
+import (
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// APIKeysList renders all API keys. Keys are masked — the full plaintext is only
+// ever shown once at creation time and never re-rendered here.
+templ APIKeysList(d layout.ShellData, keys []service.APIKeyResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("API keys", "Programmatic access to your household data") {
+		}
+		if len(keys) == 0 {
+			@components.EmptyState("No API keys", "API keys let scripts and agents call the REST API and MCP.") {
+			}
+		} else {
+			<div class="card overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="data-table">
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Scope</th>
+								<th>Key</th>
+								<th>Last used</th>
+								<th class="text-right">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, k := range keys {
+								<tr>
+									<td class="font-medium">{ k.Name }</td>
+									<td class="whitespace-nowrap">
+										@components.Badge(apiKeyScopeVariant(k.Scope), apiKeyScopeLabel(k.Scope))
+									</td>
+									<td class="whitespace-nowrap">
+										<span class="kbd">{ apiKeyMask(k.KeyPrefix) }</span>
+									</td>
+									<td class="whitespace-nowrap text-muted-foreground">{ Deref(k.LastUsedAt, "Never") }</td>
+									<td class="whitespace-nowrap text-right">
+										@components.Badge(apiKeyStatusVariant(k.RevokedAt), apiKeyStatusLabel(k.RevokedAt))
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		}
+	}
+}
+
+// apiKeyMask renders the visible prefix followed by an ellipsis — never plaintext.
+func apiKeyMask(prefix string) string {
+	if prefix == "" {
+		return "••••••••"
+	}
+	return prefix + "…"
+}
+
+func apiKeyScopeLabel(scope string) string {
+	switch scope {
+	case "full_access":
+		return "Full access"
+	case "read_only":
+		return "Read only"
+	default:
+		return TitleCase(scope)
+	}
+}
+
+func apiKeyScopeVariant(scope string) string {
+	if scope == "full_access" {
+		return "default"
+	}
+	return "secondary"
+}
+
+func apiKeyStatusLabel(revokedAt *string) string {
+	if revokedAt != nil && *revokedAt != "" {
+		return "Revoked"
+	}
+	return "Active"
+}
+
+func apiKeyStatusVariant(revokedAt *string) string {
+	if revokedAt != nil && *revokedAt != "" {
+		return "destructive"
+	}
+	return "success"
+}

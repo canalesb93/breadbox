@@ -1,0 +1,226 @@
+package pages
+
+import (
+	"fmt"
+	"strings"
+
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// RulesList renders all transaction rules as a table linking to each detail page.
+templ RulesList(d layout.ShellData, rules []service.TransactionRuleResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("Rules", "Automations applied to your transactions") {
+		}
+		if len(rules) == 0 {
+			@components.EmptyState("No rules yet", "Rules categorize and tag transactions automatically as they sync.") {
+			}
+		} else {
+			<div class="card overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="data-table">
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Trigger</th>
+								<th class="text-right">Hits</th>
+								<th class="text-right">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, ru := range rules {
+								<tr>
+									<td>
+										<a href={ templ.SafeURL("/app/rules/" + ru.ShortID) } class="font-medium hover:underline">
+											{ ru.Name }
+										</a>
+									</td>
+									<td class="whitespace-nowrap text-muted-foreground">{ ruleTriggerLabel(ru.Trigger) }</td>
+									<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ fmt.Sprintf("%d", ru.HitCount) }</td>
+									<td class="whitespace-nowrap text-right">
+										@components.Badge(ruleEnabledVariant(ru.Enabled), ruleEnabledLabel(ru.Enabled))
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		}
+	}
+}
+
+// RuleDetail shows one rule with its conditions and actions rendered readably.
+templ RuleDetail(d layout.ShellData, rule *service.TransactionRuleResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/rules" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Rules
+			</a>
+		</div>
+		@components.PageHeader(rule.Name, ruleDetailSubtitle(rule)) {
+			@components.Badge(ruleEnabledVariant(rule.Enabled), ruleEnabledLabel(rule.Enabled))
+		}
+		<div class="grid gap-6 lg:grid-cols-2">
+			<div>
+				<h2 class="mb-3 text-sm font-medium text-muted-foreground">Conditions</h2>
+				@components.Card() {
+					<div class="p-4">
+						if ruleMatchesAll(rule.Conditions) {
+							<p class="text-sm text-muted-foreground">Matches every transaction.</p>
+						} else {
+							@conditionTree(rule.Conditions)
+						}
+					</div>
+				}
+			</div>
+			<div>
+				<h2 class="mb-3 text-sm font-medium text-muted-foreground">Actions</h2>
+				@components.Card() {
+					<div class="p-4">
+						if len(rule.Actions) == 0 {
+							<p class="text-sm text-muted-foreground">No actions configured.</p>
+						} else {
+							<ul class="space-y-2">
+								for _, a := range rule.Actions {
+									<li class="flex items-center gap-2 text-sm">
+										<span class="badge-outline">{ ruleActionVerb(a) }</span>
+										<span>{ ruleActionTarget(a) }</span>
+									</li>
+								}
+							</ul>
+						}
+					</div>
+				}
+			</div>
+		</div>
+	}
+}
+
+// conditionTree renders a Condition recursively as nested readable rows.
+templ conditionTree(c service.Condition) {
+	if len(c.And) > 0 {
+		<div class="space-y-2">
+			<p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">All of</p>
+			<div class="space-y-2 border-l pl-3">
+				for _, sub := range c.And {
+					@conditionTree(sub)
+				}
+			</div>
+		</div>
+	} else if len(c.Or) > 0 {
+		<div class="space-y-2">
+			<p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Any of</p>
+			<div class="space-y-2 border-l pl-3">
+				for _, sub := range c.Or {
+					@conditionTree(sub)
+				}
+			</div>
+		</div>
+	} else if c.Not != nil {
+		<div class="space-y-2">
+			<p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Not</p>
+			<div class="space-y-2 border-l pl-3">
+				@conditionTree(*c.Not)
+			</div>
+		</div>
+	} else if c.Field != "" {
+		<p class="font-mono text-sm">{ conditionLeaf(c) }</p>
+	} else {
+		<p class="text-sm text-muted-foreground">No conditions.</p>
+	}
+}
+
+func ruleMatchesAll(c service.Condition) bool {
+	return c.Field == "" && len(c.And) == 0 && len(c.Or) == 0 && c.Not == nil
+}
+
+func conditionLeaf(c service.Condition) string {
+	field := TitleCase(c.Field)
+	op := ruleOpLabel(c.Op)
+	val := fmt.Sprintf("%v", c.Value)
+	return strings.TrimSpace(field + " " + op + " " + val)
+}
+
+func ruleOpLabel(op string) string {
+	switch op {
+	case "eq":
+		return "is"
+	case "neq":
+		return "is not"
+	case "contains":
+		return "contains"
+	case "not_contains":
+		return "does not contain"
+	case "matches":
+		return "matches"
+	case "in":
+		return "in"
+	case "gt":
+		return ">"
+	case "gte":
+		return ">="
+	case "lt":
+		return "<"
+	case "lte":
+		return "<="
+	default:
+		return op
+	}
+}
+
+func ruleActionVerb(a service.RuleAction) string {
+	switch a.Type {
+	case "set_category":
+		return "Set category"
+	case "add_tag":
+		return "Add tag"
+	case "add_comment":
+		return "Add comment"
+	default:
+		return TitleCase(a.Type)
+	}
+}
+
+func ruleActionTarget(a service.RuleAction) string {
+	switch a.Type {
+	case "set_category":
+		return a.CategorySlug
+	case "add_tag":
+		return a.TagSlug
+	case "add_comment":
+		return a.Content
+	default:
+		return ""
+	}
+}
+
+func ruleTriggerLabel(trigger string) string {
+	return TitleCase(trigger)
+}
+
+func ruleEnabledLabel(enabled bool) string {
+	if enabled {
+		return "Enabled"
+	}
+	return "Disabled"
+}
+
+func ruleEnabledVariant(enabled bool) string {
+	if enabled {
+		return "success"
+	}
+	return "secondary"
+}
+
+func ruleDetailSubtitle(r *service.TransactionRuleResponse) string {
+	parts := []string{ruleTriggerLabel(r.Trigger)}
+	parts = append(parts, fmt.Sprintf("Priority %d", r.Priority))
+	if r.CreatedByName != "" {
+		parts = append(parts, "by "+r.CreatedByName)
+	}
+	return strings.Join(parts, " · ")
+}

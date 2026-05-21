@@ -1,0 +1,99 @@
+package pages
+
+import (
+	"strconv"
+
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// TagsList renders all tags as a grid of chips, each a real link to its detail page.
+templ TagsList(d layout.ShellData, tags []service.TagResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("Tags", "Free-form labels you can attach to transactions") {
+		}
+		if len(tags) == 0 {
+			@components.EmptyState("No tags yet", "Tags appear when you label transactions or rules add them.") {
+			}
+		} else {
+			<div class="flex flex-wrap gap-2">
+				for _, t := range tags {
+					<a href={ templ.SafeURL("/app/tags/" + t.Slug) } class="badge-outline inline-flex items-center gap-2 px-3 py-1.5 transition-colors hover:bg-accent/40">
+						@tagSwatch(t)
+						<span class="truncate">{ t.DisplayName }</span>
+					</a>
+				}
+			</div>
+		}
+	}
+}
+
+// TagDetail shows one tag with its slug, description, color, icon, lifecycle, and usage count.
+templ TagDetail(d layout.ShellData, t *service.TagResponse, usage int64) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/tags" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Tags
+			</a>
+		</div>
+		@components.PageHeader(t.DisplayName, tagSubtitle(t)) {
+			@components.Badge("secondary", tagUsageLabel(usage))
+		}
+		<div class="card divide-y">
+			@detailRow("Slug") {
+				<code class="text-sm">{ t.Slug }</code>
+			}
+			@detailRow("Display name") {
+				{ t.DisplayName }
+			}
+			@detailRow("Description") {
+				if t.Description != "" {
+					{ t.Description }
+				} else {
+					<span class="text-muted-foreground">—</span>
+				}
+			}
+			@detailRow("Lifecycle") {
+				<span class="text-sm">{ TitleCase(t.Lifecycle) }</span>
+			}
+			@detailRow("Color") {
+				if t.Color != nil && *t.Color != "" {
+					<span class="inline-flex items-center gap-2">
+						@swatchDot(*t.Color)
+						<code class="text-sm">{ *t.Color }</code>
+					</span>
+				} else {
+					<span class="text-muted-foreground">—</span>
+				}
+			}
+			@detailRow("Icon") {
+				<span class="text-sm">{ Deref(t.Icon, "—") }</span>
+			}
+		</div>
+	}
+}
+
+// tagSwatch renders the tag's color dot (falling back to a neutral dot).
+templ tagSwatch(t service.TagResponse) {
+	if t.Color != nil && *t.Color != "" {
+		@swatchDot(*t.Color)
+	} else {
+		<span class="size-2.5 shrink-0 rounded-full bg-muted-foreground/40"></span>
+	}
+}
+
+func tagSubtitle(t *service.TagResponse) string {
+	if t.Description != "" {
+		return t.Description
+	}
+	return "Tag · " + t.Slug
+}
+
+func tagUsageLabel(n int64) string {
+	if n == 1 {
+		return "1 transaction"
+	}
+	return strconv.FormatInt(n, 10) + " transactions"
+}
