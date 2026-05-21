@@ -1,0 +1,25 @@
+package pages
+
+import (
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// Home is the authenticated landing. Real overview content arrives in Phase 2; this
+// proves the shell + auth + nav + View Transition loop.
+templ Home(d layout.ShellData) {
+	@layout.Shell(d) {
+		@components.PageHeader("Home", "Your household at a glance") {
+		}
+		<div class="card p-6">
+			<p class="text-sm text-muted-foreground">
+				Welcome to the new Breadbox app. Navigation, history, scroll restoration and
+				page transitions are owned by the browser — try the sidebar and the back button.
+			</p>
+			<p class="mt-2 text-sm text-muted-foreground">
+				Overview metrics and charts land in Phase 2. Start with
+				<a href="/app/accounts" class="font-medium text-foreground underline underline-offset-4">Accounts</a>.
+			</p>
+		</div>
+	}
+}

@@ -1,0 +1,132 @@
+package pages
+
+import (
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// AccountsList is the first ported read surface: a responsive grid of account cards,
+// each a real link to its detail page.
+templ AccountsList(d layout.ShellData, accounts []service.AccountResponse) {
+	@layout.Shell(d) {
+		@components.PageHeader("Accounts", "Every account synced into your household") {
+		}
+		if len(accounts) == 0 {
+			@components.EmptyState("No accounts yet", "Connect a bank to start syncing accounts.") {
+				<a href="/app/connections" class="btn-primary mt-4">Add a connection</a>
+			}
+		} else {
+			<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				for _, a := range accounts {
+					<a href={ templ.SafeURL("/app/accounts/" + a.ShortID) } class="card flex flex-col p-4 transition-colors hover:bg-accent/40">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="truncate font-medium">{ a.Name }</p>
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">
+									{ Deref(a.InstitutionName, "Unlinked") } · { TitleCase(a.Type) }
+								</p>
+							</div>
+							if a.Mask != nil && *a.Mask != "" {
+								<span class="kbd shrink-0">··{ *a.Mask }</span>
+							}
+						</div>
+						<p class="mt-4 text-xl font-semibold tracking-tight">{ Money(a.BalanceCurrent, a.IsoCurrencyCode) }</p>
+					</a>
+				}
+			</div>
+		}
+	}
+}
+
+// AccountDetail shows one account with balances and recent transactions.
+templ AccountDetail(d layout.ShellData, acct *service.AccountDetailResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/accounts" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Accounts
+			</a>
+		</div>
+		@components.PageHeader(accountTitle(acct), accountSubtitle(acct)) {
+			if acct.ConnectionShortID != "" {
+				<a href={ templ.SafeURL("/app/connections/" + acct.ConnectionShortID) } class="btn-outline btn-sm">View connection</a>
+			}
+		}
+		<div class="grid gap-3 sm:grid-cols-3">
+			@components.StatCard("Current balance", Money(acct.BalanceCurrent, acct.IsoCurrencyCode), "")
+			@components.StatCard("Available", Money(acct.BalanceAvailable, acct.IsoCurrencyCode), "")
+			@components.StatCard("Limit", Money(acct.BalanceLimit, acct.IsoCurrencyCode), "")
+		</div>
+		<div class="mt-6">
+			<h2 class="mb-3 text-sm font-medium text-muted-foreground">Recent transactions</h2>
+			if len(acct.RecentTransactions) == 0 {
+				@components.EmptyState("No transactions", "Nothing has synced for this account yet.") {
+				}
+			} else {
+				<div class="card overflow-hidden">
+					<div class="overflow-x-auto">
+						<table class="data-table">
+							<thead>
+								<tr>
+									<th>Date</th>
+									<th>Description</th>
+									<th class="text-right">Amount</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, t := range acct.RecentTransactions {
+									<tr>
+										<td class="whitespace-nowrap text-muted-foreground">{ t.Date }</td>
+										<td>
+											<a href={ templ.SafeURL("/app/transactions/" + t.ShortID) } class="hover:underline">
+												{ txName(t) }
+											</a>
+											if t.Pending {
+												<span class="badge-secondary ml-2">Pending</span>
+											}
+										</td>
+										<td class="whitespace-nowrap text-right font-medium tabular-nums">{ Money(&t.Amount, t.IsoCurrencyCode) }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			}
+		</div>
+	}
+}
+
+func accountTitle(a *service.AccountDetailResponse) string {
+	if a.DisplayName != nil && *a.DisplayName != "" {
+		return *a.DisplayName
+	}
+	return a.Name
+}
+
+func accountSubtitle(a *service.AccountDetailResponse) string {
+	parts := []string{}
+	if a.InstitutionName != nil && *a.InstitutionName != "" {
+		parts = append(parts, *a.InstitutionName)
+	}
+	parts = append(parts, TitleCase(a.Type))
+	if a.Subtype != nil && *a.Subtype != "" {
+		parts = append(parts, TitleCase(*a.Subtype))
+	}
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += " · "
+		}
+		out += p
+	}
+	return out
+}
+
+func txName(t service.TransactionResponse) string {
+	if t.ProviderMerchantName != nil && *t.ProviderMerchantName != "" {
+		return *t.ProviderMerchantName
+	}
+	return t.ProviderName
+}

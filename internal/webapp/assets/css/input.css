@@ -1,0 +1,194 @@
+/* Breadbox v3 webapp — Node-free Tailwind v4 build.
+ * Built with the tailwind-cli-extra standalone binary (no node_modules):
+ *   ./tailwindcss-extra -i internal/webapp/assets/css/input.css -o internal/webapp/static/css/app.css
+ * Design language: shadcn/Basecoat tokens (oklch), so the v3 MPA matches the v2 SPA look
+ * without React. This file does NOT import anything from v1 admin (clean start).
+ */
+@import "tailwindcss";
+
+/* Scan templ sources and their generated Go (literal class strings land in *_templ.go). */
+@source "../../**/*.templ";
+@source "../../**/*_templ.go";
+
+/* Dark mode driven by a `.dark` class on <html>, set server-side from the theme cookie. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- shadcn/Basecoat design tokens (light) ---- */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.6 0.145 150);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.696 0.17 162.48);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+/* ---- Map tokens into Tailwind's theme so `bg-background`, `text-muted-foreground`, etc. work ---- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    /* Mobile/iOS lessons ported from the SPA: real viewport height, smooth scroll opt-out. */
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* 44pt minimum tap targets on coarse pointers (iOS). */
+  @media (pointer: coarse) {
+    a, button, [role="button"], summary, input, select {
+      min-height: 44px;
+    }
+  }
+}
+
+/* ---- Basecoat-style component classes (shadcn look as plain HTML/Tailwind). ----
+ * templ components in components/*.templ are thin wrappers over these. Compose,
+ * don't fork. Use semantic tokens (bg-primary, text-muted-foreground), never raw colors. */
+/* btn and badge are registered as @utility so other classes can @apply them
+ * (Tailwind v4 @apply only resolves utilities, not @layer-components classes). */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium
+         transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+         disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 cursor-pointer;
+}
+@utility badge {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors;
+}
+
+@layer components {
+  .btn-primary { @apply btn bg-primary text-primary-foreground hover:bg-primary/90; }
+  .btn-secondary { @apply btn bg-secondary text-secondary-foreground hover:bg-secondary/80; }
+  .btn-outline { @apply btn border border-input bg-background hover:bg-accent hover:text-accent-foreground; }
+  .btn-ghost { @apply btn hover:bg-accent hover:text-accent-foreground; }
+  .btn-destructive { @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90; }
+  .btn-icon { @apply btn h-9 w-9 p-0; }
+  .btn-sm { @apply h-8 px-3 text-xs; }
+
+  .card { @apply rounded-xl border bg-card text-card-foreground shadow-sm; }
+  .card-header { @apply flex flex-col space-y-1.5 p-6; }
+  .card-title { @apply font-semibold leading-none tracking-tight; }
+  .card-desc { @apply text-sm text-muted-foreground; }
+  .card-content { @apply p-6 pt-0; }
+
+  .badge-default { @apply badge border-transparent bg-primary text-primary-foreground; }
+  .badge-secondary { @apply badge border-transparent bg-secondary text-secondary-foreground; }
+  .badge-outline { @apply badge text-foreground; }
+  .badge-success { @apply badge border-transparent bg-success/15 text-success; }
+  .badge-destructive { @apply badge border-transparent bg-destructive/15 text-destructive; }
+
+  .input {
+    @apply flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm
+           transition-colors placeholder:text-muted-foreground focus-visible:outline-none
+           focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .label { @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70; }
+  .field-error { @apply text-sm text-destructive; }
+
+  .data-table { @apply w-full caption-bottom text-sm; }
+  .data-table thead tr { @apply border-b; }
+  .data-table th { @apply h-10 px-3 text-left align-middle font-medium text-muted-foreground; }
+  .data-table td { @apply p-3 align-middle; }
+  .data-table tbody tr { @apply border-b transition-colors hover:bg-muted/50; }
+
+  .kbd { @apply inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground; }
+
+  .menu { @apply z-50 min-w-40 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md; }
+  .menu-item { @apply flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground; }
+}
+
+/* ---- Cross-document View Transitions: the SPA-smooth feel, zero JS. ---- */
+@view-transition {
+  navigation: auto;
+}
+
+/* Respect reduced-motion: no transition animation. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Keep the persistent shell (sidebar/topbar) stable across navigations while the
+ * main content cross-fades. The shell opts out by naming itself; main is the default group. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(main-content),
+  ::view-transition-new(main-content) {
+    animation-duration: 160ms;
+  }
+}

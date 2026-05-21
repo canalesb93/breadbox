@@ -1,0 +1,14 @@
+package pages
+
+import "breadbox/internal/webapp/layout"
+
+// ErrorPage renders inside the app shell so navigation stays usable on 404/500.
+templ ErrorPage(d layout.ShellData, code, message string) {
+	@layout.Shell(d) {
+		<div class="flex flex-col items-center justify-center py-24 text-center">
+			<p class="text-6xl font-bold tracking-tight text-muted-foreground">{ code }</p>
+			<p class="mt-4 text-lg">{ message }</p>
+			<a href="/app/" class="btn-outline mt-6">Back home</a>
+		</div>
+	}
+}

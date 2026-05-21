@@ -1,0 +1,41 @@
+package pages
+
+import "breadbox/internal/webapp/layout"
+
+// Login is a standalone page (no app shell). Native form POST to /app/login with
+// progressive-enhancement-friendly attributes (autocomplete, inputmode, enterkeyhint).
+templ Login(themeClass string, f LoginForm) {
+	@layout.Base(layout.BaseData{Title: "Sign in", ThemeClass: themeClass}) {
+		<div class="flex min-h-dvh items-center justify-center px-4 py-12">
+			<div class="card w-full max-w-sm">
+				<div class="card-header text-center">
+					<h1 class="text-xl font-semibold tracking-tight">Breadbox</h1>
+					<p class="card-desc">Sign in to your household</p>
+				</div>
+				<div class="card-content">
+					if f.Error != "" {
+						<div role="alert" class="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+							{ f.Error }
+						</div>
+					}
+					<form method="post" action="/app/login" class="space-y-4">
+						<input type="hidden" name="next" value={ f.Next }/>
+						<div class="space-y-1.5">
+							<label for="username" class="label">Email</label>
+							<input id="username" name="username" type="email" autocomplete="username" inputmode="email" enterkeyhint="next" required autofocus value={ f.Username } class="input"/>
+						</div>
+						<div class="space-y-1.5">
+							<label for="password" class="label">Password</label>
+							<input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go" required class="input"/>
+						</div>
+						<label class="flex items-center gap-2 text-sm">
+							<input type="checkbox" name="remember_me" value="1" class="size-4 rounded border-input"/>
+							Remember me
+						</label>
+						<button type="submit" class="btn-primary w-full">Sign in</button>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}
