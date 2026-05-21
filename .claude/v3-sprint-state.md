@@ -32,12 +32,14 @@ subagents, validate every surface with Chrome DevTools, merge PRs into this spri
       login gate, Node-free build, app-mpa.md rule. Validated desktop+mobile+dark, no console errors.
 - [x] Phase 2 — Read surfaces **DONE** (transactions, connections, providers, categories, tags, rules,
       api-keys, agents+runs, placeholders). Built via 4 fanned-out subagents, integrated, Chrome-validated.
-- [ ] Phase 3 — Write surfaces/forms + settings
+- [x] Phase 3 — Write surfaces/forms + settings **DONE & MERGED** (PR #1404). Forms for category/tag/
+      api-key/rule/agent + agent settings + real /app/settings + setup-account. Validated (creates persist).
 - [ ] Phase 4 — Islands (⌘K, dnd)
 - [ ] Phase 5 — Streaming (Datastar+SSE)
 - [ ] Phase 6 — Cutover + parity audit
 
 ## Progress log (newest first)
+- 2026-05-21 01:4x — Phase 3 MERGED (PR #1404). Core CRUD app complete (read+write+settings+auth). 3 PRs merged into sprint branch. NEXT: (#14) CI/deploy wiring — CRITICAL gotcha: CI runs `templ generate` directly and only injects the !headless&&!lite build tag into internal/templates/components; it MUST also inject into internal/webapp generated files or headless/lite CI cells break. Delegated #14 to a subagent. After that: Phase 4 (esbuild-via-Go islands: ⌘K palette, drag-drop rule builder), Phase 5 (Datastar+SSE streaming: sync progress, agent transcripts, activity timeline), Phase 6 cutover (302 /v2→/app, retire SPA), then loop end-state (deprecate v1+SPA, Playwright polish/mobile).
 - 2026-05-21 01:2x — Phase 3 form pattern PROVEN: Category create/edit validated in Chrome (create→303→detail, slug auto-gen, persisted). Reusable components/forms.templ established. Created a "V3 Test Category" in dev DB (harmless test data; no delete UI yet). Fanned out 4 more form agents: (A) tags+api-keys, (B) rules, (C) agents+settings-tokens, (D) settings routes+setup-account. INTEGRATION TODO when they return: wire `h.registerSettings(r)` into AUTHED group + `h.registerSetup(r)` into PUBLIC group in handler.go, and REMOVE `/settings` from registerPlaceholders (settings replaces it). Then templ generate, build, fix collisions, rebuild binary, restart :8088, Chrome-validate, PR. Watch: secrets must stay masked (agents tokens, api-key plaintext only on create page); category_override sacred.
 - 2026-05-21 01:1x — Phase 2 MERGED (PR #1403). Starting Phase 3 forms: launched 1 subagent to establish the reusable form-component pattern + Category create/edit exemplar. When it returns: validate, then fan out tags/api-keys/rules/agents/settings/setup-account forms following that pattern.
 - 2026-05-21 01:0x — Phase 2 read surfaces DONE & validated (no console errors). 9 surfaces live under /app. Fixed missing </div> in categories/tags templ from subagents. templ+build+vet green. Opening Phase 2 PR. Next: Phase 3 write surfaces/forms (+ real settings).
