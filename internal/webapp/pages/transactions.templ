@@ -40,7 +40,16 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 		<script type="module" src={ layout.IslandSrc("transactions") }></script>
 		@components.PageHeader("Transactions", "Every transaction synced into your household") {
 		}
-		<form method="get" action="/app/transactions" class="card mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
+		<!-- Mobile: the filter bar collapses behind a "Filters" disclosure to reclaim
+			 vertical space. Desktop (md+): the .tx-filters CSS forces it open and hides the
+			 summary, so the layout is byte-identical to before. Plain <details>/<summary> —
+			 no JS; the GET form and sticky values are untouched inside. -->
+		<details class="tx-filters mb-4 card p-0">
+			<summary class="tx-filters-summary flex cursor-pointer select-none items-center justify-between gap-2 p-4 font-medium md:hidden">
+				Filters
+				@components.Icon("back")
+			</summary>
+			<form method="get" action="/app/transactions" class="grid gap-3 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-5 md:pt-4">
 			<div class="flex flex-col gap-1 lg:col-span-2">
 				<label for="tx-search" class="text-xs font-medium text-muted-foreground">Search</label>
 				<input
@@ -85,7 +94,8 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 				<button type="submit" class="btn-primary">Filter</button>
 				<a href="/app/transactions" class="btn-ghost">Reset</a>
 			</div>
-		</form>
+			</form>
+		</details>
 		if result == nil || len(result.Transactions) == 0 {
 			@components.EmptyState("No transactions", "Nothing matches these filters yet.") {
 			}

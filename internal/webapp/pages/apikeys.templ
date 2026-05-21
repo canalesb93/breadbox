@@ -46,9 +46,7 @@ templ APIKeysList(d layout.ShellData, keys []service.APIKeyResponse) {
 									</td>
 									<td class="whitespace-nowrap text-right">
 										if k.RevokedAt == nil || *k.RevokedAt == "" {
-											<form method="post" action={ templ.SafeURL("/app/api-keys/" + k.ID + "/revoke") } onsubmit="return confirm('Revoke this key? Any client using it will immediately lose access.')">
-												<button type="submit" class="btn-ghost btn-sm text-destructive">Revoke</button>
-											</form>
+											@apiKeyRevoke(k)
 										} else {
 											<span class="text-muted-foreground">—</span>
 										}
@@ -61,6 +59,57 @@ templ APIKeysList(d layout.ShellData, keys []service.APIKeyResponse) {
 			</div>
 		}
 	}
+}
+
+// apiKeyRevoke renders the per-row revoke control: a button that opens a native
+// <dialog> confirmation, plus the dialog itself holding the real POST form. Revoke
+// is irreversible, so the confirm step replaces the old blocking confirm() — no JS
+// dialog API needed (native <dialog>, opened via a tiny inline showModal() handler).
+// With JS off the trigger is a plain submit button inside the form, so the form still
+// posts directly (acceptable degradation — same as any native form).
+templ apiKeyRevoke(k service.APIKeyResponse) {
+	{{ dialogID := "revoke-" + k.ID }}
+	<form method="post" action={ templ.SafeURL("/app/api-keys/" + k.ID + "/revoke") }>
+		<button
+			type="submit"
+			class="btn-ghost btn-sm text-destructive"
+			onclick={ apiKeyOpenRevokeDialog(dialogID) }
+		>
+			Revoke
+		</button>
+		<dialog id={ dialogID } class="dialog" aria-labelledby={ dialogID + "-title" }>
+			<div class="dialog-panel">
+				<h2 id={ dialogID + "-title" } class="text-base font-semibold">Revoke this key?</h2>
+				<p class="mt-1.5 text-sm text-muted-foreground">
+					This can't be undone. Any client using <span class="font-medium text-foreground">{ k.Name }</span> will immediately lose access.
+				</p>
+				<div class="mt-5 flex justify-end gap-2">
+					<button type="button" class="btn-ghost btn-sm" formnovalidate onclick={ apiKeyCloseRevokeDialog(dialogID) }>Cancel</button>
+					<button type="submit" class="btn-primary btn-sm bg-destructive text-destructive-foreground hover:bg-destructive/90">Revoke</button>
+				</div>
+			</div>
+		</dialog>
+	</form>
+}
+
+// apiKeyOpenRevokeDialog intercepts the trigger button's default submit to open the
+// confirmation dialog instead. The script attribute degrades to nothing with JS off,
+// in which case the button submits the form directly.
+script apiKeyOpenRevokeDialog(id string) {
+	event.preventDefault();
+	const dlg = document.getElementById(id);
+	if (dlg && typeof dlg.showModal === "function") {
+		dlg.showModal();
+	} else if (dlg) {
+		// No <dialog> support: fall back to immediate submit of the parent form.
+		event.target.closest("form").submit();
+	}
+}
+
+// apiKeyCloseRevokeDialog dismisses the confirmation without submitting.
+script apiKeyCloseRevokeDialog(id string) {
+	const dlg = document.getElementById(id);
+	if (dlg) dlg.close();
 }
 
 // apiKeyMask renders the visible prefix followed by an ellipsis — never plaintext.
