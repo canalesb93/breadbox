@@ -12,6 +12,7 @@ import (
 templ TagsList(d layout.ShellData, tags []service.TagResponse) {
 	@layout.Shell(d) {
 		@components.PageHeader("Tags", "Free-form labels you can attach to transactions") {
+			<a href="/app/tags/new" class="btn-primary btn-sm">New tag</a>
 		}
 		if len(tags) == 0 {
 			@components.EmptyState("No tags yet", "Tags appear when you label transactions or rules add them.") {
@@ -40,6 +41,7 @@ templ TagDetail(d layout.ShellData, t *service.TagResponse, usage int64) {
 		</div>
 		@components.PageHeader(t.DisplayName, tagSubtitle(t)) {
 			@components.Badge("secondary", tagUsageLabel(usage))
+			<a href={ templ.SafeURL("/app/tags/" + t.Slug + "/edit") } class="btn-outline btn-sm">Edit</a>
 		}
 		<div class="card divide-y">
 			@detailRow("Slug") {
@@ -96,4 +98,107 @@ func tagUsageLabel(n int64) string {
 		return "1 transaction"
 	}
 	return strconv.FormatInt(n, 10) + " transactions"
+}
+
+// TagFormData drives the create/edit tag form. Mode flips the title, action verb, and
+// whether the slug is editable (create-only; UpdateTag treats slug as immutable). Errors
+// is keyed by field name (display_name, slug, color, icon, description, lifecycle) plus
+// the reserved "form" key for a top-level banner.
+type TagFormData struct {
+	Mode      string // "create" or "edit"
+	ActionURL string // POST target
+	CancelURL string // link back to list (create) or detail (edit)
+	Values    TagFormValues
+	Errors    map[string]string
+}
+
+// TagFormValues is the editable field set, pre-filled on edit and on error re-render.
+type TagFormValues struct {
+	DisplayName string
+	Slug        string
+	Color       string
+	Icon        string
+	Description string
+	Lifecycle   string
+}
+
+func (f TagFormData) isEdit() bool { return f.Mode == "edit" }
+
+func (f TagFormData) title() string {
+	if f.isEdit() {
+		return "Edit tag"
+	}
+	return "New tag"
+}
+
+func (f TagFormData) submitLabel() string {
+	if f.isEdit() {
+		return "Save changes"
+	}
+	return "Create tag"
+}
+
+// tagLifecycleOptions are the selectable lifecycle states (only shown on edit, since
+// CreateTag defaults lifecycle server-side).
+func tagLifecycleOptions() []components.Option {
+	return []components.Option{
+		{Value: "persistent", Label: "Persistent"},
+		{Value: "ephemeral", Label: "Ephemeral"},
+	}
+}
+
+// TagForm renders the create/edit tag form as a native POST. Slug is settable only on
+// create; on edit it renders read-only (UpdateTag does not change it). Per-field errors
+// come from f.Errors; a "form" key renders a banner.
+templ TagForm(d layout.ShellData, f TagFormData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Cancel
+			</a>
+		</div>
+		@components.PageHeader(f.title(), "") {
+		}
+		<form method="post" action={ templ.SafeURL(f.ActionURL) } class="card max-w-xl space-y-5 p-6">
+			@components.FormError(f.Errors["form"])
+			@components.FieldAttrs("display_name", "Display name", f.Values.DisplayName, f.Errors["display_name"], templ.Attributes{
+				"type":      "text",
+				"required":  true,
+				"autofocus": true,
+				"maxlength": "100",
+			})
+			if f.isEdit() {
+				<div class="space-y-1.5">
+					<span class="label">Slug</span>
+					<input type="text" value={ f.Values.Slug } class="input" disabled readonly/>
+					<p class="text-xs text-muted-foreground">The slug is permanent once a tag is created.</p>
+				</div>
+			} else {
+				@components.FieldAttrs("slug", "Slug", f.Values.Slug, f.Errors["slug"], templ.Attributes{
+					"type":        "text",
+					"required":    true,
+					"pattern":     "[a-z0-9]([a-z0-9\\-:]*[a-z0-9])?",
+					"placeholder": "needs-review",
+					"inputmode":   "text",
+				})
+			}
+			@components.Textarea("description", "Description", f.Values.Description, f.Errors["description"])
+			@components.FieldAttrs("color", "Color", f.Values.Color, f.Errors["color"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "#22c55e",
+			})
+			@components.FieldAttrs("icon", "Icon", f.Values.Icon, f.Errors["icon"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "lucide icon name",
+			})
+			if f.isEdit() {
+				@components.SelectField("lifecycle", "Lifecycle", tagLifecycleOptions(), f.Values.Lifecycle, "", f.Errors["lifecycle"])
+			}
+			@components.FormActions() {
+				<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn-primary btn-sm">{ f.submitLabel() }</button>
+			}
+		</form>
+	}
 }

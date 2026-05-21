@@ -39,6 +39,7 @@ func (h *Handler) Router() http.Handler {
 		// Public (pre-auth) routes.
 		r.Get("/login", h.loginPage)
 		r.Post("/login", h.requireSameOrigin(h.loginSubmit))
+		h.registerSetup(r) // setup-account/{token}: token-gated, no requireAuth
 
 		// Authenticated routes. The gate is a real server-side 302 to /app/login —
 		// so the SPA's "401 redirect trap" class of bug cannot exist here.
@@ -60,6 +61,7 @@ func (h *Handler) Router() http.Handler {
 			h.registerRules(r)
 			h.registerAPIKeys(r)
 			h.registerAgents(r)
+			h.registerSettings(r)
 			h.registerPlaceholders(r)
 		})
 	})

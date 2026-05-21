@@ -1,0 +1,135 @@
+package components
+
+// Reusable form primitives for native <form> POST surfaces. These are the template
+// for every CRUD form in the v3 MPA (categories, tags, api-keys, rules, agents).
+// They wrap the existing .label / .input / .field-error classes (assets/css/input.css)
+// and rely on the browser's Constraint Validation API (required, pattern, type) plus
+// server-side re-render of field errors. No client validation libs, no JS.
+//
+// Convention: pass errMsg from the handler's per-field error map. A non-empty errMsg
+// sets aria-invalid and renders a .field-error below the control. The field id equals
+// its name so <label for> wiring is automatic.
+
+// Option is a single <option> for SelectField.
+type Option struct {
+	Value string
+	Label string
+}
+
+// Field renders a labelled text input with optional inline error.
+templ Field(name, label, value, errMsg string) {
+	<div class="space-y-1.5">
+		<label for={ name } class="label">{ label }</label>
+		<input
+			id={ name }
+			name={ name }
+			type="text"
+			value={ value }
+			class="input"
+			if errMsg != "" {
+				aria-invalid="true"
+				aria-describedby={ name + "-error" }
+			}
+		/>
+		if errMsg != "" {
+			<p id={ name + "-error" } class="field-error">{ errMsg }</p>
+		}
+	</div>
+}
+
+// FieldAttrs renders a labelled input with caller-supplied attributes (type, pattern,
+// required, autocomplete, inputmode, etc.) spread onto the control. Use this when the
+// plain text Field isn't enough; the error wiring is identical.
+templ FieldAttrs(name, label, value, errMsg string, attrs templ.Attributes) {
+	<div class="space-y-1.5">
+		<label for={ name } class="label">{ label }</label>
+		<input
+			id={ name }
+			name={ name }
+			value={ value }
+			class="input"
+			if errMsg != "" {
+				aria-invalid="true"
+				aria-describedby={ name + "-error" }
+			}
+			{ attrs... }
+		/>
+		if errMsg != "" {
+			<p id={ name + "-error" } class="field-error">{ errMsg }</p>
+		}
+	</div>
+}
+
+// SelectField renders a labelled <select>. A leading blank option is included when
+// placeholder != "" so a "none/top-level" choice is selectable.
+templ SelectField(name, label string, options []Option, selected, placeholder, errMsg string) {
+	<div class="space-y-1.5">
+		<label for={ name } class="label">{ label }</label>
+		<select
+			id={ name }
+			name={ name }
+			class="input"
+			if errMsg != "" {
+				aria-invalid="true"
+				aria-describedby={ name + "-error" }
+			}
+		>
+			if placeholder != "" {
+				<option value="" selected?={ selected == "" }>{ placeholder }</option>
+			}
+			for _, o := range options {
+				<option value={ o.Value } selected?={ o.Value == selected }>{ o.Label }</option>
+			}
+		</select>
+		if errMsg != "" {
+			<p id={ name + "-error" } class="field-error">{ errMsg }</p>
+		}
+	</div>
+}
+
+// Textarea renders a labelled multi-line input.
+templ Textarea(name, label, value, errMsg string) {
+	<div class="space-y-1.5">
+		<label for={ name } class="label">{ label }</label>
+		<textarea
+			id={ name }
+			name={ name }
+			rows="4"
+			class="input min-h-20 py-2"
+			if errMsg != "" {
+				aria-invalid="true"
+				aria-describedby={ name + "-error" }
+			}
+		>{ value }</textarea>
+		if errMsg != "" {
+			<p id={ name + "-error" } class="field-error">{ errMsg }</p>
+		}
+	</div>
+}
+
+// CheckboxField renders a single labelled checkbox. The control submits its name with
+// value "1" when checked (unchecked checkboxes send nothing — handlers test presence).
+templ CheckboxField(name, label string, checked bool) {
+	<label for={ name } class="flex items-center gap-2 text-sm">
+		<input id={ name } name={ name } type="checkbox" value="1" checked?={ checked } class="size-4 rounded border-input"/>
+		{ label }
+	</label>
+}
+
+// FormError is the top-of-form banner for a non-field (form-level) error. Renders
+// nothing when msg is empty.
+templ FormError(msg string) {
+	if msg != "" {
+		<div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{ msg }
+		</div>
+	}
+}
+
+// FormActions is the submit/cancel button row. Pass the buttons/links as children so
+// each form controls its own labels and cancel destination.
+templ FormActions() {
+	<div class="flex items-center justify-end gap-2 pt-2">
+		{ children... }
+	</div>
+}

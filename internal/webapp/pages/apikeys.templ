@@ -11,6 +11,7 @@ import (
 templ APIKeysList(d layout.ShellData, keys []service.APIKeyResponse) {
 	@layout.Shell(d) {
 		@components.PageHeader("API keys", "Programmatic access to your household data") {
+			<a href="/app/api-keys/new" class="btn-primary btn-sm">New API key</a>
 		}
 		if len(keys) == 0 {
 			@components.EmptyState("No API keys", "API keys let scripts and agents call the REST API and MCP.") {
@@ -25,7 +26,8 @@ templ APIKeysList(d layout.ShellData, keys []service.APIKeyResponse) {
 								<th>Scope</th>
 								<th>Key</th>
 								<th>Last used</th>
-								<th class="text-right">Status</th>
+								<th>Status</th>
+								<th class="text-right">Actions</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -39,8 +41,17 @@ templ APIKeysList(d layout.ShellData, keys []service.APIKeyResponse) {
 										<span class="kbd">{ apiKeyMask(k.KeyPrefix) }</span>
 									</td>
 									<td class="whitespace-nowrap text-muted-foreground">{ Deref(k.LastUsedAt, "Never") }</td>
-									<td class="whitespace-nowrap text-right">
+									<td class="whitespace-nowrap">
 										@components.Badge(apiKeyStatusVariant(k.RevokedAt), apiKeyStatusLabel(k.RevokedAt))
+									</td>
+									<td class="whitespace-nowrap text-right">
+										if k.RevokedAt == nil || *k.RevokedAt == "" {
+											<form method="post" action={ templ.SafeURL("/app/api-keys/" + k.ID + "/revoke") } onsubmit="return confirm('Revoke this key? Any client using it will immediately lose access.')">
+												<button type="submit" class="btn-ghost btn-sm text-destructive">Revoke</button>
+											</form>
+										} else {
+											<span class="text-muted-foreground">—</span>
+										}
 									</td>
 								</tr>
 							}
@@ -90,4 +101,86 @@ func apiKeyStatusVariant(revokedAt *string) string {
 		return "destructive"
 	}
 	return "success"
+}
+
+// APIKeyFormData drives the create API-key form. Errors is keyed by field name (name,
+// scope) plus the reserved "form" key for a top-level banner. Values preserves submitted
+// input on an error re-render.
+type APIKeyFormData struct {
+	ActionURL string
+	CancelURL string
+	Values    APIKeyFormValues
+	Errors    map[string]string
+}
+
+// APIKeyFormValues is the editable field set for the create form.
+type APIKeyFormValues struct {
+	Name  string
+	Scope string
+}
+
+// apiKeyScopeOptions are the two selectable key scopes.
+func apiKeyScopeOptions() []components.Option {
+	return []components.Option{
+		{Value: "full_access", Label: "Full access (read & write)"},
+		{Value: "read_only", Label: "Read only"},
+	}
+}
+
+// APIKeyForm renders the create API-key form as a native POST. There is no edit mode —
+// keys are immutable; a key is created once (revealing its plaintext) and later revoked.
+templ APIKeyForm(d layout.ShellData, f APIKeyFormData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Cancel
+			</a>
+		</div>
+		@components.PageHeader("New API key", "") {
+		}
+		<form method="post" action={ templ.SafeURL(f.ActionURL) } class="card max-w-xl space-y-5 p-6">
+			@components.FormError(f.Errors["form"])
+			@components.FieldAttrs("name", "Name", f.Values.Name, f.Errors["name"], templ.Attributes{
+				"type":        "text",
+				"required":    true,
+				"autofocus":   true,
+				"maxlength":   "100",
+				"placeholder": "e.g. budgeting-script",
+			})
+			@components.SelectField("scope", "Scope", apiKeyScopeOptions(), f.Values.Scope, "", f.Errors["scope"])
+			@components.FormActions() {
+				<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn-primary btn-sm">Create API key</button>
+			}
+		</form>
+	}
+}
+
+// APIKeyCreated shows the freshly-minted key's plaintext exactly once. The plaintext is
+// never stored or re-rendered anywhere else, so the page warns the user to copy it now.
+templ APIKeyCreated(d layout.ShellData, plaintextKey string, key service.APIKeyResponse) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href="/app/api-keys" class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				API keys
+			</a>
+		</div>
+		@components.PageHeader("API key created", key.Name) {
+			@components.Badge(apiKeyScopeVariant(key.Scope), apiKeyScopeLabel(key.Scope))
+		}
+		<div class="card max-w-xl space-y-4 p-6">
+			<div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+				Copy this key now — it will <strong>not</strong> be shown again. We only store a hash, so there is no way to recover it later.
+			</div>
+			<div class="space-y-1.5">
+				<span class="label">Your new API key</span>
+				<code class="block w-full break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm select-all">{ plaintextKey }</code>
+			</div>
+			@components.FormActions() {
+				<a href="/app/api-keys" class="btn-primary btn-sm">Done</a>
+			}
+		</div>
+	}
 }

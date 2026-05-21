@@ -14,6 +14,7 @@ import (
 templ CategoriesList(d layout.ShellData, cats []service.CategoryResponse) {
 	@layout.Shell(d) {
 		@components.PageHeader("Categories", "How transactions are grouped across your household") {
+			<a href="/app/categories/new" class="btn-primary btn-sm">New category</a>
 		}
 		if len(cats) == 0 {
 			@components.EmptyState("No categories yet", "Categories appear as transactions sync and rules run.") {
@@ -67,6 +68,7 @@ templ CategoryDetail(d layout.ShellData, c *service.CategoryResponse) {
 			if c.Hidden {
 				@components.Badge("secondary", "Hidden")
 			}
+			<a href={ templ.SafeURL("/app/categories/" + c.ShortID + "/edit") } class="btn-outline btn-sm">Edit</a>
 		}
 		<div class="card divide-y">
 			@detailRow("Slug") {
@@ -98,6 +100,104 @@ templ CategoryDetail(d layout.ShellData, c *service.CategoryResponse) {
 				<span class="text-sm">{ Deref(c.Icon, "—") }</span>
 			}
 		</div>
+	}
+}
+
+// CategoryFormData carries the state for the create/edit category form. One struct
+// drives both modes — Mode flips the title, action verb, and which fields are editable.
+// Errors is keyed by field name (display_name, slug, parent_id, color, icon) plus the
+// reserved key "form" for a top-level banner. Values holds the submitted/prefilled
+// field values so a re-render after a validation failure preserves user input.
+type CategoryFormData struct {
+	Mode          string // "create" or "edit"
+	ActionURL     string // POST target
+	CancelURL     string // link back to list (create) or detail (edit)
+	Values        CategoryFormValues
+	Errors        map[string]string
+	ParentOptions []components.Option
+	IsSystem      bool // edit-only: system categories can't be renamed-slug/reparented
+}
+
+// CategoryFormValues is the editable field set, pre-filled on edit and on error re-render.
+type CategoryFormValues struct {
+	DisplayName string
+	Slug        string
+	ParentID    string // parent short ID or "" for top level
+	Color       string
+	Icon        string
+	Hidden      bool
+}
+
+func (f CategoryFormData) isEdit() bool { return f.Mode == "edit" }
+
+func (f CategoryFormData) title() string {
+	if f.isEdit() {
+		return "Edit category"
+	}
+	return "New category"
+}
+
+func (f CategoryFormData) submitLabel() string {
+	if f.isEdit() {
+		return "Save changes"
+	}
+	return "Create category"
+}
+
+// CategoryForm renders the create/edit category form as a native POST. Slug and parent
+// are only settable on create (UpdateCategory doesn't change them); on edit they render
+// as read-only context. Per-field errors come from f.Errors; a "form" key renders a banner.
+templ CategoryForm(d layout.ShellData, f CategoryFormData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				Cancel
+			</a>
+		</div>
+		@components.PageHeader(f.title(), "") {
+		}
+		<form method="post" action={ templ.SafeURL(f.ActionURL) } class="card max-w-xl space-y-5 p-6">
+			@components.FormError(f.Errors["form"])
+			@components.FieldAttrs("display_name", "Display name", f.Values.DisplayName, f.Errors["display_name"], templ.Attributes{
+				"type":     "text",
+				"required": true,
+				"autofocus": true,
+				"maxlength": "100",
+			})
+			if f.isEdit() {
+				<div class="space-y-1.5">
+					<span class="label">Slug</span>
+					<input type="text" value={ f.Values.Slug } class="input" disabled readonly/>
+					<p class="text-xs text-muted-foreground">The slug is permanent once a category is created.</p>
+				</div>
+			} else {
+				@components.FieldAttrs("slug", "Slug", f.Values.Slug, f.Errors["slug"], templ.Attributes{
+					"type":        "text",
+					"pattern":     "[a-z0-9_]+",
+					"placeholder": "auto-generated from display name",
+					"inputmode":   "text",
+				})
+			}
+			if !f.isEdit() {
+				@components.SelectField("parent_id", "Parent category", f.ParentOptions, f.Values.ParentID, "Top level (no parent)", f.Errors["parent_id"])
+			}
+			@components.FieldAttrs("color", "Color", f.Values.Color, f.Errors["color"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "#22c55e",
+			})
+			@components.FieldAttrs("icon", "Icon", f.Values.Icon, f.Errors["icon"], templ.Attributes{
+				"type":        "text",
+				"placeholder": "lucide icon name",
+			})
+			if f.isEdit() {
+				@components.CheckboxField("hidden", "Hidden (exclude from pickers and totals)", f.Values.Hidden)
+			}
+			@components.FormActions() {
+				<a href={ templ.SafeURL(f.CancelURL) } class="btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn-primary btn-sm">{ f.submitLabel() }</button>
+			}
+		</form>
 	}
 }
 
