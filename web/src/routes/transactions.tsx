@@ -104,6 +104,18 @@ export function TransactionsPage() {
     // the list, flashing the URL away from the detail page we just opened.
     if (!window.location.pathname.endsWith("/transactions")) return;
     const q = debounced.trim() || undefined;
+    // Skip when the debounced query already matches the URL. This effect
+    // runs on every mount — including when the user returns to the list via
+    // the browser back/forward buttons — so an unconditional `navigate`
+    // here pushes a redundant history entry on each landing. That truncates
+    // the forward stack (the forward button stops working) and strips `p`
+    // (bouncing the user off whatever page they'd backed into). Compare
+    // against the live URL `q` rather than the `search.q` prop so it stays
+    // off the dep array — keying on `search.q` would re-fire mid-debounce
+    // and fight the reverse sync below.
+    const urlQ =
+      new URLSearchParams(window.location.search).get("q") || undefined;
+    if (q === urlQ) return;
     navigate({
       to: ".",
       search: (prev: Record<string, unknown>) => ({ ...prev, q, p: undefined }),
