@@ -194,10 +194,11 @@ export function AgentsPage() {
           isLoading={agentsQuery.isLoading}
           getRowId={(a) => a.id}
           onRowClick={(a) =>
+            // No `viewTransition` — it blanks iOS Safari's back-swipe preview
+            // on scrolled list→detail navs (see transactions.tsx / csswg#8333).
             navigate({
               to: "/agents/$slug/edit",
               params: { slug: a.slug },
-              viewTransition: true,
             })
           }
           refinedHeader

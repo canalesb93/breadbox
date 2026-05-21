@@ -164,14 +164,17 @@ export function TransactionsPage() {
 
   const openTransaction = useCallback(
     (t: Transaction) =>
-      // `viewTransition: true` opts into the browser's View Transitions API
-      // on Safari 26.2+, Chrome, and Firefox — list → detail gets a
-      // cross-fade instead of an instant swap. TanStack Router gates on
-      // `document.startViewTransition` so older browsers see plain nav.
+      // NOTE: deliberately NO `viewTransition: true`. Running a same-document
+      // View Transition on a scrolled list→detail nav corrupts iOS Safari's
+      // back-swipe preview snapshot — the gesture reveals a blank page while
+      // swiping back. Safari captures its preview mid-transition and there's
+      // no way to opt out of that capture (csswg-drafts#8333, "incorrect
+      // capture"); the `hasUAVisualTransition` coordination that mitigates it
+      // isn't present on the Safari versions we target. A cross-fade isn't
+      // worth a broken back gesture. Same applies on /tags and /agents.
       navigate({
         to: "/transactions/$id",
         params: { id: t.short_id },
-        viewTransition: true,
       }),
     [navigate],
   );

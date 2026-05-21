@@ -147,10 +147,11 @@ export function TagsTable({
         isError={isError}
         getRowId={(t) => t.id}
         onRowClick={(t) =>
+          // No `viewTransition` — it blanks iOS Safari's back-swipe preview
+          // on scrolled list→detail navs (see transactions.tsx / csswg#8333).
           navigate({
             to: "/tags/$slug",
             params: { slug: t.slug },
-            viewTransition: true,
           })
         }
         emptyState={emptyState}
