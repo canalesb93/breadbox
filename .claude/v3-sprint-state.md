@@ -38,15 +38,24 @@ subagents, validate every surface with Chrome DevTools, merge PRs into this spri
 - [x] Phase 5 — Streaming **DONE & MERGED** (PR #1407): agent-run live transcript via SSE + static fallback. Follow-ups: sync-progress + activity-timeline streaming.
 - [ ] Phase 6 — Cutover + parity audit (do NOT retire SPA until parity audited)
 
-## Parity gaps remaining (vs v2 SPA)
-- Home/overview dashboard: v3 Home is a placeholder; SPA has metrics/charts (task #16, building). Main visible gap.
-- Reports/Reviews/Insights: v3 placeholders. VERIFY whether the SPA also stubs these (plan said "match SPA's placeholder state" — if so, already at parity). Audit in Phase 6.
-- Drag-drop rule builder (#15): v3 has form-based rule editor (functional parity); SPA had @dnd-kit interaction.
-- Sync-progress + activity-timeline SSE streaming (Phase 5 follow-ups).
-- Asset fingerprinting for app.css/app.js (#15); confirm()→<dialog> on api-key revoke.
-- Mobile polish + Playwright suite (loop end-state #3).
+## Parity audit punch-list (2026-05-21, SPA vs /app — definitive)
+Core surfaces AT PARITY. Reports/Insights/Reviews are PLACEHOLDER-MATCHED (SPA also stubs them — no action). v3 EXCEEDS SPA: server-side validation, SSE streaming, native nav/bfcache.
+**Tier 1 (cutover blockers):**
+  1. Tx list filters: amount min/max + pending (+ sorting sort_by/sort_order) — EASY, handler+form params.
+  2. Bulk tx operations (select → categorize/tag) — island + multi-id POST.
+  3. Inline category edit on tx list — small island AJAX update.
+  4. Connection reauth flow — provider-specific (Plaid/Teller link); COMPLEX/risky for autonomous — may need real link tokens; defer/flag.
+**Tier 2 (high-value):**
+  5. Connection sync-all button (POST trigger).
+  6. Activity timeline on tx detail (list_annotations → render) — explains categorization.
+  7. Connection user/family filter tabs.
+  8. Rule form: warn when OR/NOT conditions can't be visually edited.
+**Tier 3/4 (post-cutover OK):** settings modals-vs-pages decision; prompt builder (or hide from nav); backups export; household mgmt; Reports/Insights/Reviews real content.
+**Loop end-state also:** #15 drag-drop rule builder + asset fingerprinting; confirm()→<dialog> on api-key revoke; Playwright suite + mobile pass.
 
 ## Progress log (newest first)
+- 2026-05-21 03:0x — Heartbeat. Core v3 complete (7 PRs). Parity-audit Explore agent running (read-only, SPA vs /app). Awaiting its punch-list to drive final polish; then loop end-state. No code change this tick (sequencing on the audit; ad-hoc edits would risk redundancy with audit findings + my context is large).
+- 2026-05-21 03:0x — Home overview dashboard MERGED (PR #1408): metrics + server-SVG spending chart + recent activity + multi-currency-safe. Phase 5 MERGED (PR #1407). 7 PRs total; core v3 app is COMPLETE & deploy-ready. NEXT: parity audit (delegated, read-only) → then loop end-state (pending improvements #15, deprecate v1+SPA after audit, Playwright polish/mobile). Phase 6 cutover (302 /v2→/app) only after parity audit confirms no critical gaps.
 - 2026-05-21 02:2x — Phase 4 islands MERGED (PR #1406): esbuild-via-Go pipeline + ⌘K command palette (validated, centered, no console errors). 5 PRs merged; v3 is a near-complete deploy-ready app. Deferred (task #15): drag-drop rule builder island + app.css/js fingerprinting (currently max-age=3600 → stale CSS up to 1h post-deploy; the islands manifest already fingerprints). NEXT: Phase 5 streaming (Datastar+SSE: sync progress, agent run live transcript, activity timeline) — delegated. Then parity audit → Phase 6 cutover (302 /v2→/app) → loop end-state (deprecate v1+SPA, Playwright polish/mobile). NOTE: do NOT retire the SPA until parity (incl. streaming) is reached + audited; SPA still has streaming/charts/reviews v3 lacks.
 - 2026-05-21 02:0x — #14 CI/deploy MERGED (PR #1405): webapp build-tag injection in CI, CSS in CI/release/Docker, Caddyfile passes /app. 4 PRs merged; v3 is deploy-ready. NEXT: Phase 4 islands (esbuild-via-Go pipeline + ⌘K palette delegated; drag-drop rule builder is a follow-up), then Phase 5 streaming, Phase 6 cutover, loop end-state (deprecate v1+SPA, Playwright polish).
 - 2026-05-21 01:4x — Phase 3 MERGED (PR #1404). Core CRUD app complete (read+write+settings+auth). 3 PRs merged into sprint branch. NEXT: (#14) CI/deploy wiring — CRITICAL gotcha: CI runs `templ generate` directly and only injects the !headless&&!lite build tag into internal/templates/components; it MUST also inject into internal/webapp generated files or headless/lite CI cells break. Delegated #14 to a subagent. After that: Phase 4 (esbuild-via-Go islands: ⌘K palette, drag-drop rule builder), Phase 5 (Datastar+SSE streaming: sync progress, agent transcripts, activity timeline), Phase 6 cutover (302 /v2→/app, retire SPA), then loop end-state (deprecate v1+SPA, Playwright polish/mobile).
@@ -88,5 +97,5 @@ Once /app reaches functional+flow parity with the SPA and the foundation is soli
    improve mobile responsiveness. Iterate until clean.
 
 ## Notifications
-- last_notified_epoch: 1779350260  (2026-05-21 00:57 — Phase 2 heartbeat)
+- last_notified_epoch: 1779354144  (2026-05-21 ~03:0x — heartbeat; pushed "core complete, 7 PRs" milestone ~2min prior, skipped dupe)
 - cadence: hourly at :37 via cron job `aecc8a60` (re-anchors plan + sends push + continues work)
