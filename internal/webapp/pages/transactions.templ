@@ -29,8 +29,15 @@ type TxFilters struct {
 
 // TransactionsList is a server-rendered data-table with a query-param filter bar and
 // real prev/next pagination links. No client router, no JS — every nav is a document.
-templ TransactionsList(d layout.ShellData, result *service.TransactionListResult, filters TxFilters) {
+//
+// Two progressive-enhancement surfaces hydrate here via the page-scoped "transactions"
+// island (assets/js/islands/transactions.ts): bulk select + actions (the table is a
+// native multi-checkbox <form> POSTing to /app/transactions/bulk) and an inline
+// per-row category editor (a <select> that POSTs to /app/transactions/{id}/category).
+// With JS off both degrade to plain native form submits — nothing is broken, just plainer.
+templ TransactionsList(d layout.ShellData, result *service.TransactionListResult, filters TxFilters, categories []components.Option) {
 	@layout.Shell(d) {
+		<script type="module" src={ layout.IslandSrc("transactions") }></script>
 		@components.PageHeader("Transactions", "Every transaction synced into your household") {
 		}
 		<form method="get" action="/app/transactions" class="card mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -83,53 +90,102 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 			@components.EmptyState("No transactions", "Nothing matches these filters yet.") {
 			}
 		} else {
-			<div class="card overflow-hidden">
-				<div class="overflow-x-auto">
-					<table class="data-table">
-						<thead>
-							<tr>
-								<th>
-									<a href={ templ.SafeURL(txnSortURL(filters, "date")) } class="inline-flex items-center gap-1 hover:underline">
-										Date
-										if filters.SortBy == "date" {
-							<span class="text-muted-foreground">{ txnSortArrow(filters.SortOrder) }</span>
-									}
-									</a>
-								</th>
-								<th>Description</th>
-								<th>Account</th>
-								<th>Category</th>
-								<th class="text-right">
-									<a href={ templ.SafeURL(txnSortURL(filters, "amount")) } class="inline-flex items-center gap-1 hover:underline">
-										Amount
-										if filters.SortBy == "amount" {
-							<span class="text-muted-foreground">{ txnSortArrow(filters.SortOrder) }</span>
-									}
-									</a>
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							for _, t := range result.Transactions {
-								<tr>
-									<td class="whitespace-nowrap text-muted-foreground">{ t.Date }</td>
-									<td>
-										<a href={ templ.SafeURL("/app/transactions/" + t.ShortID) } class="hover:underline">
-											{ txnDisplayName(t) }
-										</a>
-										if t.Pending {
-											<span class="badge-secondary ml-2">Pending</span>
-										}
-									</td>
-									<td class="whitespace-nowrap text-muted-foreground">{ Deref(t.AccountName, "—") }</td>
-									<td class="whitespace-nowrap text-muted-foreground">{ txnCategoryName(t) }</td>
-									<td class="whitespace-nowrap text-right font-medium tabular-nums">{ Money(&t.Amount, t.IsoCurrencyCode) }</td>
-								</tr>
+			<!-- The whole table is a native multi-checkbox form. Submitting posts the
+				 checked tx_id[]s + the chosen category/tag to the bulk handler. The island
+				 (data-tx-bulk) enhances it with a sticky action bar; no JS = the inline
+				 submit buttons below still work. The "return" hidden field preserves filters. -->
+			<form
+				method="post"
+				action="/app/transactions/bulk"
+				data-tx-bulk
+				data-return={ txnReturnPath(filters) }
+			>
+				<input type="hidden" name="return" value={ txnReturnPath(filters) }/>
+				<!-- Bulk action bar. Hidden until ≥1 row is selected when JS is present
+					 (the island flips [hidden]); shown statically as a plain control row
+					 with JS off so the bulk submit is always reachable. -->
+				<div
+					class="card mb-3 flex flex-wrap items-end gap-3 p-3"
+					data-tx-bulkbar
+					hidden
+				>
+					<span class="text-sm font-medium" data-tx-count>0 selected</span>
+					<div class="flex flex-col gap-1">
+						<label for="bulk-category" class="text-xs font-medium text-muted-foreground">Set category</label>
+						<select id="bulk-category" name="category_slug" class="input">
+							<option value="">No change</option>
+							for _, c := range categories {
+								<option value={ c.Value }>{ c.Label }</option>
 							}
-						</tbody>
-					</table>
+						</select>
+					</div>
+					<div class="flex flex-col gap-1">
+						<label for="bulk-tag" class="text-xs font-medium text-muted-foreground">Add tag</label>
+						<input id="bulk-tag" name="tag" type="text" class="input" placeholder="tag-slug" autocomplete="off"/>
+					</div>
+					<button type="submit" class="btn-primary">Apply</button>
+					<button type="button" class="btn-ghost" data-tx-clear>Clear</button>
 				</div>
-			</div>
+				<div class="card overflow-hidden">
+					<div class="overflow-x-auto">
+						<table class="data-table">
+							<thead>
+								<tr>
+									<th class="w-8">
+										<input type="checkbox" data-tx-all aria-label="Select all transactions"/>
+									</th>
+									<th>
+										<a href={ templ.SafeURL(txnSortURL(filters, "date")) } class="inline-flex items-center gap-1 hover:underline">
+											Date
+											if filters.SortBy == "date" {
+												<span class="text-muted-foreground">{ txnSortArrow(filters.SortOrder) }</span>
+											}
+										</a>
+									</th>
+									<th>Description</th>
+									<th>Account</th>
+									<th>Category</th>
+									<th class="text-right">
+										<a href={ templ.SafeURL(txnSortURL(filters, "amount")) } class="inline-flex items-center gap-1 hover:underline">
+											Amount
+											if filters.SortBy == "amount" {
+												<span class="text-muted-foreground">{ txnSortArrow(filters.SortOrder) }</span>
+											}
+										</a>
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, t := range result.Transactions {
+									<tr data-tx-row={ t.ShortID }>
+										<td class="w-8">
+											<input
+												type="checkbox"
+												name="tx_id"
+												value={ t.ShortID }
+												data-tx-check
+												aria-label="Select transaction"
+											/>
+										</td>
+										<td class="whitespace-nowrap text-muted-foreground">{ t.Date }</td>
+										<td>
+											<a href={ templ.SafeURL("/app/transactions/" + t.ShortID) } class="hover:underline">
+												{ txnDisplayName(t) }
+											</a>
+											if t.Pending {
+												<span class="badge-secondary ml-2">Pending</span>
+											}
+										</td>
+										<td class="whitespace-nowrap text-muted-foreground">{ Deref(t.AccountName, "—") }</td>
+										@txnCategoryCell(t, categories, txnReturnPath(filters))
+										<td class="whitespace-nowrap text-right font-medium tabular-nums">{ Money(&t.Amount, t.IsoCurrencyCode) }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</form>
 			<div class="mt-4 flex items-center justify-between gap-3">
 				<p class="text-sm text-muted-foreground">{ txnPageLabel(filters, len(result.Transactions)) }</p>
 				<div class="flex items-center gap-2">
@@ -153,6 +209,45 @@ templ TransactionsList(d layout.ShellData, result *service.TransactionListResult
 			</div>
 		}
 	}
+}
+
+// txnCategoryCell renders the category column as an inline editor. With JS off the
+// static label + a link to the detail page (where category is editable) is all that
+// shows — the <select> is hidden and unused. The island reveals the <select> on click
+// (data-tx-cat-edit), and on change POSTs {category_slug} to the per-row category
+// endpoint as fetch, then optimistically swaps the label text. The cell is OUTSIDE the
+// bulk <form> semantics — its <select> has no name, so it never participates in the
+// bulk submit; the island reads data-tx-id + the select value and fires its own request.
+templ txnCategoryCell(t service.TransactionResponse, categories []components.Option, returnPath string) {
+	<td class="whitespace-nowrap text-muted-foreground" data-tx-catcell data-tx-id={ t.ShortID } data-tx-return={ returnPath }>
+		<button
+			type="button"
+			class="inline-flex items-center gap-1 rounded px-1 -mx-1 text-left hover:bg-accent hover:text-accent-foreground"
+			data-tx-cat-edit
+			data-tx-cat-label
+		>
+			{ txnCategoryName(t) }
+		</button>
+		<select class="input hidden" data-tx-cat aria-label="Set category" hidden>
+			for _, c := range categories {
+				<option value={ c.Value } selected?={ c.Value == txnCategorySlug(t) }>{ c.Label }</option>
+			}
+		</select>
+	</td>
+}
+
+// txnCategorySlug returns the transaction's current category slug, or "" when uncategorized.
+func txnCategorySlug(t service.TransactionResponse) string {
+	if t.Category != nil && t.Category.Slug != nil {
+		return *t.Category.Slug
+	}
+	return ""
+}
+
+// txnReturnPath is the current list URL (filters + offset) the POST handlers 303
+// back to, so a bulk/inline mutation lands the user on the same filtered page.
+func txnReturnPath(f TxFilters) string {
+	return txnPageURL(f, f.Offset)
 }
 
 // TransactionDetail shows one transaction with its amount header, a definition
