@@ -11,6 +11,7 @@ import (
 	breadboxmcp "breadbox/internal/mcp"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
+	"breadbox/internal/webapp"
 	"breadbox/internal/webhook"
 	"breadbox/static"
 	webui "breadbox/web"
@@ -320,6 +321,11 @@ func NewRouter(a *app.App, version string) http.Handler {
 		// boundary.
 		r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
 		r.Handle("/v2/*", webui.Handler())
+
+		// /app/* — v3 browser-native, server-rendered MPA. Coexists with the v2 SPA
+		// (/v2) and v1 admin (/) until cutover, when /v2 will 302 here. Shares the
+		// same session cookie via sm. Mounted before the "/" admin catch-all.
+		r.Mount("/app", webapp.New(a, sm).Router())
 
 		tr, err := admin.NewTemplateRenderer(sm)
 		if err != nil {

@@ -21,7 +21,8 @@ New admin UI pieces are authored as [`a-h/templ`](https://templ.guide) component
 - `internal/provider/` — provider interface + error sentinels. Subdirs: `plaid/`, `teller/`, `csv/`. See `.claude/rules/providers.md`.
 - `internal/sync/` — sync engine, matcher, rule application. See `.claude/rules/sync.md`.
 - `internal/db/` — sqlc-generated code (`*.sql.go`), queries (`queries/*.sql`), migrations (`migrations/*.sql`). See `.claude/rules/migrations.md`.
-- `internal/templates/` — `html/template` admin UI. See `.claude/rules/ui.md`.
+- `internal/templates/` — `html/template` admin UI (v1). See `.claude/rules/ui.md`.
+- `internal/webapp/` — v3 browser-native MPA mounted at `/app` (templ + Tailwind v4, server-rendered, no React). Replacing the `web/` React SPA. See `.claude/rules/app-mpa.md`.
 - `internal/crypto/` — AES-256-GCM encrypt/decrypt shared across providers.
 - `internal/shortid/` — 8-char base62 alias generation.
 - `internal/testutil/` — DB fixtures and test helpers. See `.claude/rules/testing.md`.
@@ -134,5 +135,6 @@ Scoped rules in `.claude/rules/` load when you touch matching files:
 - `mcp.md` — MCP tool and permission patterns
 - `providers.md` — provider integrations
 - `sync.md` — sync engine patterns
-- `ui.md` — admin UI, CSS, Alpine, icons
+- `ui.md` — admin UI (v1), CSS, Alpine, icons
+- `app-mpa.md` — v3 webapp (`/app`) conventions: browser-native MPA, templ, Basecoat components
 - `stacked-prs.md` — `gt` workflow and stack conventions (read before creating a stack)

@@ -61,3 +61,6 @@ backups/
 
 # MCP config (contains API key)
 .mcp.json
+
+# v3 webapp validation screenshots (local only)
+.shots/

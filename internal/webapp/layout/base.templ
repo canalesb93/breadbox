@@ -1,0 +1,38 @@
+package layout
+
+// Base is the document shell: <html>/<head>/<body>. It wires the browser-native
+// smoothness layer (View Transitions opt-in lives in app.css; Speculation Rules here)
+// and renders the server-chosen theme class with no flash of the wrong theme.
+templ Base(d BaseData) {
+	<!DOCTYPE html>
+	<html lang="en" class={ d.ThemeClass }>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+			<meta name="color-scheme" content="light dark"/>
+			<title>{ pageTitle(d.Title) }</title>
+			<link rel="stylesheet" href="/app/static/css/app.css"/>
+			<script defer src="/app/static/js/app.js"></script>
+			// Prerender same-origin /app links on hover/intent — the native equivalent
+			// of the SPA's defaultPreload:"intent". No-ops where unsupported.
+			<script type="speculationrules">
+				{
+					"prerender": [
+						{ "where": { "href_matches": "/app/*" }, "eagerness": "moderate" }
+					]
+				}
+			</script>
+		</head>
+		<body class="bg-background text-foreground antialiased">
+			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground">Skip to content</a>
+			{ children... }
+		</body>
+	</html>
+}
+
+func pageTitle(t string) string {
+	if t == "" {
+		return "Breadbox"
+	}
+	return t + " · Breadbox"
+}

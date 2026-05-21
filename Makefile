@@ -3,9 +3,13 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck webapp-css webapp-css-watch
 
 PORT ?= 8080
+
+# v3 webapp (internal/webapp) — Node-free Tailwind v4 build via the standalone CLI.
+WEBAPP_CSS_IN := internal/webapp/assets/css/input.css
+WEBAPP_CSS_OUT := internal/webapp/static/css/app.css
 
 # generate ensures gitignored build artifacts exist and are up to date.
 # - sqlc: only rebuilds if the generated models file is missing (queries are
@@ -19,6 +23,7 @@ PORT ?= 8080
 generate: templ
 	@if [ ! -f internal/db/models.go ]; then $(MAKE) sqlc; fi
 	@if [ ! -f static/css/styles.css ] || [ input.css -nt static/css/styles.css ]; then $(MAKE) css; fi
+	@if [ ! -s $(WEBAPP_CSS_OUT) ] || [ $(WEBAPP_CSS_IN) -nt $(WEBAPP_CSS_OUT) ]; then $(MAKE) webapp-css; fi
 
 # templ-install pulls the templ CLI if it's missing. Pinned via go.mod so the
 # version the CLI understands always matches the runtime lib the binary
@@ -39,11 +44,18 @@ templ-install:
 # dashboard surface and must be excluded from headless and lite builds.
 templ: templ-install
 	templ generate
-	@find internal/templates/components -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do \
+	@find internal/templates/components internal/webapp -name '*_templ.go' -print0 | while IFS= read -r -d '' f; do \
 		if ! head -1 "$$f" | grep -q '^//go:build'; then \
 			printf '//go:build !headless && !lite\n\n' | cat - "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
 		fi; \
 	done
+
+# webapp-css builds the v3 webapp stylesheet (Node-free, standalone Tailwind CLI).
+webapp-css: css-install
+	$(TAILWIND_BIN) -i $(WEBAPP_CSS_IN) -o $(WEBAPP_CSS_OUT) --minify
+
+webapp-css-watch: css-install
+	$(TAILWIND_BIN) -i $(WEBAPP_CSS_IN) -o $(WEBAPP_CSS_OUT) --watch
 
 # templ-check fails if generated files are stale. Used in CI so a PR cannot
 # land with hand-edited .templ files that nobody regenerated.
@@ -91,6 +103,7 @@ dev-watch: generate air-install
 	@echo $(PORT) > .breadbox-port
 	@trap 'rm -f .breadbox-port; kill 0' EXIT INT TERM; \
 		$(TAILWIND_BIN) -i input.css -o static/css/styles.css --watch & \
+		$(TAILWIND_BIN) -i $(WEBAPP_CSS_IN) -o $(WEBAPP_CSS_OUT) --watch & \
 		BREADBOX_DEV_RELOAD=1 SERVER_PORT=$(PORT) air -c .air.toml; \
 		wait
 
