@@ -116,8 +116,14 @@ export function TransactionsPage() {
     const urlQ =
       new URLSearchParams(window.location.search).get("q") || undefined;
     if (q === urlQ) return;
+    // `replace` (not push): the search box is current-view state, not a
+    // navigation destination. Without it, each debounce settle while typing
+    // ("c" → "co" → "cof") would append a back-stack entry, and "back"
+    // after a search would land on the unfiltered list instead of the page
+    // the user actually came from.
     navigate({
       to: ".",
+      replace: true,
       search: (prev: Record<string, unknown>) => ({ ...prev, q, p: undefined }),
     });
   }, [debounced, navigate]);
@@ -132,6 +138,10 @@ export function TransactionsPage() {
     (patch: Partial<TransactionsSearch>) => {
       navigate({
         to: ".",
+        // `replace`: filters are current-view state, consistent with the
+        // search-sync above — a filter tweak shouldn't add a back-stack
+        // entry or wipe the forward stack.
+        replace: true,
         // Any filter change collapses back to page 1 — staying on page 11
         // when the filtered result has only 2 pages would land on an empty
         // view. The pagination control itself patches `p` directly and
@@ -158,6 +168,11 @@ export function TransactionsPage() {
     (next: number) => {
       navigate({
         to: ".",
+        // `replace`: paging is current-view state. Back walks out of the
+        // list to where the user came from, not back through each page —
+        // the paginator handles page-to-page; the browser button handles
+        // the "leave the list" navigation.
+        replace: true,
         search: (prev: Record<string, unknown>) => ({
           ...prev,
           p: next > 1 ? next : undefined,
