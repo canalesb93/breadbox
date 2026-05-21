@@ -1,0 +1,113 @@
+package pages
+
+import (
+	"breadbox/internal/service"
+	"breadbox/internal/webapp/components"
+	"breadbox/internal/webapp/layout"
+)
+
+// AgentRunData drives the single-run detail + live-transcript page.
+type AgentRunData struct {
+	Agent *service.AgentDefinitionResponse
+	Run   *service.AgentRunResponse
+	// Lines are the transcript NDJSON lines already on disk at first paint
+	// (server-rendered initial state, so the page works with JS off).
+	Lines []string
+	// Live is true when the run is still in_progress — the only case where
+	// the SSE stream attaches. Finished runs render the full static transcript
+	// and the island stays dormant.
+	Live bool
+	// StreamURL is the SSE endpoint the island connects to when Live is true.
+	StreamURL string
+}
+
+// AgentRunDetail renders one agent run: its metadata, then the transcript. When
+// the run is still in progress the transcript region is enhanced by the
+// agent-run-stream island (SSE) which appends new lines live. With JS off (or
+// no SSE) the server-rendered lines + a Refresh link keep the surface usable —
+// graceful degradation per .claude/rules/app-mpa.md.
+templ AgentRunDetail(d layout.ShellData, data AgentRunData) {
+	@layout.Shell(d) {
+		<div class="mb-4">
+			<a href={ templ.SafeURL("/app/agents/" + data.Agent.Slug + "/runs") } class="btn-ghost btn-sm -ml-2">
+				@components.Icon("back")
+				{ data.Agent.Name } runs
+			</a>
+		</div>
+		@components.PageHeader("Run "+data.Run.ShortID, agentRunStartedLabel(data.Run)) {
+			@components.Badge(agentRunStatusVariant(data.Run.Status), TitleCase(data.Run.Status))
+		}
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+			@runStat("Trigger", TitleCase(data.Run.Trigger))
+			@runStat("Duration", agentRunDuration(data.Run.DurationMs))
+			@runStat("Cost", agentRunCost(data.Run.TotalCostUSD))
+			@runStat("Tokens", agentRunTokens(data.Run.InputTokens, data.Run.OutputTokens))
+		</div>
+		if data.Run.ErrorMessage != nil && *data.Run.ErrorMessage != "" {
+			<div class="card border-destructive/40 bg-destructive/5 p-4 mb-6">
+				<p class="text-sm font-medium text-destructive">Error</p>
+				<p class="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{ *data.Run.ErrorMessage }</p>
+			</div>
+		}
+		<div class="card overflow-hidden">
+			<div class="flex items-center justify-between border-b px-4 py-2">
+				<p class="text-sm font-medium">Transcript</p>
+				if data.Live {
+					<span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground" data-stream-status="connecting">
+						<span class="size-2 rounded-full bg-primary animate-pulse"></span>
+						Live
+					</span>
+				} else {
+					<a href={ templ.SafeURL(d.CurrentPath) } class="btn-ghost btn-sm">Refresh</a>
+				}
+			</div>
+			<pre
+				id="transcript"
+				class="max-h-[60vh] overflow-auto p-4 text-xs leading-relaxed whitespace-pre-wrap break-words"
+				data-stream-live={ liveAttr(data.Live) }
+				data-stream-url={ data.StreamURL }
+			>
+				if len(data.Lines) == 0 && !data.Live {
+					<span class="text-muted-foreground">No transcript recorded for this run.</span>
+				}
+				for _, line := range data.Lines {
+					@transcriptLine(line)
+				}
+			</pre>
+		</div>
+		if data.Live {
+			<script type="module" src={ layout.IslandSrc("agent-run-stream") }></script>
+		}
+	}
+}
+
+// transcriptLine renders one NDJSON line. We keep it raw (the line is already a
+// JSON object string) so both server render and the island's appended nodes
+// share an identical shape.
+templ transcriptLine(line string) {
+	<div class="transcript-line border-b border-border/30 py-0.5 last:border-0">{ line }</div>
+}
+
+templ runStat(label, value string) {
+	<div class="card p-3">
+		<p class="text-xs text-muted-foreground">{ label }</p>
+		<p class="mt-0.5 text-sm font-medium tabular-nums">{ value }</p>
+	</div>
+}
+
+// liveAttr maps the live flag to the data-stream-live attribute value. The
+// island only attaches when this is "true"; a finished run renders "false" and
+// the EventSource is never opened.
+func liveAttr(live bool) string {
+	if live {
+		return "true"
+	}
+	return "false"
+}
+
+func agentRunStartedLabel(r *service.AgentRunResponse) string {
+	if r.StartedAt == "" {
+		return ""
+	}
+	return "Started " + r.StartedAt
+}
