@@ -116,7 +116,8 @@ JS is a last resort, scoped to **named islands**: tiny, dependency-free TS modul
 server-rendered DOM and wire *behavior only*. An island must never own navigation — it only
 triggers real `location.href` navigations, so the browser keeps owning history/scroll/bfcache.
 With JS off, the island simply doesn't appear and everything stays reachable (pure progressive
-enhancement). First island shipped: the ⌘K command palette.
+enhancement). Islands shipped: the ⌘K command palette (`palette`), and the agent-run live-transcript
+SSE consumer (`agent-run-stream`, see "Streaming surfaces" below).
 
 **Where things live**
 - Source TS: `internal/webapp/assets/js/islands/<name>.ts` (one entrypoint per island).
@@ -145,6 +146,46 @@ enhancement). First island shipped: the ⌘K command palette.
 3. Add any `.<name>*` styles to `assets/css/input.css` using design tokens (never raw colors).
 4. Run `make webapp-js` (or `make generate`) — it bundles, hashes, and regenerates `manifest.go`.
    Commit the new bundle + the updated manifest alongside your `.templ`/CSS changes.
+
+## Streaming surfaces (SSE) — sync progress, agent runs, activity timeline
+
+SSE is the v3 real-time mechanism, scoped to **streaming surfaces only** — never static CRUD. The
+shape below is hand-rolled `text/event-stream` (the Datastar Go SDK is *allowed* but unnecessary for
+append-only growth; reach for it only when a surface needs server-driven fragment diffing rather than
+appending). First surface shipped: **agent run live transcript** (`agents_stream.go`).
+
+**The contract — server-first, SSE-enhances, degrades to static**
+1. **The page renders current state server-side.** No SSE, no JS → the page still shows everything
+   on disk/in the DB right now, plus a real `<a href>` **Refresh** link. "Unsupported" means "plain,"
+   never "broken." (For the transcript: the lines already written are rendered at first paint.)
+2. **A handler streams only NEW data as SSE.** `Content-Type: text/event-stream`, `Cache-Control:
+   no-store`, `X-Accel-Buffering: no`. Get an `http.Flusher`, `Flush()` after each frame. Emit named
+   events: `event: <name>\ndata: <payload>\n\n`. End the stream with a terminal event (e.g.
+   `event: done`) when the underlying work reaches a terminal state, then return. Honor
+   `r.Context().Done()` so a client disconnect tears the goroutine down.
+3. **The client passes a cursor so the server never replays.** The island counts the
+   server-rendered nodes and connects with `?from=<n>`; the handler skips the first `n` items.
+   EventSource auto-reconnects on transient drops, and the cursor keeps reconnects gap-free.
+4. **A tiny page-scoped island consumes it.** `data-stream-live="true"` + `data-stream-url` on the
+   target element gate hydration; the island opens an `EventSource`, appends a node per `event:
+   line`, and flips the status pill on `event: done`. With JS off the element has the data attrs but
+   nothing reads them — the static render stands. The island is page-scoped (`<script type="module">`
+   rendered only when `Live`), not global in `base.templ`.
+
+**Why tail-a-file for agent transcripts:** the sidecar already writes the run's NDJSON transcript
+line-by-line (`internal/agent/sidecar.go`); the handler just re-reads past the cursor each tick
+(~750ms) and checks run status for the terminal condition. Path resolution mirrors the REST handler
+(`internal/api/agents.go`): prefer `agent_runs.transcript_path`, else fall back to
+`<agent.transcript_dir>/<run.ID>.ndjson` — the column is only persisted on completion, so the
+fallback is what makes an *in-progress* run streamable at all.
+
+**Routing:** register stream routes via the surface's own registrar (e.g. `registerAgentStream`
+called from `registerAgents`), not the central `Router` in `handler.go`. Never render secrets into a
+stream (no tokens, no API keys).
+
+**Remaining streaming surfaces (follow-ups):** sync progress (SSE that re-renders the sync-status
+fragment on sync-engine events / an interval) and the activity timeline (append new events). Both
+follow the same server-first + cursor + terminal-event contract.
 
 ## Do not
 

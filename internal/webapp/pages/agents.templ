@@ -70,7 +70,7 @@ templ AgentRuns(d layout.ShellData, agent *service.AgentDefinitionResponse, runs
 			@components.Badge(agentEnabledVariant(agent.Enabled), agentEnabledLabel(agent.Enabled))
 			<a href={ templ.SafeURL("/app/agents/" + agent.Slug + "/edit") } class="btn-outline btn-sm">Edit</a>
 		}
-		@agentRunsTable(runs)
+		@agentRunsTable(agent.Slug, runs)
 	}
 }
 
@@ -111,7 +111,9 @@ templ AllAgentRuns(d layout.ShellData, runs []service.AgentRunWithAgentResponse)
 										</a>
 									</td>
 									<td class="whitespace-nowrap">
-										@components.Badge(agentRunStatusVariant(run.Status), TitleCase(run.Status))
+										<a href={ templ.SafeURL("/app/agents/" + run.AgentSlug + "/runs/" + run.ShortID) } class="hover:underline">
+											@components.Badge(agentRunStatusVariant(run.Status), TitleCase(run.Status))
+										</a>
 									</td>
 									<td class="whitespace-nowrap text-muted-foreground">{ run.StartedAt }</td>
 									<td class="whitespace-nowrap text-right tabular-nums text-muted-foreground">{ agentRunDuration(run.DurationMs) }</td>
@@ -128,7 +130,7 @@ templ AllAgentRuns(d layout.ShellData, runs []service.AgentRunWithAgentResponse)
 }
 
 // agentRunsTable is the shared per-agent runs table body.
-templ agentRunsTable(runs []service.AgentRunResponse) {
+templ agentRunsTable(slug string, runs []service.AgentRunResponse) {
 	if len(runs) == 0 {
 		@components.EmptyState("No runs yet", "This agent hasn't run yet.") {
 		}
@@ -150,7 +152,9 @@ templ agentRunsTable(runs []service.AgentRunResponse) {
 						for _, run := range runs {
 							<tr>
 								<td class="whitespace-nowrap">
-									@components.Badge(agentRunStatusVariant(run.Status), TitleCase(run.Status))
+									<a href={ templ.SafeURL("/app/agents/" + slug + "/runs/" + run.ShortID) } class="hover:underline">
+										@components.Badge(agentRunStatusVariant(run.Status), TitleCase(run.Status))
+									</a>
 								</td>
 								<td class="whitespace-nowrap text-muted-foreground">{ TitleCase(run.Trigger) }</td>
 								<td class="whitespace-nowrap text-muted-foreground">{ run.StartedAt }</td>

@@ -34,6 +34,7 @@ func (h *Handler) registerAgents(r chi.Router) {
 	r.Get("/agents/settings", h.agentSettings)
 	r.Post("/agents/settings", h.requireSameOrigin(h.updateAgentSettings))
 	r.Get("/agents/{slug}/runs", h.agentRuns)
+	h.registerAgentStream(r) // /agents/{slug}/runs/{shortId} + /stream (SSE)
 	r.Get("/agents/{slug}/edit", h.editAgent)
 	r.Post("/agents/{slug}", h.requireSameOrigin(h.updateAgent))
 }

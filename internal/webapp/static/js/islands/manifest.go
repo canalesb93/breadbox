@@ -7,5 +7,6 @@ package islands
 // Manifest maps a logical island name to its content-hashed built filename
 // under /app/static/js/islands/. Resolve URLs via layout.IslandSrc.
 var Manifest = map[string]string{
+	"agent-run-stream": "agent-run-stream-7LQUBZ2S.js",
 	"palette": "palette-SYBGVEW7.js",
 }
