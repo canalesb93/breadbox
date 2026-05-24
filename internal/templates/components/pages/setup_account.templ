@@ -66,7 +66,7 @@ templ SetupAccount(p SetupAccountProps) {
 						autocomplete="new-password"
 						minlength="8"
 						placeholder="Create a password"
-						class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Password"] != "") }
+						class={ "input w-full h-12 text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Password"] != "") }
 					/>
 					<p class="text-xs text-base-content/40 mt-1.5">Minimum 8 characters</p>
 					if p.FieldErrors["Password"] != "" {
@@ -82,7 +82,7 @@ templ SetupAccount(p SetupAccountProps) {
 						required
 						autocomplete="new-password"
 						placeholder="Confirm your password"
-						class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["ConfirmPassword"] != "") }
+						class={ "input w-full h-12 text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["ConfirmPassword"] != "") }
 					/>
 					if p.FieldErrors["ConfirmPassword"] != "" {
 						<p class="text-xs text-error mt-1.5">{ p.FieldErrors["ConfirmPassword"] }</p>

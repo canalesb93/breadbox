@@ -460,7 +460,7 @@ templ connectionsCreateLinkModal(p ConnectionsProps) {
 				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				<div class="form-control">
 					<label class="label label-text text-sm font-medium">Primary Account</label>
-					<select name="primary_account_id" class="select select-sm w-full rounded-xl" required>
+					<select name="primary_account_id" class="select select-sm w-full" required>
 						<option value="">Select the primary cardholder's account...</option>
 						for _, a := range p.LinkAccounts {
 							<option value={ a.ID }>{ connectionsLinkAccountLabel(a) }</option>
@@ -469,7 +469,7 @@ templ connectionsCreateLinkModal(p ConnectionsProps) {
 				</div>
 				<div class="form-control">
 					<label class="label label-text text-sm font-medium">Dependent Account</label>
-					<select name="dependent_account_id" class="select select-sm w-full rounded-xl" required>
+					<select name="dependent_account_id" class="select select-sm w-full" required>
 						<option value="">Select the authorized user's account...</option>
 						for _, a := range p.LinkAccounts {
 							<option value={ a.ID }>{ connectionsLinkAccountLabel(a) }</option>

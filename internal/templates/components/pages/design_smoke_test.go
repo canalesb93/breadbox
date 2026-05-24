@@ -90,7 +90,11 @@ func TestDesignGalleryRenders(t *testing.T) {
 }
 
 // TestDesignComponentRenders confirms the standalone single-section page
-// renders for every section without error.
+// renders for every section without error. The page hosts the section
+// inside an iframe pointing at the ?embed=1 variant of the same route,
+// so the assertion checks that wiring rather than any chrome (the
+// standalone shell's back-to-gallery link lives in base.html, not in
+// this templ).
 func TestDesignComponentRenders(t *testing.T) {
 	for _, sec := range DesignSections() {
 		var buf bytes.Buffer
@@ -109,9 +113,21 @@ func TestDesignComponentRenders(t *testing.T) {
 		if len(out) < 200 {
 			t.Errorf("section %q standalone page too small (%d bytes)", sec.Slug, len(out))
 		}
-		// The breadcrumb back link should always be present.
-		if !strings.Contains(out, `href="/design"`) {
-			t.Errorf("section %q standalone page missing back link to /design", sec.Slug)
+		// Iframe src must point at the embed mode of the same slug.
+		wantEmbedSrc := "/design/c/" + sec.Slug + "?embed=1"
+		if !strings.Contains(out, wantEmbedSrc) {
+			t.Errorf("section %q standalone page missing iframe src=%q", sec.Slug, wantEmbedSrc)
+		}
+		// The embed renderer itself must render the section markup
+		// non-empty (it's a thin wrapper around sec.Render(); silent
+		// failure here would mean the iframe loads a blank page).
+		var embedBuf bytes.Buffer
+		if err := DesignComponentEmbed(props).Render(context.Background(), &embedBuf); err != nil {
+			t.Errorf("section %q embed render error: %v", sec.Slug, err)
+			continue
+		}
+		if embedBuf.Len() < 50 {
+			t.Errorf("section %q embed render too small (%d bytes)", sec.Slug, embedBuf.Len())
 		}
 	}
 }

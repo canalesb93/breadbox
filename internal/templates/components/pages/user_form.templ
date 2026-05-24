@@ -60,7 +60,7 @@ templ userFormCreate() {
 						type="text"
 						:value="setupURL"
 						readonly
-						class="input input-sm rounded-xl flex-1 text-xs font-mono bg-base-200 select-all cursor-text"
+						class="input input-sm flex-1 text-xs font-mono bg-base-200 select-all cursor-text"
 					/>
 					<button
 						@click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
@@ -109,7 +109,7 @@ templ userFormCreate() {
 							type="text"
 							id="name"
 							name="name"
-							class="input w-full rounded-xl"
+							class="input w-full"
 							required
 							maxlength="128"
 							placeholder="e.g., Alex Canales"
@@ -126,7 +126,7 @@ templ userFormCreate() {
 							type="email"
 							id="email"
 							name="email"
-							class="input w-full rounded-xl"
+							class="input w-full"
 							:required="createLogin"
 							placeholder="e.g., alex@example.com"
 						/>
@@ -146,7 +146,7 @@ templ userFormCreate() {
 								<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_role">
 									Role
 								</label>
-								<select id="login_role" name="login_role" x-model="role" class="select w-full rounded-xl bg-base-200">
+								<select id="login_role" name="login_role" x-model="role" class="select w-full bg-base-200">
 									<option value="viewer">Viewer — can only see their own data</option>
 									<option value="editor">Editor — can view and edit all household data</option>
 								</select>

@@ -114,7 +114,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 		<div x-show="expanded" x-collapse>
 			<div class="px-4 sm:px-5 py-4">
 				if c.ShowWarning {
-					<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
+					<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs">
 						<i data-lucide="triangle-alert" class="w-4 h-4"></i>
 						<span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
 					</div>
@@ -124,7 +124,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 					<div class="form-control mb-4">
 						<textarea
 							name={ c.FieldName }
-							class="textarea font-mono text-xs leading-relaxed w-full rounded-xl"
+							class="textarea font-mono text-xs leading-relaxed w-full"
 							style={ "min-height: " + c.MinHeight }
 							maxlength={ fmt.Sprintf("%d", c.MaxLen) }
 							x-model="value"

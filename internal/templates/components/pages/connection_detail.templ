@@ -307,7 +307,7 @@ templ connDetailInfoGrid(p ConnectionDetailProps) {
 			<div class="p-4">
 				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Sync Interval</div>
 				<div>
-					<select id="sync-interval" @change="updateSyncInterval($event.target.value)" class="select select-xs w-full rounded-lg">
+					<select id="sync-interval" @change="updateSyncInterval($event.target.value)" class="select select-xs w-full">
 						@connDetailIntervalOption("", "Global default", !p.SyncIntervalOverrideMinutesValid, false, false)
 						@connDetailIntervalOption("15", "Every 15 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 15)
 						@connDetailIntervalOption("30", "Every 30 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 30)
@@ -422,7 +422,7 @@ templ connDetailAccountCard(a AccountRow) {
 						value={ a.DisplayName }
 						placeholder="Display name..."
 						@change={ "updateDisplayName('" + a.ID + "', $event.target.value)" }
-						class="input input-xs input-ghost flex-1 hover:focus:transition-all rounded-lg text-xs"
+						class="input input-xs input-ghost flex-1 hover:focus:transition-all text-xs"
 					/>
 					<label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
 						if a.Excluded {

@@ -474,7 +474,7 @@ templ ruleDetailApplyModal(p RuleDetailProps) {
 					     the dialog is still open. The old in-card alert (above the
 					     category button) was rendered behind the z-50 backdrop and
 					     therefore invisible whenever apply failed — see #701. -->
-					<div x-show="applyError" x-cloak role="alert" class="alert alert-error text-xs mt-4 rounded-xl">
+					<div x-show="applyError" x-cloak role="alert" class="alert alert-error text-xs mt-4">
 						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
 						<span x-text="applyError"></span>
 					</div>

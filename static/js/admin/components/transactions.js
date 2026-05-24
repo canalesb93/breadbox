@@ -974,11 +974,11 @@ document.addEventListener('DOMContentLoaded', function() {
   modal.id = 'bb-bulk-modal-root';
   modal.innerHTML =
     '<dialog id="bb-bulk-comment-modal" class="modal modal-bottom sm:modal-middle">'
-    + '<div class="modal-box rounded-xl max-w-md">'
+    + '<div class="modal-box max-w-md">'
     + '<h3 class="text-lg font-bold">Add comment to selected</h3>'
     + '<p class="text-sm text-base-content/50 mt-1">Adds the same comment annotation to <span id="bb-comment-count" class="font-semibold">0</span> selected transactions.</p>'
     + '<div class="space-y-3 mt-4">'
-    + '<textarea id="bb-comment-content" class="textarea w-full rounded-xl" rows="4" placeholder="Markdown supported"></textarea>'
+    + '<textarea id="bb-comment-content" class="textarea w-full" rows="4" placeholder="Markdown supported"></textarea>'
     + '</div>'
     + '<div class="modal-action">'
     + '<button type="button" class="btn btn-ghost" onclick="document.getElementById(\'bb-bulk-comment-modal\').close()">Cancel</button>'

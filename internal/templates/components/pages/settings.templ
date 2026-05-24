@@ -54,6 +54,7 @@ templ SettingsHelp(p SettingsProps) {
 	})
 	<div class="grid gap-6 max-w-2xl">
 		@settingsHelpCardFlat(p)
+		@settingsHelpDeveloperCard()
 	</div>
 }
 
@@ -93,7 +94,7 @@ templ settingsSyncCard(p SettingsProps) {
 						Sync Interval
 						@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
 					</label>
-					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm rounded-xl bg-base-200">
+					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm bg-base-200">
 						@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
 						@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
 						@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
@@ -120,7 +121,7 @@ templ settingsSyncCard(p SettingsProps) {
 							<label class="text-sm font-medium text-base-content/70" for="sync_log_retention_days">Log Retention</label>
 							<span class="text-xs text-base-content/40 tabular-nums">{ fmt.Sprintf("%d logs stored", p.SyncLogCount) }</span>
 						</div>
-						<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm rounded-xl bg-base-200">
+						<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm bg-base-200">
 							@retentionOption(7, p.SyncLogRetentionDays, "7 days")
 							@retentionOption(14, p.SyncLogRetentionDays, "14 days")
 							@retentionOption(30, p.SyncLogRetentionDays, "30 days")
@@ -334,7 +335,7 @@ templ settingsSyncSchedule(p SettingsProps) {
 				Sync Interval
 				@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
 			</label>
-			<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm rounded-xl bg-base-200">
+			<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm bg-base-200">
 				@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
 				@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
 				@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
@@ -370,7 +371,7 @@ templ settingsSyncRetention(p SettingsProps) {
 		<form method="POST" action="/settings/retention">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_log_retention_days">Keep logs for</label>
-			<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm rounded-xl bg-base-200">
+			<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm bg-base-200">
 				@retentionOption(7, p.SyncLogRetentionDays, "7 days")
 				@retentionOption(14, p.SyncLogRetentionDays, "14 days")
 				@retentionOption(30, p.SyncLogRetentionDays, "30 days")
@@ -466,5 +467,33 @@ templ settingsHelpCardFlat(p SettingsProps) {
 				<i data-lucide="square-arrow-out-up-right" class="w-4 h-4 text-base-content opacity-40"></i>
 			</a>
 		</div>
+	</div>
+}
+
+// settingsHelpDeveloperCard surfaces internal developer-facing tools —
+// currently the design-system sandbox. Lives below the Resources card on
+// the Help tab; intentionally a separate card so the developer-only
+// nature reads at a glance.
+templ settingsHelpDeveloperCard() {
+	<div class="bb-card p-5">
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="palette" class="w-4 h-4 text-base-content/60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">Developer</h2>
+				<p class="text-xs text-base-content/45">Internal tools for contributors</p>
+			</div>
+		</div>
+		<a href="/design" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
+			<div class="flex items-center gap-2.5">
+				<i data-lucide="palette" class="w-4 h-4 text-base-content/50"></i>
+				<div>
+					<span class="text-sm font-medium">Design system sandbox</span>
+					<p class="text-xs text-base-content/40">Reference gallery for every shared admin-UI component</p>
+				</div>
+			</div>
+			<i data-lucide="arrow-right" class="w-4 h-4 text-base-content/40"></i>
+		</a>
 	</div>
 }

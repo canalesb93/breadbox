@@ -192,7 +192,7 @@ templ categoryRowActions(c service.CategoryResponse, child bool) {
 		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ fmt.Sprintf("Category %s actions", c.DisplayName) }>
 			<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 		</div>
-		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
+		<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-40 p-1">
 			<li>
 				<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) } aria-label={ fmt.Sprintf("Edit category %s", c.DisplayName) }>
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit

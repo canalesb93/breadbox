@@ -41,7 +41,7 @@ templ Backups(p BackupsProps) {
 	</div>
 	<div class="grid gap-6">
 		<!-- Encryption Key Warning -->
-		<div class="alert alert-warning rounded-xl">
+		<div class="alert alert-warning">
 			<i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i>
 			<div>
 				<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
@@ -60,13 +60,13 @@ templ Backups(p BackupsProps) {
 			</div>
 		</div>
 		if p.Error != "" {
-			<div class="alert alert-error rounded-xl">
+			<div class="alert alert-error">
 				<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
 				<span class="text-sm">{ p.Error }</span>
 			</div>
 		} else {
 			if !p.PreflightOK {
-				<div class="alert alert-error rounded-xl">
+				<div class="alert alert-error">
 					<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
 					<div>
 						<h3 class="font-semibold text-sm">Backups unavailable</h3>
@@ -129,7 +129,7 @@ templ backupsScheduleSection(p BackupsProps) {
 					<div class="grid sm:grid-cols-2 gap-4 max-w-lg">
 						<div>
 							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_schedule">Frequency</label>
-							<select id="backup_schedule" name="backup_schedule" class="select select-sm w-full rounded-xl bg-base-200">
+							<select id="backup_schedule" name="backup_schedule" class="select select-sm w-full bg-base-200">
 								@scheduleOption("", "Disabled", p.Schedule)
 								@scheduleOption("daily_2am", "Daily at 2:00 AM", p.Schedule)
 								@scheduleOption("daily_3am", "Daily at 3:00 AM", p.Schedule)
@@ -139,7 +139,7 @@ templ backupsScheduleSection(p BackupsProps) {
 						</div>
 						<div>
 							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_retention_days">Retention</label>
-							<select id="backup_retention_days" name="backup_retention_days" class="select select-sm w-full rounded-xl bg-base-200">
+							<select id="backup_retention_days" name="backup_retention_days" class="select select-sm w-full bg-base-200">
 								@backupsRetentionOption(3, "3 days", p.RetentionDays)
 								@backupsRetentionOption(7, "7 days (default)", p.RetentionDays)
 								@backupsRetentionOption(14, "14 days", p.RetentionDays)
@@ -334,7 +334,7 @@ templ backupsRestoreSection(p BackupsProps) {
 							id="backup_file"
 							name="backup_file"
 							accept=".sql.gz,.gz"
-							class="file-input file-file-input-sm w-full rounded-xl"
+							class="file-input file-file-input-sm w-full"
 							@change="filename = $event.target.files[0]?.name || ''"
 							required
 						/>

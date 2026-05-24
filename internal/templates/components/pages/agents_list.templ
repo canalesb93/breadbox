@@ -76,7 +76,7 @@ templ AgentsList(p AgentsListProps) {
 }
 
 templ agentsListStatusBanner(s AgentSubsystemStatusProps) {
-	<div role="alert" class="alert alert-warning alert-soft mb-4 rounded-xl">
+	<div role="alert" class="alert alert-warning alert-soft mb-4">
 		<i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
 		<div class="flex-1">
 			<div class="font-semibold text-sm">Agents need configuration</div>
@@ -193,7 +193,7 @@ templ agentsListRow(a AgentsListRowProps) {
 				<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ "Agent " + a.Name + " actions" }>
 					<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 				</div>
-				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+				<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
 					<li>
 						<button type="button" @click={ "runNow('" + a.Slug + "')" }>
 							<i data-lucide="play" class="w-3.5 h-3.5"></i> Run now

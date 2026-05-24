@@ -32,7 +32,7 @@ templ ReportDetail(p ReportDetailProps) {
 	<div x-data="reportDetail" data-report-id={ p.Report.ID } data-is-read={ boolLiteral(p.Report.IsRead) } class="max-w-4xl">
 		<!-- Toast for copy + mark-unread feedback -->
 		<div class="toast toast-top toast-center z-50" x-show="toast" x-cloak x-transition.opacity>
-			<div class="alert alert-success text-xs rounded-xl shadow-md">
+			<div class="alert alert-success text-xs shadow-md">
 				<i data-lucide="check" class="w-3.5 h-3.5"></i>
 				<span x-text="toast"></span>
 			</div>

@@ -104,7 +104,7 @@ templ CategoryForm(p CategoryFormProps) {
 								data-categories-source="category-form-picker-data"
 								@category-change="parentId = $event.detail.id"
 							>
-								<button type="button" class="select w-full text-left flex items-center gap-2 rounded-xl bg-base-200/50" @click="openPicker()">
+								<button type="button" class="select w-full text-left flex items-center gap-2 bg-base-200/50" @click="openPicker()">
 									<span x-text="displayLabel" class="flex-1 text-sm"></span>
 									<i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
 								</button>

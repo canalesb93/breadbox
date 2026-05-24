@@ -23,6 +23,13 @@
   themes: light --default, dark --prefersdark;
 }
 
+/* Force-include classes that Tailwind's content scanner can't see
+   because they live inside dynamic strings (Alpine :class, runtime
+   templ expressions, JS className builders).
+   Add new entries here whenever a class only exists at runtime —
+   prefer this over chasing arbitrary-value scanner bugs. */
+@source inline("max-w-[768px] max-w-[390px]");
+
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }
 
@@ -45,8 +52,15 @@
    * before applying transparency. `text-COLOR/NN` on Lucide icons is treated
    * the same as `text-COLOR` here — call sites that wanted dimming should
    * use `opacity-NN`.
+   *
+   * The explicit `/ 1` matters: in CSS relative color syntax, an omitted
+   * alpha defaults to the *origin* color's alpha (not 100%), so
+   * `rgb(from currentColor r g b)` alone passes the parent's alpha straight
+   * through — making this rule a no-op whenever the parent sets
+   * `text-COLOR/NN` (e.g. the sidebar's `.bb-sidebar-link`
+   * `text-base-content/60`). `/ 1` forces opaque output.
    */
-  svg.lucide { color: rgb(from currentColor r g b); }
+  svg.lucide { color: rgb(from currentColor r g b / 1); }
 
   /*
    * Pre-hydration size for Lucide placeholders.
@@ -743,28 +757,6 @@
 
   .bb-page-title {
     @apply text-xl font-semibold tracking-tight;
-  }
-
-  /* ── Standalone shell (e.g. /design sandbox) ──
-     Slim top bar that replaces the sidebar when the page is hosted in
-     standalone mode (base.html .Standalone branch). Keeps the chrome
-     minimal so reviewers focus on the component under test. */
-  /* Opaque solid background — no /85 + backdrop-blur, otherwise the
-     modal dim looks like it undims the bar at a different rate than
-     the rest of the page (the bar reveals partially-blurred content
-     behind it as the dim fades). */
-  .bb-standalone-bar {
-    @apply sticky top-0 z-30
-           flex items-center justify-between gap-3
-           px-4 sm:px-6 h-12
-           bg-base-100
-           border-b border-base-300;
-  }
-
-  .bb-standalone-brand {
-    @apply inline-flex items-center gap-2
-           text-sm font-semibold text-base-content
-           no-underline hover:text-primary transition-colors;
   }
 
   /* ── Wizard / Auth pages (login, setup, error) ── */

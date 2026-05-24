@@ -90,7 +90,7 @@ templ settingsRailMobile(p SettingsLayoutProps) {
 			so the panel never blends into the page when the page bg is
 			also base-100. Pairs with shadow-xl for elevation.
 		-->
-		<ul class="dropdown-content menu mt-2 z-20 w-full rounded-xl bg-base-100 shadow-xl ring-1 ring-base-content/10 p-1 gap-0.5">
+		<ul class="dropdown-content menu mt-2 z-20 w-full bg-base-100 shadow-xl ring-1 ring-base-content/10 p-1 gap-0.5">
 			@settingsRailMobileItem(p.CurrentTab, SettingsTabProfile, "/settings/profile", "user-round", "Profile")
 			@settingsRailMobileItem(p.CurrentTab, SettingsTabAccount, "/settings/account", "user-cog", "Account")
 			if p.IsAdmin {

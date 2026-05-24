@@ -92,7 +92,7 @@ templ CSVImport(p CSVImportProps) {
 				} else {
 					<fieldset class="fieldset mb-5">
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-user-id">Family Member</label>
-						<select id="csv-user-id" class="select w-full rounded-xl" required>
+						<select id="csv-user-id" class="select w-full" required>
 							<option value="" disabled selected>Select a member...</option>
 							for _, u := range p.Users {
 								<option value={ u.ID }>{ u.Name }</option>
@@ -102,7 +102,7 @@ templ CSVImport(p CSVImportProps) {
 				}
 				<fieldset class="fieldset mb-6">
 					<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-file">CSV File</label>
-					<input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input file-w-full rounded-xl"/>
+					<input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input file-w-full"/>
 					<p class="text-xs text-base-content/40 mt-2">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
 				</fieldset>
 				<div id="upload-alert" role="alert" class="hidden mb-4 flex items-start gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm">
@@ -134,31 +134,31 @@ templ CSVImport(p CSVImportProps) {
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-date">
 							Date Column <span class="text-xs text-base-content/30">(required)</span>
 						</label>
-						<select id="map-date" class="select w-full rounded-xl"></select>
+						<select id="map-date" class="select w-full"></select>
 					</fieldset>
 					<fieldset class="fieldset">
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-amount">
 							Amount Column <span class="text-xs text-base-content/30">(required)</span>
 						</label>
-						<select id="map-amount" class="select w-full rounded-xl"></select>
+						<select id="map-amount" class="select w-full"></select>
 					</fieldset>
 					<fieldset class="fieldset">
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-description">
 							Description Column <span class="text-xs text-base-content/30">(required)</span>
 						</label>
-						<select id="map-description" class="select w-full rounded-xl"></select>
+						<select id="map-description" class="select w-full"></select>
 					</fieldset>
 					<fieldset class="fieldset">
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-category">
 							Category Column <span class="text-xs text-base-content/30">(optional)</span>
 						</label>
-						<select id="map-category" class="select w-full rounded-xl"></select>
+						<select id="map-category" class="select w-full"></select>
 					</fieldset>
 					<fieldset class="fieldset">
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-merchant">
 							Merchant Column <span class="text-xs text-base-content/30">(optional)</span>
 						</label>
-						<select id="map-merchant" class="select w-full rounded-xl"></select>
+						<select id="map-merchant" class="select w-full"></select>
 					</fieldset>
 				</div>
 				<div id="debit-credit-section" class="hidden mb-6">
@@ -167,11 +167,11 @@ templ CSVImport(p CSVImportProps) {
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							<fieldset class="fieldset">
 								<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-debit">Debit Column</label>
-								<select id="map-debit" class="select w-full rounded-xl"></select>
+								<select id="map-debit" class="select w-full"></select>
 							</fieldset>
 							<fieldset class="fieldset">
 								<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-credit">Credit Column</label>
-								<select id="map-credit" class="select w-full rounded-xl"></select>
+								<select id="map-credit" class="select w-full"></select>
 							</fieldset>
 						</div>
 					</div>
@@ -196,7 +196,7 @@ templ CSVImport(p CSVImportProps) {
 				if p.ConnectionID == "" {
 					<fieldset class="fieldset mb-6">
 						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="account-name">Account Name</label>
-						<input type="text" id="account-name" class="input w-full rounded-xl" value="CSV Import" placeholder="e.g., Chase Checking CSV"/>
+						<input type="text" id="account-name" class="input w-full" value="CSV Import" placeholder="e.g., Chase Checking CSV"/>
 					</fieldset>
 				}
 				<div class="flex items-center gap-3 pt-2">

@@ -29,7 +29,7 @@ templ APIKeyCreated(p APIKeyCreatedProps) {
 			<label class="text-xs font-medium text-base-content/50 mb-1.5 block">API Key</label>
 			<div class="flex flex-col sm:flex-row gap-2" x-data="{ copied: false }">
 				<div class="relative flex-1 min-w-0">
-					<input type="text" value={ p.PlaintextKey } readonly id="api-key-value" class="input input-sm font-mono w-full bg-base-200/50 border-base-300 rounded-xl text-xs truncate"/>
+					<input type="text" value={ p.PlaintextKey } readonly id="api-key-value" class="input input-sm font-mono w-full bg-base-200/50 border-base-300 text-xs truncate"/>
 				</div>
 				<button class="btn btn-primary btn-sm shrink-0 gap-2 w-full sm:w-auto" :class="copied && '!btn-success'" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
 					<i data-lucide="clipboard" class="w-4 h-4" x-show="!copied"></i>

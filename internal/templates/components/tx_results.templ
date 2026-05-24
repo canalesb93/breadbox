@@ -95,7 +95,7 @@ templ TxResults(p TxResultsProps) {
 				</span>
 				<div class="bb-paginator__per-page">
 					<label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
-					<select class="select select-xs rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
+					<select class="select select-xs tabular-nums" onchange="bbSetPerPage(this.value)">
 						@perPageOption(25, p.PageSize)
 						@perPageOption(50, p.PageSize)
 						@perPageOption(100, p.PageSize)

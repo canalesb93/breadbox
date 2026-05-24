@@ -97,7 +97,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 						</fieldset>
 						<fieldset class="fieldset">
 							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
-							<select id="user_id" name="user_id" required class="select w-full rounded-xl">
+							<select id="user_id" name="user_id" required class="select w-full">
 								<option value="" disabled selected>Select a member...</option>
 								for _, u := range p.Users {
 									<option value={ u.ID }>{ u.Name }</option>

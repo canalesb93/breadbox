@@ -162,26 +162,26 @@ templ SectionAlerts() {
 	<div class="flex flex-col gap-6">
 		@designExample("Page-level alerts", "role=\"alert\" + rounded-xl + mb-6. Use the matching alert-{type} color.") {
 			<div class="flex flex-col gap-3">
-				<div role="alert" class="alert alert-success rounded-xl">
+				<div role="alert" class="alert alert-success">
 					<i data-lucide="check-circle" class="w-5 h-5"></i>
 					<span>Backup created successfully.</span>
 				</div>
-				<div role="alert" class="alert alert-info rounded-xl">
+				<div role="alert" class="alert alert-info">
 					<i data-lucide="info" class="w-5 h-5"></i>
 					<span>Sync starts in 5 minutes.</span>
 				</div>
-				<div role="alert" class="alert alert-warning rounded-xl">
+				<div role="alert" class="alert alert-warning">
 					<i data-lucide="alert-triangle" class="w-5 h-5"></i>
 					<span>2 connections need reauth.</span>
 				</div>
-				<div role="alert" class="alert alert-error rounded-xl">
+				<div role="alert" class="alert alert-error">
 					<i data-lucide="x-circle" class="w-5 h-5"></i>
 					<span>Failed to revoke API key.</span>
 				</div>
 			</div>
 		}
 		@designExample("Soft variant", "Less prominent — embed inside content rather than over page chrome.") {
-			<div role="alert" class="alert alert-warning alert-soft rounded-xl">
+			<div role="alert" class="alert alert-warning alert-soft">
 				<i data-lucide="alert-triangle" class="w-5 h-5"></i>
 				<span>Read-only keys cannot trigger syncs.</span>
 			</div>
@@ -249,22 +249,22 @@ templ SectionFormControls() {
 		@designExample("Text input", "Daisy 5 input is bordered by default — no input-bordered modifier needed. Pair with the text-xs label.") {
 			<div class="max-w-sm">
 				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-input-1">Email</label>
-				<input id="ds-input-1" type="email" class="input w-full rounded-xl" placeholder="alex@example.com"/>
+				<input id="ds-input-1" type="email" class="input w-full" placeholder="alex@example.com"/>
 			</div>
 		}
 		@designExample("Select", "Same shape as input — bordered by default. WARNING: never apply bg-base-200/50 — browsers render the alpha as fully transparent on selects.") {
 			<div class="max-w-sm">
 				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-select-1">Scope</label>
-				<select id="ds-select-1" class="select w-full rounded-xl">
+				<select id="ds-select-1" class="select w-full">
 					<option>Full access</option>
 					<option>Read only</option>
 				</select>
 			</div>
 		}
-		@designExample("Textarea", "Bordered by default — just add rounded-xl for the size convention.") {
+		@designExample("Textarea", "Vanilla daisy — bordered by default, daisy theme radius applies.") {
 			<div class="max-w-sm">
 				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-textarea-1">Note</label>
-				<textarea id="ds-textarea-1" class="textarea w-full rounded-xl" rows="3" placeholder="What's this transaction for?"></textarea>
+				<textarea id="ds-textarea-1" class="textarea w-full" rows="3" placeholder="What's this transaction for?"></textarea>
 			</div>
 		}
 		@designExample("Compact (filter bar)", "input-sm / select-sm for filter bars. Styled by bb-filter-bar.") {
@@ -430,7 +430,7 @@ templ SectionMenusDropdowns() {
 						<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100">
 							<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
 						</div>
-						<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+						<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
 							<li><a><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
 							<li><a><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
 							<li><a class="text-error"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete</a></li>
@@ -460,7 +460,7 @@ templ SectionModals() {
 					Open modal
 				</button>
 				<dialog id="ds-modal-1" class="modal modal-bottom sm:modal-middle">
-					<div class="modal-box rounded-xl max-w-lg">
+					<div class="modal-box max-w-lg">
 						<h3 class="text-base font-semibold mb-2">Delete connection?</h3>
 						<p class="text-sm text-base-content/60 mb-4">All transactions and accounts will be removed. This cannot be undone.</p>
 						<div class="modal-action mt-0 gap-2">
@@ -766,6 +766,19 @@ templ SectionOverflowMenu() {
 						},
 					})
 				</div>
+			</div>
+		}
+		@designExample("Inside an overflow-clipped container", "Native popover + CSS anchor positioning lets the menu escape an `overflow:hidden` ancestor (the bug that hid the kebab on /tags inside the table viewport). The trigger sits in the bottom-right of a 96px-tall clipped box — an old `absolute`-positioned dropdown would be invisible; the popover version paints in the top layer above everything.") {
+			<div class="overflow-hidden border border-base-300 rounded-xl h-24 w-72 bg-base-200/40 p-3 flex items-end justify-end">
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Clipped-container actions",
+					Items: []components.OverflowMenuItem{
+						{Label: "View", Icon: "eye", Href: "#"},
+						{Label: "Edit", Icon: "pencil", Href: "#"},
+						{Label: "Archive", Icon: "archive", OnClick: "noop()"},
+						{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
+					},
+				})
 			</div>
 		}
 	</div>
@@ -1101,6 +1114,183 @@ templ SectionFilterSearchInput() {
 				XModel:      "filter",
 				Icon:        "hash",
 			})
+		}
+	</div>
+}
+
+// ─── Transaction rows ──────────────────────────────────────────────────
+
+// SectionTransactionRows shows the three row variants (full, compact,
+// feed) side by side, plus the building-block elements
+// (`bb-tx-avatar`, `bb-tx-amount`, `bb-tx-owner-badge`) that compose
+// them. The fixture rows live in design_transaction_rows_helpers.go
+// so the templ stays focused on layout.
+//
+// We seed window.__bbCategories from a JSONScript tag so the inline
+// `categoryPicker` Alpine factory on TxRow can resolve `data-initial`
+// (a category UUID) to a visible label. Without this seed the picker's
+// button collapses to a ~18px shell because x-text="displayLabel"
+// overwrites the static fallback with an empty string. The
+// CategoryPickerScript + Styles ship the factory itself; live pages
+// (e.g. /transactions) load them via their own page-component module.
+templ SectionTransactionRows() {
+	@components.CategoryPickerScript()
+	@components.CategoryPickerStyles()
+	@templ.JSONScript("design-tx-rows-cats", designTxRowsCategories())
+	<script>
+		(function(){var e=document.getElementById('design-tx-rows-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
+	</script>
+	<div class="flex flex-col gap-6">
+		@designExample("TxRow — full row (transactions list)", "Two-line layout with checkbox, avatar, name + meta, inline category picker (xl+), date, amount, expand panel. Used on /transactions.") {
+			<div class="divide-y divide-base-300/40 -mx-5">
+				@components.TxRow(designTxRowsCategorized())
+				@components.TxRow(designTxRowsIncome())
+				@components.TxRow(designTxRowsPending())
+				@components.TxRow(designTxRowsUncategorized())
+			</div>
+		}
+		@designExample("TxRowCompact — dense list (dashboard, rule detail)", "Single-anchor row with avatar, name + meta, amount + relative date. No selection, no expand panel.") {
+			<div class="flex flex-col gap-1">
+				@components.TxRowCompact(designTxRowsCategorized())
+				@components.TxRowCompact(designTxRowsIncome())
+				@components.TxRowCompact(designTxRowsPending())
+				@components.TxRowCompact(designTxRowsUncategorized())
+			</div>
+		}
+		@designExample("TxRowFeed — single-line glance row (/feed samples)", "Raw provider description + avatar + amount in one line, with optional `Dimmed` for de-emphasised reference rows and an inline `[tag] N` chip. Amount uses leading + / − so direction is unambiguous regardless of sign convention.") {
+			<div class="flex flex-col gap-0.5">
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:       "tx12abcd",
+					Description:   "WHOLEFDS NEW YORK 12345",
+					Amount:        48.27,
+					Currency:      "USD",
+					CategoryColor: designTxRowsPtr("#22c55e"),
+					CategoryIcon:  designTxRowsPtr("shopping-cart"),
+					TagCount:      2,
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:     "tx34efgh",
+					Description: "ACME PAYROLL DIRECT DEP",
+					Amount:      -2845.00,
+					Currency:    "USD",
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:       "tx56ijkl",
+					Description:   "BLUE BOTTLE COFFEE",
+					Amount:        6.75,
+					Currency:      "USD",
+					Pending:       true,
+					CategoryColor: designTxRowsPtr("#d97706"),
+					CategoryIcon:  designTxRowsPtr("coffee"),
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:     "tx78mnop",
+					Description: "USPS PO 12345",
+					Amount:      14.95,
+					Currency:    "USD",
+					Dimmed:      true,
+				})
+			</div>
+		}
+		@designExample("Avatars (bb-tx-avatar)", "Default 36×36 (full row) and 32×32 (--sm, compact/feed). `--avatar-color` from category drives a 12 % background tint via color-mix. Uncategorised variant is a neutral circle-off glyph.") {
+			<div class="flex flex-wrap items-end gap-4">
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
+						<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">default</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #22c55e">
+						<i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--sm</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #d97706">
+						<i data-lucide="coffee" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">amber</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #0ea5e9">
+						<i data-lucide="home" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">sky</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #a855f7">
+						<i data-lucide="plane" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">violet</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+						<i data-lucide="circle-off" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--uncategorized</code>
+				</div>
+			</div>
+		}
+		@designExample("Owner badge (bb-tx-owner-badge)", "Bottom-right corner of the avatar, ringed in the row background. Image when EffectiveUserID is set, letter fallback otherwise.") {
+			<div class="flex flex-wrap items-end gap-6">
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
+							<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Alex">
+							<span>A</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--letter</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #d97706">
+							<i data-lucide="coffee" class="w-3.5 h-3.5"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
+							<span>S</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--sm + letter</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+							<i data-lucide="circle-off" class="w-4 h-4"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
+							<span>S</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">on uncategorized</code>
+				</div>
+			</div>
+		}
+		@designExample("Amount (bb-tx-amount)", "tabular-nums sets a stable right edge. --income flips to green for inflow (negative in our sign convention). --pending dims to 55 % so the provisional number reads quieter without becoming illegible.") {
+			<div class="flex flex-col gap-2 text-right max-w-[18rem]">
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">default (outflow)</span>
+					<span class="bb-tx-amount tabular-nums">$48.27</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">--income</span>
+					<span class="bb-tx-amount bb-tx-amount--income tabular-nums">-$2,845.00</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">--pending</span>
+					<span class="inline-flex items-center justify-end gap-1">
+						<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+						<span class="bb-tx-amount bb-tx-amount--pending tabular-nums">$6.75</span>
+					</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">income + pending</span>
+					<span class="bb-tx-amount bb-tx-amount--income bb-tx-amount--pending tabular-nums">-$120.00</span>
+				</div>
+			</div>
 		}
 	</div>
 }

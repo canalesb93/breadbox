@@ -42,7 +42,7 @@ templ Rules(p RulesProps) {
 			if len(p.Rules) > 0 {
 				<label class="flex items-center gap-2 text-xs text-base-content/40 whitespace-nowrap">
 					<span class="hidden sm:inline">Sort by</span>
-					<select onchange="bbSetRulesSort(this.value)" class="select select-xs rounded-lg bg-base-100 min-w-32 tabular-nums">
+					<select onchange="bbSetRulesSort(this.value)" class="select select-xs bg-base-100 min-w-32 tabular-nums">
 						@rulesSortOption("", "Pipeline stage", p.SortBy == "" || p.SortBy == "priority")
 						@rulesSortOption("hit_count", "Most hits", p.SortBy == "hit_count")
 						@rulesSortOption("last_hit_at", "Recently active", p.SortBy == "last_hit_at")
@@ -184,7 +184,7 @@ templ rulesRow(r RulesRow) {
 					<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ "Rule " + r.Name + " actions" }>
 						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 					</div>
-					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
 						<li>
 							<button
 								type="button"
@@ -262,7 +262,7 @@ templ rulesPaginator(p RulesProps) {
 			</span>
 			<div class="bb-paginator__per-page">
 				<label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
-				<select class="select select-xs rounded-lg tabular-nums" onchange="bbSetRulesPerPage(this.value)">
+				<select class="select select-xs tabular-nums" onchange="bbSetRulesPerPage(this.value)">
 					@rulesPerPageOption(25, p.PageSize)
 					@rulesPerPageOption(50, p.PageSize)
 					@rulesPerPageOption(100, p.PageSize)

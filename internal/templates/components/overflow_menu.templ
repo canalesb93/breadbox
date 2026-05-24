@@ -1,14 +1,25 @@
 package components
 
+import (
+	"strconv"
+	"sync/atomic"
+)
+
 // OverflowMenu is the kebab "more actions" dropdown used on row lists
 // (tags, rules, categories, OAuth clients, household users). Replaces the
 // duplicated 12-line `dropdown dropdown-end` + `menu` block scattered
 // across 6+ templ files with subtly different geometry.
 //
+// Implementation: uses daisy 5's first-class popover support on
+// `.dropdown[popover]` — anchor positioning (via daisy's `--anchor-h`/
+// `--anchor-v` custom properties), `z-index: 999`, and the open/close
+// scale-in animation all come from daisy. The component just wires up
+// the per-instance anchor name and picks `dropdown-end`/`dropdown-start`.
+//
 // Pins (do not deviate when calling):
 //   - Trigger:  `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
-//   - Menu:     `dropdown-content menu bg-base-100 rounded-xl shadow-lg`
-//               `border border-base-300 z-50 w-44 p-1`
+//   - Menu:     `dropdown dropdown-end menu bg-base-100 rounded-xl`
+//               `shadow-lg border border-base-300 w-44 p-1`
 //   - Item icon: `w-3.5 h-3.5`
 //   - Destructive items: `text-error` on the inner element
 //   - Disabled items: `disabled` class on the <li>
@@ -16,6 +27,12 @@ package components
 // Items render in the order provided. Pass `Href` for link items,
 // `OnClick` (an Alpine handler string, e.g. `"delete(...)"`) for button
 // items. If both are set, `Href` wins.
+//
+// Browser support: popover (Chrome 114+, Safari 17+, Firefox 125+) and
+// CSS anchor positioning (Chrome 125+, Safari 17.4+; no Firefox yet)
+// are both used by daisy's own `.dropdown[popover]` rules. Where anchor
+// positioning isn't supported, daisy's `position: fixed` + `margin: auto`
+// fallback lands the menu somewhere reasonable.
 
 type OverflowMenuItem struct {
 	Label       string
@@ -33,17 +50,37 @@ type OverflowMenuProps struct {
 	Position  string             // "end" (default) or "start"
 }
 
+// overflowMenuSeq generates a process-wide monotonic id used to make every
+// rendered OverflowMenu's popover id + anchor-name unique on a page.
+var overflowMenuSeq atomic.Uint64
+
+func nextOverflowMenuID() string {
+	return strconv.FormatUint(overflowMenuSeq.Add(1), 10)
+}
+
 templ OverflowMenu(p OverflowMenuProps) {
-	<div class={ overflowMenuRootClass(p.Position) }>
-		<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity" aria-label={ p.AriaLabel }>
-			<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
-		</div>
-		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
-			for _, it := range p.Items {
-				@overflowMenuItem(it)
-			}
-		</ul>
-	</div>
+	{{ uid := nextOverflowMenuID() }}
+	{{ popoverID := "om-" + uid }}
+	{{ anchorName := "--om-anchor-" + uid }}
+	<button
+		type="button"
+		popovertarget={ popoverID }
+		class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity"
+		aria-label={ p.AriaLabel }
+		style={ "anchor-name:" + anchorName }
+	>
+		<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+	</button>
+	<ul
+		id={ popoverID }
+		popover="auto"
+		class={ overflowMenuListClass(p.Position) }
+		style={ overflowMenuListStyle(anchorName, p.Position) }
+	>
+		for _, it := range p.Items {
+			@overflowMenuItem(it)
+		}
+	</ul>
 }
 
 templ overflowMenuItem(it OverflowMenuItem) {
@@ -58,7 +95,12 @@ templ overflowMenuItem(it OverflowMenuItem) {
 		</li>
 	} else if it.Href != "" {
 		<li>
-			<a href={ it.Href } class={ overflowItemClass(it.Destructive) } aria-label={ overflowAria(it) }>
+			<a
+				href={ it.Href }
+				class={ overflowItemClass(it.Destructive) }
+				aria-label={ overflowAria(it) }
+				@click="$el.closest('[popover]')?.hidePopover()"
+			>
 				if it.Icon != "" {
 					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
 				}
@@ -67,7 +109,12 @@ templ overflowMenuItem(it OverflowMenuItem) {
 		</li>
 	} else {
 		<li>
-			<button type="button" class={ overflowItemClass(it.Destructive) } aria-label={ overflowAria(it) } @click={ it.OnClick }>
+			<button
+				type="button"
+				class={ overflowItemClass(it.Destructive) }
+				aria-label={ overflowAria(it) }
+				@click={ overflowItemClickHandler(it.OnClick) }
+			>
 				if it.Icon != "" {
 					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
 				}
@@ -77,11 +124,26 @@ templ overflowMenuItem(it OverflowMenuItem) {
 	}
 }
 
-func overflowMenuRootClass(pos string) string {
+// overflowMenuListClass returns the menu UL classes. Uses daisy's
+// `.dropdown` (NOT `.dropdown-content`) so daisy's first-class popover
+// support kicks in: anchor positioning via `--anchor-h`/`--anchor-v`,
+// `z-index: 999`, and the scale-in open/close animation. `dropdown-end`
+// (default) or `dropdown-start` flips the horizontal alignment via
+// daisy's `--anchor-h` switch.
+func overflowMenuListClass(pos string) string {
+	side := "dropdown-end"
 	if pos == "start" {
-		return "dropdown dropdown-start"
+		side = "dropdown-start"
 	}
-	return "dropdown dropdown-end"
+	return "dropdown " + side + " menu bg-base-100 rounded-xl shadow-lg border border-base-300 w-44 p-1"
+}
+
+// overflowMenuListStyle wires the popover element to the trigger's anchor
+// name. Daisy's `.dropdown[popover]` rules handle the position-area
+// keyword and the open/close `margin: auto` choreography — we just need
+// to point at the right anchor.
+func overflowMenuListStyle(anchorName, _ string) string {
+	return "position-anchor:" + anchorName
 }
 
 func overflowItemClass(destructive bool) string {
@@ -89,6 +151,18 @@ func overflowItemClass(destructive bool) string {
 		return "text-error"
 	}
 	return ""
+}
+
+// overflowItemClickHandler chains the caller's Alpine handler (if any)
+// with a native popover close call. Both expressions run in Alpine's
+// event scope — closing AFTER the user handler so the handler can read
+// the trigger state if it needs to.
+func overflowItemClickHandler(onClick string) string {
+	const closer = "$el.closest('[popover]')?.hidePopover()"
+	if onClick == "" {
+		return closer
+	}
+	return onClick + "; " + closer
 }
 
 func overflowAria(it OverflowMenuItem) string {

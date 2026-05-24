@@ -160,7 +160,7 @@ templ AgentForm(p AgentFormProps) {
 							id="agent-system-prompt"
 							name="system_prompt"
 							rows="4"
-							class="textarea w-full rounded-xl bg-base-200/50 font-mono text-sm"
+							class="textarea w-full bg-base-200/50 font-mono text-sm"
 							placeholder="Override the default breadbox agent persona…"
 						>{ p.Form.SystemPrompt }</textarea>
 						<p class="text-xs text-base-content/40 mt-1.5">Leave blank to use the bundled default. Persona / safety invariants — not the per-run task.</p>
@@ -172,7 +172,7 @@ templ AgentForm(p AgentFormProps) {
 							id="agent-prompt"
 							name="prompt"
 							rows="12"
-							class="textarea w-full rounded-xl bg-base-200/50 font-mono text-sm"
+							class="textarea w-full bg-base-200/50 font-mono text-sm"
 							placeholder="What should this agent do on every run?"
 							required
 						>{ p.Form.Prompt }</textarea>

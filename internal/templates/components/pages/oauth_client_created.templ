@@ -40,7 +40,7 @@ templ OAuthClientCreated(p OAuthClientCreatedProps) {
 			<div>
 				<label class="text-xs font-medium text-base-content/50 mb-1.5 block">Client ID</label>
 				<div class="flex gap-2">
-					<input type="text" value={ p.ClientID } readonly id="oauth-client-id" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs"/>
+					<input type="text" value={ p.ClientID } readonly id="oauth-client-id" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 text-xs"/>
 					<button class="btn btn-sm btn-ghost shrink-0 gap-1.5" :class="copiedId && '!text-success'" @click="copyClientId()">
 						<i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedId"></i>
 						<i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedId" x-cloak></i>
@@ -51,7 +51,7 @@ templ OAuthClientCreated(p OAuthClientCreatedProps) {
 			<div>
 				<label class="text-xs font-medium text-base-content/50 mb-1.5 block">Client Secret</label>
 				<div class="flex gap-2">
-					<input type="text" value={ p.ClientSecret } readonly id="oauth-client-secret" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs"/>
+					<input type="text" value={ p.ClientSecret } readonly id="oauth-client-secret" class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 text-xs"/>
 					<button class="btn btn-primary btn-sm shrink-0 gap-1.5" :class="copiedSecret && '!btn-success'" @click="copyClientSecret()">
 						<i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedSecret"></i>
 						<i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedSecret" x-cloak></i>
@@ -70,7 +70,7 @@ templ OAuthClientCreated(p OAuthClientCreatedProps) {
 			<div class="rounded-xl bg-base-200/50 p-3">
 				<div class="text-xs font-medium text-base-content/50 mb-1.5">MCP Server URL</div>
 				<div class="flex gap-2">
-					<input type="text" value={ p.MCPServerURL } readonly id="oauth-mcp-url" class="input input-sm font-mono flex-1 bg-base-100 border-base-300 rounded-xl text-xs text-primary/80"/>
+					<input type="text" value={ p.MCPServerURL } readonly id="oauth-mcp-url" class="input input-sm font-mono flex-1 bg-base-100 border-base-300 text-xs text-primary/80"/>
 					<button class="btn btn-sm btn-ghost shrink-0 gap-1.5" :class="copiedUrl && '!text-success'" @click="copyMCPUrl()">
 						<i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedUrl"></i>
 						<i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedUrl" x-cloak></i>

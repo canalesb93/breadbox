@@ -18,13 +18,13 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 		</div>
 	</div>
 	if p.FormError != "" {
-		<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">
+		<div role="alert" class="alert alert-error alert-soft mb-4">
 			<i data-lucide="circle-x" class="w-4 h-4"></i>
 			<span>{ p.FormError }</span>
 		</div>
 	}
 	if p.FormSuccess != "" {
-		<div role="alert" class="alert alert-success alert-soft mb-4 rounded-xl">
+		<div role="alert" class="alert alert-success alert-soft mb-4">
 			<i data-lucide="circle-check" class="w-4 h-4"></i>
 			<span>{ p.FormSuccess }</span>
 		</div>
@@ -203,7 +203,7 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 				name={ name }
 				autocomplete="off"
 				placeholder={ "Current: " + maskedDisplay }
-				class="input input-sm w-full rounded-xl font-mono"
+				class="input input-sm w-full font-mono"
 			/>
 		} else {
 			<input
@@ -211,7 +211,7 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 				name={ name }
 				autocomplete="off"
 				placeholder="Not set"
-				class="input input-sm w-full rounded-xl font-mono"
+				class="input input-sm w-full font-mono"
 			/>
 		}
 		<label class="label">
@@ -239,7 +239,7 @@ templ agentSDKSidecarSection(p AgentSDKSettingsProps) {
 					name="runtime_path"
 					value={ p.Form.RuntimePath }
 					placeholder="auto"
-					class="input input-sm w-full rounded-xl font-mono"
+					class="input input-sm w-full font-mono"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Override default lookup — empty uses discovery chain.</span>
@@ -257,7 +257,7 @@ templ agentSDKSidecarSection(p AgentSDKSettingsProps) {
 					name="transcript_dir"
 					value={ p.Form.TranscriptDir }
 					placeholder="transcripts/agents"
-					class="input input-sm w-full rounded-xl font-mono"
+					class="input input-sm w-full font-mono"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Where to persist NDJSON transcripts.</span>
@@ -287,7 +287,7 @@ templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
 					value={ strconv.Itoa(p.Form.MaxConcurrent) }
 					min="1"
 					max="50"
-					class="input input-sm w-full rounded-xl"
+					class="input input-sm w-full"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Concurrent SDK runs across all definitions. 1–50.</span>
@@ -308,7 +308,7 @@ templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
 					min="0"
 					max="1000"
 					placeholder="no cap"
-					class="input input-sm w-full rounded-xl"
+					class="input input-sm w-full"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Optional ceiling per run. Leave empty for no global cap.</span>
@@ -378,7 +378,7 @@ templ agentSDKToolsCard(csrfToken string) {
 					<pre class="text-xs font-mono whitespace-pre-wrap" x-text="smokeResult.response"></pre>
 				</div>
 			</div>
-			<div x-show="smokeState === 'error' && smokeError" x-cloak role="alert" class="alert alert-error alert-soft rounded-xl">
+			<div x-show="smokeState === 'error' && smokeError" x-cloak role="alert" class="alert alert-error alert-soft">
 				<i data-lucide="circle-x" class="w-4 h-4"></i>
 				<span x-text="'Smoke test failed: ' + smokeError"></span>
 			</div>
@@ -390,7 +390,7 @@ templ agentSDKToolsCard(csrfToken string) {
 					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Retention days</dt><dd class="font-mono text-xs" x-text="cleanupResult.retention_days ?? '—'"></dd></div>
 				</dl>
 			</div>
-			<div x-show="cleanupState === 'error' && cleanupError" x-cloak role="alert" class="alert alert-error alert-soft rounded-xl">
+			<div x-show="cleanupState === 'error' && cleanupError" x-cloak role="alert" class="alert alert-error alert-soft">
 				<i data-lucide="circle-x" class="w-4 h-4"></i>
 				<span x-text="'Cleanup failed: ' + cleanupError"></span>
 			</div>
