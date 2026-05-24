@@ -182,7 +182,7 @@ templ agentRunsRow(r AgentRunRowProps, mode string) {
 		</td>
 		<td class="text-right tabular-nums text-xs">{ formatAgentRunDuration(r.DurationMs) }</td>
 		<td class="text-right tabular-nums text-xs">{ strconv.Itoa(r.Turns) }</td>
-		<td class="text-right text-xs">
+		<td class="text-right text-xs tabular-nums">
 			@agentRunCost(r.CostUSD, "text-xs")
 		</td>
 		<td class="text-right tabular-nums text-xs whitespace-nowrap">{ formatAgentRunTokens(r.TokensIn, r.TokensOut) }</td>

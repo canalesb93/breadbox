@@ -4,6 +4,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/templates/components"
@@ -312,8 +313,12 @@ func amountSandboxCode(p components.AmountProps) string {
 }
 
 // trimFloat formats a float without a trailing ".0" when the value is a
-// whole number, so "Value: 50" reads naturally next to "Value: 12.34".
+// whole number, so "Value: 50" reads naturally next to "Value: 12.34"
+// in the sandbox copy-paste reference rows. Uses FormatFloat with -1
+// precision to drop trailing zeros, and 'f' to avoid the scientific
+// notation %g switches to at ≥ 1e6 — abbreviated-format examples
+// (Value: 1_234_567) would otherwise render as "1.234567e+06" and
+// defeat the rows' copy-paste purpose.
 func trimFloat(f float64) string {
-	s := fmt.Sprintf("%g", f)
-	return s
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }

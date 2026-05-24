@@ -149,6 +149,12 @@ templ TxResults(p TxResultsProps) {
 // reads it as income (negative = inflow, rendered "+$X" in green) —
 // keeping sign/color logic in one place instead of forking a manual
 // "-formatAmount" shape here.
+//
+// Per-side opacity (`text-base-content/50` spending, the dimmed-success
+// override on income) preserves the date-header hierarchy: subtotals
+// stay quieter than the per-row amounts beneath them. Without it the
+// income subtotal would render in full-strength text-success and shout
+// over the row-level numbers.
 templ dayTotalBadge(attr string, value float64, income bool) {
 	<span
 		if !(value > 0) {
@@ -158,7 +164,7 @@ templ dayTotalBadge(attr string, value float64, income bool) {
 		data-value={ fmt.Sprintf("%.2f", value) }
 	>
 		if income {
-			@Amount(AmountProps{Value: -value, Class: "text-xs"})
+			@Amount(AmountProps{Value: -value, Class: "text-xs !text-success/70"})
 		} else {
 			@Amount(AmountProps{Value: value, Intent: AmountCost, Class: "text-xs text-base-content/50"})
 		}

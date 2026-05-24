@@ -67,7 +67,11 @@ templ accountLinkDetailDesktopRow(m AccountLinkDetailMatchRow, csrfToken string)
 	<tr>
 		<td class="whitespace-nowrap">{ m.Date }</td>
 		<td class="whitespace-nowrap text-right">
-			@components.Amount(components.AmountProps{Value: m.Amount})
+			<!-- AmountBalance: matched pairs in this table compare magnitudes
+			     between linked accounts. Keep the raw sign visible and skip
+			     the success-green income coloring — the row already conveys
+			     which side is the credit via account context. -->
+			@components.Amount(components.AmountProps{Value: m.Amount, Intent: components.AmountBalance})
 		</td>
 		<td>
 			<a href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.PrimaryTransactionID)) } class="link link-hover">{ m.PrimaryTxnName }</a>
@@ -114,8 +118,9 @@ templ accountLinkDetailMobileCard(m AccountLinkDetailMatchRow, csrfToken string)
 				@accountLinkDetailConfidenceBadge(m.MatchConfidence)
 			</div>
 			@components.Amount(components.AmountProps{
-				Value: m.Amount,
-				Class: "text-sm font-semibold",
+				Value:  m.Amount,
+				Intent: components.AmountBalance,
+				Class:  "text-sm font-semibold",
 			})
 		</div>
 		<div class="space-y-2">

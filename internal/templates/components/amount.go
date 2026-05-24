@@ -34,6 +34,18 @@ const (
 )
 
 // AmountProps configures the canonical Amount component.
+//
+// Class must be a literal class-list (sizes, weights, opacity, layout
+// utilities). Never pass user-derived strings — the value is
+// concatenated unescaped into the rendered class attribute.
+//
+// Tailwind v4 picks the winner on equal-specificity collisions by
+// source order in the compiled stylesheet, not by class-attribute
+// order. Passing a text-{color} utility in Class on a transaction
+// intent (which already emits text-success for income) is therefore
+// undefined — to override the intent color, use the `!` important
+// modifier (e.g. "!text-success/70") or pick an intent that doesn't
+// emit a color (AmountBalance / AmountCost).
 type AmountProps struct {
 	Value     float64
 	Intent    AmountIntent // default AmountTransaction
@@ -149,6 +161,11 @@ func compactCurrency(abs float64) string {
 // commaInt64 inserts thousand-separator commas in a non-negative int64.
 // Defers to CommaInt for values ≥ 1000 so all comma logic lives in one
 // place (helpers.go).
+//
+// Negative input is silently truncated to its magnitude (CommaInt walks
+// digits left-to-right and ignores the sign byte). All current callers
+// Abs the value before passing — keep that invariant for any new
+// caller, or add sign handling upstream.
 func commaInt64(n int64) string {
 	if n < 1000 {
 		return fmt.Sprintf("%d", n)

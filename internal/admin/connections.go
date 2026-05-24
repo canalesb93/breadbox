@@ -844,23 +844,29 @@ func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetail
 
 	for _, a := range in.Accounts {
 		row := pages.AccountRow{
-			ID:                  pgconv.FormatUUID(a.ID),
-			Name:                a.Name,
-			Type:                a.Type,
-			SubtypeValid:        a.Subtype.Valid,
-			SubtypeString:       a.Subtype.String,
-			MaskValid:           a.Mask.Valid,
-			MaskString:          a.Mask.String,
-			BalanceCurrentValid: a.BalanceCurrent.Valid,
-			BalanceAvailableValid: a.BalanceAvailable.Valid,
-			DisplayName:         a.DisplayName.String,
-			Excluded:            a.Excluded,
+			ID:            pgconv.FormatUUID(a.ID),
+			Name:          a.Name,
+			Type:          a.Type,
+			SubtypeValid:  a.Subtype.Valid,
+			SubtypeString: a.Subtype.String,
+			MaskValid:     a.Mask.Valid,
+			MaskString:    a.Mask.String,
+			DisplayName:   a.DisplayName.String,
+			Excluded:      a.Excluded,
 		}
-		if a.BalanceCurrent.Valid {
-			row.BalanceCurrentAbs = numericAbsFloat(a.BalanceCurrent)
+		// Set the Valid flags based on numericAbsFloat's ok return — a
+		// Numeric can be pgtype-Valid yet still fail conversion (NaN,
+		// out-of-range). Gating on .Valid alone would surface a
+		// fabricated "$0.00" on the connection-detail card; the templ
+		// renders the "No balance data" fallback when these flags are
+		// false.
+		if v, ok := numericAbsFloat(a.BalanceCurrent); ok {
+			row.BalanceCurrentValid = true
+			row.BalanceCurrentAbs = v
 		}
-		if a.BalanceAvailable.Valid {
-			row.BalanceAvailableAbs = numericAbsFloat(a.BalanceAvailable)
+		if v, ok := numericAbsFloat(a.BalanceAvailable); ok {
+			row.BalanceAvailableValid = true
+			row.BalanceAvailableAbs = v
 		}
 		props.Accounts = append(props.Accounts, row)
 	}
@@ -907,19 +913,20 @@ type connectionDaySync struct {
 }
 
 // numericAbsFloat returns |amount| as a float64 for templates that pass
-// the value through components.Amount (Intent: AmountCost). Returns 0
-// when the NUMERIC is invalid — the caller must gate on the matching
-// BalanceCurrent.Valid / BalanceAvailable.Valid flag, mirroring the
-// original behavior of returning "" from formatNumericAbsCurrency.
-func numericAbsFloat(n pgtype.Numeric) float64 {
+// the value through components.Amount (Intent: AmountCost). The second
+// return mirrors pgconv.NumericToFloat — false for NaN, infinity,
+// out-of-range, or an invalid Numeric. Callers should treat !ok as
+// "no balance" and skip the Amount render entirely, so a corrupt or
+// missing value never surfaces as a fabricated "$0.00".
+func numericAbsFloat(n pgtype.Numeric) (float64, bool) {
 	f, ok := pgconv.NumericToFloat(n)
 	if !ok {
-		return 0
+		return 0, false
 	}
 	if f < 0 {
 		f = -f
 	}
-	return f
+	return f, true
 }
 
 // ConnectionReauthHandler serves GET /admin/connections/{id}/reauth.

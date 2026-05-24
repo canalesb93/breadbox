@@ -125,9 +125,12 @@ templ Connections(p ConnectionsProps) {
 							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
 								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Assets</div>
 								<div class="truncate">
+									<!-- AmountBalance (signed): admin/connections.go sums totalAssets
+									     WITHOUT abs, so an overdrawn checking account contributes
+									     negatively. Strip-sign (AmountCost) would silently hide that. -->
 									@components.Amount(components.AmountProps{
 										Value:  p.TotalAssets,
-										Intent: components.AmountCost,
+										Intent: components.AmountBalance,
 										Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-success",
 									})
 								</div>
@@ -135,6 +138,8 @@ templ Connections(p ConnectionsProps) {
 							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
 								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Liabilities</div>
 								<div class="truncate">
+									<!-- totalLiabilities is pre-abs'd in admin/connections.go, so
+									     AmountCost (always-non-negative) is safe here. -->
 									@components.Amount(components.AmountProps{
 										Value:  p.TotalLiabilities,
 										Intent: components.AmountCost,
@@ -290,10 +295,10 @@ templ connectionsCard(c ConnectionsRow) {
 				if c.HasBalance {
 					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
 						@components.Amount(components.AmountProps{
-						Value:  c.TotalBalance,
-						Intent: components.AmountBalance,
-						Class:  "text-sm sm:text-lg font-semibold tracking-tight",
-					})
+							Value:  c.TotalBalance,
+							Intent: components.AmountBalance,
+							Class:  "text-sm sm:text-lg font-semibold tracking-tight",
+						})
 						<div class="text-xs text-base-content/40">
 							{ strconv.FormatInt(c.AccountCount, 10) }
 							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>

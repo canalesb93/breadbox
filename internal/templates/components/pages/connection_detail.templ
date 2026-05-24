@@ -409,11 +409,13 @@ templ connDetailAccountCard(a AccountRow) {
 					<div class="min-w-0">
 						if a.BalanceCurrentValid {
 							<div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Current</div>
-							@components.Amount(components.AmountProps{
-								Value:  a.BalanceCurrentAbs,
-								Intent: components.AmountCost,
-								Class:  "text-lg font-bold " + connDetailBalanceColor(a.Type),
-							})
+							<div>
+								@components.Amount(components.AmountProps{
+									Value:  a.BalanceCurrentAbs,
+									Intent: components.AmountCost,
+									Class:  "text-lg font-bold " + connDetailBalanceColor(a.Type),
+								})
+							</div>
 						} else {
 							<div class="text-xs text-base-content/30">No balance data</div>
 						}

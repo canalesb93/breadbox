@@ -389,9 +389,14 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 										<tr>
 											<td class="text-sm">{ m.ProviderName }</td>
 											<td class="text-sm text-right">
+												<!-- Rule preview shows the raw amounts the rule would
+												     match; AmountBalance keeps the stored sign visible
+												     without the success-green income tint that would
+												     mis-read in a rule-match context. -->
 												@components.Amount(components.AmountProps{
-													Value: m.Amount,
-													Class: "text-sm",
+													Value:  m.Amount,
+													Intent: components.AmountBalance,
+													Class:  "text-sm",
 												})
 											</td>
 											<td class="text-sm text-base-content/60">{ m.Date }</td>
