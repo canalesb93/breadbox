@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"breadbox/internal/templates/components"
 
@@ -269,7 +270,27 @@ func DesignSections() []DesignSection {
 			Group:       "patterns",
 			Render:      func() templ.Component { return SectionMultiSelectToolbar() },
 		},
+		{
+			Slug:        "timeline",
+			Title:       "Activity timeline",
+			Description: "GitHub-style row-on-rail primitives shared by /feed and /transactions/{id} — Timeline wrapper (card + prominent variants), day separators, system rows (built-in tones + custom tile), comment rows, inline actor references, and the empty-state.",
+			Group:       "patterns",
+			Render:      func() templ.Component { return SectionTimeline() },
+		},
 	}
+}
+
+// designTimelineNow returns the render-time anchor used by the timeline
+// sandbox examples. Centralised so every example shares a single now
+// across midnight, matching the contract real callers (/feed and
+// /transactions/{id}) hold with components.Timeline.
+func designTimelineNow() time.Time { return time.Now() }
+
+// designTimelineAgo returns an RFC3339 timestamp `d` before
+// designTimelineNow() — the format components.Timeline accepts on
+// TimelineRowProps.Timestamp / TimelineCommentRow / TimelineSystemRowCustomTile.
+func designTimelineAgo(d time.Duration) string {
+	return designTimelineNow().Add(-d).Format(time.RFC3339)
 }
 
 // toastDispatchExample returns the canonical dispatch snippet used in

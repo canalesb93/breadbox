@@ -1,6 +1,10 @@
 package pages
 
-import "breadbox/internal/templates/components"
+import (
+	"time"
+
+	"breadbox/internal/templates/components"
+)
 
 // design_sections.templ holds one `templ SectionX()` per entry in
 // DesignSections() (design_types.go). Each section demonstrates the
@@ -1411,5 +1415,224 @@ templ amountAntiPatternRow(legacy string, p components.AmountProps) {
 			@components.Amount(p)
 			<code class="text-[0.65rem] text-base-content/40 font-mono">{ amountSandboxCode(p) }</code>
 		</div>
+	</div>
+}
+
+// ─── Activity timeline ─────────────────────────────────────────────────
+//
+// The Timeline family lives in internal/templates/components/timeline.templ
+// and powers two surfaces: /feed (prominent variant) and /transactions/{id}
+// (prominent variant + the optimistic-update fragment endpoint). Section
+// examples below mirror the shapes those callers compose, so a reviewer
+// can pin one variant on /design/c/timeline and compare side-by-side with
+// the live pages without booting both.
+
+templ SectionTimeline() {
+	<div class="flex flex-col gap-6">
+		@designExample("Prominent variant", "Variant: \"prominent\" — used on /feed and /transactions/{id}. Larger heading, top divider, scaled-up tiles via .bb-timeline-prominent in input.css.") {
+			@components.Timeline(components.TimelineProps{
+				Heading:     "Activity",
+				HeadingIcon: "activity",
+				EventCount:  4,
+				AriaLabel:   "Sandbox prominent timeline",
+				Variant:     "prominent",
+			}) {
+				@components.TimelineDay("Today", true)
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon:      "zap",
+					IconTone:  "info",
+					Timestamp: designTimelineAgo(15 * time.Minute),
+					Origin:    "rule",
+					Now:       designTimelineNow(),
+				}) {
+					<span>Rule <strong class="font-semibold text-base-content">Coffee shops → Dining</strong> applied</span>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon:      "tag",
+					IconTone:  "success",
+					Timestamp: designTimelineAgo(48 * time.Minute),
+					Now:       designTimelineNow(),
+				}) {
+					@components.TimelineActorInline(components.TimelineActor{Name: "Alice"})
+					<span>added the </span>
+					<span class="bb-tag bb-tag-sm" style="--tag-color: oklch(0.7 0.18 220);">recurring</span>
+				}
+				@components.TimelineDay("Yesterday", false)
+				@components.TimelineCommentRow(
+					components.TimelineActor{Name: "Bob"},
+					designTimelineAgo(26*time.Hour),
+					designTimelineNow(),
+				) {
+					<div class="bb-comment-bubble mt-1">
+						Pulled this out of grocery — it's actually a household gift.
+					</div>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon:      "rotate-cw",
+					IconTone:  "neutral",
+					Timestamp: designTimelineAgo(30 * time.Hour),
+					Origin:    "sync",
+					Now:       designTimelineNow(),
+				}) {
+					<span class="font-medium text-base-content">12 new transactions</span>
+					<span class="text-base-content/55"> from Chase</span>
+				}
+			}
+		}
+		@designExample("Card variant", "Default Variant (\"\" or \"card\") — wrapped in bb-card with a tighter header. Used by future side-panel / embed callers (sync-log detail, agent-run logs).") {
+			@components.Timeline(components.TimelineProps{
+				Heading:     "Activity",
+				HeadingIcon: "activity",
+				EventCount:  2,
+				AriaLabel:   "Sandbox card timeline",
+			}) {
+				@components.TimelineDay("Today", true)
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon:      "check",
+					IconTone:  "success",
+					Timestamp: designTimelineAgo(3 * time.Minute),
+					Now:       designTimelineNow(),
+				}) {
+					@components.TimelineActorInline(components.TimelineActor{Name: "Alice"})
+					<span>approved the review</span>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon:      "x",
+					IconTone:  "error",
+					Timestamp: designTimelineAgo(2 * time.Hour),
+					Now:       designTimelineNow(),
+				}) {
+					@components.TimelineActorInline(components.TimelineActor{Name: "Alice"})
+					<span>removed the </span>
+					<span class="bb-tag bb-tag-sm" style="--tag-color: oklch(0.7 0.12 30);">duplicate</span>
+				}
+			}
+		}
+		@designExample("IconTone palette", "TimelineRowProps.IconTone — built-in palette for system rows. The default tone is \"neutral\".") {
+			@components.Timeline(components.TimelineProps{
+				AriaLabel: "Sandbox icon tones",
+				Variant:   "prominent",
+			}) {
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon: "info", IconTone: "neutral", Timestamp: designTimelineAgo(1 * time.Minute), Now: designTimelineNow(),
+				}) {
+					<span><code class="text-xs">IconTone: "neutral"</code> — comments, unknown system events, fallback</span>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon: "zap", IconTone: "info", Timestamp: designTimelineAgo(2 * time.Minute), Now: designTimelineNow(),
+				}) {
+					<span><code class="text-xs">IconTone: "info"</code> — rule applications</span>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon: "check", IconTone: "success", Timestamp: designTimelineAgo(3 * time.Minute), Now: designTimelineNow(),
+				}) {
+					<span><code class="text-xs">IconTone: "success"</code> — tag added, review approved</span>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon: "alert-triangle", IconTone: "warning", Timestamp: designTimelineAgo(4 * time.Minute), Now: designTimelineNow(),
+				}) {
+					<span><code class="text-xs">IconTone: "warning"</code> — review skipped</span>
+				}
+				@components.TimelineSystemRow(components.TimelineRowProps{
+					Icon: "x", IconTone: "error", Timestamp: designTimelineAgo(5 * time.Minute), Now: designTimelineNow(),
+				}) {
+					<span><code class="text-xs">IconTone: "error"</code> — tag removed, review rejected</span>
+				}
+			}
+		}
+		@designExample("Custom-tile row + comment tile", "TimelineSystemRowCustomTile lets a caller render the entire 24px tile — the production /feed and /transactions/{id} callers use it for category-tinted, status-tinted, and message-square tiles.") {
+			@components.Timeline(components.TimelineProps{
+				AriaLabel: "Sandbox custom-tile rows",
+				Variant:   "prominent",
+			}) {
+				@components.TimelineSystemRowCustomTile(
+					designTimelineAgo(7*time.Minute),
+					"",
+					designTimelineNow(),
+					timelineSandboxCategoryTile(),
+					timelineSandboxCategoryBody(),
+					nil,
+				)
+				@components.TimelineSystemRowCustomTile(
+					"",
+					"",
+					designTimelineNow(),
+					components.TimelineCommentTile(),
+					timelineSandboxCommentBody(),
+					nil,
+				)
+			}
+		}
+		@designExample("Comment row (TimelineCommentRow)", "User avatar on the rail + standard \"<actor> commented · <time>\" meta line above a bubble. Falls back to initials when AvatarURL is empty; agents render as a bot tile when IsAgent=true.") {
+			@components.Timeline(components.TimelineProps{
+				AriaLabel: "Sandbox comment rows",
+				Variant:   "prominent",
+			}) {
+				@components.TimelineCommentRow(
+					components.TimelineActor{Name: "Alice"},
+					designTimelineAgo(5*time.Minute),
+					designTimelineNow(),
+				) {
+					<div class="bb-comment-bubble mt-1">
+						Looks right — leaving as-is.
+					</div>
+				}
+				@components.TimelineCommentRow(
+					components.TimelineActor{Name: "Insights agent", IsAgent: true},
+					designTimelineAgo(2*time.Hour),
+					designTimelineNow(),
+				) {
+					<div class="bb-comment-bubble mt-1">
+						This merchant looks like a duplicate of <strong>WHOLE FOODS #102</strong>. Worth a quick look.
+					</div>
+				}
+			}
+		}
+		@designExample("Inline actor (TimelineActorInline)", "Used inside system-row sentences and comment meta lines so the actor representation is identical on every surface. Avatar uses align-text-bottom so the baseline matches the surrounding leading-6 text.") {
+			<div class="flex flex-col gap-2 text-sm">
+				<div>
+					@components.TimelineActorInline(components.TimelineActor{Name: "Alice"})
+					<span class="text-base-content/55">— user with initials fallback</span>
+				</div>
+				<div>
+					@components.TimelineActorInline(components.TimelineActor{Name: "Bob", HRef: "#"})
+					<span class="text-base-content/55">— user with a linked name</span>
+				</div>
+				<div>
+					@components.TimelineActorInline(components.TimelineActor{Name: "Insights agent", IsAgent: true})
+					<span class="text-base-content/55">— agent with bot tile</span>
+				</div>
+			</div>
+		}
+		@designExample("Empty state (TimelineEmpty)", "Rendered in place of the Timeline section when there are zero rows. Callers wrap their own composer/CTA above the divider; this primitive owns only the icon + message.") {
+			<div class="bb-card p-6 max-w-md">
+				@components.TimelineEmpty("No activity yet")
+			</div>
+		}
+	</div>
+}
+
+// timelineSandboxCategoryTile renders a category-tinted 24px tile shaped
+// like the per-tx activity timeline's category-set rows. Mirrors the
+// "data-driven tile colour, fall back to neutral chrome" pattern that the
+// real callers use via txdSystemIcon — but inlined here so the sandbox
+// stays decoupled from the service-layer types.
+templ timelineSandboxCategoryTile() {
+	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-success/15 ring-4 ring-base-100" aria-hidden="true">
+		<i data-lucide="utensils" class="w-3 h-3 text-success"></i>
+	</span>
+}
+
+templ timelineSandboxCategoryBody() {
+	@components.TimelineActorInline(components.TimelineActor{Name: "Alice"})
+	<span>set category to </span>
+	<span class="badge badge-soft badge-success badge-sm">Groceries</span>
+}
+
+templ timelineSandboxCommentBody() {
+	<div class="flex items-center gap-1.5 flex-wrap min-w-0">
+		@components.TimelineActorInline(components.TimelineActor{Name: "Alice"})
+		<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
+		<a href="#" class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">Whole Foods Market</a>
 	</div>
 }
