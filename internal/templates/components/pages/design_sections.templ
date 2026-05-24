@@ -1112,7 +1112,21 @@ templ SectionFilterSearchInput() {
 // (`bb-tx-avatar`, `bb-tx-amount`, `bb-tx-owner-badge`) that compose
 // them. The fixture rows live in design_transaction_rows_helpers.go
 // so the templ stays focused on layout.
+//
+// We seed window.__bbCategories from a JSONScript tag so the inline
+// `categoryPicker` Alpine factory on TxRow can resolve `data-initial`
+// (a category UUID) to a visible label. Without this seed the picker's
+// button collapses to a ~18px shell because x-text="displayLabel"
+// overwrites the static fallback with an empty string. The
+// CategoryPickerScript + Styles ship the factory itself; live pages
+// (e.g. /transactions) load them via their own page-component module.
 templ SectionTransactionRows() {
+	@components.CategoryPickerScript()
+	@components.CategoryPickerStyles()
+	@templ.JSONScript("design-tx-rows-cats", designTxRowsCategories())
+	<script>
+		(function(){var e=document.getElementById('design-tx-rows-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
+	</script>
 	<div class="flex flex-col gap-6">
 		@designExample("TxRow — full row (transactions list)", "Two-line layout with checkbox, avatar, name + meta, inline category picker (xl+), date, amount, expand panel. Used on /transactions.") {
 			<div class="divide-y divide-base-300/40 -mx-5">

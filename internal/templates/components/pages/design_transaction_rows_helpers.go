@@ -8,6 +8,33 @@ import (
 	"breadbox/internal/service"
 )
 
+// designTxRowsCategory mirrors the minimal shape the inline
+// categoryPicker (static/js/admin/components/category_picker.js) reads
+// from window.__bbCategories — id, slug, display_name, icon, color,
+// plus optional children. The sandbox seeds a fixture list so the
+// picker button on TxRow resolves data-initial to a visible label
+// instead of collapsing to an empty 18px shell.
+type designTxRowsCategory struct {
+	ID          string `json:"id"`
+	Slug        string `json:"slug"`
+	DisplayName string `json:"display_name"`
+	Icon        string `json:"icon,omitempty"`
+	Color       string `json:"color,omitempty"`
+}
+
+// designTxRowsCategories returns the fixture category list seeded into
+// window.__bbCategories on the /design page. IDs must match the
+// CategoryID fields on designTxRowsCategorized + designTxRowsPending so
+// the picker can resolve data-initial back to a label.
+func designTxRowsCategories() []designTxRowsCategory {
+	return []designTxRowsCategory{
+		{ID: "cat0001", Slug: "groceries", DisplayName: "Groceries", Icon: "shopping-cart", Color: "#22c55e"},
+		{ID: "cat0002", Slug: "coffee", DisplayName: "Coffee & Cafés", Icon: "coffee", Color: "#d97706"},
+		{ID: "cat0003", Slug: "transit", DisplayName: "Transit", Icon: "train", Color: "#0ea5e9"},
+		{ID: "cat0004", Slug: "travel", DisplayName: "Travel", Icon: "plane", Color: "#a855f7"},
+	}
+}
+
 // designTxRowsToday returns today's date in the YYYY-MM-DD form the
 // transaction helpers expect, so the sandbox sample rows render
 // "Today" in relative-date columns without freezing a stale value.

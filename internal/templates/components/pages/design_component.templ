@@ -45,17 +45,24 @@ templ DesignComponent(p DesignComponentProps) {
 		</div>
 		<!-- Iframe gives the embedded component its OWN viewport so
 		     Tailwind responsive prefixes (sm:, lg:) trigger based on
-		     the toggle's chosen width, not the outer browser width. -->
-		<div
-			class="bb-card p-0 mx-auto overflow-hidden transition-[max-width] duration-200"
-			:class="{ 'max-w-full': vp === 'desktop', 'max-w-[768px]': vp === 'tablet', 'max-w-[390px]': vp === 'mobile' }"
-		>
-			<iframe
-				src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
-				title={ p.Section.Title + " preview" }
-				class="w-full h-[80vh] border-0 bg-base-100"
-				loading="lazy"
-			></iframe>
+		     the toggle's chosen width, not the outer browser width.
+		     Desktop is pinned to min-width 1320px (just above Tailwind
+		     xl=1280px) so components gated on xl: — like the inline
+		     category picker column on TxRow — render at their full
+		     shape. On narrower browsers the outer wrapper scrolls
+		     horizontally instead of squeezing the preview below xl. -->
+		<div class="overflow-x-auto">
+			<div
+				class="bb-card p-0 mx-auto overflow-hidden transition-[max-width] duration-200"
+				:class="{ 'min-w-[1320px] max-w-full': vp === 'desktop', 'max-w-[768px]': vp === 'tablet', 'max-w-[390px]': vp === 'mobile' }"
+			>
+				<iframe
+					src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
+					title={ p.Section.Title + " preview" }
+					class="w-full h-[80vh] border-0 bg-base-100"
+					loading="lazy"
+				></iframe>
+			</div>
 		</div>
 	</div>
 }
