@@ -263,10 +263,17 @@
         </a>
       </div>
     </div>
-    <main class="p-4 sm:p-6 max-w-6xl mx-auto min-h-screen">
+    <main class="p-4 sm:p-6 max-w-6xl mx-auto">
       {{template "flash" .}}
       {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
     </main>
+    <footer class="text-center text-xs text-base-content/35 py-6">
+      Powered by
+      <a href="https://daisyui.com/"
+         target="_blank"
+         rel="noopener"
+         class="hover:text-base-content/60 transition-colors no-underline">daisyUI</a>
+    </footer>
   </div>
   {{else}}
   <div class="drawer lg:drawer-open">
