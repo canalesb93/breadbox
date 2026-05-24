@@ -8,13 +8,18 @@
   <!-- Safari: theme color for status bar / tab bar -->
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
-  <!-- Safari: Add to Home Screen support -->
+  <!-- Safari: Add to Home Screen support. The non-prefixed mobile-web-app-capable
+       is the modern equivalent; Safari still reads the apple-* variant, but
+       browsers warn in console without the standard name. Ship both. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Breadbox">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <!-- fetchpriority="high" hints that the app stylesheet is render-blocking and
+       critical. Safari 17.2+ and Chrome 102+ honor it; older browsers ignore. -->
+  <link rel="stylesheet" href="/static/css/styles.css" fetchpriority="high">
   <script>
     // Stash the browser's IANA timezone in a cookie so server-rendered date
     // logic ("Today" buckets, hero "Events today" counters, absolute-time

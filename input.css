@@ -56,7 +56,23 @@
 
 @view-transition { navigation: auto; }
 
+/* Universal reduced-motion guard. Honors the OS-level "Reduce Motion"
+ * toggle (iOS Accessibility, macOS Accessibility, Windows Animations,
+ * Linux GNOME Animations) by collapsing every transition/animation to
+ * a near-zero duration and disabling smooth scroll. Recommended pattern
+ * from web.dev / Eric Bailey — scoped to *::before/::after to catch
+ * pseudo-elements, !important to override Tailwind/daisy/our own rules.
+ *
+ * The view-transition pseudo-elements need their own zero-out below
+ * because they're not matched by the universal selector. */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
