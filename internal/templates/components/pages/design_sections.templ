@@ -419,23 +419,21 @@ templ SectionTags() {
 
 templ SectionMenusDropdowns() {
 	<div class="flex flex-col gap-6">
-		@designExample("Overflow action menu", "When a card has ≥2 secondary actions, prefer one ellipsis dropdown over a cluster of icon buttons.") {
+		@designExample("Overflow action menu", "When a card has ≥2 secondary actions, prefer one ellipsis dropdown over a cluster of icon buttons. Use the shared components.OverflowMenu — same shape, native popover that escapes overflow-clipped ancestors.") {
 			<div class="bb-card p-4 max-w-sm">
 				<div class="flex items-center justify-between gap-3">
 					<div>
 						<div class="text-sm font-semibold">Alex Chen</div>
 						<div class="text-xs text-base-content/50">alex@example.com</div>
 					</div>
-					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100">
-							<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
-						</div>
-						<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
-							<li><a><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
-							<li><a><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
-							<li><a class="text-error"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete</a></li>
-						</ul>
-					</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Actions for Alex Chen",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit profile", Icon: "pencil", Href: "#"},
+							{Label: "Manage login", Icon: "settings", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
+						},
+					})
 				</div>
 			</div>
 		}
@@ -779,6 +777,31 @@ templ SectionOverflowMenu() {
 						{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
 					},
 				})
+			</div>
+		}
+		@designExample("Size=\"xs\" — dense table rows", "Use `Size: \"xs\"` inside tight tables (tags, rules, categories, OAuth client rows, agents). The trigger shrinks from `btn-sm` to `btn-xs`, the icon from `w-5 h-5` to `w-4 h-4`, and the menu from `w-44` to `w-40`. Both sizes shown side-by-side for comparison.") {
+			<div class="bb-card p-4 max-w-sm">
+				<div class="flex items-center justify-between gap-3">
+					<div class="text-sm font-semibold">Default — Size=\"sm\"</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Default size actions",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit", Icon: "pencil", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
+						},
+					})
+				</div>
+				<div class="border-t border-base-300/40 mt-3 pt-3 flex items-center justify-between gap-3">
+					<div class="text-sm font-semibold">Compact — Size="xs"</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Compact size actions",
+						Size:      "xs",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit", Icon: "pencil", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
+						},
+					})
+				</div>
 			</div>
 		}
 	</div>

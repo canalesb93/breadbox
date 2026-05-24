@@ -180,46 +180,12 @@ templ rulesRow(r RulesRow) {
 				>
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
 				</a>
-				<div class="dropdown dropdown-end" @click.stop>
-					<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ "Rule " + r.Name + " actions" }>
-						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
-					</div>
-					<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
-						<li>
-							<button
-								type="button"
-								data-toggle-enabled
-								aria-label={ rulesToggleLabel(r) }
-								@click.stop={ "toggleRule('" + r.ID + "'); document.activeElement && document.activeElement.blur()" }
-							>
-								if r.Enabled {
-									<i data-lucide="pause" class="w-3.5 h-3.5"></i> Disable
-								} else {
-									<i data-lucide="play" class="w-3.5 h-3.5"></i> Enable
-								}
-							</button>
-						</li>
-						if r.IsSystem {
-							<li class="disabled">
-								<span class="text-base-content/40 cursor-not-allowed" title="System rules cannot be deleted — disable instead">
-									<i data-lucide="shield" class="w-3.5 h-3.5"></i> System (no delete)
-								</span>
-							</li>
-						} else {
-							<li>
-								<button
-									type="button"
-									class="text-error"
-									data-delete-action
-									aria-label={ "Delete rule " + r.Name }
-									:disabled="deleting"
-									@click.stop={ "deleteRule('" + r.ID + "', $el); document.activeElement && document.activeElement.blur()" }
-								>
-									<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
-								</button>
-							</li>
-						}
-					</ul>
+				<div @click.stop class="contents">
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Rule " + r.Name + " actions",
+						Size:      "xs",
+						Items:     rulesOverflowItems(r),
+					})
 				</div>
 			</div>
 		</div>
@@ -323,4 +289,38 @@ func rulesToggleLabel(r RulesRow) string {
 		return "Disable rule " + r.Name
 	}
 	return "Enable rule " + r.Name
+}
+
+// rulesOverflowItems builds the kebab menu items for one rule row.
+// Toggles between Enable/Disable based on r.Enabled; system rules
+// render Delete as a disabled "System (no delete)" entry instead.
+func rulesOverflowItems(r RulesRow) []components.OverflowMenuItem {
+	toggle := components.OverflowMenuItem{
+		Label:     "Disable",
+		Icon:      "pause",
+		OnClick:   "toggleRule('" + r.ID + "'); document.activeElement && document.activeElement.blur()",
+		AriaLabel: rulesToggleLabel(r),
+	}
+	if !r.Enabled {
+		toggle.Label = "Enable"
+		toggle.Icon = "play"
+	}
+	items := []components.OverflowMenuItem{toggle}
+	if r.IsSystem {
+		items = append(items, components.OverflowMenuItem{
+			Label:     "System (no delete)",
+			Icon:      "shield",
+			Disabled:  true,
+			AriaLabel: "System rules cannot be deleted — disable instead",
+		})
+	} else {
+		items = append(items, components.OverflowMenuItem{
+			Label:       "Delete",
+			Icon:        "trash-2",
+			OnClick:     "deleteRule('" + r.ID + "', $el); document.activeElement && document.activeElement.blur()",
+			Destructive: true,
+			AriaLabel:   "Delete rule " + r.Name,
+		})
+	}
+	return items
 }

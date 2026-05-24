@@ -188,32 +188,35 @@ templ categoryTileInner(c service.CategoryResponse, child bool) {
 // always-visible kebab menu so actions are reachable on every viewport
 // (mouse, touch, keyboard). Matches the pattern used on /tags (PR #728).
 templ categoryRowActions(c service.CategoryResponse, child bool) {
-	<div class="dropdown dropdown-end">
-		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ fmt.Sprintf("Category %s actions", c.DisplayName) }>
-			<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
-		</div>
-		<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-40 p-1">
-			<li>
-				<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) } aria-label={ fmt.Sprintf("Edit category %s", c.DisplayName) }>
-					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
-				</a>
-			</li>
-			if !c.IsSystem {
-				<li>
-					<button
-						type="button"
-						class="text-error"
-						data-id={ c.ID }
-						data-name={ c.DisplayName }
-						aria-label={ fmt.Sprintf("Delete category %s", c.DisplayName) }
-						@click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
-					>
-						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
-					</button>
-				</li>
-			}
-		</ul>
-	</div>
+	@components.OverflowMenu(components.OverflowMenuProps{
+		AriaLabel: fmt.Sprintf("Category %s actions", c.DisplayName),
+		Size:      "xs",
+		Items:     categoryRowItems(c),
+	})
+}
+
+// categoryRowItems builds the Edit (+ optional Delete) items for one
+// category row. System categories omit Delete entirely (same as the
+// inline version we replaced).
+func categoryRowItems(c service.CategoryResponse) []components.OverflowMenuItem {
+	items := []components.OverflowMenuItem{
+		{
+			Label:     "Edit",
+			Icon:      "pencil",
+			Href:      templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)),
+			AriaLabel: fmt.Sprintf("Edit category %s", c.DisplayName),
+		},
+	}
+	if !c.IsSystem {
+		items = append(items, components.OverflowMenuItem{
+			Label:       "Delete",
+			Icon:        "trash-2",
+			OnClick:     fmt.Sprintf("$dispatch('delete-category', {id: '%s', name: '%s'})", jsEscape(c.ID), jsEscape(c.DisplayName)),
+			Destructive: true,
+			AriaLabel:   fmt.Sprintf("Delete category %s", c.DisplayName),
+		})
+	}
+	return items
 }
 
 templ categoriesNewCategoryAction() {
