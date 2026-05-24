@@ -55,7 +55,13 @@ templ-check: templ-install
 		exit 1; \
 	}
 
-dev: generate
+# `make dev` runs the prod-like embedded-FS server. We rebuild CSS up front
+# so any template changes (new utility classes, new templ files) are reflected
+# in the bundled styles.css before the binary boots — otherwise Tailwind's
+# scanned class list goes stale and the page renders without the classes
+# this dev session just added. `dev-watch` doesn't need this because
+# tailwindcss-extra --watch is running alongside air.
+dev: generate css
 	@if [ -z "$$DATABASE_URL" ]; then \
 		echo "Error: DATABASE_URL is not set."; \
 		echo "  Set it for local dev:  export DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"; \
