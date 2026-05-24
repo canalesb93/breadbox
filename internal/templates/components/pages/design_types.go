@@ -223,6 +223,13 @@ func DesignSections() []DesignSection {
 			Group:       "data",
 			Render:      func() templ.Component { return SectionAmounts() },
 		},
+		{
+			Slug:        "transaction-rows",
+			Title:       "Transaction rows",
+			Description: "TxRow / TxRowCompact / TxRowFeed and their building blocks (bb-tx-avatar, bb-tx-owner-badge, bb-tx-amount). The same avatar + amount shapes carry across every surface that lists transactions.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionTransactionRows() },
+		},
 
 		// ── Feedback ────────────────────────────────────────────────
 		{

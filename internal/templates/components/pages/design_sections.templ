@@ -768,6 +768,19 @@ templ SectionOverflowMenu() {
 				</div>
 			</div>
 		}
+		@designExample("Inside an overflow-clipped container", "Native popover + CSS anchor positioning lets the menu escape an `overflow:hidden` ancestor (the bug that hid the kebab on /tags inside the table viewport). The trigger sits in the bottom-right of a 96px-tall clipped box — an old `absolute`-positioned dropdown would be invisible; the popover version paints in the top layer above everything.") {
+			<div class="overflow-hidden border border-base-300 rounded-xl h-24 w-72 bg-base-200/40 p-3 flex items-end justify-end">
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Clipped-container actions",
+					Items: []components.OverflowMenuItem{
+						{Label: "View", Icon: "eye", Href: "#"},
+						{Label: "Edit", Icon: "pencil", Href: "#"},
+						{Label: "Archive", Icon: "archive", OnClick: "noop()"},
+						{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
+					},
+				})
+			</div>
+		}
 	</div>
 }
 
@@ -1192,6 +1205,183 @@ templ SectionAmounts() {
 				@amountAntiPatternRow("fmt.Sprintf(\"$%.4f\", v) // agent_runs", components.AmountProps{Value: 0.1234, Intent: components.AmountCost, Precision: 4})
 				@amountAntiPatternRow("-formatAmount(v) // dayTotalBadge income hack", components.AmountProps{Value: -84.55})
 				@amountAntiPatternRow("formatAmount(tx.Amount) // bare, no tabular-nums", components.AmountProps{Value: 12.34})
+			</div>
+		}
+	</div>
+}
+
+// ─── Transaction rows ──────────────────────────────────────────────────
+
+// SectionTransactionRows shows the three row variants (full, compact,
+// feed) side by side, plus the building-block elements
+// (`bb-tx-avatar`, `bb-tx-amount`, `bb-tx-owner-badge`) that compose
+// them. The fixture rows live in design_transaction_rows_helpers.go
+// so the templ stays focused on layout.
+//
+// We seed window.__bbCategories from a JSONScript tag so the inline
+// `categoryPicker` Alpine factory on TxRow can resolve `data-initial`
+// (a category UUID) to a visible label. Without this seed the picker's
+// button collapses to a ~18px shell because x-text="displayLabel"
+// overwrites the static fallback with an empty string. The
+// CategoryPickerScript + Styles ship the factory itself; live pages
+// (e.g. /transactions) load them via their own page-component module.
+templ SectionTransactionRows() {
+	@components.CategoryPickerScript()
+	@components.CategoryPickerStyles()
+	@templ.JSONScript("design-tx-rows-cats", designTxRowsCategories())
+	<script>
+		(function(){var e=document.getElementById('design-tx-rows-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
+	</script>
+	<div class="flex flex-col gap-6">
+		@designExample("TxRow — full row (transactions list)", "Two-line layout with checkbox, avatar, name + meta, inline category picker (xl+), date, amount, expand panel. Used on /transactions.") {
+			<div class="divide-y divide-base-300/40 -mx-5">
+				@components.TxRow(designTxRowsCategorized())
+				@components.TxRow(designTxRowsIncome())
+				@components.TxRow(designTxRowsPending())
+				@components.TxRow(designTxRowsUncategorized())
+			</div>
+		}
+		@designExample("TxRowCompact — dense list (dashboard, rule detail)", "Single-anchor row with avatar, name + meta, amount + relative date. No selection, no expand panel.") {
+			<div class="flex flex-col gap-1">
+				@components.TxRowCompact(designTxRowsCategorized())
+				@components.TxRowCompact(designTxRowsIncome())
+				@components.TxRowCompact(designTxRowsPending())
+				@components.TxRowCompact(designTxRowsUncategorized())
+			</div>
+		}
+		@designExample("TxRowFeed — single-line glance row (/feed samples)", "Raw provider description + avatar + amount in one line, with optional `Dimmed` for de-emphasised reference rows and an inline `[tag] N` chip. Amount uses leading + / − so direction is unambiguous regardless of sign convention.") {
+			<div class="flex flex-col gap-0.5">
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:       "tx12abcd",
+					Description:   "WHOLEFDS NEW YORK 12345",
+					Amount:        48.27,
+					Currency:      "USD",
+					CategoryColor: designTxRowsPtr("#22c55e"),
+					CategoryIcon:  designTxRowsPtr("shopping-cart"),
+					TagCount:      2,
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:     "tx34efgh",
+					Description: "ACME PAYROLL DIRECT DEP",
+					Amount:      -2845.00,
+					Currency:    "USD",
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:       "tx56ijkl",
+					Description:   "BLUE BOTTLE COFFEE",
+					Amount:        6.75,
+					Currency:      "USD",
+					Pending:       true,
+					CategoryColor: designTxRowsPtr("#d97706"),
+					CategoryIcon:  designTxRowsPtr("coffee"),
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:     "tx78mnop",
+					Description: "USPS PO 12345",
+					Amount:      14.95,
+					Currency:    "USD",
+					Dimmed:      true,
+				})
+			</div>
+		}
+		@designExample("Avatars (bb-tx-avatar)", "Default 36×36 (full row) and 32×32 (--sm, compact/feed). `--avatar-color` from category drives a 12 % background tint via color-mix. Uncategorised variant is a neutral circle-off glyph.") {
+			<div class="flex flex-wrap items-end gap-4">
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
+						<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">default</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #22c55e">
+						<i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--sm</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #d97706">
+						<i data-lucide="coffee" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">amber</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #0ea5e9">
+						<i data-lucide="home" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">sky</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #a855f7">
+						<i data-lucide="plane" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">violet</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+						<i data-lucide="circle-off" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--uncategorized</code>
+				</div>
+			</div>
+		}
+		@designExample("Owner badge (bb-tx-owner-badge)", "Bottom-right corner of the avatar, ringed in the row background. Image when EffectiveUserID is set, letter fallback otherwise.") {
+			<div class="flex flex-wrap items-end gap-6">
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
+							<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Alex">
+							<span>A</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--letter</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #d97706">
+							<i data-lucide="coffee" class="w-3.5 h-3.5"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
+							<span>S</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--sm + letter</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+							<i data-lucide="circle-off" class="w-4 h-4"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
+							<span>S</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">on uncategorized</code>
+				</div>
+			</div>
+		}
+		@designExample("Amount (components.Amount)", "Routes through the canonical Amount component — income (negative in our convention) renders as +$X in success green via tabular-nums, expense as $X in the default color. Pending: true dims to 55 %. See the dedicated Amounts section for the full intent / format matrix.") {
+			<div class="flex flex-col gap-2 text-right max-w-[18rem]">
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">default (outflow)</span>
+					@components.Amount(components.AmountProps{Value: 48.27, Class: "text-sm font-semibold"})
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">income</span>
+					@components.Amount(components.AmountProps{Value: -2845.00, Class: "text-sm font-semibold"})
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">pending</span>
+					<span class="inline-flex items-center justify-end gap-1">
+						<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+						@components.Amount(components.AmountProps{Value: 6.75, Pending: true, Class: "text-sm font-semibold"})
+					</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">income + pending</span>
+					@components.Amount(components.AmountProps{Value: -120.00, Pending: true, Class: "text-sm font-semibold"})
+				</div>
 			</div>
 		}
 	</div>
