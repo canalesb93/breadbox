@@ -152,6 +152,12 @@ func DesignSections() []DesignSection {
 			Description: "Icon + h2 + count + optional action — for section headings INSIDE pages. Use components.SectionHeader (PageHeader is for top-of-page titles).",
 			Render:      func() templ.Component { return SectionSectionHeader() },
 		},
+		{
+			Slug:        "filter-search-input",
+			Title:       "Filter search input",
+			Description: "Client-side filter input — daisy input + leading search icon + x-model binding for Alpine-driven row filtering. Use components.FilterSearchInput on /categories, /tags, and future inline-filter list pages.",
+			Render:      func() templ.Component { return SectionFilterSearchInput() },
+		},
 	}
 }
 
