@@ -118,7 +118,8 @@ templ DesignComponent(p DesignComponentProps) {
 			<iframe
 				src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
 				title={ p.Section.Title + " preview" }
-				class="w-full h-[80vh] border-0 bg-base-100"
+				class="h-[80vh] border-0 bg-base-100"
+				:class="vp === 'free' ? 'w-[calc(100%-32px)]' : 'w-full'"
 				:style="dragging ? 'pointer-events: none' : ''"
 				loading="lazy"
 			></iframe>
