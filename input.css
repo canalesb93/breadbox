@@ -23,6 +23,13 @@
   themes: light --default, dark --prefersdark;
 }
 
+/* Force-include classes that Tailwind's content scanner can't see
+   because they live inside dynamic strings (Alpine :class, runtime
+   templ expressions, JS className builders).
+   Add new entries here whenever a class only exists at runtime —
+   prefer this over chasing arbitrary-value scanner bugs. */
+@source inline("max-w-[768px] max-w-[390px]");
+
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }
 

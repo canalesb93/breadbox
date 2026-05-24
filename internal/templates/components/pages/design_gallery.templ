@@ -1,7 +1,5 @@
 package pages
 
-import "breadbox/internal/templates/components"
-
 // DesignGallery renders the /design page — a long, anchored scroll of
 // every component family in the system. The sidebar groups sections
 // under collapsible top-level buckets so the navigation stays scannable
@@ -13,21 +11,6 @@ import "breadbox/internal/templates/components"
 // design_types.go::DesignSections() and tag it with a Group slug from
 // design_types.go::DesignSectionGroups().
 templ DesignGallery(p DesignGalleryProps) {
-	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Design system</h1>
-			<p class="text-sm text-base-content/50 mt-1">
-				Reference gallery for every shared admin-UI component. Click a section to deep-link, or open the standalone viewer for focused screenshots.
-			</p>
-		</div>
-		<div class="flex items-center gap-2">
-			<a href="/design" class="btn btn-ghost btn-sm rounded-xl gap-1.5">
-				<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-				Reload
-			</a>
-		</div>
-	</div>
 	<div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-6">
 		<aside class="hidden lg:block">
 			// `h-[calc(100vh-3rem)]` (not max-h) pins the nav to viewport
