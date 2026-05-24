@@ -1,5 +1,11 @@
 package pages
 
+import (
+	"strings"
+
+	"breadbox/internal/templates/components"
+)
+
 // DesignGallery renders the /design page — a long, anchored scroll of
 // every component family in the system. The sidebar groups sections
 // under collapsible top-level buckets so the navigation stays scannable
@@ -10,8 +16,19 @@ package pages
 // family, write the section component, then append the entry in
 // design_types.go::DesignSections() and tag it with a Group slug from
 // design_types.go::DesignSectionGroups().
+//
+// The page is wrapped in the `designGallery` Alpine factory
+// (static/js/admin/components/design_gallery.js) which owns the inline
+// filter, per-group accordion state, and a page-scoped shortcut wiring
+// that disables the command palette on this page in favor of focusing
+// the filter input.
 templ DesignGallery(p DesignGalleryProps) {
-	<div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-6">
+	<script src="/static/js/admin/components/design_gallery.js"></script>
+	<div
+		x-data="designGallery"
+		@keydown.window.capture="onCmdK($event)"
+		class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-6"
+	>
 		<aside class="hidden lg:block">
 			// Offsets account for the sticky standalone navbar above (daisy
 			// `navbar` ≈ 4rem). `top-[5.5rem]` = navbar (4rem) + 1.5rem gap
@@ -19,15 +36,43 @@ templ DesignGallery(p DesignGalleryProps) {
 			// (not max-h) pins it to viewport height with the same 1.5rem
 			// gap mirrored at the bottom, giving a defined scroll context
 			// even when the catalog overflows.
-			<nav
-				x-data="{
-				  allOpen: true,
-				  inputs() { return Array.from(this.$root.querySelectorAll('input[type=checkbox][name^=design-nav-]')); },
-				  toggleAll() { this.allOpen = !this.allOpen; this.inputs().forEach(i => { i.checked = this.allOpen; }); },
-				}"
-				class="sticky top-[5.5rem] flex flex-col gap-1 h-[calc(100vh-7rem)] overflow-y-auto pr-1 -mr-1"
-			>
-				<div class="flex items-center justify-between px-2 pb-1 -mb-1">
+			<nav class="sticky top-[5.5rem] flex flex-col gap-2 h-[calc(100vh-7rem)] overflow-y-auto pr-1 -mr-1">
+				<div class="relative">
+					<i
+						data-lucide="search"
+						class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content opacity-40 pointer-events-none z-10"
+					></i>
+					<input
+						x-ref="filter"
+						x-model="filter"
+						@keydown.escape.stop="$el.blur()"
+						type="text"
+						placeholder="Filter sections..."
+						aria-label="Filter sections"
+						autocomplete="off"
+						spellcheck="false"
+						class="input input-sm w-full pl-8 pr-14 rounded-lg text-xs"
+					/>
+					<div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+						<template x-if="!filter">
+							<span x-show="!$store.device.isTouch" class="pointer-events-none">
+								@components.KbdCombo("cmd", "k")
+							</span>
+						</template>
+						<template x-if="filter">
+							<button
+								type="button"
+								class="text-base-content/40 hover:text-base-content transition-colors"
+								@click="filter = ''; $refs.filter.focus()"
+								aria-label="Clear filter"
+								title="Clear"
+							>
+								<i data-lucide="x" class="w-3.5 h-3.5"></i>
+							</button>
+						</template>
+					</div>
+				</div>
+				<div class="flex items-center justify-between px-2 pt-1">
 					<span class="text-[0.65rem] font-semibold uppercase tracking-wider text-base-content/30">Catalog</span>
 					<button
 						type="button"
@@ -39,6 +84,11 @@ templ DesignGallery(p DesignGalleryProps) {
 				for _, group := range DesignSectionGroups() {
 					@designSidebarGroup(group, SectionsByGroup(p.Sections, group.Slug))
 				}
+				<p
+					x-cloak
+					x-show={ "filter && " + designAllTitlesNoMatchJS(p.Sections) }
+					class="px-2 py-3 text-xs text-base-content/40"
+				>No sections match.</p>
 			</nav>
 		</aside>
 		<div class="flex flex-col gap-12 min-w-0">
@@ -50,28 +100,37 @@ templ DesignGallery(p DesignGalleryProps) {
 }
 
 // designSidebarGroup renders one collapsible group in the sidebar.
-// Uses DaisyUI's `collapse collapse-arrow` with a hidden checkbox so
-// the open/closed state survives without JS. Every group renders
-// pre-opened (`checked`) so the full catalog is visible on first
-// load; users can collapse individual groups to focus.
+// Uses DaisyUI's `collapse collapse-arrow` with a checkbox bound to the
+// per-group state in the parent `designGallery` Alpine factory, so the
+// "Collapse all"/"Expand all" toggle, per-group clicks, and an active
+// filter (which force-opens every group) all share one source of truth.
 //
 // Items inside the group are flat anchor links — they jump to the
-// section's id in the main column.
+// section's id in the main column. Each link reads `match(title)` for
+// its x-show, and the whole group hides when no child matches.
 templ designSidebarGroup(group DesignSectionGroup, sections []DesignSection) {
 	if len(sections) > 0 {
 		// `overflow-visible` is critical: daisy's .collapse defaults to
 		// overflow:hidden, which prevents the parent <nav> from measuring
 		// the content rows for scroll. Letting the content overflow the
 		// grid box restores normal flow inside the scrollable <nav>.
-		<div class="collapse collapse-arrow bg-transparent rounded-none overflow-visible">
-			<input type="checkbox" name={ "design-nav-" + group.Slug } checked/>
+		<div
+			class="collapse collapse-arrow bg-transparent rounded-none overflow-visible"
+			x-show={ "groupMatches('" + designGroupTitlesJoined(sections) + "')" }
+		>
+			<input
+				type="checkbox"
+				name={ "design-nav-" + group.Slug }
+				:checked={ "isGroupOpen('" + group.Slug + "')" }
+				@change={ "toggleGroup('" + group.Slug + "')" }
+			/>
 			<div class="collapse-title px-2 py-1.5 min-h-0 text-xs font-semibold uppercase tracking-wider text-base-content/50">
 				{ group.Label }
 			</div>
 			<div class="collapse-content px-0">
 				<ul class="flex flex-col gap-0.5 pl-3 border-l border-base-300/60 ml-2">
 					for _, sec := range sections {
-						<li>
+						<li x-show={ "match('" + sec.Title + "')" }>
 							<a
 								href={ templ.SafeURL("#" + sec.Slug) }
 								class="block text-sm text-base-content/60 hover:text-base-content transition-colors py-1 px-2 rounded-md hover:bg-base-200/40"
@@ -92,7 +151,11 @@ templ designSidebarGroup(group DesignSectionGroup, sections []DesignSection) {
 // (e.g. /design#group-feedback).
 templ designSectionGroupBlock(group DesignSectionGroup, sections []DesignSection) {
 	if len(sections) > 0 {
-		<section id={ "group-" + group.Slug } class="scroll-mt-[5.5rem]">
+		<section
+			id={ "group-" + group.Slug }
+			class="scroll-mt-[5.5rem]"
+			x-show={ "groupMatches('" + designGroupTitlesJoined(sections) + "')" }
+		>
 			<header class="mb-6 pb-2 border-b border-base-300/60">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ group.Label }</h2>
 			</header>
@@ -114,7 +177,11 @@ templ designSectionGroupBlock(group DesignSectionGroup, sections []DesignSection
 // of mb-6 = 24px + card padding-top of 24px = 48px to first inner
 // content). H3 → description is mb-1 so they read as a tight pair.
 templ designSectionBlock(sec DesignSection) {
-	<section id={ sec.Slug } class="scroll-mt-[5.5rem]">
+	<section
+		id={ sec.Slug }
+		class="scroll-mt-[5.5rem]"
+		x-show={ "match('" + sec.Title + "')" }
+	>
 		<div class="flex items-baseline justify-between gap-3 mb-1">
 			<h3 class="text-lg font-semibold tracking-tight">{ sec.Title }</h3>
 			<a href={ templ.SafeURL("/design/c/" + sec.Slug) } class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
@@ -131,4 +198,24 @@ templ designSectionBlock(sec DesignSection) {
 			@sec.Render()
 		</div>
 	</section>
+}
+
+// designGroupTitlesJoined returns the section titles in a group joined
+// by " | " as one lowercased haystack string. The Alpine `groupMatches()`
+// helper does a substring check on this — the group only renders when
+// at least one section title contains the active filter.
+func designGroupTitlesJoined(sections []DesignSection) string {
+	titles := make([]string, 0, len(sections))
+	for _, s := range sections {
+		titles = append(titles, s.Title)
+	}
+	return strings.ToLower(strings.Join(titles, " | "))
+}
+
+// designAllTitlesNoMatchJS returns the JS expression
+// `!groupMatches('<every-title-joined>')` — the "no sections match"
+// empty-state placeholder uses this to detect whether the *entire*
+// catalog has been filtered out.
+func designAllTitlesNoMatchJS(sections []DesignSection) string {
+	return "!groupMatches('" + designGroupTitlesJoined(sections) + "')"
 }
