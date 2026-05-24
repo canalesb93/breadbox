@@ -3,6 +3,8 @@ package pages
 import (
 	"fmt"
 	"strconv"
+
+	"breadbox/internal/templates/components"
 )
 
 // AgentsSettings renders the Agents tab inside the Settings shell. Hosts
@@ -40,9 +42,7 @@ templ agentsSettingsInstructionsCard(p AgentsSettingsProps) {
 		x-data={ fmt.Sprintf("{ expanded: location.hash === '#instructions', instructions: %s, defaultInstructions: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your current instructions will be replaced with the default server instructions.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.instructions = this.defaultInstructions; } } }", jsString(p.Instructions), jsString(p.DefaultInstructions)) }
 	>
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="scroll-text" class="w-5 h-5 text-info"></i>
-			</div>
+			@components.IconTile("info", "scroll-text")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Server Instructions</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Custom instructions sent to agents when they connect via MCP</p>
@@ -81,9 +81,7 @@ templ agentsSettingsReviewGuidelinesCard(p AgentsSettingsProps) {
 		x-data={ fmt.Sprintf("{ expanded: location.hash === '#review-guidelines', guidelines: %s, defaultGuidelines: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your review guidelines will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.guidelines = this.defaultGuidelines; } } }", jsString(p.ReviewGuidelines), jsString(p.DefaultReviewGuidelines)) }
 	>
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="book-open" class="w-5 h-5 text-success"></i>
-			</div>
+			@components.IconTile("success", "book-open")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Review Guidelines</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://review-guidelines</code> to agents during reviews</p>
@@ -118,9 +116,7 @@ templ agentsSettingsReportFormatCard(p AgentsSettingsProps) {
 		x-data={ fmt.Sprintf("{ expanded: location.hash === '#report-format', reportFormat: %s, defaultReportFormat: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your report format will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.reportFormat = this.defaultReportFormat; } } }", jsString(p.ReportFormat), jsString(p.DefaultReportFormat)) }
 	>
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="file-text" class="w-5 h-5 text-warning"></i>
-			</div>
+			@components.IconTile("warning", "file-text")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Report Format</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://report-format</code> to agents when submitting reports</p>
@@ -151,9 +147,7 @@ templ agentsSettingsReportFormatCard(p AgentsSettingsProps) {
 templ agentsSettingsToolsCard(p AgentsSettingsProps) {
 	<div id="tools" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#tools' }">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="wrench" class="w-5 h-5 text-primary"></i>
-			</div>
+			@components.IconTile("primary", "wrench")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Tools Enabled</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">{ agentsSettingsToolsSummary(p) }</p>
@@ -211,9 +205,7 @@ templ agentsSettingsToolRow(t AgentsSettingsTool) {
 templ agentsSettingsConnectionCard() {
 	<div id="connection" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#connection', copiedConfig: false }">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="plug" class="w-5 h-5 text-warning"></i>
-			</div>
+			@components.IconTile("warning", "plug")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Connection</h2>
 				<p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
