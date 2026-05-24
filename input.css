@@ -1,100 +1,26 @@
 @import "tailwindcss";
+
+/* ─── EXPERIMENT (theme-strip branch) ─────────────────────────────────
+ * Drop the bespoke breadbox-light / breadbox-dark OKLCH palettes and
+ * fall back to daisyUI's stock light + dark themes. Goal: see whether
+ * the v1 admin "drift" feel comes from custom theme tokens diverging
+ * from canonical daisy. Decide keep/revert after visual comparison
+ * against the pre-strip screenshots under
+ * .claude/sandbox-screens/theme-before/.
+ *
+ * Known dependents that hardcode oklch values against the old palette
+ * (kept untouched in this PR — flagged here for the follow-up if we
+ * decide to keep the strip):
+ *   - .bb-card dark-mode lift (color-mix on var(--color-base-100))
+ *   - .bb-comment-bubble dark-mode background mix
+ *   - .bb-tx-avatar--uncategorized
+ *   - .bb-tx-amount--income (hardcoded green)
+ *   - body bg, focus rings, ::selection, scrollbar (oklch hex tied to
+ *     the old palette — may look slightly off under daisy stock)
+ *   - .select::picker(select) dark-mode block (daisyUI v5 bug fix)
+ * ─────────────────────────────────────────────────────────────────── */
 @plugin "daisyui" {
-  themes: false;
-}
-
-/* ─── Breadbox Light Theme (shadcn/ui neutral palette) ─── */
-@plugin "daisyui/theme" {
-  name: "breadbox-light";
-  default: true;
-  color-scheme: light;
-
-  /* Backgrounds: pure white surfaces on very subtle gray canvas */
-  --color-base-100: oklch(1 0 0);          /* pure white — cards, main surfaces */
-  --color-base-200: oklch(0.97 0 0);       /* subtle gray — secondary surfaces, hover */
-  --color-base-300: oklch(0.922 0 0);      /* border gray — dividers, borders */
-  --color-base-content: oklch(0.145 0 0);  /* near-black — primary text */
-
-  /* Primary: near-black (shadcn neutral primary) */
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-content: oklch(0.985 0 0);
-
-  /* Secondary: light gray background (shadcn secondary) */
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-content: oklch(0.205 0 0);
-
-  /* Accent: same as secondary — shadcn is monochrome-first */
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-content: oklch(0.205 0 0);
-
-  /* Neutral: dark for badges, overlays */
-  --color-neutral: oklch(0.269 0 0);
-  --color-neutral-content: oklch(0.985 0 0);
-
-  /* Semantic: restrained, professional tones */
-  --color-info: oklch(0.62 0.1 245);
-  --color-info-content: oklch(0.985 0 0);
-  --color-success: oklch(0.62 0.14 155);
-  --color-success-content: oklch(0.985 0 0);
-  --color-warning: oklch(0.72 0.14 75);
-  --color-warning-content: oklch(0.205 0 0);
-  --color-error: oklch(0.577 0.245 27.325);
-  --color-error-content: oklch(0.985 0 0);
-
-  /* Shape: shadcn radius (0.625rem), minimal depth */
-  --radius-selector: 0.625rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
-  --border: 1px;
-  --depth: 0;
-  --noise: 0;
-}
-
-/* ─── Breadbox Dark Theme (shadcn/ui neutral dark) ─── */
-@plugin "daisyui/theme" {
-  name: "breadbox-dark";
-  prefersdark: true;
-  color-scheme: dark;
-
-  /* Backgrounds: true dark, slightly lighter cards */
-  --color-base-100: oklch(0.205 0 0);     /* card/surface — slightly lighter than bg */
-  --color-base-200: oklch(0.145 0 0);     /* canvas — near-black background */
-  --color-base-300: oklch(0.269 0 0);     /* borders — subtle separation */
-  --color-base-content: oklch(0.985 0 0); /* near-white text */
-
-  /* Primary: near-white (inverted from light) */
-  --color-primary: oklch(0.922 0 0);
-  --color-primary-content: oklch(0.205 0 0);
-
-  /* Secondary: dark gray surface */
-  --color-secondary: oklch(0.269 0 0);
-  --color-secondary-content: oklch(0.985 0 0);
-
-  /* Accent: same as secondary */
-  --color-accent: oklch(0.269 0 0);
-  --color-accent-content: oklch(0.985 0 0);
-
-  /* Neutral: slightly lifted dark */
-  --color-neutral: oklch(0.269 0 0);
-  --color-neutral-content: oklch(0.985 0 0);
-
-  /* Semantic: slightly brighter for dark bg readability */
-  --color-info: oklch(0.70 0.1 245);
-  --color-info-content: oklch(0.145 0 0);
-  --color-success: oklch(0.70 0.14 155);
-  --color-success-content: oklch(0.145 0 0);
-  --color-warning: oklch(0.78 0.13 75);
-  --color-warning-content: oklch(0.205 0 0);
-  --color-error: oklch(0.704 0.191 22.216);
-  --color-error-content: oklch(0.145 0 0);
-
-  /* Shape: same radius */
-  --radius-selector: 0.625rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
-  --border: 1px;
-  --depth: 0;
-  --noise: 0;
+  themes: light --default, dark --prefersdark;
 }
 
 /* Utility: hide Alpine.js elements until initialized */
