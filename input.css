@@ -368,17 +368,12 @@
   .bb-sidebar-link .bb-sidebar-sparkle,
   .bb-sidebar-link .bb-sidebar-sparkle svg {
     @apply w-3.5 h-3.5 opacity-90;
-    animation: bb-sparkle-pulse 2.4s ease-in-out infinite;
   }
   .bb-sidebar-link:hover .bb-sidebar-sparkle,
   .bb-sidebar-link:hover .bb-sidebar-sparkle svg,
   .bb-sidebar-link--active .bb-sidebar-sparkle,
   .bb-sidebar-link--active .bb-sidebar-sparkle svg {
     @apply opacity-100;
-  }
-  @keyframes bb-sparkle-pulse {
-    0%, 100% { opacity: 0.65; transform: scale(1); }
-    50%      { opacity: 1;    transform: scale(1.12); }
   }
 
   /* ── External-link arrow (Documentation / GitHub buttons) ── */
@@ -625,15 +620,6 @@
     vector-effect: non-scaling-stroke;
   }
 
-  .bb-sparkline-dot {
-    animation: bb-spark-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes bb-spark-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
   /* Summary pill hover lift */
   .bb-summary-pill {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -774,6 +760,28 @@
     @apply text-xl font-semibold tracking-tight;
   }
 
+  /* ── Standalone shell (e.g. /design sandbox) ──
+     Slim top bar that replaces the sidebar when the page is hosted in
+     standalone mode (base.html .Standalone branch). Keeps the chrome
+     minimal so reviewers focus on the component under test. */
+  /* Opaque solid background — no /85 + backdrop-blur, otherwise the
+     modal dim looks like it undims the bar at a different rate than
+     the rest of the page (the bar reveals partially-blurred content
+     behind it as the dim fades). */
+  .bb-standalone-bar {
+    @apply sticky top-0 z-30
+           flex items-center justify-between gap-3
+           px-4 sm:px-6 h-12
+           bg-base-100
+           border-b border-base-300;
+  }
+
+  .bb-standalone-brand {
+    @apply inline-flex items-center gap-2
+           text-sm font-semibold text-base-content
+           no-underline hover:text-primary transition-colors;
+  }
+
   /* ── Wizard / Auth pages (login, setup, error) ── */
   .bb-wizard-bg {
     /* Mobile: top-aligned with generous top padding so content isn't dead-center
@@ -804,18 +812,6 @@
   .bb-wizard-card {
     /* Tighter padding on mobile (p-5), comfortable on sm+ (p-6) */
     @apply bg-base-100 rounded-xl border border-base-300 p-5 sm:p-6;
-    animation: bb-wizard-enter 0.3s ease-out;
-  }
-
-  @keyframes bb-wizard-enter {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
 
   /* ── Error pages (404, 500) ── */
@@ -841,33 +837,9 @@
     @apply text-sm text-base-content/50 max-w-sm mb-6 leading-relaxed;
   }
 
-  /* ── Page entrance animation ── */
-  .bb-page-enter {
-    animation: bb-page-enter 0.25s ease-out both;
-  }
-
-  @keyframes bb-page-enter {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  /* Disable the page entrance animation on small/touch screens — feels sluggish on mobile */
-  @media (max-width: 640px), (hover: none) and (pointer: coarse) {
-    .bb-page-enter {
-      animation: none !important;
-    }
-  }
-
   /* ── Financial Health Score ring ── */
   .bb-health-ring {
     stroke: currentColor;
-    transition: stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* ── Button polish ── */
@@ -929,41 +901,12 @@
     }
   }
 
-  /* ── Modal backdrop smooth ── */
-  .modal-backdrop {
-    transition: opacity 0.2s ease !important;
-  }
+  /* DaisyUI's .modal defaults are used as-is — no per-class overrides
+     here. If you ever add a non-none transform animation to <main> or
+     any ancestor, the dialog will snap to that ancestor's bounds the
+     moment the browser removes it from the top layer on close. Stay
+     opacity-only on page-level entrance animations. */
 
-
-
-  /* ── Dropdown smooth open ── */
-  .dropdown-content {
-    animation: bb-dropdown-enter 0.15s ease-out both;
-  }
-
-  @keyframes bb-dropdown-enter {
-    from {
-      opacity: 0;
-      transform: translateY(-4px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  /* ── Category picker shake animation (reviews page) ── */
-  .bb-picker-shake {
-    animation: bb-shake 0.4s ease-in-out;
-  }
-
-  @keyframes bb-shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-4px); }
-    40% { transform: translateX(4px); }
-    60% { transform: translateX(-3px); }
-    80% { transform: translateX(3px); }
-  }
 
   /* ── Transaction row hover + keyboard focus ──
    *
@@ -1310,14 +1253,8 @@
     background: oklch(0 0 0 / 0.4);
     -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
-    animation: bb-cmdk-backdrop-in 0.15s ease-out;
     touch-action: none;
     -webkit-overflow-scrolling: auto;
-  }
-
-  @keyframes bb-cmdk-backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   .bb-cmdk-dialog {
@@ -1328,23 +1265,11 @@
     width: min(95vw, 560px);
     max-height: min(70vh, 460px);
     box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
-    animation: bb-cmdk-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-cmdk-dialog {
       box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
-    }
-  }
-
-  @keyframes bb-cmdk-dialog-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) scale(0.96) translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) scale(1) translateY(0);
     }
   }
 
@@ -1652,12 +1577,6 @@
     background: oklch(0 0 0 / 0.45);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
-    animation: bb-shortcuts-backdrop-in 0.15s ease-out;
-  }
-
-  @keyframes bb-shortcuts-backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   .bb-shortcuts-dialog {
@@ -1672,23 +1591,11 @@
        through at the top/bottom of the dialog scroll on macOS. */
     overscroll-behavior: contain;
     box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
-    animation: bb-shortcuts-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-shortcuts-dialog {
       box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
-    }
-  }
-
-  @keyframes bb-shortcuts-dialog-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) scale(0.96) translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) scale(1) translateY(0);
     }
   }
 
@@ -1859,14 +1766,8 @@
     background: oklch(0 0 0 / 0.4);
     -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
-    animation: bb-catpicker-backdrop-in 0.15s ease-out;
     touch-action: none;
     -webkit-overflow-scrolling: auto;
-  }
-
-  @keyframes bb-catpicker-backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   .bb-catpicker-dialog {
@@ -1877,23 +1778,11 @@
     width: min(95vw, 420px);
     max-height: min(70vh, 460px);
     box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
-    animation: bb-catpicker-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-catpicker-dialog {
       box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
-    }
-  }
-
-  @keyframes bb-catpicker-dialog-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) scale(0.96) translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) scale(1) translateY(0);
     }
   }
 
@@ -2024,7 +1913,6 @@
     display: flex;
     flex-direction: column;
     box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
-    animation: bb-catpicker-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -2236,12 +2124,6 @@
     background: oklch(0 0 0 / 0.4);
     -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
-    animation: bb-confirm-backdrop-in 0.15s ease-out;
-  }
-
-  @keyframes bb-confirm-backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   .bb-confirm-dialog {
@@ -2251,23 +2133,11 @@
     transform: translateX(-50%);
     width: min(92vw, 420px);
     box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
-    animation: bb-confirm-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-confirm-dialog {
       box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
-    }
-  }
-
-  @keyframes bb-confirm-dialog-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) scale(0.96) translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) scale(1) translateY(0);
     }
   }
 
@@ -2287,47 +2157,11 @@
   .bb-skeleton {
     @apply rounded-md;
     background: oklch(0.95 0 0);
-    position: relative;
-    overflow: hidden;
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-skeleton {
       background: oklch(0.25 0 0);
-    }
-  }
-
-  .bb-skeleton::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      oklch(1 0 0 / 0.4) 50%,
-      transparent 100%
-    );
-    animation: bb-shimmer 1.8s ease-in-out infinite;
-    transform: translateX(-100%);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-skeleton::after {
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        oklch(1 0 0 / 0.06) 50%,
-        transparent 100%
-      );
-    }
-  }
-
-  @keyframes bb-shimmer {
-    0% {
-      transform: translateX(-100%);
-    }
-    60%, 100% {
-      transform: translateX(100%);
     }
   }
 
@@ -2390,12 +2224,6 @@
   /* Page-level skeleton overlay (shown during nav transitions) */
   .bb-page-skeleton {
     @apply min-h-[60vh];
-    animation: bb-skeleton-enter 0.2s ease-out both;
-  }
-
-  @keyframes bb-skeleton-enter {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   /* Inline loading fade */

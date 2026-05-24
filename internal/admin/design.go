@@ -18,6 +18,7 @@ import (
 func DesignGalleryHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := BaseTemplateData(r, sm, "design", "Design system")
+		data["Standalone"] = true
 		tr.RenderWithTempl(w, r, data, pages.DesignGallery(pages.DesignGalleryProps{
 			Sections: pages.DesignSections(),
 			Breadcrumbs: []components.Breadcrumb{
@@ -40,6 +41,7 @@ func DesignComponentHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.H
 			return
 		}
 		data := BaseTemplateData(r, sm, "design", section.Title)
+		data["Standalone"] = true
 		tr.RenderWithTempl(w, r, data, pages.DesignComponent(pages.DesignComponentProps{
 			Section: section,
 			Breadcrumbs: []components.Breadcrumb{

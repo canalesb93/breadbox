@@ -1,10 +1,12 @@
 package components
 
+import "cmp"
+
 // FilterSearchInput is the canonical client-side filter input — a daisy
-// `input input-bordered` with a small leading search icon and an
-// `x-model` binding for Alpine-driven row filtering. Currently used by
-// `/categories` and `/tags`; future inline-filter list pages should
-// reach for this before re-rolling the markup.
+// `input` with a small leading search icon and an `x-model` binding
+// for Alpine-driven row filtering. Currently used by `/categories` and
+// `/tags`; future inline-filter list pages should reach for this
+// before re-rolling the markup.
 //
 // The component is markup-only. Caller owns the Alpine factory that the
 // XModel string targets — typically a `filter` string on the page's
@@ -26,19 +28,15 @@ type FilterSearchInputProps struct {
 
 templ FilterSearchInput(p FilterSearchInputProps) {
 	<div class="relative">
-		<i data-lucide={ filterSearchIcon(p.Icon) } class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
+		<i
+			data-lucide={ cmp.Or(p.Icon, "search") }
+			class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50 pointer-events-none z-10"
+		></i>
 		<input
 			type="text"
 			placeholder={ p.Placeholder }
 			x-model={ p.XModel }
-			class="input input-bordered w-full pl-9 rounded-xl h-10 text-sm"
+			class="input w-full pl-9 rounded-xl h-10 text-sm"
 		/>
 	</div>
-}
-
-func filterSearchIcon(icon string) string {
-	if icon == "" {
-		return "search"
-	}
-	return icon
 }
