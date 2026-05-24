@@ -237,7 +237,7 @@ func buildUsersProps(in usersListInput) pages.UsersProps {
 				Mask:             a.Mask,
 				HasMask:          a.Mask != "",
 				InstitutionName:  a.InstitutionName,
-				BalanceDisplay:   components.FormatAmount(a.BalanceCurrent),
+				BalanceValue:     a.BalanceCurrent,
 				IsoCurrencyCode:  a.IsoCurrencyCode,
 				IsLiability:      a.IsLiability,
 				HasBalance:       a.HasBalance,

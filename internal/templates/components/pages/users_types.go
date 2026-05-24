@@ -106,7 +106,7 @@ type UsersAccountRow struct {
 	Mask             string
 	HasMask          bool
 	InstitutionName  string
-	BalanceDisplay   string // pre-formatted via components.FormatAmount
+	BalanceValue     float64 // rendered via components.Amount(Intent: AmountBalance)
 	IsoCurrencyCode  string
 	IsLiability      bool
 	HasBalance       bool

@@ -250,9 +250,19 @@ templ usersAccountRow(a UsersAccountRow) {
 		</div>
 		<div class="text-right shrink-0">
 			if a.HasBalance {
-				<span class={ "text-sm font-semibold tabular-nums", templ.KV("text-error", a.IsLiability) }>
-					{ a.BalanceDisplay }
-				</span>
+				if a.IsLiability {
+					@components.Amount(components.AmountProps{
+						Value:  a.BalanceValue,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-semibold text-error",
+					})
+				} else {
+					@components.Amount(components.AmountProps{
+						Value:  a.BalanceValue,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-semibold",
+					})
+				}
 				<div class="text-[0.65rem] text-base-content/30 mt-0.5 hidden sm:block">{ a.IsoCurrencyCode }</div>
 			} else {
 				<span class="text-xs text-base-content/30">—</span>

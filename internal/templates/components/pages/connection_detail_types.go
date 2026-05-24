@@ -96,9 +96,9 @@ type AccountRow struct {
 	MaskValid             bool
 	MaskString            string
 	BalanceCurrentValid   bool
-	BalanceCurrentText    string // pre-formatted via service.FormatCurrency(abs)
+	BalanceCurrentAbs     float64 // |amount| — rendered via components.Amount(Intent: AmountCost)
 	BalanceAvailableValid bool
-	BalanceAvailableText  string
+	BalanceAvailableAbs   float64
 	DisplayName           string
 	Excluded              bool
 }

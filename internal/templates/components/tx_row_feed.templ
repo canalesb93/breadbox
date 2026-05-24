@@ -83,19 +83,16 @@ templ TxRowFeed(p TxRowFeedProps) {
 			<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70" title="Pending — not yet posted"></i>
 			<span class="sr-only">(pending)</span>
 		}
-		<!-- Amount: leading sign so income (negative in our convention)
-		     reads as "+$X" without the user having to know the sign rule. -->
-		<span class={ "tabular-nums font-medium shrink-0", txRowFeedAmountClass(p.Amount), templ.KV("bb-tx-amount--pending", p.Pending) }>
-			{ TxRowFeedAmountWithSign(p.Amount, p.Currency) }
-		</span>
+		<!-- Amount via the canonical component: income reads as "+$X" in
+		     green, expense as "$X" in the default color. Format=abbreviated
+		     so big values collapse to "$1.2M" in the narrow feed lane. -->
+		@Amount(AmountProps{
+			Value:   p.Amount,
+			Format:  AmountFormatAbbreviated,
+			Pending: p.Pending,
+			Class:   "font-medium shrink-0",
+		})
 	</a>
-}
-
-func txRowFeedAmountClass(amount float64) string {
-	if amount < 0 {
-		return "text-success"
-	}
-	return "text-base-content"
 }
 
 // TxRowFeedTagTitle returns the tooltip text for the inline tag chip,
@@ -105,25 +102,4 @@ func TxRowFeedTagTitle(n int) string {
 		return "1 tag"
 	}
 	return fmt.Sprintf("%d tags", n)
-}
-
-// TxRowFeedAmountWithSign formats an amount for the feed one-liner: a
-// leading "+" for income (breadbox negative) and "−" for outflow so the
-// direction is unambiguous without the reader having to remember the
-// sign convention. Uses an en-dash (U+2212) for the minus so the glyph
-// matches the bookkeeping convention used elsewhere in the admin UI.
-func TxRowFeedAmountWithSign(amount float64, _currency string) string {
-	abs := amount
-	if abs < 0 {
-		abs = -abs
-	}
-	formatted := FormatBalance(abs)
-	switch {
-	case amount < 0:
-		return "+" + formatted
-	case amount > 0:
-		return "−" + formatted
-	default:
-		return formatted
-	}
 }

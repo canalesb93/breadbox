@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 )
 
@@ -219,15 +220,21 @@ func lookupTagLabel(tags []service.TagResponse, slug string) string {
 }
 
 // formatAmountForChip renders a compact amount label — "$50" if whole,
-// "$12.34" otherwise. The incoming string is already a user-supplied
-// decimal so a single ParseFloat is enough; on failure we echo the raw.
+// "$12.34" otherwise. Defers to the canonical components.AmountText with
+// the compact format so chip rendering stays in lock-step with the
+// design-system sandbox; on parse failure we echo the raw input.
+//
+// Uses AmountBalance, not AmountCost, so a min/max filter with a
+// negative value (e.g. ?min_amount=-100) renders the leading "-" — the
+// chip must reflect what the user actually filtered on.
 func formatAmountForChip(raw string) string {
 	v, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
 		return raw
 	}
-	if v == float64(int64(v)) {
-		return "$" + strconv.FormatInt(int64(v), 10)
-	}
-	return "$" + strconv.FormatFloat(v, 'f', 2, 64)
+	return components.AmountText(components.AmountProps{
+		Value:  v,
+		Intent: components.AmountBalance,
+		Format: components.AmountFormatCompact,
+	})
 }

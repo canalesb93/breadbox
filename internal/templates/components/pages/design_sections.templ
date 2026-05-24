@@ -1118,6 +1118,98 @@ templ SectionFilterSearchInput() {
 	</div>
 }
 
+// ─── Amounts ───────────────────────────────────────────────────────────
+
+templ SectionAmounts() {
+	<div class="flex flex-col gap-6">
+		@designExample("Transaction intent (default)", "Income (negative in our convention) renders as '+$X' in success green. Expense renders as '$X' with NO sign in the default text color. Use for transaction rows, day totals, transaction detail, activity feed.") {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+				@amountSandboxRow("Expense (positive)", components.AmountProps{Value: 12.34})
+				@amountSandboxRow("Income (negative)", components.AmountProps{Value: -12.34})
+				@amountSandboxRow("Zero", components.AmountProps{Value: 0})
+				@amountSandboxRow("Big income", components.AmountProps{Value: -1234.56})
+				@amountSandboxRow("Big expense", components.AmountProps{Value: 9876.54})
+				@amountSandboxRow("Pending expense", components.AmountProps{Value: 42.10, Pending: true})
+			</div>
+		}
+		@designExample("Balance intent (signed, neutral color)", "Sign reflects the real balance direction — negative means a liability/debt. No color treatment; the caller wraps in a context color (text-success / text-error) when assets vs. liabilities matters.") {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+				@amountSandboxRow("Positive balance", components.AmountProps{Value: 4523.18, Intent: components.AmountBalance})
+				@amountSandboxRow("Negative balance (debt)", components.AmountProps{Value: -1284.55, Intent: components.AmountBalance})
+				@amountSandboxRow("Zero balance", components.AmountProps{Value: 0, Intent: components.AmountBalance})
+			</div>
+		}
+		@designExample("Cost intent (absolute, neutral)", "Always-non-negative monetary values: agent run costs, fees, totals. No sign, no color. Precision picks decimal places (default 2; agent runs use 4 for sub-cent costs).") {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+				@amountSandboxRow("Cost (default precision)", components.AmountProps{Value: 1.50, Intent: components.AmountCost})
+				@amountSandboxRow("Cost (precision 4)", components.AmountProps{Value: 0.1234, Intent: components.AmountCost, Precision: 4})
+				@amountSandboxRow("Cost (negative absorbed)", components.AmountProps{Value: -2.75, Intent: components.AmountCost})
+			</div>
+		}
+		@designExample("Format: abbreviated (≥ $1M)", "Values ≥ $1M collapse to '$1.2M' (one decimal). For big dashboard tiles where exact cents aren't meaningful. Below $1M, falls back to the standard format.") {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+				@amountSandboxRow("Just under $1M", components.AmountProps{Value: 999_999.99, Intent: components.AmountBalance, Format: components.AmountFormatAbbreviated})
+				@amountSandboxRow("$1.2M", components.AmountProps{Value: 1_234_567, Intent: components.AmountBalance, Format: components.AmountFormatAbbreviated})
+				@amountSandboxRow("Negative $1.5M", components.AmountProps{Value: -1_500_000, Intent: components.AmountBalance, Format: components.AmountFormatAbbreviated})
+				@amountSandboxRow("$42M", components.AmountProps{Value: 42_000_000, Intent: components.AmountBalance, Format: components.AmountFormatAbbreviated})
+			</div>
+		}
+		@designExample("Format: compact", "Whole values drop the .00 ($50). Decimals keep two ($12.34). Used by the transactions filter-chip min/max labels.") {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+				@amountSandboxRow("Whole", components.AmountProps{Value: 50, Intent: components.AmountCost, Format: components.AmountFormatCompact})
+				@amountSandboxRow("Decimal", components.AmountProps{Value: 12.34, Intent: components.AmountCost, Format: components.AmountFormatCompact})
+				@amountSandboxRow("Large whole", components.AmountProps{Value: 12_345, Intent: components.AmountCost, Format: components.AmountFormatCompact})
+			</div>
+		}
+		@designExample("Size via Class", "Tabular-nums and color come from the component; pass size/weight/extra-color utilities through Class. Class is appended LAST so it can override (but never strip tabular-nums).") {
+			<div class="flex flex-col gap-3">
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">text-sm</span>
+					@components.Amount(components.AmountProps{Value: -1234.56, Class: "text-sm font-medium"})
+				</div>
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">text-base</span>
+					@components.Amount(components.AmountProps{Value: -1234.56, Class: "text-base font-semibold"})
+				</div>
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">text-2xl</span>
+					@components.Amount(components.AmountProps{Value: -1234.56, Class: "text-2xl font-semibold tracking-tight"})
+				</div>
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">text-3xl hero</span>
+					@components.Amount(components.AmountProps{Value: 84.55, Class: "text-3xl font-semibold tracking-tight"})
+				</div>
+			</div>
+		}
+		@designExample("Pending state", "Pending: true applies bb-tx-amount--pending (opacity 0.55 light / 0.65 dark). Soften the glyph for transactions that haven't posted yet. Pair with a leading clock icon at the call site.") {
+			<div class="flex flex-col gap-3">
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">Settled income</span>
+					@components.Amount(components.AmountProps{Value: -52.40, Class: "text-sm font-semibold"})
+				</div>
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">Pending income</span>
+					<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+					@components.Amount(components.AmountProps{Value: -52.40, Pending: true, Class: "text-sm font-semibold"})
+				</div>
+				<div class="flex items-baseline gap-4">
+					<span class="text-xs text-base-content/40 w-24 shrink-0">Pending expense</span>
+					<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+					@components.Amount(components.AmountProps{Value: 42.10, Pending: true, Class: "text-sm font-semibold"})
+				</div>
+			</div>
+		}
+		@designExample("Anti-patterns (do not do this)", "Each row below shows the OLD ad-hoc pattern next to the canonical component. Migrate any new call site to components.Amount.") {
+			<div class="space-y-3 text-sm">
+				@amountAntiPatternRow("fmt.Sprintf(\"$%.2f\", v) // agents_list", components.AmountProps{Value: 3.45, Intent: components.AmountCost})
+				@amountAntiPatternRow("fmt.Sprintf(\"$%.4f\", v) // agent_runs", components.AmountProps{Value: 0.1234, Intent: components.AmountCost, Precision: 4})
+				@amountAntiPatternRow("-formatAmount(v) // dayTotalBadge income hack", components.AmountProps{Value: -84.55})
+				@amountAntiPatternRow("formatAmount(tx.Amount) // bare, no tabular-nums", components.AmountProps{Value: 12.34})
+			</div>
+		}
+	</div>
+}
+
 // ─── Transaction rows ──────────────────────────────────────────────────
 
 // SectionTransactionRows shows the three row variants (full, compact,
@@ -1269,28 +1361,55 @@ templ SectionTransactionRows() {
 				</div>
 			</div>
 		}
-		@designExample("Amount (bb-tx-amount)", "tabular-nums sets a stable right edge. --income flips to green for inflow (negative in our sign convention). --pending dims to 55 % so the provisional number reads quieter without becoming illegible.") {
+		@designExample("Amount (components.Amount)", "Routes through the canonical Amount component — income (negative in our convention) renders as +$X in success green via tabular-nums, expense as $X in the default color. Pending: true dims to 55 %. See the dedicated Amounts section for the full intent / format matrix.") {
 			<div class="flex flex-col gap-2 text-right max-w-[18rem]">
 				<div class="flex items-center justify-between gap-3">
 					<span class="text-xs text-base-content/50">default (outflow)</span>
-					<span class="bb-tx-amount tabular-nums">$48.27</span>
+					@components.Amount(components.AmountProps{Value: 48.27, Class: "text-sm font-semibold"})
 				</div>
 				<div class="flex items-center justify-between gap-3">
-					<span class="text-xs text-base-content/50">--income</span>
-					<span class="bb-tx-amount bb-tx-amount--income tabular-nums">-$2,845.00</span>
+					<span class="text-xs text-base-content/50">income</span>
+					@components.Amount(components.AmountProps{Value: -2845.00, Class: "text-sm font-semibold"})
 				</div>
 				<div class="flex items-center justify-between gap-3">
-					<span class="text-xs text-base-content/50">--pending</span>
+					<span class="text-xs text-base-content/50">pending</span>
 					<span class="inline-flex items-center justify-end gap-1">
 						<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
-						<span class="bb-tx-amount bb-tx-amount--pending tabular-nums">$6.75</span>
+						@components.Amount(components.AmountProps{Value: 6.75, Pending: true, Class: "text-sm font-semibold"})
 					</span>
 				</div>
 				<div class="flex items-center justify-between gap-3">
 					<span class="text-xs text-base-content/50">income + pending</span>
-					<span class="bb-tx-amount bb-tx-amount--income bb-tx-amount--pending tabular-nums">-$120.00</span>
+					@components.Amount(components.AmountProps{Value: -120.00, Pending: true, Class: "text-sm font-semibold"})
 				</div>
 			</div>
 		}
+	</div>
+}
+
+// amountSandboxRow renders one labeled row in the SectionAmounts gallery —
+// caption on the left, the live Amount on the right, with the props
+// printed below for copy-paste reference.
+templ amountSandboxRow(label string, p components.AmountProps) {
+	<div class="flex flex-col gap-1 py-2 px-3 rounded-lg bg-base-200/40">
+		<div class="flex items-baseline justify-between gap-3">
+			<span class="text-xs text-base-content/50">{ label }</span>
+			@components.Amount(p)
+		</div>
+		<code class="text-[0.65rem] text-base-content/40 font-mono">{ amountSandboxCode(p) }</code>
+	</div>
+}
+
+// amountAntiPatternRow renders a single before-vs-after row in the
+// SectionAmounts anti-patterns block: legacy code on the left, the
+// canonical components.Amount rendering on the right.
+templ amountAntiPatternRow(legacy string, p components.AmountProps) {
+	<div class="grid grid-cols-[1fr_auto_1fr] gap-3 items-baseline">
+		<code class="text-xs text-base-content/50 truncate">{ legacy }</code>
+		<span class="text-xs text-base-content/40">→</span>
+		<div class="flex items-baseline gap-2">
+			@components.Amount(p)
+			<code class="text-[0.65rem] text-base-content/40 font-mono">{ amountSandboxCode(p) }</code>
+		</div>
 	</div>
 }

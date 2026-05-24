@@ -11,14 +11,12 @@ package components
 import (
 	"fmt"
 	"html"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"breadbox/internal/ptrutil"
-	"breadbox/internal/service"
 )
 
 // deref is a templ-friendly alias for ptrutil.Deref[string]. Generated *_templ.go
@@ -78,14 +76,6 @@ func relativeDateAt(s string, now time.Time) string {
 	default:
 		return t.Format("Jan 2, 2006")
 	}
-}
-
-func formatAmount(amount float64) string {
-	formatted := service.FormatCurrency(math.Abs(amount))
-	if amount < 0 {
-		return "-" + formatted
-	}
-	return formatted
 }
 
 func avatarURL(id string) string {
@@ -154,32 +144,9 @@ func amount2f(f float64) string {
 	return fmt.Sprintf("%.2f", f)
 }
 
-// FormatBalance formats an amount for balance display. Values >= $1M are
-// abbreviated ($1.2M); values >= $1K use comma-thousands ($1,234.56); all
-// others use two-decimal notation ($123.45). Sign is ignored — always absolute.
-// Mirrors the "formatBalance" admin funcMap entry; keep them in sync.
-func FormatBalance(amount float64) string {
-	abs := math.Abs(amount)
-	if abs >= 1_000_000 {
-		return fmt.Sprintf("$%.1fM", abs/1_000_000)
-	}
-	if abs >= 1_000 {
-		return fmt.Sprintf("$%s", commaAmount(abs))
-	}
-	return fmt.Sprintf("$%.2f", abs)
-}
-
-// commaAmount formats a non-negative float as "1,234.56" (no $ prefix).
-func commaAmount(f float64) string {
-	whole := int64(f)
-	cents := int(math.Round((f - float64(whole)) * 100))
-	s := CommaInt(whole)
-	return fmt.Sprintf("%s.%02d", s, cents)
-}
-
 // CommaInt formats a non-negative integer with thousands-separator commas:
-// 1234567 → "1,234,567". Used by FormatBalance and templates that need
-// a plain integer count formatted with commas.
+// 1234567 → "1,234,567". Used by components.Amount and templates that
+// need a plain integer count formatted with commas.
 func CommaInt(n int64) string {
 	s := strconv.FormatInt(n, 10)
 	if len(s) <= 3 {
@@ -234,14 +201,6 @@ func FormatDate(s string) string { return formatDate(s) }
 // RelativeDate renders a "2006-01-02" date as "Today", "Yesterday", etc.
 // See relativeDate.
 func RelativeDate(s string) string { return relativeDate(s) }
-
-// FormatAmount renders a signed amount with currency prefix (e.g. "-$1.50").
-// See formatAmount.
-func FormatAmount(amount float64) string { return formatAmount(amount) }
-
-// CommaAmount formats a non-negative float as "1,234.56" (no currency prefix
-// or sign). See commaAmount.
-func CommaAmount(f float64) string { return commaAmount(f) }
 
 // TitleCase rewrites ALL-CAPS or all-lowercase input to Title Case, leaving
 // mixed-case input untouched. See titleCase.

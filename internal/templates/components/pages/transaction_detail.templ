@@ -87,7 +87,7 @@ templ txdHero(p TransactionDetailProps) {
 		</div>
 		<div class="flex flex-row items-baseline justify-between sm:block sm:text-right shrink-0">
 			<p
-				class={ "text-3xl font-semibold tabular-nums inline-flex items-center gap-2 justify-end", templ.KV("text-success", p.Transaction.Amount < 0) }
+				class="inline-flex items-center gap-2 justify-end"
 				if p.Transaction.Pending {
 					title="Pending — not yet posted"
 				}
@@ -95,7 +95,11 @@ templ txdHero(p TransactionDetailProps) {
 				if p.Transaction.Pending {
 					<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning opacity-70"></i>
 				}
-				<span class={ templ.KV("bb-tx-amount--pending", p.Transaction.Pending) }>{ components.FormatAmount(p.Transaction.Amount) }</span>
+				@components.Amount(components.AmountProps{
+					Value:   p.Transaction.Amount,
+					Pending: p.Transaction.Pending,
+					Class:   "text-3xl font-semibold",
+				})
 			</p>
 			if p.Transaction.IsoCurrencyCode != nil && *p.Transaction.IsoCurrencyCode != "" {
 				<p class="text-xs text-base-content/30 mt-0.5 sm:mt-0.5 ml-1 sm:ml-0">{ *p.Transaction.IsoCurrencyCode }</p>
@@ -135,7 +139,13 @@ templ txdAccountBanner(p TransactionDetailProps) {
 			if p.Account != nil && p.Account.BalanceCurrent != nil {
 				<div class="text-right shrink-0 hidden sm:block">
 					<p class="text-xs text-base-content/40 mb-0.5">Balance</p>
-					<p class="text-sm font-semibold tabular-nums">{ components.FormatAmount(*p.Account.BalanceCurrent) }</p>
+					<p>
+						@components.Amount(components.AmountProps{
+							Value:  *p.Account.BalanceCurrent,
+							Intent: components.AmountBalance,
+							Class:  "text-sm font-semibold",
+						})
+					</p>
 				</div>
 			}
 			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-xs shrink-0 ml-auto sm:ml-0">

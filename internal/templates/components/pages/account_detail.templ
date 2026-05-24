@@ -2,7 +2,6 @@ package pages
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"breadbox/internal/service"
@@ -108,18 +107,25 @@ templ acctSummaryCards(p AccountDetailProps) {
 		<!-- Balance Card (with credit utilization inline for credit cards) -->
 		<div class="bb-card p-5">
 			<div class="text-xs font-medium text-base-content/50 mb-1">Current Balance</div>
-			<div class={ "text-2xl font-semibold tabular-nums tracking-tight", templ.KV("text-error/80", p.IsLiability) }>
-				if p.Account.BalanceCurrent != nil {
-					if p.IsLiability {
-						{ "-" }
-					}
-					{ fmtBalancePtr(p.Account.BalanceCurrent) }
+			if p.Account.BalanceCurrent != nil {
+				if p.IsLiability {
+					@components.Amount(components.AmountProps{
+						Value:  -1 * absFloat(*p.Account.BalanceCurrent),
+						Intent: components.AmountBalance,
+						Class:  "text-2xl font-semibold tracking-tight text-error/80",
+					})
 				} else {
-					<span class="text-base-content/20">
-						@templ.Raw("&mdash;")
-					</span>
+					@components.Amount(components.AmountProps{
+						Value:  *p.Account.BalanceCurrent,
+						Intent: components.AmountBalance,
+						Class:  "text-2xl font-semibold tracking-tight",
+					})
 				}
-			</div>
+			} else {
+				<div class="text-2xl font-semibold tracking-tight text-base-content/20">
+					@templ.Raw("&mdash;")
+				</div>
+			}
 			if p.HasCreditUtil {
 				<div class="mt-3">
 					<div class="flex items-center justify-between mb-1">
@@ -147,9 +153,12 @@ templ acctSummaryCards(p AccountDetailProps) {
 				<span class="text-xs text-base-content/30">30d</span>
 			</div>
 			<div class="flex items-baseline gap-2">
-				<div class="text-2xl font-semibold tabular-nums tracking-tight">
-					{ components.FormatBalance(p.TotalSpending) }
-				</div>
+				@components.Amount(components.AmountProps{
+					Value:  p.TotalSpending,
+					Intent: components.AmountCost,
+					Format: components.AmountFormatAbbreviated,
+					Class:  "text-2xl font-semibold tracking-tight",
+				})
 				if p.HasSpendingChange {
 					<span class="text-xs text-base-content/30">
 						if p.SpendingChangePercent > 0 {
@@ -488,19 +497,28 @@ func acctUtilBarStyle(util float64) string {
 	return fmt.Sprintf("width: %.0f%%", pct)
 }
 
-// fmtBalancePtr mirrors the admin "fmtBalance" funcMap for the
-// *float64 inputs this page uses (BalanceCurrent / BalanceLimit /
-// BalanceAvailable). Returns "" for nil — the caller decides whether
-// to render a fallback.
+// fmtBalancePtr renders a *float64 balance as a signed currency string
+// for the inline "limit" and "available" labels on the account detail
+// page. Returns "" for nil — the caller decides whether to render a
+// fallback. Defers to components.AmountText so the rendered string
+// stays in lock-step with the canonical Amount component.
 func fmtBalancePtr(p *float64) string {
 	if p == nil {
 		return ""
 	}
-	formatted := "$" + components.CommaAmount(math.Abs(*p))
-	if *p < 0 {
-		return "-" + formatted
+	return components.AmountText(components.AmountProps{
+		Value:  *p,
+		Intent: components.AmountBalance,
+	})
+}
+
+// absFloat is a templ-friendly wrapper around math.Abs so the
+// account_detail templates can compute |balance| without importing math.
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
 	}
-	return formatted
+	return v
 }
 
 // subtypeSuffix mirrors the admin funcMap of the same name: returns

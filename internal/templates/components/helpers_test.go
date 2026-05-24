@@ -93,27 +93,6 @@ func TestRelativeDateAt(t *testing.T) {
 	}
 }
 
-func TestFormatAmount(t *testing.T) {
-	tests := []struct {
-		in   float64
-		want string
-	}{
-		{0, "$0.00"},
-		{1.5, "$1.50"},
-		{-1.5, "-$1.50"},
-		{1234.56, "$1,234.56"},
-		{-1234.56, "-$1,234.56"},
-		{1000000, "$1,000,000.00"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.want, func(t *testing.T) {
-			if got := formatAmount(tc.in); got != tc.want {
-				t.Errorf("formatAmount(%v) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestAvatarURL(t *testing.T) {
 	tests := []struct {
 		in   string
@@ -206,9 +185,6 @@ func TestExportedWrappersDelegate(t *testing.T) {
 	if got, want := FormatDate("2024-03-15"), formatDate("2024-03-15"); got != want {
 		t.Errorf("FormatDate = %q, want %q", got, want)
 	}
-	if got, want := FormatAmount(-1.5), formatAmount(-1.5); got != want {
-		t.Errorf("FormatAmount = %q, want %q", got, want)
-	}
 	if got, want := TitleCase("STARBUCKS"), titleCase("STARBUCKS"); got != want {
 		t.Errorf("TitleCase = %q, want %q", got, want)
 	}
@@ -241,52 +217,6 @@ func TestCommaInt(t *testing.T) {
 		if got := CommaInt(tc.in); got != tc.want {
 			t.Errorf("CommaInt(%d) = %q, want %q", tc.in, got, tc.want)
 		}
-	}
-}
-
-func TestCommaAmount(t *testing.T) {
-	tests := []struct {
-		in   float64
-		want string
-	}{
-		{0, "0.00"},
-		{1.5, "1.50"},
-		{12.34, "12.34"},
-		{1234.56, "1,234.56"},
-		{1000000, "1,000,000.00"},
-		{1234567.89, "1,234,567.89"},
-	}
-	for _, tc := range tests {
-		if got := commaAmount(tc.in); got != tc.want {
-			t.Errorf("commaAmount(%v) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
-func TestFormatBalance(t *testing.T) {
-	tests := []struct {
-		name string
-		in   float64
-		want string
-	}{
-		{"zero", 0, "$0.00"},
-		{"small", 12.34, "$12.34"},
-		{"under 1K rounds cents", 999.995, "$1000.00"}, // edge: cents round up to 1.00, not yet ≥1K branch
-		{"exactly 1K uses commas", 1000, "$1,000.00"},
-		{"mid thousands", 12345.67, "$12,345.67"},
-		{"just under 1M", 999999.99, "$999,999.99"},
-		{"exactly 1M abbreviates", 1_000_000, "$1.0M"},
-		{"1.25M abbreviates with one decimal", 1_250_000, "$1.2M"},
-		{"10M abbreviates", 10_500_000, "$10.5M"},
-		{"negative treated as absolute", -1234.56, "$1,234.56"},
-		{"negative over 1M abbreviates", -2_500_000, "$2.5M"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := FormatBalance(tc.in); got != tc.want {
-				t.Errorf("FormatBalance(%v) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
 	}
 }
 
