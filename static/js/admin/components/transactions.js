@@ -482,6 +482,17 @@ document.addEventListener('alpine:init', function () {
       },
 
       clear: function () {
+        // Two-stage Esc behavior on the search bar:
+        //   1st Esc (input has content) → clear the query, keep focus so the
+        //                                 user can immediately type a new one.
+        //   2nd Esc (already empty)     → blur the field, "escape out" of the
+        //                                 search. Native browser default for
+        //                                 <input type="search"> doesn't do
+        //                                 this — surprising but true.
+        if (!this.query) {
+          if (this.$refs.searchInput) this.$refs.searchInput.blur();
+          return;
+        }
         this.query = '';
         if (this._abortCtrl) this._abortCtrl.abort();
         this.$refs.searchInput.value = '';

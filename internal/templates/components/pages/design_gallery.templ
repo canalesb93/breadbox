@@ -62,6 +62,7 @@ templ DesignGallery(p DesignGalleryProps) {
 						x-model="filter"
 						@keydown.escape.stop="filter = ''; $el.blur()"
 						type="search"
+						enterkeyhint="search"
 						placeholder="Filter sections..."
 						aria-label="Filter sections"
 						autocomplete="off"
