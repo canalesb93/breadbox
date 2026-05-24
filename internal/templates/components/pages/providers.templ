@@ -100,7 +100,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									Client ID
 									@configSourceBadge(p.ConfigSources, "plaid_client_id")
 								</label>
-								<input type="text" id="plaid_client_id" name="plaid_client_id" value={ p.PlaidClientID } placeholder="Plaid Client ID" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl"/>
+								<input type="text" id="plaid_client_id" name="plaid_client_id" value={ p.PlaidClientID } placeholder="Plaid Client ID" autocomplete="off" class="input input-sm w-full"/>
 							</div>
 							<div class="form-control">
 								<label class="label label-text text-sm font-medium" for="plaid_secret">Secret</label>
@@ -111,7 +111,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									value=""
 									placeholder={ plaidSecretPlaceholder(p.PlaidConfigured) }
 									autocomplete="new-password"
-									class="input input-sm input-bordered w-full rounded-xl"
+									class="input input-sm w-full"
 								/>
 							</div>
 							<div class="form-control">
@@ -119,7 +119,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									Environment
 									@configSourceBadge(p.ConfigSources, "plaid_env")
 								</label>
-								<select id="plaid_env" name="plaid_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl bg-base-200">
+								<select id="plaid_env" name="plaid_env" class="select select-sm w-full sm:max-w-xs bg-base-200">
 									@plaidEnvOption("sandbox", p.PlaidEnv, "Sandbox")
 									@plaidEnvOption("development", p.PlaidEnv, "Development")
 									@plaidEnvOption("production", p.PlaidEnv, "Production")
@@ -131,11 +131,11 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									Webhook URL
 									@configSourceBadge(p.ConfigSources, "webhook_url")
 								</label>
-								<input type="url" id="webhook_url" name="webhook_url" value={ p.WebhookURL } placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl"/>
+								<input type="url" id="webhook_url" name="webhook_url" value={ p.WebhookURL } placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="input input-sm w-full"/>
 								<p class="text-xs text-base-content/40 mt-1.5">Plaid will send transaction updates to this URL. Must use HTTPS.</p>
 							</div>
 							<div class="pt-2">
-								<button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="saving">
+								<button type="submit" class="btn btn-primary btn-sm" :disabled="saving">
 									<span x-show="!saving">Save Plaid Settings</span>
 									<span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving...</span>
 								</button>
@@ -145,7 +145,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 					if p.PlaidConfigured {
 						<!-- Test connection -->
 						<div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
-							<button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
+							<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing">
 								<span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
 								<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
 							</button>
@@ -244,11 +244,11 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 							<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 							<div class="form-control">
 								<label class="label label-text text-sm font-medium" for="teller_app_id">App ID</label>
-								<input type="text" id="teller_app_id" name="teller_app_id" value={ p.TellerAppID } placeholder="Teller App ID" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl"/>
+								<input type="text" id="teller_app_id" name="teller_app_id" value={ p.TellerAppID } placeholder="Teller App ID" autocomplete="off" class="input input-sm w-full"/>
 							</div>
 							<div class="form-control">
 								<label class="label label-text text-sm font-medium" for="teller_env">Environment</label>
-								<select id="teller_env" name="teller_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl bg-base-200">
+								<select id="teller_env" name="teller_env" class="select select-sm w-full sm:max-w-xs bg-base-200">
 									@plaidEnvOption("sandbox", p.TellerEnv, "Sandbox")
 									@plaidEnvOption("development", p.TellerEnv, "Development")
 									@plaidEnvOption("production", p.TellerEnv, "Production")
@@ -264,11 +264,11 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									}
 									<div class="form-control mb-3">
 										<label class="label label-text text-sm font-medium" for="teller_cert_file">Certificate File (.pem)</label>
-										<input type="file" id="teller_cert_file" name="teller_cert_file" accept=".pem,.crt,.cert" class="file-input file-input-sm file-input-bordered w-full rounded-xl"/>
+										<input type="file" id="teller_cert_file" name="teller_cert_file" accept=".pem,.crt,.cert" class="file-input file-input-sm file-w-full"/>
 									</div>
 									<div class="form-control">
 										<label class="label label-text text-sm font-medium" for="teller_key_file">Private Key File (.pem)</label>
-										<input type="file" id="teller_key_file" name="teller_key_file" accept=".pem,.key" class="file-input file-input-sm file-input-bordered w-full rounded-xl"/>
+										<input type="file" id="teller_key_file" name="teller_key_file" accept=".pem,.key" class="file-input file-input-sm file-w-full"/>
 									</div>
 									if !p.HasEncryptionKey {
 										<p class="text-xs text-warning mt-3 flex items-center gap-1.5">
@@ -288,11 +288,11 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									value=""
 									placeholder={ tellerWebhookPlaceholder(p.TellerWebhookConfigured) }
 									autocomplete="new-password"
-									class="input input-sm input-bordered w-full rounded-xl"
+									class="input input-sm w-full"
 								/>
 							</div>
 							<div class="pt-2">
-								<button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="saving">
+								<button type="submit" class="btn btn-primary btn-sm" :disabled="saving">
 									<span x-show="!saving">Save Teller Settings</span>
 									<span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving...</span>
 								</button>
@@ -302,7 +302,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 					if p.TellerConfigured {
 						<!-- Test connection -->
 						<div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
-							<button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
+							<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing">
 								<span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
 								<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
 							</button>
@@ -378,7 +378,7 @@ templ providersCSVCard(h *service.ProviderHealthSummary) {
 			<!-- Description + action -->
 			<div class="border-t border-base-300 pt-4">
 				<p class="text-sm text-base-content/60 mb-4">Import transactions from CSV files exported from your bank or financial institution. No API credentials required.</p>
-				<a href="/connections/import-csv" class="btn btn-sm btn-primary btn-outline rounded-xl">
+				<a href="/connections/import-csv" class="btn btn-sm btn-primary btn-outline">
 					<i data-lucide="upload" class="w-4 h-4"></i>
 					Import CSV File
 				</a>

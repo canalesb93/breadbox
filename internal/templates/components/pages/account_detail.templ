@@ -230,20 +230,20 @@ templ acctTransactionsHeader(p AccountDetailProps) {
 			</div>
 			<div class="flex items-center gap-2">
 				if acctHasFilters(p) {
-					<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-sm rounded-xl">
+					<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-sm">
 						<i data-lucide="x" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">Clear filters</span>
 					</a>
 				}
 				if len(p.Transactions) > 0 {
-					<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm rounded-xl" title="Export as CSV">
+					<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm" title="Export as CSV">
 						<i data-lucide="download" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">CSV</span>
 					</a>
 				}
 				<button
 					type="button"
-					class="btn rounded-xl gap-2 shrink-0 h-9 min-h-0 px-3"
+					class="btn gap-2 shrink-0 h-9 min-h-0 px-3"
 					:class="filtersOpen ? 'btn-primary' : 'btn-ghost'"
 					@click="filtersOpen = !filtersOpen"
 				>
@@ -266,11 +266,11 @@ templ acctFilterPanel(p AccountDetailProps) {
 		<div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
 			<label class="bb-filter-label">
 				Start Date
-				<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm input-bordered w-full"/>
+				<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm w-full"/>
 			</label>
 			<label class="bb-filter-label">
 				End Date
-				<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm input-bordered w-full"/>
+				<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm w-full"/>
 			</label>
 			<label class="bb-filter-label col-span-2 sm:col-span-1">
 				Category
@@ -286,7 +286,7 @@ templ acctFilterPanel(p AccountDetailProps) {
 					@category-change="$refs.catInput.value = selectedSlug"
 				>
 					<input type="hidden" name="category" x-ref="catInput" value={ p.FilterCategory }/>
-					<button type="button" class="select select-sm select-bordered w-full text-left flex items-center gap-2" @click="openPicker()">
+					<button type="button" class="select select-sm w-full text-left flex items-center gap-2" @click="openPicker()">
 						<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
 						<span x-text="displayLabel" class="text-sm truncate"></span>
 					</button>
@@ -294,7 +294,7 @@ templ acctFilterPanel(p AccountDetailProps) {
 			</label>
 			<label class="bb-filter-label col-span-2 sm:col-span-1">
 				Status
-				<select name="pending" class="select select-sm select-bordered w-full">
+				<select name="pending" class="select select-sm w-full">
 					<option value="">All</option>
 					if p.FilterPending == "true" {
 						<option value="true" selected>Pending</option>
@@ -310,12 +310,12 @@ templ acctFilterPanel(p AccountDetailProps) {
 			</label>
 			<label class="bb-filter-label col-span-2 sm:col-span-1">
 				Search
-				<input type="text" name="search" value={ p.FilterSearch } placeholder="Name or merchant" class="input input-sm input-bordered w-full"/>
+				<input type="text" name="search" value={ p.FilterSearch } placeholder="Name or merchant" class="input input-sm w-full"/>
 			</label>
 		</div>
 		<div class="bb-filter-actions">
-			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-sm btn-ghost rounded-xl">Reset</a>
-			<button type="submit" class="btn btn-sm btn-primary rounded-xl">
+			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-sm btn-ghost">Reset</a>
+			<button type="submit" class="btn btn-sm btn-primary">
 				<i data-lucide="search" class="w-3.5 h-3.5"></i>
 				Apply Filters
 			</button>
@@ -354,40 +354,40 @@ templ acctPagination(p AccountDetailProps) {
 				{ fmt.Sprintf("%d", p.ShowingEnd) } of { fmt.Sprintf("%d", p.Total) }
 			</span>
 		</div>
-		<div class="bb-paginator__nav">
+		<div class="join">
 			<!-- First -->
 			if p.Page > 2 {
-				<a href={ acctPageURL(p.PaginationBase, 1) } class="bb-paginator__btn" title="First page">
+				<a href={ acctPageURL(p.PaginationBase, 1) } class="join-item btn btn-sm btn-ghost" title="First page">
 					<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
 				</a>
 			}
 			<!-- Previous -->
 			if p.Page > 1 {
-				<a href={ acctPageURL(p.PaginationBase, p.Page-1) } class="bb-paginator__btn" title="Previous page">
+				<a href={ acctPageURL(p.PaginationBase, p.Page-1) } class="join-item btn btn-sm btn-ghost" title="Previous page">
 					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
 				</a>
 			}
 			<!-- Page numbers -->
 			for _, n := range acctPageRange(p.Page, p.TotalPages) {
 				if n == 0 {
-					<span class="bb-paginator__ellipsis">
+					<span class="join-item btn btn-sm btn-ghost btn-disabled tabular-nums">
 						@templ.Raw("&hellip;")
 					</span>
 				} else if n == p.Page {
-					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
+					<span class="join-item btn btn-sm btn-active tabular-nums">{ fmt.Sprintf("%d", n) }</span>
 				} else {
-					<a href={ acctPageURL(p.PaginationBase, n) } class="bb-paginator__btn">{ fmt.Sprintf("%d", n) }</a>
+					<a href={ acctPageURL(p.PaginationBase, n) } class="join-item btn btn-sm btn-ghost">{ fmt.Sprintf("%d", n) }</a>
 				}
 			}
 			<!-- Next -->
 			if p.Page < p.TotalPages {
-				<a href={ acctPageURL(p.PaginationBase, p.Page+1) } class="bb-paginator__btn" title="Next page">
+				<a href={ acctPageURL(p.PaginationBase, p.Page+1) } class="join-item btn btn-sm btn-ghost" title="Next page">
 					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
 				</a>
 			}
 			<!-- Last -->
 			if p.Page < p.TotalPages-1 {
-				<a href={ acctPageURL(p.PaginationBase, p.TotalPages) } class="bb-paginator__btn" title="Last page">
+				<a href={ acctPageURL(p.PaginationBase, p.TotalPages) } class="join-item btn btn-sm btn-ghost" title="Last page">
 					<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
 				</a>
 			}
@@ -586,7 +586,7 @@ func acctDisplayNameInputHTML(p AccountDetailProps) string {
 		placeholder = p.Account.Name
 	}
 	return fmt.Sprintf(
-		`<input type="text" value="%s" placeholder="%s" onchange="updateDisplayName('%s', this.value)" class="input input-sm input-bordered w-full">`,
+		`<input type="text" value="%s" placeholder="%s" onchange="updateDisplayName('%s', this.value)" class="input input-sm w-full">`,
 		htmlAttrEscape(value),
 		htmlAttrEscape(placeholder),
 		htmlAttrEscape(p.AccountID),

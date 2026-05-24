@@ -1,18 +1,19 @@
-# Design System Specification
+# Design System Architecture
 
-## 1. Overview
+> **Component shapes & visual conventions live in the `/design` sandbox**
+> (`internal/templates/components/pages/design_sections.templ` + the
+> live gallery at `http://localhost:<port>/design`). The sandbox is the
+> source of truth — read it before adding a `bb-*` class or hand-rolling
+> something daisy ships. This file documents the architectural pieces
+> that don't fit a component specimen: build setup, layout patterns,
+> form patterns, async button state, Alpine page-component convention,
+> and the mobile baseline.
+>
+> Visual tuning (radii, palette, density) is configured via the
+> [daisyUI theme builder](https://daisyui.com/theme-generator/) — do
+> not reintroduce per-size CSS overrides here.
 
-The Breadbox admin dashboard uses **DaisyUI 5 + Tailwind CSS v4** with **Alpine.js v3** for interactivity. DaisyUI provides semantic component classes (drawer, table, badge, menu, modal) with built-in dark mode.
-
-**Component authoring:** new UI pieces are written as [`a-h/templ`](https://templ.guide) components in `internal/templates/components/*.templ` — this is the target pattern going forward (issue #462). Existing `html/template` pages and partials continue to work during the migration and can call templ components via the `renderComponent` funcMap bridge. See §13 below for the workflow.
-
-**Constraints:**
-- No Node.js, no npm, no bundler — uses `tailwindcss-extra` standalone binary
-- Single `make css` build step (like `sqlc generate` or `go generate`)
-- Must work on mobile browsers
-- Single developer maintaining it
-
-## 2. Build Setup
+## 1. Build setup
 
 ### Binary
 
@@ -98,231 +99,8 @@ RUN curl -sLo tailwindcss-extra https://github.com/dobicinaitis/tailwind-cli-ext
 
 The Go server already serves `static/` via `http.FileServer`. The generated CSS is available at `/static/css/styles.css`.
 
-## 3. Theme
 
-### Theme Pairing
-
-- **Light:** `breadbox-light` — custom shadcn/ui neutral palette, set as default
-- **Dark:** `breadbox-dark` — custom dark palette, auto-switches via `prefers-color-scheme`
-
-Auto-switches based on `prefers-color-scheme`. Users can also force a theme with `data-theme="light"` or `data-theme="dark"` on `<html>`.
-
-### Custom Properties Retained
-
-Some `--bb-*` variables are kept for app-specific tokens not covered by DaisyUI themes:
-
-```css
-:root {
-  --bb-gap-xs: 0.25rem;
-  --bb-gap-sm: 0.5rem;
-  --bb-gap-md: 1rem;
-  --bb-gap-lg: 1.5rem;
-  --bb-gap-xl: 2rem;
-}
-```
-
-DaisyUI semantic colors (`success`, `error`, `warning`, `info`, `primary`, `secondary`) handle light/dark variants automatically.
-
-## 4. Component Conventions
-
-### Buttons
-
-Two sizes only: `btn-sm` (default) and `btn-xs` (compact contexts like table cells).
-
-| Context | Classes |
-|---|---|
-| Primary action | `btn btn-primary btn-sm rounded-xl` |
-| Secondary/ghost | `btn btn-ghost btn-sm rounded-xl` |
-| Destructive | `btn btn-error btn-sm rounded-xl` (add `btn-soft` for softer look) |
-| Compact inline (table rows) | `btn btn-ghost btn-xs rounded-lg` |
-| Icon-only (standard) | `btn btn-ghost btn-sm btn-square rounded-xl` |
-| Icon-only (compact) | `btn btn-ghost btn-xs btn-square rounded-lg` |
-| Outline | `btn btn-outline btn-sm rounded-xl` |
-
-**Rounding:** `btn-sm` → `rounded-xl`, `btn-xs` → `rounded-lg`.
-
-**Icon + text gap:** `btn-sm` → `gap-2`, `btn-xs` → `gap-1.5`.
-
-**Full-width / oversized buttons** (login CTA, modal actions): May omit `btn-sm` and use custom sizing — these are intentional exceptions.
-
-### Badges
-
-| Context | Classes |
-|---|---|
-| Status (connection, sync, review) | `badge badge-soft badge-{color} badge-sm` |
-| Metadata labels (scope, source, type) | `badge badge-ghost badge-xs` |
-| Counts / numbers | `badge badge-{color} badge-xs` |
-
-**No extra rounding** — DaisyUI badges have their own radius. Never add `rounded-lg` or `rounded-xl` to badges.
-
-**`badge-soft`** is used for all semantic status badges (success/error/warning/info). Plain `badge badge-{color}` is for counts and indicators.
-
-**Template functions** (`statusBadge()`, `syncBadge()`, `configSource()`) emit standardized badge HTML:
-```go
-statusBadge("active")  → <span class="badge badge-soft badge-success badge-sm">Active</span>
-syncBadge("error")     → <span class="badge badge-soft badge-error badge-sm">error</span>
-configSource(src, key) → <span class="badge badge-ghost badge-sm">from env</span>
-```
-
-### Cards (`bb-card`)
-
-Base class: `bb-card` — provides `bg-base-100 rounded-xl border border-base-300` with smooth transitions.
-
-| Pattern | Classes | Internal padding |
-|---|---|---|
-| Simple content | `bb-card p-5` | Direct content, no sections |
-| Compact (stat cards) | `bb-card p-4` | Metrics, small info blocks |
-| Forms (centered) | `bb-card p-6` or `bb-card p-8` | Auth forms, setup wizards |
-| Empty states | `bb-card p-12 text-center` | Large centered messages |
-| Sectioned (header + body) | `bb-card p-0 overflow-hidden` | Children: `px-4 sm:px-5 py-3` (header), `px-4 sm:px-5 py-4` (body) |
-| Table container | `bb-card p-0 overflow-hidden` | Table handles its own padding |
-| Collapsible panels | `bb-card p-0 overflow-hidden` | Toggle header + body sections |
-
-**Sectioned cards** use `border-t border-base-300/50` for dividers between sections. Always add `overflow-hidden` when using `p-0` to prevent rounded border clipping.
-
-**Interactive cards** add `bb-card--interactive` for hover effects (cursor change, background shift).
-
-**Danger-zone cards** add `bb-danger-card` (soft error tint: `border-error/20 bg-error/[0.02]`) — use for destructive-action cards placed below the main form card.
-
-### Icon Tiles (`bb-icon-tile--*`)
-
-Colored 40×40 rounded squares used inside card headers to ground the page's purpose. Pair `.bb-icon-header__tile` (geometry) with a color modifier; the icon inside inherits `currentColor`, so don't set a text color on it.
-
-| Modifier | Background | Text |
-|---|---|---|
-| `.bb-icon-tile--primary` | `bg-primary/8` | `text-primary` |
-| `.bb-icon-tile--success` | `bg-success/10` | `text-success` |
-| `.bb-icon-tile--warning` | `bg-warning/10` | `text-warning` |
-| `.bb-icon-tile--error` | `bg-error/10` | `text-error` |
-
-```html
-<div class="bb-icon-header__tile bb-icon-tile--primary">
-  <i data-lucide="user-plus" class="w-5 h-5"></i>
-</div>
-```
-
-### Modals
-
-All `<dialog>` elements use:
-- Container: `<dialog id="..." class="modal modal-bottom sm:modal-middle">`
-- Content: `<div class="modal-box rounded-xl max-w-lg">` (use `<form>` wrapper only when the modal IS a form)
-- Rounding: always `rounded-xl`
-- Close backdrop: `<form method="dialog" class="modal-backdrop"><button>close</button></form>`
-
-Custom overlay dialogs (confirm, shortcuts, category picker) in `base.html` use their own CSS classes and are not standard modals.
-
-### Form Controls
-
-| Element | Standard classes |
-|---|---|
-| Text inputs | `input input-bordered w-full rounded-xl` |
-| Filter inputs | `input input-sm input-bordered w-full` (styled by `.bb-filter-bar` CSS) |
-| Compact inputs (rules) | `input input-bordered input-xs rounded-lg` |
-| Selects | `select select-bordered w-full rounded-xl` |
-| Filter selects | `select select-sm select-bordered w-full` |
-| Textareas | `textarea textarea-bordered rounded-xl w-full` |
-
-**Background:** No `bg-base-200/50` on standard form inputs — only on read-only, disabled, or inline-edit inputs.
-
-**Labels** use three patterns depending on context:
-- Filter bars: `.bb-filter-label` (defined in `input.css`)
-- Form fields: DaisyUI `<label class="label">` with `<span class="label-text">`
-- Simple forms: `<label class="text-sm font-medium text-base-content/70 mb-1.5 block">`
-
-### Icon Sizes
-
-| Context | Size |
-|---|---|
-| Inline with text (badges, labels) | `w-3.5 h-3.5` |
-| In buttons (`btn-sm`) | `w-4 h-4` |
-| In buttons (`btn-xs`) | `w-3.5 h-3.5` |
-| Section headers / standalone | `w-5 h-5` |
-| Empty state illustrations | `w-8 h-8` |
-| Sidebar nav | Managed by CSS (`.bb-sidebar-link` rules) — don't set manually |
-
-### Transitions (Alpine.js)
-
-| Context | Approach |
-|---|---|
-| Collapsible sections (filter panels, accordions, disclosures) | `x-collapse` |
-| Tab panels, wizard steps | Explicit `x-transition:enter` with `ease-out duration-200` |
-| Dropdowns / popovers | Explicit transitions with scale + opacity |
-| Modals | Handled by DaisyUI — no Alpine transitions needed |
-| Toast / notifications | Already handled in `base.html` |
-| Simple show/hide (spinners, help text) | No transition — instant is fine |
-
-### Empty States
-
-Standard pattern for "no data" screens:
-```html
-<div class="bb-card p-12 text-center">
-  <div class="flex flex-col items-center">
-    <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
-      <i data-lucide="..." class="w-7 h-7 text-base-content/30"></i>
-    </div>
-    <h3 class="text-base font-semibold mb-1">Title</h3>
-    <p class="text-base-content/50 text-sm mb-5 max-w-sm">Description text.</p>
-    <a href="..." class="btn btn-primary btn-sm rounded-xl gap-2">
-      <i data-lucide="plus" class="w-4 h-4"></i> CTA Button
-    </a>
-  </div>
-</div>
-```
-
-For filtered "no results" states (e.g., transactions with active filters), a compact version with just icon + text is acceptable.
-
-### Timeline
-
-GitHub-style activity timelines (continuous left rail threading through 24px icon tiles, day separators, sentence rows, comment bubbles) are assembled from generic templ primitives in `internal/templates/components/timeline.templ`. Use them whenever a surface needs to show a chronological feed — transactions, account links, reviews, sync runs — regardless of the underlying data shape.
-
-**Primitives**
-
-| Component | Purpose |
-| --- | --- |
-| `Timeline(TimelineProps)` | Section wrapper: optional heading + event count, ordered list, the absolutely-positioned rail. Body via `{ children... }`. |
-| `TimelineDay(label, first)` | Horizontal day separator with a small dot anchored on the rail. Pass `first=true` for the topmost separator to tighten the leading gap. |
-| `TimelineSystemRow(TimelineRowProps)` | Compact one-liner row: 24px icon tile (driven by `IconTone`) + sentence body via `{ children... }` + optional `Origin` and relative `Timestamp`. |
-| `TimelineSystemRowCustomTile(timestamp, origin, tile, body)` | Same row chrome but the caller supplies the entire 24px tile as a templ component. Use when the icon tile is data-driven (per-category colour, multi-shade status badge). |
-| `TimelineCommentRow(actor, timestamp)` | Chat-bubble row with the default "`Name` commented · `time`" meta line; bubble body via `{ children... }`. |
-| `TimelineCommentRowRaw(avatar)` | Escape hatch for callers that need a custom avatar or to inject controls (e.g. an inline delete button) inside the meta line. Both the avatar and the right-hand body are component slots. |
-| `TimelineEmpty(message)` | Compact "no activity yet" treatment: clock glyph + muted message. Caller wraps any composer or CTA above it. |
-
-**`IconTone` palette** — drives the small (24px) tile background + icon colour on `TimelineSystemRow`:
-
-| Tone | Background | Icon colour | Typical use |
-| --- | --- | --- | --- |
-| `neutral` (default) | `bg-base-200` | `text-base-content/40` | comments, generic system events |
-| `info` | `bg-info/15` | `text-info` | rule applications, automation hits |
-| `success` | `bg-success/15` | `text-success` | additive events (tag added, review approved) |
-| `warning` | `bg-warning/15` | `text-warning` | review skipped, soft warnings |
-| `error` | `bg-error/15` | `text-error` | tag removed, review rejected, failures |
-| `custom` | — | — | sentinel: caller renders the tile itself |
-
-**Reference call site** — the transaction-detail timeline lives in `internal/templates/components/pages/transaction_detail.templ` and uses `TimelineSystemRowCustomTile` (because individual rows render category-specific colours and 10/15% alpha review tints) plus `TimelineCommentRowRaw` (because comment rows host an inline trash button on hover):
-
-```go
-@components.Timeline(components.TimelineProps{
-    Heading: "Activity", HeadingIcon: "activity",
-    EventCount: len(p.Activity),
-    AriaLabel: "Transaction activity timeline",
-}) {
-    for di, day := range p.ActivityDays {
-        @components.TimelineDay(day.Label, di == 0)
-        for _, event := range day.Events {
-            if event.Type == "comment" {
-                @txdTimelineComment(event)        // wraps TimelineCommentRowRaw
-            } else {
-                @txdTimelineSystem(event)         // wraps TimelineSystemRowCustomTile
-            }
-        }
-    }
-    @txdTimelineComposer(p)                       // page-specific composer
-}
-```
-
-The composer (textarea + submit) is intentionally **not** a primitive — comment-creation UX is too tied to its caller (Alpine bindings, max-length, "also flag for review" toggle, keyboard shortcuts). Keep composer markup in the page template and slot it into the timeline children list at the tail.
-
-## 5. Layout Patterns
+## 2. Layout patterns
 
 ### Base Layout (Drawer Sidebar)
 
@@ -473,8 +251,8 @@ The canonical pattern for create/edit/settings forms. A sectioned card with a co
 
     <!-- Bottom action row -->
     <div class="bb-action-row">
-      <a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-      <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+      <a href="/users" class="btn btn-sm btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
         <span x-show="!submitting" class="inline-flex items-center gap-1.5">
           <i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes
         </span>
@@ -493,64 +271,8 @@ The canonical pattern for create/edit/settings forms. A sectioned card with a co
 - **No back link inside `.bb-page-header`.** The breadcrumb above the header is the sole back affordance — see the [Page Header](#page-header-bb-page-header) section above. The Cancel button in the bottom action row is the only secondary navigation the form needs.
 - For destructive operations, add a **separate** `bb-card bb-danger-card` below — never mix the save action with the delete action in one card.
 
-## 6. Table Guidelines
 
-### Base Table
-
-All data tables use:
-```html
-<div class="overflow-x-auto">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Column</th>
-        ...
-      </tr>
-    </thead>
-    <tbody>
-      <tr class="hover:bg-base-200">
-        <td>Value</td>
-        ...
-      </tr>
-    </tbody>
-  </table>
-</div>
-```
-
-Note: DaisyUI 5 removed the built-in `hover` table class. Use Tailwind `hover:bg-base-200` on `<tr>` elements.
-
-### Size Variants
-
-- `table-sm`: Default for most pages (connections, API keys, sync logs, family members)
-- `table-md`: Transaction list (more data per row)
-- `table-xs`: Embedded tables (accounts within connection detail)
-
-### Sticky Headers
-
-For tables that can grow long (transactions, sync logs):
-```html
-<div class="overflow-x-auto max-h-[70vh]">
-  <table class="table table-zebra table-sm table-pin-rows">
-```
-
-### Amount Columns
-
-```html
-<td class="bb-amount">{{formatAmount .Amount}}</td>
-```
-
-Transaction rows use `bb-tx-amount` and `bb-tx-amount--income` for styled amounts.
-
-### Status Badges in Tables
-
-```html
-<td>{{statusBadge .Status}}</td>
-<!-- Renders: <span class="badge badge-soft badge-success badge-sm">Active</span> -->
-```
-
-Status badges use `badge-soft badge-sm`. See Component Conventions above for the full badge pattern.
-
-## 7. Form Patterns
+## 3. Form patterns
 
 ### Filter Bar
 
@@ -559,11 +281,11 @@ Used on transactions, sync logs, account detail:
 <div class="bb-filter-bar">
   <label>
     Start Date
-    <input type="date" name="start_date" class="input input-sm input-bordered" />
+    <input type="date" name="start_date" class="input input-sm" />
   </label>
   <label>
     Status
-    <select name="status" class="select select-sm select-bordered">
+    <select name="status" class="select select-sm">
       <option value="">All</option>
       ...
     </select>
@@ -577,7 +299,7 @@ Used on transactions, sync logs, account detail:
 For connection detail (display name, sync interval):
 ```html
 <div class="flex items-center gap-2" x-data="{ saving: false }">
-  <input type="text" class="input input-sm input-bordered w-48" ... />
+  <input type="text" class="input input-sm w-48" ... />
   <span x-show="saving" class="loading loading-spinner loading-xs"></span>
 </div>
 ```
@@ -589,9 +311,9 @@ Use DaisyUI form control patterns:
 <label class="label">
   <span class="label-text">Password</span>
 </label>
-<input type="password" class="input input-bordered" required />
+<input type="password" class="input" required />
 <!-- Error state -->
-<input type="password" class="input input-bordered input-error" />
+<input type="password" class="input input-error" />
 <label class="label">
   <span class="label-text-alt text-error">Password must be at least 8 characters</span>
 </label>
@@ -634,8 +356,8 @@ For settings-style edit screens where Save is explicit (not auto-save on change)
     <span x-show="saved" x-transition.opacity class="text-xs text-success inline-flex items-center gap-1 mr-2">
       <i data-lucide="check" class="w-3.5 h-3.5"></i> Saved
     </span>
-    <a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-    <button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32">
+    <a href="/users" class="btn btn-sm btn-ghost">Cancel</a>
+    <button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary gap-1.5 min-w-32">
       <span x-show="!saving" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
       <span x-show="saving" class="loading loading-spinner loading-xs"></span>
     </button>
@@ -654,7 +376,7 @@ Destructive operations (delete, revoke, disconnect) go in a **separate** `bb-car
       <h3 class="text-sm font-semibold text-error/80">Delete login account</h3>
       <p class="text-xs text-base-content/50 mt-0.5">{{.Name}} will no longer be able to sign in. This cannot be undone.</p>
     </div>
-    <button class="btn btn-error btn-soft btn-sm rounded-xl shrink-0" @click="…">
+    <button class="btn btn-error btn-soft btn-sm shrink-0" @click="…">
       <i data-lucide="user-x" class="w-4 h-4"></i>
       Delete Login
     </button>
@@ -668,7 +390,7 @@ When a card has ≥2 secondary actions (Edit, Manage, Transactions, Delete, …)
 
 ```html
 <div class="dropdown dropdown-end">
-  <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity">
+  <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity">
     <i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
   </div>
   <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
@@ -680,96 +402,8 @@ When a card has ≥2 secondary actions (Edit, Manage, Transactions, Delete, …)
 
 Keep icons at `w-3.5 h-3.5` in dropdown rows to match the `btn-xs` baseline weight of menu items.
 
-## 8. Icon System
 
-### Lucide Icons
-
-**CDN:** `https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js`
-
-Pin to a specific version in production for stability.
-
-**Usage:**
-```html
-<i data-lucide="icon-name" class="w-4 h-4"></i>
-
-<!-- At end of body -->
-<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-<script>lucide.createIcons();</script>
-```
-
-After `createIcons()`, each `<i data-lucide="...">` is replaced with an inline `<svg>`.
-
-**Size control:** See the Icon Sizes table in Component Conventions (§4) for the canonical convention. Quick reference:
-- In `btn-sm`: `w-4 h-4`
-- In `btn-xs` / inline: `w-3.5 h-3.5`
-- Section headers: `w-5 h-5`
-- Empty states: `w-8 h-8`
-
-### Icon Inventory
-
-| Context | Icon | Lucide Name |
-|---|---|---|
-| Dashboard nav | Layout grid | `layout-dashboard` |
-| Connections nav | Chain link | `link` |
-| Transactions nav | Receipt | `receipt` |
-| Family Members nav | Group | `users` |
-| API Keys nav | Key | `key` |
-| Sync Logs nav | Refresh | `refresh-cw` |
-| Settings nav | Gear | `settings` |
-| Sign Out | Door arrow | `log-out` |
-| Mobile menu toggle | Hamburger | `menu` |
-| Brand icon | Package | `package` |
-| Stat: Accounts | Building | `building-2` |
-| Stat: Transactions | Trending | `trending-up` |
-| Stat: Last Sync | Clock | `clock` |
-| Stat: Needs Attention | Alert | `alert-triangle` |
-| Empty state | Inbox | `inbox` |
-| Add / Create | Plus | `plus` |
-| Edit | Pencil | `pencil` |
-| Delete / Remove | Trash | `trash-2` |
-| Sync | Refresh | `refresh-cw` |
-| External link | Arrow up-right | `external-link` |
-| Copy | Clipboard | `clipboard` |
-| Success toast | Check circle | `check-circle` |
-| Error toast | X circle | `x-circle` |
-| Info toast | Info | `info` |
-
-### Alpine.js Re-initialization
-
-When Alpine.js dynamically adds elements with `data-lucide` attributes (e.g., toast messages), call `lucide.createIcons()` after DOM insertion:
-
-```html
-<div x-init="$watch('show', v => { if(v) $nextTick(() => lucide.createIcons()) })">
-```
-
-## 9. Toast / Notification Pattern
-
-Global toast in `base.html` — centered floating pill at the bottom of the viewport with type-specific Lucide icons (check, x-circle, alert-triangle, info). Auto-dismisses after 3 seconds with fade+slide transition.
-
-**Dispatch from anywhere:**
-```js
-window.dispatchEvent(new CustomEvent('bb-toast', {
-  detail: { message: 'Sync triggered', type: 'success' }
-}));
-```
-
-Supported types: `success` (default), `error`, `warning`, `info`.
-
-**Inline feedback:** For trivial instant actions (copy-to-clipboard), use the icon swap pattern instead of a toast: swap the icon to a checkmark with `text-success` for 2 seconds. See `agent_wizard.html` for the reference implementation.
-
-## 10. Typography
-
-DaisyUI inherits Tailwind's type scale. Key decisions:
-
-- **Body text:** Default (`text-base`, 16px) — no override needed
-- **Page titles:** `text-2xl font-bold` (or `text-xl` on mobile)
-- **Section headers:** `text-lg font-semibold`
-- **Stat values:** `stat-value` class (DaisyUI handles sizing)
-- **Amounts:** `tabular-nums` via `.bb-amount` class (fixed-width digits for alignment)
-- **Small text:** `text-sm` for labels, metadata, timestamps
-- **Monospace:** `font-mono` for API keys, transaction IDs, code snippets
-
-## 11. Async Button Loading
+## 4. Async button loading
 
 Use `bbButtonLoading(btn)` / `bbButtonDone(btn)` for async button feedback:
 
@@ -784,69 +418,8 @@ fetch('/api/...').then(() => {
 });
 ```
 
-## 12. Alerts
 
-**Page-level alerts** use: `<div role="alert" class="alert alert-{type} rounded-xl mb-6">`.
-
-Flash messages (`partials/flash.html`) and inline alerts follow the same pattern. Use `alert-soft` for less prominent inline warnings.
-
-**Form-level errors** inside a `.bb-card` use the `.bb-form-error` inline variant — softer, tighter, and sits flush with the form fields rather than the page chrome:
-
-```html
-<div role="alert" class="bb-form-error">
-  <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
-  <span x-text="error"></span>
-</div>
-```
-
-Always pair with an `alert-circle` icon so the error reads at a glance. This is the canonical pattern for inline Alpine-driven form validation errors.
-
-## 13. Templ Components
-
-Admin UI is migrating from `html/template` to [`a-h/templ`](https://templ.guide) (issue #462). Both coexist during the migration — don't rewrite a whole page to templ unless the migration plan calls for it.
-
-### Where components live
-
-`internal/templates/components/*.templ` — one component per file, named in `PascalCase`. Each `.templ` file produces a generated `*_templ.go` sibling; commit both.
-
-### Generating Go from `.templ`
-
-```
-templ generate      # regenerates all *_templ.go in the repo
-```
-
-`make generate` and `make dev-watch` invoke `templ generate` automatically (once the #462 infrastructure lands). If you edit a `.templ` file by hand, re-run generation before `go build` — the Go compiler only sees the generated files.
-
-Install the CLI with `go install github.com/a-h/templ/cmd/templ@latest` if it's missing from `$PATH`.
-
-### Dev-reload interaction
-
-`make dev-watch` rebuilds the Go binary on `.templ` changes via **air** — the generated `*_templ.go` files are part of the Go build graph, so a save triggers a ~1–2s restart, not the HTML-from-disk fast path used for `.html` edits. `BREADBOX_DEV_RELOAD=1` does **not** re-read templ components from disk; they're compiled in.
-
-If you're iterating rapidly on a templ component, expect a Go restart per save. Prefer `.html` for pure markup tweaks during the migration if restart latency matters.
-
-### Calling templ components from `.html` pages
-
-`.html` templates bridge to templ via the `renderComponent` funcMap helper. Register a component once in the bridge (see `internal/templates/components/bridge.go`) and call it from any `.html` block:
-
-```html
-{{renderComponent "StatusBadge" .Connection.Status}}
-```
-
-The helper invokes the component's `Render(ctx, w)` and returns `template.HTML` so the output isn't re-escaped. Pass simple Go values — the bridge signature is fixed per component.
-
-### Adding a new component
-
-1. Copy an existing component (e.g. `status_badge.templ`) — mirrors package, imports, and signature conventions.
-2. Edit the markup and params, then run `templ generate`.
-3. If the component will be called from a `.html` page, add an entry to the `renderComponent` bridge. Pure templ-to-templ calls don't need a bridge entry.
-4. `go build ./...` to confirm the generated code compiles.
-
-### `templ fmt`
-
-Run `templ fmt .` before committing — it normalizes whitespace and attribute order in `.templ` files. CI may enforce this. Many editors have a templ LSP that formats on save.
-
-## 14. Alpine page components
+## 5. Alpine page components
 
 Page-level Alpine factories — the things rendered as `x-data="..."` at the root of an admin page — live in `static/js/admin/components/<pageSlug>.js` and load via a synchronous `<script src="...">` placed at the top of the templ component. This keeps JS out of templ files and out of `_scripts.go` Go-string sidecars, so editors give you syntax highlighting, the formatter works, and refactors are mechanical.
 
@@ -946,7 +519,7 @@ Failure messages include `path:line[-end]` so the offender can be extracted dire
 
 `static/js/admin/components/prompt_builder.js` + `internal/templates/components/pages/prompt_builder.templ` (the `/agent-wizard/{type}` page). Copy this shape for any new Alpine page component.
 
-## 15. Mobile baseline
+## 6. Mobile baseline
 
 The admin UI targets **iOS 26.2 / iPadOS 26.2 and the latest desktop Safari**. Anything older than the baseline still loads, but renders a soft-warn banner at the top of the shell prompting the user to update.
 

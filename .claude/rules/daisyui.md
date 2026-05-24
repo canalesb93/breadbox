@@ -28,8 +28,9 @@ Before reaching for inline Tailwind utilities or writing a new
 
 1. **Is there a DaisyUI component for this?** Check
    [daisyui.com/llms.txt](https://daisyui.com/llms.txt). If yes →
-   use it. Apply our spec'd overlays (e.g. `rounded-xl` on `btn-sm`,
-   `badge-soft` for status) but do not re-build the component.
+   use it. Visual tuning (radii, palette, density) goes through the
+   [daisy theme builder](https://daisyui.com/theme-generator/) — do
+   not stamp `rounded-*` modifiers per caller.
 2. **Is there a DaisyUI modifier for the variant?** `btn-soft`,
    `btn-dash`, `badge-outline`, `card-border`, `tabs-border`,
    `collapse-arrow`, `kbd-xs`, `skeleton-text`, etc. Prefer modifier
@@ -50,7 +51,7 @@ Always use the daisy component (with our standard overlays only):
 
 | Daisy | Standard overlay | Notes |
 |---|---|---|
-| `btn` | `btn-sm` → `rounded-xl gap-2`; `btn-xs` → `rounded-lg gap-1.5` | Two sizes only. Icon size `w-4 h-4` (sm) / `w-3.5 h-3.5` (xs). |
+| `btn` | `btn-sm` → `gap-2`; `btn-xs` → `gap-1.5` | Two sizes only. Icon size `w-4 h-4` (sm) / `w-3.5 h-3.5` (xs). Radius is daisy default — no per-caller `rounded-*`. |
 | `badge` | `badge-soft badge-{tone} badge-sm` for status; `badge-ghost badge-xs` for metadata; solid `badge-{tone} badge-xs` for counts | Never add `rounded-lg`/`rounded-xl` to a badge. |
 | `alert` | `alert alert-{tone} rounded-xl` for page-level; `alert-soft` for less prominent inline | Use `bb-form-error` inside a form card (tighter). |
 | `modal` | `modal modal-bottom sm:modal-middle`; `modal-box rounded-xl` | Use for all confirm/dialog UX. See "Anti-patterns" below for the bespoke shells we're retiring. |

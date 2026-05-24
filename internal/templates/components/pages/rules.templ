@@ -42,7 +42,7 @@ templ Rules(p RulesProps) {
 			if len(p.Rules) > 0 {
 				<label class="flex items-center gap-2 text-xs text-base-content/40 whitespace-nowrap">
 					<span class="hidden sm:inline">Sort by</span>
-					<select onchange="bbSetRulesSort(this.value)" class="select select-bordered select-xs rounded-lg bg-base-100 min-w-32 tabular-nums">
+					<select onchange="bbSetRulesSort(this.value)" class="select select-xs bg-base-100 min-w-32 tabular-nums">
 						@rulesSortOption("", "Pipeline stage", p.SortBy == "" || p.SortBy == "priority")
 						@rulesSortOption("hit_count", "Most hits", p.SortBy == "hit_count")
 						@rulesSortOption("last_hit_at", "Recently active", p.SortBy == "last_hit_at")
@@ -68,7 +68,7 @@ templ Rules(p RulesProps) {
 }
 
 templ rulesNewRuleAction() {
-	<a href="/rules/new" class="btn btn-primary btn-sm rounded-xl gap-2" data-new-rule>
+	<a href="/rules/new" class="btn btn-primary btn-sm gap-2" data-new-rule>
 		<i data-lucide="plus" class="w-4 h-4"></i>
 		New Rule
 	</a>
@@ -173,7 +173,7 @@ templ rulesRow(r RulesRow) {
 			<div class="flex items-center justify-end gap-0.5 flex-shrink-0">
 				<a
 					href={ templ.SafeURL("/rules/" + r.ID + "/edit") }
-					class="btn btn-ghost btn-xs btn-square rounded-lg"
+					class="btn btn-ghost btn-xs btn-square"
 					title="Edit"
 					aria-label={ "Edit rule " + r.Name }
 					@click.stop
@@ -181,10 +181,10 @@ templ rulesRow(r RulesRow) {
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
 				</a>
 				<div class="dropdown dropdown-end" @click.stop>
-					<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label={ "Rule " + r.Name + " actions" }>
+					<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ "Rule " + r.Name + " actions" }>
 						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 					</div>
-					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
 						<li>
 							<button
 								type="button"
@@ -262,40 +262,40 @@ templ rulesPaginator(p RulesProps) {
 			</span>
 			<div class="bb-paginator__per-page">
 				<label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
-				<select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetRulesPerPage(this.value)">
+				<select class="select select-xs tabular-nums" onchange="bbSetRulesPerPage(this.value)">
 					@rulesPerPageOption(25, p.PageSize)
 					@rulesPerPageOption(50, p.PageSize)
 					@rulesPerPageOption(100, p.PageSize)
 				</select>
 			</div>
 		</div>
-		<div class="bb-paginator__nav">
+		<div class="join">
 			if p.Page > 2 {
-				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, 1)) } class="bb-paginator__btn" title="First page">
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, 1)) } class="join-item btn btn-sm btn-ghost" title="First page">
 					<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
 				</a>
 			}
 			if p.Page > 1 {
-				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, p.Page-1)) } class="bb-paginator__btn" title="Previous page">
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, p.Page-1)) } class="join-item btn btn-sm btn-ghost" title="Previous page">
 					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
 				</a>
 			}
 			for _, n := range components.PageRange(p.Page, p.TotalPages) {
 				if n == 0 {
-					<span class="bb-paginator__ellipsis">…</span>
+					<span class="join-item btn btn-sm btn-ghost btn-disabled tabular-nums">…</span>
 				} else if n == p.Page {
-					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
+					<span class="join-item btn btn-sm btn-active tabular-nums">{ fmt.Sprintf("%d", n) }</span>
 				} else {
-					<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, n)) } class="bb-paginator__btn">{ fmt.Sprintf("%d", n) }</a>
+					<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, n)) } class="join-item btn btn-sm btn-ghost">{ fmt.Sprintf("%d", n) }</a>
 				}
 			}
 			if p.Page < p.TotalPages {
-				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, p.Page+1)) } class="bb-paginator__btn" title="Next page">
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, p.Page+1)) } class="join-item btn btn-sm btn-ghost" title="Next page">
 					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
 				</a>
 			}
 			if p.Page < p.TotalPages-1 {
-				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, p.TotalPages)) } class="bb-paginator__btn" title="Last page">
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", p.PaginationBase, p.TotalPages)) } class="join-item btn btn-sm btn-ghost" title="Last page">
 					<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
 				</a>
 			}

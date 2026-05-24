@@ -49,7 +49,7 @@ templ CreateAdmin(p CreateAdminProps) {
 					required
 					autocomplete="name"
 					placeholder="e.g. Alex"
-					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Name"] != "") }
+					class={ "input w-full h-12 text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Name"] != "") }
 				/>
 				if p.FieldErrors["Name"] != "" {
 					<p class="text-xs text-error mt-1.5">{ p.FieldErrors["Name"] }</p>
@@ -65,7 +65,7 @@ templ CreateAdmin(p CreateAdminProps) {
 					required
 					autocomplete="email"
 					placeholder="you@example.com"
-					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Email"] != "") }
+					class={ "input w-full h-12 text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Email"] != "") }
 				/>
 				if p.FieldErrors["Email"] != "" {
 					<p class="text-xs text-error mt-1.5">{ p.FieldErrors["Email"] }</p>
@@ -81,7 +81,7 @@ templ CreateAdmin(p CreateAdminProps) {
 					autocomplete="new-password"
 					minlength="8"
 					placeholder="Create a password"
-					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Password"] != "") }
+					class={ "input w-full h-12 text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Password"] != "") }
 				/>
 				<p class="text-xs text-base-content/40 mt-1.5">At least 8 characters</p>
 				if p.FieldErrors["Password"] != "" {
@@ -89,7 +89,7 @@ templ CreateAdmin(p CreateAdminProps) {
 				}
 			</div>
 			<p class="text-xs text-base-content/40 text-center">You'll be able to add other family members after setup.</p>
-			<button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
+			<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold transition-colors duration-150 mt-1">
 				Get Started
 				<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
 			</button>

@@ -46,7 +46,7 @@ templ Connections(p ConnectionsProps) {
 					if len(p.Connections) > 0 {
 						<div x-data="syncAllBtn">
 							<button
-								class="btn btn-outline btn-sm rounded-xl gap-2"
+								class="btn btn-outline btn-sm gap-2"
 								:disabled="state !== 'idle'"
 								@click="triggerSyncAll()"
 								:title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'"
@@ -58,12 +58,12 @@ templ Connections(p ConnectionsProps) {
 							</button>
 						</div>
 					}
-					<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+					<a href="/connections/new" class="btn btn-primary btn-sm">
 						<i data-lucide="plus" class="w-4 h-4"></i>
 						Connect Bank
 					</a>
 				</div>
-				<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
+				<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm" onclick="document.getElementById('create-link-modal').showModal()">
 					<i data-lucide="plus" class="w-4 h-4"></i> New Link
 				</button>
 			</div>
@@ -164,7 +164,7 @@ templ Connections(p ConnectionsProps) {
 							Account links connect authorized user accounts to primary accounts for deduplication.
 							If two family members connect the same credit card, linking prevents double-counting.
 						</p>
-						<button class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
+						<button class="btn btn-primary btn-sm" onclick="document.getElementById('create-link-modal').showModal()">
 							<i data-lucide="plus" class="w-4 h-4"></i> Create First Link
 						</button>
 					</div>
@@ -297,9 +297,9 @@ templ connectionsCard(c ConnectionsRow) {
 					<span class="truncate">{ components.ErrorMessage(c.ErrorCode) }</span>
 				</div>
 				if c.Provider != "csv" && (c.ErrorCode == "ITEM_LOGIN_REQUIRED" || c.ErrorCode == "INSUFFICIENT_CREDENTIALS" || c.ErrorCode == "INVALID_CREDENTIALS" || c.Status == "pending_reauth") {
-					<a href={ templ.SafeURL("/connections/" + c.ID + "/reauth") } class="btn btn-warning btn-xs rounded-lg shrink-0" @click.stop>Re-authenticate</a>
+					<a href={ templ.SafeURL("/connections/" + c.ID + "/reauth") } class="btn btn-warning btn-xs shrink-0" @click.stop>Re-authenticate</a>
 				} else {
-					<a href={ templ.SafeURL("/connections/" + c.ID) } class="btn btn-ghost btn-xs rounded-lg shrink-0" @click.stop>View Details</a>
+					<a href={ templ.SafeURL("/connections/" + c.ID) } class="btn btn-ghost btn-xs shrink-0" @click.stop>View Details</a>
 				}
 			</div>
 		}
@@ -427,11 +427,11 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 			<div class="flex items-center gap-1 shrink-0 sm:self-start self-end">
 				<form method="POST" action={ templ.SafeURL(connectionsLinkActionURL(l.ID, "reconcile")) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
-					<button type="submit" class="btn btn-ghost btn-xs rounded-lg" title="Run reconciliation">
+					<button type="submit" class="btn btn-ghost btn-xs" title="Run reconciliation">
 						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
 					</button>
 				</form>
-				<a href={ templ.SafeURL("/account-links/" + l.ID) } class="btn btn-ghost btn-xs rounded-lg" title="View matches">
+				<a href={ templ.SafeURL("/account-links/" + l.ID) } class="btn btn-ghost btn-xs" title="View matches">
 					<i data-lucide="list" class="w-3.5 h-3.5"></i>
 				</a>
 				<form
@@ -442,7 +442,7 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 					@submit.prevent="bbConfirm({title:'Delete account link?',message:'All transaction attribution from this link will be cleared. This cannot be undone.',confirmLabel:'Delete',variant:'danger'}).then(ok => { if(ok) $el.submit(); })"
 				>
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
-					<button type="submit" class="btn btn-ghost btn-xs text-error rounded-lg" title="Delete link">
+					<button type="submit" class="btn btn-ghost btn-xs text-error" title="Delete link">
 						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
 					</button>
 				</form>
@@ -460,7 +460,7 @@ templ connectionsCreateLinkModal(p ConnectionsProps) {
 				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				<div class="form-control">
 					<label class="label label-text text-sm font-medium">Primary Account</label>
-					<select name="primary_account_id" class="select select-bordered select-sm w-full rounded-xl" required>
+					<select name="primary_account_id" class="select select-sm w-full" required>
 						<option value="">Select the primary cardholder's account...</option>
 						for _, a := range p.LinkAccounts {
 							<option value={ a.ID }>{ connectionsLinkAccountLabel(a) }</option>
@@ -469,7 +469,7 @@ templ connectionsCreateLinkModal(p ConnectionsProps) {
 				</div>
 				<div class="form-control">
 					<label class="label label-text text-sm font-medium">Dependent Account</label>
-					<select name="dependent_account_id" class="select select-bordered select-sm w-full rounded-xl" required>
+					<select name="dependent_account_id" class="select select-sm w-full" required>
 						<option value="">Select the authorized user's account...</option>
 						for _, a := range p.LinkAccounts {
 							<option value={ a.ID }>{ connectionsLinkAccountLabel(a) }</option>
@@ -477,8 +477,8 @@ templ connectionsCreateLinkModal(p ConnectionsProps) {
 					</select>
 				</div>
 				<div class="modal-action">
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').close()">Cancel</button>
-					<button type="submit" class="btn btn-primary btn-sm rounded-xl" :class="{ 'loading': loading }" :disabled="loading">Create Link</button>
+					<button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('create-link-modal').close()">Cancel</button>
+					<button type="submit" class="btn btn-primary btn-sm" :class="{ 'loading': loading }" :disabled="loading">Create Link</button>
 				</div>
 			</form>
 		</div>

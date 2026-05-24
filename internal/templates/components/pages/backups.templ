@@ -25,12 +25,12 @@ templ Backups(p BackupsProps) {
 				<form method="POST" action="/-/backups/create">
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					if p.PreflightOK {
-						<button type="submit" data-new-backup class="btn btn-primary btn-sm rounded-xl">
+						<button type="submit" data-new-backup class="btn btn-primary btn-sm">
 							<i data-lucide="download" class="w-4 h-4"></i>
 							Create Backup Now
 						</button>
 					} else {
-						<button type="submit" data-new-backup class="btn btn-primary btn-sm rounded-xl" disabled title={ p.PreflightMessage }>
+						<button type="submit" data-new-backup class="btn btn-primary btn-sm" disabled title={ p.PreflightMessage }>
 							<i data-lucide="info" class="w-4 h-4"></i>
 							Create Backup Now
 						</button>
@@ -41,7 +41,7 @@ templ Backups(p BackupsProps) {
 	</div>
 	<div class="grid gap-6">
 		<!-- Encryption Key Warning -->
-		<div class="alert alert-warning rounded-xl">
+		<div class="alert alert-warning">
 			<i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i>
 			<div>
 				<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
@@ -60,13 +60,13 @@ templ Backups(p BackupsProps) {
 			</div>
 		</div>
 		if p.Error != "" {
-			<div class="alert alert-error rounded-xl">
+			<div class="alert alert-error">
 				<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
 				<span class="text-sm">{ p.Error }</span>
 			</div>
 		} else {
 			if !p.PreflightOK {
-				<div class="alert alert-error rounded-xl">
+				<div class="alert alert-error">
 					<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
 					<div>
 						<h3 class="font-semibold text-sm">Backups unavailable</h3>
@@ -129,7 +129,7 @@ templ backupsScheduleSection(p BackupsProps) {
 					<div class="grid sm:grid-cols-2 gap-4 max-w-lg">
 						<div>
 							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_schedule">Frequency</label>
-							<select id="backup_schedule" name="backup_schedule" class="select select-sm select-bordered w-full rounded-xl bg-base-200">
+							<select id="backup_schedule" name="backup_schedule" class="select select-sm w-full bg-base-200">
 								@scheduleOption("", "Disabled", p.Schedule)
 								@scheduleOption("daily_2am", "Daily at 2:00 AM", p.Schedule)
 								@scheduleOption("daily_3am", "Daily at 3:00 AM", p.Schedule)
@@ -139,7 +139,7 @@ templ backupsScheduleSection(p BackupsProps) {
 						</div>
 						<div>
 							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_retention_days">Retention</label>
-							<select id="backup_retention_days" name="backup_retention_days" class="select select-sm select-bordered w-full rounded-xl bg-base-200">
+							<select id="backup_retention_days" name="backup_retention_days" class="select select-sm w-full bg-base-200">
 								@backupsRetentionOption(3, "3 days", p.RetentionDays)
 								@backupsRetentionOption(7, "7 days (default)", p.RetentionDays)
 								@backupsRetentionOption(14, "14 days", p.RetentionDays)
@@ -156,7 +156,7 @@ templ backupsScheduleSection(p BackupsProps) {
 						Backups stored in: <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">{ p.BackupDir }</code>
 					</p>
 					<div class="mt-4">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Schedule</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
 					</div>
 				</form>
 			</div>
@@ -236,7 +236,7 @@ templ backupsRow(b BackupRow, csrf string) {
 		</td>
 		<td>
 			<div class="flex items-center justify-end gap-1">
-				<a href={ templ.SafeURL(b.DownloadHref) } class="btn btn-ghost btn-xs rounded-lg" title="Download">
+				<a href={ templ.SafeURL(b.DownloadHref) } class="btn btn-ghost btn-xs" title="Download">
 					<i data-lucide="download" class="w-3.5 h-3.5"></i>
 				</a>
 				<form
@@ -253,7 +253,7 @@ templ backupsRow(b BackupRow, csrf string) {
                       })"
 				>
 					<input type="hidden" name="_csrf" value={ csrf }/>
-					<button type="submit" class="btn btn-ghost btn-xs rounded-lg text-warning" title="Restore">
+					<button type="submit" class="btn btn-ghost btn-xs text-warning" title="Restore">
 						<i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
 					</button>
 				</form>
@@ -271,7 +271,7 @@ templ backupsRow(b BackupRow, csrf string) {
                       })"
 				>
 					<input type="hidden" name="_csrf" value={ csrf }/>
-					<button type="submit" class="btn btn-ghost btn-xs rounded-lg text-error" title="Delete">
+					<button type="submit" class="btn btn-ghost btn-xs text-error" title="Delete">
 						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
 					</button>
 				</form>
@@ -334,13 +334,13 @@ templ backupsRestoreSection(p BackupsProps) {
 							id="backup_file"
 							name="backup_file"
 							accept=".sql.gz,.gz"
-							class="file-input file-input-bordered file-input-sm w-full rounded-xl"
+							class="file-input file-file-input-sm w-full"
 							@change="filename = $event.target.files[0]?.name || ''"
 							required
 						/>
 					</div>
 					<div class="mt-4">
-						<button type="submit" class="btn btn-warning btn-sm rounded-xl" :disabled="!filename">
+						<button type="submit" class="btn btn-warning btn-sm" :disabled="!filename">
 							<i data-lucide="rotate-ccw" class="w-4 h-4"></i>
 							Restore from Upload
 						</button>

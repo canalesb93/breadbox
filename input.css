@@ -159,43 +159,11 @@
 /* ─── App-specific component classes ─── */
 @layer components {
 
-  /* ── Breadcrumbs: shadcn-style navigation trail ── */
-  .bb-breadcrumb {
-    @apply flex items-center gap-1.5 text-sm mb-6 overflow-x-auto whitespace-nowrap;
-    /* With overflow-x:auto the CSS spec forces overflow-y to also compute
-       as auto (visible can't coexist with a scroll container). That means
-       any sub-pixel row-height mismatch between the SVG chevrons and the
-       text baseline produces a spurious vertical scroll region. Pin Y to
-       clip so a long trail still scrolls horizontally, but vertical
-       overflow never becomes scrollable. */
-    overflow-y: clip;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;        /* Firefox */
-    -ms-overflow-style: none;     /* IE/Edge */
-  }
-  .bb-breadcrumb::-webkit-scrollbar {
-    display: none;                /* Chrome/Safari */
-  }
-
-  .bb-breadcrumb-item {
-    @apply text-base-content/40 transition-colors duration-150 shrink-0;
-  }
-
-  .bb-breadcrumb-item a {
-    @apply text-base-content/40 no-underline hover:text-base-content/70 transition-colors duration-150;
-  }
-
-  .bb-breadcrumb-sep {
-    @apply text-base-content/25 select-none shrink-0;
-  }
-
-  .bb-breadcrumb-sep svg {
-    @apply w-3.5 h-3.5;
-  }
-
-  .bb-breadcrumb-current {
-    @apply text-base-content/70 font-medium shrink-0;
-  }
+  /* Daisy `breadcrumbs` is the source of truth (see breadcrumb.templ).
+     Only override: hide the scrollbar to match the prior shadcn-style
+     trail, daisy keeps the system scrollbar visible by default. */
+  .breadcrumbs { scrollbar-width: none; -ms-overflow-style: none; }
+  .breadcrumbs::-webkit-scrollbar { display: none; }
 
   /* ── Cards: shadcn-style — border, not shadow ── */
   .bb-card {
@@ -862,6 +830,9 @@
     transform: scale(0.97) !important;
   }
 
+  /* Button radius convention — see unlayered .btn-sm / .btn-xs override
+     below the components layer. */
+
   /* ── Badge transitions ── */
   .badge {
     transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
@@ -1113,28 +1084,6 @@
     }
   }
 
-  /* ── Rule creator badge ── */
-  .bb-rule-creator-badge {
-    @apply inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full;
-    @apply bg-base-200 text-base-content/50;
-  }
-
-  .bb-rule-creator-badge--agent {
-    @apply bg-primary/8 text-primary/70;
-  }
-
-  .bb-rule-creator-badge--user {
-    @apply bg-base-content/6 text-base-content/50;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-rule-creator-badge--agent {
-      @apply bg-primary/12 text-primary/80;
-    }
-  }
-
-
-
   /* ── Smooth collapse for filter panels ── */
   [x-collapse] {
     transition: height 0.2s ease-out, opacity 0.15s ease !important;
@@ -1161,25 +1110,6 @@
     .bb-info-grid dd:last-of-type {
       @apply border-b-0 pb-0;
     }
-  }
-
-  /* ── View Toggle (pill buttons) ── */
-  .bb-view-toggle {
-    @apply inline-flex items-center rounded-lg border border-base-300 p-0.5 gap-0 bg-base-200;
-  }
-
-  .bb-view-toggle__btn {
-    @apply flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md
-           text-base-content/50 cursor-pointer select-none;
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-
-  .bb-view-toggle__btn:hover {
-    @apply text-base-content/70;
-  }
-
-  .bb-view-toggle__btn--active {
-    @apply bg-base-100 text-base-content shadow-sm;
   }
 
   /* ── Consistent filter toggle button ── */
@@ -1217,7 +1147,10 @@
     display: none !important;
   }
 
-  /* ── Paginator ── */
+  /* ── Paginator ──
+     Numbered-button row is now a daisy `join` + `join-item btn` group
+     (see tx_results.templ / rules.templ). Only the surrounding layout
+     wrapper + per-page selector + info span keep dedicated classes. */
   .bb-paginator {
     @apply flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 px-1;
   }
@@ -1228,32 +1161,6 @@
 
   .bb-paginator__per-page {
     @apply flex items-center gap-2;
-  }
-
-  .bb-paginator__nav {
-    @apply flex items-center gap-1;
-  }
-
-  .bb-paginator__btn {
-    @apply flex items-center justify-center min-w-[2rem] h-8 px-2 text-xs font-medium
-           text-base-content/60 rounded-lg border border-transparent
-           hover:bg-base-200 hover:text-base-content;
-    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-    tabular-nums: lining-nums;
-  }
-
-  .bb-paginator__btn--active {
-    @apply bg-base-100 text-base-content border-base-300 font-semibold shadow-sm;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-paginator__btn--active {
-      @apply bg-base-300/40 text-base-content border-base-300;
-    }
-  }
-
-  .bb-paginator__ellipsis {
-    @apply flex items-center justify-center w-8 h-8 text-xs text-base-content/30;
   }
 
   /* ─── Command Palette (Cmd+K) ─── */
@@ -1406,8 +1313,8 @@
     background-color: transparent;
   }
 
-  /* Palette key hint. Matches `.bb-kbd` exactly so single keys render
-     identically to combo-pill cells and help-modal hints. */
+  /* Palette key hint — shares the .bb-kbd recipe verbatim (Tailwind v4 doesn't
+     allow @apply across @layer components custom classes). */
   .bb-cmdk-kbd {
     @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
            text-[0.6rem] font-mono font-medium leading-none
@@ -1438,8 +1345,8 @@
     @apply flex items-center justify-between px-4 py-2.5 border-t border-base-300 text-[0.65rem] text-base-content/40;
   }
 
-  /* Palette footer inline kbd. Matches `.bb-kbd` / `.bb-cmdk-kbd`; only
-     the outer margin is specific to the footer layout. */
+  /* Palette footer inline kbd — same recipe as .bb-kbd; only the outer
+     margin is specific to the footer layout. */
   .bb-cmdk-footer kbd {
     @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
            text-[0.6rem] font-mono font-medium leading-none
@@ -1455,7 +1362,7 @@
       background: oklch(0.25 0 0);
       color: oklch(0.7 0 0);
       border-color: oklch(0.35 0 0);
-      box-shadow: 0 1px 0 oklch(0.15 0 0);
+      box-shadow: 0 1px 0 oklch(0.88 0 0);
     }
   }
 
@@ -1740,8 +1647,7 @@
     @apply flex items-center gap-1.5;
   }
 
-  /* Help modal key hint. Unified with `.bb-kbd` so palette, inline, and
-     help-modal keys all render at the same size and weight. */
+  /* Help modal key hint — same recipe as .bb-kbd. */
   .bb-shortcuts-kbd {
     @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
            text-[0.6rem] font-mono font-medium leading-none
@@ -2162,78 +2068,10 @@
     @apply flex items-center justify-end gap-2 px-5 py-3.5 border-t border-base-300 bg-base-200/30;
   }
 
-  /* ─── Skeleton Loading System ─── */
-  .bb-skeleton {
-    @apply rounded-md;
-    background: oklch(0.95 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-skeleton {
-      background: oklch(0.25 0 0);
-    }
-  }
-
-  /* Skeleton size variants */
-  .bb-skeleton--text {
-    @apply h-3.5 rounded;
-    width: 100%;
-  }
-
-  .bb-skeleton--text-sm {
-    @apply h-3 rounded;
-    width: 80%;
-  }
-
-  .bb-skeleton--text-xs {
-    @apply h-2.5 rounded;
-    width: 60%;
-  }
-
-  .bb-skeleton--badge {
-    @apply h-5 w-16 rounded-full;
-  }
-
-  .bb-skeleton--circle {
-    @apply rounded-full;
-    width: 40px;
-    height: 40px;
-  }
-
-  .bb-skeleton--circle-sm {
-    @apply rounded-full;
-    width: 32px;
-    height: 32px;
-  }
-
-  .bb-skeleton--amount {
-    @apply h-7 w-24 rounded;
-  }
-
-  .bb-skeleton--card {
-    @apply rounded-xl border border-base-300 p-6;
-    background: oklch(0.98 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-skeleton--card {
-      background: oklch(0.22 0 0);
-    }
-  }
-
-  /* Pre-built skeleton patterns */
-  .bb-skeleton-table-row {
-    @apply flex items-center gap-4 px-4 py-3 border-b border-base-300/50;
-  }
-
-  .bb-skeleton-table-row:last-child {
-    @apply border-b-0;
-  }
-
-  /* Page-level skeleton overlay (shown during nav transitions) */
-  .bb-page-skeleton {
-    @apply min-h-[60vh];
-  }
+  /* Skeleton: daisy 5's `skeleton` primitive is the source of truth.
+     Pair with Tailwind sizing utilities — see /design > Loading & skeletons.
+     The previous bb-skeleton* family (9 size/shape variants) was deleted in
+     favor of daisy's single primitive. */
 
   /* Inline loading fade */
   .bb-loading-fade {
@@ -2348,47 +2186,6 @@
 
   .bb-triage-row__type {
     @apply hidden sm:block shrink-0 w-12;
-  }
-
-  .bb-triage-badge {
-    @apply inline-flex items-center justify-center text-[0.6rem] font-semibold
-           leading-none rounded px-1.5 py-0.5;
-  }
-
-  .bb-triage-badge--info {
-    background: oklch(0.62 0.1 245 / 0.12);
-    color: oklch(0.50 0.1 245);
-  }
-  .bb-triage-badge--warning {
-    background: oklch(0.72 0.14 75 / 0.15);
-    color: oklch(0.55 0.14 55);
-  }
-  .bb-triage-badge--error {
-    background: oklch(0.577 0.245 27.325 / 0.12);
-    color: oklch(0.50 0.2 27);
-  }
-  .bb-triage-badge--neutral {
-    background: oklch(0.5 0 0 / 0.1);
-    color: oklch(0.5 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-triage-badge--info {
-      background: oklch(0.70 0.1 245 / 0.15);
-      color: oklch(0.75 0.1 245);
-    }
-    .bb-triage-badge--warning {
-      background: oklch(0.78 0.13 75 / 0.15);
-      color: oklch(0.82 0.12 75);
-    }
-    .bb-triage-badge--error {
-      background: oklch(0.704 0.191 22.216 / 0.15);
-      color: oklch(0.75 0.17 22);
-    }
-    .bb-triage-badge--neutral {
-      background: oklch(0.6 0 0 / 0.12);
-      color: oklch(0.65 0 0);
-    }
   }
 
   .bb-triage-row__name {
@@ -2894,3 +2691,8 @@
   }
 }
 
+/* Button radius is now vanilla daisy (--radius-field, 4px by default).
+ * The previous `rounded-xl on btn-sm` convention was dropped to align
+ * with daisyui.com defaults — adopt daisy theme tokens via the daisy
+ * theme builder if a different shape is wanted, don't reintroduce
+ * per-size CSS overrides here. */

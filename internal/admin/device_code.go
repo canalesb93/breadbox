@@ -55,17 +55,17 @@ var deviceCodePageTmpl = template.Must(template.New("device-code").Parse(`<!doct
           <input type="hidden" name="user_code" value="{{.UserCode}}">
           <div class="form-control">
             <label class="label"><span class="label-text font-medium">Code</span></label>
-            <input class="input input-bordered" value="{{.DisplayCode}}" readonly>
+            <input class="input" value="{{.DisplayCode}}" readonly>
           </div>
           <div class="form-control">
             <label class="label" for="actor_name"><span class="label-text font-medium">Actor name</span></label>
-            <input id="actor_name" name="actor_name" class="input input-bordered"
+            <input id="actor_name" name="actor_name" class="input"
               value="{{.DefaultActor}}" placeholder="e.g. workstation-prod">
             <span class="label-text-alt text-base-content/60 mt-1">Shown in audit logs as the user behind this key.</span>
           </div>
           <div class="form-control">
             <label class="label" for="scope"><span class="label-text font-medium">Scope</span></label>
-            <select id="scope" name="scope" class="select select-bordered bg-base-100">
+            <select id="scope" name="scope" class="select bg-base-100">
               <option value="read_only" selected>Read only</option>
               <option value="full_access">Full access</option>
             </select>

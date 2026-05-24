@@ -21,7 +21,7 @@ package components
 // CTA precedence: if CustomCTA is set, it renders instead of the
 // simple href/label pair (use when you need multiple buttons, Alpine
 // data attributes, POST forms, etc.). Otherwise a primary
-// `btn-sm rounded-xl` is rendered iff CTAHref and CTALabel are both
+// `btn-sm` is rendered iff CTAHref and CTALabel are both
 // non-empty. Compact CTAs render as `btn-ghost btn-sm` so they don't
 // dominate the smaller card.
 //
@@ -72,7 +72,7 @@ templ EmptyState(p EmptyStateProps) {
 				if p.CustomCTA != nil {
 					@p.CustomCTA
 				} else if p.CTAHref != "" && p.CTALabel != "" {
-					<a href={ p.CTAHref } class="btn btn-primary btn-sm rounded-xl gap-2">
+					<a href={ p.CTAHref } class="btn btn-primary btn-sm gap-2">
 						if p.CTAIcon != "" {
 							<i data-lucide={ p.CTAIcon } class="w-4 h-4"></i>
 						}
@@ -95,7 +95,7 @@ templ emptyStateCompactBody(p EmptyStateProps) {
 				@p.CustomCTA
 			</div>
 		} else if p.CTAHref != "" && p.CTALabel != "" {
-			<a href={ p.CTAHref } class="btn btn-ghost btn-sm rounded-xl mt-2">
+			<a href={ p.CTAHref } class="btn btn-ghost btn-sm mt-2">
 				if p.CTAIcon != "" {
 					<i data-lucide={ p.CTAIcon } class="w-3.5 h-3.5"></i>
 				}

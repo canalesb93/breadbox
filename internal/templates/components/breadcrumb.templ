@@ -9,25 +9,31 @@ type Breadcrumb struct {
 }
 
 // BreadcrumbNav renders a navigation breadcrumb trail. The last entry is
-// the current page (no link, bolder text). Separators are inline SVG
-// chevrons so we don't have to wait for lucide.createIcons() to run.
+// the current page (no link, bolder text).
+//
+// Built on daisy 5 `breadcrumbs` — daisy renders the chevron as a CSS-only
+// rotated border (no SVG), so we don't fight sub-pixel SVG row-height
+// mismatches and can drop the `overflow-y: clip` workaround the previous
+// hand-rolled `.bb-breadcrumb` carried.
+//
+// Three-tier colour ramp is preserved via Tailwind utilities:
+//   - chevron:        text-base-content/25  (set on the <li>, inherited by ::before)
+//   - link:           text-base-content/40 → hover text-base-content/70
+//   - current crumb:  text-base-content/70 font-medium
 templ BreadcrumbNav(items []Breadcrumb) {
 	if len(items) > 0 {
-		<nav aria-label="Breadcrumb" class="bb-breadcrumb">
-			for i, crumb := range items {
-				if i > 0 {
-					<span class="bb-breadcrumb-sep" aria-hidden="true">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
-					</span>
+		<nav aria-label="Breadcrumb" class="breadcrumbs text-sm mb-6 py-0">
+			<ul>
+				for _, crumb := range items {
+					<li class="text-base-content/25">
+						if crumb.Href != "" {
+							<a class="text-base-content/40 no-underline hover:no-underline hover:text-base-content/70 transition-colors duration-150" href={ templ.SafeURL(crumb.Href) }>{ crumb.Label }</a>
+						} else {
+							<span class="text-base-content/70 font-medium cursor-default">{ crumb.Label }</span>
+						}
+					</li>
 				}
-				if crumb.Href != "" {
-					<span class="bb-breadcrumb-item">
-						<a href={ templ.SafeURL(crumb.Href) }>{ crumb.Label }</a>
-					</span>
-				} else {
-					<span class="bb-breadcrumb-current">{ crumb.Label }</span>
-				}
-			}
+			</ul>
 		</nav>
 	}
 }

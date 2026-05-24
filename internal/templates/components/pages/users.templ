@@ -26,7 +26,7 @@ templ Users(p UsersProps) {
 		Action:   usersAddMemberAction(),
 	})
 	if p.Created {
-		<div role="alert" class="alert alert-success rounded-xl mb-6">
+		<div role="alert" class="alert alert-success mb-6">
 			<i data-lucide="check-circle" class="w-5 h-5"></i>
 			<span>Member created. <a href="/connections/new" class="link font-medium">Connect a bank for them</a></span>
 		</div>
@@ -49,7 +49,7 @@ templ Users(p UsersProps) {
 // admin account isn't linked to a household member. Offers two flows:
 // create a new member or link an existing unlinked one.
 templ usersAddMemberAction() {
-	<a href="/settings/household/new" data-new-user class="btn btn-primary btn-sm rounded-xl gap-2">
+	<a href="/settings/household/new" data-new-user class="btn btn-primary btn-sm gap-2">
 		<i data-lucide="plus" class="w-4 h-4"></i>
 		Add Member
 	</a>
@@ -71,13 +71,13 @@ templ usersUnlinkedPrompt(p UsersProps) {
 							type="button"
 							@click="mode = 'create'"
 							:class="mode === 'create' ? 'btn-primary' : 'btn-ghost'"
-							class="btn btn-xs rounded-lg"
+							class="btn btn-xs"
 						>Create New</button>
 						<button
 							type="button"
 							@click="mode = 'existing'"
 							:class="mode === 'existing' ? 'btn-primary' : 'btn-ghost'"
-							class="btn btn-xs rounded-lg"
+							class="btn btn-xs"
 						>Link Existing</button>
 					</div>
 				} else {
@@ -93,9 +93,9 @@ templ usersUnlinkedPrompt(p UsersProps) {
 						name="name"
 						required
 						placeholder="Your name"
-						class="input input-sm w-full sm:max-w-64 rounded-xl bg-base-200/50"
+						class="input input-sm w-full sm:max-w-64 bg-base-200/50"
 					/>
-					<button type="submit" class="btn btn-primary btn-sm rounded-xl gap-1.5 shrink-0">
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5 shrink-0">
 						<i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
 						Create &amp; Link
 					</button>
@@ -109,14 +109,14 @@ templ usersUnlinkedPrompt(p UsersProps) {
 						<select
 							name="user_id"
 							required
-							class="select select-sm w-full sm:max-w-64 rounded-xl bg-base-200"
+							class="select select-sm w-full sm:max-w-64 bg-base-200"
 						>
 							<option value="">Select a member…</option>
 							for _, u := range p.UnlinkedUsers {
 								<option value={ u.ID }>{ u.Name }</option>
 							}
 						</select>
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl gap-1.5 shrink-0">
+						<button type="submit" class="btn btn-primary btn-sm gap-1.5 shrink-0">
 							<i data-lucide="link" class="w-3.5 h-3.5"></i>
 							Link Account
 						</button>
@@ -159,10 +159,10 @@ templ usersMemberCard(u UsersEnrichedRow) {
 					</div>
 				</div>
 				<div class="dropdown dropdown-end">
-					<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity">
+					<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity">
 						<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
 					</div>
-					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
 						<li><a href={ templ.SafeURL(fmt.Sprintf("/settings/household/%s/edit", u.ID)) }><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
 						if u.HasLogin {
 							<li><a href={ templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)) }><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
@@ -195,7 +195,7 @@ templ usersMemberCard(u UsersEnrichedRow) {
 					<i data-lucide="landmark" class="w-6 h-6 text-base-content opacity-25"></i>
 				</div>
 				<p class="text-sm text-base-content/40 mb-3">No bank accounts connected</p>
-				<a href="/connections/new" class="btn btn-ghost btn-sm rounded-xl">
+				<a href="/connections/new" class="btn btn-ghost btn-sm">
 					<i data-lucide="plus" class="w-3.5 h-3.5"></i>
 					Connect a bank
 				</a>

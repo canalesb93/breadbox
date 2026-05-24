@@ -138,7 +138,7 @@ templ txdAccountBanner(p TransactionDetailProps) {
 					<p class="text-sm font-semibold tabular-nums">{ components.FormatAmount(*p.Account.BalanceCurrent) }</p>
 				</div>
 			}
-			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-xs rounded-lg shrink-0 ml-auto sm:ml-0">
+			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-xs shrink-0 ml-auto sm:ml-0">
 				<i data-lucide="external-link" class="w-3.5 h-3.5"></i>
 			</a>
 		</div>

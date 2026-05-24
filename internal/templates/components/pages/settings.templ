@@ -94,7 +94,7 @@ templ settingsSyncCard(p SettingsProps) {
 						Sync Interval
 						@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
 					</label>
-					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm bg-base-200">
 						@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
 						@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
 						@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
@@ -110,7 +110,7 @@ templ settingsSyncCard(p SettingsProps) {
 						</p>
 					}
 					<div class="mt-4">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Schedule</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
 					</div>
 				</form>
 				<!-- Retention section -->
@@ -121,7 +121,7 @@ templ settingsSyncCard(p SettingsProps) {
 							<label class="text-sm font-medium text-base-content/70" for="sync_log_retention_days">Log Retention</label>
 							<span class="text-xs text-base-content/40 tabular-nums">{ fmt.Sprintf("%d logs stored", p.SyncLogCount) }</span>
 						</div>
-						<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+						<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm bg-base-200">
 							@retentionOption(7, p.SyncLogRetentionDays, "7 days")
 							@retentionOption(14, p.SyncLogRetentionDays, "14 days")
 							@retentionOption(30, p.SyncLogRetentionDays, "30 days")
@@ -136,7 +136,7 @@ templ settingsSyncCard(p SettingsProps) {
 							Cleanup runs daily at 3:00 AM
 						</p>
 						<div class="mt-4">
-							<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Retention</button>
+							<button type="submit" class="btn btn-primary btn-sm">Save Retention</button>
 						</div>
 					</form>
 				</div>
@@ -288,10 +288,10 @@ templ settingsHelpCard(p SettingsProps) {
 						if p.OnboardingDismissed {
 							<form method="POST" action="/getting-started/reopen">
 								<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-								<button type="submit" class="btn btn-ghost btn-sm rounded-xl">Re-open</button>
+								<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
 							</form>
 						} else {
-							<a href="/getting-started" class="btn btn-ghost btn-sm rounded-xl">Open</a>
+							<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
 						}
 					</div>
 				</div>
@@ -335,7 +335,7 @@ templ settingsSyncSchedule(p SettingsProps) {
 				Sync Interval
 				@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
 			</label>
-			<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+			<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm bg-base-200">
 				@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
 				@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
 				@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
@@ -351,7 +351,7 @@ templ settingsSyncSchedule(p SettingsProps) {
 				</p>
 			}
 			<div class="mt-4">
-				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Schedule</button>
+				<button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
 			</div>
 		</form>
 	</div>
@@ -371,7 +371,7 @@ templ settingsSyncRetention(p SettingsProps) {
 		<form method="POST" action="/settings/retention">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_log_retention_days">Keep logs for</label>
-			<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+			<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm bg-base-200">
 				@retentionOption(7, p.SyncLogRetentionDays, "7 days")
 				@retentionOption(14, p.SyncLogRetentionDays, "14 days")
 				@retentionOption(30, p.SyncLogRetentionDays, "30 days")
@@ -386,7 +386,7 @@ templ settingsSyncRetention(p SettingsProps) {
 				Cleanup runs daily at 3:00 AM
 			</p>
 			<div class="mt-4">
-				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Retention</button>
+				<button type="submit" class="btn btn-primary btn-sm">Save Retention</button>
 			</div>
 		</form>
 	</div>
@@ -450,10 +450,10 @@ templ settingsHelpCardFlat(p SettingsProps) {
 				if p.OnboardingDismissed {
 					<form method="POST" action="/getting-started/reopen">
 						<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-						<button type="submit" class="btn btn-ghost btn-sm rounded-xl">Re-open</button>
+						<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
 					</form>
 				} else {
-					<a href="/getting-started" class="btn btn-ghost btn-sm rounded-xl">Open</a>
+					<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
 				}
 			</div>
 			<a href="https://docs.breadbox.sh" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">

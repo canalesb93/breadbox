@@ -52,21 +52,21 @@ templ agentsSettingsInstructionsCard(p AgentsSettingsProps) {
 		</div>
 		<div x-show="expanded" x-collapse>
 			<div class="px-4 sm:px-5 py-4">
-				<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
+				<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs">
 					<i data-lucide="triangle-alert" class="w-4 h-4"></i>
 					<span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
 				</div>
 				<form method="POST" action="/mcp-settings/instructions">
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					<div class="form-control mb-4">
-						<textarea name="instructions" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
+						<textarea name="instructions" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
 						<label class="label">
 							<span class="label-text-alt text-base-content/40" x-text="instructions.length + '/20000'"></span>
 						</label>
 					</div>
 					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Instructions</button>
-						<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Instructions</button>
+						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
 					</div>
 				</form>
 			</div>
@@ -96,14 +96,14 @@ templ agentsSettingsReviewGuidelinesCard(p AgentsSettingsProps) {
 				<form method="POST" action="/mcp-settings/review-guidelines">
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					<div class="form-control mb-4">
-						<textarea name="review_guidelines" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 20rem" maxlength="30000" x-model="guidelines" placeholder="Review guidelines for agents..."></textarea>
+						<textarea name="review_guidelines" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 20rem" maxlength="30000" x-model="guidelines" placeholder="Review guidelines for agents..."></textarea>
 						<label class="label">
 							<span class="label-text-alt text-base-content/40" x-text="guidelines.length + '/30000'"></span>
 						</label>
 					</div>
 					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Guidelines</button>
-						<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Guidelines</button>
+						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
 					</div>
 				</form>
 			</div>
@@ -133,14 +133,14 @@ templ agentsSettingsReportFormatCard(p AgentsSettingsProps) {
 				<form method="POST" action="/mcp-settings/report-format">
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					<div class="form-control mb-4">
-						<textarea name="report_format" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 20rem" maxlength="20000" x-model="reportFormat" placeholder="Report format guidelines for agents..."></textarea>
+						<textarea name="report_format" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 20rem" maxlength="20000" x-model="reportFormat" placeholder="Report format guidelines for agents..."></textarea>
 						<label class="label">
 							<span class="label-text-alt text-base-content/40" x-text="reportFormat.length + '/20000'"></span>
 						</label>
 					</div>
 					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Format</button>
-						<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Format</button>
+						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
 					</div>
 				</form>
 			</div>
@@ -179,7 +179,7 @@ templ agentsSettingsToolsCard(p AgentsSettingsProps) {
 						}
 					</div>
 					<div class="mt-5">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Tools</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Tools</button>
 					</div>
 				</form>
 			</div>
@@ -235,7 +235,7 @@ templ agentsSettingsConnectionCard() {
 					<div class="relative">
 						<pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{ claudeDesktopConfigJSON() }</pre>
 						<button
-							class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2"
+							class="btn btn-sm btn-ghost absolute top-2 right-2"
 							@click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
 						>
 							<template x-if="!copiedConfig">

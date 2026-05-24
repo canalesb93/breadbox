@@ -85,7 +85,7 @@ templ MultiSelectToolbar(p MultiSelectToolbarProps) {
 			if p.CloseEvent != "" || p.XShow != "" {
 				<button
 					type="button"
-					class="btn btn-ghost btn-sm btn-square rounded-xl"
+					class="btn btn-ghost btn-sm btn-square"
 					title="Clear selection"
 					aria-label="Clear selection"
 					@click={ dispatchEventJS(orDefault(p.CloseEvent, "multi-select-close")) }
@@ -103,7 +103,7 @@ templ MultiSelectToolbar(p MultiSelectToolbarProps) {
 // trigger) just render a raw `<button>` instead.
 //
 // Variant ""/"ghost" → btn-ghost; "primary" → btn-primary. Always
-// btn-sm rounded-xl to match the bulk-bar shape.
+// btn-sm to match the bulk-bar shape.
 //
 // OnClick is an Alpine handler expression (rendered as `@click`); use
 // it to dispatch a CustomEvent so callers wire to a single listener.
@@ -142,7 +142,7 @@ templ multiSelectCount(p MultiSelectToolbarProps) {
 	if p.CountToggleEvent != "" {
 		<button
 			type="button"
-			class="btn btn-ghost btn-sm rounded-xl gap-1.5"
+			class="btn btn-ghost btn-sm gap-1.5"
 			title="Select all / clear"
 			@click={ dispatchEventJS(p.CountToggleEvent) }
 		>
@@ -179,7 +179,7 @@ func dispatchEventJS(event string) string {
 
 func multiSelectActionClass(variant string) string {
 	if variant == "primary" {
-		return "btn btn-primary btn-sm rounded-xl gap-2"
+		return "btn btn-primary btn-sm gap-2"
 	}
-	return "btn btn-ghost btn-sm rounded-xl gap-2"
+	return "btn btn-ghost btn-sm gap-2"
 }

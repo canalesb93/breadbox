@@ -60,11 +60,11 @@ templ userFormCreate() {
 						type="text"
 						:value="setupURL"
 						readonly
-						class="input input-bordered input-sm rounded-xl flex-1 text-xs font-mono bg-base-200 select-all cursor-text"
+						class="input input-sm flex-1 text-xs font-mono bg-base-200 select-all cursor-text"
 					/>
 					<button
 						@click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
-						class="btn btn-sm btn-primary rounded-xl"
+						class="btn btn-sm btn-primary"
 						:class="copied ? 'btn-success' : ''"
 					>
 						<i x-show="!copied" data-lucide="copy" class="w-4 h-4"></i>
@@ -73,7 +73,7 @@ templ userFormCreate() {
 					</button>
 				</div>
 				<p class="text-xs text-base-content/40 mb-6">This link expires in 7 days. You can regenerate it from the Household page.</p>
-				<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">
+				<a href="/settings/household" class="btn btn-ghost btn-sm">
 					<i data-lucide="arrow-left" class="w-4 h-4"></i>
 					Back to Household
 				</a>
@@ -109,7 +109,7 @@ templ userFormCreate() {
 							type="text"
 							id="name"
 							name="name"
-							class="input input-bordered w-full rounded-xl"
+							class="input w-full"
 							required
 							maxlength="128"
 							placeholder="e.g., Alex Canales"
@@ -126,7 +126,7 @@ templ userFormCreate() {
 							type="email"
 							id="email"
 							name="email"
-							class="input input-bordered w-full rounded-xl"
+							class="input w-full"
 							:required="createLogin"
 							placeholder="e.g., alex@example.com"
 						/>
@@ -146,7 +146,7 @@ templ userFormCreate() {
 								<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_role">
 									Role
 								</label>
-								<select id="login_role" name="login_role" x-model="role" class="select select-bordered w-full rounded-xl bg-base-200">
+								<select id="login_role" name="login_role" x-model="role" class="select w-full bg-base-200">
 									<option value="viewer">Viewer — can only see their own data</option>
 									<option value="editor">Editor — can view and edit all household data</option>
 								</select>
@@ -157,11 +157,11 @@ templ userFormCreate() {
 						<div class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4" x-text="error"></div>
 					</template>
 					<div class="flex gap-3 pt-2">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl whitespace-nowrap" :disabled="submitting">
+						<button type="submit" class="btn btn-primary btn-sm whitespace-nowrap" :disabled="submitting">
 							<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Create Member</span>
 							<span x-show="submitting" class="loading loading-spinner loading-sm"></span>
 						</button>
-						<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+						<a href="/settings/household" class="btn btn-ghost btn-sm">Cancel</a>
 					</div>
 				</form>
 			</div>
@@ -258,8 +258,8 @@ templ userFormEdit(p UserFormProps) {
 			</div>
 			<!-- Action row -->
 			<div class="bb-action-row">
-				<a href="/settings/household" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-				<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+				<a href="/settings/household" class="btn btn-sm btn-ghost">Cancel</a>
+				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
 					<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
 					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 				</button>

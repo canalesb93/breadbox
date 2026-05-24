@@ -104,7 +104,7 @@ templ CategoryForm(p CategoryFormProps) {
 								data-categories-source="category-form-picker-data"
 								@category-change="parentId = $event.detail.id"
 							>
-								<button type="button" class="select select-bordered w-full text-left flex items-center gap-2 rounded-xl bg-base-200/50" @click="openPicker()">
+								<button type="button" class="select w-full text-left flex items-center gap-2 bg-base-200/50" @click="openPicker()">
 									<span x-text="displayLabel" class="flex-1 text-sm"></span>
 									<i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
 								</button>
@@ -129,7 +129,7 @@ templ CategoryForm(p CategoryFormProps) {
 								/>
 								<button
 									type="button"
-									class="btn btn-sm btn-ghost rounded-xl shrink-0"
+									class="btn btn-sm btn-ghost shrink-0"
 									@click="showIconPicker = !showIconPicker"
 									title="Browse icons"
 								>
@@ -141,7 +141,7 @@ templ CategoryForm(p CategoryFormProps) {
 									<template x-for="ic in commonIcons" :key="ic">
 										<button
 											type="button"
-											class="btn btn-ghost btn-sm rounded-xl"
+											class="btn btn-ghost btn-sm"
 											@click="icon = ic; showIconPicker = false; $nextTick(() => lucide.createIcons())"
 										>
 											<i :data-lucide="ic" class="w-4 h-4"></i>
@@ -213,10 +213,10 @@ templ CategoryForm(p CategoryFormProps) {
 				</div>
 			</div>
 			<div class="bb-action-row">
-				<a href="/categories" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+				<a href="/categories" class="btn btn-sm btn-ghost">Cancel</a>
 				<button
 					type="submit"
-					class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32"
+					class="btn btn-sm btn-primary gap-1.5 min-w-32"
 					:disabled="submitting || !displayName"
 				>
 					<span x-show="!submitting" class="inline-flex items-center gap-1.5">

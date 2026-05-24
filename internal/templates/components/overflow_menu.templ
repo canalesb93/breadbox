@@ -17,7 +17,7 @@ import (
 // the per-instance anchor name and picks `dropdown-end`/`dropdown-start`.
 //
 // Pins (do not deviate when calling):
-//   - Trigger:  `btn btn-ghost btn-sm btn-square rounded-lg` + icon `w-5 h-5`
+//   - Trigger:  `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
 //   - Menu:     `dropdown dropdown-end menu bg-base-100 rounded-xl`
 //               `shadow-lg border border-base-300 w-44 p-1`
 //   - Item icon: `w-3.5 h-3.5`
@@ -65,7 +65,7 @@ templ OverflowMenu(p OverflowMenuProps) {
 	<button
 		type="button"
 		popovertarget={ popoverID }
-		class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity"
+		class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity"
 		aria-label={ p.AriaLabel }
 		style={ "anchor-name:" + anchorName }
 	>

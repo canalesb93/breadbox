@@ -160,7 +160,7 @@ templ AgentForm(p AgentFormProps) {
 							id="agent-system-prompt"
 							name="system_prompt"
 							rows="4"
-							class="textarea textarea-bordered w-full rounded-xl bg-base-200/50 font-mono text-sm"
+							class="textarea w-full bg-base-200/50 font-mono text-sm"
 							placeholder="Override the default breadbox agent persona…"
 						>{ p.Form.SystemPrompt }</textarea>
 						<p class="text-xs text-base-content/40 mt-1.5">Leave blank to use the bundled default. Persona / safety invariants — not the per-run task.</p>
@@ -172,7 +172,7 @@ templ AgentForm(p AgentFormProps) {
 							id="agent-prompt"
 							name="prompt"
 							rows="12"
-							class="textarea textarea-bordered w-full rounded-xl bg-base-200/50 font-mono text-sm"
+							class="textarea w-full bg-base-200/50 font-mono text-sm"
 							placeholder="What should this agent do on every run?"
 							required
 						>{ p.Form.Prompt }</textarea>
@@ -271,8 +271,8 @@ templ AgentForm(p AgentFormProps) {
 			</fieldset>
 			<!-- Submit -->
 			<div class="bb-action-row">
-				<a href="/agents" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-				<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32">
+				<a href="/agents" class="btn btn-sm btn-ghost">Cancel</a>
+				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32">
 					<i data-lucide="save" class="w-3.5 h-3.5"></i>
 					if p.Mode == "edit" {
 						<span>Save changes</span>
@@ -296,7 +296,7 @@ templ agentFormEditExtras(p AgentFormProps) {
 	<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
 		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/agents/%s/run", p.Slug)) } class="inline">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<button type="submit" class="btn btn-sm btn-outline rounded-xl gap-1.5">
+			<button type="submit" class="btn btn-sm btn-outline gap-1.5">
 				<i data-lucide="play" class="w-3.5 h-3.5"></i>
 				<span>Run now</span>
 			</button>
@@ -306,7 +306,7 @@ templ agentFormEditExtras(p AgentFormProps) {
 				type="button"
 				x-show="!confirming"
 				@click="confirming = true"
-				class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl gap-1.5"
+				class="btn btn-sm btn-ghost text-error/70 hover:text-error gap-1.5"
 			>
 				<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
 				<span>Delete</span>
@@ -320,8 +320,8 @@ templ agentFormEditExtras(p AgentFormProps) {
 			>
 				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				<span class="text-xs text-base-content/60">Delete this agent?</span>
-				<button type="button" @click="confirming = false" class="btn btn-ghost btn-xs rounded-lg">Cancel</button>
-				<button type="submit" class="btn btn-error btn-xs rounded-lg gap-1">
+				<button type="button" @click="confirming = false" class="btn btn-ghost btn-xs">Cancel</button>
+				<button type="submit" class="btn btn-error btn-xs gap-1">
 					<i data-lucide="trash-2" class="w-3 h-3"></i>
 					<span>Confirm delete</span>
 				</button>
@@ -352,7 +352,7 @@ templ agentFormToolScopeRadio(value, label, current string) {
 templ agentFormCronPreset(value, label string) {
 	<button
 		type="button"
-		class="btn btn-ghost btn-xs rounded-lg"
+		class="btn btn-ghost btn-xs"
 		@click={ "$refs.cronInput.value = '" + value + "'" }
 		title={ value }
 	>
