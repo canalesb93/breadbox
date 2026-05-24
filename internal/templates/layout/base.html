@@ -37,6 +37,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+  <!--
+    Speculation Rules — Chromium-only predictive prefetch of sidebar nav.
+    Chrome 122+ fetches matching links when it predicts the user is about
+    to navigate (intersection + hover heuristics). Safari ignores the
+    script entirely, so this is purely additive — iOS gets the equivalent
+    win from the hover/touchstart prefetch listener below in body scripts.
+  -->
+  <script type="speculationrules">
+    {
+      "prefetch": [{
+        "source": "document",
+        "where": { "selector_matches": "a.bb-sidebar-link" },
+        "eagerness": "moderate"
+      }]
+    }
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.15.11/dist/cdn.min.js" integrity="sha384-NArNwzWsUSF+kY2lgW4YriEkjLqi+J+za6HrENUn/3nZqkBnWbxV22kCJEK5Uu6n" crossorigin="anonymous"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.11/dist/cdn.min.js" integrity="sha384-WPtu0YHhJ3arcykfnv1JgUffWDSKRnqnDeTpJUbOc2os2moEmLkIdaeR0trPN4be" crossorigin="anonymous"></script>
   <!-- Lucide: self-hosted + deferred so the browser fetches it in parallel with HTML parsing
@@ -940,6 +956,64 @@
           }
         }, 50);
       }).observe(document.body, { childList: true, subtree: true });
+    })();
+
+    // Sidebar nav prefetch — instant.page-style hover/touch warmup.
+    //
+    // When the user lingers on a sidebar nav link for ≥65ms (or starts a
+    // touch / focuses it via keyboard), inject <link rel="prefetch"> so
+    // the browser preloads the next page's HTML into the HTTP cache. On
+    // click, the navigation resolves from cache, eliminating the network
+    // round-trip without giving up bfcache, native scroll restoration, or
+    // the iOS swipe-back gesture.
+    //
+    // Chromium also gets the Speculation Rules block in <head>, which is
+    // strictly more capable. This listener is the Safari/Firefox path.
+    //
+    // Scoped to a.bb-sidebar-link only — a bounded set of canonical
+    // destinations — so we never speculatively fetch unbounded lists
+    // (transaction rows, search results, etc.). Skips cross-origin,
+    // current URL, [data-no-prefetch], and save-data connections.
+    (function() {
+      var conn = navigator.connection || {};
+      if (conn.saveData) return;
+      var prefetched = new Set();
+      function shouldSkip(a) {
+        if (!a.href || a.target === '_blank' || a.hasAttribute('download')) return true;
+        if (a.dataset.noPrefetch !== undefined) return true;
+        try {
+          var u = new URL(a.href, location.href);
+          if (u.origin !== location.origin) return true;
+          if (u.pathname + u.search === location.pathname + location.search) return true;
+        } catch (_) { return true; }
+        return prefetched.has(a.href);
+      }
+      function prefetch(url) {
+        if (prefetched.has(url)) return;
+        prefetched.add(url);
+        var link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.as = 'document';
+        link.href = url;
+        document.head.appendChild(link);
+      }
+      var HOVER_DELAY = 65;
+      document.addEventListener('mouseover', function(e) {
+        var a = e.target.closest('a.bb-sidebar-link');
+        if (!a || shouldSkip(a)) return;
+        var timer = setTimeout(function() { prefetch(a.href); }, HOVER_DELAY);
+        a.addEventListener('mouseleave', function() { clearTimeout(timer); }, { once: true });
+      });
+      document.addEventListener('touchstart', function(e) {
+        var a = e.target.closest('a.bb-sidebar-link');
+        if (!a || shouldSkip(a)) return;
+        prefetch(a.href);
+      }, { passive: true, capture: true });
+      document.addEventListener('focusin', function(e) {
+        var a = e.target.closest('a.bb-sidebar-link');
+        if (!a || shouldSkip(a)) return;
+        prefetch(a.href);
+      });
     })();
 
     // Button loading state helpers for async actions
