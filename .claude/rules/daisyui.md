@@ -4,14 +4,22 @@ paths:
   - "internal/admin/**"
   - "input.css"
   - "static/**"
+  - "Makefile"
 ---
 
-# DaisyUI adherence
+# DaisyUI adherence + UI dev loop
 
 The v1 admin UI is built on **DaisyUI 5 + Tailwind CSS v4**. This rule
-codifies how we use it. The short version: **daisy first, custom only
-when daisy can't reach**, and document every exception. The audit at
-`docs/design-system-audit/` enumerates the current state.
+covers both: (a) which classes/components to use and which patterns to
+avoid (daisy-first decision tree, below), and (b) the **dev loop
+gotchas** that bite when you actually run the server to validate
+changes (CSS rebuild, templ regen, port hygiene — at the bottom of
+this file).
+
+Short version: **daisy first, custom only when daisy can't reach**,
+document every exception, and **always rebuild CSS after touching
+templ files**. The audit at `docs/design-system-audit/` enumerates the
+current state of the codebase.
 
 ## The decision tree
 
@@ -165,6 +173,148 @@ checklist:
 The sandbox-first rule ensures every new shared component has at
 least one place reviewers can see it without reading the call site.
 
+## UI dev loop — gotchas that bite every session
+
+Validating UI changes means running the server and rendering them.
+These are the failure modes that cost the most debugging time during
+the design-system sprint.
+
+### Rebuild CSS after any templ edit
+
+`make dev` runs `templ generate` but **also runs `make css`** (added
+in the sprint). `make dev-watch` runs `tailwindcss-extra --watch`
+alongside `air` so it's handled automatically. The footgun: an ad-hoc
+session that boots the binary directly (`go run ./cmd/breadbox serve`
+or a prebuilt binary) **skips both steps**.
+
+- Tailwind v4 scans `*_templ.go` (the generated Go output) for class
+  names. Templ source files alone are not enough — generation must
+  run first, then Tailwind must scan.
+- If `static/css/styles.css` is older than your newest `*_templ.go`,
+  every utility class you just introduced is **missing from the
+  bundle** and the page renders without them. The breakage is
+  silent — no error, just wrong layout.
+
+When booting the server manually:
+
+```sh
+templ generate          # writes *_templ.go from .templ sources
+make css                # rebuilds styles.css against the latest classes
+go run ./cmd/breadbox serve   # or your prebuilt binary
+```
+
+If you set `BREADBOX_DEV_RELOAD=1`, the running binary reads
+`static/css/styles.css` from disk on every request — so a fresh
+`make css` is picked up by a browser reload without restarting Go.
+That's the fastest iteration loop when you're only tweaking CSS or
+templ markup.
+
+### Templ files are gitignored — regenerate after every checkout
+
+`*_templ.go` is in `.gitignore`. After `git checkout <branch>` (or a
+fresh worktree), the templ output files don't exist yet. Building
+without first running `templ generate` will either fail (missing
+symbols) or, worse, succeed against the stale outputs from the
+previous branch. **Always run `templ generate` before `go build` on
+a fresh tree.**
+
+`make generate` (which most other targets depend on) handles this
+automatically. The trap is invoking `go build` or `go run` directly
+without going through the Makefile.
+
+### Validate in a real browser — don't trust JPEG contrast
+
+Screenshots are JPEG-encoded. Subtle opacity (`text-base-content/50`,
+soft surfaces) can read as "the page is dim/broken" in a JPEG when
+the page is actually fine. Before diagnosing a dim/contrast
+regression, **verify with `getComputedStyle`**:
+
+```js
+const el = document.querySelector('.bb-page-title');
+const cs = getComputedStyle(el);
+// Expect oklch(0.145 0 0) and opacity 1 in light mode.
+({ color: cs.color, opacity: cs.opacity });
+```
+
+In this sprint a "dim page" diagnosis was actually a JPEG quirk —
+the colors were correct. Cost: one wrong-direction debugging detour.
+
+### Kill stale dev servers before booting yours
+
+Multiple sessions tend to leave breadbox binaries running on
+8080–8099. Before booting, check what's listening:
+
+```sh
+lsof -iTCP -sTCP:LISTEN -P | grep -E '808[0-9]|breadbox'
+```
+
+Kill stale ones (the user has confirmed it's fine in this repo's
+session model) with `kill <pid>`, then take the freed port. Don't
+pick a port outside 8080–8099 — that range is what other dev
+tooling expects.
+
+### Recover ENCRYPTION_KEY without restarting providers
+
+If a `breadbox serve` instance is already running, grab its key
+rather than minting a new one (existing encrypted tokens won't
+decrypt under a fresh key):
+
+```sh
+ps eww -p $(pgrep -f 'breadbox serve' | head -1) \
+  | tr ' ' '\n' \
+  | grep '^ENCRYPTION_KEY=' \
+  | cut -d= -f2
+```
+
+Pair with the standard DATABASE_URL and `SERVER_PORT=<your port>`:
+
+```sh
+DATABASE_URL='postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable' \
+ENCRYPTION_KEY='<recovered>' \
+SERVER_PORT=8089 \
+BREADBOX_DEV_RELOAD=1 \
+$TMPDIR/breadbox-mine serve
+```
+
+### sqlc-generated files can look stale via the build cache
+
+If `go build` complains about a missing field in a `db.*Params`
+struct (e.g. `unknown field ErrorMessage`), the most likely cause is
+a stale Go build cache — not a real divergence. Run `sqlc generate`
+(or `make sqlc`) once; if the generated file is bit-identical, the
+cache invalidates and the build succeeds on the retry.
+
+This is rare but it cost real time in this sprint — flag if you see
+"unknown field" on a stable branch.
+
+### Sandbox / .git ref-lock errors
+
+Running `git push`, `git checkout -b`, or `git fetch` can hit
+`Operation not permitted` on `.git/refs/...lock` because Claude
+Code's sandbox blocks certain `.git` writes. The fix is one of:
+
+- Set `dangerouslyDisableSandbox: true` on the specific Bash call
+  that needs to write to `.git/refs/...`. Don't blanket-disable.
+- Or use `gh` for PR-side operations (it goes through the GitHub
+  API, not local refs).
+
+### Process recap
+
+For UI sprint work specifically:
+
+1. `git checkout <branch>` → `templ generate` (regenerates outputs).
+2. Make your templ / CSS edits.
+3. `make dev` (rebuilds CSS + Go + boots) or `make dev-watch` (auto).
+4. Browser to `http://localhost:<PORT>/<route>` and verify visually.
+5. Sanity-check colors / opacity via `getComputedStyle` if anything
+   looks off before assuming a regression.
+6. Take screenshots via Chrome DevTools MCP for PR evidence; embed
+   per `.claude/rules/ui.md` (validate-ui skill).
+
+The sandbox at `/design` and per-component standalone viewer at
+`/design/c/{slug}` are the canonical proving ground. New components
+land there first, then propagate to live pages.
+
 ## References
 
 - `docs/design-system.md` — canonical spec
@@ -172,6 +322,7 @@ least one place reviewers can see it without reading the call site.
   v1 admin pattern, with file:line citations
 - `docs/design-system-audit/daisyui-coverage.md` — coverage matrix +
   remediation roadmap
-- `.claude/rules/ui.md` — general admin UI conventions
+- `.claude/rules/ui.md` — general admin UI conventions (validation
+  skill, browser automation backends, screenshot upload flow)
 - `https://daisyui.com/llms.txt` — canonical machine-readable
   component list (always check before writing custom)
