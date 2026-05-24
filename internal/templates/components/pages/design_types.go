@@ -125,8 +125,32 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "empty-states",
 			Title:       "Empty states",
-			Description: "Standard no-data and no-results patterns.",
+			Description: "Standard no-data and no-results patterns. Use components.EmptyState.",
 			Render:      func() templ.Component { return SectionEmptyStates() },
+		},
+		{
+			Slug:        "stat-tiles",
+			Title:       "Stat tiles",
+			Description: "4-up dashboard metric tiles — icon-on-left, big tabular-nums value. Use components.StatTile + StatTileRow.",
+			Render:      func() templ.Component { return SectionStatTiles() },
+		},
+		{
+			Slug:        "tabs",
+			Title:       "Tabs",
+			Description: "Daisy tabs-border (navigation) and tabs-box (filter-as-tabs). Use components.TabBar. Nest a second TabBar inside an active tab's content for multi-level.",
+			Render:      func() templ.Component { return SectionTabs() },
+		},
+		{
+			Slug:        "overflow-menu",
+			Title:       "Overflow menu",
+			Description: "Kebab dropdown for row actions. Use components.OverflowMenu.",
+			Render:      func() templ.Component { return SectionOverflowMenu() },
+		},
+		{
+			Slug:        "section-header",
+			Title:       "Section header",
+			Description: "Icon + h2 + count + optional action — for section headings INSIDE pages. Use components.SectionHeader (PageHeader is for top-of-page titles).",
+			Render:      func() templ.Component { return SectionSectionHeader() },
 		},
 	}
 }

@@ -616,6 +616,176 @@ templ SectionEmptyStates() {
 				<p class="text-sm text-base-content/50">No transactions match these filters.</p>
 			</div>
 		}
+		@designExample("Live: components.EmptyState (default)", "The new shared component — replaces the 18+ duplicated scaffolds. Use this going forward.") {
+			<div class="max-w-md mx-auto">
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:     "inbox",
+					Title:    "No connections yet",
+					Body:     "Link a bank to start importing transactions.",
+					CTAHref:  "#",
+					CTAIcon:  "plus",
+					CTALabel: "Add connection",
+				})
+			</div>
+		}
+		@designExample("Live: components.EmptyState (compact)", "Filter-returned-no-rows variant — no card chrome.") {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:    "search-x",
+				Title:   "No transactions match these filters.",
+				Compact: true,
+			})
+		}
+	</div>
+}
+
+// ─── Stat tiles ────────────────────────────────────────────────────────
+
+templ SectionStatTiles() {
+	<div class="flex flex-col gap-6">
+		@designExample("4-up tile row (canonical dashboard pattern)", "StatTileRow lays out the 2-up / 4-up grid. Tones drive the icon-tile color.") {
+			@components.StatTileRow() {
+				@components.StatTile(components.StatTileProps{
+					Icon:  "target",
+					Label: "Times matched",
+					Value: "1,284",
+					Tone:  components.StatTonePrimary,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  "layers",
+					Label: "Transactions",
+					Value: "342",
+					Tone:  components.StatToneInfo,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:        "alert-circle",
+					Label:       "Pending",
+					Value:       "12",
+					Tone:        components.StatToneWarning,
+					Description: "review needed",
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  "clock",
+					Label: "Last active",
+					Value: "2h ago",
+					Href:  "#",
+				})
+			}
+		}
+		@designExample("Without icon (label-only)", "Omit Icon when there's no meaningful glyph.") {
+			<div class="max-w-sm">
+				@components.StatTile(components.StatTileProps{
+					Label: "Total volume (USD)",
+					Value: "$48,201.55",
+				})
+			</div>
+		}
+	</div>
+}
+
+// ─── Tabs ──────────────────────────────────────────────────────────────
+
+templ SectionTabs() {
+	<div class="flex flex-col gap-6">
+		@designExample("Navigation tabs (tabs-border)", "Top-of-page tab navigation. Use Variant=\"border\" or omit (default).") {
+			@components.TabBar(components.TabBarProps{
+				AriaLabel: "Demo navigation tabs",
+				Items: []components.TabBarItem{
+					{Label: "Sync logs", Href: "#", Icon: "refresh-cw", Active: true},
+					{Label: "Webhooks", Href: "#", Icon: "webhook"},
+					{Label: "Sessions", Href: "#", Icon: "bot"},
+				},
+			})
+		}
+		@designExample("Filter-as-tabs (tabs-box)", "Segmented control feel for in-page filters.") {
+			@components.TabBar(components.TabBarProps{
+				Variant:   "box",
+				AriaLabel: "Demo filter tabs",
+				Items: []components.TabBarItem{
+					{Label: "All", Href: "#", Icon: "layers", Active: true},
+					{Label: "Syncs", Href: "#", Icon: "refresh-cw"},
+					{Label: "Reports", Href: "#", Icon: "file-text"},
+					{Label: "Comments", Href: "#", Icon: "message-square"},
+				},
+			})
+		}
+		@designExample("With badge counts", "Pass Count: &N on any item.") {
+			@components.TabBar(components.TabBarProps{
+				AriaLabel: "Demo tabs with counts",
+				Items: []components.TabBarItem{
+					{Label: "All", Href: "#", Count: components.SectionHeaderIntPtr(12), Active: true},
+					{Label: "Active", Href: "#", Count: components.SectionHeaderIntPtr(8)},
+					{Label: "Disconnected", Href: "#", Count: components.SectionHeaderIntPtr(2)},
+				},
+			})
+		}
+	</div>
+}
+
+// ─── Overflow menu ─────────────────────────────────────────────────────
+
+templ SectionOverflowMenu() {
+	<div class="flex flex-col gap-6">
+		@designExample("Standard kebab", "Mix link items (Href) and button items (OnClick). Mark destructive items with Destructive: true.") {
+			<div class="bb-card p-4 max-w-sm">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<div class="text-sm font-semibold">Coffee &amp; Cafés</div>
+						<div class="text-xs text-base-content/50">Food &amp; Drink → Coffee</div>
+					</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Category Coffee actions",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit", Icon: "pencil", Href: "#"},
+							{Label: "View transactions", Icon: "receipt", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "deleteCategory()", Destructive: true},
+						},
+					})
+				</div>
+			</div>
+		}
+		@designExample("With a disabled item", "System-protected entries render disabled.") {
+			<div class="bb-card p-4 max-w-sm">
+				<div class="flex items-center justify-between gap-3">
+					<div class="text-sm font-semibold">Uncategorized (system)</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Category Uncategorized actions",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit", Icon: "pencil", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true, Disabled: true},
+						},
+					})
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ─── Section header ────────────────────────────────────────────────────
+
+templ SectionSectionHeader() {
+	<div class="flex flex-col gap-6">
+		@designExample("Bare (icon + title)", "For section dividers inside a card.") {
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:  "receipt",
+				Title: "Transactions",
+			})
+		}
+		@designExample("With count", "Count helps users scan list size at a glance.") {
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:       "receipt",
+				Title:      "Transactions",
+				Count:      components.SectionHeaderIntPtr(342),
+				CountLabel: "total",
+			})
+		}
+		@designExample("With trailing action", "Pair with PageHeaderAction for the common case.") {
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:   "fingerprint",
+				Title:  "OAuth clients",
+				Count:  components.SectionHeaderIntPtr(3),
+				Action: components.PageHeaderAction("#", "plus", "Create client"),
+			})
+		}
 	</div>
 }
 

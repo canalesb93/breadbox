@@ -1,0 +1,75 @@
+package components
+
+import "strconv"
+
+// TabBar is the canonical tab/filter-tab primitive for the v1 admin UI.
+// Replaces the hand-rolled `btn-primary`/`btn-ghost` toggle in
+// mcp_guide.templ, the `bg-base-200/60 rounded-lg p-0.5` pill toggles
+// in agents.templ / logs.templ / connections.templ, and the rounded
+// chip filters in feed.templ.
+//
+// Renders the daisy native shape:
+//
+//	<div role="tablist" class="tabs tabs-border" aria-label="...">
+//	  <a role="tab" class="tab tab-active" href="..."> ... </a>
+//	</div>
+//
+// Variants:
+//   - "border" (default) — for top-of-page navigation tabs.
+//   - "box"             — for filter-as-tabs (segmented control feel).
+//
+// All callers SHOULD pass server-rendered `<a href>` items. For pure
+// client-side state (Alpine x-show), still render `<a>` with `href="#"`
+// and an `@click.prevent` handler; daisy markup is identical either way.
+//
+// Multi-level: just nest a second TabBar inside the active tab's content
+// region. Use Variant: "border" for the outer level (navigation) and
+// Variant: "box" for the inner level (filter-segmented control). Both
+// share daisy semantics; screen readers see two adjacent role="tablist"
+// regions with distinct aria-label values — the WAI-ARIA correct shape.
+
+type TabBarItem struct {
+	Label  string
+	Href   templ.SafeURL
+	Active bool
+	Icon   string // optional Lucide icon name
+	Count  *int   // optional badge count; nil = no badge
+}
+
+type TabBarProps struct {
+	Items     []TabBarItem
+	Variant   string // "border" (default) | "box"
+	AriaLabel string // required
+}
+
+templ TabBar(p TabBarProps) {
+	<div role="tablist" class={ "tabs", tabBarVariantClass(p.Variant) } aria-label={ p.AriaLabel }>
+		for _, it := range p.Items {
+			<a
+				role="tab"
+				href={ it.Href }
+				class={ "tab gap-2", templ.KV("tab-active", it.Active) }
+				if it.Active {
+					aria-current="page"
+				}
+			>
+				if it.Icon != "" {
+					<i data-lucide={ it.Icon } class="w-4 h-4"></i>
+				}
+				{ it.Label }
+				if it.Count != nil {
+					<span class={ "badge badge-xs", templ.KV("badge-soft", !it.Active), templ.KV("badge-primary", it.Active) }>
+						{ strconv.Itoa(*it.Count) }
+					</span>
+				}
+			</a>
+		}
+	</div>
+}
+
+func tabBarVariantClass(v string) string {
+	if v == "box" {
+		return "tabs-box"
+	}
+	return "tabs-border"
+}
