@@ -16,16 +16,12 @@ templ Tags(p TagsProps) {
 	     Alpine.data() registration runs before Alpine — itself deferred from
 	     <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/tags.js"></script>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Tags</h1>
-			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Open-ended labels for coordinating work on transactions</p>
-		</div>
-		<a href="/tags/new" class="btn btn-sm btn-primary rounded-xl gap-2">
-			<i data-lucide="plus" class="w-4 h-4"></i>
-			Add Tag
-		</a>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "Tags",
+		Subtitle:             "Open-ended labels for coordinating work on transactions",
+		SubtitleHideOnMobile: true,
+		Action:               components.PageHeaderAction("/tags/new", "plus", "Add Tag"),
+	})
 	<div x-data="tags" class="space-y-4">
 		<div class="relative">
 			<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>

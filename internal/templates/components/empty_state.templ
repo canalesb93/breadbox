@@ -1,0 +1,78 @@
+package components
+
+// EmptyState is the canonical "no data" / "no results" card.
+// Replaces the ~18 hand-rolled `bb-card p-12 text-center flex flex-col
+// items-center` blocks across the admin templ tree (see
+// docs/design-system-audit/components-inventory.md §4).
+//
+// Two shapes:
+//
+//   - Default (Compact=false): full-card hero with a 56×56 tinted icon
+//     tile, title, body copy, and a primary CTA. Used as the page-level
+//     "you have nothing yet" state.
+//   - Compact (Compact=true): inline-block with a small bare icon and
+//     one line of text. Used inside lists/tables for "filters returned
+//     no rows" — no card chrome, no body, no CTA tile.
+//
+// CTA precedence: if CustomCTA is set, it renders instead of the
+// simple href/label pair (use when you need multiple buttons, Alpine
+// data attributes, POST forms, etc.). Otherwise a primary
+// `btn-sm rounded-xl` is rendered iff CTAHref and CTALabel are both
+// non-empty. Compact mode never renders a CTA — keep it one line.
+//
+// Usage:
+//
+//	@components.EmptyState(components.EmptyStateProps{
+//	  Icon:     "fingerprint",
+//	  Title:    "No OAuth clients yet",
+//	  Body:     "Create an OAuth client to connect external AI services to your Breadbox MCP server.",
+//	  CTAHref:  templ.SafeURL("/settings/oauth-clients/new"),
+//	  CTAIcon:  "plus",
+//	  CTALabel: "Create your first client",
+//	})
+
+type EmptyStateProps struct {
+	Icon      string // Lucide name, e.g. "inbox", "search-x"
+	Title     string // required
+	Body      string // optional supporting copy
+	CTAHref   templ.SafeURL
+	CTAIcon   string
+	CTALabel  string
+	CustomCTA templ.Component // overrides the simple href/label CTA
+	Compact   bool            // inline "no results" variant; no card, no CTA
+}
+
+templ EmptyState(p EmptyStateProps) {
+	if p.Compact {
+		<div class="flex flex-col items-center text-center py-10">
+			if p.Icon != "" {
+				<i data-lucide={ p.Icon } class="w-8 h-8 text-base-content/30 mb-3"></i>
+			}
+			<p class="text-sm text-base-content/50">{ p.Title }</p>
+		</div>
+	} else {
+		<div class="bb-card p-12 text-center">
+			<div class="flex flex-col items-center">
+				if p.Icon != "" {
+					<div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+						<i data-lucide={ p.Icon } class="w-7 h-7 text-base-content/30"></i>
+					</div>
+				}
+				<h3 class="text-base font-semibold mb-1">{ p.Title }</h3>
+				if p.Body != "" {
+					<p class="text-base-content/50 text-sm mb-5 max-w-sm">{ p.Body }</p>
+				}
+				if p.CustomCTA != nil {
+					@p.CustomCTA
+				} else if p.CTAHref != "" && p.CTALabel != "" {
+					<a href={ p.CTAHref } class="btn btn-primary btn-sm rounded-xl gap-2">
+						if p.CTAIcon != "" {
+							<i data-lucide={ p.CTAIcon } class="w-4 h-4"></i>
+						}
+						{ p.CTALabel }
+					</a>
+				}
+			</div>
+		</div>
+	}
+}

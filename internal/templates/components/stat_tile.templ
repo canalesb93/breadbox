@@ -1,0 +1,121 @@
+package components
+
+// StatTile is the canonical 4-up dashboard metric tile: a tinted icon
+// square on the left, big tabular-nums value + small label on the right,
+// optional secondary description line. Replaces the hand-rolled
+// `bb-card p-4 + flex items-center gap-3 + w-9 h-9 rounded-lg bg-{tone}/10`
+// block currently duplicated across rule_detail / logs / feed /
+// connection_detail / getting_started (see audit #17).
+//
+// Custom shell rather than daisy `stat` — daisy enforces value-below-label
+// typography and `place-self: end` for `stat-figure`, both of which
+// fight the icon-tile-on-left shape we already ship. See the agent
+// rationale in PR description.
+//
+// Props:
+//   - Icon:        Lucide name. Optional — omit for label-only tiles.
+//   - Label:       required. Rendered as small uppercase metadata.
+//   - Value:       required. Caller formats (CommaInt, fmt.Sprintf, etc).
+//   - Description: optional secondary line below the value.
+//   - Tone:        "neutral" (default), "primary", "success", "warning",
+//                  "error", "info". Drives icon-tile bg + icon color only.
+//   - Href:        optional. When set, the tile becomes an <a> with
+//                  bb-card--interactive hover.
+
+type StatTileTone string
+
+const (
+	StatToneNeutral StatTileTone = "neutral"
+	StatTonePrimary StatTileTone = "primary"
+	StatToneSuccess StatTileTone = "success"
+	StatToneWarning StatTileTone = "warning"
+	StatToneError   StatTileTone = "error"
+	StatToneInfo    StatTileTone = "info"
+)
+
+type StatTileProps struct {
+	Icon        string
+	Label       string
+	Value       string
+	Description string
+	Tone        StatTileTone
+	Href        templ.SafeURL // optional; if set, tile becomes a link
+}
+
+func statTileBg(t StatTileTone) string {
+	switch t {
+	case StatTonePrimary:
+		return "bg-primary/10"
+	case StatToneSuccess:
+		return "bg-success/10"
+	case StatToneWarning:
+		return "bg-warning/10"
+	case StatToneError:
+		return "bg-error/10"
+	case StatToneInfo:
+		return "bg-info/10"
+	default:
+		return "bg-base-200/60"
+	}
+}
+
+func statTileIcon(t StatTileTone) string {
+	switch t {
+	case StatTonePrimary:
+		return "text-primary"
+	case StatToneSuccess:
+		return "text-success"
+	case StatToneWarning:
+		return "text-warning"
+	case StatToneError:
+		return "text-error"
+	case StatToneInfo:
+		return "text-info"
+	default:
+		return "text-base-content/40"
+	}
+}
+
+templ StatTile(p StatTileProps) {
+	if p.Href != "" {
+		<a href={ p.Href } class="bb-card bb-card--interactive p-4 no-underline block">
+			@statTileBody(p)
+		</a>
+	} else {
+		<div class="bb-card p-4">
+			@statTileBody(p)
+		</div>
+	}
+}
+
+templ statTileBody(p StatTileProps) {
+	<div class="flex items-center gap-3">
+		if p.Icon != "" {
+			<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statTileBg(p.Tone) }>
+				<i data-lucide={ p.Icon } class={ "w-4 h-4", statTileIcon(p.Tone) }></i>
+			</div>
+		}
+		<div class="min-w-0">
+			<div class="text-2xl font-semibold tabular-nums leading-none truncate">{ p.Value }</div>
+			<div class="text-xs text-base-content/40 mt-1 uppercase tracking-wider">{ p.Label }</div>
+			if p.Description != "" {
+				<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">{ p.Description }</div>
+			}
+		</div>
+	</div>
+}
+
+// StatTileRow wraps StatTile children in the canonical 2-up / 4-up grid
+// so callers don't re-derive the breakpoint. Use Templ's children block:
+//
+//	@components.StatTileRow() {
+//	  @components.StatTile(...)
+//	  @components.StatTile(...)
+//	  @components.StatTile(...)
+//	  @components.StatTile(...)
+//	}
+templ StatTileRow() {
+	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+		{ children... }
+	</div>
+}

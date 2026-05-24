@@ -1,0 +1,818 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// design_sections.templ holds one `templ SectionX()` per entry in
+// DesignSections() (design_types.go). Each section demonstrates the
+// representative variants of one component family using a small grid
+// of `designExample` blocks (title + caption + the live markup).
+//
+// Layout helpers (designExample, designSwatch, designToken) live at the
+// bottom of this file so individual sections stay focused on markup.
+
+// ─── Foundations ───────────────────────────────────────────────────────
+
+templ SectionFoundations() {
+	<div class="flex flex-col gap-6">
+		@designExample("Color tokens", "DaisyUI semantic surfaces — adapt automatically across light/dark.") {
+			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+				@designSwatch("base-100", "bg-base-100 border border-base-300")
+				@designSwatch("base-200", "bg-base-200")
+				@designSwatch("base-300", "bg-base-300")
+				@designSwatch("primary", "bg-primary text-primary-content")
+				@designSwatch("secondary", "bg-secondary text-secondary-content")
+				@designSwatch("accent", "bg-accent text-accent-content")
+				@designSwatch("info", "bg-info text-info-content")
+				@designSwatch("success", "bg-success text-success-content")
+				@designSwatch("warning", "bg-warning text-warning-content")
+				@designSwatch("error", "bg-error text-error-content")
+			</div>
+		}
+		@designExample("Typography", "Page title, section header, body, label, meta — the only sizes a page should use.") {
+			<div class="space-y-3">
+				<div class="text-2xl font-semibold tracking-tight">Page title (text-2xl semibold)</div>
+				<div class="text-xl font-semibold tracking-tight">bb-page-title (text-xl semibold)</div>
+				<div class="text-lg font-semibold">Section header (text-lg semibold)</div>
+				<div class="text-base">Body text (text-base default)</div>
+				<div class="text-sm text-base-content/70">Secondary body (text-sm @ 70%)</div>
+				<div class="text-xs text-base-content/50">Meta / caption (text-xs @ 50%)</div>
+				<div class="text-xs font-medium text-base-content/50">Form label (text-xs font-medium @ 50%)</div>
+				<div class="font-mono text-sm">Mono — bb_live_xxxxxxxxxx</div>
+			</div>
+		}
+		@designExample("Radius scale", "rounded-lg → field, rounded-xl → selector + cards, rounded-full → pills.") {
+			<div class="flex flex-wrap gap-3">
+				<div class="w-16 h-16 bg-base-200 border border-base-300 rounded-md flex items-center justify-center text-xs">md</div>
+				<div class="w-16 h-16 bg-base-200 border border-base-300 rounded-lg flex items-center justify-center text-xs">lg</div>
+				<div class="w-16 h-16 bg-base-200 border border-base-300 rounded-xl flex items-center justify-center text-xs">xl</div>
+				<div class="w-16 h-16 bg-base-200 border border-base-300 rounded-2xl flex items-center justify-center text-xs">2xl</div>
+				<div class="w-16 h-16 bg-base-200 border border-base-300 rounded-full flex items-center justify-center text-xs">full</div>
+			</div>
+		}
+	</div>
+}
+
+// ─── Buttons ───────────────────────────────────────────────────────────
+
+templ SectionButtons() {
+	<div class="flex flex-col gap-6">
+		@designExample("Sizes (sm + xs)", "Two sizes only. sm uses rounded-xl, xs uses rounded-lg.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-primary btn-sm rounded-xl">Primary sm</button>
+				<button class="btn btn-primary btn-xs rounded-lg">Primary xs</button>
+			</div>
+		}
+		@designExample("Variants", "Pick by intent: primary for the page CTA, ghost for secondary, outline for selectors, soft for danger.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-primary btn-sm rounded-xl">Primary</button>
+				<button class="btn btn-ghost btn-sm rounded-xl">Ghost</button>
+				<button class="btn btn-outline btn-sm rounded-xl">Outline</button>
+				<button class="btn btn-secondary btn-sm rounded-xl">Secondary</button>
+				<button class="btn btn-error btn-soft btn-sm rounded-xl">Destructive (soft)</button>
+				<button class="btn btn-error btn-sm rounded-xl">Destructive</button>
+				<button class="btn btn-sm rounded-xl" disabled>Disabled</button>
+			</div>
+		}
+		@designExample("With icons", "Icon size: w-4 h-4 for btn-sm, w-3.5 h-3.5 for btn-xs. Gap: gap-2 / gap-1.5.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-primary btn-sm rounded-xl gap-2">
+					<i data-lucide="plus" class="w-4 h-4"></i>
+					New connection
+				</button>
+				<button class="btn btn-ghost btn-sm rounded-xl gap-2">
+					<i data-lucide="refresh-cw" class="w-4 h-4"></i>
+					Sync
+				</button>
+				<button class="btn btn-ghost btn-xs rounded-lg gap-1.5">
+					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+					Edit
+				</button>
+			</div>
+		}
+		@designExample("Icon-only (square)", "btn-square keeps it 1:1. Use rounded-xl / rounded-lg matching the size.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-ghost btn-sm btn-square rounded-xl" aria-label="Edit">
+					<i data-lucide="pencil" class="w-4 h-4"></i>
+				</button>
+				<button class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label="Edit">
+					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+				</button>
+				<button class="btn btn-ghost btn-sm btn-square rounded-xl" aria-label="More">
+					<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+				</button>
+			</div>
+		}
+		@designExample("Loading state", "Swap the label for a spinner. min-w-32 stops the button from jittering between states.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button class="btn btn-primary btn-sm rounded-xl min-w-32">
+					<span class="loading loading-spinner loading-xs"></span>
+				</button>
+				<button class="btn btn-primary btn-sm rounded-xl gap-2 min-w-32" disabled>
+					<i data-lucide="save" class="w-4 h-4"></i>
+					Save
+				</button>
+			</div>
+		}
+	</div>
+}
+
+// ─── Badges ────────────────────────────────────────────────────────────
+
+templ SectionBadges() {
+	<div class="flex flex-col gap-6">
+		@designExample("Status (badge-soft)", "Use statusBadge() / syncBadge() helpers — emits the canonical shape with badge-soft + badge-sm.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="badge badge-soft badge-success badge-sm">Active</span>
+				<span class="badge badge-soft badge-warning badge-sm">Pending</span>
+				<span class="badge badge-soft badge-error badge-sm">Error</span>
+				<span class="badge badge-soft badge-info badge-sm">Syncing</span>
+				<span class="badge badge-soft badge-neutral badge-sm">Disconnected</span>
+			</div>
+		}
+		@designExample("Metadata (badge-ghost)", "Scope, source, type, env — quiet labels with no semantic color.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="badge badge-ghost badge-xs">from env</span>
+				<span class="badge badge-ghost badge-xs">read-only</span>
+				<span class="badge badge-ghost badge-xs">plaid</span>
+				<span class="badge badge-ghost badge-xs">teller</span>
+				<span class="badge badge-ghost badge-xs">csv</span>
+			</div>
+		}
+		@designExample("Solid (counts)", "For numeric indicators / unread counts.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="badge badge-primary badge-xs">12</span>
+				<span class="badge badge-success badge-xs">+3</span>
+				<span class="badge badge-warning badge-xs">2</span>
+				<span class="badge badge-error badge-xs">!</span>
+			</div>
+		}
+		@designExample("Outline", "Less common — when soft is too loud and ghost too quiet.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="badge badge-outline badge-success badge-sm">Verified</span>
+				<span class="badge badge-outline badge-warning badge-sm">Beta</span>
+				<span class="badge badge-outline badge-info badge-sm">New</span>
+			</div>
+		}
+	</div>
+}
+
+// ─── Alerts ────────────────────────────────────────────────────────────
+
+templ SectionAlerts() {
+	<div class="flex flex-col gap-6">
+		@designExample("Page-level alerts", "role=\"alert\" + rounded-xl + mb-6. Use the matching alert-{type} color.") {
+			<div class="flex flex-col gap-3">
+				<div role="alert" class="alert alert-success rounded-xl">
+					<i data-lucide="check-circle" class="w-5 h-5"></i>
+					<span>Backup created successfully.</span>
+				</div>
+				<div role="alert" class="alert alert-info rounded-xl">
+					<i data-lucide="info" class="w-5 h-5"></i>
+					<span>Sync starts in 5 minutes.</span>
+				</div>
+				<div role="alert" class="alert alert-warning rounded-xl">
+					<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+					<span>2 connections need reauth.</span>
+				</div>
+				<div role="alert" class="alert alert-error rounded-xl">
+					<i data-lucide="x-circle" class="w-5 h-5"></i>
+					<span>Failed to revoke API key.</span>
+				</div>
+			</div>
+		}
+		@designExample("Soft variant", "Less prominent — embed inside content rather than over page chrome.") {
+			<div role="alert" class="alert alert-warning alert-soft rounded-xl">
+				<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+				<span>Read-only keys cannot trigger syncs.</span>
+			</div>
+		}
+		@designExample("Inline form error (bb-form-error)", "Tighter than alert; sits flush inside a form card.") {
+			<div role="alert" class="bb-form-error">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>Password must be at least 8 characters.</span>
+			</div>
+		}
+	</div>
+}
+
+// ─── Cards ─────────────────────────────────────────────────────────────
+
+templ SectionCards() {
+	<div class="flex flex-col gap-6">
+		@designExample("Simple (bb-card p-5)", "Direct content, no internal sections.") {
+			<div class="bb-card p-5 max-w-md">
+				<h3 class="text-sm font-semibold mb-1">Connection summary</h3>
+				<p class="text-sm text-base-content/60">3 accounts, last synced 4 minutes ago.</p>
+			</div>
+		}
+		@designExample("Sectioned (bb-card p-0 overflow-hidden)", "p-0 + overflow-hidden to keep dividers flush with the rounded edge.") {
+			<div class="bb-card p-0 overflow-hidden max-w-md">
+				<div class="px-4 sm:px-5 py-3 border-b border-base-300/50">
+					<h3 class="text-sm font-semibold">Connection</h3>
+				</div>
+				<div class="px-4 sm:px-5 py-4 text-sm text-base-content/70">
+					Chase · 3 accounts
+				</div>
+				<div class="px-4 sm:px-5 py-3 border-t border-base-300/50 bg-base-200/20 flex justify-end gap-2">
+					<button class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
+					<button class="btn btn-primary btn-sm rounded-xl">Save</button>
+				</div>
+			</div>
+		}
+		@designExample("Interactive (bb-card--interactive)", "Hover lift + cursor.") {
+			<a href="#" class="bb-card bb-card--interactive p-5 max-w-md block">
+				<h3 class="text-sm font-semibold mb-1">Open transaction history</h3>
+				<p class="text-sm text-base-content/60">View the full list of imported transactions.</p>
+			</a>
+		}
+		@designExample("Danger zone (bb-danger-card)", "Pair with bb-card. Use for destructive actions placed below the primary card.") {
+			<div class="bb-card bb-danger-card p-5 sm:p-6 max-w-md">
+				<div class="flex items-start justify-between gap-4 flex-col sm:flex-row sm:items-center">
+					<div>
+						<h3 class="text-sm font-semibold text-error/80">Delete connection</h3>
+						<p class="text-xs text-base-content/50 mt-0.5">All transactions and accounts will be removed. This cannot be undone.</p>
+					</div>
+					<button class="btn btn-error btn-soft btn-sm rounded-xl shrink-0 gap-2">
+						<i data-lucide="trash-2" class="w-4 h-4"></i>
+						Delete
+					</button>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ─── Form controls ─────────────────────────────────────────────────────
+
+templ SectionFormControls() {
+	<div class="flex flex-col gap-6">
+		@designExample("Text input", "input-bordered + rounded-xl. Pair with the text-xs label.") {
+			<div class="max-w-sm">
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-input-1">Email</label>
+				<input id="ds-input-1" type="email" class="input input-bordered w-full rounded-xl" placeholder="alex@example.com"/>
+			</div>
+		}
+		@designExample("Select", "Same shape as input. WARNING: never apply bg-base-200/50 — browsers render the alpha as fully transparent on selects.") {
+			<div class="max-w-sm">
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-select-1">Scope</label>
+				<select id="ds-select-1" class="select select-bordered w-full rounded-xl">
+					<option>Full access</option>
+					<option>Read only</option>
+				</select>
+			</div>
+		}
+		@designExample("Textarea", "textarea-bordered + rounded-xl.") {
+			<div class="max-w-sm">
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-textarea-1">Note</label>
+				<textarea id="ds-textarea-1" class="textarea textarea-bordered w-full rounded-xl" rows="3" placeholder="What's this transaction for?"></textarea>
+			</div>
+		}
+		@designExample("Compact (filter bar)", "input-sm / select-sm for filter bars. Styled by bb-filter-bar.") {
+			<div class="bb-filter-bar mb-0">
+				<label>
+					<span>Start date</span>
+					<input type="date" class="input input-sm input-bordered" value="2026-05-01"/>
+				</label>
+				<label>
+					<span>Status</span>
+					<select class="select select-sm select-bordered">
+						<option>All</option>
+						<option>Active</option>
+						<option>Error</option>
+					</select>
+				</label>
+				<button type="button" class="btn btn-sm btn-primary rounded-xl self-end">Filter</button>
+			</div>
+		}
+		@designExample("Checkbox / toggle / radio", "DaisyUI primitives.") {
+			<div class="flex flex-wrap items-center gap-6">
+				<label class="label cursor-pointer gap-2">
+					<input type="checkbox" class="checkbox" checked/>
+					<span class="label-text">Send daily digest</span>
+				</label>
+				<label class="label cursor-pointer gap-2">
+					<input type="checkbox" class="toggle" checked/>
+					<span class="label-text">Auto-sync</span>
+				</label>
+				<label class="label cursor-pointer gap-2">
+					<input type="radio" name="ds-radio-1" class="radio" checked/>
+					<span class="label-text">Daily</span>
+				</label>
+				<label class="label cursor-pointer gap-2">
+					<input type="radio" name="ds-radio-1" class="radio"/>
+					<span class="label-text">Weekly</span>
+				</label>
+			</div>
+		}
+	</div>
+}
+
+// ─── Tables ────────────────────────────────────────────────────────────
+
+templ SectionTables() {
+	<div class="flex flex-col gap-6">
+		@designExample("Standard (table-sm table-zebra)", "Default for most list pages. Use hover:bg-base-200 on <tr>.") {
+			<div class="overflow-x-auto">
+				<table class="table table-zebra table-sm">
+					<thead>
+						<tr>
+							<th>Connection</th>
+							<th>Provider</th>
+							<th>Status</th>
+							<th class="text-right">Accounts</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="hover:bg-base-200">
+							<td>Chase</td>
+							<td><span class="badge badge-ghost badge-xs">plaid</span></td>
+							<td><span class="badge badge-soft badge-success badge-sm">Active</span></td>
+							<td class="bb-amount">3</td>
+						</tr>
+						<tr class="hover:bg-base-200">
+							<td>Capital One</td>
+							<td><span class="badge badge-ghost badge-xs">teller</span></td>
+							<td><span class="badge badge-soft badge-warning badge-sm">Reauth</span></td>
+							<td class="bb-amount">2</td>
+						</tr>
+						<tr class="hover:bg-base-200">
+							<td>Ally Savings</td>
+							<td><span class="badge badge-ghost badge-xs">csv</span></td>
+							<td><span class="badge badge-soft badge-neutral badge-sm">Disconnected</span></td>
+							<td class="bb-amount">1</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		}
+		@designExample("Compact (table-xs)", "For embedded tables inside detail pages.") {
+			<div class="overflow-x-auto">
+				<table class="table table-xs">
+					<thead>
+						<tr>
+							<th>Account</th>
+							<th>Mask</th>
+							<th class="text-right">Balance</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr><td>Total Checking</td><td class="font-mono text-xs">0123</td><td class="bb-amount">$3,421.55</td></tr>
+						<tr><td>Sapphire Reserve</td><td class="font-mono text-xs">9876</td><td class="bb-amount">−$842.10</td></tr>
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+// ─── Tags ──────────────────────────────────────────────────────────────
+
+templ SectionTags() {
+	<div class="flex flex-col gap-6">
+		@designExample("Tag sizes", "Pill-shaped, colored via --tag-color CSS variable.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="bb-tag-sm" style="--tag-color:#f59e0b">
+					<i data-lucide="inbox"></i>
+					<span>Needs review</span>
+				</span>
+				<span class="bb-tag" style="--tag-color:#10b981">
+					<i data-lucide="check"></i>
+					<span>Reconciled</span>
+				</span>
+				<span class="bb-tag-lg" style="--tag-color:#6366f1">
+					<i data-lucide="bookmark"></i>
+					<span>Subscription</span>
+				</span>
+			</div>
+		}
+		@designExample("Ghost (unselected filter state)", "Faded variant for filter-bar tag toggles.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="bb-tag bb-tag-ghost" style="--tag-color:#0ea5e9">
+					<i data-lucide="building"></i>
+					<span>Business</span>
+				</span>
+				<span class="bb-tag bb-tag-ghost" style="--tag-color:#a855f7">
+					<i data-lucide="plane"></i>
+					<span>Travel</span>
+				</span>
+			</div>
+		}
+		@designExample("Add (dashed)", "Ghost \"+ Add tag\" chip — same shape, dashed border.") {
+			<button type="button" class="bb-tag bb-tag-add">
+				<i data-lucide="plus"></i>
+				<span>Add tag</span>
+			</button>
+		}
+		@designExample("Interactive + removable", "Inline × button. Hover the chip to reveal.") {
+			<span class="bb-tag bb-tag-interactive" style="--tag-color:#ef4444">
+				<i data-lucide="tag"></i>
+				<span>Refund</span>
+				<button type="button" class="bb-tag-remove" aria-label="Remove tag">
+					<i data-lucide="x"></i>
+				</button>
+			</span>
+		}
+	</div>
+}
+
+// ─── Menus & dropdowns ─────────────────────────────────────────────────
+
+templ SectionMenusDropdowns() {
+	<div class="flex flex-col gap-6">
+		@designExample("Overflow action menu", "When a card has ≥2 secondary actions, prefer one ellipsis dropdown over a cluster of icon buttons.") {
+			<div class="bb-card p-4 max-w-sm">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<div class="text-sm font-semibold">Alex Chen</div>
+						<div class="text-xs text-base-content/50">alex@example.com</div>
+					</div>
+					<div class="dropdown dropdown-end">
+						<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100">
+							<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+						</div>
+						<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+							<li><a><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
+							<li><a><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
+							<li><a class="text-error"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete</a></li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		}
+		@designExample("Menu (vertical nav list)", "menu-md / menu-sm.") {
+			<ul class="menu bg-base-100 rounded-xl border border-base-300 w-56">
+				<li class="menu-title">Settings</li>
+				<li><a class="menu-active"><i data-lucide="key" class="w-4 h-4"></i> API keys</a></li>
+				<li><a><i data-lucide="users" class="w-4 h-4"></i> Household</a></li>
+				<li><a><i data-lucide="bot" class="w-4 h-4"></i> MCP</a></li>
+			</ul>
+		}
+	</div>
+}
+
+// ─── Modals ────────────────────────────────────────────────────────────
+
+templ SectionModals() {
+	<div class="flex flex-col gap-6">
+		@designExample("Standard modal trigger", "modal-bottom on mobile, modal-middle on sm+. rounded-xl modal-box.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button type="button" class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('ds-modal-1').showModal()">
+					Open modal
+				</button>
+				<dialog id="ds-modal-1" class="modal modal-bottom sm:modal-middle">
+					<div class="modal-box rounded-xl max-w-lg">
+						<h3 class="text-base font-semibold mb-2">Delete connection?</h3>
+						<p class="text-sm text-base-content/60 mb-4">All transactions and accounts will be removed. This cannot be undone.</p>
+						<div class="modal-action mt-0 gap-2">
+							<form method="dialog">
+								<button class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
+							</form>
+							<button class="btn btn-error btn-sm rounded-xl">Delete</button>
+						</div>
+					</div>
+					<form method="dialog" class="modal-backdrop">
+						<button>close</button>
+					</form>
+				</dialog>
+			</div>
+		}
+	</div>
+}
+
+// ─── Loading & skeletons ───────────────────────────────────────────────
+
+templ SectionLoading() {
+	<div class="flex flex-col gap-6">
+		@designExample("Spinners", "DaisyUI loading variants in xs/sm/md.") {
+			<div class="flex flex-wrap items-center gap-4">
+				<span class="loading loading-spinner loading-xs"></span>
+				<span class="loading loading-spinner loading-sm"></span>
+				<span class="loading loading-spinner loading-md"></span>
+				<span class="loading loading-dots loading-sm"></span>
+				<span class="loading loading-ring loading-sm"></span>
+				<span class="loading loading-bars loading-sm"></span>
+			</div>
+		}
+		@designExample("Skeletons", "DaisyUI skeleton for placeholder blocks.") {
+			<div class="space-y-3 max-w-md">
+				<div class="skeleton h-4 w-2/3"></div>
+				<div class="skeleton h-4 w-1/2"></div>
+				<div class="skeleton h-12 w-full rounded-xl"></div>
+			</div>
+		}
+		@designExample("Progress", "Indeterminate + determinate.") {
+			<div class="space-y-3 max-w-md">
+				<progress class="progress progress-primary w-full"></progress>
+				<progress class="progress progress-primary w-full" value="38" max="100"></progress>
+			</div>
+		}
+	</div>
+}
+
+// ─── Icons & tiles ─────────────────────────────────────────────────────
+
+templ SectionIcons() {
+	<div class="flex flex-col gap-6">
+		@designExample("Lucide sizes", "Buttons → w-4 h-4 (sm) / w-3.5 h-3.5 (xs). Section headers → w-5 h-5. Empty states → w-8 h-8.") {
+			<div class="flex flex-wrap items-center gap-4 text-base-content/70">
+				<i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+				<i data-lucide="receipt" class="w-4 h-4"></i>
+				<i data-lucide="receipt" class="w-5 h-5"></i>
+				<i data-lucide="receipt" class="w-6 h-6"></i>
+				<i data-lucide="receipt" class="w-8 h-8"></i>
+			</div>
+		}
+		@designExample("Icon tiles (bb-icon-tile)", "Colored 40×40 squares for sectioned form-card headers.") {
+			<div class="flex flex-wrap items-center gap-3">
+				<div class="bb-icon-header__tile bb-icon-tile--primary">
+					<i data-lucide="user-plus" class="w-5 h-5"></i>
+				</div>
+				<div class="bb-icon-header__tile bb-icon-tile--success">
+					<i data-lucide="check" class="w-5 h-5"></i>
+				</div>
+				<div class="bb-icon-header__tile bb-icon-tile--warning">
+					<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+				</div>
+				<div class="bb-icon-header__tile bb-icon-tile--error">
+					<i data-lucide="x" class="w-5 h-5"></i>
+				</div>
+			</div>
+		}
+		@designExample("Icon header (form card top)", "bb-icon-header pairs the tile with title + subtitle.") {
+			<div class="bb-icon-header">
+				<div class="bb-icon-header__tile bb-icon-tile--primary">
+					<i data-lucide="key" class="w-5 h-5"></i>
+				</div>
+				<div class="bb-icon-header__text">
+					<h3 class="text-sm font-semibold">New API key</h3>
+					<p class="text-xs text-base-content/45">Give your script a way to talk to Breadbox.</p>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ─── Page header ───────────────────────────────────────────────────────
+
+templ SectionPageHeader() {
+	<div class="flex flex-col gap-6">
+		@designExample("Title only", "Just the page title. Use for pages whose section is named by its breadcrumb.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title: "Connections",
+			})
+		}
+		@designExample("With subtitle", "Common on detail pages and forms.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:    "Create API key",
+				Subtitle: "Generate a new key for API or MCP access",
+			})
+		}
+		@designExample("With subtitle (hidden on mobile)", "Dense list pages where the subtitle is decorative.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:                "Rules",
+				Subtitle:             "Automatically categorize, tag, or comment on transactions during sync",
+				SubtitleHideOnMobile: true,
+			})
+		}
+		@designExample("With primary action", "Trailing slot reserved for the page's single primary action.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:    "Categories",
+				Subtitle: "Organize transactions with a two-level taxonomy",
+				Action:   components.PageHeaderAction("/categories/new", "plus", "Add Category"),
+			})
+		}
+		@designExample("With leading icon", "Reserved for hero pages (Getting Started, etc.).") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:    "Getting started",
+				Icon:     "compass",
+				Subtitle: "Set up Breadbox step by step.",
+			})
+		}
+	</div>
+}
+
+// ─── Empty states ──────────────────────────────────────────────────────
+
+templ SectionEmptyStates() {
+	<div class="flex flex-col gap-6">
+		@designExample("Standard (no data yet)", "Card-wrapped, icon + title + description + CTA.") {
+			<div class="bb-card p-12 text-center max-w-md mx-auto">
+				<div class="flex flex-col items-center">
+					<div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+						<i data-lucide="inbox" class="w-7 h-7 text-base-content/30"></i>
+					</div>
+					<h3 class="text-base font-semibold mb-1">No connections yet</h3>
+					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Link a bank to start importing transactions.</p>
+					<a href="#" class="btn btn-primary btn-sm rounded-xl gap-2">
+						<i data-lucide="plus" class="w-4 h-4"></i>
+						Add connection
+					</a>
+				</div>
+			</div>
+		}
+		@designExample("Compact (filtered no results)", "Inline, no card chrome.") {
+			<div class="flex flex-col items-center text-center py-10">
+				<i data-lucide="search-x" class="w-8 h-8 text-base-content/30 mb-3"></i>
+				<p class="text-sm text-base-content/50">No transactions match these filters.</p>
+			</div>
+		}
+		@designExample("Live: components.EmptyState (default)", "The new shared component — replaces the 18+ duplicated scaffolds. Use this going forward.") {
+			<div class="max-w-md mx-auto">
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:     "inbox",
+					Title:    "No connections yet",
+					Body:     "Link a bank to start importing transactions.",
+					CTAHref:  "#",
+					CTAIcon:  "plus",
+					CTALabel: "Add connection",
+				})
+			</div>
+		}
+		@designExample("Live: components.EmptyState (compact)", "Filter-returned-no-rows variant — no card chrome.") {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:    "search-x",
+				Title:   "No transactions match these filters.",
+				Compact: true,
+			})
+		}
+	</div>
+}
+
+// ─── Stat tiles ────────────────────────────────────────────────────────
+
+templ SectionStatTiles() {
+	<div class="flex flex-col gap-6">
+		@designExample("4-up tile row (canonical dashboard pattern)", "StatTileRow lays out the 2-up / 4-up grid. Tones drive the icon-tile color.") {
+			@components.StatTileRow() {
+				@components.StatTile(components.StatTileProps{
+					Icon:  "target",
+					Label: "Times matched",
+					Value: "1,284",
+					Tone:  components.StatTonePrimary,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  "layers",
+					Label: "Transactions",
+					Value: "342",
+					Tone:  components.StatToneInfo,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:        "alert-circle",
+					Label:       "Pending",
+					Value:       "12",
+					Tone:        components.StatToneWarning,
+					Description: "review needed",
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  "clock",
+					Label: "Last active",
+					Value: "2h ago",
+					Href:  "#",
+				})
+			}
+		}
+		@designExample("Without icon (label-only)", "Omit Icon when there's no meaningful glyph.") {
+			<div class="max-w-sm">
+				@components.StatTile(components.StatTileProps{
+					Label: "Total volume (USD)",
+					Value: "$48,201.55",
+				})
+			</div>
+		}
+	</div>
+}
+
+// ─── Tabs ──────────────────────────────────────────────────────────────
+
+templ SectionTabs() {
+	<div class="flex flex-col gap-6">
+		@designExample("Navigation tabs (tabs-border)", "Top-of-page tab navigation. Use Variant=\"border\" or omit (default).") {
+			@components.TabBar(components.TabBarProps{
+				AriaLabel: "Demo navigation tabs",
+				Items: []components.TabBarItem{
+					{Label: "Sync logs", Href: "#", Icon: "refresh-cw", Active: true},
+					{Label: "Webhooks", Href: "#", Icon: "webhook"},
+					{Label: "Sessions", Href: "#", Icon: "bot"},
+				},
+			})
+		}
+		@designExample("Filter-as-tabs (tabs-box)", "Segmented control feel for in-page filters.") {
+			@components.TabBar(components.TabBarProps{
+				Variant:   "box",
+				AriaLabel: "Demo filter tabs",
+				Items: []components.TabBarItem{
+					{Label: "All", Href: "#", Icon: "layers", Active: true},
+					{Label: "Syncs", Href: "#", Icon: "refresh-cw"},
+					{Label: "Reports", Href: "#", Icon: "file-text"},
+					{Label: "Comments", Href: "#", Icon: "message-square"},
+				},
+			})
+		}
+		@designExample("With badge counts", "Pass Count: &N on any item.") {
+			@components.TabBar(components.TabBarProps{
+				AriaLabel: "Demo tabs with counts",
+				Items: []components.TabBarItem{
+					{Label: "All", Href: "#", Count: components.SectionHeaderIntPtr(12), Active: true},
+					{Label: "Active", Href: "#", Count: components.SectionHeaderIntPtr(8)},
+					{Label: "Disconnected", Href: "#", Count: components.SectionHeaderIntPtr(2)},
+				},
+			})
+		}
+	</div>
+}
+
+// ─── Overflow menu ─────────────────────────────────────────────────────
+
+templ SectionOverflowMenu() {
+	<div class="flex flex-col gap-6">
+		@designExample("Standard kebab", "Mix link items (Href) and button items (OnClick). Mark destructive items with Destructive: true.") {
+			<div class="bb-card p-4 max-w-sm">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<div class="text-sm font-semibold">Coffee &amp; Cafés</div>
+						<div class="text-xs text-base-content/50">Food &amp; Drink → Coffee</div>
+					</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Category Coffee actions",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit", Icon: "pencil", Href: "#"},
+							{Label: "View transactions", Icon: "receipt", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "deleteCategory()", Destructive: true},
+						},
+					})
+				</div>
+			</div>
+		}
+		@designExample("With a disabled item", "System-protected entries render disabled.") {
+			<div class="bb-card p-4 max-w-sm">
+				<div class="flex items-center justify-between gap-3">
+					<div class="text-sm font-semibold">Uncategorized (system)</div>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Category Uncategorized actions",
+						Items: []components.OverflowMenuItem{
+							{Label: "Edit", Icon: "pencil", Href: "#"},
+							{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true, Disabled: true},
+						},
+					})
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ─── Section header ────────────────────────────────────────────────────
+
+templ SectionSectionHeader() {
+	<div class="flex flex-col gap-6">
+		@designExample("Bare (icon + title)", "For section dividers inside a card.") {
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:  "receipt",
+				Title: "Transactions",
+			})
+		}
+		@designExample("With count", "Count helps users scan list size at a glance.") {
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:       "receipt",
+				Title:      "Transactions",
+				Count:      components.SectionHeaderIntPtr(342),
+				CountLabel: "total",
+			})
+		}
+		@designExample("With trailing action", "Pair with PageHeaderAction for the common case.") {
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:   "fingerprint",
+				Title:  "OAuth clients",
+				Count:  components.SectionHeaderIntPtr(3),
+				Action: components.PageHeaderAction("#", "plus", "Create client"),
+			})
+		}
+	</div>
+}
+
+// ─── Layout helpers ────────────────────────────────────────────────────
+
+// designExample wraps a demo block with a heading + caption row above
+// the live markup. Used by every Section* component above.
+templ designExample(title, caption string) {
+	<div>
+		<div class="flex items-baseline gap-3 mb-3">
+			<h3 class="text-sm font-semibold">{ title }</h3>
+			if caption != "" {
+				<p class="text-xs text-base-content/50">{ caption }</p>
+			}
+		</div>
+		<div class="rounded-xl border border-base-300/60 bg-base-100 p-5">
+			{ children... }
+		</div>
+	</div>
+}
+
+// designSwatch renders a single color token tile with its name + class label.
+templ designSwatch(name, classes string) {
+	<div class="flex flex-col gap-1">
+		<div class={ "h-14 rounded-xl flex items-center justify-center text-xs font-medium", classes }>
+			{ name }
+		</div>
+		<code class="text-[0.65rem] text-base-content/50 font-mono px-1">.{ classes }</code>
+	</div>
+}

@@ -1,6 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // Users renders the household-members page. Hosts inside the base layout
 // via TemplateRenderer.RenderWithTempl. Markup mirrors the prior
@@ -16,16 +20,11 @@ templ Users(p UsersProps) {
 		   surfaces it under "This page". Reset on Alpine teardown. */
 	}}
 	<div x-data x-init="$store.shortcuts.setScope('users')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Household</h1>
-			<p class="text-sm text-base-content/50 mt-1">Manage who has bank connections in Breadbox</p>
-		</div>
-		<a href="/settings/household/new" data-new-user class="btn btn-primary btn-sm rounded-xl">
-			<i data-lucide="plus" class="w-4 h-4"></i>
-			Add Member
-		</a>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Household",
+		Subtitle: "Manage who has bank connections in Breadbox",
+		Action:   usersAddMemberAction(),
+	})
 	if p.Created {
 		<div role="alert" class="alert alert-success rounded-xl mb-6">
 			<i data-lucide="check-circle" class="w-5 h-5"></i>
@@ -49,6 +48,13 @@ templ Users(p UsersProps) {
 // usersUnlinkedPrompt renders the warning panel shown when the current
 // admin account isn't linked to a household member. Offers two flows:
 // create a new member or link an existing unlinked one.
+templ usersAddMemberAction() {
+	<a href="/settings/household/new" data-new-user class="btn btn-primary btn-sm rounded-xl gap-2">
+		<i data-lucide="plus" class="w-4 h-4"></i>
+		Add Member
+	</a>
+}
+
 templ usersUnlinkedPrompt(p UsersProps) {
 	<!-- Admin link prompt: admin account not yet linked to a household member -->
 	<div class="bb-card p-0 overflow-hidden mb-6 border-warning/30 bg-warning/[0.03]" x-data="{ mode: 'create', open: true }" x-show="open">

@@ -1,0 +1,57 @@
+package components
+
+import "strconv"
+
+// SectionHeader is the icon + h2 + optional-count + optional-action
+// row that appears above lists INSIDE a page (above the OAuth clients
+// table, above the accounts list on connection detail, above the
+// transactions list on account detail, etc.).
+//
+// NOT a page title — top-of-page titles use `PageHeader`. This component
+// stays small (`text-sm font-semibold`) because it sits inside a card
+// or page region, often several per page.
+//
+// Slots:
+//   - Icon:       optional Lucide name; rendered muted (`text-base-content/60`)
+//   - Title:      required
+//   - Count:      optional `*int`; renders "N items" after the title
+//   - CountLabel: optional override for "items" (e.g. "active", "total",
+//                 "matches"). Defaults to "items".
+//   - Action:     optional templ.Component slot, right-aligned via `ml-auto`.
+//                 Use for trailing "Add X" buttons or filter toggles.
+
+type SectionHeaderProps struct {
+	Icon       string
+	Title      string
+	Count      *int
+	CountLabel string // defaults to "items"
+	Action     templ.Component
+}
+
+templ SectionHeader(p SectionHeaderProps) {
+	<header class="flex items-center gap-2 mb-3">
+		if p.Icon != "" {
+			<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content/60 shrink-0"></i>
+		}
+		<h2 class="text-sm font-semibold">{ p.Title }</h2>
+		if p.Count != nil {
+			<span class="text-xs text-base-content/40">{ strconv.Itoa(*p.Count) } { sectionHeaderCountLabel(p) }</span>
+		}
+		if p.Action != nil {
+			<div class="ml-auto shrink-0">
+				@p.Action
+			</div>
+		}
+	</header>
+}
+
+func sectionHeaderCountLabel(p SectionHeaderProps) string {
+	if p.CountLabel != "" {
+		return p.CountLabel
+	}
+	return "items"
+}
+
+// SectionHeaderIntPtr is a small helper to take the address of an int
+// literal inline at the call site (Go doesn't allow `&3`).
+func SectionHeaderIntPtr(n int) *int { return &n }

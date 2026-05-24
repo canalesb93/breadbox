@@ -12,12 +12,10 @@ import (
 templ SettingsSync(p SettingsProps) {
 	<script src="/static/js/admin/components/settings.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Sync</h1>
-			<p class="text-sm text-base-content/50 mt-1">Schedule and log retention</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Sync",
+		Subtitle: "Schedule and log retention",
+	})
 	<div class="grid gap-6 bb-stagger max-w-2xl">
 		@settingsSyncSchedule(p)
 		@settingsSyncRetention(p)
@@ -27,12 +25,10 @@ templ SettingsSync(p SettingsProps) {
 // SettingsSecurity renders the Security tab — encryption key status +
 // pointer to Account for password changes.
 templ SettingsSecurity(p SettingsProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Security</h1>
-			<p class="text-sm text-base-content/50 mt-1">Encryption key status</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Security",
+		Subtitle: "Encryption key status",
+	})
 	<div class="grid gap-6 bb-stagger max-w-2xl">
 		@settingsSecurityCardFlat(p)
 	</div>
@@ -40,12 +36,10 @@ templ SettingsSecurity(p SettingsProps) {
 
 // SettingsSystem renders the System tab — version info + update badge.
 templ SettingsSystem(p SettingsProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">System</h1>
-			<p class="text-sm text-base-content/50 mt-1">Version and runtime information</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "System",
+		Subtitle: "Version and runtime information",
+	})
 	<div class="grid gap-6 bb-stagger max-w-2xl">
 		@settingsSystemCard(p)
 	</div>
@@ -54,12 +48,10 @@ templ SettingsSystem(p SettingsProps) {
 // SettingsHelp renders the Help tab — pointer to the Getting Started
 // wizard. The Documentation footer button covers external help.
 templ SettingsHelp(p SettingsProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Help</h1>
-			<p class="text-sm text-base-content/50 mt-1">Setup guide and resources</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Help",
+		Subtitle: "Setup guide and resources",
+	})
 	<div class="grid gap-6 bb-stagger max-w-2xl">
 		@settingsHelpCardFlat(p)
 	</div>
