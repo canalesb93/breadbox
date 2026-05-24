@@ -40,6 +40,16 @@ Caveats:
 
 Use `make dev` (no watch) when you specifically want the production embedded-FS behavior — e.g. validating an embed regression.
 
+## DaisyUI adherence
+
+DaisyUI 5 is the source of truth for component shapes. The decision
+tree (daisy first → daisy modifier → existing `bb-*` → templ component
+→ inline) and the list of justified `bb-*` extensions vs the
+anti-patterns being retired live in **`.claude/rules/daisyui.md`** —
+read it before adding a new `bb-*` class or hand-rolling something
+daisy ships. The two audits in `docs/design-system-audit/` show the
+current state.
+
 ## Footguns
 
 ### Never use `bg-base-200/50` (or any `/opacity` modifier) on `<select>` elements
