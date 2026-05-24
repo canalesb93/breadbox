@@ -135,4 +135,5 @@ Scoped rules in `.claude/rules/` load when you touch matching files:
 - `providers.md` — provider integrations
 - `sync.md` — sync engine patterns
 - `ui.md` — admin UI, CSS, Alpine, icons
+- `daisyui.md` — **daisy-first decision tree**: when to use a daisy primitive, when a `bb-*` extension is justified, which bespoke patterns are being retired
 - `stacked-prs.md` — `gt` workflow and stack conventions (read before creating a stack)
