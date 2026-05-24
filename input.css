@@ -2706,9 +2706,13 @@
  * daisyui.* cascade layer (lower layers lose, regardless of selector
  * specificity). btn-md / btn-lg keep daisy's default `--radius-field`.
  *
+ * Uses Tailwind's `--radius-xl` / `--radius-lg` theme tokens (not
+ * hardcoded values) so a future radius-theme change flows through. The
+ * tokens evaluate to 0.75rem / 0.5rem at the daisy 5 defaults.
+ *
  * `:not(.join-item)` keeps daisy's `.join > .join-item` corner-squaring
  * intact — those use longhand `border-*-radius` props and our shorthand
  * here would otherwise paint all four corners. Buttons inline-stamping
  * `rounded-lg` / `rounded-md` still win via @layer utilities. */
-.btn.btn-sm:not(.join-item) { border-radius: 1rem; }       /* matches rounded-xl */
-.btn.btn-xs:not(.join-item) { border-radius: 0.75rem; }    /* matches rounded-lg */
+.btn.btn-sm:not(.join-item) { border-radius: var(--radius-xl); }
+.btn.btn-xs:not(.join-item) { border-radius: var(--radius-lg); }
