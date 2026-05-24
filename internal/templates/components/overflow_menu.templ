@@ -10,15 +10,16 @@ import (
 // duplicated 12-line `dropdown dropdown-end` + `menu` block scattered
 // across 6+ templ files with subtly different geometry.
 //
-// Implementation: backed by the **native HTML popover API + CSS anchor
-// positioning** so the menu renders in the browser top layer and escapes
-// any `overflow:hidden` / `overflow-x:auto` clipping of the row/table
-// container. Daisy's `dropdown` wrapper isn't needed and is omitted.
+// Implementation: uses daisy 5's first-class popover support on
+// `.dropdown[popover]` — anchor positioning (via daisy's `--anchor-h`/
+// `--anchor-v` custom properties), `z-index: 999`, and the open/close
+// scale-in animation all come from daisy. The component just wires up
+// the per-instance anchor name and picks `dropdown-end`/`dropdown-start`.
 //
 // Pins (do not deviate when calling):
 //   - Trigger:  `btn btn-ghost btn-sm btn-square rounded-lg` + icon `w-5 h-5`
-//   - Menu:     `dropdown-content menu bg-base-100 rounded-xl shadow-lg`
-//               `border border-base-300 z-50 w-44 p-1`
+//   - Menu:     `dropdown dropdown-end menu bg-base-100 rounded-xl`
+//               `shadow-lg border border-base-300 w-44 p-1`
 //   - Item icon: `w-3.5 h-3.5`
 //   - Destructive items: `text-error` on the inner element
 //   - Disabled items: `disabled` class on the <li>
@@ -27,14 +28,11 @@ import (
 // `OnClick` (an Alpine handler string, e.g. `"delete(...)"`) for button
 // items. If both are set, `Href` wins.
 //
-// Browser support: popover is in Chrome 114+, Safari 17+, Firefox 125+.
-// CSS anchor positioning is narrower (Chrome 125+, Safari TP 26+, no
-// Firefox yet). Where anchor positioning isn't supported, the menu still
-// opens in the top layer (escaping clipping) but falls back to a fixed
-// top/left positioning via the `position-area` rule being ignored — see
-// the `[popover].dropdown-content` block in `input.css` for the static
-// fallback positioning that ensures the menu lands beside the trigger
-// even when anchor-positioning isn't available.
+// Browser support: popover (Chrome 114+, Safari 17+, Firefox 125+) and
+// CSS anchor positioning (Chrome 125+, Safari 17.4+; no Firefox yet)
+// are both used by daisy's own `.dropdown[popover]` rules. Where anchor
+// positioning isn't supported, daisy's `position: fixed` + `margin: auto`
+// fallback lands the menu somewhere reasonable.
 
 type OverflowMenuItem struct {
 	Label       string
@@ -126,27 +124,26 @@ templ overflowMenuItem(it OverflowMenuItem) {
 	}
 }
 
-// overflowMenuListClass returns the menu UL classes. The visual shell
-// (dropdown-content menu …) is unchanged from the prior implementation;
-// `dropdown-end` / `dropdown-start` are dropped because anchor positioning
-// drives placement instead.
-func overflowMenuListClass(_ string) string {
-	return "dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1"
+// overflowMenuListClass returns the menu UL classes. Uses daisy's
+// `.dropdown` (NOT `.dropdown-content`) so daisy's first-class popover
+// support kicks in: anchor positioning via `--anchor-h`/`--anchor-v`,
+// `z-index: 999`, and the scale-in open/close animation. `dropdown-end`
+// (default) or `dropdown-start` flips the horizontal alignment via
+// daisy's `--anchor-h` switch.
+func overflowMenuListClass(pos string) string {
+	side := "dropdown-end"
+	if pos == "start" {
+		side = "dropdown-start"
+	}
+	return "dropdown " + side + " menu bg-base-100 rounded-xl shadow-lg border border-base-300 w-44 p-1"
 }
 
 // overflowMenuListStyle wires the popover element to the trigger's anchor
-// name and picks the position-area keyword based on Position.
-//   - end   → bottom span-left  (menu's right edge aligns with trigger's right)
-//   - start → bottom span-right (menu's left edge aligns with trigger's left)
-//
-// `margin:0` is required because user-agents apply default `margin:auto`
-// to popovers (centring them), which would override anchor positioning.
-func overflowMenuListStyle(anchorName, pos string) string {
-	area := "bottom span-left"
-	if pos == "start" {
-		area = "bottom span-right"
-	}
-	return "position-anchor:" + anchorName + ";position-area:" + area + ";margin:0;"
+// name. Daisy's `.dropdown[popover]` rules handle the position-area
+// keyword and the open/close `margin: auto` choreography — we just need
+// to point at the right anchor.
+func overflowMenuListStyle(anchorName, _ string) string {
+	return "position-anchor:" + anchorName
 }
 
 func overflowItemClass(destructive bool) string {
