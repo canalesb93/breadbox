@@ -45,8 +45,15 @@
    * before applying transparency. `text-COLOR/NN` on Lucide icons is treated
    * the same as `text-COLOR` here — call sites that wanted dimming should
    * use `opacity-NN`.
+   *
+   * The explicit `/ 1` matters: in CSS relative color syntax, an omitted
+   * alpha defaults to the *origin* color's alpha (not 100%), so
+   * `rgb(from currentColor r g b)` alone passes the parent's alpha straight
+   * through — making this rule a no-op whenever the parent sets
+   * `text-COLOR/NN` (e.g. the sidebar's `.bb-sidebar-link`
+   * `text-base-content/60`). `/ 1` forces opaque output.
    */
-  svg.lucide { color: rgb(from currentColor r g b); }
+  svg.lucide { color: rgb(from currentColor r g b / 1); }
 
   /*
    * Pre-hydration size for Lucide placeholders.
