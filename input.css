@@ -33,6 +33,37 @@
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }
 
+/* ─── Native browser polish ──────────────────────────────────────────
+ * Two top-level hooks the platform now offers for free:
+ *
+ *   color-scheme: light dark
+ *     Tells the browser to render native widgets (scrollbars, form
+ *     controls, <dialog> backdrops, input UA styles) with dark-mode
+ *     awareness driven by prefers-color-scheme. Without this they
+ *     stay light against our dark theme. Safe everywhere.
+ *
+ *   @view-transition { navigation: auto }
+ *     Opt-in to cross-document View Transitions on same-origin nav.
+ *     Browsers that support it (Chrome 126+, Safari 18.2+) cross-fade
+ *     between full page loads automatically; others do regular nav.
+ *     Doesn't disable bfcache or the iOS swipe-back gesture — the spec
+ *     layers transitions on top of native navigation.
+ *
+ *     Reduced-motion guard zeros out the animations rather than turning
+ *     the at-rule off, which is the pattern recommended by the spec.
+ * ──────────────────────────────────────────────────────────────── */
+:root { color-scheme: light dark; }
+
+@view-transition { navigation: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 /* ─── shadcn-inspired global overrides ─── */
 @layer base {
   /* Ensure Lucide SVG icons don't steal clicks from interactive parents. */
