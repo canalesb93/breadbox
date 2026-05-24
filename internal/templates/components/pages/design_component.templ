@@ -13,13 +13,23 @@ templ DesignComponent(p DesignComponentProps) {
 					<p class="text-sm text-base-content/50 mt-1">{ p.Section.Description }</p>
 				}
 			</div>
+			<!-- Viewport toggle. Mobile / Tablet pin the iframe to a
+			     fixed device width. Desktop fills the standalone shell's
+			     page column. Free starts at 1320px (above Tailwind
+			     xl=1280px so xl: utilities engage — e.g. TxRow's inline
+			     category picker column) and exposes a native browser
+			     resize handle on the bottom-right corner so reviewers
+			     can drag the preview to any width they want; the iframe
+			     stays horizontally centered via mx-auto. The parent
+			     <main> drops max-w-6xl on this route (see base.html
+			     .WideMain branch) so Free has room to grow. -->
 			<div class="join shrink-0 hidden sm:inline-flex" aria-label="Viewport size">
 				<input
 					type="radio"
 					name="design-vp"
-					value="desktop"
-					aria-label="Desktop"
-					title="Desktop — full width"
+					value="mobile"
+					aria-label="Mobile"
+					title="Mobile — 390px (iPhone 14)"
 					class="join-item btn btn-sm"
 					x-model="vp"
 				/>
@@ -35,9 +45,18 @@ templ DesignComponent(p DesignComponentProps) {
 				<input
 					type="radio"
 					name="design-vp"
-					value="mobile"
-					aria-label="Mobile"
-					title="Mobile — 390px (iPhone 14)"
+					value="desktop"
+					aria-label="Desktop"
+					title="Desktop — fills the page column"
+					class="join-item btn btn-sm"
+					x-model="vp"
+				/>
+				<input
+					type="radio"
+					name="design-vp"
+					value="free"
+					aria-label="Free"
+					title="Free — drag the bottom-right corner to resize (starts ≥1320px so xl: utilities engage)"
 					class="join-item btn btn-sm"
 					x-model="vp"
 				/>
@@ -45,24 +64,30 @@ templ DesignComponent(p DesignComponentProps) {
 		</div>
 		<!-- Iframe gives the embedded component its OWN viewport so
 		     Tailwind responsive prefixes (sm:, lg:) trigger based on
-		     the toggle's chosen width, not the outer browser width.
-		     Desktop is pinned to min-width 1320px (just above Tailwind
-		     xl=1280px) so components gated on xl: — like the inline
-		     category picker column on TxRow — render at their full
-		     shape. On narrower browsers the outer wrapper scrolls
-		     horizontally instead of squeezing the preview below xl. -->
-		<div class="overflow-x-auto">
-			<div
-				class="bb-card p-0 mx-auto overflow-hidden transition-[max-width] duration-200"
-				:class="{ 'min-w-[1320px] max-w-full': vp === 'desktop', 'max-w-[768px]': vp === 'tablet', 'max-w-[390px]': vp === 'mobile' }"
-			>
-				<iframe
-					src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
-					title={ p.Section.Title + " preview" }
-					class="w-full h-[80vh] border-0 bg-base-100"
-					loading="lazy"
-				></iframe>
-			</div>
+		     the toggle's chosen width, not the outer browser width. In
+		     Free mode the wrapper uses `resize-x` so the user can drag
+		     the bottom-right corner to widen/narrow the preview; the
+		     iframe inside is `w-full` so it tracks the new width. We
+		     clear any user-set inline width on mode switch (Alpine
+		     $refs.frame) so leaving and returning to Free starts fresh
+		     at the 1320px default instead of inheriting the last drag. -->
+		<div
+			x-ref="frame"
+			x-effect="if (vp !== 'free' && $refs.frame) { $refs.frame.style.width = ''; $refs.frame.style.height = ''; }"
+			class="bb-card p-0 mx-auto overflow-hidden transition-[max-width] duration-200"
+			:class="{
+				'max-w-full': vp === 'desktop',
+				'resize-x overflow-x-hidden w-[1320px] min-w-[320px] max-w-full': vp === 'free',
+				'max-w-[768px]': vp === 'tablet',
+				'max-w-[390px]': vp === 'mobile',
+			}"
+		>
+			<iframe
+				src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
+				title={ p.Section.Title + " preview" }
+				class="w-full h-[80vh] border-0 bg-base-100"
+				loading="lazy"
+			></iframe>
 		</div>
 	</div>
 }
