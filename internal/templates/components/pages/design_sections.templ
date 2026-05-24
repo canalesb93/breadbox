@@ -56,58 +56,58 @@ templ SectionFoundations() {
 
 templ SectionButtons() {
 	<div class="flex flex-col gap-6">
-		@designExample("Sizes (sm + xs)", "Two sizes only. sm uses rounded-xl, xs uses rounded-lg.") {
+		@designExample("Sizes (sm + xs)", "Two sizes only. Radius (xl on sm, lg on xs) is baked into the theme — just write `btn btn-sm` / `btn btn-xs`. No rounded-* modifier needed.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button class="btn btn-primary btn-sm rounded-xl">Primary sm</button>
-				<button class="btn btn-primary btn-xs rounded-lg">Primary xs</button>
+				<button class="btn btn-primary btn-sm">Primary sm</button>
+				<button class="btn btn-primary btn-xs">Primary xs</button>
 			</div>
 		}
 		@designExample("Variants", "Pick by intent: primary for the page CTA, ghost for secondary, outline for selectors, soft for danger.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button class="btn btn-primary btn-sm rounded-xl">Primary</button>
-				<button class="btn btn-ghost btn-sm rounded-xl">Ghost</button>
-				<button class="btn btn-outline btn-sm rounded-xl">Outline</button>
-				<button class="btn btn-secondary btn-sm rounded-xl">Secondary</button>
-				<button class="btn btn-error btn-soft btn-sm rounded-xl">Destructive (soft)</button>
-				<button class="btn btn-error btn-sm rounded-xl">Destructive</button>
-				<button class="btn btn-sm rounded-xl" disabled>Disabled</button>
+				<button class="btn btn-primary btn-sm">Primary</button>
+				<button class="btn btn-ghost btn-sm">Ghost</button>
+				<button class="btn btn-outline btn-sm">Outline</button>
+				<button class="btn btn-secondary btn-sm">Secondary</button>
+				<button class="btn btn-error btn-soft btn-sm">Destructive (soft)</button>
+				<button class="btn btn-error btn-sm">Destructive</button>
+				<button class="btn btn-sm" disabled>Disabled</button>
 			</div>
 		}
 		@designExample("With icons", "Icon size: w-4 h-4 for btn-sm, w-3.5 h-3.5 for btn-xs. Gap: gap-2 / gap-1.5.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button class="btn btn-primary btn-sm rounded-xl gap-2">
+				<button class="btn btn-primary btn-sm gap-2">
 					<i data-lucide="plus" class="w-4 h-4"></i>
 					New connection
 				</button>
-				<button class="btn btn-ghost btn-sm rounded-xl gap-2">
+				<button class="btn btn-ghost btn-sm gap-2">
 					<i data-lucide="refresh-cw" class="w-4 h-4"></i>
 					Sync
 				</button>
-				<button class="btn btn-ghost btn-xs rounded-lg gap-1.5">
+				<button class="btn btn-ghost btn-xs gap-1.5">
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
 					Edit
 				</button>
 			</div>
 		}
-		@designExample("Icon-only (square)", "btn-square keeps it 1:1. Use rounded-xl / rounded-lg matching the size.") {
+		@designExample("Icon-only (square)", "btn-square keeps it 1:1. Radius inherits the size convention (xl on sm, lg on xs). Kebab/overflow triggers opt down to `rounded-lg` for a tighter icon-button feel — see the overflow-menu section.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button class="btn btn-ghost btn-sm btn-square rounded-xl" aria-label="Edit">
+				<button class="btn btn-ghost btn-sm btn-square" aria-label="Edit">
 					<i data-lucide="pencil" class="w-4 h-4"></i>
 				</button>
-				<button class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label="Edit">
+				<button class="btn btn-ghost btn-xs btn-square" aria-label="Edit">
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
 				</button>
-				<button class="btn btn-ghost btn-sm btn-square rounded-xl" aria-label="More">
+				<button class="btn btn-ghost btn-sm btn-square" aria-label="More">
 					<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
 				</button>
 			</div>
 		}
 		@designExample("Loading state", "Swap the label for a spinner. min-w-32 stops the button from jittering between states.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button class="btn btn-primary btn-sm rounded-xl min-w-32">
+				<button class="btn btn-primary btn-sm min-w-32">
 					<span class="loading loading-spinner loading-xs"></span>
 				</button>
-				<button class="btn btn-primary btn-sm rounded-xl gap-2 min-w-32" disabled>
+				<button class="btn btn-primary btn-sm gap-2 min-w-32" disabled>
 					<i data-lucide="save" class="w-4 h-4"></i>
 					Save
 				</button>
@@ -214,8 +214,8 @@ templ SectionCards() {
 					Chase · 3 accounts
 				</div>
 				<div class="px-4 sm:px-5 py-3 border-t border-base-300/50 bg-base-200/20 flex justify-end gap-2">
-					<button class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
-					<button class="btn btn-primary btn-sm rounded-xl">Save</button>
+					<button class="btn btn-ghost btn-sm">Cancel</button>
+					<button class="btn btn-primary btn-sm">Save</button>
 				</div>
 			</div>
 		}
@@ -232,7 +232,7 @@ templ SectionCards() {
 						<h3 class="text-sm font-semibold text-error/80">Delete connection</h3>
 						<p class="text-xs text-base-content/50 mt-0.5">All transactions and accounts will be removed. This cannot be undone.</p>
 					</div>
-					<button class="btn btn-error btn-soft btn-sm rounded-xl shrink-0 gap-2">
+					<button class="btn btn-error btn-soft btn-sm shrink-0 gap-2">
 						<i data-lucide="trash-2" class="w-4 h-4"></i>
 						Delete
 					</button>
@@ -246,42 +246,42 @@ templ SectionCards() {
 
 templ SectionFormControls() {
 	<div class="flex flex-col gap-6">
-		@designExample("Text input", "input-bordered + rounded-xl. Pair with the text-xs label.") {
+		@designExample("Text input", "Daisy 5 input is bordered by default — no input-bordered modifier needed. Pair with the text-xs label.") {
 			<div class="max-w-sm">
 				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-input-1">Email</label>
-				<input id="ds-input-1" type="email" class="input input-bordered w-full rounded-xl" placeholder="alex@example.com"/>
+				<input id="ds-input-1" type="email" class="input w-full rounded-xl" placeholder="alex@example.com"/>
 			</div>
 		}
-		@designExample("Select", "Same shape as input. WARNING: never apply bg-base-200/50 — browsers render the alpha as fully transparent on selects.") {
+		@designExample("Select", "Same shape as input — bordered by default. WARNING: never apply bg-base-200/50 — browsers render the alpha as fully transparent on selects.") {
 			<div class="max-w-sm">
 				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-select-1">Scope</label>
-				<select id="ds-select-1" class="select select-bordered w-full rounded-xl">
+				<select id="ds-select-1" class="select w-full rounded-xl">
 					<option>Full access</option>
 					<option>Read only</option>
 				</select>
 			</div>
 		}
-		@designExample("Textarea", "textarea-bordered + rounded-xl.") {
+		@designExample("Textarea", "Bordered by default — just add rounded-xl for the size convention.") {
 			<div class="max-w-sm">
 				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-textarea-1">Note</label>
-				<textarea id="ds-textarea-1" class="textarea textarea-bordered w-full rounded-xl" rows="3" placeholder="What's this transaction for?"></textarea>
+				<textarea id="ds-textarea-1" class="textarea w-full rounded-xl" rows="3" placeholder="What's this transaction for?"></textarea>
 			</div>
 		}
 		@designExample("Compact (filter bar)", "input-sm / select-sm for filter bars. Styled by bb-filter-bar.") {
 			<div class="bb-filter-bar mb-0">
 				<label>
 					<span>Start date</span>
-					<input type="date" class="input input-sm input-bordered" value="2026-05-01"/>
+					<input type="date" class="input input-sm" value="2026-05-01"/>
 				</label>
 				<label>
 					<span>Status</span>
-					<select class="select select-sm select-bordered">
+					<select class="select select-sm">
 						<option>All</option>
 						<option>Active</option>
 						<option>Error</option>
 					</select>
 				</label>
-				<button type="button" class="btn btn-sm btn-primary rounded-xl self-end">Filter</button>
+				<button type="button" class="btn btn-sm btn-primary self-end">Filter</button>
 			</div>
 		}
 		@designExample("Checkbox / toggle / radio", "DaisyUI primitives.") {
@@ -456,7 +456,7 @@ templ SectionModals() {
 	<div class="flex flex-col gap-6">
 		@designExample("Standard modal trigger", "modal-bottom on mobile, modal-middle on sm+. rounded-xl modal-box.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button type="button" class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('ds-modal-1').showModal()">
+				<button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('ds-modal-1').showModal()">
 					Open modal
 				</button>
 				<dialog id="ds-modal-1" class="modal modal-bottom sm:modal-middle">
@@ -465,9 +465,9 @@ templ SectionModals() {
 						<p class="text-sm text-base-content/60 mb-4">All transactions and accounts will be removed. This cannot be undone.</p>
 						<div class="modal-action mt-0 gap-2">
 							<form method="dialog">
-								<button class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
+								<button class="btn btn-ghost btn-sm">Cancel</button>
 							</form>
-							<button class="btn btn-error btn-sm rounded-xl">Delete</button>
+							<button class="btn btn-error btn-sm">Delete</button>
 						</div>
 					</div>
 					<form method="dialog" class="modal-backdrop">
@@ -603,7 +603,7 @@ templ SectionEmptyStates() {
 					</div>
 					<h3 class="text-base font-semibold mb-1">No connections yet</h3>
 					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Link a bank to start importing transactions.</p>
-					<a href="#" class="btn btn-primary btn-sm rounded-xl gap-2">
+					<a href="#" class="btn btn-primary btn-sm gap-2">
 						<i data-lucide="plus" class="w-4 h-4"></i>
 						Add connection
 					</a>
@@ -929,12 +929,12 @@ templ SectionKbd() {
 		@designExample("Inline in a toolbar (live ref)", "How the bulk action bar surfaces hotkey hints — passed as Hotkey on MultiSelectToolbarAction.") {
 			<div role="toolbar" aria-label="Selection actions (preview)" class="inline-block">
 				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5">
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl gap-2">
+					<button type="button" class="btn btn-ghost btn-sm gap-2">
 						<i data-lucide="tag" class="w-3.5 h-3.5"></i>
 						<span>Tag</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">T</span>
 					</button>
-					<button type="button" class="btn btn-primary btn-sm rounded-xl gap-2">
+					<button type="button" class="btn btn-primary btn-sm gap-2">
 						<i data-lucide="tags" class="w-3.5 h-3.5"></i>
 						<span>Categorize</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
@@ -953,7 +953,7 @@ templ SectionToast() {
 			<div class="flex flex-wrap items-center gap-2">
 				<button
 					type="button"
-					class="btn btn-sm rounded-xl gap-2 border border-success/30 bg-success/10 text-success hover:bg-success/15"
+					class="btn btn-sm gap-2 border border-success/30 bg-success/10 text-success hover:bg-success/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Saved', type: 'success'}}))"
 				>
 					<i data-lucide="check" class="w-3.5 h-3.5"></i>
@@ -961,7 +961,7 @@ templ SectionToast() {
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm rounded-xl gap-2 border border-error/30 bg-error/10 text-error hover:bg-error/15"
+					class="btn btn-sm gap-2 border border-error/30 bg-error/10 text-error hover:bg-error/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Could not save: provider rejected the request', type: 'error'}}))"
 				>
 					<i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
@@ -969,7 +969,7 @@ templ SectionToast() {
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm rounded-xl gap-2 border border-warning/30 bg-warning/10 text-warning hover:bg-warning/15"
+					class="btn btn-sm gap-2 border border-warning/30 bg-warning/10 text-warning hover:bg-warning/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: '2 rows updated, 1 skipped', type: 'warning'}}))"
 				>
 					<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
@@ -977,7 +977,7 @@ templ SectionToast() {
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm rounded-xl gap-2 border border-info/30 bg-info/10 text-info hover:bg-info/15"
+					class="btn btn-sm gap-2 border border-info/30 bg-info/10 text-info hover:bg-info/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Sync starting in the background', type: 'info'}}))"
 				>
 					<i data-lucide="info" class="w-3.5 h-3.5"></i>
@@ -1015,12 +1015,12 @@ templ SectionMultiSelectToolbar() {
 	<div x-data="{ open: false, count: 3 }" class="flex flex-col gap-6">
 		@designExample("Live demo", "Toggle the floating toolbar. Real-world wiring listens for `multi-select-close` and `multi-select-toggle-all` events to clear / select-all.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<button type="button" class="btn btn-primary btn-sm rounded-xl" @click="open = !open">
+				<button type="button" class="btn btn-primary btn-sm" @click="open = !open">
 					<span x-show="!open">Show toolbar</span>
 					<span x-show="open" x-cloak>Hide toolbar</span>
 				</button>
-				<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="count++">+1 selection</button>
-				<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="count = Math.max(0, count - 1)">−1 selection</button>
+				<button type="button" class="btn btn-ghost btn-sm" @click="count++">+1 selection</button>
+				<button type="button" class="btn btn-ghost btn-sm" @click="count = Math.max(0, count - 1)">−1 selection</button>
 				<span class="text-xs text-base-content/50 ml-2">count = <span x-text="count"></span></span>
 			</div>
 			@components.MultiSelectToolbar(components.MultiSelectToolbarProps{
@@ -1057,26 +1057,26 @@ templ SectionMultiSelectToolbar() {
 		@designExample("Inline shape (static)", "The pill rendered without the fixed wrapper, for layout reference.") {
 			<div role="toolbar" aria-label="Selection actions (preview)" class="inline-block">
 				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5">
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl gap-1.5">
+					<button type="button" class="btn btn-ghost btn-sm gap-1.5">
 						<span class="font-bold tabular-nums">3</span>
 						<span class="hidden sm:inline text-base-content/60 font-normal">selected</span>
 					</button>
 					<div class="w-px h-6 bg-base-300"></div>
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Comment">
+					<button type="button" class="btn btn-ghost btn-sm gap-2" title="Comment">
 						<i data-lucide="message-square" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">Comment</span>
 					</button>
-					<button type="button" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Tag">
+					<button type="button" class="btn btn-ghost btn-sm gap-2" title="Tag">
 						<i data-lucide="tag" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">Tag</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">T</span>
 					</button>
-					<button type="button" class="btn btn-primary btn-sm rounded-xl gap-2" title="Categorize">
+					<button type="button" class="btn btn-primary btn-sm gap-2" title="Categorize">
 						<i data-lucide="tags" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">Categorize</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
 					</button>
-					<button type="button" class="btn btn-ghost btn-sm btn-square rounded-xl" title="Clear selection" aria-label="Clear selection">
+					<button type="button" class="btn btn-ghost btn-sm btn-square" title="Clear selection" aria-label="Clear selection">
 						<i data-lucide="x" class="w-4 h-4"></i>
 					</button>
 				</div>

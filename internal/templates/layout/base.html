@@ -243,7 +243,7 @@
       </a>
       <div class="flex items-center gap-1">
         <label
-          class="swap swap-rotate btn btn-ghost btn-xs btn-square rounded-lg text-base-content/60"
+          class="swap swap-rotate btn btn-ghost btn-xs btn-square text-base-content/60"
           title="Toggle theme (resets on reload)"
         >
           <input
@@ -257,7 +257,7 @@
           <i data-lucide="sun" class="swap-off w-4 h-4"></i>
           <i data-lucide="moon" class="swap-on w-4 h-4"></i>
         </label>
-        <a href="/" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/60">
+        <a href="/" class="btn btn-ghost btn-xs gap-1.5 text-base-content/60">
           <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
           Back to app
         </a>
@@ -378,8 +378,8 @@
             </div>
           </div>
           <div class="bb-confirm-actions">
-            <button class="btn btn-sm btn-ghost rounded-xl" @click="cancel()" x-text="cancelLabel"></button>
-            <button class="btn btn-sm rounded-xl"
+            <button class="btn btn-sm btn-ghost" @click="cancel()" x-text="cancelLabel"></button>
+            <button class="btn btn-sm"
                     :class="variant === 'danger' ? 'btn-error' : 'btn-warning'"
                     @click="confirm()"
                     x-text="confirmLabel"
@@ -390,11 +390,13 @@
     </template>
   </div>
 
-  <!-- Global toast (centered floating pill). Also flushes any
-       session-persisted toast (e.g. queued before a full-page reload by the
-       bulk action bar), which dispatching bb-toast from a DOMContentLoaded
-       handler is too early to deliver reliably. -->
-  <div class="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
+  <!-- Global toast (centered floating pill). Daisy `toast toast-center
+       toast-bottom` gives us the centered-bottom placement + flex-col
+       stack out of the box; the bottom-8 spacing comes from daisy. Also
+       flushes any session-persisted toast (e.g. queued before a full-page
+       reload by the bulk action bar), which dispatching bb-toast from a
+       DOMContentLoaded handler is too early to deliver reliably. -->
+  <div class="toast toast-center toast-bottom z-50 pointer-events-none"
        role="region"
        aria-live="polite"
        aria-label="Notifications"
@@ -721,8 +723,8 @@
           <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "esc"}} cancel</span>
         </div>
         <div class="flex items-center gap-2">
-          <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="closePicker()">Cancel</button>
-          <button type="button" class="btn btn-primary btn-xs rounded-lg"
+          <button type="button" class="btn btn-ghost btn-xs" @click="closePicker()">Cancel</button>
+          <button type="button" class="btn btn-primary btn-xs"
             :disabled="pendingAddCount + pendingRemoveCount === 0"
             @click="apply()">Apply</button>
         </div>

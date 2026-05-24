@@ -105,10 +105,10 @@ templ ruleDetailHeader(p RuleDetailProps) {
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
-				<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline rounded-xl">
+				<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline">
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
 				</a>
-				<button class="btn btn-sm btn-ghost rounded-xl" @click="toggleRule()">
+				<button class="btn btn-sm btn-ghost" @click="toggleRule()">
 					if p.Rule.Enabled {
 						<i data-lucide="pause" class="w-3.5 h-3.5"></i>
 						Disable
@@ -403,7 +403,7 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 				if retro {
 					<div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 						<p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
-						<button class="btn btn-sm btn-outline rounded-xl w-full sm:w-auto" data-apply-btn @click="openApplyModal()" :disabled="applying">
+						<button class="btn btn-sm btn-outline w-full sm:w-auto" data-apply-btn @click="openApplyModal()" :disabled="applying">
 							<span x-show="applying" class="loading loading-spinner loading-xs"></span>
 							<i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
 							if p.ActionCategoryName != "" {
@@ -479,10 +479,10 @@ templ ruleDetailApplyModal(p RuleDetailProps) {
 						<span x-text="applyError"></span>
 					</div>
 					<div class="flex items-center justify-end gap-2 mt-5">
-						<button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="closeApplyModal()">Cancel</button>
+						<button type="button" class="btn btn-sm btn-ghost" @click="closeApplyModal()">Cancel</button>
 						<button
 							type="button"
-							class="btn btn-sm rounded-xl btn-warning disabled:bg-warning/40 disabled:text-warning disabled:border-transparent disabled:!opacity-100"
+							class="btn btn-sm btn-warning disabled:bg-warning/40 disabled:text-warning disabled:border-transparent disabled:!opacity-100"
 							:disabled="!confirmApply || applying"
 							@click="applyRetroactively()"
 						>

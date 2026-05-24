@@ -25,7 +25,7 @@ templ AccountLinkDetail(p AccountLinkDetailProps) {
 		</div>
 		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/account-links/%s/reconcile", p.LinkID)) } class="inline">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<button type="submit" class="btn btn-primary btn-sm rounded-xl">
+			<button type="submit" class="btn btn-primary btn-sm">
 				<i data-lucide="refresh-cw" class="w-4 h-4"></i> <span class="hidden sm:inline">Reconcile Now</span><span class="sm:hidden">Reconcile</span>
 			</button>
 		</form>
@@ -88,13 +88,13 @@ templ accountLinkDetailDesktopRow(m AccountLinkDetailMatchRow, csrfToken string)
 				<div class="flex gap-1">
 					<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/confirm", m.ID)) } class="inline">
 						<input type="hidden" name="_csrf" value={ csrfToken }/>
-						<button type="submit" class="btn btn-ghost btn-xs text-success rounded-lg" title="Confirm match">
+						<button type="submit" class="btn btn-ghost btn-xs text-success" title="Confirm match">
 							<i data-lucide="check" class="w-3.5 h-3.5"></i>
 						</button>
 					</form>
 					<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/reject", m.ID)) } class="inline">
 						<input type="hidden" name="_csrf" value={ csrfToken }/>
-						<button type="submit" class="btn btn-ghost btn-xs text-error rounded-lg" title="Reject match">
+						<button type="submit" class="btn btn-ghost btn-xs text-error" title="Reject match">
 							<i data-lucide="x" class="w-3.5 h-3.5"></i>
 						</button>
 					</form>
@@ -141,13 +141,13 @@ templ accountLinkDetailMobileCard(m AccountLinkDetailMatchRow, csrfToken string)
 			<div class="flex gap-2 mt-3 pt-3 border-t border-base-200">
 				<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/confirm", m.ID)) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
-					<button type="submit" class="btn btn-success btn-xs btn-soft rounded-lg">
+					<button type="submit" class="btn btn-success btn-xs btn-soft">
 						<i data-lucide="check" class="w-3.5 h-3.5"></i> Confirm
 					</button>
 				</form>
 				<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/reject", m.ID)) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
-					<button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">
+					<button type="submit" class="btn btn-error btn-xs btn-soft">
 						<i data-lucide="x" class="w-3.5 h-3.5"></i> Reject
 					</button>
 				</form>

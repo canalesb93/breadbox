@@ -75,7 +75,7 @@ templ GettingStarted(p GettingStartedProps) {
 		if !p.OnboardingDismissed {
 			<form method="POST" action="/getting-started/dismiss">
 				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				<button type="submit" class="btn btn-ghost btn-sm rounded-xl text-base-content/50">
+				<button type="submit" class="btn btn-ghost btn-sm text-base-content/50">
 					<i data-lucide="x" class="w-3.5 h-3.5"></i>
 					Dismiss guide
 					<span class="text-xs text-base-content/30 ml-1 hidden sm:inline">-- you can always find it at /getting-started or in Settings</span>
@@ -115,17 +115,17 @@ templ gsStep1(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasMember {
-						<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">View Members</a>
+						<a href="/settings/household" class="btn btn-ghost btn-sm">View Members</a>
 					} else {
-						<a href="/settings/household/new" class="btn btn-primary btn-sm rounded-xl">Add Member</a>
+						<a href="/settings/household/new" class="btn btn-primary btn-sm">Add Member</a>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasMember {
-					<a href="/settings/household" class="btn btn-ghost btn-sm rounded-xl">View Members</a>
+					<a href="/settings/household" class="btn btn-ghost btn-sm">View Members</a>
 				} else {
-					<a href="/settings/household/new" class="btn btn-primary btn-sm rounded-xl">Add Member</a>
+					<a href="/settings/household/new" class="btn btn-primary btn-sm">Add Member</a>
 				}
 			</div>
 		</div>
@@ -158,17 +158,17 @@ templ gsStep2(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasProvider {
-						<a href="/settings/providers" class="btn btn-ghost btn-sm rounded-xl">View Providers</a>
+						<a href="/settings/providers" class="btn btn-ghost btn-sm">View Providers</a>
 					} else {
-						<a href="/settings/providers" class="btn btn-primary btn-sm rounded-xl">Configure</a>
+						<a href="/settings/providers" class="btn btn-primary btn-sm">Configure</a>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasProvider {
-					<a href="/settings/providers" class="btn btn-ghost btn-sm rounded-xl">View Providers</a>
+					<a href="/settings/providers" class="btn btn-ghost btn-sm">View Providers</a>
 				} else {
-					<a href="/settings/providers" class="btn btn-primary btn-sm rounded-xl">Configure</a>
+					<a href="/settings/providers" class="btn btn-primary btn-sm">Configure</a>
 				}
 			</div>
 		</div>
@@ -203,21 +203,21 @@ templ gsStep3(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasConnection {
-						<a href="/connections" class="btn btn-ghost btn-sm rounded-xl">View Connections</a>
+						<a href="/connections" class="btn btn-ghost btn-sm">View Connections</a>
 					} else if p.HasProvider {
-						<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">Connect Bank</a>
+						<a href="/connections/new" class="btn btn-primary btn-sm">Connect Bank</a>
 					} else {
-						<span class="btn btn-sm btn-disabled rounded-xl">Connect Bank</span>
+						<span class="btn btn-sm btn-disabled">Connect Bank</span>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasConnection {
-					<a href="/connections" class="btn btn-ghost btn-sm rounded-xl">View Connections</a>
+					<a href="/connections" class="btn btn-ghost btn-sm">View Connections</a>
 				} else if p.HasProvider {
-					<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">Connect Bank</a>
+					<a href="/connections/new" class="btn btn-primary btn-sm">Connect Bank</a>
 				} else {
-					<span class="btn btn-sm btn-disabled rounded-xl">Connect Bank</span>
+					<span class="btn btn-sm btn-disabled">Connect Bank</span>
 				}
 			</div>
 		</div>
@@ -251,21 +251,21 @@ templ gsStep4(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasSync {
-						<a href="/transactions" class="btn btn-ghost btn-sm rounded-xl">View Transactions</a>
+						<a href="/transactions" class="btn btn-ghost btn-sm">View Transactions</a>
 					} else if p.HasConnection {
-						<a href="/logs" class="btn btn-ghost btn-sm rounded-xl">View Logs</a>
+						<a href="/logs" class="btn btn-ghost btn-sm">View Logs</a>
 					} else {
-						<span class="btn btn-sm btn-disabled rounded-xl">View Logs</span>
+						<span class="btn btn-sm btn-disabled">View Logs</span>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasSync {
-					<a href="/transactions" class="btn btn-ghost btn-sm rounded-xl">View Transactions</a>
+					<a href="/transactions" class="btn btn-ghost btn-sm">View Transactions</a>
 				} else if p.HasConnection {
-					<a href="/logs" class="btn btn-ghost btn-sm rounded-xl">View Logs</a>
+					<a href="/logs" class="btn btn-ghost btn-sm">View Logs</a>
 				} else {
-					<span class="btn btn-sm btn-disabled rounded-xl">View Logs</span>
+					<span class="btn btn-sm btn-disabled">View Logs</span>
 				}
 			</div>
 		</div>
@@ -298,17 +298,17 @@ templ gsStep5(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasAPIKey {
-						<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">View Agents</a>
+						<a href="/agent-prompts" class="btn btn-ghost btn-sm">View Agents</a>
 					} else {
-						<a href="/agent-prompts" class="btn btn-primary btn-sm rounded-xl">Set Up Agents</a>
+						<a href="/agent-prompts" class="btn btn-primary btn-sm">Set Up Agents</a>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasAPIKey {
-					<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">View Agents</a>
+					<a href="/agent-prompts" class="btn btn-ghost btn-sm">View Agents</a>
 				} else {
-					<a href="/agent-prompts" class="btn btn-primary btn-sm rounded-xl">Set Up Agents</a>
+					<a href="/agent-prompts" class="btn btn-primary btn-sm">Set Up Agents</a>
 				}
 			</div>
 		</div>

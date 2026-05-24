@@ -194,7 +194,7 @@ templ wizardCard(c wizardCardData) {
 			</div>
 		</a>
 		<button
-			class={ "btn btn-ghost btn-sm rounded-xl text-base-content/30 mr-2 flex-shrink-0",
+			class={ "btn btn-ghost btn-sm text-base-content/30 mr-2 flex-shrink-0",
 				"hover:text-" + c.Color }
 			:class="copied && '!text-success'"
 			@click.stop={ "copyPrompt('" + c.Slug + "')" }

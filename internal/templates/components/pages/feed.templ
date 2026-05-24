@@ -58,7 +58,7 @@ templ feedHero(p FeedProps) {
 			<div class="flex items-center gap-2 shrink-0">
 				<button
 					type="button"
-					class="btn btn-sm btn-ghost rounded-xl"
+					class="btn btn-sm btn-ghost"
 					onclick="window.location.reload()"
 					title="Refresh"
 					aria-label="Refresh feed"
@@ -66,7 +66,7 @@ templ feedHero(p FeedProps) {
 					<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Refresh</span>
 				</button>
-				<a href="/connections/new" class="btn btn-sm btn-primary rounded-xl" aria-label="Connect a new bank">
+				<a href="/connections/new" class="btn btn-sm btn-primary" aria-label="Connect a new bank">
 					<i data-lucide="plus" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Connect bank</span>
 				</a>
@@ -146,7 +146,7 @@ templ feedAlertCard(a FeedAlert) {
 				<p class="text-xs opacity-80">Last successful sync: { a.LastSyncedAt }</p>
 			}
 		</div>
-		<a href={ templ.SafeURL("/connections/" + a.ConnectionID) } class="btn btn-sm btn-warning rounded-xl shrink-0">
+		<a href={ templ.SafeURL("/connections/" + a.ConnectionID) } class="btn btn-sm btn-warning shrink-0">
 			<i data-lucide="wrench" class="w-3.5 h-3.5"></i>
 			Fix
 		</a>
@@ -221,7 +221,7 @@ templ feedLoadOlder(p FeedProps) {
 			} else {
 				<a
 					href={ templ.SafeURL(feedLoadOlderHRef(p)) }
-					class="btn btn-sm btn-ghost rounded-xl border border-base-300 text-base-content/65"
+					class="btn btn-sm btn-ghost border border-base-300 text-base-content/65"
 				>
 					<i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
 					Load older activity
@@ -261,7 +261,7 @@ templ feedEmptyFirstRun() {
 		<p class="text-sm text-base-content/55 max-w-md mx-auto mb-5">
 			Connect your first bank to start filling your feed.
 		</p>
-		<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+		<a href="/connections/new" class="btn btn-primary btn-sm">
 			<i data-lucide="plus" class="w-3.5 h-3.5"></i>
 			Connect a bank
 		</a>
@@ -279,7 +279,7 @@ templ feedEmptyFiltered(filter string) {
 		<p class="text-sm text-base-content/55 mb-5">
 			Nothing in this slice today.
 		</p>
-		<a href="/" class="btn btn-sm btn-ghost rounded-xl border border-base-300">
+		<a href="/" class="btn btn-sm btn-ghost border border-base-300">
 			<i data-lucide="x" class="w-3.5 h-3.5"></i>
 			Clear filter
 		</a>
@@ -302,14 +302,14 @@ templ feedEmptyNoRecent(p FeedProps) {
 			<div class="flex items-center justify-center gap-2 flex-wrap">
 				<button
 					type="button"
-					class="btn btn-primary btn-sm rounded-xl"
+					class="btn btn-primary btn-sm"
 					x-bind:disabled="state !== 'idle'"
 					x-on:click="triggerSyncNow()"
 				>
 					<i data-lucide="refresh-cw" class="w-3.5 h-3.5" x-bind:class="state === 'syncing' ? 'animate-spin' : ''"></i>
 					<span x-text="state === 'syncing' ? 'Syncing…' : (state === 'done' ? 'Sync queued' : 'Sync now')"></span>
 				</button>
-				<a href="/transactions" class="btn btn-sm btn-ghost rounded-xl border border-base-300">
+				<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
 					<i data-lucide="receipt" class="w-3.5 h-3.5"></i>
 					Browse transactions
 				</a>
@@ -322,7 +322,7 @@ templ feedEmptyNoRecent(p FeedProps) {
 			<p class="text-sm text-base-content/55 mb-5">
 				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
 			</p>
-			<a href="/transactions" class="btn btn-sm btn-ghost rounded-xl border border-base-300">
+			<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
 				<i data-lucide="receipt" class="w-3.5 h-3.5"></i>
 				Browse transactions
 			</a>

@@ -22,7 +22,7 @@ templ Reports(p ReportsProps) {
 			<p class="text-sm text-base-content/50 mt-0.5 hidden sm:block">Messages from your AI agents — their work, flagged items, and findings</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<a href="/settings/mcp#report-format" class="btn btn-ghost btn-sm rounded-xl text-xs no-underline" aria-label="Manage report format" title="Customize how agents write reports">
+			<a href="/settings/mcp#report-format" class="btn btn-ghost btn-sm text-xs no-underline" aria-label="Manage report format" title="Customize how agents write reports">
 				<i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
 				<span>Manage format</span>
 			</a>
@@ -36,7 +36,7 @@ templ Reports(p ReportsProps) {
 		<div class="ml-auto flex items-center gap-2 shrink-0">
 			<span class="text-xs text-base-content/30 hidden sm:inline">{ reportsCountLabel(p.TotalCount) }</span>
 			<button
-				class="btn btn-ghost btn-sm rounded-xl text-xs cursor-pointer"
+				class="btn btn-ghost btn-sm text-xs cursor-pointer"
 				onclick="fetch('/-/reports/read-all', {method:'POST'}).then(function(){window.location.reload()})"
 				aria-label="Mark all reports read"
 				title="Mark all read"
@@ -111,7 +111,7 @@ templ reportsRow(r ReportsItem) {
 				if !r.IsRead {
 					<button
 						@click.prevent.stop={ fmt.Sprintf("markRead('%s')", r.ID) }
-						class="btn btn-ghost btn-xs rounded-lg cursor-pointer text-base-content/40 hover:text-success hover:bg-success/10"
+						class="btn btn-ghost btn-xs cursor-pointer text-base-content/40 hover:text-success hover:bg-success/10"
 						title="Mark as read"
 					>
 						<i data-lucide="check" class="w-4 h-4"></i>

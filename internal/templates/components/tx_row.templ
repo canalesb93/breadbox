@@ -193,7 +193,7 @@ templ TxRow(tx service.AdminTransactionRow) {
 					data-initial={ txCategoryInitial(tx.CategoryID) }
 					x-init={ fmt.Sprintf("$watch('selectedId', (v, old) => { if (old !== undefined && v !== old && !($store.bulk && $store.bulk.processing)) { quickSetCategory('%s', v) } })", tx.ID) }
 				>
-					<button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
+					<button type="button" class="btn btn-ghost btn-xs gap-1.5" @click="openPicker()">
 						<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
 						<span x-text="displayLabel" class="text-xs" :class="!selectedId && 'text-base-content/30'">
 							if tx.CategoryDisplayName != nil {

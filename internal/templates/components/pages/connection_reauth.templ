@@ -72,14 +72,14 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 			<div class="flex items-center gap-3">
 				<button
 					type="button"
-					class="btn btn-primary btn-sm rounded-xl"
+					class="btn btn-primary btn-sm"
 					x-show="canRetry"
 					x-cloak
 					@click="startReauth()"
 				>
 					<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
 				</button>
-				<a href={ templ.SafeURL("/connections/" + p.ConnID) } class="btn btn-ghost btn-sm rounded-xl">
+				<a href={ templ.SafeURL("/connections/" + p.ConnID) } class="btn btn-ghost btn-sm">
 					<i data-lucide="x" class="w-4 h-4"></i> Cancel
 				</a>
 			</div>

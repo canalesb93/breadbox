@@ -99,13 +99,13 @@ templ txPageHeader(p TransactionsProps) {
 			}
 		</div>
 		<div class="flex items-center gap-2">
-			<!-- View Toggle -->
-			<div class="bb-view-toggle" x-data>
-				<button type="button" class="bb-view-toggle__btn" :class="$store.txView.mode === 'grouped' && 'bb-view-toggle__btn--active'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
+			<!-- View Toggle — daisy join + join-item btn (segmented control). -->
+			<div class="join border border-base-300 bg-base-200" x-data>
+				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
 					<i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Grouped</span>
 				</button>
-				<button type="button" class="bb-view-toggle__btn" :class="$store.txView.mode === 'list' && 'bb-view-toggle__btn--active'" @click="$store.txView.setMode('list')" title="Flat list view">
+				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')" title="Flat list view">
 					<i data-lucide="list" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">List</span>
 				</button>
@@ -115,7 +115,7 @@ templ txPageHeader(p TransactionsProps) {
 				type="button"
 				x-data
 				@click="$store.bulk.toggleMode()"
-				class="btn btn-ghost btn-sm rounded-xl gap-2"
+				class="btn btn-ghost btn-sm gap-2"
 				:class="$store.bulk.selecting && 'bg-primary/10 text-primary'"
 				title="Toggle selection mode"
 			>
@@ -123,13 +123,13 @@ templ txPageHeader(p TransactionsProps) {
 				<span class="hidden sm:inline" x-text="$store.bulk.selecting ? 'Done' : 'Select'"></span>
 			</button>
 			if p.HasAnyFilter() {
-				<a href="/transactions" class="btn btn-ghost btn-sm rounded-xl">
+				<a href="/transactions" class="btn btn-ghost btn-sm">
 					<i data-lucide="x" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Clear filters</span>
 				</a>
 			}
 			if len(p.Transactions) > 0 {
-				<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm rounded-xl" title="Export as CSV">
+				<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm" title="Export as CSV">
 					<i data-lucide="download" class="w-3.5 h-3.5"></i>
 					<span class="hidden sm:inline">Export CSV</span>
 				</a>
@@ -174,7 +174,7 @@ templ txFilters(p TransactionsProps) {
 					type="text"
 					id="bb-quick-search"
 					placeholder="Search transactions..."
-					class="input input-bordered pl-9 pr-9 w-full rounded-xl text-sm bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200 h-10"
+					class="input pl-9 pr-9 w-full rounded-xl text-sm bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200 h-10"
 					x-ref="searchInput"
 					:value="query"
 					@input="doSearch($event.target.value)"
@@ -216,16 +216,16 @@ templ txFilters(p TransactionsProps) {
 				<div class="grid grid-cols-2 gap-3 lg:col-span-2">
 					<label class="bb-filter-label">
 						Start Date
-						<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm input-bordered w-full"/>
+						<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm w-full"/>
 					</label>
 					<label class="bb-filter-label">
 						End Date
-						<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm input-bordered w-full"/>
+						<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm w-full"/>
 					</label>
 				</div>
 				<label class="bb-filter-label">
 					Connection
-					<select name="connection_id" class="select select-sm select-bordered w-full">
+					<select name="connection_id" class="select select-sm w-full">
 						<option value="">All connections</option>
 						for _, c := range p.Connections {
 							@txSelectOption(c.ID, c.InstitutionName, p.FilterConnID)
@@ -234,7 +234,7 @@ templ txFilters(p TransactionsProps) {
 				</label>
 				<label class="bb-filter-label">
 					Account
-					<select name="account_id" class="select select-sm select-bordered w-full">
+					<select name="account_id" class="select select-sm w-full">
 						<option value="">All accounts</option>
 						for _, a := range p.Accounts {
 							@txSelectOption(a.ID, accountSelectLabel(a.Name, a.Mask), p.FilterAccountID)
@@ -243,7 +243,7 @@ templ txFilters(p TransactionsProps) {
 				</label>
 				<label class="bb-filter-label">
 					Family Member
-					<select name="user_id" class="select select-sm select-bordered w-full">
+					<select name="user_id" class="select select-sm w-full">
 						<option value="">All members</option>
 						for _, u := range p.Users {
 							@txSelectOption(u.ID, u.Name, p.FilterUserID)
@@ -266,7 +266,7 @@ templ txFilters(p TransactionsProps) {
 						@category-change="$refs.catInput.value = selectedSlug"
 					>
 						<input type="hidden" name="category" x-ref="catInput" value={ p.FilterCategory }/>
-						<button type="button" class="select select-sm select-bordered w-full text-left flex items-center gap-2" @click="openPicker()">
+						<button type="button" class="select select-sm w-full text-left flex items-center gap-2" @click="openPicker()">
 							<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
 							<span x-text="displayLabel" class="text-sm truncate"></span>
 						</button>
@@ -276,16 +276,16 @@ templ txFilters(p TransactionsProps) {
 				<div class="grid grid-cols-2 gap-3 lg:col-span-2">
 					<label class="bb-filter-label">
 						Min Amount
-						<input type="number" name="min_amount" step="0.01" value={ p.FilterMinAmount } placeholder="0.00" class="input input-sm input-bordered w-full"/>
+						<input type="number" name="min_amount" step="0.01" value={ p.FilterMinAmount } placeholder="0.00" class="input input-sm w-full"/>
 					</label>
 					<label class="bb-filter-label">
 						Max Amount
-						<input type="number" name="max_amount" step="0.01" value={ p.FilterMaxAmount } placeholder="0.00" class="input input-sm input-bordered w-full"/>
+						<input type="number" name="max_amount" step="0.01" value={ p.FilterMaxAmount } placeholder="0.00" class="input input-sm w-full"/>
 					</label>
 				</div>
 				<label class="bb-filter-label">
 					Pending
-					<select name="pending" class="select select-sm select-bordered w-full">
+					<select name="pending" class="select select-sm w-full">
 						<option value="">All</option>
 						@txSelectOption("true", "Yes", p.FilterPending)
 						@txSelectOption("false", "No", p.FilterPending)
@@ -305,13 +305,13 @@ templ txFilters(p TransactionsProps) {
 						<i data-lucide="search" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						Search
 					</div>
-					<input type="text" name="search" value={ p.FilterSearch } placeholder="Search transactions..." class="input input-sm input-bordered w-full col-span-2 sm:col-span-1"/>
-					<select name="search_field" class="select select-sm select-bordered w-full">
+					<input type="text" name="search" value={ p.FilterSearch } placeholder="Search transactions..." class="input input-sm w-full col-span-2 sm:col-span-1"/>
+					<select name="search_field" class="select select-sm w-full">
 						@txSearchFieldOption("all", "Name & Merchant", p.FilterSearchField, true)
 						@txSearchFieldOption("name", "Name only", p.FilterSearchField, false)
 						@txSearchFieldOption("merchant", "Merchant only", p.FilterSearchField, false)
 					</select>
-					<select name="search_mode" class="select select-sm select-bordered w-full" x-model="mode">
+					<select name="search_mode" class="select select-sm w-full" x-model="mode">
 						<option value="contains">Contains</option>
 						<option value="words">All words</option>
 						<option value="fuzzy">Fuzzy match</option>
@@ -356,8 +356,8 @@ templ txFilters(p TransactionsProps) {
 				</div>
 			</div>
 			<div class="bb-filter-actions">
-				<a href="/transactions" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
-				<button type="submit" class="btn btn-sm btn-primary rounded-xl">
+				<a href="/transactions" class="btn btn-sm btn-ghost">Reset</a>
+				<button type="submit" class="btn btn-sm btn-primary">
 					<i data-lucide="search" class="w-3.5 h-3.5"></i>
 					Apply Filters
 				</button>

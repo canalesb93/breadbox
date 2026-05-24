@@ -38,7 +38,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 						<p class="text-xs text-base-content/50 mt-0.5 truncate">{ p.ErrorMessage }</p>
 					}
 				</div>
-				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-error rounded-xl shrink-0">Re-authenticate</a>
+				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-error shrink-0">Re-authenticate</a>
 			</div>
 		}
 		if p.ConsecutiveFailures >= 3 && !(p.Status == "error" || p.Status == "pending_reauth") {
@@ -105,21 +105,21 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 			</div>
 			<div class="flex items-center gap-2 flex-wrap sm:shrink-0">
 				if p.Status == "error" || p.Status == "pending_reauth" {
-					<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
+					<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline">Re-authenticate</a>
 				}
 				if p.Provider == "csv" {
-					<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline rounded-xl">
+					<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline">
 						<i data-lucide="upload" class="w-3.5 h-3.5"></i>
 						Import More
 					</a>
 				}
 				if p.Status == "active" {
-					<button class="btn btn-sm btn-primary rounded-xl" @click="syncConnection()" id="sync-btn">
+					<button class="btn btn-sm btn-primary" @click="syncConnection()" id="sync-btn">
 						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
 						Sync Now
 					</button>
 				}
-				<button class="btn btn-sm btn-ghost rounded-xl" @click="togglePause()" id="pause-btn">
+				<button class="btn btn-sm btn-ghost" @click="togglePause()" id="pause-btn">
 					if p.Paused {
 						<i data-lucide="play" class="w-3.5 h-3.5"></i>
 						Resume
@@ -128,12 +128,12 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 						Pause
 					}
 				</button>
-				<button class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl" x-show="!confirming" @click="confirming = true" id="remove-btn">
+				<button class="btn btn-sm btn-ghost text-error/70 hover:text-error" x-show="!confirming" @click="confirming = true" id="remove-btn">
 					<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
 				</button>
 				<span x-show="confirming" x-cloak class="inline-flex gap-2">
-					<button class="btn btn-error btn-sm rounded-xl" @click="removeConnection()">Yes, Remove</button>
-					<button class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
+					<button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
+					<button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
 				</span>
 			</div>
 		</div>
@@ -307,7 +307,7 @@ templ connDetailInfoGrid(p ConnectionDetailProps) {
 			<div class="p-4">
 				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Sync Interval</div>
 				<div>
-					<select id="sync-interval" @change="updateSyncInterval($event.target.value)" class="select select-xs select-bordered w-full rounded-lg">
+					<select id="sync-interval" @change="updateSyncInterval($event.target.value)" class="select select-xs w-full rounded-lg">
 						@connDetailIntervalOption("", "Global default", !p.SyncIntervalOverrideMinutesValid, false, false)
 						@connDetailIntervalOption("15", "Every 15 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 15)
 						@connDetailIntervalOption("30", "Every 30 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 30)
@@ -422,7 +422,7 @@ templ connDetailAccountCard(a AccountRow) {
 						value={ a.DisplayName }
 						placeholder="Display name..."
 						@change={ "updateDisplayName('" + a.ID + "', $event.target.value)" }
-						class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs"
+						class="input input-xs input-ghost flex-1 hover:focus:transition-all rounded-lg text-xs"
 					/>
 					<label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
 						if a.Excluded {

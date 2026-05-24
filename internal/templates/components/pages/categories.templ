@@ -189,7 +189,7 @@ templ categoryTileInner(c service.CategoryResponse, child bool) {
 // (mouse, touch, keyboard). Matches the pattern used on /tags (PR #728).
 templ categoryRowActions(c service.CategoryResponse, child bool) {
 	<div class="dropdown dropdown-end">
-		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label={ fmt.Sprintf("Category %s actions", c.DisplayName) }>
+		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ fmt.Sprintf("Category %s actions", c.DisplayName) }>
 			<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 		</div>
 		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
@@ -217,7 +217,7 @@ templ categoryRowActions(c service.CategoryResponse, child bool) {
 }
 
 templ categoriesNewCategoryAction() {
-	<a href="/categories/new" data-new-category class="btn btn-sm btn-primary rounded-xl gap-2">
+	<a href="/categories/new" data-new-category class="btn btn-sm btn-primary gap-2">
 		<i data-lucide="plus" class="w-4 h-4"></i>
 		Add Category
 	</a>
@@ -253,10 +253,10 @@ templ deleteCategoryModal() {
 			</div>
 			<p class="text-sm text-base-content/70">Are you sure you want to delete <strong x-text="deleteName"></strong>? Affected transactions will be set to Uncategorized.</p>
 			<div class="modal-action">
-				<button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('delete-modal').close()">Cancel</button>
+				<button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('delete-modal').close()">Cancel</button>
 				<button
 					type="button"
-					class="btn btn-error btn-sm rounded-xl"
+					class="btn btn-error btn-sm"
 					:disabled="submitting"
 					@click="
 						submitting = true;

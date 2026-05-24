@@ -124,7 +124,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 					<div class="form-control mb-4">
 						<textarea
 							name={ c.FieldName }
-							class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl"
+							class="textarea font-mono text-xs leading-relaxed w-full rounded-xl"
 							style={ "min-height: " + c.MinHeight }
 							maxlength={ fmt.Sprintf("%d", c.MaxLen) }
 							x-model="value"
@@ -135,8 +135,8 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 						</label>
 					</div>
 					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">{ c.SaveLabel }</button>
-						<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+						<button type="submit" class="btn btn-primary btn-sm">{ c.SaveLabel }</button>
+						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
 					</div>
 				</form>
 			</div>
@@ -180,7 +180,7 @@ templ mcpSettingsToolsCard(p MCPSettingsProps) {
 						}
 					</div>
 					<div class="mt-5">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Tools</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save Tools</button>
 					</div>
 				</form>
 			</div>
@@ -235,7 +235,7 @@ templ mcpSettingsConnectionCard() {
 					<h3 class="font-medium text-sm mb-2 text-base-content/60">Claude Desktop Config (stdio)</h3>
 					<div class="relative">
 						<pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{ stdioConfigJSON() }</pre>
-						<button class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2" @click.stop="copyStdioConfig()">
+						<button class="btn btn-sm btn-ghost absolute top-2 right-2" @click.stop="copyStdioConfig()">
 							<template x-if="!copiedConfig">
 								<span class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> Copy</span>
 							</template>

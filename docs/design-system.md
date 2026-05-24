@@ -215,12 +215,12 @@ Custom overlay dialogs (confirm, shortcuts, category picker) in `base.html` use 
 
 | Element | Standard classes |
 |---|---|
-| Text inputs | `input input-bordered w-full rounded-xl` |
-| Filter inputs | `input input-sm input-bordered w-full` (styled by `.bb-filter-bar` CSS) |
-| Compact inputs (rules) | `input input-bordered input-xs rounded-lg` |
-| Selects | `select select-bordered w-full rounded-xl` |
-| Filter selects | `select select-sm select-bordered w-full` |
-| Textareas | `textarea textarea-bordered rounded-xl w-full` |
+| Text inputs | `input w-full rounded-xl` |
+| Filter inputs | `input input-sm w-full` (styled by `.bb-filter-bar` CSS) |
+| Compact inputs (rules) | `input input-xs rounded-lg` |
+| Selects | `select w-full rounded-xl` |
+| Filter selects | `select select-sm w-full` |
+| Textareas | `textarea rounded-xl w-full` |
 
 **Background:** No `bg-base-200/50` on standard form inputs — only on read-only, disabled, or inline-edit inputs.
 
@@ -559,11 +559,11 @@ Used on transactions, sync logs, account detail:
 <div class="bb-filter-bar">
   <label>
     Start Date
-    <input type="date" name="start_date" class="input input-sm input-bordered" />
+    <input type="date" name="start_date" class="input input-sm" />
   </label>
   <label>
     Status
-    <select name="status" class="select select-sm select-bordered">
+    <select name="status" class="select select-sm">
       <option value="">All</option>
       ...
     </select>
@@ -577,7 +577,7 @@ Used on transactions, sync logs, account detail:
 For connection detail (display name, sync interval):
 ```html
 <div class="flex items-center gap-2" x-data="{ saving: false }">
-  <input type="text" class="input input-sm input-bordered w-48" ... />
+  <input type="text" class="input input-sm w-48" ... />
   <span x-show="saving" class="loading loading-spinner loading-xs"></span>
 </div>
 ```
@@ -589,9 +589,9 @@ Use DaisyUI form control patterns:
 <label class="label">
   <span class="label-text">Password</span>
 </label>
-<input type="password" class="input input-bordered" required />
+<input type="password" class="input" required />
 <!-- Error state -->
-<input type="password" class="input input-bordered input-error" />
+<input type="password" class="input input-error" />
 <label class="label">
   <span class="label-text-alt text-error">Password must be at least 8 characters</span>
 </label>

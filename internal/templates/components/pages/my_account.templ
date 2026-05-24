@@ -30,7 +30,7 @@ templ MyAccount(p MyAccountProps) {
 				if p.CSRFToken != "" {
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				}
-				<button type="submit" class="btn btn-ghost btn-sm rounded-xl gap-2 text-base-content/60 hover:text-base-content">
+				<button type="submit" class="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content">
 					<i data-lucide="log-out" class="w-4 h-4"></i>
 					Sign out
 				</button>
@@ -167,7 +167,7 @@ templ myAccountProfileCard(p MyAccountProps) {
 				</div>
 			</div>
 			<div class="bb-action-row">
-				<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
 					<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
 					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 				</button>
@@ -232,7 +232,7 @@ templ myAccountPasswordCard(csrfToken string) {
 			</div>
 		</div>
 		<div class="bb-action-row">
-			<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5">
+			<button type="submit" class="btn btn-sm btn-primary gap-1.5">
 				<i data-lucide="save" class="w-3.5 h-3.5"></i>
 				Update password
 			</button>
@@ -255,7 +255,7 @@ templ myAccountDangerZone(csrfToken string) {
 				</div>
 			</div>
 			<template x-if="!confirmWipe">
-				<button @click="confirmWipe = true" type="button" class="btn btn-error btn-sm btn-outline rounded-xl gap-1.5">
+				<button @click="confirmWipe = true" type="button" class="btn btn-error btn-sm btn-outline gap-1.5">
 					<i data-lucide="trash-2" class="w-4 h-4"></i>
 					Wipe my data
 				</button>
@@ -268,9 +268,9 @@ templ myAccountDangerZone(csrfToken string) {
 							if csrfToken != "" {
 								<input type="hidden" name="_csrf" value={ csrfToken }/>
 							}
-							<button type="submit" class="btn btn-error btn-sm rounded-xl">Yes, wipe my data</button>
+							<button type="submit" class="btn btn-error btn-sm">Yes, wipe my data</button>
 						</form>
-						<button @click="confirmWipe = false" type="button" class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
+						<button @click="confirmWipe = false" type="button" class="btn btn-ghost btn-sm">Cancel</button>
 					</div>
 				</div>
 			</template>

@@ -49,7 +49,7 @@ templ createLoginManage(p CreateLoginProps) {
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label class="block text-xs text-base-content/40 mb-1.5" for="manage_role">Role</label>
-						<select id="manage_role" x-model="role" class="select select-sm select-bordered rounded-xl text-sm w-full">
+						<select id="manage_role" x-model="role" class="select select-sm rounded-xl text-sm w-full">
 							<option value="viewer">Viewer</option>
 							<option value="editor">Editor</option>
 						</select>
@@ -77,8 +77,8 @@ templ createLoginManage(p CreateLoginProps) {
 				<span x-show="saved" x-transition.opacity class="text-xs text-success inline-flex items-center gap-1 mr-2">
 					<i data-lucide="check" class="w-3.5 h-3.5"></i> Saved
 				</span>
-				<a href="/settings/household" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-				<button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32">
+				<a href="/settings/household" class="btn btn-sm btn-ghost">Cancel</a>
+				<button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary gap-1.5 min-w-32">
 					<span x-show="!saving" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
 					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
 				</button>
@@ -108,7 +108,7 @@ templ createLoginManage(p CreateLoginProps) {
 					/>
 					<button
 						@click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
-						class="btn btn-sm btn-ghost rounded-xl"
+						class="btn btn-sm btn-ghost"
 						:class="copied ? 'text-success' : ''"
 					>
 						<i x-show="!copied" data-lucide="copy" class="w-4 h-4"></i>
@@ -118,7 +118,7 @@ templ createLoginManage(p CreateLoginProps) {
 				<button
 					@click="regenerate()"
 					:disabled="regenerating"
-					class="btn btn-sm btn-ghost rounded-xl gap-1.5 text-base-content/60 hover:text-base-content"
+					class="btn btn-sm btn-ghost gap-1.5 text-base-content/60 hover:text-base-content"
 				>
 					<i data-lucide="refresh-cw" class="w-3.5 h-3.5" :class="regenerating ? 'animate-spin' : ''"></i>
 					<span x-text="regenerating ? 'Regenerating…' : 'Regenerate link'"></span>
@@ -137,15 +137,15 @@ templ createLoginManage(p CreateLoginProps) {
 				</div>
 				<div class="flex items-center gap-2 shrink-0">
 					<template x-if="!confirming">
-						<button @click="confirming = true" class="btn btn-error btn-soft btn-sm rounded-xl">
+						<button @click="confirming = true" class="btn btn-error btn-soft btn-sm">
 							<i data-lucide="user-x" class="w-4 h-4"></i>
 							Delete Login
 						</button>
 					</template>
 					<template x-if="confirming">
 						<div class="flex items-center gap-2">
-							<button @click="confirming = false" :disabled="deleting" class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
-							<button @click="confirmDelete()" :disabled="deleting" class="btn btn-error btn-sm rounded-xl gap-1.5 min-w-28">
+							<button @click="confirming = false" :disabled="deleting" class="btn btn-ghost btn-sm">Cancel</button>
+							<button @click="confirmDelete()" :disabled="deleting" class="btn btn-error btn-sm gap-1.5 min-w-28">
 								<span x-show="!deleting" class="inline-flex items-center gap-1.5">
 									<i data-lucide="user-x" class="w-3.5 h-3.5"></i> Confirm Delete
 								</span>
@@ -217,8 +217,8 @@ templ createLoginNew(p CreateLoginProps) {
 				</div>
 				<!-- Action row -->
 				<div class="bb-action-row">
-					<a href="/settings/household" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-					<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+					<a href="/settings/household" class="btn btn-sm btn-ghost">Cancel</a>
+					<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
 						<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i>Create Login</span>
 						<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 					</button>
@@ -249,7 +249,7 @@ templ createLoginNew(p CreateLoginProps) {
 							/>
 							<button
 								@click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
-								class="btn btn-sm rounded-xl gap-1.5 min-w-24 transition-colors"
+								class="btn btn-sm gap-1.5 min-w-24 transition-colors"
 								:class="copied ? 'btn-success' : 'btn-primary'"
 							>
 								<i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
@@ -262,7 +262,7 @@ templ createLoginNew(p CreateLoginProps) {
 				</div>
 				<!-- Action row -->
 				<div class="bb-action-row">
-					<a href="/settings/household" class="btn btn-sm btn-primary rounded-xl gap-1.5">
+					<a href="/settings/household" class="btn btn-sm btn-primary gap-1.5">
 						<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
 						Back to Household
 					</a>

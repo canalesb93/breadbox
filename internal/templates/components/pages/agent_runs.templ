@@ -49,7 +49,7 @@ templ agentRunsHeader(p AgentRunsListProps) {
 			}
 		</div>
 		<div class="flex items-center gap-2">
-			<a href="/agents" class="btn btn-ghost btn-sm rounded-xl">
+			<a href="/agents" class="btn btn-ghost btn-sm">
 				<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
 				Back to agents
 			</a>
@@ -64,7 +64,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 				if p.Mode == "global" {
 					<label class="bb-filter-label">
 						Agent
-						<select name="agent" class="select select-sm select-bordered w-full">
+						<select name="agent" class="select select-sm w-full">
 							<option value="">All agents</option>
 							for _, opt := range p.AgentOptions {
 								@agentRunsSelectOption(opt.Slug, opt.Name, p.Filters.AgentSlug)
@@ -74,7 +74,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 				}
 				<label class="bb-filter-label">
 					Status
-					<select name="status" class="select select-sm select-bordered w-full">
+					<select name="status" class="select select-sm w-full">
 						<option value="">All statuses</option>
 						@agentRunsSelectOption("success", "Success", p.Filters.Status)
 						@agentRunsSelectOption("error", "Error", p.Filters.Status)
@@ -85,7 +85,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 				</label>
 				<label class="bb-filter-label">
 					Trigger
-					<select name="trigger" class="select select-sm select-bordered w-full">
+					<select name="trigger" class="select select-sm w-full">
 						<option value="">All triggers</option>
 						@agentRunsSelectOption("cron", "Cron", p.Filters.Trigger)
 						@agentRunsSelectOption("manual", "Manual", p.Filters.Trigger)
@@ -94,7 +94,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 				</label>
 				<label class="bb-filter-label">
 					Hit cap
-					<select name="hit_cap" class="select select-sm select-bordered w-full">
+					<select name="hit_cap" class="select select-sm w-full">
 						<option value="">All</option>
 						@agentRunsSelectOption("any", "Any cap", p.Filters.HitCap)
 						@agentRunsSelectOption("max_turns", "Max turns", p.Filters.HitCap)
@@ -103,19 +103,19 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 				</label>
 				<label class="bb-filter-label">
 					Start
-					<input type="date" name="start" value={ p.Filters.Start } class="input input-sm input-bordered w-full"/>
+					<input type="date" name="start" value={ p.Filters.Start } class="input input-sm w-full"/>
 				</label>
 				<label class="bb-filter-label">
 					End
-					<input type="date" name="end" value={ p.Filters.End } class="input input-sm input-bordered w-full"/>
+					<input type="date" name="end" value={ p.Filters.End } class="input input-sm w-full"/>
 				</label>
 			</div>
 			<div class="bb-filter-actions flex items-center gap-2">
-				<button type="submit" class="btn btn-sm btn-primary rounded-xl">
+				<button type="submit" class="btn btn-sm btn-primary">
 					<i data-lucide="filter" class="w-3.5 h-3.5"></i>
 					Apply
 				</button>
-				<a href={ templ.SafeURL(agentRunsFormAction(p)) } class="btn btn-sm btn-ghost rounded-xl">Clear</a>
+				<a href={ templ.SafeURL(agentRunsFormAction(p)) } class="btn btn-sm btn-ghost">Clear</a>
 			</div>
 		</form>
 	</div>
@@ -226,15 +226,15 @@ templ agentRunsPagination(p AgentRunsListProps) {
 		<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
 			{ fmt.Sprintf("Showing %d to %d", p.Offset+1, p.Offset+len(p.Rows)) }
 		</span>
-		<div class="bb-paginator__nav">
+		<div class="join">
 			if p.Offset > 0 {
-				<a href={ templ.SafeURL(agentRunsPageHref(p, prevOffset(p.Offset, p.Limit))) } class="bb-paginator__btn" title="Previous page">
+				<a href={ templ.SafeURL(agentRunsPageHref(p, prevOffset(p.Offset, p.Limit))) } class="join-item btn btn-sm btn-ghost" title="Previous page">
 					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
 					Prev
 				</a>
 			}
 			if len(p.Rows) >= p.Limit {
-				<a href={ templ.SafeURL(agentRunsPageHref(p, p.Offset+p.Limit)) } class="bb-paginator__btn" title="Next page">
+				<a href={ templ.SafeURL(agentRunsPageHref(p, p.Offset+p.Limit)) } class="join-item btn btn-sm btn-ghost" title="Next page">
 					Next
 					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
 				</a>
@@ -307,12 +307,12 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 		</div>
 		<div class="flex items-center gap-2">
 			if p.Run.AgentSlug != "" {
-				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", p.Run.AgentSlug)) } class="btn btn-ghost btn-sm rounded-xl">
+				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", p.Run.AgentSlug)) } class="btn btn-ghost btn-sm">
 					<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
 					Back to runs
 				</a>
 			} else {
-				<a href="/agents/runs" class="btn btn-ghost btn-sm rounded-xl">
+				<a href="/agents/runs" class="btn btn-ghost btn-sm">
 					<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
 					Back to runs
 				</a>
@@ -375,10 +375,10 @@ templ agentRunDetailNote(p AgentRunDetailProps) {
 				maxlength="2000"
 				rows="3"
 				placeholder="Add a note about this run..."
-				class="textarea textarea-bordered w-full text-sm"
+				class="textarea w-full text-sm"
 			>{ p.Run.Note }</textarea>
 			<div class="flex items-center justify-end mt-2">
-				<button type="submit" class="btn btn-sm btn-primary rounded-xl">Save note</button>
+				<button type="submit" class="btn btn-sm btn-primary">Save note</button>
 			</div>
 		</form>
 	</div>

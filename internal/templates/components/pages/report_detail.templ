@@ -71,16 +71,16 @@ templ ReportDetail(p ReportDetailProps) {
 			</div>
 			<!-- Action toolbar -->
 			<div class="flex flex-wrap items-center gap-1 px-3 sm:px-4 py-2 border-t border-base-200/60 bg-base-200/20 rounded-b-2xl">
-				<button type="button" @click="toggleRead()" class="btn btn-ghost btn-xs rounded-lg text-xs">
+				<button type="button" @click="toggleRead()" class="btn btn-ghost btn-xs text-xs">
 					<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-3.5 h-3.5"></i>
 					<span x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
 				</button>
-				<button type="button" @click="copyLink()" class="btn btn-ghost btn-xs rounded-lg text-xs">
+				<button type="button" @click="copyLink()" class="btn btn-ghost btn-xs text-xs">
 					<i data-lucide="link" class="w-3.5 h-3.5"></i>
 					<span>Copy link</span>
 				</button>
 				<div class="ml-auto">
-					<a href="/settings/mcp#report-format" class="btn btn-ghost btn-xs rounded-lg text-xs no-underline" title="Edit the guidelines agents follow when writing reports">
+					<a href="/settings/mcp#report-format" class="btn btn-ghost btn-xs text-xs no-underline" title="Edit the guidelines agents follow when writing reports">
 						<i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">Manage report format</span>
 						<span class="sm:hidden">Format</span>

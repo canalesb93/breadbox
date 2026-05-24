@@ -133,7 +133,7 @@ templ agentSDKFormCard(p AgentSDKSettingsProps) {
 			@agentSDKSidecarSection(p)
 			@agentSDKLimitsSection(p)
 			<div class="flex flex-wrap gap-2 items-center pt-2 border-t border-base-300">
-				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save settings</button>
+				<button type="submit" class="btn btn-primary btn-sm">Save settings</button>
 			</div>
 		</form>
 	</div>
@@ -203,7 +203,7 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 				name={ name }
 				autocomplete="off"
 				placeholder={ "Current: " + maskedDisplay }
-				class="input input-bordered input-sm w-full rounded-xl font-mono"
+				class="input input-sm w-full rounded-xl font-mono"
 			/>
 		} else {
 			<input
@@ -211,7 +211,7 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 				name={ name }
 				autocomplete="off"
 				placeholder="Not set"
-				class="input input-bordered input-sm w-full rounded-xl font-mono"
+				class="input input-sm w-full rounded-xl font-mono"
 			/>
 		}
 		<label class="label">
@@ -239,7 +239,7 @@ templ agentSDKSidecarSection(p AgentSDKSettingsProps) {
 					name="runtime_path"
 					value={ p.Form.RuntimePath }
 					placeholder="auto"
-					class="input input-bordered input-sm w-full rounded-xl font-mono"
+					class="input input-sm w-full rounded-xl font-mono"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Override default lookup — empty uses discovery chain.</span>
@@ -257,7 +257,7 @@ templ agentSDKSidecarSection(p AgentSDKSettingsProps) {
 					name="transcript_dir"
 					value={ p.Form.TranscriptDir }
 					placeholder="transcripts/agents"
-					class="input input-bordered input-sm w-full rounded-xl font-mono"
+					class="input input-sm w-full rounded-xl font-mono"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Where to persist NDJSON transcripts.</span>
@@ -287,7 +287,7 @@ templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
 					value={ strconv.Itoa(p.Form.MaxConcurrent) }
 					min="1"
 					max="50"
-					class="input input-bordered input-sm w-full rounded-xl"
+					class="input input-sm w-full rounded-xl"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Concurrent SDK runs across all definitions. 1–50.</span>
@@ -308,7 +308,7 @@ templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
 					min="0"
 					max="1000"
 					placeholder="no cap"
-					class="input input-bordered input-sm w-full rounded-xl"
+					class="input input-sm w-full rounded-xl"
 				/>
 				<label class="label">
 					<span class="label-text-alt text-base-content/50 text-xs">Optional ceiling per run. Leave empty for no global cap.</span>
@@ -338,7 +338,7 @@ templ agentSDKToolsCard(csrfToken string) {
 			<div class="flex flex-wrap gap-2 items-center">
 				<button
 					type="button"
-					class="btn btn-secondary btn-sm rounded-xl"
+					class="btn btn-secondary btn-sm"
 					@click="runSmokeTest()"
 					:disabled="smokeState === 'loading'"
 				>
@@ -351,7 +351,7 @@ templ agentSDKToolsCard(csrfToken string) {
 				</button>
 				<button
 					type="button"
-					class="btn btn-ghost btn-sm rounded-xl"
+					class="btn btn-ghost btn-sm"
 					@click="runCleanup()"
 					:disabled="cleanupState === 'loading'"
 				>

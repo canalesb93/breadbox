@@ -189,10 +189,10 @@ templ TagForm(p TagFormProps) {
 				</div>
 			</div>
 			<div class="bb-action-row">
-				<a href="/tags" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+				<a href="/tags" class="btn btn-sm btn-ghost">Cancel</a>
 				<button
 					type="submit"
-					class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32"
+					class="btn btn-sm btn-primary gap-1.5 min-w-32"
 					:disabled="submitting"
 				>
 					<span x-show="!submitting" class="inline-flex items-center gap-1.5">
@@ -222,7 +222,7 @@ templ TagForm(p TagFormProps) {
 					<div class="mt-4">
 						<button
 							type="button"
-							class="btn btn-sm btn-error btn-outline rounded-xl gap-1.5"
+							class="btn btn-sm btn-error btn-outline gap-1.5"
 							@click="deleteTag()"
 							:disabled="deleting"
 						>

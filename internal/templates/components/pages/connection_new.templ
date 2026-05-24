@@ -33,7 +33,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 				</div>
 				<h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
 				<p class="text-sm text-base-content/50 mb-6">You need to configure at least one bank provider before creating connections.</p>
-				<a href="/settings/providers" class="btn btn-primary btn-sm rounded-xl">
+				<a href="/settings/providers" class="btn btn-primary btn-sm">
 					<i data-lucide="settings" class="w-4 h-4"></i> Configure Providers
 				</a>
 			</div>
@@ -97,7 +97,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 						</fieldset>
 						<fieldset class="fieldset">
 							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
-							<select id="user_id" name="user_id" required class="select select-bordered w-full rounded-xl">
+							<select id="user_id" name="user_id" required class="select w-full rounded-xl">
 								<option value="" disabled selected>Select a member...</option>
 								for _, u := range p.Users {
 									<option value={ u.ID }>{ u.Name }</option>
@@ -105,7 +105,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 							</select>
 						</fieldset>
 						<div class="pt-2">
-							<button type="submit" class="btn btn-primary btn-sm rounded-xl">
+							<button type="submit" class="btn btn-primary btn-sm">
 								Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
 							</button>
 						</div>
@@ -122,10 +122,10 @@ templ ConnectionNew(p ConnectionNewProps) {
 						<p class="text-sm text-base-content/50 mb-1">Connecting for: <span id="member-name" class="font-semibold text-base-content"></span></p>
 						<p id="link-status" class="text-sm text-base-content/50 mb-6">Opening bank connection dialog...</p>
 						<div class="flex items-center gap-3">
-							<button id="retry-btn" class="btn btn-primary btn-sm rounded-xl hidden">
+							<button id="retry-btn" class="btn btn-primary btn-sm hidden">
 								<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
 							</button>
-							<button id="back-btn" class="btn btn-ghost btn-sm rounded-xl">
+							<button id="back-btn" class="btn btn-ghost btn-sm">
 								<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
 							</button>
 						</div>
