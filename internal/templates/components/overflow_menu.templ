@@ -1,0 +1,99 @@
+package components
+
+// OverflowMenu is the kebab "more actions" dropdown used on row lists
+// (tags, rules, categories, OAuth clients, household users). Replaces the
+// duplicated 12-line `dropdown dropdown-end` + `menu` block scattered
+// across 6+ templ files with subtly different geometry.
+//
+// Pins (do not deviate when calling):
+//   - Trigger:  `btn btn-ghost btn-sm btn-square rounded-lg` + icon `w-5 h-5`
+//   - Menu:     `dropdown-content menu bg-base-100 rounded-xl shadow-lg`
+//               `border border-base-300 z-50 w-44 p-1`
+//   - Item icon: `w-3.5 h-3.5`
+//   - Destructive items: `text-error` on the inner element
+//   - Disabled items: `disabled` class on the <li>
+//
+// Items render in the order provided. Pass `Href` for link items,
+// `OnClick` (an Alpine handler string, e.g. `"delete(...)"`) for button
+// items. If both are set, `Href` wins.
+
+type OverflowMenuItem struct {
+	Label       string
+	Icon        string // Lucide name, e.g. "pencil"
+	Href        templ.SafeURL
+	OnClick     string // Alpine handler (rendered as `@click`). Ignored if Href set.
+	Destructive bool   // applies `text-error` to the inner element
+	Disabled    bool   // renders <li class="disabled"> and inert span instead of button/link
+	AriaLabel   string // optional per-item label (overrides the visible Label)
+}
+
+type OverflowMenuProps struct {
+	AriaLabel string             // REQUIRED, e.g. "Category Income actions"
+	Items     []OverflowMenuItem // rendered in order
+	Position  string             // "end" (default) or "start"
+}
+
+templ OverflowMenu(p OverflowMenuProps) {
+	<div class={ overflowMenuRootClass(p.Position) }>
+		<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity" aria-label={ p.AriaLabel }>
+			<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+		</div>
+		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+			for _, it := range p.Items {
+				@overflowMenuItem(it)
+			}
+		</ul>
+	</div>
+}
+
+templ overflowMenuItem(it OverflowMenuItem) {
+	if it.Disabled {
+		<li class="disabled">
+			<span class="text-base-content/40 cursor-not-allowed" aria-label={ overflowAria(it) }>
+				if it.Icon != "" {
+					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
+				}
+				{ it.Label }
+			</span>
+		</li>
+	} else if it.Href != "" {
+		<li>
+			<a href={ it.Href } class={ overflowItemClass(it.Destructive) } aria-label={ overflowAria(it) }>
+				if it.Icon != "" {
+					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
+				}
+				{ it.Label }
+			</a>
+		</li>
+	} else {
+		<li>
+			<button type="button" class={ overflowItemClass(it.Destructive) } aria-label={ overflowAria(it) } @click={ it.OnClick }>
+				if it.Icon != "" {
+					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
+				}
+				{ it.Label }
+			</button>
+		</li>
+	}
+}
+
+func overflowMenuRootClass(pos string) string {
+	if pos == "start" {
+		return "dropdown dropdown-start"
+	}
+	return "dropdown dropdown-end"
+}
+
+func overflowItemClass(destructive bool) string {
+	if destructive {
+		return "text-error"
+	}
+	return ""
+}
+
+func overflowAria(it OverflowMenuItem) string {
+	if it.AriaLabel != "" {
+		return it.AriaLabel
+	}
+	return it.Label
+}
