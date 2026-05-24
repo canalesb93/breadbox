@@ -138,13 +138,40 @@ func ruleCategoryIconColorStyle(rule *service.TransactionRuleResponse) string {
 	return ""
 }
 
-// rulePendingTileClass returns the bg class for the third stat tile
-// (warning when pending matches exist, success otherwise).
-func rulePendingTileClass(pendingActive bool) string {
-	if pendingActive {
-		return "bg-warning/10"
+// rulePendingTone selects the StatTile tone for the pending-matches
+// tile — warning when matches are waiting, success when caught up.
+func rulePendingTone(p RuleDetailProps) components.StatTileTone {
+	if p.Preview != nil && p.Preview.MatchCount > 0 {
+		return components.StatToneWarning
 	}
-	return "bg-success/10"
+	return components.StatToneSuccess
+}
+
+// rulePendingIcon mirrors rulePendingTone: alert when there's
+// untouched-match work, check-circle otherwise.
+func rulePendingIcon(p RuleDetailProps) string {
+	if p.Preview != nil && p.Preview.MatchCount > 0 {
+		return "alert-circle"
+	}
+	return "check-circle"
+}
+
+// rulePendingValue is the numeric body of the pending-matches tile.
+// Falls back to "0" when no preview has been computed yet.
+func rulePendingValue(p RuleDetailProps) string {
+	if p.Preview == nil {
+		return "0"
+	}
+	return components.CommaInt(p.Preview.MatchCount)
+}
+
+// ruleLastActiveValue renders the last-active timestamp; the dash em
+// keeps the tile non-empty when the rule has never matched.
+func ruleLastActiveValue(p RuleDetailProps) string {
+	if !p.HasLastActive {
+		return "—"
+	}
+	return ruleRelativeTime(p.LastActiveTime)
 }
 
 // ruleStatsUnique returns the UniqueTransactions count, defensively

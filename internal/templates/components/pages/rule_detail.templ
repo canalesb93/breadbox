@@ -245,65 +245,29 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 templ ruleDetailStats(p RuleDetailProps) {
 	if p.Rule != nil {
 		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-			<div class="bb-card p-4">
-				<div class="flex items-center gap-3">
-					<div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-						<i data-lucide="target" class="w-4 h-4 text-primary"></i>
-					</div>
-					<div>
-						<div class="text-2xl font-semibold tabular-nums leading-none">{ components.CommaInt(int64(p.Rule.HitCount)) }</div>
-						<div class="text-xs text-base-content/40 mt-0.5">Times matched</div>
-					</div>
-				</div>
-			</div>
-			<div class="bb-card p-4">
-				<div class="flex items-center gap-3">
-					<div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-						<i data-lucide="layers" class="w-4 h-4 text-info"></i>
-					</div>
-					<div>
-						<div class="text-2xl font-semibold tabular-nums leading-none">{ components.CommaInt(ruleStatsUnique(p.Stats)) }</div>
-						<div class="text-xs text-base-content/40 mt-0.5">Transactions affected</div>
-					</div>
-				</div>
-			</div>
-			<div class="bb-card p-4">
-				<div class="flex items-center gap-3">
-					{{ pendingActive := p.Preview != nil && p.Preview.MatchCount > 0 }}
-					<div class={ "w-9", "h-9", "rounded-lg", "flex", "items-center", "justify-center", "shrink-0", rulePendingTileClass(pendingActive) }>
-						if pendingActive {
-							<i data-lucide="alert-circle" class="w-4 h-4 text-warning"></i>
-						} else {
-							<i data-lucide="check-circle" class="w-4 h-4 text-success"></i>
-						}
-					</div>
-					<div>
-						<div class="text-2xl font-semibold tabular-nums leading-none">
-							if p.Preview != nil {
-								{ components.CommaInt(p.Preview.MatchCount) }
-							} else {
-								0
-							}
-						</div>
-						<div class="text-xs text-base-content/40 mt-0.5">Untouched matches</div>
-					</div>
-				</div>
-			</div>
-			<div class="bb-card p-4">
-				<div class="flex items-center gap-3">
-					<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-						<i data-lucide="clock" class="w-4 h-4 text-base-content/40"></i>
-					</div>
-					<div>
-						if p.HasLastActive {
-							<div class="text-sm font-semibold leading-none">{ ruleRelativeTime(p.LastActiveTime) }</div>
-						} else {
-							<div class="text-sm font-semibold leading-none text-base-content/30">Never</div>
-						}
-						<div class="text-xs text-base-content/40 mt-0.5">Last active</div>
-					</div>
-				</div>
-			</div>
+			@components.StatTile(components.StatTileProps{
+				Icon:  "target",
+				Label: "Times matched",
+				Value: components.CommaInt(int64(p.Rule.HitCount)),
+				Tone:  components.StatTonePrimary,
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:  "layers",
+				Label: "Transactions affected",
+				Value: components.CommaInt(ruleStatsUnique(p.Stats)),
+				Tone:  components.StatToneInfo,
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:  rulePendingIcon(p),
+				Label: "Untouched matches",
+				Value: rulePendingValue(p),
+				Tone:  rulePendingTone(p),
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:  "clock",
+				Label: "Last active",
+				Value: ruleLastActiveValue(p),
+			})
 		</div>
 	}
 }
