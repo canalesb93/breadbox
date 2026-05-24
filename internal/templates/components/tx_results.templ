@@ -49,8 +49,8 @@ templ TxResults(p TxResultsProps) {
 							</span>
 						</div>
 						<div class="flex items-center gap-3 text-xs tabular-nums">
-							@dayTotalBadge("text-base-content/50", "data-day-spending", g.DaySpending, false)
-							@dayTotalBadge("text-success/70", "data-day-income", g.DayIncome, true)
+							@dayTotalBadge("data-day-spending", g.DaySpending, false)
+							@dayTotalBadge("data-day-income", g.DayIncome, true)
 						</div>
 					</div>
 					<!-- Transaction Rows -->
@@ -143,24 +143,26 @@ templ TxResults(p TxResultsProps) {
 	@txMetaScript(p.Transactions)
 }
 
-templ dayTotalBadge(class, attr string, value float64, income bool) {
-	if value > 0 {
-		<span class={ class } data-attr={ attr } data-value={ fmt.Sprintf("%.2f", value) }>
-			if income {
-				-{ formatAmount(value) }
-			} else {
-				{ formatAmount(value) }
-			}
-		</span>
-	} else {
-		<span class={ class } data-attr={ attr } data-value={ fmt.Sprintf("%.2f", value) } style="display:none">
-			if income {
-				-{ formatAmount(value) }
-			} else {
-				{ formatAmount(value) }
-			}
-		</span>
-	}
+// dayTotalBadge renders the per-day spending / income totals on the
+// grouped-view date header. Both totals arrive as positive aggregates;
+// the income side negates the value so the canonical Amount component
+// reads it as income (negative = inflow, rendered "+$X" in green) —
+// keeping sign/color logic in one place instead of forking a manual
+// "-formatAmount" shape here.
+templ dayTotalBadge(attr string, value float64, income bool) {
+	<span
+		if !(value > 0) {
+			style="display:none"
+		}
+		data-attr={ attr }
+		data-value={ fmt.Sprintf("%.2f", value) }
+	>
+		if income {
+			@Amount(AmountProps{Value: -value, Class: "text-xs"})
+		} else {
+			@Amount(AmountProps{Value: value, Intent: AmountCost, Class: "text-xs text-base-content/50"})
+		}
+	</span>
 }
 
 templ perPageOption(size, current int) {

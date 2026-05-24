@@ -857,10 +857,10 @@ func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetail
 			Excluded:            a.Excluded,
 		}
 		if a.BalanceCurrent.Valid {
-			row.BalanceCurrentText = formatNumericAbsCurrency(a.BalanceCurrent)
+			row.BalanceCurrentAbs = numericAbsFloat(a.BalanceCurrent)
 		}
 		if a.BalanceAvailable.Valid {
-			row.BalanceAvailableText = formatNumericAbsCurrency(a.BalanceAvailable)
+			row.BalanceAvailableAbs = numericAbsFloat(a.BalanceAvailable)
 		}
 		props.Accounts = append(props.Accounts, row)
 	}
@@ -906,18 +906,20 @@ type connectionDaySync struct {
 	Total      int
 }
 
-// formatNumericAbsCurrency formats a NUMERIC balance as |amount| currency,
-// matching the funcMap "formatNumeric" helper that the old template used
-// for both BalanceCurrent and BalanceAvailable.
-func formatNumericAbsCurrency(n pgtype.Numeric) string {
+// numericAbsFloat returns |amount| as a float64 for templates that pass
+// the value through components.Amount (Intent: AmountCost). Returns 0
+// when the NUMERIC is invalid — the caller must gate on the matching
+// BalanceCurrent.Valid / BalanceAvailable.Valid flag, mirroring the
+// original behavior of returning "" from formatNumericAbsCurrency.
+func numericAbsFloat(n pgtype.Numeric) float64 {
 	f, ok := pgconv.NumericToFloat(n)
 	if !ok {
-		return ""
+		return 0
 	}
 	if f < 0 {
 		f = -f
 	}
-	return service.FormatCurrency(f)
+	return f
 }
 
 // ConnectionReauthHandler serves GET /admin/connections/{id}/reauth.

@@ -114,15 +114,33 @@ templ Connections(p ConnectionsProps) {
 						<div class="grid grid-cols-3 divide-x divide-base-300">
 							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
 								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Net Worth</div>
-								<div class="text-sm sm:text-2xl font-semibold tabular-nums tracking-tight truncate">{ components.FormatAmount(p.NetWorth) }</div>
+								<div class="truncate">
+									@components.Amount(components.AmountProps{
+										Value:  p.NetWorth,
+										Intent: components.AmountBalance,
+										Class:  "text-sm sm:text-2xl font-semibold tracking-tight",
+									})
+								</div>
 							</div>
 							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
 								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Assets</div>
-								<div class="text-sm sm:text-2xl font-semibold tabular-nums tracking-tight text-success truncate">{ components.FormatAmount(p.TotalAssets) }</div>
+								<div class="truncate">
+									@components.Amount(components.AmountProps{
+										Value:  p.TotalAssets,
+										Intent: components.AmountCost,
+										Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-success",
+									})
+								</div>
 							</div>
 							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
 								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Liabilities</div>
-								<div class="text-sm sm:text-2xl font-semibold tabular-nums tracking-tight text-error truncate">{ components.FormatAmount(p.TotalLiabilities) }</div>
+								<div class="truncate">
+									@components.Amount(components.AmountProps{
+										Value:  p.TotalLiabilities,
+										Intent: components.AmountCost,
+										Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-error",
+									})
+								</div>
 							</div>
 						</div>
 					</div>
@@ -271,7 +289,11 @@ templ connectionsCard(c ConnectionsRow) {
 				<!-- Connection total balance -->
 				if c.HasBalance {
 					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
-						<div class="text-sm sm:text-lg font-semibold tabular-nums tracking-tight">{ components.FormatAmount(c.TotalBalance) }</div>
+						@components.Amount(components.AmountProps{
+						Value:  c.TotalBalance,
+						Intent: components.AmountBalance,
+						Class:  "text-sm sm:text-lg font-semibold tracking-tight",
+					})
 						<div class="text-xs text-base-content/40">
 							{ strconv.FormatInt(c.AccountCount, 10) }
 							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
@@ -367,7 +389,19 @@ templ connectionsAccountRow(a ConnectionsAccountRow) {
 		</div>
 		<div class="text-right shrink-0">
 			if a.HasBalance {
-				<span class={ "text-sm font-medium tabular-nums", templ.KV("text-error", a.BalanceFloat < 0.0) }>{ components.FormatAmount(a.BalanceFloat) }</span>
+				if a.BalanceFloat < 0 {
+					@components.Amount(components.AmountProps{
+						Value:  a.BalanceFloat,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-medium text-error",
+					})
+				} else {
+					@components.Amount(components.AmountProps{
+						Value:  a.BalanceFloat,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-medium",
+					})
+				}
 			} else {
 				<span class="text-xs text-base-content/30">&mdash;</span>
 			}

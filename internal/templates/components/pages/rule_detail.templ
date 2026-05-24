@@ -388,7 +388,12 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 									for _, m := range p.Preview.SampleMatches {
 										<tr>
 											<td class="text-sm">{ m.ProviderName }</td>
-											<td class="text-sm text-right tabular-nums bb-amount">{ fmt.Sprintf("%.2f", m.Amount) }</td>
+											<td class="text-sm text-right">
+												@components.Amount(components.AmountProps{
+													Value: m.Amount,
+													Class: "text-sm",
+												})
+											</td>
 											<td class="text-sm text-base-content/60">{ m.Date }</td>
 										</tr>
 									}

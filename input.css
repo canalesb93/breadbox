@@ -1087,25 +1087,15 @@
     @apply text-[0.5rem] font-semibold leading-none;
   }
 
-  /* ── Transaction amount styling ── */
-  .bb-tx-amount {
-    @apply text-sm font-semibold tabular-nums text-base-content;
-  }
-
-  .bb-tx-amount--income {
-    color: oklch(0.62 0.14 155);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-tx-amount--income {
-      color: oklch(0.70 0.14 155);
-    }
-  }
-
-  /* Pending transactions: the amount is provisional, so we soften it (dimmed
-     glyph + leading clock icon via the row template) instead of tacking a
-     warning chip onto the name line where it competes with tag pills.
-     No italic / no underline — just a quieter number. */
+  /* ── Transaction amount pending modifier ──
+     Pending transactions are provisional, so we soften the amount glyph
+     (dimmed + leading clock icon at the call site) instead of tacking a
+     warning chip onto the name line. No italic / no underline — just a
+     quieter number. Applied by components.Amount when Pending: true.
+     The sibling --income tone (success green for negative values) and
+     the base .bb-tx-amount typography rule were retired with the
+     components.Amount migration — sign + color now flow through the
+     component's tabular-nums + text-success classes instead. */
   .bb-tx-amount--pending {
     opacity: 0.55;
   }

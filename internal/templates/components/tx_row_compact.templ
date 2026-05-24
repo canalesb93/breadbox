@@ -83,13 +83,11 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 					></i>
 					<span class="sr-only">(pending)</span>
 				}
-				<span
-					class={ "bb-tx-amount tabular-nums",
-					templ.KV("bb-tx-amount--income", tx.Amount < 0),
-					templ.KV("bb-tx-amount--pending", tx.Pending) }
-				>
-					{ formatAmount(tx.Amount) }
-				</span>
+				@Amount(AmountProps{
+					Value:   tx.Amount,
+					Pending: tx.Pending,
+					Class:   "text-sm font-semibold",
+				})
 			</div>
 			<span class="text-[0.65rem] text-base-content/40 tabular-nums">{ relativeDate(tx.Date) }</span>
 		</div>

@@ -182,7 +182,9 @@ templ agentRunsRow(r AgentRunRowProps, mode string) {
 		</td>
 		<td class="text-right tabular-nums text-xs">{ formatAgentRunDuration(r.DurationMs) }</td>
 		<td class="text-right tabular-nums text-xs">{ strconv.Itoa(r.Turns) }</td>
-		<td class="text-right tabular-nums text-xs">{ formatAgentRunCost(r.CostUSD) }</td>
+		<td class="text-right text-xs">
+			@agentRunCost(r.CostUSD, "text-xs")
+		</td>
 		<td class="text-right tabular-nums text-xs whitespace-nowrap">{ formatAgentRunTokens(r.TokensIn, r.TokensOut) }</td>
 		<td>
 			if r.HitCap != "" {
@@ -342,7 +344,9 @@ templ agentRunDetailMetadata(p AgentRunDetailProps) {
 			</div>
 			<div>
 				<div class="text-base-content/50 mb-1">Cost</div>
-				<div class="font-medium tabular-nums">{ formatAgentRunCost(p.Run.CostUSD) }</div>
+				<div>
+					@agentRunCost(p.Run.CostUSD, "font-medium")
+				</div>
 			</div>
 			<div>
 				<div class="text-base-content/50 mb-1">Tokens (in / out)</div>
@@ -493,7 +497,9 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 				<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
 					<div>
 						<div class="text-base-content/50">Cost</div>
-						<div class="font-medium tabular-nums">{ formatAgentRunCost(ev.CostUSD) }</div>
+						<div>
+							@agentRunCost(ev.CostUSD, "font-medium")
+						</div>
 					</div>
 					<div>
 						<div class="text-base-content/50">Tokens in</div>
@@ -620,11 +626,21 @@ func formatAgentRunDuration(ms int64) string {
 	return fmt.Sprintf("%.1fm", mins)
 }
 
-func formatAgentRunCost(v float64) string {
-	if v <= 0 {
-		return "—"
+// agentRunCost renders an agent-run cost cell via the canonical Amount
+// component (Intent: AmountCost, Precision: 4 for sub-cent values).
+// Zero/negative costs render an em-dash placeholder, matching the prior
+// formatAgentRunCost behavior.
+templ agentRunCost(v float64, extraClass string) {
+	if v > 0 {
+		@components.Amount(components.AmountProps{
+			Value:     v,
+			Intent:    components.AmountCost,
+			Precision: 4,
+			Class:     extraClass,
+		})
+	} else {
+		<span class="text-base-content/40">—</span>
 	}
-	return fmt.Sprintf("$%.4f", v)
 }
 
 func formatAgentRunTokens(in, out int64) string {

@@ -1,0 +1,63 @@
+package components
+
+// Amount is the canonical renderer for any monetary value in the admin UI.
+//
+// Consolidates: bb-tx-amount markup in tx_row / tx_row_compact,
+// TxRowFeedAmountWithSign in tx_row_feed, dayTotalBadge in tx_results,
+// and the ad-hoc Sprintf("$%.2f", ...) / Sprintf("$%.4f", ...) sites
+// in agents_list, agent_runs, and the connections summary bar.
+//
+// Three intents drive sign + color; pick by what the value MEANS:
+//
+//   - AmountTransaction — a credit/debit pair entry where the value is
+//     stored in breadbox sign convention (negative = income / inflow,
+//     positive = expense / outflow). Renders income as "+$X" in success
+//     green; expense as "$X" with NO sign in the page's default text
+//     color. Use for transaction rows, day totals, transaction detail,
+//     activity feed.
+//
+//   - AmountBalance — a standing balance where the sign reflects the
+//     real direction of the value (negative = liability / debt). Renders
+//     as-is: "$1,234.56" or "-$1,234.56". Default text color; the
+//     caller can wrap in a `text-success`/`text-error` span when context
+//     (assets, liabilities) demands it.
+//
+//   - AmountCost — an always-non-negative value (agent run cost, fees,
+//     monthly spending total). Renders the absolute value, no sign, no
+//     color treatment. Use Precision to pick decimal places.
+//
+// Format covers the three display shapes we use across the app:
+//
+//   - "" (default) — "$1,234.56" with comma-thousands and two decimals.
+//   - "abbreviated" — "$1.2M" for values ≥ $1M, else default. For big
+//     dashboard tiles where the exact cent doesn't matter.
+//   - "compact" — "$50" for whole values, "$12.34" otherwise. For
+//     filter chips and other tight contexts.
+//
+// Pending applies the same opacity dimming used by bb-tx-amount--pending
+// today — softens the glyph for transactions that haven't posted yet.
+//
+// Class is appended to the rendered <span> for size/weight overrides
+// (e.g. "text-3xl font-semibold" on the transaction detail hero, or
+// "text-sm font-medium" inside the activity feed). Tabular-nums is
+// always applied — never override that.
+//
+// Usage:
+//
+//	@components.Amount(components.AmountProps{Value: tx.Amount})                // transaction row
+//	@components.Amount(components.AmountProps{Value: tx.Amount, Pending: true}) // pending
+//	@components.Amount(components.AmountProps{
+//	    Value: account.Balance, Intent: components.AmountBalance,
+//	})
+//	@components.Amount(components.AmountProps{
+//	    Value: cost, Intent: components.AmountCost, Precision: 4,
+//	})
+//	@components.Amount(components.AmountProps{
+//	    Value: netWorth, Intent: components.AmountBalance,
+//	    Format: components.AmountFormatAbbreviated,
+//	    Class:  "text-2xl font-semibold",
+//	})
+
+templ Amount(p AmountProps) {
+	<span class={ amountClasses(p) }>{ AmountText(p) }</span>
+}

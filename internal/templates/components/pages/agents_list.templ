@@ -170,11 +170,19 @@ templ agentsListRow(a AgentsListRowProps) {
 				<span class="text-base-content/30">—</span>
 			}
 		</td>
-		<td class="align-middle text-xs text-right tabular-nums">
+		<td class="align-middle text-xs text-right">
 			if a.Cost30dUSD > 0 {
-				<span class="text-base-content/70">{ fmt.Sprintf("$%.2f", a.Cost30dUSD) }</span>
+				@components.Amount(components.AmountProps{
+					Value:  a.Cost30dUSD,
+					Intent: components.AmountCost,
+					Class:  "text-xs text-base-content/70",
+				})
 			} else {
-				<span class="text-base-content/30">$0.00</span>
+				@components.Amount(components.AmountProps{
+					Value:  0,
+					Intent: components.AmountCost,
+					Class:  "text-xs text-base-content/30",
+				})
 			}
 		</td>
 		<td class="align-middle text-center">

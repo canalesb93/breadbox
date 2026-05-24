@@ -3,6 +3,9 @@
 package pages
 
 import (
+	"fmt"
+	"strings"
+
 	"breadbox/internal/templates/components"
 
 	"github.com/a-h/templ"
@@ -212,6 +215,13 @@ func DesignSections() []DesignSection {
 			Group:       "data",
 			Render:      func() templ.Component { return SectionTags() },
 		},
+		{
+			Slug:        "amounts",
+			Title:       "Amounts",
+			Description: "components.Amount — the canonical renderer for monetary values. Three intents (transaction / balance / cost), three formats (standard / abbreviated / compact), pending modifier. Adopt for every new amount display so coloring and sign don't drift across pages.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionAmounts() },
+		},
 
 		// ── Feedback ────────────────────────────────────────────────
 		{
@@ -272,4 +282,38 @@ func FindDesignSection(slug string) (DesignSection, bool) {
 		}
 	}
 	return DesignSection{}, false
+}
+
+// amountSandboxCode renders an AmountProps literal as a short Go-style
+// code string for the sandbox copy-paste reference rows. Mirrors only
+// the fields a reader is likely to type — drops zero-valued defaults so
+// "{Value: 12.34}" stays terse instead of stringifying every field.
+func amountSandboxCode(p components.AmountProps) string {
+	parts := []string{fmt.Sprintf("Value: %s", trimFloat(p.Value))}
+	switch p.Intent {
+	case components.AmountBalance:
+		parts = append(parts, "Intent: AmountBalance")
+	case components.AmountCost:
+		parts = append(parts, "Intent: AmountCost")
+	}
+	switch p.Format {
+	case components.AmountFormatAbbreviated:
+		parts = append(parts, "Format: AmountFormatAbbreviated")
+	case components.AmountFormatCompact:
+		parts = append(parts, "Format: AmountFormatCompact")
+	}
+	if p.Precision > 0 {
+		parts = append(parts, fmt.Sprintf("Precision: %d", p.Precision))
+	}
+	if p.Pending {
+		parts = append(parts, "Pending: true")
+	}
+	return "AmountProps{" + strings.Join(parts, ", ") + "}"
+}
+
+// trimFloat formats a float without a trailing ".0" when the value is a
+// whole number, so "Value: 50" reads naturally next to "Value: 12.34".
+func trimFloat(f float64) string {
+	s := fmt.Sprintf("%g", f)
+	return s
 }

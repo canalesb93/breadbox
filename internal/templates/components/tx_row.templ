@@ -223,13 +223,11 @@ templ TxRow(tx service.AdminTransactionRow) {
 					></i>
 					<span class="sr-only">(pending)</span>
 				}
-				<span
-					class={ "bb-tx-amount tabular-nums",
-					templ.KV("bb-tx-amount--income", tx.Amount < 0),
-					templ.KV("bb-tx-amount--pending", tx.Pending) }
-				>
-					{ formatAmount(tx.Amount) }
-				</span>
+				@Amount(AmountProps{
+					Value:   tx.Amount,
+					Pending: tx.Pending,
+					Class:   "text-sm font-semibold",
+				})
 			</div>
 			<!-- Expand chevron. Rotation lives on the wrapper because Lucide
 			     replaces the <i> with an <svg> at runtime. Below the `sm`

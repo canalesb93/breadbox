@@ -66,7 +66,9 @@ templ AccountLinkDetail(p AccountLinkDetailProps) {
 templ accountLinkDetailDesktopRow(m AccountLinkDetailMatchRow, csrfToken string) {
 	<tr>
 		<td class="whitespace-nowrap">{ m.Date }</td>
-		<td class="whitespace-nowrap bb-amount">{ fmt.Sprintf("%.2f", m.Amount) }</td>
+		<td class="whitespace-nowrap text-right">
+			@components.Amount(components.AmountProps{Value: m.Amount})
+		</td>
 		<td>
 			<a href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.PrimaryTransactionID)) } class="link link-hover">{ m.PrimaryTxnName }</a>
 			if m.PrimaryTxnMerchant != "" {
@@ -111,7 +113,10 @@ templ accountLinkDetailMobileCard(m AccountLinkDetailMatchRow, csrfToken string)
 				<span class="text-xs text-base-content/40">{ m.Date }</span>
 				@accountLinkDetailConfidenceBadge(m.MatchConfidence)
 			</div>
-			<span class="text-sm font-semibold tabular-nums bb-amount">{ fmt.Sprintf("%.2f", m.Amount) }</span>
+			@components.Amount(components.AmountProps{
+				Value: m.Amount,
+				Class: "text-sm font-semibold",
+			})
 		</div>
 		<div class="space-y-2">
 			<div class="flex items-center gap-2">
