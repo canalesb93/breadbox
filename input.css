@@ -324,6 +324,9 @@
     @apply flex flex-col gap-0.5 flex-1 overflow-y-auto pb-4;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+    /* Contain the iOS rubber-band — without this, dragging past either end
+       of the nav list pulls the page underneath the drawer along with it. */
+    overscroll-behavior: contain;
   }
 
   .bb-sidebar-nav:hover,
@@ -1112,6 +1115,18 @@
   /* ── Mobile sidebar overlay above sticky navbar ── */
   .drawer-side {
     z-index: 40 !important;
+  }
+
+  /* ── Modal scroll containment ──────────────────────────────────────
+   * When the daisy modal-box body scrolls past its top/bottom (a
+   * long form in a `<dialog class="modal">`), iOS Safari rubber-bands
+   * the page underneath the backdrop instead of just bouncing the
+   * modal's own scroll. `contain` keeps the bounce local to the
+   * modal — matches the platform feel the bespoke pickers already
+   * have on their inner scroll regions (.bb-cmdk-list, etc).
+   * ──────────────────────────────────────────────────────────── */
+  .modal-box {
+    overscroll-behavior: contain;
   }
 
 
