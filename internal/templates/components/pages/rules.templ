@@ -24,17 +24,12 @@ templ Rules(p RulesProps) {
 	     routes j/k/Enter/n/Space/d to this page's handlers. Reset on
 	     teardown so other pages don't inherit. -->
 	<div x-data x-init="$store.shortcuts.setScope('rules')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Rules</h1>
-			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Automatically categorize, tag, or comment on transactions during sync</p>
-		</div>
-		<div class="flex items-center gap-2">
-			<a href="/rules/new" class="btn btn-primary btn-sm rounded-xl" data-new-rule>
-				<i data-lucide="plus" class="w-4 h-4"></i> New Rule
-			</a>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "Rules",
+		Subtitle:             "Automatically categorize, tag, or comment on transactions during sync",
+		SubtitleHideOnMobile: true,
+		Action:               rulesNewRuleAction(),
+	})
 	<div x-data="rulesPage">
 		<!-- Rules count + sort -->
 		<div class="flex items-center justify-between flex-wrap gap-3 mb-4 px-1">
@@ -70,6 +65,13 @@ templ Rules(p RulesProps) {
 			@rulesPaginator(p)
 		}
 	</div>
+}
+
+templ rulesNewRuleAction() {
+	<a href="/rules/new" class="btn btn-primary btn-sm rounded-xl gap-2" data-new-rule>
+		<i data-lucide="plus" class="w-4 h-4"></i>
+		New Rule
+	</a>
 }
 
 templ rulesSortOption(value, label string, selected bool) {

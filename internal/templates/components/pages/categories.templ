@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 )
 
 // Categories renders the categories configuration page. Hosts inside the
@@ -24,16 +25,12 @@ import (
 // docs/design-system.md → "Alpine page components".
 templ Categories(p CategoriesProps) {
 	<script src="/static/js/admin/components/categories.js"></script>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Categories</h1>
-			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Organize transactions with a two-level taxonomy</p>
-		</div>
-		<a href="/categories/new" data-new-category class="btn btn-sm btn-primary rounded-xl gap-2">
-			<i data-lucide="plus" class="w-4 h-4"></i>
-			Add Category
-		</a>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "Categories",
+		Subtitle:             "Organize transactions with a two-level taxonomy",
+		SubtitleHideOnMobile: true,
+		Action: categoriesNewCategoryAction(),
+	})
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
 		j/k/Enter/Space/e/n (registered inside categories.js) to this page's
@@ -222,6 +219,13 @@ templ categoryRowActions(c service.CategoryResponse, child bool) {
 			}
 		</ul>
 	</div>
+}
+
+templ categoriesNewCategoryAction() {
+	<a href="/categories/new" data-new-category class="btn btn-sm btn-primary rounded-xl gap-2">
+		<i data-lucide="plus" class="w-4 h-4"></i>
+		Add Category
+	</a>
 }
 
 templ categoriesEmpty() {
