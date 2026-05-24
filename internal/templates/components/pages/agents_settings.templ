@@ -48,7 +48,7 @@ templ agentsSettingsInstructionsCard(p AgentsSettingsProps) {
 				<p class="text-xs text-base-content/40" x-show="!expanded">Custom instructions sent to agents when they connect via MCP</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Instructions sent to agents when they connect via MCP</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse>
 			<div class="px-4 sm:px-5 py-4">
@@ -89,7 +89,7 @@ templ agentsSettingsReviewGuidelinesCard(p AgentsSettingsProps) {
 				<p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://review-guidelines</code> to agents during reviews</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Guidelines for reviewing transactions and creating rules — agents read this resource before processing reviews</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
@@ -126,7 +126,7 @@ templ agentsSettingsReportFormatCard(p AgentsSettingsProps) {
 				<p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://report-format</code> to agents when submitting reports</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Report structure templates and formatting guidelines — agents read this resource before submitting reports</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
@@ -159,7 +159,7 @@ templ agentsSettingsToolsCard(p AgentsSettingsProps) {
 				<p class="text-xs text-base-content/40" x-show="!expanded">{ agentsSettingsToolsSummary(p) }</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Enable or disable individual MCP tools</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
@@ -218,7 +218,7 @@ templ agentsSettingsConnectionCard() {
 				<h2 class="font-semibold">Connection</h2>
 				<p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4 space-y-5">

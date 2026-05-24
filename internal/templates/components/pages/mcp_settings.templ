@@ -109,7 +109,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 					@templ.Raw(c.SubtitleExp)
 				</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse>
 			<div class="px-4 sm:px-5 py-4">
@@ -160,7 +160,7 @@ templ mcpSettingsToolsCard(p MCPSettingsProps) {
 				</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Enable or disable individual MCP tools</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
@@ -219,7 +219,7 @@ templ mcpSettingsConnectionCard() {
 				<h2 class="font-semibold">Connection</h2>
 				<p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4 space-y-5">

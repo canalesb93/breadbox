@@ -58,7 +58,7 @@ templ Reports(p ReportsProps) {
 	} else {
 		<div class="bb-card px-5 py-16 text-center">
 			<div class="w-14 h-14 rounded-xl bg-base-200/50 mx-auto mb-4 flex items-center justify-center">
-				<i data-lucide="inbox" class="w-6 h-6 text-base-content/25"></i>
+				<i data-lucide="inbox" class="w-6 h-6 text-base-content opacity-25"></i>
 			</div>
 			<p class="text-base font-medium text-base-content/70 mb-1">{ reportsEmptyTitle(p.FilterStatus) }</p>
 			<p class="text-sm text-base-content/40 max-w-md mx-auto">{ reportsEmptyMessage(p.FilterStatus) }</p>
@@ -117,7 +117,7 @@ templ reportsRow(r ReportsItem) {
 						<i data-lucide="check" class="w-4 h-4"></i>
 					</button>
 				}
-				<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/25 group-hover:text-base-content/50 transition-colors"></i>
+				<i data-lucide="chevron-right" class="w-4 h-4 text-base-content opacity-25 group-hover:text-base-content group-hover:opacity-50 transition-colors"></i>
 			</div>
 		</div>
 	</a>

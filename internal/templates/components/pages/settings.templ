@@ -70,7 +70,7 @@ templ settingsSyncCard(p SettingsProps) {
 			@keydown.enter.prevent="expanded = !expanded"
 			@keydown.space.prevent="expanded = !expanded"
 		>
-			<i data-lucide="refresh-cw" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<i data-lucide="refresh-cw" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Sync</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -82,7 +82,7 @@ templ settingsSyncCard(p SettingsProps) {
 				</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Schedule and log retention</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div id="sync-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
@@ -184,7 +184,7 @@ templ settingsSecurityCard(p SettingsProps) {
 			@keydown.enter.prevent="expanded = !expanded"
 			@keydown.space.prevent="expanded = !expanded"
 		>
-			<i data-lucide="shield" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<i data-lucide="shield" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Security</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -192,14 +192,14 @@ templ settingsSecurityCard(p SettingsProps) {
 				</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption key status · Change password in <a href="/settings/account" class="link link-hover">My Account</a></p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div id="security-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<!-- Encryption Key Status -->
 				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 					<div class="flex items-center gap-2.5">
-						<i data-lucide="key-round" class="w-4 h-4 text-base-content/50"></i>
+						<i data-lucide="key-round" class="w-4 h-4 text-base-content opacity-50"></i>
 						<span class="text-sm font-medium">Encryption Key</span>
 					</div>
 					if p.HasEncryptionKey {
@@ -227,7 +227,7 @@ templ settingsSystemCard(p SettingsProps) {
 	<div id="system" class="bb-card p-5">
 		<div class="flex items-center justify-between gap-3 mb-4">
 			<div class="flex items-center gap-3">
-				<i data-lucide="cpu" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+				<i data-lucide="cpu" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 				<h2 class="font-semibold">System</h2>
 			</div>
 			if p.UpdateAvailable {
@@ -265,20 +265,20 @@ templ settingsHelpCard(p SettingsProps) {
 			@keydown.enter.prevent="expanded = !expanded"
 			@keydown.space.prevent="expanded = !expanded"
 		>
-			<i data-lucide="life-buoy" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<i data-lucide="life-buoy" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Help</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Setup guide and documentation</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Resources and guides</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div id="help-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<div class="flex flex-col gap-3">
 					<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 						<div class="flex items-center gap-2.5">
-							<i data-lucide="compass" class="w-4 h-4 text-base-content/50"></i>
+							<i data-lucide="compass" class="w-4 h-4 text-base-content opacity-50"></i>
 							<div>
 								<span class="text-sm font-medium">Getting Started Guide</span>
 								<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
@@ -316,7 +316,7 @@ templ settingsSyncSchedule(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="refresh-cw" class="w-4 h-4 text-base-content/60"></i>
+				<i data-lucide="refresh-cw" class="w-4 h-4 text-base-content opacity-60"></i>
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Schedule</h2>
@@ -360,7 +360,7 @@ templ settingsSyncRetention(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="archive" class="w-4 h-4 text-base-content/60"></i>
+				<i data-lucide="archive" class="w-4 h-4 text-base-content opacity-60"></i>
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Log Retention</h2>
@@ -395,7 +395,7 @@ templ settingsSecurityCardFlat(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="shield" class="w-4 h-4 text-base-content/60"></i>
+				<i data-lucide="shield" class="w-4 h-4 text-base-content opacity-60"></i>
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Encryption Key</h2>
@@ -404,7 +404,7 @@ templ settingsSecurityCardFlat(p SettingsProps) {
 		</div>
 		<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 			<div class="flex items-center gap-2.5">
-				<i data-lucide="key-round" class="w-4 h-4 text-base-content/50"></i>
+				<i data-lucide="key-round" class="w-4 h-4 text-base-content opacity-50"></i>
 				<span class="text-sm font-medium">ENCRYPTION_KEY</span>
 			</div>
 			if p.HasEncryptionKey {
@@ -430,7 +430,7 @@ templ settingsHelpCardFlat(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="life-buoy" class="w-4 h-4 text-base-content/60"></i>
+				<i data-lucide="life-buoy" class="w-4 h-4 text-base-content opacity-60"></i>
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Resources</h2>
@@ -440,7 +440,7 @@ templ settingsHelpCardFlat(p SettingsProps) {
 		<div class="flex flex-col gap-3">
 			<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 				<div class="flex items-center gap-2.5">
-					<i data-lucide="compass" class="w-4 h-4 text-base-content/50"></i>
+					<i data-lucide="compass" class="w-4 h-4 text-base-content opacity-50"></i>
 					<div>
 						<span class="text-sm font-medium">Getting Started Guide</span>
 						<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
@@ -457,13 +457,13 @@ templ settingsHelpCardFlat(p SettingsProps) {
 			</div>
 			<a href="https://docs.breadbox.sh" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
 				<div class="flex items-center gap-2.5">
-					<i data-lucide="book-open" class="w-4 h-4 text-base-content/50"></i>
+					<i data-lucide="book-open" class="w-4 h-4 text-base-content opacity-50"></i>
 					<div>
 						<span class="text-sm font-medium">Documentation</span>
 						<p class="text-xs text-base-content/40">docs.breadbox.sh</p>
 					</div>
 				</div>
-				<i data-lucide="square-arrow-out-up-right" class="w-4 h-4 text-base-content/40"></i>
+				<i data-lucide="square-arrow-out-up-right" class="w-4 h-4 text-base-content opacity-40"></i>
 			</a>
 		</div>
 	</div>

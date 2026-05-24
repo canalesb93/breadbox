@@ -102,7 +102,7 @@ templ agentsActivity(p AgentsProps) {
 	} else {
 		<div class="card bg-base-100 shadow-sm">
 			<div class="card-body items-center text-center py-12 gap-4">
-				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-1"></i>
+				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content opacity-20 mb-1"></i>
 				<div>
 					<h3 class="font-medium text-base-content/70">No agent sessions yet</h3>
 					<p class="text-sm text-base-content/50 max-w-md mt-1">Agent activity appears here once an MCP client connects to Breadbox. Start by configuring your first agent.</p>
@@ -149,7 +149,7 @@ templ agentsSessionCard(s AgentsSessionRow) {
 						<span>{ s.CreatedAtRel }</span>
 					</div>
 				</div>
-				<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/30 shrink-0 mt-1"></i>
+				<i data-lucide="chevron-right" class="w-4 h-4 text-base-content opacity-30 shrink-0 mt-1"></i>
 			</div>
 		</div>
 	</a>

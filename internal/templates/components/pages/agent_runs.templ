@@ -365,7 +365,7 @@ templ agentRunDetailMetadata(p AgentRunDetailProps) {
 templ agentRunDetailNote(p AgentRunDetailProps) {
 	<div class="bb-card p-4 mb-4">
 		<h2 class="text-sm font-semibold mb-2 flex items-center gap-2">
-			<i data-lucide="sticky-note" class="w-4 h-4 text-base-content/60"></i>
+			<i data-lucide="sticky-note" class="w-4 h-4 text-base-content opacity-60"></i>
 			Operator note
 		</h2>
 		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/agents/runs/%s/note", p.Run.ShortID)) }>
@@ -388,7 +388,7 @@ templ agentRunDetailPrompt(p AgentRunDetailProps) {
 	if p.SystemPrompt != "" || p.Prompt != "" || p.PromptPrefix != "" {
 		<div class="bb-card p-4 mb-4">
 			<h2 class="text-sm font-semibold mb-2 flex items-center gap-2">
-				<i data-lucide="message-square" class="w-4 h-4 text-base-content/60"></i>
+				<i data-lucide="message-square" class="w-4 h-4 text-base-content opacity-60"></i>
 				Prompt
 			</h2>
 			if p.PromptPrefix != "" {
@@ -417,7 +417,7 @@ templ agentRunDetailTranscript(p AgentRunDetailProps) {
 	<div class="bb-card p-4">
 		<div class="flex items-center justify-between mb-3">
 			<h2 class="text-sm font-semibold flex items-center gap-2">
-				<i data-lucide="scroll-text" class="w-4 h-4 text-base-content/60"></i>
+				<i data-lucide="scroll-text" class="w-4 h-4 text-base-content opacity-60"></i>
 				Transcript
 			</h2>
 			if len(p.Transcript) > 0 {

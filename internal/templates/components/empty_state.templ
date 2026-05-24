@@ -62,7 +62,7 @@ templ EmptyState(p EmptyStateProps) {
 			<div class="flex flex-col items-center">
 				if p.Icon != "" {
 					<div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
-						<i data-lucide={ p.Icon } class="w-7 h-7 text-base-content/30"></i>
+						<i data-lucide={ p.Icon } class="w-7 h-7 text-base-content opacity-30"></i>
 					</div>
 				}
 				<h3 class="text-base font-semibold mb-1">{ p.Title }</h3>
@@ -87,7 +87,7 @@ templ EmptyState(p EmptyStateProps) {
 templ emptyStateCompactBody(p EmptyStateProps) {
 	<div class="flex flex-col items-center text-center py-12 px-6">
 		if p.Icon != "" {
-			<i data-lucide={ p.Icon } class="w-12 h-12 text-base-content/20 mb-2"></i>
+			<i data-lucide={ p.Icon } class="w-12 h-12 text-base-content opacity-20 mb-2"></i>
 		}
 		<p class="text-sm text-base-content/60">{ p.Title }</p>
 		if p.CustomCTA != nil {

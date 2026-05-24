@@ -32,6 +32,23 @@
   svg.lucide, svg.lucide * { pointer-events: none; }
 
   /*
+   * Lucide icons are composed of multiple sibling <path> elements that share
+   * `stroke="currentColor"`. If the inherited color carries alpha (Tailwind
+   * v4's `text-COLOR/NN` syntax), every path strokes at that alpha
+   * independently and overlapping strokes — the curl-arrows of `repeat`, the
+   * stem of `circle-dollar-sign`, the check on `shield-check`, etc — stack
+   * into visibly darker pixels at intersections.
+   *
+   * Strip alpha at the SVG so each stroke renders fully opaque. To dim a
+   * Lucide icon, use `opacity-NN` on the <i> (Lucide preserves the class on
+   * the generated <svg>), which composites the whole icon as a single layer
+   * before applying transparency. `text-COLOR/NN` on Lucide icons is treated
+   * the same as `text-COLOR` here — call sites that wanted dimming should
+   * use `opacity-NN`.
+   */
+  svg.lucide { color: rgb(from currentColor r g b); }
+
+  /*
    * Pre-hydration size for Lucide placeholders.
    *
    * Before lucide.createIcons() swaps `<i data-lucide="x">` for `<svg>`, the

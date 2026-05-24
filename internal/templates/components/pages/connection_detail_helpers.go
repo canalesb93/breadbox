@@ -115,15 +115,15 @@ func connDetailAccountIcon(t string) string {
 func connDetailAccountIconColor(t string) string {
 	switch t {
 	case "depository":
-		return "text-info/60"
+		return "text-info opacity-60"
 	case "credit":
-		return "text-warning/70"
+		return "text-warning opacity-70"
 	case "loan":
-		return "text-error/60"
+		return "text-error opacity-60"
 	case "investment":
-		return "text-success/60"
+		return "text-success opacity-60"
 	default:
-		return "text-base-content/40"
+		return "text-base-content opacity-40"
 	}
 }
 

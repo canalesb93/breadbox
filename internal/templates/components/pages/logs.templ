@@ -148,7 +148,7 @@ templ logsSyncStats(p LogsProps) {
 			<div class="bb-card p-4">
 				<div class="flex items-center gap-3">
 					<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-						<i data-lucide="timer" class="w-4 h-4 text-base-content/40"></i>
+						<i data-lucide="timer" class="w-4 h-4 text-base-content opacity-40"></i>
 					</div>
 					<div>
 						<div class="text-2xl font-semibold tabular-nums leading-none">
@@ -167,13 +167,13 @@ templ logsSyncFilterBar(p LogsProps) {
 		<div class="p-0">
 			<button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
 				<div class="flex items-center gap-2">
-					<i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content/60"></i>
+					<i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content opacity-60"></i>
 					<span>Filters</span>
 					if p.HasAdvancedFilters {
 						<span class="badge badge-primary badge-xs">Active</span>
 					}
 				</div>
-				<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
+				<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
 			</button>
 			<form
 				method="GET"
@@ -304,7 +304,7 @@ templ logsSyncRow(l LogsSyncRow) {
 							case "in_progress":
 								<i data-lucide="loader" class="w-3.5 h-3.5 text-warning animate-spin"></i>
 							default:
-								<i data-lucide="minus" class="w-3.5 h-3.5 text-base-content/30"></i>
+								<i data-lucide="minus" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
 						}
 					</div>
 				</div>
@@ -391,7 +391,7 @@ templ logsWebhookStats(p LogsProps) {
 			<div class="bb-card p-4">
 				<div class="flex items-center gap-3">
 					<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-						<i data-lucide="webhook" class="w-4 h-4 text-base-content/40"></i>
+						<i data-lucide="webhook" class="w-4 h-4 text-base-content opacity-40"></i>
 					</div>
 					<div>
 						<div class="text-2xl font-semibold tabular-nums leading-none">{ strconv.FormatInt(p.WHStats.TotalEvents, 10) }</div>
@@ -591,7 +591,7 @@ templ logsWebhookRow(e LogsWebhookRow) {
 				</div>
 				if e.ErrorMessage != nil && *e.ErrorMessage != "" {
 					<div class="flex items-start gap-2 text-xs mt-2">
-						<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/60 shrink-0 mt-0.5"></i>
+						<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error opacity-60 shrink-0 mt-0.5"></i>
 						<p class="text-error/80 font-mono break-all leading-relaxed">{ *e.ErrorMessage }</p>
 					</div>
 				}
@@ -641,7 +641,7 @@ templ logsSessionsBody(p LogsProps) {
 templ logsSessionRow(s LogsSessionRow) {
 	<a href={ templ.SafeURL("/logs/sessions/" + s.ShortID) } class="bb-card bb-card--interactive group flex items-start gap-3 py-3 px-4 no-underline">
 		<div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0 mt-0.5">
-			<i data-lucide="bot" class="w-3.5 h-3.5 text-base-content/40"></i>
+			<i data-lucide="bot" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 		</div>
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2 flex-wrap">
@@ -671,7 +671,7 @@ templ logsSessionRow(s LogsSessionRow) {
 				<span>{ s.CreatedAtRelative }</span>
 			</div>
 		</div>
-		<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 shrink-0 mt-1"></i>
+		<i data-lucide="chevron-right" class="w-4 h-4 text-base-content opacity-20 shrink-0 mt-1"></i>
 	</a>
 }
 
@@ -791,9 +791,9 @@ func errorBg(hasErrors bool) string {
 
 func errorIconClass(hasErrors bool) string {
 	if hasErrors {
-		return "text-error/70"
+		return "text-error opacity-70"
 	}
-	return "text-base-content/40"
+	return "text-base-content opacity-40"
 }
 
 func errorTextClass(hasErrors bool) string {

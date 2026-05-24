@@ -192,7 +192,7 @@ templ usersMemberCard(u UsersEnrichedRow) {
 			<!-- No accounts state -->
 			<div class="border-t border-base-300 px-4 sm:px-5 py-8 bg-base-200/20 flex-1 flex flex-col items-center justify-center text-center">
 				<div class="w-12 h-12 rounded-xl bg-base-200/60 flex items-center justify-center mb-3">
-					<i data-lucide="landmark" class="w-6 h-6 text-base-content/25"></i>
+					<i data-lucide="landmark" class="w-6 h-6 text-base-content opacity-25"></i>
 				</div>
 				<p class="text-sm text-base-content/40 mb-3">No bank accounts connected</p>
 				<a href="/connections/new" class="btn btn-ghost btn-sm rounded-xl">
@@ -218,15 +218,15 @@ templ usersAccountRow(a UsersAccountRow) {
 		<div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0 hidden sm:flex">
 			switch a.Type {
 				case "depository":
-					<i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/40"></i>
+					<i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 				case "credit":
-					<i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content/40"></i>
+					<i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 				case "loan":
-					<i data-lucide="banknote" class="w-3.5 h-3.5 text-base-content/40"></i>
+					<i data-lucide="banknote" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 				case "investment":
-					<i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content/40"></i>
+					<i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 				default:
-					<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/40"></i>
+					<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 			}
 		</div>
 		<div class="flex-1 min-w-0">
