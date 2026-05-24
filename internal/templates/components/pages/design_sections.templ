@@ -1,5 +1,7 @@
 package pages
 
+import "breadbox/internal/templates/components"
+
 // design_sections.templ holds one `templ SectionX()` per entry in
 // DesignSections() (design_types.go). Each section demonstrates the
 // representative variants of one component family using a small grid
@@ -554,32 +556,37 @@ templ SectionIcons() {
 
 templ SectionPageHeader() {
 	<div class="flex flex-col gap-6">
-		@designExample("Title only", "Just the page title.") {
-			<div class="bb-page-header mb-0">
-				<div>
-					<h1 class="bb-page-title">Connections</h1>
-				</div>
-			</div>
+		@designExample("Title only", "Just the page title. Use for pages whose section is named by its breadcrumb.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title: "Connections",
+			})
 		}
 		@designExample("With subtitle", "Common on detail pages and forms.") {
-			<div class="bb-page-header mb-0">
-				<div>
-					<h1 class="bb-page-title">Create API key</h1>
-					<p class="text-sm text-base-content/50 mt-1">Generate a new key for API or MCP access</p>
-				</div>
-			</div>
+			@components.PageHeader(components.PageHeaderProps{
+				Title:    "Create API key",
+				Subtitle: "Generate a new key for API or MCP access",
+			})
+		}
+		@designExample("With subtitle (hidden on mobile)", "Dense list pages where the subtitle is decorative.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:                "Rules",
+				Subtitle:             "Automatically categorize, tag, or comment on transactions during sync",
+				SubtitleHideOnMobile: true,
+			})
 		}
 		@designExample("With primary action", "Trailing slot reserved for the page's single primary action.") {
-			<div class="bb-page-header mb-0">
-				<div>
-					<h1 class="bb-page-title">Rules</h1>
-					<p class="text-sm text-base-content/50 mt-1">Auto-categorize transactions as they arrive.</p>
-				</div>
-				<a href="#" class="btn btn-primary btn-sm rounded-xl gap-2">
-					<i data-lucide="plus" class="w-4 h-4"></i>
-					New rule
-				</a>
-			</div>
+			@components.PageHeader(components.PageHeaderProps{
+				Title:    "Categories",
+				Subtitle: "Organize transactions with a two-level taxonomy",
+				Action:   components.PageHeaderAction("/categories/new", "plus", "Add Category"),
+			})
+		}
+		@designExample("With leading icon", "Reserved for hero pages (Getting Started, etc.).") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:    "Getting started",
+				Icon:     "compass",
+				Subtitle: "Set up Breadbox step by step.",
+			})
 		}
 	</div>
 }

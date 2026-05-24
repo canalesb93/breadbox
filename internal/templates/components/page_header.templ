@@ -1,0 +1,86 @@
+package components
+
+// PageHeader is the canonical title row at the top of every admin page.
+// Replaces the duplicated `<div class="bb-page-header"><div><h1>...</h1>
+// <p>...</p></div>[<action>]</div>` block that appears in 37 templ files.
+//
+// Slots:
+//   - Title:    required
+//   - Subtitle: optional; rendered as a muted paragraph below the title.
+//   - Icon:     optional Lucide icon name; rendered inline-left of the title.
+//   - Action:   optional templ.Component slot for the page's primary
+//               action (button, link, dropdown). Always right-aligned.
+//   - SubtitleHideOnMobile: when true, applies `hidden sm:block` so the
+//               subtitle disappears on small screens (used on dense
+//               list pages where the subtitle is decorative).
+//
+// Conventions:
+//   - Single back-affordance rule: the breadcrumb above this header is
+//     the sole back link. Do not place a `← Back` link in the Action
+//     slot. See docs/design-system.md.
+//   - One primary action only. Cluster of buttons → use a dropdown.
+//
+// Usage:
+//
+//   @components.PageHeader(components.PageHeaderProps{
+//     Title:    "Categories",
+//     Subtitle: "Organize transactions with a two-level taxonomy",
+//     SubtitleHideOnMobile: true,
+//     Action: components.PageHeaderAction(
+//       templ.SafeURL("/categories/new"),
+//       "plus",
+//       "Add Category",
+//     ),
+//   })
+
+type PageHeaderProps struct {
+	Title                string
+	Subtitle             string
+	Icon                 string // optional Lucide icon name
+	SubtitleHideOnMobile bool
+	// Action is rendered in the trailing right-aligned slot. Typically
+	// constructed with PageHeaderAction(...) for the common case of a
+	// single primary link/button.
+	Action templ.Component
+}
+
+templ PageHeader(p PageHeaderProps) {
+	<div class="bb-page-header">
+		<div class="min-w-0">
+			if p.Icon != "" {
+				<h1 class="bb-page-title flex items-center gap-2">
+					<i data-lucide={ p.Icon } class="w-6 h-6 text-primary shrink-0"></i>
+					<span>{ p.Title }</span>
+				</h1>
+			} else {
+				<h1 class="bb-page-title">{ p.Title }</h1>
+			}
+			if p.Subtitle != "" {
+				if p.SubtitleHideOnMobile {
+					<p class="text-sm text-base-content/50 mt-1 hidden sm:block">{ p.Subtitle }</p>
+				} else {
+					<p class="text-sm text-base-content/50 mt-1">{ p.Subtitle }</p>
+				}
+			}
+		</div>
+		if p.Action != nil {
+			<div class="flex items-center gap-2 shrink-0">
+				@p.Action
+			</div>
+		}
+	</div>
+}
+
+// PageHeaderAction is a convenience constructor for the most common
+// trailing-slot shape: a primary `<a>` button with a leading Lucide
+// icon and a label. Pages with bespoke trailing content (toggle +
+// button, dropdown, multiple buttons) should pass a custom
+// templ.Component to PageHeaderProps.Action directly.
+templ PageHeaderAction(href templ.SafeURL, icon string, label string) {
+	<a href={ href } class="btn btn-primary btn-sm rounded-xl gap-2">
+		if icon != "" {
+			<i data-lucide={ icon } class="w-4 h-4"></i>
+		}
+		{ label }
+	</a>
+}
