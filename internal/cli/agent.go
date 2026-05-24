@@ -72,7 +72,7 @@ Exit codes:
 key, spawns the sidecar with the definition's prompt + schedule, calls
 the MCP server, persists the resulting agent_runs row, revokes the key.
 
-Equivalent to clicking "Run now" in the v2 SPA — useful for cron/shell
+Equivalent to clicking "Run now" in the admin UI — useful for cron/shell
 automation or local debugging.
 
 Exit codes:
@@ -98,7 +98,7 @@ Exit codes:
 		Use:   "list",
 		Short: "List configured agents",
 		Long: `Print every agent definition with status, schedule, model, and
-last-run info. Useful for SSH-based ops without the v2 SPA.
+last-run info. Useful for SSH-based ops without the admin UI.
 
   breadbox agent list           # human-readable table
   breadbox agent list --json    # full JSON for piping into jq
@@ -247,7 +247,7 @@ func runAgentTest(parent context.Context) error {
 		case errors.Is(err, agent.ErrAuthNotConfigured):
 			fmt.Fprintln(os.Stdout, "  ✗ auth          not configured")
 			fmt.Fprintln(os.Stdout, "")
-			fmt.Fprintln(os.Stdout, "Open the v2 SPA → Settings → Agents and paste an Anthropic credential.")
+			fmt.Fprintln(os.Stdout, "Open the admin Settings → Agents (/settings/agents) and paste an Anthropic credential.")
 			fmt.Fprintln(os.Stdout, "For a subscription token: run `claude setup-token` on any machine, then paste the sk-ant-oat01-… into Settings.")
 			return silentlyFail(err)
 		case errors.Is(err, agent.ErrBinaryNotFound):
@@ -311,7 +311,7 @@ func runAgentList(parent context.Context, jsonOut bool) error {
 	}
 
 	if len(defs) == 0 {
-		fmt.Fprintln(os.Stdout, "No agents configured. The fresh-install seed should have added 5 starters — run `breadbox migrate` if you skipped it, or check the v2 SPA at /v2/agents to confirm.")
+		fmt.Fprintln(os.Stdout, "No agents configured. The fresh-install seed should have added 5 starters — run `breadbox migrate` if you skipped it, or check /agents to confirm.")
 		return nil
 	}
 

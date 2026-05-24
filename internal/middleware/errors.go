@@ -29,7 +29,7 @@ func WriteError(w http.ResponseWriter, status int, code, message string) {
 }
 
 // WriteJSON writes v as JSON with the given HTTP status code. Shared across
-// REST handlers, admin handlers, and the v2 SPA backend.
+// REST handlers and admin handlers.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

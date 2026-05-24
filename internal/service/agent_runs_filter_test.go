@@ -15,7 +15,7 @@ import (
 
 // TestListAgentRuns_ScansNewColumns is a regression test for an iter-22
 // through iter-27 bug: ListAgentRuns' hand-rolled SELECT was missing
-// operator_note, prompt_prefix, and hit_cap, so the v2 SPA run history
+// operator_note, prompt_prefix, and hit_cap, so the admin run history
 // never showed those pills even when the underlying row had them. The
 // fix landed in iter-31 (this iteration); this test pins it.
 func TestListAgentRuns_ScansNewColumns(t *testing.T) {

@@ -16,7 +16,6 @@ type SettingsProps struct {
 	ProviderCount        int
 	HasEncryptionKey     bool
 	OnboardingDismissed  bool
-	V2Default            bool
 	NextSyncTime         string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string

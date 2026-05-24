@@ -29,9 +29,9 @@ All error responses use:
 - `scope` column: `full_access` or `read_only`. `middleware.RequireWriteScope()` blocks read-only keys from write endpoints.
 - Full key record exposed to handlers via `middleware.SetAPIKey()` / `GetAPIKey()` for actor attribution.
 
-### Session cookie on `/api/v1/*` (the v2 SPA)
+### Browser session auth on `/api/v1/*`
 
-`/api/v1/*` also accepts the v2 dashboard **session cookie** — that's how the v2 SPA reads public resources without holding an API key. `internal/api/auth_session.go` (`sessionOrAPIKeyAuth`) wraps the API-key/Bearer middleware:
+`/api/v1/*` also accepts the dashboard **session cookie** — that's how a logged-in admin browser (or any future first-party client) can call the public REST API without holding an API key. `internal/api/auth_session.go` (`sessionOrAPIKeyAuth`) wraps the API-key/Bearer middleware:
 
 - A valid session is translated into a **synthetic `db.ApiKey`** (`ActorType: "user"`), so every downstream `RequireWriteScope` / actor-attribution path works unchanged — there is no second auth code path.
 - **Scope is role-derived:** `auth_accounts.role` of `admin` or `editor` → `full_access`; `viewer` (or unknown) → `read_only`. Mirrors `admin.IsEditor`.

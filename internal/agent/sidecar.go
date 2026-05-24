@@ -39,7 +39,8 @@ func (s *Sidecar) resolveBinary() (string, error) {
 
 // LocateBinary finds the breadbox-agent sidecar binary using the same
 // priority order Sidecar.Run uses at exec time. Exported so the `breadbox
-// doctor` check + the v2 SPA settings can share the discovery semantics.
+// doctor` check + the admin Settings page can share the discovery
+// semantics.
 //
 //	1. explicit path (e.g. app_config.agent.runtime_path)
 //	2. $BREADBOX_AGENT_BIN

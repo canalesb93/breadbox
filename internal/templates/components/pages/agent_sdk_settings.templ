@@ -1,0 +1,399 @@
+package pages
+
+import "strconv"
+
+// AgentSDKSettings renders the v1 admin "Agents settings" tab inside the
+// Settings shell — auth + sidecar + execution limits for Claude Agent
+// SDK runs. Distinct from AgentsSettings ("MCP Settings"), which targets
+// MCP server instructions / tool toggles.
+//
+// All POST targets sit under /-/agents/* (admin-scoped). The handler
+// resolves masked credential display strings before render so the templ
+// stays free of nil-handling.
+templ AgentSDKSettings(p AgentSDKSettingsProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Agents settings</h1>
+			<p class="text-sm text-base-content/50 mt-1">Auth, sidecar binary, and execution limits for Claude Agent SDK runs</p>
+		</div>
+	</div>
+	if p.FormError != "" {
+		<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">
+			<i data-lucide="circle-x" class="w-4 h-4"></i>
+			<span>{ p.FormError }</span>
+		</div>
+	}
+	if p.FormSuccess != "" {
+		<div role="alert" class="alert alert-success alert-soft mb-4 rounded-xl">
+			<i data-lucide="circle-check" class="w-4 h-4"></i>
+			<span>{ p.FormSuccess }</span>
+		</div>
+	}
+	<div class="grid gap-6 bb-stagger">
+		@agentSDKStatusCard(p.Status)
+		@agentSDKFormCard(p)
+		@agentSDKToolsCard(p.CSRFToken)
+	</div>
+}
+
+// agentSDKStatusCard renders the readiness panel at the top of the page.
+// Green dots for "Auth configured" + "Sidecar binary present"; either
+// red drops the overall Ready badge to a warning and surfaces a link to
+// the install docs.
+templ agentSDKStatusCard(s AgentSDKStatusProps) {
+	<div class="bb-card p-0 overflow-hidden">
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 border-b border-base-300">
+			<div class={ "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0", agentSDKStatusIconClass(s.Ready) }>
+				if s.Ready {
+					<i data-lucide="circle-check" class="w-5 h-5 text-success"></i>
+				} else {
+					<i data-lucide="triangle-alert" class="w-5 h-5 text-warning"></i>
+				}
+			</div>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">
+					if s.Ready {
+						Ready
+					} else {
+						Setup incomplete
+					}
+				</h2>
+				<p class="text-xs text-base-content/50">Side-effect-free probe of auth + binary location</p>
+			</div>
+		</div>
+		<div class="px-4 sm:px-5 py-4 space-y-3">
+			@agentSDKStatusRow("Auth configured", s.AuthConfigured, "Set a subscription token or API key below")
+			if s.BinaryPresent {
+				@agentSDKStatusRowWithDetail("Sidecar binary present", true, s.BinaryPath)
+			} else {
+				@agentSDKStatusRowWithDetail("Sidecar binary present", false, "Not found on PATH or at ~/.breadbox/agent-bin/")
+			}
+			if !s.Ready {
+				<div class="text-xs text-base-content/60 pt-2 border-t border-base-300">
+					{ "See " }
+					<a class="link link-hover" href="https://github.com/canalesb93/breadbox/blob/main/docs/agents.md" target="_blank" rel="noopener noreferrer">docs/agents.md</a>
+					{ " for setup instructions." }
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ agentSDKStatusRow(label string, ok bool, hintWhenMissing string) {
+	<div class="flex items-center gap-3">
+		if ok {
+			<span class="inline-flex w-2.5 h-2.5 rounded-full bg-success shrink-0"></span>
+			<span class="text-sm">{ label }</span>
+		} else {
+			<span class="inline-flex w-2.5 h-2.5 rounded-full bg-error shrink-0"></span>
+			<div class="min-w-0">
+				<div class="text-sm">{ label }</div>
+				<div class="text-xs text-base-content/50">{ hintWhenMissing }</div>
+			</div>
+		}
+	</div>
+}
+
+templ agentSDKStatusRowWithDetail(label string, ok bool, detail string) {
+	<div class="flex items-center gap-3">
+		if ok {
+			<span class="inline-flex w-2.5 h-2.5 rounded-full bg-success shrink-0"></span>
+			<div class="min-w-0">
+				<div class="text-sm">{ label }</div>
+				<div class="text-xs text-base-content/50 font-mono truncate">{ detail }</div>
+			</div>
+		} else {
+			<span class="inline-flex w-2.5 h-2.5 rounded-full bg-error shrink-0"></span>
+			<div class="min-w-0">
+				<div class="text-sm">{ label }</div>
+				<div class="text-xs text-base-content/50">{ detail }</div>
+			</div>
+		}
+	</div>
+}
+
+func agentSDKStatusIconClass(ready bool) string {
+	if ready {
+		return "bg-success/10"
+	}
+	return "bg-warning/10"
+}
+
+// agentSDKFormCard renders the main settings form — authentication
+// (radio + masked-token inputs), sidecar paths, and execution limits.
+templ agentSDKFormCard(p AgentSDKSettingsProps) {
+	<div class="bb-card p-0 overflow-hidden">
+		<div class="px-4 sm:px-5 py-4 border-b border-base-300">
+			<h2 class="font-semibold">Configuration</h2>
+			<p class="text-xs text-base-content/50">Authentication, sidecar paths, and per-run limits</p>
+		</div>
+		<form method="POST" action="/-/agents/settings" class="px-4 sm:px-5 py-4 space-y-6" x-data={ "{ authMode: " + jsString(p.Form.AuthMode) + " }" }>
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			@agentSDKAuthSection(p)
+			@agentSDKSidecarSection(p)
+			@agentSDKLimitsSection(p)
+			<div class="flex flex-wrap gap-2 items-center pt-2 border-t border-base-300">
+				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save settings</button>
+			</div>
+		</form>
+	</div>
+}
+
+templ agentSDKAuthSection(p AgentSDKSettingsProps) {
+	<section class="space-y-4">
+		<div>
+			<h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2">Authentication</h3>
+			<p class="text-xs text-base-content/50">Choose how the sidecar authenticates with Anthropic.</p>
+		</div>
+		<div class="space-y-3">
+			<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'subscription' && 'bg-base-200/60 ring-primary/40'">
+				<input
+					type="radio"
+					name="auth_mode"
+					value="subscription"
+					class="radio radio-sm radio-primary mt-0.5 shrink-0"
+					x-model="authMode"
+					if p.Form.AuthMode == "subscription" {
+						checked
+					}
+				/>
+				<div class="min-w-0 flex-1">
+					<div class="text-sm font-medium">Subscription token <span class="badge badge-soft badge-success badge-xs ml-1">recommended</span></div>
+					<div class="text-xs text-base-content/50 mt-0.5">Generate from <code class="text-xs">claude setup-token</code>. Charges your Claude Pro / Max subscription.</div>
+				</div>
+			</label>
+			<div x-show="authMode === 'subscription'" x-cloak class="pl-9">
+				@agentSDKMaskedInput("subscription_token", "Subscription token", p.Form.SubscriptionTokenDisplay, p.FieldErrors["subscription_token"])
+			</div>
+			<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'api_key' && 'bg-base-200/60 ring-primary/40'">
+				<input
+					type="radio"
+					name="auth_mode"
+					value="api_key"
+					class="radio radio-sm radio-primary mt-0.5 shrink-0"
+					x-model="authMode"
+					if p.Form.AuthMode == "api_key" {
+						checked
+					}
+				/>
+				<div class="min-w-0 flex-1">
+					<div class="text-sm font-medium">API key</div>
+					<div class="text-xs text-base-content/50 mt-0.5">From <a class="link link-hover" href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — pay-as-you-go.</div>
+				</div>
+			</label>
+			<div x-show="authMode === 'api_key'" x-cloak class="pl-9">
+				@agentSDKMaskedInput("anthropic_api_key", "Anthropic API key", p.Form.AnthropicAPIKeyDisplay, p.FieldErrors["anthropic_api_key"])
+			</div>
+		</div>
+	</section>
+}
+
+// agentSDKMaskedInput renders a credential input that uses the masked
+// display string as a placeholder hint — never as the value, because we
+// don't ever send plaintext back to the browser. Submitting an empty
+// field is the "keep current value" signal.
+templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
+	<div class="form-control">
+		<label class="label">
+			<span class="label-text text-sm font-medium">{ label }</span>
+		</label>
+		if maskedDisplay != "" {
+			<input
+				type="password"
+				name={ name }
+				autocomplete="off"
+				placeholder={ "Current: " + maskedDisplay }
+				class="input input-bordered input-sm w-full rounded-xl font-mono"
+			/>
+		} else {
+			<input
+				type="password"
+				name={ name }
+				autocomplete="off"
+				placeholder="Not set"
+				class="input input-bordered input-sm w-full rounded-xl font-mono"
+			/>
+		}
+		<label class="label">
+			<span class="label-text-alt text-base-content/50 text-xs">Leave blank to keep current value.</span>
+		</label>
+		if fieldErr != "" {
+			<div class="text-xs text-error mt-1">{ fieldErr }</div>
+		}
+	</div>
+}
+
+templ agentSDKSidecarSection(p AgentSDKSettingsProps) {
+	<section class="space-y-4">
+		<div>
+			<h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2">Sidecar</h3>
+			<p class="text-xs text-base-content/50">Override the sidecar binary lookup and transcript storage.</p>
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2">
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text text-sm font-medium">Runtime path</span>
+				</label>
+				<input
+					type="text"
+					name="runtime_path"
+					value={ p.Form.RuntimePath }
+					placeholder="auto"
+					class="input input-bordered input-sm w-full rounded-xl font-mono"
+				/>
+				<label class="label">
+					<span class="label-text-alt text-base-content/50 text-xs">Override default lookup — empty uses discovery chain.</span>
+				</label>
+				if p.FieldErrors["runtime_path"] != "" {
+					<div class="text-xs text-error mt-1">{ p.FieldErrors["runtime_path"] }</div>
+				}
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text text-sm font-medium">Transcript directory</span>
+				</label>
+				<input
+					type="text"
+					name="transcript_dir"
+					value={ p.Form.TranscriptDir }
+					placeholder="transcripts/agents"
+					class="input input-bordered input-sm w-full rounded-xl font-mono"
+				/>
+				<label class="label">
+					<span class="label-text-alt text-base-content/50 text-xs">Where to persist NDJSON transcripts.</span>
+				</label>
+				if p.FieldErrors["transcript_dir"] != "" {
+					<div class="text-xs text-error mt-1">{ p.FieldErrors["transcript_dir"] }</div>
+				}
+			</div>
+		</div>
+	</section>
+}
+
+templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
+	<section class="space-y-4">
+		<div>
+			<h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2">Limits</h3>
+			<p class="text-xs text-base-content/50">Hard ceilings applied across all agent runs.</p>
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2">
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text text-sm font-medium">Max concurrent runs</span>
+				</label>
+				<input
+					type="number"
+					name="max_concurrent"
+					value={ strconv.Itoa(p.Form.MaxConcurrent) }
+					min="1"
+					max="50"
+					class="input input-bordered input-sm w-full rounded-xl"
+				/>
+				<label class="label">
+					<span class="label-text-alt text-base-content/50 text-xs">Concurrent SDK runs across all definitions. 1–50.</span>
+				</label>
+				if p.FieldErrors["max_concurrent"] != "" {
+					<div class="text-xs text-error mt-1">{ p.FieldErrors["max_concurrent"] }</div>
+				}
+			</div>
+			<div class="form-control">
+				<label class="label">
+					<span class="label-text text-sm font-medium">Global max budget (USD)</span>
+				</label>
+				<input
+					type="number"
+					name="global_max_budget_usd"
+					value={ p.Form.GlobalMaxBudgetUSDStr }
+					step="0.01"
+					min="0"
+					max="1000"
+					placeholder="no cap"
+					class="input input-bordered input-sm w-full rounded-xl"
+				/>
+				<label class="label">
+					<span class="label-text-alt text-base-content/50 text-xs">Optional ceiling per run. Leave empty for no global cap.</span>
+				</label>
+				if p.FieldErrors["global_max_budget_usd"] != "" {
+					<div class="text-xs text-error mt-1">{ p.FieldErrors["global_max_budget_usd"] }</div>
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// agentSDKToolsCard renders the operator-side tools — smoke test + manual
+// cleanup. Both fire small async POSTs and show their JSON response
+// inline in a card. Alpine drives the state machine; the result panels
+// reuse the same card chrome.
+templ agentSDKToolsCard(csrfToken string) {
+	<div
+		class="bb-card p-0 overflow-hidden"
+		x-data={ "{ csrfToken: " + jsString(csrfToken) + ", smokeState: 'idle', smokeResult: null, smokeError: null, cleanupState: 'idle', cleanupResult: null, cleanupError: null, async runSmokeTest() { this.smokeState = 'loading'; this.smokeResult = null; this.smokeError = null; try { const res = await fetch('/-/agents/test', { method: 'POST', headers: { 'X-CSRF-Token': this.csrfToken, 'Accept': 'application/json' } }); const body = await res.json(); if (!res.ok) { this.smokeError = (body && body.error && body.error.message) || ('HTTP ' + res.status); this.smokeState = 'error'; return; } this.smokeResult = body; this.smokeState = 'ok'; } catch (e) { this.smokeError = e.message || 'Request failed'; this.smokeState = 'error'; } }, async runCleanup() { this.cleanupState = 'loading'; this.cleanupResult = null; this.cleanupError = null; try { const res = await fetch('/-/agents/cleanup', { method: 'POST', headers: { 'X-CSRF-Token': this.csrfToken, 'Accept': 'application/json' } }); const body = await res.json(); if (!res.ok) { this.cleanupError = (body && body.error && body.error.message) || ('HTTP ' + res.status); this.cleanupState = 'error'; return; } this.cleanupResult = body; this.cleanupState = 'ok'; } catch (e) { this.cleanupError = e.message || 'Request failed'; this.cleanupState = 'error'; } } }" }
+	>
+		<div class="px-4 sm:px-5 py-4 border-b border-base-300">
+			<h2 class="font-semibold">Diagnostics</h2>
+			<p class="text-xs text-base-content/50">Validate the setup without scheduling a real run.</p>
+		</div>
+		<div class="px-4 sm:px-5 py-4 space-y-5">
+			<div class="flex flex-wrap gap-2 items-center">
+				<button
+					type="button"
+					class="btn btn-secondary btn-sm rounded-xl"
+					@click="runSmokeTest()"
+					:disabled="smokeState === 'loading'"
+				>
+					<span x-show="smokeState !== 'loading'" class="flex items-center gap-1.5">
+						<i data-lucide="zap" class="w-4 h-4"></i> Run smoke test
+					</span>
+					<span x-show="smokeState === 'loading'" x-cloak class="flex items-center gap-1.5">
+						<span class="loading loading-spinner loading-xs"></span> Running…
+					</span>
+				</button>
+				<button
+					type="button"
+					class="btn btn-ghost btn-sm rounded-xl"
+					@click="runCleanup()"
+					:disabled="cleanupState === 'loading'"
+				>
+					<span x-show="cleanupState !== 'loading'" class="flex items-center gap-1.5">
+						<i data-lucide="broom" class="w-4 h-4"></i> Run cleanup now
+					</span>
+					<span x-show="cleanupState === 'loading'" x-cloak class="flex items-center gap-1.5">
+						<span class="loading loading-spinner loading-xs"></span> Cleaning…
+					</span>
+				</button>
+				<span class="text-xs text-base-content/40">Smoke test calls the SDK (~5¢ ceiling). Cleanup applies retention immediately.</span>
+			</div>
+			<div x-show="smokeState === 'ok' && smokeResult" x-cloak class="rounded-xl bg-base-200/60 p-4 space-y-2">
+				<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Smoke test result</div>
+				<dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Auth mode</dt><dd class="font-mono text-xs" x-text="smokeResult.auth_mode"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Model</dt><dd class="font-mono text-xs" x-text="smokeResult.model"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Duration</dt><dd class="font-mono text-xs" x-text="(smokeResult.duration_ms || 0) + ' ms'"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Cost</dt><dd class="font-mono text-xs" x-text="'$' + (smokeResult.total_cost_usd || 0).toFixed(4)"></dd></div>
+					<div class="flex justify-between gap-3 sm:col-span-2"><dt class="text-base-content/50">Binary path</dt><dd class="font-mono text-xs truncate text-right" x-text="smokeResult.binary_path || '—'"></dd></div>
+				</dl>
+				<div x-show="smokeResult.response" class="pt-2 mt-2 border-t border-base-300">
+					<div class="text-xs text-base-content/50 mb-1">Response</div>
+					<pre class="text-xs font-mono whitespace-pre-wrap" x-text="smokeResult.response"></pre>
+				</div>
+			</div>
+			<div x-show="smokeState === 'error' && smokeError" x-cloak role="alert" class="alert alert-error alert-soft rounded-xl">
+				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				<span x-text="'Smoke test failed: ' + smokeError"></span>
+			</div>
+			<div x-show="cleanupState === 'ok' && cleanupResult" x-cloak class="rounded-xl bg-base-200/60 p-4 space-y-2">
+				<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Cleanup result</div>
+				<dl class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 text-sm">
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Runs deleted</dt><dd class="font-mono text-xs" x-text="cleanupResult.runs_deleted ?? 0"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Transcripts deleted</dt><dd class="font-mono text-xs" x-text="cleanupResult.transcripts_deleted ?? 0"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Retention days</dt><dd class="font-mono text-xs" x-text="cleanupResult.retention_days ?? '—'"></dd></div>
+				</dl>
+			</div>
+			<div x-show="cleanupState === 'error' && cleanupError" x-cloak role="alert" class="alert alert-error alert-soft rounded-xl">
+				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				<span x-text="'Cleanup failed: ' + cleanupError"></span>
+			</div>
+		</div>
+	</div>
+}

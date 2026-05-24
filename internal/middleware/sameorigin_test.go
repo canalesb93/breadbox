@@ -33,7 +33,7 @@ func TestSameOrigin(t *testing.T) {
 	}{
 		{"matching origin", "breadbox.example.com", "https://breadbox.example.com", "", true},
 		{"mismatched origin", "breadbox.example.com", "https://evil.com", "", false},
-		{"referer fallback matches", "breadbox.example.com", "", "https://breadbox.example.com/v2/transactions", true},
+		{"referer fallback matches", "breadbox.example.com", "", "https://breadbox.example.com/transactions", true},
 		{"referer fallback mismatched", "breadbox.example.com", "", "https://evil.com/x", false},
 		{"no origin, no referer", "breadbox.example.com", "", "", false},
 		{"origin takes precedence over referer", "breadbox.example.com", "https://evil.com", "https://breadbox.example.com/x", false},

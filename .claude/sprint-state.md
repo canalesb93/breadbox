@@ -1,3 +1,5 @@
+> **v2 SPA deprecated 2026-05-24; this file retained for historical reference only.**
+
 # Claude Agent SDK integration sprint
 
 **Sprint branch (persistent, accumulates all iterations):** `agents/claude-agent-sdk-sprint`

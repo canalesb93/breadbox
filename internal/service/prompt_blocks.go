@@ -13,9 +13,8 @@ import (
 	"breadbox/prompts"
 )
 
-// PromptBlockGroup is the taxonomy classification used by the v2 SPA's
-// prompt-builder picker. The string union on the client mirrors these
-// constants — keep both sides in sync.
+// PromptBlockGroup is the taxonomy classification used by the admin
+// prompt-builder picker.
 type PromptBlockGroup string
 
 const (
@@ -30,8 +29,8 @@ const (
 )
 
 // PromptBlock is one reusable agent-prompt building block — the parsed
-// view of a single `prompts/agents/*.md` file. The v2 SPA's prompt
-// builder composes these into agent prompts.
+// view of a single `prompts/agents/*.md` file. The admin prompt builder
+// composes these into agent prompts.
 //
 // On-disk format is YAML frontmatter + markdown body:
 //
@@ -43,8 +42,7 @@ const (
 //
 //	<body markdown — sent to the model verbatim>
 //
-// Icon names are kebab-case Lucide identifiers (matching the React
-// `DynamicIcon` resolver).
+// Icon names are kebab-case Lucide identifiers.
 type PromptBlock struct {
 	ID          string           `json:"id"`
 	Title       string           `json:"title"`
@@ -64,8 +62,8 @@ var hiddenPromptBlockIDs = map[string]bool{
 
 // loadPromptBlocks reads + parses every file under prompts/agents/
 // once. The embed.FS contents are immutable at runtime, so the result
-// is cached forever via sync.OnceValues — the v2 SPA hits this on
-// every page mount, no reason to re-walk the FS each time.
+// is cached forever via sync.OnceValues — the admin UI hits this on
+// every page render, no reason to re-walk the FS each time.
 var loadPromptBlocks = sync.OnceValues(func() ([]PromptBlock, error) {
 	entries, err := prompts.FS.ReadDir("agents")
 	if err != nil {
