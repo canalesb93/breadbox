@@ -18,8 +18,8 @@ import (
 //
 // Pins (do not deviate when calling):
 //   - Trigger:  `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
-//   - Menu:     `dropdown dropdown-end menu bg-base-100 rounded-xl`
-//               `shadow-lg border border-base-300 w-44 p-1`
+//   - Menu:     `dropdown dropdown-end menu bg-base-100 shadow-lg`
+//               `border border-base-300 w-44 p-1`
 //   - Item icon: `w-3.5 h-3.5`
 //   - Destructive items: `text-error` on the inner element
 //   - Disabled items: `disabled` class on the <li>
@@ -135,7 +135,7 @@ func overflowMenuListClass(pos string) string {
 	if pos == "start" {
 		side = "dropdown-start"
 	}
-	return "dropdown " + side + " menu bg-base-100 rounded-xl shadow-lg border border-base-300 w-44 p-1"
+	return "dropdown " + side + " menu bg-base-100 shadow-lg border border-base-300 w-44 p-1"
 }
 
 // overflowMenuListStyle wires the popover element to the trigger's anchor

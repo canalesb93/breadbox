@@ -53,9 +53,9 @@ Always use the daisy component (with our standard overlays only):
 |---|---|---|
 | `btn` | `btn-sm` → `gap-2`; `btn-xs` → `gap-1.5` | Two sizes only. Icon size `w-4 h-4` (sm) / `w-3.5 h-3.5` (xs). Radius is daisy default — no per-caller `rounded-*`. |
 | `badge` | `badge-soft badge-{tone} badge-sm` for status; `badge-ghost badge-xs` for metadata; solid `badge-{tone} badge-xs` for counts | Never add `rounded-lg`/`rounded-xl` to a badge. |
-| `alert` | `alert alert-{tone} rounded-xl` for page-level; `alert-soft` for less prominent inline | Use `bb-form-error` inside a form card (tighter). |
-| `modal` | `modal modal-bottom sm:modal-middle`; `modal-box rounded-xl` | Use for all confirm/dialog UX. See "Anti-patterns" below for the bespoke shells we're retiring. |
-| `dropdown` + `menu` | `dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1` | Standard overflow-menu shape. |
+| `alert` | `alert alert-{tone}` for page-level; `alert-soft` for less prominent inline | Use `bb-form-error` inside a form card (tighter). Radius is daisy default — no per-caller `rounded-*`. |
+| `modal` | `modal modal-bottom sm:modal-middle`; `modal-box` | Use for all confirm/dialog UX. See "Anti-patterns" below for the bespoke shells we're retiring. |
+| `dropdown` + `menu` | `dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1` | Standard overflow-menu shape. Radius is daisy default. |
 | `table` | `table table-sm table-zebra` + `hover:bg-base-200` on `<tr>` | `table-md` for transaction list; `table-xs` for embedded. |
 | `toast` | `toast toast-center toast-bottom` | One toast pattern. |
 | `tooltip` | `tooltip tooltip-top` + `data-tip="…"` | Don't roll your own tooltip. |
@@ -68,7 +68,7 @@ Always use the daisy component (with our standard overlays only):
 | `kbd` | `kbd kbd-xs/sm` | **Adopt — `bb-*-kbd` duplication is being retired.** |
 | `join` | `join` + `join-item btn` | For segmented controls + pagination — use instead of new `.bb-*-toggle` classes. |
 | `fieldset` + `fieldset-legend` | Use the legend, drop the parallel `<label>` | Currently 19 fieldsets use a redundant external label. |
-| `checkbox`, `radio`, `toggle`, `textarea`, `file-input` | Native daisy with our `rounded-xl` where applicable | Faithful. |
+| `checkbox`, `radio`, `toggle`, `textarea`, `file-input` | Native daisy, no per-caller `rounded-*` | Visual tuning lives in the theme. |
 
 ## Justified `bb-*` extensions (do not rewrite to daisy)
 

@@ -5,7 +5,7 @@ package components
 // the human-readable message. The caller is responsible for the nil check
 // (the html/template facade short-circuits when .Flash is nil).
 templ Flash(flashType, message string) {
-	<div role="alert" class={ "alert", flashClass(flashType), "rounded-xl", "mb-6" }>
+	<div role="alert" class={ "alert", flashClass(flashType), "mb-6" }>
 		<span>{ message }</span>
 	</div>
 }

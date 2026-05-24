@@ -393,7 +393,7 @@ When a card has ≥2 secondary actions (Edit, Manage, Transactions, Delete, …)
   <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity">
     <i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
   </div>
-  <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+  <ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
     <li><a href="…"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
     <li><a href="…"><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
   </ul>
