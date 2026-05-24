@@ -1117,3 +1117,180 @@ templ SectionFilterSearchInput() {
 		}
 	</div>
 }
+
+// ─── Transaction rows ──────────────────────────────────────────────────
+
+// SectionTransactionRows shows the three row variants (full, compact,
+// feed) side by side, plus the building-block elements
+// (`bb-tx-avatar`, `bb-tx-amount`, `bb-tx-owner-badge`) that compose
+// them. The fixture rows live in design_transaction_rows_helpers.go
+// so the templ stays focused on layout.
+//
+// We seed window.__bbCategories from a JSONScript tag so the inline
+// `categoryPicker` Alpine factory on TxRow can resolve `data-initial`
+// (a category UUID) to a visible label. Without this seed the picker's
+// button collapses to a ~18px shell because x-text="displayLabel"
+// overwrites the static fallback with an empty string. The
+// CategoryPickerScript + Styles ship the factory itself; live pages
+// (e.g. /transactions) load them via their own page-component module.
+templ SectionTransactionRows() {
+	@components.CategoryPickerScript()
+	@components.CategoryPickerStyles()
+	@templ.JSONScript("design-tx-rows-cats", designTxRowsCategories())
+	<script>
+		(function(){var e=document.getElementById('design-tx-rows-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
+	</script>
+	<div class="flex flex-col gap-6">
+		@designExample("TxRow — full row (transactions list)", "Two-line layout with checkbox, avatar, name + meta, inline category picker (xl+), date, amount, expand panel. Used on /transactions.") {
+			<div class="divide-y divide-base-300/40 -mx-5">
+				@components.TxRow(designTxRowsCategorized())
+				@components.TxRow(designTxRowsIncome())
+				@components.TxRow(designTxRowsPending())
+				@components.TxRow(designTxRowsUncategorized())
+			</div>
+		}
+		@designExample("TxRowCompact — dense list (dashboard, rule detail)", "Single-anchor row with avatar, name + meta, amount + relative date. No selection, no expand panel.") {
+			<div class="flex flex-col gap-1">
+				@components.TxRowCompact(designTxRowsCategorized())
+				@components.TxRowCompact(designTxRowsIncome())
+				@components.TxRowCompact(designTxRowsPending())
+				@components.TxRowCompact(designTxRowsUncategorized())
+			</div>
+		}
+		@designExample("TxRowFeed — single-line glance row (/feed samples)", "Raw provider description + avatar + amount in one line, with optional `Dimmed` for de-emphasised reference rows and an inline `[tag] N` chip. Amount uses leading + / − so direction is unambiguous regardless of sign convention.") {
+			<div class="flex flex-col gap-0.5">
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:       "tx12abcd",
+					Description:   "WHOLEFDS NEW YORK 12345",
+					Amount:        48.27,
+					Currency:      "USD",
+					CategoryColor: designTxRowsPtr("#22c55e"),
+					CategoryIcon:  designTxRowsPtr("shopping-cart"),
+					TagCount:      2,
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:     "tx34efgh",
+					Description: "ACME PAYROLL DIRECT DEP",
+					Amount:      -2845.00,
+					Currency:    "USD",
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:       "tx56ijkl",
+					Description:   "BLUE BOTTLE COFFEE",
+					Amount:        6.75,
+					Currency:      "USD",
+					Pending:       true,
+					CategoryColor: designTxRowsPtr("#d97706"),
+					CategoryIcon:  designTxRowsPtr("coffee"),
+				})
+				@components.TxRowFeed(components.TxRowFeedProps{
+					ShortID:     "tx78mnop",
+					Description: "USPS PO 12345",
+					Amount:      14.95,
+					Currency:    "USD",
+					Dimmed:      true,
+				})
+			</div>
+		}
+		@designExample("Avatars (bb-tx-avatar)", "Default 36×36 (full row) and 32×32 (--sm, compact/feed). `--avatar-color` from category drives a 12 % background tint via color-mix. Uncategorised variant is a neutral circle-off glyph.") {
+			<div class="flex flex-wrap items-end gap-4">
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
+						<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">default</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #22c55e">
+						<i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--sm</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #d97706">
+						<i data-lucide="coffee" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">amber</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #0ea5e9">
+						<i data-lucide="home" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">sky</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar" style="--avatar-color: #a855f7">
+						<i data-lucide="plane" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">violet</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+						<i data-lucide="circle-off" class="w-4 h-4"></i>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--uncategorized</code>
+				</div>
+			</div>
+		}
+		@designExample("Owner badge (bb-tx-owner-badge)", "Bottom-right corner of the avatar, ringed in the row background. Image when EffectiveUserID is set, letter fallback otherwise.") {
+			<div class="flex flex-wrap items-end gap-6">
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
+							<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Alex">
+							<span>A</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--letter</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #d97706">
+							<i data-lucide="coffee" class="w-3.5 h-3.5"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
+							<span>S</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">--sm + letter</code>
+				</div>
+				<div class="flex flex-col items-center gap-1.5">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+							<i data-lucide="circle-off" class="w-4 h-4"></i>
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
+							<span>S</span>
+						</span>
+					</div>
+					<code class="text-[0.65rem] text-base-content/50">on uncategorized</code>
+				</div>
+			</div>
+		}
+		@designExample("Amount (bb-tx-amount)", "tabular-nums sets a stable right edge. --income flips to green for inflow (negative in our sign convention). --pending dims to 55 % so the provisional number reads quieter without becoming illegible.") {
+			<div class="flex flex-col gap-2 text-right max-w-[18rem]">
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">default (outflow)</span>
+					<span class="bb-tx-amount tabular-nums">$48.27</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">--income</span>
+					<span class="bb-tx-amount bb-tx-amount--income tabular-nums">-$2,845.00</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">--pending</span>
+					<span class="inline-flex items-center justify-end gap-1">
+						<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+						<span class="bb-tx-amount bb-tx-amount--pending tabular-nums">$6.75</span>
+					</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span class="text-xs text-base-content/50">income + pending</span>
+					<span class="bb-tx-amount bb-tx-amount--income bb-tx-amount--pending tabular-nums">-$120.00</span>
+				</div>
+			</div>
+		}
+	</div>
+}
