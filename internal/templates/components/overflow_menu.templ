@@ -6,7 +6,7 @@ package components
 // across 6+ templ files with subtly different geometry.
 //
 // Pins (do not deviate when calling):
-//   - Trigger:  `btn btn-ghost btn-sm btn-square rounded-lg` + icon `w-5 h-5`
+//   - Trigger:  `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
 //   - Menu:     `dropdown-content menu bg-base-100 rounded-xl shadow-lg`
 //               `border border-base-300 z-50 w-44 p-1`
 //   - Item icon: `w-3.5 h-3.5`
@@ -35,7 +35,7 @@ type OverflowMenuProps struct {
 
 templ OverflowMenu(p OverflowMenuProps) {
 	<div class={ overflowMenuRootClass(p.Position) }>
-		<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity" aria-label={ p.AriaLabel }>
+		<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity" aria-label={ p.AriaLabel }>
 			<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
 		</div>
 		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">

@@ -106,7 +106,7 @@ templ accessActiveClientRow(c AccessClientRow, isAdmin bool, csrfToken string) {
 		if isAdmin {
 			<div class="shrink-0 flex items-center">
 				<div class="dropdown dropdown-end" x-show="!confirming">
-					<div tabindex="0" role="button" class={ "btn btn-ghost btn-xs btn-square rounded-lg text-base-content/40" } aria-label={ "Actions for OAuth client " + c.Name } title="More actions">
+					<div tabindex="0" role="button" class={ "btn btn-ghost btn-xs btn-square text-base-content/40" } aria-label={ "Actions for OAuth client " + c.Name } title="More actions">
 						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 					</div>
 					<ul tabindex="0" class="dropdown-content menu menu-sm bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
@@ -235,7 +235,7 @@ templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
 		if isAdmin {
 			<div class="shrink-0 flex items-center">
 				<div class="dropdown dropdown-end" x-show="!confirming">
-					<div tabindex="0" role="button" class={ "btn btn-ghost btn-xs btn-square rounded-lg text-base-content/40" } aria-label={ "Actions for API key " + k.Name } title="More actions">
+					<div tabindex="0" role="button" class={ "btn btn-ghost btn-xs btn-square text-base-content/40" } aria-label={ "Actions for API key " + k.Name } title="More actions">
 						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 					</div>
 					<ul tabindex="0" class="dropdown-content menu menu-sm bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">

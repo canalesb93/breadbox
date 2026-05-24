@@ -56,7 +56,7 @@ templ SectionFoundations() {
 
 templ SectionButtons() {
 	<div class="flex flex-col gap-6">
-		@designExample("Sizes (sm + xs)", "Two sizes only. Radius (xl on sm, lg on xs) is baked into the theme — just write `btn btn-sm` / `btn btn-xs`. No rounded-* modifier needed.") {
+		@designExample("Sizes (sm + xs)", "Two sizes only. Vanilla daisy — no per-caller radius override. Future visual changes go through the daisy theme builder.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<button class="btn btn-primary btn-sm">Primary sm</button>
 				<button class="btn btn-primary btn-xs">Primary xs</button>
@@ -89,7 +89,7 @@ templ SectionButtons() {
 				</button>
 			</div>
 		}
-		@designExample("Icon-only (square)", "btn-square keeps it 1:1. Radius inherits the size convention (xl on sm, lg on xs). Kebab/overflow triggers opt down to `rounded-lg` for a tighter icon-button feel — see the overflow-menu section.") {
+		@designExample("Icon-only (square)", "btn-square keeps it 1:1. Vanilla daisy radius applies — same as text buttons.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<button class="btn btn-ghost btn-sm btn-square" aria-label="Edit">
 					<i data-lucide="pencil" class="w-4 h-4"></i>
@@ -427,7 +427,7 @@ templ SectionMenusDropdowns() {
 						<div class="text-xs text-base-content/50">alex@example.com</div>
 					</div>
 					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100">
+						<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100">
 							<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
 						</div>
 						<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">

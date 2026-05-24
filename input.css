@@ -2699,20 +2699,8 @@
   }
 }
 
-/* ── Button radius convention (UNLAYERED — beats daisy's cascade layer) ──
- * Was per-caller `rounded-xl` (sm) / `rounded-lg` (xs); the override moves
- * the convention into the theme so callers can write vanilla `btn btn-sm`.
- * Must sit outside any @layer so it wins against daisy's btn rules in the
- * daisyui.* cascade layer (lower layers lose, regardless of selector
- * specificity). btn-md / btn-lg keep daisy's default `--radius-field`.
- *
- * Uses Tailwind's `--radius-xl` / `--radius-lg` theme tokens (not
- * hardcoded values) so a future radius-theme change flows through. The
- * tokens evaluate to 0.75rem / 0.5rem at the daisy 5 defaults.
- *
- * `:not(.join-item)` keeps daisy's `.join > .join-item` corner-squaring
- * intact — those use longhand `border-*-radius` props and our shorthand
- * here would otherwise paint all four corners. Buttons inline-stamping
- * `rounded-lg` / `rounded-md` still win via @layer utilities. */
-.btn.btn-sm:not(.join-item) { border-radius: var(--radius-xl); }
-.btn.btn-xs:not(.join-item) { border-radius: var(--radius-lg); }
+/* Button radius is now vanilla daisy (--radius-field, 4px by default).
+ * The previous `rounded-xl on btn-sm` convention was dropped to align
+ * with daisyui.com defaults — adopt daisy theme tokens via the daisy
+ * theme builder if a different shape is wanted, don't reintroduce
+ * per-size CSS overrides here. */

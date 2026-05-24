@@ -67,11 +67,11 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 					<input type="hidden" name="code_challenge" value={ p.CodeChallenge }/>
 					<input type="hidden" name="code_challenge_method" value={ p.CodeChallengeMethod }/>
 					<div class="flex gap-3">
-						<button type="submit" name="action" value="approve" class="btn btn-primary flex-1 rounded-xl">
+						<button type="submit" name="action" value="approve" class="btn btn-primary flex-1">
 							<i data-lucide="check" class="w-4 h-4"></i>
 							Authorize
 						</button>
-						<button type="submit" name="action" value="deny" class="btn btn-ghost flex-1 rounded-xl">
+						<button type="submit" name="action" value="deny" class="btn btn-ghost flex-1">
 							Deny
 						</button>
 					</div>
