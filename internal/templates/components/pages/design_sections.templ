@@ -369,9 +369,9 @@ templ SectionTables() {
 
 templ SectionTags() {
 	<div class="flex flex-col gap-6">
-		@designExample("Tag sizes", "Pill-shaped, colored via --tag-color CSS variable.") {
+		@designExample("Tag sizes", "Pill-shaped, colored via --tag-color CSS variable. Size variants are modifiers — always pair with the base .bb-tag class.") {
 			<div class="flex flex-wrap items-center gap-2">
-				<span class="bb-tag-sm" style="--tag-color:#f59e0b">
+				<span class="bb-tag bb-tag-sm" style="--tag-color:#f59e0b">
 					<i data-lucide="inbox"></i>
 					<span>Needs review</span>
 				</span>
@@ -379,7 +379,7 @@ templ SectionTags() {
 					<i data-lucide="check"></i>
 					<span>Reconciled</span>
 				</span>
-				<span class="bb-tag-lg" style="--tag-color:#6366f1">
+				<span class="bb-tag bb-tag-lg" style="--tag-color:#6366f1">
 					<i data-lucide="bookmark"></i>
 					<span>Subscription</span>
 				</span>

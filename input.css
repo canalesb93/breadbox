@@ -778,11 +778,15 @@
      Slim top bar that replaces the sidebar when the page is hosted in
      standalone mode (base.html .Standalone branch). Keeps the chrome
      minimal so reviewers focus on the component under test. */
+  /* Opaque solid background — no /85 + backdrop-blur, otherwise the
+     modal dim looks like it undims the bar at a different rate than
+     the rest of the page (the bar reveals partially-blurred content
+     behind it as the dim fades). */
   .bb-standalone-bar {
     @apply sticky top-0 z-30
            flex items-center justify-between gap-3
            px-4 sm:px-6 h-12
-           bg-base-100/85 backdrop-blur
+           bg-base-100
            border-b border-base-300;
   }
 
@@ -864,15 +868,15 @@
     animation: bb-page-enter 0.25s ease-out both;
   }
 
+  /* Opacity-only fade — do NOT animate transform here. Even after the
+     keyframe ends, the browser keeps the computed transform as
+     matrix(1,0,0,1,0,0) (identity but non-none), which turns the
+     animated element into the containing block for any
+     position:fixed descendants. That breaks <dialog> close, which
+     leaves the browser's top layer and snaps to <main>'s bounds. */
   @keyframes bb-page-enter {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
   /* Disable the page entrance animation on small/touch screens — feels sluggish on mobile */
@@ -947,10 +951,14 @@
     }
   }
 
-  /* ── Modal backdrop smooth ── */
-  .modal-backdrop {
-    transition: opacity 0.2s ease !important;
-  }
+  /* DaisyUI's .modal defaults are fine; do not add per-class overrides
+     here. The "dim background moves around on close" bug previously
+     attributed to the modal was actually @keyframes bb-page-enter
+     applying a non-none transform on its end frame — that turns <main>
+     into the containing block for position:fixed descendants, so the
+     dialog snaps to <main>'s bounds the moment the browser removes it
+     from the top layer. Fixed by changing the keyframe end transform
+     to `none`. */
 
 
 

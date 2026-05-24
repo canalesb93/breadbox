@@ -26,7 +26,10 @@ type FilterSearchInputProps struct {
 
 templ FilterSearchInput(p FilterSearchInputProps) {
 	<div class="relative">
-		<i data-lucide={ filterSearchIcon(p.Icon) } class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
+		<i
+			data-lucide={ filterSearchIcon(p.Icon) }
+			class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50 pointer-events-none z-10"
+		></i>
 		<input
 			type="text"
 			placeholder={ p.Placeholder }
