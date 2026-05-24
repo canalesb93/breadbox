@@ -768,6 +768,19 @@ templ SectionOverflowMenu() {
 				</div>
 			</div>
 		}
+		@designExample("Inside an overflow-clipped container", "Native popover + CSS anchor positioning lets the menu escape an `overflow:hidden` ancestor (the bug that hid the kebab on /tags inside the table viewport). The trigger sits in the bottom-right of a 96px-tall clipped box — an old `absolute`-positioned dropdown would be invisible; the popover version paints in the top layer above everything.") {
+			<div class="overflow-hidden border border-base-300 rounded-xl h-24 w-72 bg-base-200/40 p-3 flex items-end justify-end">
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Clipped-container actions",
+					Items: []components.OverflowMenuItem{
+						{Label: "View", Icon: "eye", Href: "#"},
+						{Label: "Edit", Icon: "pencil", Href: "#"},
+						{Label: "Archive", Icon: "archive", OnClick: "noop()"},
+						{Label: "Delete", Icon: "trash-2", OnClick: "noop()", Destructive: true},
+					},
+				})
+			</div>
+		}
 	</div>
 }
 
