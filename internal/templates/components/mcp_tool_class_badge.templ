@@ -1,0 +1,18 @@
+package components
+
+// MCPToolClassBadge renders the write/read pill that flags MCP tools
+// in the agents/MCP settings UI. Two call sites (mcp_settings.templ
+// and agents_settings.templ) rendered an identical 4-line if/else
+// — extract so the read/write color choice (success vs warning) is
+// defined in one place and the next caller doesn't accidentally flip
+// the convention.
+//
+// Anything other than "write" renders as the read variant — matching
+// the prior if/else fallback.
+templ MCPToolClassBadge(classification string) {
+	if classification == "write" {
+		<span class="badge badge-soft badge-warning badge-xs font-medium">write</span>
+	} else {
+		<span class="badge badge-soft badge-success badge-xs font-medium">read</span>
+	}
+}
