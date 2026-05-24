@@ -46,73 +46,41 @@ templ SyncLogDetail(p SyncLogDetailProps) {
 	</div>
 	<!-- Summary Stats -->
 	<div class={ "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6", summaryStatsXLClass(len(p.Log.RuleHits) > 0) }>
-		<div class="bb-card p-4">
-			<div class="flex items-center gap-3">
-				<div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-					<i data-lucide="plus" class="w-4 h-4 text-success"></i>
-				</div>
-				<div>
-					<div class="text-2xl font-semibold tabular-nums leading-none text-success">{ strconv.FormatInt(int64(p.Log.AddedCount), 10) }</div>
-					<div class="text-xs text-base-content/40 mt-0.5">Added</div>
-				</div>
-			</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="flex items-center gap-3">
-				<div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-					<i data-lucide="pencil" class="w-4 h-4 text-info"></i>
-				</div>
-				<div>
-					<div class="text-2xl font-semibold tabular-nums leading-none text-info">{ strconv.FormatInt(int64(p.Log.ModifiedCount), 10) }</div>
-					<div class="text-xs text-base-content/40 mt-0.5">Modified</div>
-				</div>
-			</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="flex items-center gap-3">
-				<div class="w-9 h-9 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
-					<i data-lucide="minus" class="w-4 h-4 text-error"></i>
-				</div>
-				<div>
-					<div class="text-2xl font-semibold tabular-nums leading-none text-error">{ strconv.FormatInt(int64(p.Log.RemovedCount), 10) }</div>
-					<div class="text-xs text-base-content/40 mt-0.5">Removed</div>
-				</div>
-			</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="flex items-center gap-3">
-				<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-					<i data-lucide="equal" class="w-4 h-4 text-base-content/30"></i>
-				</div>
-				<div>
-					<div class="text-2xl font-semibold tabular-nums leading-none text-base-content/40">{ strconv.FormatInt(int64(p.Log.UnchangedCount), 10) }</div>
-					<div class="text-xs text-base-content/40 mt-0.5">Unchanged</div>
-				</div>
-			</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="flex items-center gap-3">
-				<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-					<i data-lucide="wallet" class="w-4 h-4 text-base-content/40"></i>
-				</div>
-				<div>
-					<div class="text-2xl font-semibold tabular-nums leading-none">{ strconv.FormatInt(p.Log.AccountsAffected, 10) }</div>
-					<div class="text-xs text-base-content/40 mt-0.5">{ pluralLabel("Account", p.Log.AccountsAffected != 1) }</div>
-				</div>
-			</div>
-		</div>
+		@components.StatTile(components.StatTileProps{
+			Icon:  "plus",
+			Label: "Added",
+			Value: strconv.FormatInt(int64(p.Log.AddedCount), 10),
+			Tone:  components.StatToneSuccess,
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "pencil",
+			Label: "Modified",
+			Value: strconv.FormatInt(int64(p.Log.ModifiedCount), 10),
+			Tone:  components.StatToneInfo,
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "minus",
+			Label: "Removed",
+			Value: strconv.FormatInt(int64(p.Log.RemovedCount), 10),
+			Tone:  components.StatToneError,
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "equal",
+			Label: "Unchanged",
+			Value: strconv.FormatInt(int64(p.Log.UnchangedCount), 10),
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "wallet",
+			Label: pluralLabel("Account", p.Log.AccountsAffected != 1),
+			Value: strconv.FormatInt(p.Log.AccountsAffected, 10),
+		})
 		if len(p.Log.RuleHits) > 0 {
-			<div class="bb-card p-4">
-				<div class="flex items-center gap-3">
-					<div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-						<i data-lucide="list-filter" class="w-4 h-4 text-primary"></i>
-					</div>
-					<div>
-						<div class="text-2xl font-semibold tabular-nums leading-none text-primary">{ strconv.Itoa(p.Log.TotalRuleHits) }</div>
-						<div class="text-xs text-base-content/40 mt-0.5">{ pluralLabel("Rule Hit", p.Log.TotalRuleHits != 1) }</div>
-					</div>
-				</div>
-			</div>
+			@components.StatTile(components.StatTileProps{
+				Icon:  "list-filter",
+				Label: pluralLabel("Rule Hit", p.Log.TotalRuleHits != 1),
+				Value: strconv.Itoa(p.Log.TotalRuleHits),
+				Tone:  components.StatTonePrimary,
+			})
 		}
 	</div>
 	<!-- Warning Card -->
