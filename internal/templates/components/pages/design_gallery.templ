@@ -1,45 +1,120 @@
 package pages
 
 // DesignGallery renders the /design page — a long, anchored scroll of
-// every component family in the system. The table of contents sticks
-// to the top of the content column so reviewers can jump between
-// sections without losing place.
+// every component family in the system. The sidebar groups sections
+// under collapsible top-level buckets so the navigation stays scannable
+// as the catalog grows.
 //
 // Per-section markup lives in design_sections.templ (one
 // `templ SectionX()` per entry in DesignSections). When you add a new
 // family, write the section component, then append the entry in
-// design_types.go::DesignSections().
+// design_types.go::DesignSections() and tag it with a Group slug from
+// design_types.go::DesignSectionGroups().
 templ DesignGallery(p DesignGalleryProps) {
-	<div class="grid grid-cols-1 lg:grid-cols-[14rem_minmax(0,1fr)] gap-6">
+	<div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-6">
 		<aside class="hidden lg:block">
-			<nav class="sticky top-6 flex flex-col gap-1 text-sm border-l border-base-300/60 pl-4">
-				for _, sec := range p.Sections {
-					<a href={ templ.SafeURL("#" + sec.Slug) } class="text-base-content/60 hover:text-base-content transition-colors">
-						{ sec.Title }
-					</a>
+			// `h-[calc(100vh-3rem)]` (not max-h) pins the nav to viewport
+			// height so it always has a defined scroll context. `top-6`
+			// matches the 3rem offset so the nav sits exactly between the
+			// top of the visible viewport and the bottom edge.
+			<nav
+				x-data="{
+				  allOpen: true,
+				  inputs() { return Array.from(this.$root.querySelectorAll('input[type=checkbox][name^=design-nav-]')); },
+				  toggleAll() { this.allOpen = !this.allOpen; this.inputs().forEach(i => { i.checked = this.allOpen; }); },
+				}"
+				class="sticky top-6 flex flex-col gap-1 h-[calc(100vh-3rem)] overflow-y-auto pr-1 -mr-1"
+			>
+				<div class="flex items-center justify-between px-2 pb-1 -mb-1">
+					<span class="text-[0.65rem] font-semibold uppercase tracking-wider text-base-content/30">Catalog</span>
+					<button
+						type="button"
+						class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-base-200/40 transition-colors"
+						@click="toggleAll()"
+						x-text="allOpen ? 'Collapse all' : 'Expand all'"
+					>Collapse all</button>
+				</div>
+				for _, group := range DesignSectionGroups() {
+					@designSidebarGroup(group, SectionsByGroup(p.Sections, group.Slug))
 				}
 			</nav>
 		</aside>
 		<div class="flex flex-col gap-12 min-w-0">
-			for _, sec := range p.Sections {
-				@designSectionBlock(sec)
+			for _, group := range DesignSectionGroups() {
+				@designSectionGroupBlock(group, SectionsByGroup(p.Sections, group.Slug))
 			}
 		</div>
 	</div>
+}
+
+// designSidebarGroup renders one collapsible group in the sidebar.
+// Uses DaisyUI's `collapse collapse-arrow` with a hidden checkbox so
+// the open/closed state survives without JS. Every group renders
+// pre-opened (`checked`) so the full catalog is visible on first
+// load; users can collapse individual groups to focus.
+//
+// Items inside the group are flat anchor links — they jump to the
+// section's id in the main column.
+templ designSidebarGroup(group DesignSectionGroup, sections []DesignSection) {
+	if len(sections) > 0 {
+		// `overflow-visible` is critical: daisy's .collapse defaults to
+		// overflow:hidden, which prevents the parent <nav> from measuring
+		// the content rows for scroll. Letting the content overflow the
+		// grid box restores normal flow inside the scrollable <nav>.
+		<div class="collapse collapse-arrow bg-transparent rounded-none overflow-visible">
+			<input type="checkbox" name={ "design-nav-" + group.Slug } checked/>
+			<div class="collapse-title px-2 py-1.5 min-h-0 text-xs font-semibold uppercase tracking-wider text-base-content/50">
+				{ group.Label }
+			</div>
+			<div class="collapse-content px-0">
+				<ul class="flex flex-col gap-0.5 pl-3 border-l border-base-300/60 ml-2">
+					for _, sec := range sections {
+						<li>
+							<a
+								href={ templ.SafeURL("#" + sec.Slug) }
+								class="block text-sm text-base-content/60 hover:text-base-content transition-colors py-1 px-2 rounded-md hover:bg-base-200/40"
+							>
+								{ sec.Title }
+							</a>
+						</li>
+					}
+				</ul>
+			</div>
+		</div>
+	}
+}
+
+// designSectionGroupBlock renders one whole top-level group: a sticky
+// group header followed by each section's block. The group header acts
+// as the deep-link target for navigating to a group from elsewhere
+// (e.g. /design#group-feedback).
+templ designSectionGroupBlock(group DesignSectionGroup, sections []DesignSection) {
+	if len(sections) > 0 {
+		<section id={ "group-" + group.Slug } class="scroll-mt-6">
+			<header class="mb-6 pb-2 border-b border-base-300/60">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ group.Label }</h2>
+			</header>
+			<div class="flex flex-col gap-12">
+				for _, sec := range sections {
+					@designSectionBlock(sec)
+				}
+			</div>
+		</section>
+	}
 }
 
 // designSectionBlock wraps one DesignSection in the standard gallery
 // frame: anchor, title row with "Open standalone" link, description, then
 // the rendered demo inside a bordered card surface.
 //
-// Spacing intent — the H2 sits inside roughly equal whitespace above
+// Spacing intent — the H3 sits inside roughly equal whitespace above
 // (parent gap-12 = 48px from prev card) and below (heading-group bottom
 // of mb-6 = 24px + card padding-top of 24px = 48px to first inner
-// content). H2 → description is mb-1 so they read as a tight pair.
+// content). H3 → description is mb-1 so they read as a tight pair.
 templ designSectionBlock(sec DesignSection) {
 	<section id={ sec.Slug } class="scroll-mt-6">
 		<div class="flex items-baseline justify-between gap-3 mb-1">
-			<h2 class="text-lg font-semibold tracking-tight">{ sec.Title }</h2>
+			<h3 class="text-lg font-semibold tracking-tight">{ sec.Title }</h3>
 			<a href={ templ.SafeURL("/design/c/" + sec.Slug) } class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
 				<i data-lucide="external-link" class="w-3 h-3"></i>
 				Open standalone

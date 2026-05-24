@@ -1,0 +1,185 @@
+package components
+
+// MultiSelectToolbar is the floating bottom toolbar that surfaces bulk
+// actions on a multi-selection. Pattern reference: the transactions
+// list's bulk-action bar (`#bb-bulk-bar` in
+// `static/js/admin/components/transactions.js`).
+//
+// Geometry — pinned 1.5rem from the viewport bottom, horizontally
+// centered, with `pointer-events-none` when hidden so it doesn't
+// intercept clicks before it's shown. Children render inside a
+// `bg-base-100 border rounded-2xl shadow-lg` pill matching the bulk-bar
+// shape from the transactions page.
+//
+// Visibility is Alpine-driven: pass `XShow` (an Alpine boolean
+// expression — typically `selecting && count > 0` or
+// `$store.bulk.sel.length > 0`) and the toolbar fades + slides up. Pass
+// an empty `XShow` to always render (useful for the sandbox).
+//
+// Slots:
+//   - the `Count` button reads `CountExpr` (e.g. `$store.bulk.sel.length`)
+//     and dispatches `CountToggleEvent` on click — a "select all / clear"
+//     toggle. Set `CountLabel` to override the default "selected".
+//   - children render between the count chip's divider and the close
+//     button — caller's `<button>` actions (Comment / Tag / Categorize /
+//     etc.) go here.
+//   - the trailing × button dispatches `CloseEvent` (default
+//     `multi-select-close`) so callers can wire it to whatever clears
+//     selection state.
+
+type MultiSelectToolbarProps struct {
+	// XShow is an Alpine boolean expression. Empty = always visible
+	// (sandbox / static demos). When provided, the toolbar uses
+	// `x-show` plus transitions instead of being unconditionally
+	// rendered.
+	XShow string
+
+	// CountExpr is an Alpine expression that resolves to the
+	// currently-selected count. Rendered with tabular-nums so digits
+	// don't jitter as the user adds/removes selections. REQUIRED.
+	CountExpr string
+
+	// CountLabel is the trailing word after the number. Default
+	// "selected". The label hides under sm breakpoints so the bar
+	// stays compact on phones.
+	CountLabel string
+
+	// CountToggleEvent is the custom event dispatched when the user
+	// clicks the count chip — Gmail-style "select all / clear" toggle.
+	// Default `multi-select-toggle-all`. Set to empty string to make
+	// the count chip non-interactive (renders as a static badge).
+	CountToggleEvent string
+
+	// CloseEvent is the custom event dispatched when the user clicks
+	// the trailing × button. Default `multi-select-close`. Callers
+	// listen with `@multi-select-close.window` and clear their state.
+	CloseEvent string
+
+	// AriaLabel labels the toolbar landmark for screen readers.
+	// Default "Selection actions".
+	AriaLabel string
+}
+
+templ MultiSelectToolbar(p MultiSelectToolbarProps) {
+	<div
+		role="toolbar"
+		aria-label={ orDefault(p.AriaLabel, "Selection actions") }
+		class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2"
+		if p.XShow != "" {
+			x-show={ p.XShow }
+			x-cloak
+			x-transition:enter="transition ease-out duration-200"
+			x-transition:enter-start="opacity-0 translate-y-2"
+			x-transition:enter-end="opacity-100 translate-y-0"
+			x-transition:leave="transition ease-in duration-150"
+			x-transition:leave-start="opacity-100 translate-y-0"
+			x-transition:leave-end="opacity-0 translate-y-2"
+		}
+	>
+		<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">
+			if p.CountToggleEvent != "" || p.CountExpr != "" {
+				@multiSelectCount(p)
+			}
+			<div class="w-px h-6 bg-base-300"></div>
+			{ children... }
+			if p.CloseEvent != "" || p.XShow != "" {
+				<button
+					type="button"
+					class="btn btn-ghost btn-sm btn-square rounded-xl"
+					title="Clear selection"
+					aria-label="Clear selection"
+					@click={ dispatchEventJS(orDefault(p.CloseEvent, "multi-select-close")) }
+				>
+					<i data-lucide="x" class="w-4 h-4"></i>
+				</button>
+			}
+		</div>
+	</div>
+}
+
+// MultiSelectToolbarAction renders one action button inside the
+// toolbar. Use it for the common case (icon + label + optional
+// hotkey-hint kbd). For richer slots (split-button, dropdown, modal
+// trigger) just render a raw `<button>` instead.
+//
+// Variant ""/"ghost" → btn-ghost; "primary" → btn-primary. Always
+// btn-sm rounded-xl to match the bulk-bar shape.
+//
+// OnClick is an Alpine handler expression (rendered as `@click`); use
+// it to dispatch a CustomEvent so callers wire to a single listener.
+
+type MultiSelectToolbarActionProps struct {
+	Icon      string // Lucide name, REQUIRED
+	Label     string // visible on sm+, hidden under sm to keep the bar narrow
+	OnClick   string // Alpine handler, e.g. `dispatchOpenComment()`
+	Variant   string // "" / "ghost" / "primary"
+	Hotkey    string // optional uppercase hint shown as a kbd-like badge ("T", "C")
+	Title     string // tooltip / aria-label; defaults to Label
+	AriaLabel string // overrides Title for the aria-label only
+}
+
+templ MultiSelectToolbarAction(p MultiSelectToolbarActionProps) {
+	<button
+		type="button"
+		class={ multiSelectActionClass(p.Variant) }
+		title={ orDefault(p.Title, p.Label) }
+		aria-label={ orDefault(p.AriaLabel, orDefault(p.Title, p.Label)) }
+		@click={ p.OnClick }
+	>
+		if p.Icon != "" {
+			<i data-lucide={ p.Icon } class="w-3.5 h-3.5"></i>
+		}
+		if p.Label != "" {
+			<span class="hidden sm:inline">{ p.Label }</span>
+		}
+		if p.Hotkey != "" {
+			<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">{ p.Hotkey }</span>
+		}
+	</button>
+}
+
+templ multiSelectCount(p MultiSelectToolbarProps) {
+	if p.CountToggleEvent != "" {
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm rounded-xl gap-1.5"
+			title="Select all / clear"
+			@click={ dispatchEventJS(p.CountToggleEvent) }
+		>
+			@multiSelectCountInner(p)
+		</button>
+	} else {
+		<div class="px-2 inline-flex items-center gap-1.5 text-sm">
+			@multiSelectCountInner(p)
+		</div>
+	}
+}
+
+templ multiSelectCountInner(p MultiSelectToolbarProps) {
+	<span class="font-bold tabular-nums" x-text={ p.CountExpr }>0</span>
+	<span class="hidden sm:inline text-base-content/60 font-normal">{ orDefault(p.CountLabel, "selected") }</span>
+}
+
+// orDefault returns s when non-empty, otherwise fallback. Used to keep
+// optional prop defaults inline at the call site instead of one
+// per-prop helper.
+func orDefault(s, fallback string) string {
+	if s != "" {
+		return s
+	}
+	return fallback
+}
+
+// dispatchEventJS renders the Alpine `@click` handler that fires a
+// window-scoped CustomEvent. The component's caller listens with
+// `@<event>.window` on a sibling node.
+func dispatchEventJS(event string) string {
+	return "window.dispatchEvent(new CustomEvent('" + event + "'))"
+}
+
+func multiSelectActionClass(variant string) string {
+	if variant == "primary" {
+		return "btn btn-primary btn-sm rounded-xl gap-2"
+	}
+	return "btn btn-ghost btn-sm rounded-xl gap-2"
+}
