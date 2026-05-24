@@ -22,11 +22,24 @@ func TestDesignGalleryRenders(t *testing.T) {
 		t.Fatal("DesignSections() returned empty slice")
 	}
 
+	// Build a set of known group slugs so we can assert every section
+	// declares a real one (a typo would silently exile the section from
+	// the sidebar).
+	groupSlugs := map[string]bool{}
+	for _, g := range DesignSectionGroups() {
+		groupSlugs[g.Slug] = true
+	}
+
 	// Per-section render: each section's Render() must produce non-empty
 	// output. Silent-empty would mean the templ function returned NopComponent.
 	for _, sec := range sections {
 		if sec.Slug == "" || sec.Title == "" {
 			t.Errorf("section %+v has empty slug or title", sec)
+		}
+		if sec.Group == "" {
+			t.Errorf("section %q has empty Group — every section must be assigned to a top-level group", sec.Slug)
+		} else if !groupSlugs[sec.Group] {
+			t.Errorf("section %q has unknown Group=%q (not in DesignSectionGroups)", sec.Slug, sec.Group)
 		}
 		if sec.Render == nil {
 			t.Errorf("section %q has nil Render", sec.Slug)

@@ -23,7 +23,13 @@ templ Kbd(key string) {
 // `Kbd`. Calling with 0 or 1 keys degrades gracefully.
 templ KbdChord(keys ...string) {
 	if len(keys) > 0 {
-		<span class="inline-flex items-center gap-1 hidden sm:inline-flex" x-show="!$store.device.isTouch">
+		// Order matters: `hidden` must come AFTER the layout class, and the
+		// base layout class must NOT be `inline-flex` — Tailwind emits the
+		// `inline-flex` utility after `hidden` in the generated CSS, so an
+		// `inline-flex hidden` combo silently shows the element on mobile.
+		// `sm:inline-flex` handles the desktop layout; nothing competes with
+		// `hidden` at the base breakpoint.
+		<span class="hidden sm:inline-flex items-center gap-1" x-show="!$store.device.isTouch">
 			for i, k := range keys {
 				if i > 0 {
 					<span class="bb-shortcuts-then">then</span>
