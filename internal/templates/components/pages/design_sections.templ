@@ -816,3 +816,23 @@ templ designSwatch(name, classes string) {
 		<code class="text-[0.65rem] text-base-content/50 font-mono px-1">.{ classes }</code>
 	</div>
 }
+
+templ SectionFilterSearchInput() {
+	<div x-data="{ filter: '' }" class="space-y-6">
+		@designExample("Default", "components.FilterSearchInput — default search icon + Filter placeholder.") {
+			@components.FilterSearchInput(components.FilterSearchInputProps{
+				Placeholder: "Filter categories...",
+				XModel:      "filter",
+			})
+			<p class="text-xs text-base-content/40 mt-2">Bound to <code>filter</code> on the sandbox x-data — type above and the value below updates live.</p>
+			<p class="text-sm mt-1">filter = <code x-text="JSON.stringify(filter)"></code></p>
+		}
+		@designExample("Custom icon", "Pass Icon to override the default search glyph.") {
+			@components.FilterSearchInput(components.FilterSearchInputProps{
+				Placeholder: "Filter by hashtag...",
+				XModel:      "filter",
+				Icon:        "hash",
+			})
+		}
+	</div>
+}

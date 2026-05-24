@@ -23,15 +23,10 @@ templ Tags(p TagsProps) {
 		Action:               components.PageHeaderAction("/tags/new", "plus", "Add Tag"),
 	})
 	<div x-data="tags" class="space-y-4">
-		<div class="relative">
-			<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
-			<input
-				type="text"
-				placeholder="Filter tags..."
-				x-model="filter"
-				class="input input-bordered w-full pl-9 rounded-xl h-10 text-sm"
-			/>
-		</div>
+		@components.FilterSearchInput(components.FilterSearchInputProps{
+			Placeholder: "Filter tags...",
+			XModel:      "filter",
+		})
 		if len(p.Tags) > 0 {
 			<div class="text-xs text-base-content/40 px-1">
 				{ fmt.Sprintf("%d tags", len(p.Tags)) }
