@@ -1,27 +1,10 @@
 package pages
 
-import "breadbox/internal/templates/components"
-
 // DesignComponent renders /design/c/{slug} — a single component family
 // rendered in isolation on the page. Same admin shell as the gallery
 // (so navigation back is one click), but the main column hosts just one
 // section so screenshots focus on the component being tested.
 templ DesignComponent(p DesignComponentProps) {
-	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">{ p.Section.Title }</h1>
-			if p.Section.Description != "" {
-				<p class="text-sm text-base-content/50 mt-1">{ p.Section.Description }</p>
-			}
-		</div>
-		<div class="flex items-center gap-2">
-			<a href="/design" class="btn btn-ghost btn-sm rounded-xl gap-1.5">
-				<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-				Gallery
-			</a>
-		</div>
-	</div>
 	<div class="bb-card p-6">
 		@p.Section.Render()
 	</div>
