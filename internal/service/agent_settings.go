@@ -131,7 +131,7 @@ func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettings
 }
 
 // AgentSubsystemStatus is a cheap, side-effect-free readiness report for
-// the agent subsystem — used by the v2 SPA list page to surface
+// the agent subsystem — used by the admin list page to surface
 // onboarding hints, and (later) by the smoke-test endpoints to short-
 // circuit before charging a real API call.
 type AgentSubsystemStatus struct {

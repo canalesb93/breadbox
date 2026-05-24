@@ -98,9 +98,9 @@ templ Nav(p NavProps) {
 		}
 		<div class="bb-sidebar-section">Resources</div>
 		if p.IsEditor {
-			<a href="/agent-prompts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agent-prompts") }>
+			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
 				<i data-lucide="bot-message-square"></i>
-				<span>Agent Prompts</span>
+				<span>Agents</span>
 				<i data-lucide="sparkles" class="bb-sidebar-sparkle ml-auto !text-amber-400"></i>
 			</a>
 		}

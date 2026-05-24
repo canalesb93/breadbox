@@ -1,7 +1,7 @@
 //go:build integration && !lite
 
 // Pins the agent_definitions / agent_runs schema shipped in the Claude
-// Agent SDK sprint. These tables back the v2 SPA /agents UI and the
+// Agent SDK sprint. These tables back the admin /agents UI and the
 // scheduled-runner; the integration check fails loudly if someone reverts
 // the migrations.
 package db_test

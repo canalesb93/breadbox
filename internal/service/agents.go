@@ -88,15 +88,15 @@ type AgentDefinitionResponse struct {
 	// CostStats30d — single-row Get leaves nil). RFC3339 string when set.
 	NextFireAt *string `json:"next_fire_at,omitempty"`
 	// RecentErrorStats is the count of errors among the last 5 non-skipped
-	// runs. Used by the v2 SPA to surface a warning when 3+ recent runs
+	// runs. Used by the admin UI to surface a warning when 3+ recent runs
 	// failed. List-only; nil when the agent has no run history.
 	RecentErrorStats *AgentRecentErrorStats `json:"recent_error_stats,omitempty"`
 	// LastPromptPrefix is the most recent non-null prompt_prefix this agent
-	// was ever run with. Powers the "Use last prefix" affordance in the v2
-	// SPA's Run now dialog. List-only; nil when no prefixed run exists.
+	// was ever run with. Powers the "Use last prefix" affordance in the
+	// admin Run now dialog. List-only; nil when no prefixed run exists.
 	LastPromptPrefix *string `json:"last_prompt_prefix,omitempty"`
 	// RecentCapStats is the count of cap-exhausted runs among the last 5
-	// non-skipped runs. Used by the v2 SPA to surface a warning when 2+
+	// non-skipped runs. Used by the admin UI to surface a warning when 2+
 	// recent runs hit a safety ceiling. List-only; nil when no run history.
 	RecentCapStats *AgentRecentCapStats `json:"recent_cap_stats,omitempty"`
 	CreatedAt        string  `json:"created_at"`
@@ -112,7 +112,7 @@ type AgentRecentErrorStats struct {
 
 // AgentRecentCapStats is the "is this agent regularly hitting its safety
 // ceilings?" signal — cap-exhausted (max_turns OR max_budget) runs among
-// the last 5 non-skipped. Surfaced as a warning pill on the v2 SPA list
+// the last 5 non-skipped. Surfaced as a warning pill on the admin list
 // when CapCount >= 2 (threshold tuned to avoid flagging one-off cap hits).
 type AgentRecentCapStats struct {
 	CapCount int `json:"cap_count"`
@@ -236,9 +236,10 @@ type UpdateAgentDefinitionParams struct {
 	TriggerOnSyncComplete *bool
 }
 
-// RecentErroredAgentRun is one entry in the v2 SPA's run-failed banner
-// surfaced on /v2/agents. Carries the agent slug + name so the row can
-// deep-link to the run's transcript drawer without an extra fetch.
+// RecentErroredAgentRun is one entry in the admin run-failed banner
+// surfaced on the /agents list page. Carries the agent slug + name so
+// the row can deep-link to the run's transcript drawer without an extra
+// fetch.
 type RecentErroredAgentRun struct {
 	AgentSlug    string  `json:"agent_slug"`
 	AgentName    string  `json:"agent_name"`
@@ -251,7 +252,7 @@ type RecentErroredAgentRun struct {
 
 // ListRecentErroredAgentRuns returns the most recent errored runs across
 // all agents in the last `windowHours` hours, capped at `limit`. Powers
-// the v2 SPA banner that catches operators who only open the dashboard
+// the admin banner that catches operators who only open the dashboard
 // every few days. Backed by ListRecentErroredAgentRuns sqlc query.
 func (s *Service) ListRecentErroredAgentRuns(ctx context.Context, windowHours, limit int) ([]RecentErroredAgentRun, error) {
 	if windowHours <= 0 {
@@ -353,7 +354,7 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 		}
 	}
 
-	// Last-prefix rollup — feeds the "Use last prefix" button in the v2 SPA's
+	// Last-prefix rollup — feeds the "Use last prefix" button in the admin
 	// Run now dialog. One row per definition (the most recent non-null
 	// prompt_prefix); definitions that never had a prefixed run won't appear.
 	prefixRows, err := s.Queries.GetAgentLastPromptPrefixes(ctx)
@@ -733,7 +734,7 @@ type AllAgentRunListParams struct {
 
 // ListAllAgentRuns returns offset-paginated runs across every agent,
 // joined against agent_definitions so each row carries the agent's slug
-// and name. Powers /v2/agents/runs (the cross-agent global view).
+// and name. Powers the cross-agent global runs view.
 //
 // Same hand-rolled SQL pattern as ListAgentRuns — composable WHERE
 // clauses with positional params. We don't go through sqlc because the
@@ -860,9 +861,9 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 	}, nil
 }
 
-// AgentRunNoteMaxLen caps the operator note size both in the SPA textarea
-// and on the server. Free-form text but bounded so we don't accidentally
-// host arbitrarily-large blobs.
+// AgentRunNoteMaxLen caps the operator note size both in the admin
+// textarea and on the server. Free-form text but bounded so we don't
+// accidentally host arbitrarily-large blobs.
 const AgentRunNoteMaxLen = 2000
 
 // SetAgentRunNote updates the operator note on one run. Empty string
@@ -956,8 +957,8 @@ func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, ca
 // Used by the orchestrator after Runner.Run returns.
 //
 // maxTurnsCap is the per-run snapshot of the agent's max_turns at the
-// time the run started. Stored separately from turn_count so the SPA
-// can render "turns / cap" — until iter-33 this column mirrored
+// time the run started. Stored separately from turn_count so the admin
+// UI can render "turns / cap" — until iter-33 this column mirrored
 // turn_count, which made every run look like a max-turns hit. The cap
 // itself never changes mid-run, so the orchestrator captures it
 // from def.MaxTurns at run-start and passes it through here.

@@ -1,14 +1,4 @@
-# Stage 1: Build the v2 SPA bundle. Pinned bun image, runs natively on
-# BUILDPLATFORM (not under QEMU). Output (web/dist/) is copied into the Go
-# builder below.
-FROM --platform=$BUILDPLATFORM oven/bun:1 AS web-builder
-WORKDIR /web
-COPY web/package.json web/bun.lock ./
-RUN bun install --frozen-lockfile
-COPY web/ ./
-RUN bun run build
-
-# Stage 1b: Compile the Claude Agent SDK sidecar to a standalone binary.
+# Stage 1: Compile the Claude Agent SDK sidecar to a standalone binary.
 # Bun cross-compiles to $TARGETARCH from $BUILDPLATFORM, so this runs
 # natively (no QEMU). We pick the musl variant because the runtime stage
 # below is Alpine (musl libc) — the glibc-targeted Bun binary would not
@@ -38,10 +28,6 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-
-# Replace the committed dist/.gitkeep stub with the real SPA bundle from the
-# web-builder stage so //go:embed all:dist picks up the real files.
-COPY --from=web-builder /web/dist/ ./web/dist/
 
 # Generate sqlc code (generated files are gitignored)
 # Use pre-built binary — compiling from source is very slow under QEMU emulation.

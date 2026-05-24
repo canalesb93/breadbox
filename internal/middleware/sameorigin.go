@@ -19,8 +19,8 @@ func IsUnsafeMethod(method string) bool {
 }
 
 // SameOrigin reports whether the request's Origin (or Referer fallback) host
-// matches the request host — the SameSite=Lax CSRF check shared by the
-// /web/v1/* routes and session-authed /api/v1/* writes.
+// matches the request host — the SameSite=Lax CSRF check used by
+// session-authed /api/v1/* writes.
 //
 // A request with neither header is treated as cross-origin: modern browsers
 // always send one on a state-changing request, so a caller that sends neither

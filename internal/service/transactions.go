@@ -356,7 +356,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	// Offset takes precedence over cursor — random-access pagination for the
-	// v2 SPA. External REST clients keep using the stable cursor path.
+	// admin UI. External REST clients keep using the stable cursor path.
 	if params.Offset == 0 && params.Cursor != "" {
 		cursorDate, cursorID, err := DecodeCursor(params.Cursor)
 		if err != nil {

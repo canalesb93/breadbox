@@ -65,7 +65,7 @@ WHERE id = $1;
 -- Per-definition "is this agent regularly hitting its safety ceilings?"
 -- signal: count of runs in the last 5 non-skipped that had hit_cap set
 -- (either max_turns OR max_budget). Mirrors GetAgentRecentErrorStats —
--- the v2 SPA list page renders a warning pill at 2+ recent cap hits so
+-- the admin list page renders a warning pill at 2+ recent cap hits so
 -- the operator knows to raise max_turns / max_budget_usd or split the
 -- prompt.
 WITH ranked AS (
@@ -88,7 +88,7 @@ GROUP BY agent_definition_id;
 -- name: GetAgentRecentErrorStats :many
 -- Per-definition "is this agent broken right now?" signal: error count
 -- in the last 5 non-skipped runs. Skipped runs (quiet hours, concurrency
--- lock) are excluded — they aren't agent failures. The v2 SPA list
+-- lock) are excluded — they aren't agent failures. The admin list
 -- renders a warning pill when error_count >= 3.
 WITH ranked AS (
     SELECT agent_definition_id, status,
@@ -108,7 +108,7 @@ WHERE rn <= 5
 GROUP BY agent_definition_id;
 
 -- name: GetAgentCostStats30d :many
--- Per-definition cost rollup over the last 30 days. Used by the v2 SPA
+-- Per-definition cost rollup over the last 30 days. Used by the admin
 -- list page to surface lifetime spend at a glance. Excludes skipped runs
 -- (no real cost incurred) but includes errored runs (often DO incur
 -- partial cost).
@@ -130,8 +130,8 @@ RETURNING *;
 
 -- name: ListRecentErroredAgentRuns :many
 -- Surfaces the most recent errored runs across all agents in the last
--- N hours, joined with agent slug + name for the v2 SPA "Run-failed
--- banner" on /v2/agents. Bounded by the LIMIT — the banner shows at
+-- N hours, joined with agent slug + name for the admin "Run-failed
+-- banner" on the /agents list page. Bounded by the LIMIT — the banner shows at
 -- most 5 entries, but we ask for a few extras so the UI can say
 -- "showing 5 of N most recent errors" without a second query.
 SELECT r.short_id      AS run_short_id,
@@ -170,7 +170,7 @@ RETURNING *;
 -- name: GetAgentLastPromptPrefixes :many
 -- Per-definition most recent non-null prompt_prefix. Skipped + null-prefix
 -- rows don't shadow earlier prefixes — only runs that actually carried a
--- prefix are eligible. Used by the v2 SPA "Use last prefix" button on the
+-- prefix are eligible. Used by the admin "Use last prefix" button on the
 -- Run now dialog to pre-fill the operator's prior context.
 SELECT DISTINCT ON (agent_definition_id)
        agent_definition_id, prompt_prefix

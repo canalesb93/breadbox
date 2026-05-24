@@ -39,9 +39,9 @@ func sessionOrAPIKeyAuth(
 				if accountID := admin.SessionAccountID(sm, r); accountID != "" {
 					// /api/v1/* historically had no cookie auth, so a
 					// session-authed unsafe method introduces CSRF surface —
-					// guard it with the same SameSite=Lax + Origin check the
-					// /web/v1/* routes use. Pure API-key clients send no cookie
-					// and never reach this branch.
+					// guard it with a SameSite=Lax + Origin check. Pure
+					// API-key clients send no cookie and never reach this
+					// branch.
 					if mw.IsUnsafeMethod(r.Method) && !mw.SameOrigin(r) {
 						mw.WriteError(
 							w,

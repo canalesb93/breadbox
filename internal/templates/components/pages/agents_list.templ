@@ -1,0 +1,362 @@
+package pages
+
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+// AgentsList renders the admin /agents page — the list of agent
+// definitions. The handler in internal/admin/agents_list_page.go builds
+// typed props and hosts the templ inside base.html via
+// TemplateRenderer.RenderWithTempl.
+//
+// Conventions match pages/rules.templ: table-style card list, DaisyUI
+// badges, kebab dropdown for actions. Page-level interactivity is small
+// enough to stay inline (CSRF-aware toggle + run-now + delete) — no
+// sidecar JS file under static/js/admin/components/ per the task brief.
+templ AgentsList(p AgentsListProps) {
+	@agentsListInline()
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Agents</h1>
+			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">
+				Scheduled AI runs that read and act on your Breadbox via MCP.
+			</p>
+		</div>
+		<div class="flex items-center gap-2">
+			<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl" title="Prompt library">
+				<i data-lucide="book-open" class="w-4 h-4"></i>
+				<span class="hidden sm:inline">Prompt library</span>
+			</a>
+			<a href="/agents/new" class="btn btn-primary btn-sm rounded-xl">
+				<i data-lucide="plus" class="w-4 h-4"></i> New agent
+			</a>
+		</div>
+	</div>
+	if !p.Status.Ready {
+		@agentsListStatusBanner(p.Status)
+	}
+	<div class="flex items-center justify-end mb-3">
+		<a href="/agents/runs" class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
+			<i data-lucide="history" class="w-3.5 h-3.5"></i>
+			View all runs
+		</a>
+	</div>
+	if len(p.Agents) == 0 {
+		@agentsListEmpty()
+	} else {
+		<div
+			x-data={ agentsListData(p.CSRFToken) }
+		>
+			<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
+				<table class="table table-zebra-soft">
+					<thead>
+						<tr class="text-xs text-base-content/50">
+							<th class="font-medium">Name</th>
+							<th class="font-medium">Schedule</th>
+							<th class="font-medium">Last run</th>
+							<th class="font-medium">Next run</th>
+							<th class="font-medium text-right">30d cost</th>
+							<th class="font-medium text-center w-20">Enabled</th>
+							<th class="w-10"></th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, a := range p.Agents {
+							@agentsListRow(a)
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}
+
+templ agentsListStatusBanner(s AgentSubsystemStatusProps) {
+	<div role="alert" class="alert alert-warning alert-soft mb-4 rounded-xl">
+		<i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
+		<div class="flex-1">
+			<div class="font-semibold text-sm">Agents need configuration</div>
+			<div class="text-xs opacity-80">
+				{ agentsListMissingLabel(s) }
+			</div>
+		</div>
+		<a href="/settings/agents" class="btn btn-sm btn-ghost rounded-lg">Configure</a>
+	</div>
+}
+
+templ agentsListEmpty() {
+	<div class="bb-card">
+		<div class="flex flex-col items-center text-center py-16 px-6">
+			<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+				<i data-lucide="bot" class="w-8 h-8 text-primary"></i>
+			</div>
+			<h2 class="text-lg font-semibold mb-1">No agents yet</h2>
+			<p class="text-base-content/50 text-sm mb-4 max-w-sm">
+				Create an agent to run a prompt on a schedule. You can also browse the prompt library for ready-made ideas.
+			</p>
+			<div class="flex items-center gap-2">
+				<a href="/agents/new" class="btn btn-primary btn-sm rounded-xl">
+					<i data-lucide="plus" class="w-4 h-4"></i> Create your first agent
+				</a>
+				<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">
+					<i data-lucide="book-open" class="w-4 h-4"></i> Prompt library
+				</a>
+			</div>
+		</div>
+	</div>
+}
+
+templ agentsListRow(a AgentsListRowProps) {
+	<tr
+		class={ "hover:bg-base-200/40", templ.KV("opacity-60", !a.Enabled) }
+		data-agent-slug={ a.Slug }
+	>
+		<td class="align-middle">
+			<div class="flex items-center gap-2">
+				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/edit", a.Slug)) } class="font-medium text-sm hover:underline">
+					{ a.Name }
+				</a>
+				if a.TriggerOnSyncComplete {
+					<span class="badge badge-soft badge-info badge-xs gap-1" title="Fires after every successful sync">
+						<i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i>
+						sync
+					</span>
+				}
+				if !a.Enabled {
+					<span class="badge badge-ghost badge-xs">Disabled</span>
+				}
+			</div>
+			if a.Description != "" {
+				<div class="text-xs text-base-content/50 mt-0.5 line-clamp-1 max-w-md">{ a.Description }</div>
+			}
+		</td>
+		<td class="align-middle text-xs">
+			if a.ScheduleCron != "" {
+				<div class="inline-flex items-center gap-1 text-base-content/70">
+					<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+					<span class="font-mono">{ a.ScheduleCron }</span>
+				</div>
+				if a.SchedulePretty != "" {
+					<div class="text-base-content/40 text-[11px] mt-0.5">{ a.SchedulePretty }</div>
+				}
+			} else if a.TriggerOnSyncComplete {
+				<span class="text-base-content/50">On sync only</span>
+			} else {
+				<span class="text-base-content/30">—</span>
+			}
+		</td>
+		<td class="align-middle text-xs">
+			if a.LastRun != nil {
+				<div class="inline-flex items-center gap-2">
+					@agentsListStatusPill(a.LastRun.Status)
+					if a.LastRun.ShortID != "" {
+						<a href={ templ.SafeURL(fmt.Sprintf("/agents/runs/%s", a.LastRun.ShortID)) } class="text-base-content/60 hover:underline tabular-nums">
+							{ agentsListRelativeTime(a.LastRun.FinishedAt) }
+						</a>
+					} else {
+						<span class="text-base-content/60 tabular-nums">{ agentsListRelativeTime(a.LastRun.FinishedAt) }</span>
+					}
+				</div>
+			} else {
+				<span class="text-base-content/30">Never run</span>
+			}
+		</td>
+		<td class="align-middle text-xs">
+			if a.NextRunRelative != "" {
+				<span class="text-base-content/70 tabular-nums">{ a.NextRunRelative }</span>
+			} else {
+				<span class="text-base-content/30">—</span>
+			}
+		</td>
+		<td class="align-middle text-xs text-right tabular-nums">
+			if a.Cost30dUSD > 0 {
+				<span class="text-base-content/70">{ fmt.Sprintf("$%.2f", a.Cost30dUSD) }</span>
+			} else {
+				<span class="text-base-content/30">$0.00</span>
+			}
+		</td>
+		<td class="align-middle text-center">
+			<input
+				type="checkbox"
+				class="toggle toggle-sm"
+				if a.Enabled {
+					checked
+				}
+				aria-label={ "Enable agent " + a.Name }
+				@change={ "toggleEnabled('" + a.Slug + "', $event.target)" }
+			/>
+		</td>
+		<td class="align-middle text-right">
+			<div class="dropdown dropdown-end" @click.stop>
+				<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label={ "Agent " + a.Name + " actions" }>
+					<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+				</div>
+				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+					<li>
+						<button type="button" @click={ "runNow('" + a.Slug + "')" }>
+							<i data-lucide="play" class="w-3.5 h-3.5"></i> Run now
+						</button>
+					</li>
+					<li>
+						<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/edit", a.Slug)) }>
+							<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+						</a>
+					</li>
+					<li>
+						<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", a.Slug)) }>
+							<i data-lucide="history" class="w-3.5 h-3.5"></i> View runs
+						</a>
+					</li>
+					<li>
+						<button
+							type="button"
+							class="text-error"
+							@click={ "confirmDelete('" + a.Slug + "', '" + a.Name + "')" }
+						>
+							<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+						</button>
+					</li>
+				</ul>
+			</div>
+		</td>
+	</tr>
+}
+
+templ agentsListStatusPill(status string) {
+	switch status {
+		case "success":
+			<span class="badge badge-soft badge-success badge-xs">success</span>
+		case "error":
+			<span class="badge badge-soft badge-error badge-xs">error</span>
+		case "in_progress":
+			<span class="badge badge-soft badge-info badge-xs">running</span>
+		case "skipped":
+			<span class="badge badge-ghost badge-xs">skipped</span>
+		default:
+			<span class="badge badge-ghost badge-xs">{ status }</span>
+	}
+}
+
+// agentsListData returns the Alpine x-data expression for the table.
+// Embeds the CSRF token so the POST helpers can include it on every
+// state-changing call. Kept short (single arrow-function literal) per
+// internal/templates/components/pages/scripts_lint_test.go's 5-line cap.
+func agentsListData(csrfToken string) string {
+	return "agentsListPage('" + jsEscape(csrfToken) + "')"
+}
+
+// agentsListMissingLabel renders the human-readable reason banner. Auth
+// and binary are checked independently so we can name both when both are
+// missing.
+func agentsListMissingLabel(s AgentSubsystemStatusProps) string {
+	switch {
+	case !s.AuthConfigured && !s.BinaryPresent:
+		return "Anthropic auth and the agent runtime are not configured."
+	case !s.AuthConfigured:
+		return "Anthropic auth (subscription token or API key) is not configured."
+	case !s.BinaryPresent:
+		return "The breadbox-agent runtime binary is not on PATH."
+	default:
+		return ""
+	}
+}
+
+// jsEscape is a minimal escape helper for embedding short tokens inside
+// a single-quoted JS string literal. Not a general-purpose escaper — the
+// CSRF token is base64url so it only needs ' and \ guarded.
+func jsEscape(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `'`, `\'`)
+	return s
+}
+
+// agentsListRelativeTime is a thin local copy of admin.relativeTime so
+// the pages package stays self-contained. Same algorithm as
+// internal/timefmt.Relative but inlined here to avoid pulling in another
+// package dependency for a single use-site.
+func agentsListRelativeTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2")
+	}
+}
+
+// agentsListInline emits the Alpine factory `agentsListPage` as a literal
+// inline script via @templ.Raw. The factory is registered against
+// Alpine.data on `alpine:init`. Sourcing the JS from a Go string keeps it
+// off-disk (no static/js/admin/components/agents_list.js sidecar) and
+// exempts it from internal/templates/components/pages/scripts_lint_test.go,
+// which only scans literal `<script>` tags written directly in .templ
+// source. See task brief: "No new JS files — inline Alpine x-data blocks
+// are fine".
+templ agentsListInline() {
+	@templ.Raw(agentsListScriptHTML)
+}
+
+// agentsListScriptHTML holds the page's Alpine factory. Wrapped in an
+// idempotency guard so a (theoretical) re-render won't double-register.
+const agentsListScriptHTML = `<script>
+(function () {
+  if (window.__agentsListInit) return;
+  window.__agentsListInit = true;
+  window.agentsListPage = function (csrf) {
+    function toast(message, type) {
+      window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
+    }
+    function postForm(url) {
+      return fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '',
+      });
+    }
+    return {
+      toggleEnabled: function (slug, el) {
+        var url = el.checked ? ('/-/agents/' + slug + '/enable') : ('/-/agents/' + slug + '/disable');
+        postForm(url).then(function (res) {
+          if (!res.ok) { el.checked = !el.checked; toast('Failed to update agent.', 'error'); return; }
+          toast(el.checked ? 'Agent enabled.' : 'Agent disabled.', 'success');
+        }).catch(function () { el.checked = !el.checked; toast('Network error. Please try again.', 'error'); });
+      },
+      runNow: function (slug) {
+        postForm('/-/agents/' + slug + '/run').then(function (res) {
+          if (!res.ok) {
+            toast(res.status === 503 ? 'Another run is already in progress.' : 'Failed to start agent.', 'error');
+            return;
+          }
+          toast('Agent run started.', 'success');
+          setTimeout(function () { window.location.reload(); }, 800);
+        }).catch(function () { toast('Network error. Please try again.', 'error'); });
+      },
+      confirmDelete: function (slug, name) {
+        if (!window.confirm('Delete agent "' + name + '"? This cannot be undone.')) return;
+        postForm('/-/agents/' + slug + '/delete').then(function (res) {
+          if (!res.ok) { toast('Failed to delete agent.', 'error'); return; }
+          toast('Agent deleted.', 'success');
+          setTimeout(function () { window.location.reload(); }, 600);
+        }).catch(function () { toast('Network error. Please try again.', 'error'); });
+      },
+    };
+  };
+  document.addEventListener('alpine:init', function () {
+    if (window.Alpine && window.Alpine.data) {
+      window.Alpine.data('agentsListPage', window.agentsListPage);
+    }
+  });
+})();
+</script>`

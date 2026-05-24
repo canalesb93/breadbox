@@ -49,11 +49,10 @@ type Config struct {
 	APIRateLimitBurst int // API_RATE_LIMIT_BURST, default 60
 
 	// Runtime gates. NoDashboard, when true, prevents the HTTP router from
-	// registering the admin dashboard, the v2 SPA, and the /web/v1 routes.
-	// REST, MCP, OAuth discovery, and webhooks stay up. Set by
-	// `breadbox serve --no-dashboard` or BREADBOX_NO_DASHBOARD=true. The
-	// build-tag side that strips the assets entirely is `-tags=headless`
-	// (see .claude/rules/build-tags.md).
+	// registering the admin dashboard. REST, MCP, OAuth discovery, and
+	// webhooks stay up. Set by `breadbox serve --no-dashboard` or
+	// BREADBOX_NO_DASHBOARD=true. The build-tag side that strips the assets
+	// entirely is `-tags=headless` (see .claude/rules/build-tags.md).
 	NoDashboard bool
 
 	// Runtime metadata (set at startup)

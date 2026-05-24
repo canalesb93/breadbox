@@ -7,8 +7,11 @@ User-facing reference: `docs/agents.md`. Sprint history + design decisions: `.cl
 ## The five layers
 
 ```
-v2 SPA (web/src/routes/agents*.tsx, features/agents/*)
-   │ REST /api/v1/agents/*
+admin UI (internal/admin/agents_list_page.go, agent_form_page.go,
+          agent_runs_page.go, agent_sdk_settings_page.go
+          backed by internal/templates/components/pages/agents_list.templ,
+          agent_form.templ, agent_runs.templ, agent_sdk_settings.templ)
+   │ REST /api/v1/agents/* (via browser session cookie)
    ▼
 internal/api/agents.go            ← HTTP handlers, error envelope mapping
    │
@@ -26,7 +29,7 @@ agent/sidecar/index.ts             ← TypeScript Claude Agent SDK runner
 breadbox mcp                       ← MCP tool registry (read-only or full-access)
 ```
 
-When in doubt about where new code belongs, ask: is it user input/response shaping → `api/`; is it stateful behavior → `service/`; is it the runner protocol / event shapes → `internal/agent/`; is it sidecar logic → `agent/sidecar/`.
+When in doubt about where new code belongs, ask: is it admin page shell / form state → `internal/admin/` + the matching `.templ`; is it user input/response shaping → `api/`; is it stateful behavior → `service/`; is it the runner protocol / event shapes → `internal/agent/`; is it sidecar logic → `agent/sidecar/`.
 
 ## Locked invariants
 
@@ -79,11 +82,7 @@ OTEL_LOG_TOOL_DETAILS=1 \
 ./breadbox serve
 ```
 
-Without OTel, the orchestrator emits structured slog at run boundaries (`orchestrator: run starting / finished`) and the scheduler emits at register/reload/cleanup boundaries. Every run also persists a full NDJSON transcript at `<agent.transcript_dir>/<runID>.ndjson` viewable from the v2 SPA.
-
-## v1 retirement state
-
-Every legacy admin agent URL 302s to `/v2/agents`. Symbols (`AgentsPageHandler`, `PromptBuilderHandler`, `PromptCopyHandler`, the `agent_wizard.templ` template) stay compiled but unwired so a rollback is one router line. The full deletion belongs in the broader v1-admin retirement sweep — don't bundle it with agent-subsystem changes.
+Without OTel, the orchestrator emits structured slog at run boundaries (`orchestrator: run starting / finished`) and the scheduler emits at register/reload/cleanup boundaries. Every run also persists a full NDJSON transcript at `<agent.transcript_dir>/<runID>.ndjson` viewable from the admin agent-runs page.
 
 ## Do not
 

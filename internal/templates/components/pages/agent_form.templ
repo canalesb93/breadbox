@@ -1,0 +1,399 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// AgentForm renders the create/edit agent form. Hosts inside the base
+// layout via TemplateRenderer.RenderWithTempl. Backs the admin
+// /agents/new and /agents/{slug}/edit pages.
+//
+// The form posts as plain application/x-www-form-urlencoded — no Alpine
+// component, no client-side validation. The server validates and re-renders
+// with FormError / FieldErrors populated. Submit lands on /-/agents (new)
+// or /-/agents/{slug}/update (edit); the POST handlers are wired in a
+// later PR.
+//
+// Edit mode adds two side-by-side mini-forms below the main form: a
+// "Run now" trigger that posts to /-/agents/{slug}/run, and a destructive
+// "Delete" form gated by a small Alpine confirm-toggle. Both share the
+// same CSRF token.
+templ AgentForm(p AgentFormProps) {
+	@components.BreadcrumbNav(agentFormBreadcrumbs(p))
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">{ p.Title }</h1>
+			<p class="text-sm text-base-content/50 mt-1">Configure when this agent runs, which tools it can use, and what prompt drives it.</p>
+		</div>
+	</div>
+	<div class="max-w-2xl">
+		if p.FormError != "" {
+			<div role="alert" class="bb-form-error mb-4">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>{ p.FormError }</span>
+			</div>
+		}
+		<form method="POST" action={ templ.SafeURL(agentFormSubmitAction(p)) } enctype="application/x-www-form-urlencoded" class="bb-card p-0 overflow-hidden">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<!-- Identity -->
+			<fieldset class="p-5 sm:p-6 border-0">
+				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Identity</legend>
+				<div class="space-y-4">
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-name">Name</label>
+						<input id="agent-name" name="name" type="text" value={ p.Form.Name } class="bb-form-input" placeholder="e.g., Daily triage" required/>
+						@agentFormFieldError(p.FieldErr("name"))
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-slug">Slug</label>
+						<input
+							id="agent-slug"
+							name="slug"
+							type="text"
+							value={ p.Form.Slug }
+							class="bb-form-input"
+							placeholder="daily-triage"
+							pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
+							inputmode="text"
+							autocorrect="off"
+							autocapitalize="none"
+							spellcheck="false"
+							required
+						/>
+						<p class="text-xs text-base-content/40 mt-1.5">Lowercase letters, digits, dashes. 2–64 chars. Used in URLs and the audit trail.</p>
+						@agentFormFieldError(p.FieldErr("slug"))
+					</div>
+				</div>
+			</fieldset>
+			<!-- Trigger -->
+			<fieldset class="border-t border-base-300 p-5 sm:p-6 border-l-0 border-r-0 border-b-0">
+				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Trigger</legend>
+				<div class="space-y-4">
+					<div x-data="{ openPresets: false }">
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-schedule-cron">Schedule (cron)</label>
+						<input
+							id="agent-schedule-cron"
+							name="schedule_cron"
+							type="text"
+							x-ref="cronInput"
+							value={ p.Form.ScheduleCron }
+							class="bb-form-input font-mono text-sm"
+							placeholder="0 8 * * *"
+							inputmode="text"
+							autocorrect="off"
+							autocapitalize="none"
+							spellcheck="false"
+						/>
+						<details class="mt-2" @toggle="openPresets = $event.target.open">
+							<summary class="text-xs text-base-content/40 hover:text-base-content/60 cursor-pointer inline-flex items-center gap-1">
+								<i data-lucide="clock" class="w-3 h-3"></i>
+								<span>Common presets</span>
+							</summary>
+							<div class="mt-2 flex flex-wrap gap-1.5">
+								@agentFormCronPreset("0 * * * *", "Every hour")
+								@agentFormCronPreset("0 8 * * *", "Daily at 8am")
+								@agentFormCronPreset("0 8 * * 1", "Weekly Mon 8am")
+								@agentFormCronPreset("0 8 1 * *", "Monthly 1st 8am")
+								@agentFormCronPreset("*/15 * * * *", "Every 15 min")
+							</div>
+						</details>
+						<p class="text-xs text-base-content/40 mt-1.5">Standard 5-field cron syntax. Leave blank to disable scheduled runs.</p>
+						@agentFormFieldError(p.FieldErr("schedule_cron"))
+					</div>
+					<div>
+						<label class="inline-flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								name="trigger_on_sync_complete"
+								value="true"
+								class="checkbox checkbox-sm"
+								if p.Form.TriggerOnSyncComplete {
+									checked
+								}
+							/>
+							<span class="text-sm">Run on sync complete</span>
+						</label>
+						<p class="text-xs text-base-content/40 mt-1.5 ml-7">Fires after each successful sync, in addition to any cron schedule.</p>
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-quiet-start">Quiet hours start</label>
+							<input
+								id="agent-quiet-start"
+								name="quiet_hours_start"
+								type="text"
+								value={ p.Form.QuietHoursStart }
+								class="bb-form-input font-mono"
+								placeholder="22:00"
+								pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
+								inputmode="numeric"
+							/>
+							@agentFormFieldError(p.FieldErr("quiet_hours_start"))
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-quiet-end">Quiet hours end</label>
+							<input
+								id="agent-quiet-end"
+								name="quiet_hours_end"
+								type="text"
+								value={ p.Form.QuietHoursEnd }
+								class="bb-form-input font-mono"
+								placeholder="07:00"
+								pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
+								inputmode="numeric"
+							/>
+							@agentFormFieldError(p.FieldErr("quiet_hours_end"))
+						</div>
+					</div>
+					<p class="text-xs text-base-content/40 -mt-2">Optional. HH:MM 24-hour. Scheduled fires inside the window are skipped (not delayed).</p>
+				</div>
+			</fieldset>
+			<!-- Prompt -->
+			<fieldset class="border-t border-base-300 p-5 sm:p-6 border-l-0 border-r-0 border-b-0">
+				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Prompt</legend>
+				<div class="space-y-4">
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-system-prompt">System prompt <span class="text-base-content/30 font-normal">(optional)</span></label>
+						<textarea
+							id="agent-system-prompt"
+							name="system_prompt"
+							rows="4"
+							class="textarea textarea-bordered w-full rounded-xl bg-base-200/50 font-mono text-sm"
+							placeholder="Override the default breadbox agent persona…"
+						>{ p.Form.SystemPrompt }</textarea>
+						<p class="text-xs text-base-content/40 mt-1.5">Leave blank to use the bundled default. Persona / safety invariants — not the per-run task.</p>
+						@agentFormFieldError(p.FieldErr("system_prompt"))
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-prompt">Prompt <span class="text-error">*</span></label>
+						<textarea
+							id="agent-prompt"
+							name="prompt"
+							rows="12"
+							class="textarea textarea-bordered w-full rounded-xl bg-base-200/50 font-mono text-sm"
+							placeholder="What should this agent do on every run?"
+							required
+						>{ p.Form.Prompt }</textarea>
+						<p class="text-xs text-base-content/40 mt-1.5">Compose from the Prompt Library at <a href="/agent-prompts" class="link link-hover">/agent-prompts</a> and paste here.</p>
+						@agentFormFieldError(p.FieldErr("prompt"))
+					</div>
+				</div>
+			</fieldset>
+			<!-- Execution -->
+			<fieldset class="border-t border-base-300 p-5 sm:p-6 border-l-0 border-r-0 border-b-0">
+				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Execution</legend>
+				<div class="space-y-4">
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-model">Model</label>
+						<select id="agent-model" name="model" class="bb-form-select select-sm">
+							for _, opt := range p.ModelOptions {
+								@agentFormModelOption(opt, p.Form.Model)
+							}
+						</select>
+						@agentFormFieldError(p.FieldErr("model"))
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-max-turns">Max turns</label>
+							<input
+								id="agent-max-turns"
+								name="max_turns"
+								type="number"
+								min="1"
+								max="200"
+								value={ fmt.Sprintf("%d", agentFormMaxTurns(p.Form.MaxTurns)) }
+								class="bb-form-input tabular-nums"
+								inputmode="numeric"
+							/>
+							@agentFormFieldError(p.FieldErr("max_turns"))
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-max-budget">Max budget (USD)</label>
+							<input
+								id="agent-max-budget"
+								name="max_budget_usd"
+								type="number"
+								min="0"
+								step="0.01"
+								value={ fmt.Sprintf("%.2f", p.Form.MaxBudgetUSD) }
+								class="bb-form-input tabular-nums"
+								inputmode="decimal"
+							/>
+							@agentFormFieldError(p.FieldErr("max_budget_usd"))
+						</div>
+					</div>
+					<div>
+						<span class="block text-xs font-medium text-base-content/50 mb-1.5">Tool scope</span>
+						<div class="flex flex-col gap-1.5">
+							@agentFormToolScopeRadio("read_write", "Read & write (default)", p.Form.ToolScope)
+							@agentFormToolScopeRadio("read_only", "Read only", p.Form.ToolScope)
+						</div>
+						@agentFormFieldError(p.FieldErr("tool_scope"))
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-allowed-tools">Allowed tools <span class="text-base-content/30 font-normal">(optional)</span></label>
+						<input
+							id="agent-allowed-tools"
+							name="allowed_tools"
+							type="text"
+							value={ p.Form.AllowedTools }
+							class="bb-form-input font-mono text-sm"
+							placeholder="mcp__breadbox__list_categories, mcp__breadbox__query_transactions"
+							autocorrect="off"
+							autocapitalize="none"
+							spellcheck="false"
+						/>
+						<p class="text-xs text-base-content/40 mt-1.5">Comma-separated MCP tool names. Leave blank to allow all tools in scope.</p>
+						@agentFormFieldError(p.FieldErr("allowed_tools"))
+					</div>
+				</div>
+			</fieldset>
+			<!-- State -->
+			<fieldset class="border-t border-base-300 p-5 sm:p-6 border-l-0 border-r-0 border-b-0">
+				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">State</legend>
+				<div>
+					<label class="inline-flex items-center gap-2 cursor-pointer">
+						<input
+							type="checkbox"
+							name="enabled"
+							value="true"
+							class="checkbox checkbox-sm"
+							if p.Form.Enabled {
+								checked
+							}
+						/>
+						<span class="text-sm">Enabled</span>
+					</label>
+					<p class="text-xs text-base-content/40 mt-1.5 ml-7">Disabled agents skip both scheduled fires and sync-complete triggers.</p>
+				</div>
+			</fieldset>
+			<!-- Submit -->
+			<div class="bb-action-row">
+				<a href="/agents" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+				<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32">
+					<i data-lucide="save" class="w-3.5 h-3.5"></i>
+					if p.Mode == "edit" {
+						<span>Save changes</span>
+					} else {
+						<span>Create agent</span>
+					}
+				</button>
+			</div>
+		</form>
+		if p.Mode == "edit" && p.Slug != "" {
+			@agentFormEditExtras(p)
+		}
+	</div>
+}
+
+// agentFormEditExtras renders the "Run now" + "Delete" mini-forms shown
+// only in edit mode. Each is its own POST form (different action URLs)
+// outside the main form. Delete is gated by an Alpine confirm toggle so
+// no native blocking confirm() dialog fires.
+templ agentFormEditExtras(p AgentFormProps) {
+	<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/agents/%s/run", p.Slug)) } class="inline">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<button type="submit" class="btn btn-sm btn-outline rounded-xl gap-1.5">
+				<i data-lucide="play" class="w-3.5 h-3.5"></i>
+				<span>Run now</span>
+			</button>
+		</form>
+		<div x-data="{ confirming: false }" class="inline-flex items-center gap-2">
+			<button
+				type="button"
+				x-show="!confirming"
+				@click="confirming = true"
+				class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl gap-1.5"
+			>
+				<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+				<span>Delete</span>
+			</button>
+			<form
+				method="POST"
+				action={ templ.SafeURL(fmt.Sprintf("/-/agents/%s/delete", p.Slug)) }
+				class="inline-flex items-center gap-2"
+				x-show="confirming"
+				x-cloak
+			>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				<span class="text-xs text-base-content/60">Delete this agent?</span>
+				<button type="button" @click="confirming = false" class="btn btn-ghost btn-xs rounded-lg">Cancel</button>
+				<button type="submit" class="btn btn-error btn-xs rounded-lg gap-1">
+					<i data-lucide="trash-2" class="w-3 h-3"></i>
+					<span>Confirm delete</span>
+				</button>
+			</form>
+		</div>
+	</div>
+}
+
+templ agentFormModelOption(opt AgentModelOption, current string) {
+	if opt.Value == current {
+		<option value={ opt.Value } selected>{ opt.Label }</option>
+	} else {
+		<option value={ opt.Value }>{ opt.Label }</option>
+	}
+}
+
+templ agentFormToolScopeRadio(value, label, current string) {
+	<label class="inline-flex items-center gap-2 cursor-pointer">
+		if value == current || (current == "" && value == "read_write") {
+			<input type="radio" name="tool_scope" value={ value } class="radio radio-sm" checked/>
+		} else {
+			<input type="radio" name="tool_scope" value={ value } class="radio radio-sm"/>
+		}
+		<span class="text-sm">{ label }</span>
+	</label>
+}
+
+templ agentFormCronPreset(value, label string) {
+	<button
+		type="button"
+		class="btn btn-ghost btn-xs rounded-lg"
+		@click={ "$refs.cronInput.value = '" + value + "'" }
+		title={ value }
+	>
+		{ label }
+	</button>
+}
+
+templ agentFormFieldError(msg string) {
+	if msg != "" {
+		<p class="text-error text-xs mt-1">{ msg }</p>
+	}
+}
+
+// agentFormSubmitAction returns the form action URL based on mode.
+func agentFormSubmitAction(p AgentFormProps) string {
+	if p.Mode == "edit" && p.Slug != "" {
+		return "/-/agents/" + p.Slug + "/update"
+	}
+	return "/-/agents"
+}
+
+// agentFormBreadcrumbs builds the breadcrumb trail. Last entry is the
+// current page label (rendered without a link by BreadcrumbNav).
+func agentFormBreadcrumbs(p AgentFormProps) []components.Breadcrumb {
+	last := "New"
+	if p.Mode == "edit" {
+		last = "Edit"
+	}
+	return []components.Breadcrumb{
+		{Label: "Agents", Href: "/agents"},
+		{Label: last},
+	}
+}
+
+// agentFormMaxTurns returns the value to show in the Max turns field —
+// falls back to a sensible default of 15 when the form value is zero
+// (matches the spec; service.DefaultAgentMaxTurns is 10 but the form
+// surfaces 15 as its default, which is what we mirror here).
+func agentFormMaxTurns(v int) int {
+	if v <= 0 {
+		return 15
+	}
+	return v
+}

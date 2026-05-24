@@ -16,7 +16,7 @@ import (
 
 // transactionFilters bundles the filter values shared by ListTransactions and
 // CountTransactions. Returning it via a struct keeps the parse function and
-// its call sites readable as the v2 SPA adds new multi-select filters.
+// its call sites readable as callers add new multi-select filters.
 type transactionFilters struct {
 	StartDate     *time.Time
 	EndDate       *time.Time

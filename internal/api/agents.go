@@ -292,7 +292,7 @@ func ListAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 
 // ListAllAgentRunsHandler returns paginated runs across every agent,
 // joined against agent_definitions so each row carries agent_slug +
-// agent_name. Powers the v2 SPA's global "/agents/runs" view. Supports
+// agent_name. Powers the admin global runs view. Supports
 // the same status/trigger/hit_cap/date filters as ListAgentRunsHandler,
 // plus an optional `agent=<slug|uuid>` filter to narrow to one definition
 // (a slimmer form of /agents/{slug}/runs that uses the same UI table).
@@ -462,7 +462,7 @@ func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 // --- Handlers: settings ---
 
 // AgentSubsystemStatusHandler reports whether the agent subsystem is ready
-// to fire — same checks as `breadbox doctor`, side-effect-free. The v2 SPA
+// to fire — same checks as `breadbox doctor`, side-effect-free. The admin
 // list page calls this to render onboarding hints before the user sees a
 // wall of seeded starter agents they can't run.
 func AgentSubsystemStatusHandler(svc *service.Service) http.HandlerFunc {
@@ -512,7 +512,7 @@ func UpdateAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFu
 }
 
 // runAgentNowRequest is the optional JSON body for "run now". An empty
-// body — common for the v2 SPA's bare-button click — leaves both fields
+// body — common for the admin bare-button click — leaves both fields
 // unset, which the orchestrator treats as "use the saved def.Prompt
 // verbatim."
 type runAgentNowRequest struct {
@@ -621,7 +621,7 @@ type updateAgentRunNoteRequest struct {
 
 // UpdateAgentRunNoteHandler sets/clears the operator note on one run.
 // Body: { "note": "..." }; empty string clears the field. Capped at 2000
-// chars server-side (matches the SPA textarea cap).
+// chars server-side (matches the admin textarea cap).
 func UpdateAgentRunNoteHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "shortId")
@@ -724,9 +724,9 @@ func RunAgentCleanupHandler(sched *service.AgentScheduler) http.HandlerFunc {
 
 // ListRecentErroredAgentRunsHandler returns the most recent errored runs
 // across all agents in the last `hours` hours (default 24, max 168),
-// capped at `limit` (default 5, max 50). Powers the v2 SPA "Run-failed
-// banner" on /v2/agents — catches operators who don't drill into each
-// agent's history daily. Read-only; no scope upgrade required.
+// capped at `limit` (default 5, max 50). Powers the admin "Run-failed
+// banner" on the /agents list page — catches operators who don't drill
+// into each agent's history daily. Read-only; no scope upgrade required.
 func ListRecentErroredAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -751,10 +751,10 @@ func ListRecentErroredAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 }
 
 // ListPromptBlocksHandler exposes the parsed agent prompt blocks under
-// prompts/agents/*.md to the v2 SPA. Backs the assembly-bench prompt
-// builder at /v2/prompts/build. The blocks themselves are embedded into
-// the binary at build time, so this is a read-only, side-effect-free
-// endpoint — no scope upgrade required.
+// prompts/agents/*.md to the admin UI. Backs the assembly-bench prompt
+// builder. The blocks themselves are embedded into the binary at build
+// time, so this is a read-only, side-effect-free endpoint — no scope
+// upgrade required.
 func ListPromptBlocksHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		out, err := svc.ListPromptBlocks(r.Context())

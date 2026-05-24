@@ -14,7 +14,7 @@ The `breadbox` binary supports two orthogonal build tags that shrink what compil
 
 Default build = full (everything). Two tags layer on top:
 
-- `-tags=headless` — server + CLI, **no dashboard assets**. The `internal/admin`, `internal/templates`, and `internal/webui`+`web/` SPA trees are excluded. The same binary still serves REST + MCP + OAuth + hosted-link endpoints + webhooks.
+- `-tags=headless` — server + CLI, **no dashboard assets**. The `internal/admin` and `internal/templates` trees are excluded. The same binary still serves REST + MCP + OAuth + hosted-link endpoints + webhooks.
 - `-tags=lite` — **CLI-only**. No server packages, no DB drivers, no provider SDKs. Ships as `breadbox-cli` (same source, `-o breadbox-cli`) for remote agents that only need to drive a Breadbox over HTTP.
 
 The two tags are orthogonal; `-tags=headless,lite` is meaningless (lite already excludes the server). CI runs the cells of the matrix that matter: default, `-tags=headless`, `-tags=lite`.
@@ -28,7 +28,6 @@ Apply build tags to **every Go file** in the package — including tests, with t
 These packages are dashboard-only. They never run under `-tags=headless`:
 
 - `internal/admin/**` — session manager, admin handlers, template renderer
-- `internal/webui/**` — v2 SPA bridge (`/web/v1/*`, `/v2/*`, embedded bundle)
 - `internal/templates/**` — `html/template` pages + templ components
 
 Any cross-package reference to a symbol in these trees needs a `//go:build headless` stub that returns a typed zero/nil so callers compile. As of PR-02 there are no such references; `--no-dashboard` gates registration at runtime instead. PR-03 introduces stubs only if it discovers callers.
@@ -79,7 +78,7 @@ All three are required for merge. The Makefile gains `build-headless` and `build
 
 When adding a `.go` file, ask in order:
 
-1. **Does this file render or import dashboard assets?** (templates, session manager, sm-wrapped handlers, embedded `web/`) → `//go:build !headless` at the top.
+1. **Does this file render or import dashboard assets?** (templates, session manager, sm-wrapped handlers) → `//go:build !headless` at the top.
 2. **Does this file need a server runtime?** (chi, pgx, providers, sync engine) → `//go:build !lite`.
 3. **Neither?** → no tag.
 

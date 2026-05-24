@@ -127,8 +127,7 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 }
 
 // SetLoginSessionKeys writes the session keys for a freshly authenticated
-// account. Called by both admin.LoginHandler (HTML form) and
-// webui.LoginHandler (JSON) so the two surfaces stay in lock-step.
+// account. Called by admin.LoginHandler (HTML form).
 func SetLoginSessionKeys(ctx context.Context, sm *scs.SessionManager, account db.AuthAccount, queries *db.Queries) {
 	sm.Put(ctx, sessionKeyAccountID, pgconv.FormatUUID(account.ID))
 	sm.Put(ctx, sessionKeyAccountUsername, account.Username)
