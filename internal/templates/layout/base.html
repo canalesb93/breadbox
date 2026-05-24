@@ -243,7 +243,7 @@
         Back to app
       </a>
     </div>
-    <main class="p-4 sm:p-6 max-w-6xl mx-auto min-h-screen bb-page-enter">
+    <main class="p-4 sm:p-6 max-w-6xl mx-auto min-h-screen">
       {{template "flash" .}}
       {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
     </main>
@@ -297,7 +297,7 @@
         </div>
       </div>
       <!-- Page content -->
-      <main class="p-4 sm:p-6 max-w-6xl min-h-screen bb-page-enter">
+      <main class="p-4 sm:p-6 max-w-6xl min-h-screen">
         {{template "flash" .}}
         {{- /* TemplContent slot — set by TemplateRenderer.RenderWithTempl to
               render a templ-generated body inside the base layout without
