@@ -2157,8 +2157,6 @@
   .bb-skeleton {
     @apply rounded-md;
     background: oklch(0.95 0 0);
-    position: relative;
-    overflow: hidden;
   }
 
   @media (prefers-color-scheme: dark) {

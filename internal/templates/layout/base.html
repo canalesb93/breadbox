@@ -232,16 +232,36 @@
         body still gets all the global head + footer scripts (Alpine, Lucide,
         cmdk, shortcuts) so x-data interactivity continues to work. */ -}}
   <div class="bg-base-200 min-h-screen">
-    <!-- Slim top bar with brand + back-to-app link -->
+    <!-- Slim top bar with brand + theme toggle + back-to-app link.
+         The theme toggle is short-lived: it writes data-theme to <html>
+         per click but never persists. Page reload drops the attribute
+         and the sandbox returns to system theme via prefers-color-scheme. -->
     <div class="bb-standalone-bar">
       <a href="/design" class="bb-standalone-brand">
         <i data-lucide="palette" class="w-4 h-4"></i>
         <span>Breadbox <span class="text-base-content/40">·</span> Design system</span>
       </a>
-      <a href="/" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/60">
-        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-        Back to app
-      </a>
+      <div class="flex items-center gap-1">
+        <label
+          class="swap swap-rotate btn btn-ghost btn-xs btn-square rounded-lg text-base-content/60"
+          title="Toggle theme (resets on reload)"
+        >
+          <input
+            type="checkbox"
+            class="sr-only"
+            x-data="{ dark: matchMedia('(prefers-color-scheme: dark)').matches }"
+            x-model="dark"
+            @change="document.documentElement.dataset.theme = dark ? 'dark' : 'light'"
+            aria-label="Toggle theme"
+          />
+          <i data-lucide="sun" class="swap-off w-4 h-4"></i>
+          <i data-lucide="moon" class="swap-on w-4 h-4"></i>
+        </label>
+        <a href="/" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/60">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          Back to app
+        </a>
+      </div>
     </div>
     <main class="p-4 sm:p-6 max-w-6xl mx-auto min-h-screen">
       {{template "flash" .}}
