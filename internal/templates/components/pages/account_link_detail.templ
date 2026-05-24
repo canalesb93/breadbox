@@ -168,15 +168,11 @@ templ accountLinkDetailConfidenceBadge(confidence string) {
 }
 
 templ accountLinkDetailEmpty() {
-	<div class="bb-card p-12 text-center">
-		<div class="flex flex-col items-center">
-			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-				<i data-lucide="check-circle-2" class="w-8 h-8 text-base-content/25"></i>
-			</div>
-			<h3 class="text-lg font-semibold mb-1">No Matches Yet</h3>
-			<p class="text-sm text-base-content/50 max-w-sm">Run reconciliation to find matching transactions between the linked accounts.</p>
-		</div>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:  "check-circle-2",
+		Title: "No Matches Yet",
+		Body:  "Run reconciliation to find matching transactions between the linked accounts.",
+	})
 }
 
 // accountLinkDetailMatchedOn mirrors the original `{{range .MatchedOn}}{{.}} {{end}}`

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"breadbox/internal/templates/components"
 )
 
 // AgentsList renders the admin /agents page — the list of agent
@@ -87,24 +89,22 @@ templ agentsListStatusBanner(s AgentSubsystemStatusProps) {
 }
 
 templ agentsListEmpty() {
-	<div class="bb-card">
-		<div class="flex flex-col items-center text-center py-16 px-6">
-			<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-				<i data-lucide="bot" class="w-8 h-8 text-primary"></i>
-			</div>
-			<h2 class="text-lg font-semibold mb-1">No agents yet</h2>
-			<p class="text-base-content/50 text-sm mb-4 max-w-sm">
-				Create an agent to run a prompt on a schedule. You can also browse the prompt library for ready-made ideas.
-			</p>
-			<div class="flex items-center gap-2">
-				<a href="/agents/new" class="btn btn-primary btn-sm rounded-xl">
-					<i data-lucide="plus" class="w-4 h-4"></i> Create your first agent
-				</a>
-				<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">
-					<i data-lucide="book-open" class="w-4 h-4"></i> Prompt library
-				</a>
-			</div>
-		</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:      "bot",
+		Title:     "No agents yet",
+		Body:      "Create an agent to run a prompt on a schedule. You can also browse the prompt library for ready-made ideas.",
+		CustomCTA: agentsListEmptyCTAs(),
+	})
+}
+
+templ agentsListEmptyCTAs() {
+	<div class="flex items-center gap-2">
+		<a href="/agents/new" class="btn btn-primary btn-sm rounded-xl">
+			<i data-lucide="plus" class="w-4 h-4"></i> Create your first agent
+		</a>
+		<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl">
+			<i data-lucide="book-open" class="w-4 h-4"></i> Prompt library
+		</a>
 	</div>
 }
 

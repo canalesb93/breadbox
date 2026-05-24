@@ -229,18 +229,14 @@ templ categoriesNewCategoryAction() {
 }
 
 templ categoriesEmpty() {
-	<div class="bb-card">
-		<div class="flex flex-col items-center text-center py-16 px-6">
-			<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-				<i data-lucide="tag" class="w-8 h-8 text-primary"></i>
-			</div>
-			<h2 class="text-lg font-semibold mb-1">No categories yet</h2>
-			<p class="text-base-content/50 text-sm mb-6 max-w-sm">Create your first category to start organizing transactions into a clean taxonomy.</p>
-			<a href="/categories/new" class="btn btn-primary btn-sm rounded-xl gap-2">
-				<i data-lucide="plus" class="w-4 h-4"></i> Add Category
-			</a>
-		</div>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:     "tag",
+		Title:    "No categories yet",
+		Body:     "Create your first category to start organizing transactions into a clean taxonomy.",
+		CTAHref:  templ.SafeURL("/categories/new"),
+		CTAIcon:  "plus",
+		CTALabel: "Add Category",
+	})
 }
 
 // deleteCategoryModal renders the shared confirmation dialog. Listens for

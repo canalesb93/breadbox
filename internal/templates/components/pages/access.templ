@@ -1,6 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // Access renders the combined API Keys + OAuth Clients page body. Hosts
 // inside the base layout via TemplateRenderer.RenderWithTempl — the handler
@@ -68,19 +72,14 @@ templ accessOAuthClientsSection(p AccessProps) {
 				</div>
 			}
 		} else {
-			<div class="bb-card p-8 sm:p-12 text-center">
-				<div class="flex flex-col items-center">
-					<div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
-						<i data-lucide="fingerprint" class="w-7 h-7 text-base-content/30"></i>
-					</div>
-					<h3 class="text-base font-semibold mb-1">No OAuth clients yet</h3>
-					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Create an OAuth client to connect external AI services to your Breadbox MCP server.</p>
-					<a href="/settings/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl gap-2">
-						<i data-lucide="plus" class="w-4 h-4"></i>
-						Create your first client
-					</a>
-				</div>
-			</div>
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:     "fingerprint",
+				Title:    "No OAuth clients yet",
+				Body:     "Create an OAuth client to connect external AI services to your Breadbox MCP server.",
+				CTAHref:  templ.SafeURL("/settings/oauth-clients/new"),
+				CTAIcon:  "plus",
+				CTALabel: "Create your first client",
+			})
 		}
 	</div>
 }
@@ -199,19 +198,14 @@ templ accessAPIKeysSection(p AccessProps) {
 				</div>
 			}
 		} else {
-			<div class="bb-card p-8 sm:p-12 text-center">
-				<div class="flex flex-col items-center">
-					<div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
-						<i data-lucide="key" class="w-7 h-7 text-base-content/30"></i>
-					</div>
-					<h3 class="text-base font-semibold mb-1">No API keys yet</h3>
-					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Create an API key to connect MCP agents or integrate with external tools.</p>
-					<a href="/settings/api-keys/new" class="btn btn-primary btn-sm rounded-xl gap-2">
-						<i data-lucide="plus" class="w-4 h-4"></i>
-						Create your first key
-					</a>
-				</div>
-			</div>
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:     "key",
+				Title:    "No API keys yet",
+				Body:     "Create an API key to connect MCP agents or integrate with external tools.",
+				CTAHref:  templ.SafeURL("/settings/api-keys/new"),
+				CTAIcon:  "plus",
+				CTALabel: "Create your first key",
+			})
 		}
 	</div>
 }
