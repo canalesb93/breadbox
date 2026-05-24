@@ -17,9 +17,11 @@ import (
 // the per-instance anchor name and picks `dropdown-end`/`dropdown-start`.
 //
 // Pins (do not deviate when calling):
-//   - Trigger:  `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
-//   - Menu:     `dropdown dropdown-end menu bg-base-100 rounded-xl`
-//               `shadow-lg border border-base-300 w-44 p-1`
+//   - Trigger (sm, default): `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
+//   - Trigger (xs):          `btn btn-ghost btn-xs btn-square` + icon `w-4 h-4`
+//   - Menu (sm, default):    `dropdown dropdown-end menu bg-base-100 rounded-xl`
+//                            `shadow-lg border border-base-300 w-44 p-1`
+//   - Menu (xs):             same shape, `w-40` instead of `w-44`
 //   - Item icon: `w-3.5 h-3.5`
 //   - Destructive items: `text-error` on the inner element
 //   - Disabled items: `disabled` class on the <li>
@@ -27,6 +29,11 @@ import (
 // Items render in the order provided. Pass `Href` for link items,
 // `OnClick` (an Alpine handler string, e.g. `"delete(...)"`) for button
 // items. If both are set, `Href` wins.
+//
+// `Size` selects between the two row-density variants we use in the
+// admin. `""` (zero value) and `"sm"` give the larger trigger seen on
+// the household-members list; `"xs"` gives the tighter trigger used
+// inside dense tables (tags, rules, categories, OAuth clients, agents).
 //
 // Browser support: popover (Chrome 114+, Safari 17+, Firefox 125+) and
 // CSS anchor positioning (Chrome 125+, Safari 17.4+; no Firefox yet)
@@ -48,6 +55,7 @@ type OverflowMenuProps struct {
 	AriaLabel string             // REQUIRED, e.g. "Category Income actions"
 	Items     []OverflowMenuItem // rendered in order
 	Position  string             // "end" (default) or "start"
+	Size      string             // "sm" (default) or "xs"
 }
 
 // overflowMenuSeq generates a process-wide monotonic id used to make every
@@ -65,16 +73,16 @@ templ OverflowMenu(p OverflowMenuProps) {
 	<button
 		type="button"
 		popovertarget={ popoverID }
-		class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity"
+		class={ overflowMenuTriggerClass(p.Size) }
 		aria-label={ p.AriaLabel }
 		style={ "anchor-name:" + anchorName }
 	>
-		<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+		<i data-lucide="ellipsis-vertical" class={ overflowMenuIconClass(p.Size) }></i>
 	</button>
 	<ul
 		id={ popoverID }
 		popover="auto"
-		class={ overflowMenuListClass(p.Position) }
+		class={ overflowMenuListClass(p.Position, p.Size) }
 		style={ overflowMenuListStyle(anchorName, p.Position) }
 	>
 		for _, it := range p.Items {
@@ -124,18 +132,43 @@ templ overflowMenuItem(it OverflowMenuItem) {
 	}
 }
 
+// overflowMenuTriggerClass returns the kebab button classes. `Size="xs"`
+// shrinks the trigger to match dense tables (tags / rules / categories
+// / OAuth client rows). Default keeps the larger `btn-sm` used on the
+// household-members list.
+func overflowMenuTriggerClass(size string) string {
+	btn := "btn-sm"
+	if size == "xs" {
+		btn = "btn-xs"
+	}
+	return "btn btn-ghost " + btn + " btn-square opacity-40 hover:opacity-100 transition-opacity"
+}
+
+// overflowMenuIconClass scales the lucide ellipsis-vertical icon to
+// match the trigger.
+func overflowMenuIconClass(size string) string {
+	if size == "xs" {
+		return "w-4 h-4"
+	}
+	return "w-5 h-5"
+}
+
 // overflowMenuListClass returns the menu UL classes. Uses daisy's
 // `.dropdown` (NOT `.dropdown-content`) so daisy's first-class popover
 // support kicks in: anchor positioning via `--anchor-h`/`--anchor-v`,
 // `z-index: 999`, and the scale-in open/close animation. `dropdown-end`
 // (default) or `dropdown-start` flips the horizontal alignment via
 // daisy's `--anchor-h` switch.
-func overflowMenuListClass(pos string) string {
+func overflowMenuListClass(pos, size string) string {
 	side := "dropdown-end"
 	if pos == "start" {
 		side = "dropdown-start"
 	}
-	return "dropdown " + side + " menu bg-base-100 rounded-xl shadow-lg border border-base-300 w-44 p-1"
+	width := "w-44"
+	if size == "xs" {
+		width = "w-40"
+	}
+	return "dropdown " + side + " menu bg-base-100 rounded-xl shadow-lg border border-base-300 " + width + " p-1"
 }
 
 // overflowMenuListStyle wires the popover element to the trigger's anchor

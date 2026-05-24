@@ -158,22 +158,10 @@ templ usersMemberCard(u UsersEnrichedRow) {
 						}
 					</div>
 				</div>
-				<div class="dropdown dropdown-end">
-					<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100 transition-opacity">
-						<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
-					</div>
-					<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
-						<li><a href={ templ.SafeURL(fmt.Sprintf("/settings/household/%s/edit", u.ID)) }><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
-						if u.HasLogin {
-							<li><a href={ templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)) }><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
-						} else {
-							<li><a href={ templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)) }><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Create login</a></li>
-						}
-						if u.AccountCount > 0 {
-							<li><a href={ templ.SafeURL(fmt.Sprintf("/transactions?user_id=%s", u.ID)) }><i data-lucide="receipt" class="w-3.5 h-3.5"></i> Transactions</a></li>
-						}
-					</ul>
-				</div>
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: fmt.Sprintf("Actions for %s", u.Name),
+					Items:     usersOverflowItems(u),
+				})
 			</div>
 		</div>
 		<!-- Accounts List -->
@@ -281,4 +269,39 @@ templ usersEmpty() {
 		CTAIcon:  "plus",
 		CTALabel: "Add your first member",
 	})
+}
+
+// usersOverflowItems builds the kebab items for one household-member
+// card. Same conditional shape as the inline version: always-present
+// edit, login row depends on HasLogin, transactions row only when the
+// member has connected accounts.
+func usersOverflowItems(u UsersEnrichedRow) []components.OverflowMenuItem {
+	items := []components.OverflowMenuItem{
+		{
+			Label: "Edit profile",
+			Icon:  "pencil",
+			Href:  templ.SafeURL(fmt.Sprintf("/settings/household/%s/edit", u.ID)),
+		},
+	}
+	if u.HasLogin {
+		items = append(items, components.OverflowMenuItem{
+			Label: "Manage login",
+			Icon:  "settings",
+			Href:  templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)),
+		})
+	} else {
+		items = append(items, components.OverflowMenuItem{
+			Label: "Create login",
+			Icon:  "user-plus",
+			Href:  templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)),
+		})
+	}
+	if u.AccountCount > 0 {
+		items = append(items, components.OverflowMenuItem{
+			Label: "Transactions",
+			Icon:  "receipt",
+			Href:  templ.SafeURL(fmt.Sprintf("/transactions?user_id=%s", u.ID)),
+		})
+	}
+	return items
 }

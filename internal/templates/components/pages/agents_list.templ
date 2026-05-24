@@ -197,36 +197,34 @@ templ agentsListRow(a AgentsListRowProps) {
 			/>
 		</td>
 		<td class="align-middle text-right">
-			<div class="dropdown dropdown-end" @click.stop>
-				<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label={ "Agent " + a.Name + " actions" }>
-					<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
-				</div>
-				<ul tabindex="0" class="dropdown-content menu bg-base-100 shadow-lg border border-base-300 z-50 w-44 p-1">
-					<li>
-						<button type="button" @click={ "runNow('" + a.Slug + "')" }>
-							<i data-lucide="play" class="w-3.5 h-3.5"></i> Run now
-						</button>
-					</li>
-					<li>
-						<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/edit", a.Slug)) }>
-							<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
-						</a>
-					</li>
-					<li>
-						<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", a.Slug)) }>
-							<i data-lucide="history" class="w-3.5 h-3.5"></i> View runs
-						</a>
-					</li>
-					<li>
-						<button
-							type="button"
-							class="text-error"
-							@click={ "confirmDelete('" + a.Slug + "', '" + a.Name + "')" }
-						>
-							<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
-						</button>
-					</li>
-				</ul>
+			<div @click.stop class="contents">
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Agent " + a.Name + " actions",
+					Size:      "xs",
+					Items: []components.OverflowMenuItem{
+						{
+							Label:   "Run now",
+							Icon:    "play",
+							OnClick: "runNow('" + a.Slug + "')",
+						},
+						{
+							Label: "Edit",
+							Icon:  "pencil",
+							Href:  templ.SafeURL(fmt.Sprintf("/agents/%s/edit", a.Slug)),
+						},
+						{
+							Label: "View runs",
+							Icon:  "history",
+							Href:  templ.SafeURL(fmt.Sprintf("/agents/%s/runs", a.Slug)),
+						},
+						{
+							Label:       "Delete",
+							Icon:        "trash-2",
+							OnClick:     "confirmDelete('" + a.Slug + "', '" + jsEscape(a.Name) + "')",
+							Destructive: true,
+						},
+					},
+				})
 			</div>
 		</td>
 	</tr>
