@@ -263,17 +263,12 @@ templ usersAccountRow(a UsersAccountRow) {
 
 // usersEmpty renders the "no family members" empty state.
 templ usersEmpty() {
-	<div class="bb-card p-12 text-center">
-		<div class="flex flex-col items-center">
-			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-				<i data-lucide="users" class="w-8 h-8 text-base-content/25"></i>
-			</div>
-			<h3 class="text-lg font-semibold mb-1">No family members yet</h3>
-			<p class="text-sm text-base-content/50 mb-5 max-w-sm">Add family members to connect their bank accounts and track spending across the household.</p>
-			<a href="/settings/household/new" class="btn btn-primary btn-sm rounded-xl">
-				<i data-lucide="plus" class="w-4 h-4"></i>
-				Add your first member
-			</a>
-		</div>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:     "users",
+		Title:    "No family members yet",
+		Body:     "Add family members to connect their bank accounts and track spending across the household.",
+		CTAHref:  templ.SafeURL("/settings/household/new"),
+		CTAIcon:  "plus",
+		CTALabel: "Add your first member",
+	})
 }

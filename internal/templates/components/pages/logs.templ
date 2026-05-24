@@ -361,24 +361,24 @@ templ logsSyncRow(l LogsSyncRow) {
 }
 
 templ logsSyncEmpty(p LogsProps) {
-	<div class="bb-card p-12 text-center">
-		<div class="flex flex-col items-center">
-			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-				<i data-lucide="refresh-cw" class="w-8 h-8 text-base-content/25"></i>
-			</div>
-			<h3 class="text-lg font-semibold mb-1">No sync logs found</h3>
-			<p class="text-sm text-base-content/50 mb-5">
-				if hasAnySyncFilter(p) {
-					Try adjusting your filters.
-				} else {
-					Sync logs will appear here after your first bank sync.
-				}
-			</p>
-			if hasAnySyncFilter(p) {
-				<a href="/logs?tab=syncs" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
-			}
-		</div>
-	</div>
+	if hasAnySyncFilter(p) {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:      "refresh-cw",
+			Title:     "No sync logs found",
+			Body:      "Try adjusting your filters.",
+			CustomCTA: logsClearFiltersCTA("/logs?tab=syncs"),
+		})
+	} else {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:  "refresh-cw",
+			Title: "No sync logs found",
+			Body:  "Sync logs will appear here after your first bank sync.",
+		})
+	}
+}
+
+templ logsClearFiltersCTA(href string) {
+	<a href={ templ.SafeURL(href) } class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
 }
 
 // ====================================================================
@@ -601,24 +601,20 @@ templ logsWebhookRow(e LogsWebhookRow) {
 }
 
 templ logsWebhookEmpty(p LogsProps) {
-	<div class="bb-card p-12 text-center">
-		<div class="flex flex-col items-center">
-			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-				<i data-lucide="webhook" class="w-8 h-8 text-base-content/25"></i>
-			</div>
-			<h3 class="text-lg font-semibold mb-1">No webhook events</h3>
-			<p class="text-sm text-base-content/50 mb-5">
-				if p.WHFilterProvider != "" || p.WHFilterStatus != "" {
-					Try adjusting your filters.
-				} else {
-					Webhook events will appear here when providers send notifications.
-				}
-			</p>
-			if p.WHFilterProvider != "" || p.WHFilterStatus != "" {
-				<a href="/logs?tab=webhooks" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
-			}
-		</div>
-	</div>
+	if p.WHFilterProvider != "" || p.WHFilterStatus != "" {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:      "webhook",
+			Title:     "No webhook events",
+			Body:      "Try adjusting your filters.",
+			CustomCTA: logsClearFiltersCTA("/logs?tab=webhooks"),
+		})
+	} else {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:  "webhook",
+			Title: "No webhook events",
+			Body:  "Webhook events will appear here when providers send notifications.",
+		})
+	}
 }
 
 // ====================================================================
@@ -680,19 +676,19 @@ templ logsSessionRow(s LogsSessionRow) {
 }
 
 templ logsSessionsEmpty() {
-	<div class="bb-card p-12 text-center">
-		<div class="flex flex-col items-center">
-			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-				<i data-lucide="bot" class="w-8 h-8 text-base-content/25"></i>
-			</div>
-			<h3 class="text-lg font-semibold mb-1">No agent sessions yet</h3>
-			<p class="text-sm text-base-content/50 mb-5 max-w-md">Sessions appear here once an MCP agent connects to Breadbox and starts making tool calls.</p>
-			<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl no-underline">
-				<i data-lucide="bot-message-square" class="w-4 h-4"></i>
-				Browse agent prompts
-			</a>
-		</div>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:      "bot",
+		Title:     "No agent sessions yet",
+		Body:      "Sessions appear here once an MCP agent connects to Breadbox and starts making tool calls.",
+		CustomCTA: logsBrowseAgentPromptsCTA(),
+	})
+}
+
+templ logsBrowseAgentPromptsCTA() {
+	<a href="/agent-prompts" class="btn btn-ghost btn-sm rounded-xl no-underline">
+		<i data-lucide="bot-message-square" class="w-4 h-4"></i>
+		Browse agent prompts
+	</a>
 }
 
 // logsSessionsPaginator is a simple Prev / Next strip — sessions don't

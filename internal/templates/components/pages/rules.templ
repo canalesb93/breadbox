@@ -83,18 +83,14 @@ templ rulesSortOption(value, label string, selected bool) {
 }
 
 templ rulesEmpty() {
-	<div class="bb-card">
-		<div class="flex flex-col items-center text-center py-16 px-6">
-			<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-				<i data-lucide="list-filter" class="w-8 h-8 text-primary"></i>
-			</div>
-			<h2 class="text-lg font-semibold mb-1">No rules yet</h2>
-			<p class="text-base-content/50 text-sm mb-4 max-w-sm">Create a rule to automatically categorize, tag, or comment on transactions during sync.</p>
-			<a href="/rules/new" class="btn btn-primary btn-sm rounded-xl">
-				<i data-lucide="plus" class="w-4 h-4"></i> Create Rule
-			</a>
-		</div>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:     "list-filter",
+		Title:    "No rules yet",
+		Body:     "Create a rule to automatically categorize, tag, or comment on transactions during sync.",
+		CTAHref:  templ.SafeURL("/rules/new"),
+		CTAIcon:  "plus",
+		CTALabel: "Create Rule",
+	})
 }
 
 templ rulesRow(r RulesRow) {
