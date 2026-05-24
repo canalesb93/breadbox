@@ -129,6 +129,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/tags", TagsPageHandler(svc, sm, tr))
 
+		// Design-system sandbox. /design is the full gallery; /design/c/{slug}
+		// renders a single component family in isolation for focused screenshots.
+		// Editor scope: developer tooling, not user-facing.
+		r.Get("/design", DesignGalleryHandler(sm, tr))
+		r.Get("/design/c/{slug}", DesignComponentHandler(sm, tr))
+
 		// API Keys + OAuth Clients page (Settings → API Keys tab).
 		// Editors can view and create.
 		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
