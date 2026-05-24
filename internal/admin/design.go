@@ -56,11 +56,6 @@ func DesignComponentHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.H
 			return
 		}
 		data["Standalone"] = true
-		// Drop the standalone shell's max-w-6xl cap so the viewport
-		// toggle's Free mode (≥1320px so xl: utilities trigger) has
-		// room to grow without forcing a body horizontal scroll on
-		// reasonable browser widths.
-		data["WideMain"] = true
 		tr.RenderWithTempl(w, r, data, pages.DesignComponent(pages.DesignComponentProps{
 			Section: section,
 			Breadcrumbs: []components.Breadcrumb{

@@ -5,7 +5,41 @@ package pages
 // (so navigation back is one click), but the main column hosts just one
 // section so screenshots focus on the component being tested.
 templ DesignComponent(p DesignComponentProps) {
-	<div x-data="{ vp: 'desktop' }">
+	<!-- The standalone shell wraps <main> in `max-w-6xl mx-auto` like
+	     every other admin page. That cap is the wrong shape for the
+	     Free toggle, which needs room for ≥1320px previews. Imperatively
+	     drop the cap on <main> only while Free is active, and restore it
+	     for the fixed modes (and on x-destroy so navigation cleanup is
+	     idempotent if Alpine teardown fires before page nav).
+	     `freeWidth` drives a custom right-edge resize grabber rendered
+	     below the iframe; we double the delta on drag so the width
+	     grows symmetrically around the center (the handle tracks the
+	     cursor 1:1 because both edges move by the cursor delta). -->
+	<div
+		x-data="{
+			vp: 'desktop',
+			freeWidth: 1320,
+			dragging: false,
+			onDragStart(e) {
+				e.preventDefault();
+				const self = this;
+				const startX = e.clientX;
+				const startW = this.freeWidth;
+				self.dragging = true;
+				const onMove = function(ev) { self.freeWidth = Math.max(320, startW + (ev.clientX - startX) * 2); };
+				const onUp = function() { self.dragging = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+				window.addEventListener('mousemove', onMove);
+				window.addEventListener('mouseup', onUp);
+			}
+		}"
+		x-effect="
+			document.querySelector('main') && (document.querySelector('main').style.maxWidth = vp === 'free' ? 'none' : '');
+			if (vp !== 'free') freeWidth = 1320;
+		"
+		x-destroy="
+			document.querySelector('main') && (document.querySelector('main').style.maxWidth = '');
+		"
+	>
 		<div class="bb-page-header">
 			<div class="min-w-0">
 				<h1 class="bb-page-title">{ p.Section.Title }</h1>
@@ -56,7 +90,7 @@ templ DesignComponent(p DesignComponentProps) {
 					name="design-vp"
 					value="free"
 					aria-label="Free"
-					title="Free — drag the bottom-right corner to resize (starts ≥1320px so xl: utilities engage)"
+					title="Free — drag the right edge of the preview to resize (starts ≥1320px so xl: utilities engage)"
 					class="join-item btn btn-sm"
 					x-model="vp"
 				/>
@@ -65,29 +99,47 @@ templ DesignComponent(p DesignComponentProps) {
 		<!-- Iframe gives the embedded component its OWN viewport so
 		     Tailwind responsive prefixes (sm:, lg:) trigger based on
 		     the toggle's chosen width, not the outer browser width. In
-		     Free mode the wrapper uses `resize-x` so the user can drag
-		     the bottom-right corner to widen/narrow the preview; the
-		     iframe inside is `w-full` so it tracks the new width. We
-		     clear any user-set inline width on mode switch (Alpine
-		     $refs.frame) so leaving and returning to Free starts fresh
-		     at the 1320px default instead of inheriting the last drag. -->
+		     Free mode the wrapper width is driven by the `freeWidth`
+		     Alpine state (clamped by max-w-full) and a full-height
+		     grabber on the right edge hands the user a clear surface
+		     to drag — much more discoverable than the corner triangle
+		     CSS `resize: horizontal` ships. `pointer-events: none` on
+		     the iframe while dragging so the cursor doesn't get
+		     swallowed by the embedded document. -->
 		<div
-			x-ref="frame"
-			x-effect="if (vp !== 'free' && $refs.frame) { $refs.frame.style.width = ''; $refs.frame.style.height = ''; }"
-			class="bb-card p-0 mx-auto overflow-hidden transition-[max-width] duration-200"
+			class="bb-card p-0 mx-auto overflow-hidden relative transition-[max-width] duration-200"
 			:class="{
-				'max-w-full': vp === 'desktop',
-				'resize-x overflow-x-hidden w-[1320px] min-w-[320px] max-w-full': vp === 'free',
+				'max-w-full': vp === 'desktop' || vp === 'free',
 				'max-w-[768px]': vp === 'tablet',
 				'max-w-[390px]': vp === 'mobile',
 			}"
+			:style="vp === 'free' ? 'width: ' + freeWidth + 'px' : ''"
 		>
 			<iframe
 				src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
 				title={ p.Section.Title + " preview" }
 				class="w-full h-[80vh] border-0 bg-base-100"
+				:style="dragging ? 'pointer-events: none' : ''"
 				loading="lazy"
 			></iframe>
+			<!-- Right-edge resize grabber. x-show keeps the element in
+			     the DOM (display: none when hidden) so Lucide processes
+			     the icon on initial createIcons() instead of waiting
+			     for the user to toggle Free. Bumped to 24px wide with a
+			     left border and primary-tinted background so the grab
+			     surface is obvious — the corner-only CSS triangle from
+			     native resize: horizontal was too easy to miss. -->
+			<button
+				type="button"
+				x-show="vp === 'free'"
+				@mousedown="onDragStart($event)"
+				class="absolute top-0 right-0 h-full w-6 bg-primary/10 hover:bg-primary/20 active:bg-primary/35 border-l border-primary/30 cursor-ew-resize flex items-center justify-center transition-colors group"
+				:class="dragging ? 'bg-primary/35' : ''"
+				aria-label="Drag horizontally to resize preview"
+				title="Drag horizontally to resize"
+			>
+				<i data-lucide="grip-vertical" class="w-4 h-4 text-primary/70 group-hover:text-primary"></i>
+			</button>
 		</div>
 	</div>
 }
