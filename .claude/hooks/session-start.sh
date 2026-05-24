@@ -73,15 +73,32 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
       echo "    Set DATABASE_URL"
     fi
 
-    # ENCRYPTION_KEY — grab from running breadbox process
+    # ENCRYPTION_KEY — try running process first (freshest), then on-disk cache.
+    # Cache survives between sessions so a fresh worktree with no `breadbox serve`
+    # running still gets the key without a manual `ps eww` round-trip.
     if [ -z "${ENCRYPTION_KEY:-}" ]; then
+      KEY_CACHE="$HOME/.local/share/breadbox/dev-encryption-key"
+      EK=""
       RUNNING_PID="$(pgrep -f 'breadbox serve' | head -1 || true)"
       if [ -n "$RUNNING_PID" ]; then
         EK="$(ps eww -p "$RUNNING_PID" 2>/dev/null | tr ' ' '\n' | grep '^ENCRYPTION_KEY=' | cut -d= -f2 || true)"
         if [ -n "$EK" ]; then
-          echo "ENCRYPTION_KEY=$EK" >> "$CLAUDE_ENV_FILE"
-          echo "    Set ENCRYPTION_KEY from running process"
+          mkdir -p "$(dirname "$KEY_CACHE")"
+          umask 077
+          printf '%s\n' "$EK" > "$KEY_CACHE"
+          echo "    Set ENCRYPTION_KEY from running process (cached for future sessions)"
         fi
+      fi
+      if [ -z "$EK" ] && [ -f "$KEY_CACHE" ]; then
+        EK="$(head -1 "$KEY_CACHE" 2>/dev/null || true)"
+        if [ -n "$EK" ]; then
+          echo "    Set ENCRYPTION_KEY from cache ($KEY_CACHE)"
+        fi
+      fi
+      if [ -n "$EK" ]; then
+        echo "ENCRYPTION_KEY=$EK" >> "$CLAUDE_ENV_FILE"
+      else
+        echo "WARN: ENCRYPTION_KEY not found. Start \`breadbox serve\` once in any worktree, or write the 64-char hex key to $KEY_CACHE"
       fi
     fi
 
