@@ -13,11 +13,11 @@ templ DesignComponent(p DesignComponentProps) {
 					<p class="text-sm text-base-content/50 mt-1">{ p.Section.Description }</p>
 				}
 			</div>
-			<div class="join shrink-0" role="group" aria-label="Viewport size">
+			<div class="join shrink-0 hidden sm:inline-flex" role="group" aria-label="Viewport size">
 				<button
 					type="button"
-					class="btn btn-sm join-item"
-					:class="vp === 'desktop' ? 'btn-active' : 'btn-ghost'"
+					class="btn btn-sm btn-outline join-item"
+					:class="vp === 'desktop' && 'btn-active'"
 					@click="vp = 'desktop'"
 					title="Desktop — full width"
 					aria-label="Desktop viewport"
@@ -26,8 +26,8 @@ templ DesignComponent(p DesignComponentProps) {
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm join-item"
-					:class="vp === 'tablet' ? 'btn-active' : 'btn-ghost'"
+					class="btn btn-sm btn-outline join-item"
+					:class="vp === 'tablet' && 'btn-active'"
 					@click="vp = 'tablet'"
 					title="Tablet — 768px"
 					aria-label="Tablet viewport"
@@ -36,8 +36,8 @@ templ DesignComponent(p DesignComponentProps) {
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm join-item"
-					:class="vp === 'mobile' ? 'btn-active' : 'btn-ghost'"
+					class="btn btn-sm btn-outline join-item"
+					:class="vp === 'mobile' && 'btn-active'"
 					@click="vp = 'mobile'"
 					title="Mobile — 390px (iPhone 14)"
 					aria-label="Mobile viewport"
