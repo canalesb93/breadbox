@@ -54,6 +54,7 @@ templ SettingsHelp(p SettingsProps) {
 	})
 	<div class="grid gap-6 max-w-2xl">
 		@settingsHelpCardFlat(p)
+		@settingsHelpDeveloperCard()
 	</div>
 }
 
@@ -466,5 +467,33 @@ templ settingsHelpCardFlat(p SettingsProps) {
 				<i data-lucide="square-arrow-out-up-right" class="w-4 h-4 text-base-content/40"></i>
 			</a>
 		</div>
+	</div>
+}
+
+// settingsHelpDeveloperCard surfaces internal developer-facing tools —
+// currently the design-system sandbox. Lives below the Resources card on
+// the Help tab; intentionally a separate card so the developer-only
+// nature reads at a glance.
+templ settingsHelpDeveloperCard() {
+	<div class="bb-card p-5">
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="palette" class="w-4 h-4 text-base-content/60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">Developer</h2>
+				<p class="text-xs text-base-content/45">Internal tools for contributors</p>
+			</div>
+		</div>
+		<a href="/design" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
+			<div class="flex items-center gap-2.5">
+				<i data-lucide="palette" class="w-4 h-4 text-base-content/50"></i>
+				<div>
+					<span class="text-sm font-medium">Design system sandbox</span>
+					<p class="text-xs text-base-content/40">Reference gallery for every shared admin-UI component</p>
+				</div>
+			</div>
+			<i data-lucide="arrow-right" class="w-4 h-4 text-base-content/40"></i>
+		</a>
 	</div>
 }

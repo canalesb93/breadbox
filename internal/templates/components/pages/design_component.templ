@@ -5,7 +5,52 @@ package pages
 // (so navigation back is one click), but the main column hosts just one
 // section so screenshots focus on the component being tested.
 templ DesignComponent(p DesignComponentProps) {
-	<div class="bb-card p-6">
-		@p.Section.Render()
+	<div x-data="{ vp: 'desktop' }">
+		<div class="bb-page-header">
+			<div class="min-w-0">
+				<h1 class="bb-page-title">{ p.Section.Title }</h1>
+				if p.Section.Description != "" {
+					<p class="text-sm text-base-content/50 mt-1">{ p.Section.Description }</p>
+				}
+			</div>
+			<div class="join shrink-0" role="group" aria-label="Viewport size">
+				<button
+					type="button"
+					class="btn btn-sm join-item"
+					:class="vp === 'desktop' ? 'btn-active' : 'btn-ghost'"
+					@click="vp = 'desktop'"
+					title="Desktop — full width"
+					aria-label="Desktop viewport"
+				>
+					<i data-lucide="monitor" class="w-4 h-4"></i>
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm join-item"
+					:class="vp === 'tablet' ? 'btn-active' : 'btn-ghost'"
+					@click="vp = 'tablet'"
+					title="Tablet — 768px"
+					aria-label="Tablet viewport"
+				>
+					<i data-lucide="tablet" class="w-4 h-4"></i>
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm join-item"
+					:class="vp === 'mobile' ? 'btn-active' : 'btn-ghost'"
+					@click="vp = 'mobile'"
+					title="Mobile — 390px"
+					aria-label="Mobile viewport"
+				>
+					<i data-lucide="smartphone" class="w-4 h-4"></i>
+				</button>
+			</div>
+		</div>
+		<div
+			class="bb-card p-6 mx-auto transition-[max-width] duration-200"
+			:class="{ 'max-w-full': vp === 'desktop', 'max-w-3xl': vp === 'tablet', 'max-w-[390px]': vp === 'mobile' }"
+		>
+			@p.Section.Render()
+		</div>
 	</div>
 }
