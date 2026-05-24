@@ -583,7 +583,7 @@
           @input="activeIndex = 0"
           autocomplete="off"
           spellcheck="false">
-        <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
+        <div class="bb-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
       </div>
 
       <!-- Results list -->
@@ -654,7 +654,7 @@
           x-model="search"
           autocomplete="off"
           spellcheck="false">
-        <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
+        <div class="bb-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
       </div>
 
       <!-- Context strip: which transactions are being edited -->
@@ -791,7 +791,7 @@
           @input="onInput()"
           autocomplete="off"
           spellcheck="false">
-        <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePalette()">esc</div>
+        <div class="bb-kbd" style="font-size:0.6rem" @click="closePalette()">esc</div>
       </div>
 
       <!-- Results list -->
@@ -867,7 +867,7 @@
                       <div class="bb-cmdk-item-shortcut" x-show="!$store.device.isTouch">
                         <template x-for="(tok, ti) in shortcutTokensFor(item)" :key="ti">
                           <span>
-                            <span x-show="tok.then" class="bb-cmdk-then">then</span>
+                            <span x-show="tok.then" class="bb-shortcuts-then">then</span>
                             <!-- Blended combo pill: renders ⌘│K as one tight
                                  badge so modifier combos don't read as two
                                  disconnected keycaps (see .bb-kbd-combo). -->
@@ -878,7 +878,7 @@
                                 </template>
                               </span>
                             </template>
-                            <span x-show="!tok.then && !tok.combo" class="bb-cmdk-kbd" x-text="tok.label"></span>
+                            <span x-show="!tok.then && !tok.combo" class="bb-kbd" x-text="tok.label"></span>
                           </span>
                         </template>
                       </div>
@@ -1987,7 +1987,7 @@
               }).join('') +
               '</span>';
           }
-          return '<kbd class="bb-shortcuts-kbd">' + t.label + '</kbd>';
+          return '<kbd class="bb-kbd">' + t.label + '</kbd>';
         }).join('');
       }
 
