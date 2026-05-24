@@ -241,18 +241,26 @@
         body still gets all the global head + footer scripts (Alpine, Lucide,
         cmdk, shortcuts) so x-data interactivity continues to work. */ -}}
   <div class="bg-base-200 min-h-screen">
-    <!-- Slim top bar with brand + theme toggle + back-to-app link.
+    <!-- Top bar with brand + theme toggle + back-to-app link, built on
+         the native daisy `navbar` component. Sticky so it stays in view
+         while the gallery scrolls; the design gallery's anchor links
+         and sticky outline both offset for this bar's height.
          The theme toggle is short-lived: it writes data-theme to <html>
          per click but never persists. Page reload drops the attribute
          and the sandbox returns to system theme via prefers-color-scheme. -->
-    <div class="bb-standalone-bar">
-      <a href="/design" class="bb-standalone-brand">
-        <i data-lucide="palette" class="w-4 h-4"></i>
-        <span>Breadbox <span class="text-base-content/40">·</span> Design system</span>
-      </a>
-      <div class="flex items-center gap-1">
+    <div class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-30 px-4 sm:px-6">
+      <div class="navbar-start">
+        <a
+          href="/design"
+          class="inline-flex items-center gap-2 text-sm font-semibold text-base-content no-underline hover:text-primary transition-colors"
+        >
+          <i data-lucide="palette" class="w-4 h-4"></i>
+          <span>Breadbox <span class="text-base-content/40">·</span> Design system</span>
+        </a>
+      </div>
+      <div class="navbar-end gap-1">
         <label
-          class="swap swap-rotate btn btn-ghost btn-xs btn-square rounded-lg text-base-content/60"
+          class="swap swap-rotate btn btn-ghost btn-sm btn-square rounded-lg text-base-content/60"
           title="Toggle theme (resets on reload)"
         >
           <input
@@ -266,7 +274,7 @@
           <i data-lucide="sun" class="swap-off w-4 h-4"></i>
           <i data-lucide="moon" class="swap-on w-4 h-4"></i>
         </label>
-        <a href="/" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/60">
+        <a href="/" class="btn btn-ghost btn-sm rounded-lg gap-1.5 text-base-content/60">
           <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
           Back to app
         </a>

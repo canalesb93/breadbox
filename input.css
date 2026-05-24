@@ -791,28 +791,6 @@
     @apply text-xl font-semibold tracking-tight;
   }
 
-  /* ── Standalone shell (e.g. /design sandbox) ──
-     Slim top bar that replaces the sidebar when the page is hosted in
-     standalone mode (base.html .Standalone branch). Keeps the chrome
-     minimal so reviewers focus on the component under test. */
-  /* Opaque solid background — no /85 + backdrop-blur, otherwise the
-     modal dim looks like it undims the bar at a different rate than
-     the rest of the page (the bar reveals partially-blurred content
-     behind it as the dim fades). */
-  .bb-standalone-bar {
-    @apply sticky top-0 z-30
-           flex items-center justify-between gap-3
-           px-4 sm:px-6 h-12
-           bg-base-100
-           border-b border-base-300;
-  }
-
-  .bb-standalone-brand {
-    @apply inline-flex items-center gap-2
-           text-sm font-semibold text-base-content
-           no-underline hover:text-primary transition-colors;
-  }
-
   /* ── Wizard / Auth pages (login, setup, error) ── */
   .bb-wizard-bg {
     /* Mobile: top-aligned with generous top padding so content isn't dead-center

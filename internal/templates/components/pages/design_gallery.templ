@@ -13,17 +13,19 @@ package pages
 templ DesignGallery(p DesignGalleryProps) {
 	<div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-6">
 		<aside class="hidden lg:block">
-			// `h-[calc(100vh-3rem)]` (not max-h) pins the nav to viewport
-			// height so it always has a defined scroll context. `top-6`
-			// matches the 3rem offset so the nav sits exactly between the
-			// top of the visible viewport and the bottom edge.
+			// Offsets account for the sticky standalone navbar above (daisy
+			// `navbar` ≈ 4rem). `top-[5.5rem]` = navbar (4rem) + 1.5rem gap
+			// so the outline sits just below the bar. `h-[calc(100vh-7rem)]`
+			// (not max-h) pins it to viewport height with the same 1.5rem
+			// gap mirrored at the bottom, giving a defined scroll context
+			// even when the catalog overflows.
 			<nav
 				x-data="{
 				  allOpen: true,
 				  inputs() { return Array.from(this.$root.querySelectorAll('input[type=checkbox][name^=design-nav-]')); },
 				  toggleAll() { this.allOpen = !this.allOpen; this.inputs().forEach(i => { i.checked = this.allOpen; }); },
 				}"
-				class="sticky top-6 flex flex-col gap-1 h-[calc(100vh-3rem)] overflow-y-auto pr-1 -mr-1"
+				class="sticky top-[5.5rem] flex flex-col gap-1 h-[calc(100vh-7rem)] overflow-y-auto pr-1 -mr-1"
 			>
 				<div class="flex items-center justify-between px-2 pb-1 -mb-1">
 					<span class="text-[0.65rem] font-semibold uppercase tracking-wider text-base-content/30">Catalog</span>
@@ -90,7 +92,7 @@ templ designSidebarGroup(group DesignSectionGroup, sections []DesignSection) {
 // (e.g. /design#group-feedback).
 templ designSectionGroupBlock(group DesignSectionGroup, sections []DesignSection) {
 	if len(sections) > 0 {
-		<section id={ "group-" + group.Slug } class="scroll-mt-6">
+		<section id={ "group-" + group.Slug } class="scroll-mt-[5.5rem]">
 			<header class="mb-6 pb-2 border-b border-base-300/60">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{ group.Label }</h2>
 			</header>
@@ -112,7 +114,7 @@ templ designSectionGroupBlock(group DesignSectionGroup, sections []DesignSection
 // of mb-6 = 24px + card padding-top of 24px = 48px to first inner
 // content). H3 → description is mb-1 so they read as a tight pair.
 templ designSectionBlock(sec DesignSection) {
-	<section id={ sec.Slug } class="scroll-mt-6">
+	<section id={ sec.Slug } class="scroll-mt-[5.5rem]">
 		<div class="flex items-baseline justify-between gap-3 mb-1">
 			<h3 class="text-lg font-semibold tracking-tight">{ sec.Title }</h3>
 			<a href={ templ.SafeURL("/design/c/" + sec.Slug) } class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
