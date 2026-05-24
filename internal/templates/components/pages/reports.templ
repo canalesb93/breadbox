@@ -49,7 +49,7 @@ templ Reports(p ReportsProps) {
 	<!-- Reports Inbox -->
 	if len(p.Reports) > 0 {
 		<div class="bb-card" x-data="reportsPage">
-			<div class="divide-y divide-base-200/60 bb-stagger">
+			<div class="divide-y divide-base-200/60">
 				for _, r := range p.Reports {
 					@reportsRow(r)
 				}

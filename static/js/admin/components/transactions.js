@@ -385,7 +385,7 @@ document.addEventListener('alpine:init', function () {
               // Check if response has any transaction rows
               var hasResults = html.indexOf('bb-tx-row') !== -1;
               if (hasResults) {
-                results.innerHTML = html.replace(/bb-stagger/g, '');
+                results.innerHTML = html;
                 results.querySelectorAll('script').forEach(function (s) { eval(s.textContent); });
                 Alpine.initTree(results);
                 if (window.lucide) lucide.createIcons();
@@ -465,7 +465,7 @@ document.addEventListener('alpine:init', function () {
             .then(function (html) {
               var results = document.getElementById('bb-tx-results');
               if (results) {
-                results.innerHTML = html.replace(/bb-stagger/g, '');
+                results.innerHTML = html;
                 results.querySelectorAll('script').forEach(function (s) { eval(s.textContent); });
                 Alpine.initTree(results);
                 if (window.lucide) lucide.createIcons();

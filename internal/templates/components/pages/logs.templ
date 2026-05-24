@@ -63,7 +63,7 @@ templ Logs(p LogsProps) {
 					{ fmt.Sprintf("%d sync log%s", p.Total, components.PluralS(p.Total)) }
 				</div>
 				<!-- Timeline view -->
-				<div class="space-y-1 bb-stagger">
+				<div class="space-y-1">
 					for _, l := range p.Logs {
 						@logsSyncRow(l)
 					}
@@ -89,7 +89,7 @@ templ Logs(p LogsProps) {
 					{ fmt.Sprintf("%d webhook event%s", p.WHTotal, components.PluralS(p.WHTotal)) }
 				</div>
 				<!-- Event list -->
-				<div class="space-y-1 bb-stagger">
+				<div class="space-y-1">
 					for _, e := range p.WHEvents {
 						@logsWebhookRow(e)
 					}
@@ -109,7 +109,7 @@ templ Logs(p LogsProps) {
 // ====================================================================
 templ logsSyncStats(p LogsProps) {
 	if p.Stats != nil {
-		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 bb-stagger">
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
 			<!-- Success Rate -->
 			<div class="bb-card p-4">
 				<div class="flex items-center gap-3">
@@ -386,7 +386,7 @@ templ logsSyncEmpty(p LogsProps) {
 // ====================================================================
 templ logsWebhookStats(p LogsProps) {
 	if p.WHStats != nil {
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 bb-stagger">
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 			<!-- Total Events -->
 			<div class="bb-card p-4">
 				<div class="flex items-center gap-3">
@@ -629,7 +629,7 @@ templ logsSessionsBody(p LogsProps) {
 		<div class="text-xs text-base-content/40 mb-3 px-1">
 			{ fmt.Sprintf("%d session%s", p.SessionsTotal, components.PluralS(p.SessionsTotal)) }
 		</div>
-		<div class="space-y-2 bb-stagger">
+		<div class="space-y-2">
 			for _, s := range p.Sessions {
 				@logsSessionRow(s)
 			}

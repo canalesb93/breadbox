@@ -22,7 +22,7 @@ templ GettingStarted(p GettingStartedProps) {
 		</div>
 	</div>
 	<!-- Progress summary -->
-	<div class="bb-card p-4 sm:p-5 mb-6 bb-stagger">
+	<div class="bb-card p-4 sm:p-5 mb-6">
 		<div class="flex flex-col sm:flex-row sm:items-center gap-4">
 			<div class="flex-1">
 				<div class="flex items-center gap-2 mb-2">
@@ -58,7 +58,7 @@ templ GettingStarted(p GettingStartedProps) {
 		</div>
 	</div>
 	<!-- Steps -->
-	<div class="grid gap-4 bb-stagger">
+	<div class="grid gap-4">
 		<!-- Step 1: Create a family member -->
 		@gsStep1(p)
 		<!-- Step 2: Configure a provider -->
@@ -71,7 +71,7 @@ templ GettingStarted(p GettingStartedProps) {
 		@gsStep5(p)
 	</div>
 	<!-- Dismiss section -->
-	<div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bb-stagger">
+	<div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 		if !p.OnboardingDismissed {
 			<form method="POST" action="/getting-started/dismiss">
 				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>

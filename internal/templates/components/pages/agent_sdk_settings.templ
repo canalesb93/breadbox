@@ -29,7 +29,7 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 			<span>{ p.FormSuccess }</span>
 		</div>
 	}
-	<div class="grid gap-6 bb-stagger">
+	<div class="grid gap-6">
 		@agentSDKStatusCard(p.Status)
 		@agentSDKFormCard(p)
 		@agentSDKToolsCard(p.CSRFToken)

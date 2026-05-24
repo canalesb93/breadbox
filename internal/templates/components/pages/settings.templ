@@ -16,7 +16,7 @@ templ SettingsSync(p SettingsProps) {
 		Title:    "Sync",
 		Subtitle: "Schedule and log retention",
 	})
-	<div class="grid gap-6 bb-stagger max-w-2xl">
+	<div class="grid gap-6 max-w-2xl">
 		@settingsSyncSchedule(p)
 		@settingsSyncRetention(p)
 	</div>
@@ -29,7 +29,7 @@ templ SettingsSecurity(p SettingsProps) {
 		Title:    "Security",
 		Subtitle: "Encryption key status",
 	})
-	<div class="grid gap-6 bb-stagger max-w-2xl">
+	<div class="grid gap-6 max-w-2xl">
 		@settingsSecurityCardFlat(p)
 	</div>
 }
@@ -40,7 +40,7 @@ templ SettingsSystem(p SettingsProps) {
 		Title:    "System",
 		Subtitle: "Version and runtime information",
 	})
-	<div class="grid gap-6 bb-stagger max-w-2xl">
+	<div class="grid gap-6 max-w-2xl">
 		@settingsSystemCard(p)
 	</div>
 }
@@ -52,7 +52,7 @@ templ SettingsHelp(p SettingsProps) {
 		Title:    "Help",
 		Subtitle: "Setup guide and resources",
 	})
-	<div class="grid gap-6 bb-stagger max-w-2xl">
+	<div class="grid gap-6 max-w-2xl">
 		@settingsHelpCardFlat(p)
 	</div>
 }

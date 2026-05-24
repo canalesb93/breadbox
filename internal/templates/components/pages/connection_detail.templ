@@ -363,7 +363,7 @@ templ connDetailAccounts(p ConnectionDetailProps) {
 				}
 			</span>
 		</div>
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 			for _, a := range p.Accounts {
 				@connDetailAccountCard(a)
 			}

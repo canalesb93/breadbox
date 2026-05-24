@@ -37,7 +37,7 @@ type TxResultsProps struct {
 templ TxResults(p TxResultsProps) {
 	<!-- ═══ GROUPED VIEW ═══ -->
 	<template x-if="$store.txView.mode === 'grouped'">
-		<div class="space-y-1 bb-stagger">
+		<div class="space-y-1">
 			for _, g := range p.DateGroups {
 				<div class="bb-date-group" data-date-group={ g.Date }>
 					<!-- Date Header -->

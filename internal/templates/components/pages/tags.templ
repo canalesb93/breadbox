@@ -37,7 +37,7 @@ templ Tags(p TagsProps) {
 				{ fmt.Sprintf("%d tags", len(p.Tags)) }
 			</div>
 			<div class="bb-card overflow-hidden">
-				<div class="divide-y divide-base-300/40 bb-stagger">
+				<div class="divide-y divide-base-300/40">
 					for _, t := range p.Tags {
 						@tagListRow(t)
 					}

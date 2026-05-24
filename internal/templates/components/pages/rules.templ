@@ -56,7 +56,7 @@ templ Rules(p RulesProps) {
 		if len(p.Rules) == 0 {
 			@rulesEmpty()
 		}
-		<div class="space-y-3 bb-stagger">
+		<div class="space-y-3">
 			for _, r := range p.Rules {
 				@rulesRow(r)
 			}
