@@ -118,11 +118,6 @@ jobs:
       - name: Build CSS
         run: make css
 
-      # The v2 SPA bundle is intentionally NOT built here: //go:embed
-      # all:dist is satisfied by the committed web/dist/.gitkeep, and
-      # no test exercises the bundle's content. Bundle build lives in
-      # the release/docker-build jobs that actually ship the binary.
-
       - name: Check for duplicate migration versions
         if: matrix.shard.run_unit
         run: |
@@ -338,12 +333,6 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - name: Build v2 SPA
-        run: |
-          cd web
-          bun install --frozen-lockfile
-          bun run build
 
       - name: Build binary
         env:

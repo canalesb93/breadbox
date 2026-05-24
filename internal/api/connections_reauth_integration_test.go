@@ -268,11 +268,12 @@ func TestConnectionReauthComplete_NotFound(t *testing.T) {
 	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
 }
 
-// TestConnectionReauth_TellerReturnsApplicationID guards the v2 SPA's
-// re-auth path: Teller Connect can't bootstrap reconnection mode without
+// TestConnectionReauth_TellerReturnsApplicationID guards the admin
+// reauth flow: Teller Connect can't bootstrap reconnection mode without
 // both the existing enrollment id (LinkToken) and the configured
 // application id. The reauth handler must surface ApplicationID untouched
-// so the SPA can launch the SDK without falling back to a window global.
+// so the admin reauth page can launch the SDK without falling back to a
+// window global.
 func TestConnectionReauth_TellerReturnsApplicationID(t *testing.T) {
 	env := setupReauthEnv(t, "full_access")
 	tellerFake := &fakeProvider{

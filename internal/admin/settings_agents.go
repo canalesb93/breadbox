@@ -141,6 +141,6 @@ func AgentsSettingsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 		}
 
 		data := BaseTemplateData(r, sm, "mcp", "MCP Settings")
-		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabAgents, pages.AgentsSettings(props))
+		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabMCP, pages.AgentsSettings(props))
 	}
 }

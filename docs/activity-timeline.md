@@ -516,7 +516,7 @@ calls it on every error / non-2xx branch. The transaction-detail JS shares a
 single module-level implementation across all three factories
 (category, tags, comments).
 
-In addition to clearing the SPA fade, each call site rolls back the
+In addition to clearing the admin progress fade, each call site rolls back the
 optimistic local chip state at the call site so the UI reflects the prior
 state (category chip reverts, tag chips re-add, etc.) and surfaces a toast
 via `window.showToast`.

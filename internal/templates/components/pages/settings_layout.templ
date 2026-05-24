@@ -25,7 +25,8 @@ const (
 	SettingsTabSystem    = "system"
 	SettingsTabHelp      = "help"
 	SettingsTabProviders = "providers"
-	SettingsTabAgents    = "agents-settings"
+	SettingsTabMCP       = "mcp-settings"
+	SettingsTabAgents    = "agents-sdk"
 	SettingsTabAccess    = "access"
 	SettingsTabHousehold = "users"
 	SettingsTabBackups   = "backups"
@@ -97,7 +98,8 @@ templ settingsRailMobile(p SettingsLayoutProps) {
 				@settingsRailMobileItem(p.CurrentTab, SettingsTabSecurity, "/settings/security", "shield", "Security")
 				@settingsRailMobileItem(p.CurrentTab, SettingsTabSystem, "/settings/system", "cpu", "System")
 				@settingsRailMobileItem(p.CurrentTab, SettingsTabProviders, "/settings/providers", "plug", "Providers")
-				@settingsRailMobileItem(p.CurrentTab, SettingsTabAgents, "/settings/mcp", "bot", "MCP Settings")
+				@settingsRailMobileItem(p.CurrentTab, SettingsTabAgents, "/settings/agents", "sparkles", "Agents")
+				@settingsRailMobileItem(p.CurrentTab, SettingsTabMCP, "/settings/mcp", "bot", "MCP Settings")
 			}
 			if p.IsEditor {
 				@settingsRailMobileItem(p.CurrentTab, SettingsTabAccess, "/settings/api-keys", "key-round", "API Keys")
@@ -146,6 +148,8 @@ func settingsTabIcon(tab string) string {
 	case SettingsTabProviders:
 		return "plug"
 	case SettingsTabAgents:
+		return "sparkles"
+	case SettingsTabMCP:
 		return "bot"
 	case SettingsTabAccess:
 		return "key-round"
@@ -176,6 +180,8 @@ func settingsTabLabel(tab string) string {
 	case SettingsTabProviders:
 		return "Providers"
 	case SettingsTabAgents:
+		return "Agents"
+	case SettingsTabMCP:
 		return "MCP Settings"
 	case SettingsTabAccess:
 		return "API Keys"
@@ -199,7 +205,8 @@ templ settingsRailDesktop(p SettingsLayoutProps) {
 			@settingsRailItem(p.CurrentTab, SettingsTabSecurity, "/settings/security", "shield", "Security", true)
 			@settingsRailItem(p.CurrentTab, SettingsTabSystem, "/settings/system", "cpu", "System", true)
 			@settingsRailItem(p.CurrentTab, SettingsTabProviders, "/settings/providers", "plug", "Providers", true)
-			@settingsRailItem(p.CurrentTab, SettingsTabAgents, "/settings/mcp", "bot", "MCP Settings", true)
+			@settingsRailItem(p.CurrentTab, SettingsTabAgents, "/settings/agents", "sparkles", "Agents", true)
+			@settingsRailItem(p.CurrentTab, SettingsTabMCP, "/settings/mcp", "bot", "MCP Settings", true)
 		}
 		if p.IsEditor {
 			@settingsRailItem(p.CurrentTab, SettingsTabAccess, "/settings/api-keys", "key-round", "API Keys", true)

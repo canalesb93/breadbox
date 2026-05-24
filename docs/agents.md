@@ -21,8 +21,8 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
      curl -fsSL https://bun.sh/install | bash
      ```
 
-   Discovery order is: `agent.runtime_path` (Settings → Agents) → `$BREADBOX_AGENT_BIN` → `./bin/breadbox-agent` (cwd) → `~/.breadbox/agent-bin/breadbox-agent` → `$PATH` lookup. The v2 SPA onboarding banner shows which one resolved.
-3. **Pick a starter agent** from the v2 SPA at `/v2/agents`. Five defaults are seeded on fresh installs (disabled):
+   Discovery order is: `agent.runtime_path` (Settings → Agents) → `$BREADBOX_AGENT_BIN` → `./bin/breadbox-agent` (cwd) → `~/.breadbox/agent-bin/breadbox-agent` → `$PATH` lookup.
+3. **Pick a starter agent** from `/agents`. Five defaults are seeded on fresh installs (disabled):
    - **Initial Setup** — broad rule + category mapping after first sync.
    - **Bulk Review** — thorough categorization pass over a large queue.
    - **Quick Review** — fast batch-categorize, prioritizes speed.
@@ -69,7 +69,6 @@ Exit codes (full reference):
 
 | Layer | Lives at | What it does |
 |---|---|---|
-| v2 SPA | `web/src/routes/agents*.tsx` | List, edit, run history, transcript viewer |
 | REST API | `internal/api/agents.go` | 13 endpoints under `/api/v1/agents` |
 | Service layer | `internal/service/agents.go` | CRUD, mint scoped API key, assemble JobSpec |
 | Orchestrator | `internal/service/agent_orchestrator.go` | Mint → Run → Persist → Revoke |
@@ -95,9 +94,8 @@ Exit codes (full reference):
 
 ## What replaced what
 
-The v1 admin "agent prompts" library at `/admin/agent-prompts` is retired. Every legacy path 302s to `/v2/agents`:
+The v1 admin "agent prompts" library at `/admin/agent-prompts` is retired. Legacy paths resolve to `/agents`:
 - `/agent-prompts` (and `/agent-prompts/builder/*`)
-- `/agents`
 - `/agent-wizard/*`
 
 The five seeded starter agents are direct ports of the v1 wizard's prompts. Edit them in place; they're now real schedulable agents rather than copy-to-clipboard text.

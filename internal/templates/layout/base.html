@@ -754,7 +754,7 @@
                      so cmdk shares one component with every other compact-tx
                      surface (dashboard recents, rule preview). Click is
                      prevented on the wrapper and routed through go() which
-                     handles the SPA progress bar + closePalette. -->
+                     handles the admin progress bar + closePalette. -->
                 <template x-if="item._kind === 'tx'">
                   <div x-html="item.html"></div>
                 </template>
@@ -1508,7 +1508,8 @@
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
         { id: 'nav-connections', shortcutId: 'global.go.c', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
-        { id: 'nav-agents', shortcutId: 'global.go.h', group: 'Manage', title: 'Agent Prompts', desc: 'Agent setup, prompts, and MCP settings', icon: 'bot', href: '/agent-prompts', keywords: 'getting started mcp connect agent setup guide wizard prompt tools permissions instructions' },
+        { id: 'nav-agents', shortcutId: 'global.go.h', group: 'Manage', title: 'Agents', desc: 'Claude Agent SDK runs, prompt library, settings', icon: 'bot', href: '/agents', keywords: 'agent sdk runs prompts library wizard schedule cron mcp setup tools permissions' },
+        { id: 'nav-agent-prompts', group: 'Manage', title: 'Prompt library', desc: 'Starter prompt templates for agents', icon: 'sparkles', href: '/agent-prompts', keywords: 'wizard prompt library template starter' },
         { id: 'nav-rules', shortcutId: 'global.go.u', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
         { id: 'nav-categories', shortcutId: 'global.go.a', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
         { id: 'nav-tags', group: 'Manage', title: 'Tags', desc: 'Tag transactions and triage review queue', icon: 'tags', href: '/tags', keywords: 'labels needs-review triage annotations' },
@@ -2087,7 +2088,7 @@
         m: { path: '/settings/mcp',       label: 'Go to MCP Settings' },
         k: { path: '/settings/api-keys',  label: 'Go to API Keys' },
         f: { path: '/settings/household', label: 'Go to Household' },
-        h: { path: '/agent-prompts',      label: 'Go to Agent Prompts' }
+        h: { path: '/agents',             label: 'Go to Agents' }
       };
 
       var newRoutes = {

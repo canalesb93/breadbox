@@ -58,7 +58,6 @@ func TestNoDashboard_GatesAdminButKeepsAPIAndDiscovery(t *testing.T) {
 		{"oauth_resource", "/.well-known/oauth-protected-resource", http.StatusOK},
 		// Dashboard — must be gone.
 		{"admin_root", "/", http.StatusNotFound},
-		{"v2_spa", "/v2/", http.StatusNotFound},
 		{"web_v1_me", "/web/v1/me", http.StatusNotFound},
 	}
 

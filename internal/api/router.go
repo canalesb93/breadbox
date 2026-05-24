@@ -13,7 +13,6 @@ import (
 	"breadbox/internal/service"
 	"breadbox/internal/webhook"
 	"breadbox/static"
-	webui "breadbox/web"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -272,55 +271,13 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Post("/oauth/token", admin.OAuthTokenHandler(svc))
 	r.Post("/oauth/register", admin.OAuthRegisterHandler(svc))
 
-	// Admin dashboard, v2 SPA, and /web/v1 — all gated by the runtime
-	// --no-dashboard flag. When disabled, REST + MCP + OAuth + webhooks stay
-	// reachable; the dashboard surface is silently absent (no admin router
-	// mounted on "/" — bare GET / returns 404). The build-tag side that
-	// strips the assets entirely is `-tags=headless` (see
-	// .claude/rules/build-tags.md).
+	// Admin dashboard — gated by the runtime --no-dashboard flag. When
+	// disabled, REST + MCP + OAuth + webhooks stay reachable; the dashboard
+	// surface is silently absent (no admin router mounted on "/" — bare
+	// GET / returns 404). The build-tag side that strips the assets
+	// entirely is `-tags=headless` (see .claude/rules/build-tags.md).
 	if !a.Config.NoDashboard {
 		// sm was created above (shared with the /api/v1 cookie-auth path).
-
-		// v2 SPA — internal frontend API and embedded static bundle.
-		// /web/v1/* is session-only, never accepts API keys, and carries zero
-		// stability promise (it is exclusively consumed by the v2 SPA).
-		r.Group(func(r chi.Router) {
-			r.Use(sm.LoadAndSave)
-			r.Route("/web/v1", func(r chi.Router) {
-				// SameSite=Lax cookie + Origin check is the CSRF strategy
-				// for /web/v1/* writes. See .claude/rules/v2-frontend.md.
-				r.Use(webui.RequireSameOrigin())
-				// Pre-auth (login + first-run signup-style routes): no session required.
-				r.Post("/login", webui.LoginHandler(sm, a.Queries))
-				// Setup-account: token-gated password set for new members.
-				// Pre-auth — the one-time token is the credential. POST also
-				// starts a session so the SPA can route straight into /v2/.
-				r.Get("/setup-account/{token}", webui.SetupAccountInfoHandler(a.Queries))
-				r.Post("/setup-account/{token}", webui.SetupAccountHandler(sm, a.Queries))
-				// Post-auth routes.
-				r.Group(func(r chi.Router) {
-					r.Use(webui.RequireSessionJSON(sm))
-					r.Get("/me", webui.MeHandler(sm))
-					r.Post("/logout", webui.LogoutHandler(sm))
-					r.Post("/account/password", webui.ChangePasswordHandler(sm, a.Queries))
-					webui.MountBackupRoutes(r, a, sm)
-				})
-			})
-		})
-		// /v2/* — embedded SPA static bundle. Deliberately NOT inside the
-		// session-middleware group above: `sm.LoadAndSave` appends
-		// `Vary: Cookie` to every response, and `Vary: Cookie` is one of
-		// the canonical reasons WebKit (and Chrome) refuse to bfcache a
-		// page. With bfcache disabled, iOS Safari swipe-back triggers a
-		// full SPA cold-reload (blank page + ~1-2s freeze) instead of
-		// instantly restoring the previous DOM from memory. The SPA's
-		// authenticated content is gated by its own /web/v1/me query, which
-		// loads the session through scs separately — so dropping middleware
-		// here just affects the static asset response, never the auth
-		// boundary.
-		r.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
-		r.Handle("/v2/*", webui.Handler())
-
 		tr, err := admin.NewTemplateRenderer(sm)
 		if err != nil {
 			a.Logger.Error("failed to initialize template renderer", "error", err)

@@ -156,32 +156,39 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			http.Redirect(w, r, "/settings/oauth-clients/"+chi.URLParam(r, "id")+"/created", http.StatusMovedPermanently)
 		})
 
-		// Agent Prompts page (formerly /agents) — editors can view.
-		// Per-session detail lives under /logs/sessions/{id} since
-		// session data is hosted on the Logs page's Sessions tab;
-		// it's registered here under the editor+ scope to preserve the
-		// previous /agents/sessions/{id} permission level.
-		// v1 admin agent surfaces are retired in favor of the v2 SPA
-		// /v2/agents page. Every legacy path 302s there so bookmarks,
-		// CLI completions, and external references continue to work.
-		// AgentsPageHandler / PromptBuilderHandler / PromptCopyHandler
-		// remain compiled (unwired) until the broader v1 admin retirement
-		// so a rollback is a one-line change.
-		r.Get("/agent-prompts", redirectGET("/v2/agents"))
-		r.Get("/agent-prompts/builder/{type}", redirectGET("/v2/agents"))
-		r.Get("/agent-prompts/builder/{type}/copy", redirectGET("/v2/agents"))
+		// Agents — Claude Agent SDK admin pages. List, create/edit forms,
+		// run history, run detail (with NDJSON transcript). The v1 prompt
+		// library lives at /agent-prompts as a starter-prompt composer
+		// that hands off into /agents/new via copy-to-clipboard.
+		r.Get("/agents", AgentsListPageHandler(svc, sm, tr))
+		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
+		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
+		r.Get("/agents/{slug}/runs", AgentRunsListPageHandler(svc, sm, tr))
+		r.Get("/agents/runs", AgentRunsListPageHandler(svc, sm, tr))
+		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr))
+
+		// Prompt library — the v1 wizard. Authors a starter prompt that
+		// gets pasted into the SDK agent form.
+		r.Get("/agent-prompts", AgentsPageHandler(svc, sm, tr))
+		r.Get("/agent-prompts/builder/{type}", PromptBuilderHandler(sm, tr))
+		r.Get("/agent-prompts/builder/{type}/copy", PromptCopyHandler())
+
 		r.Get("/logs/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 
-		// Legacy /agents and /activity/sessions redirects.
-		r.Get("/agents", redirectGET("/v2/agents"))
+		// Legacy aliases for /agents/sessions/{id} and /activity/sessions/{id}.
 		r.Get("/agents/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
 		r.Get("/activity/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
-		r.Get("/agent-wizard/{type}", redirectGET("/v2/agents"))
-		r.Get("/agent-wizard/{type}/copy", redirectGET("/v2/agents"))
+		// /agent-wizard/{type} legacy → /agent-prompts/builder/{type}.
+		r.Get("/agent-wizard/{type}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type"), http.StatusMovedPermanently)
+		})
+		r.Get("/agent-wizard/{type}/copy", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type")+"/copy", http.StatusMovedPermanently)
+		})
 	})
 
 	// Admin-only authenticated routes (HTML pages).
@@ -263,6 +270,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// review guidelines, report format, and per-tool toggles. POST
 		// targets remain at /-/mcp-settings/* (registered below).
 		r.Get("/settings/mcp", AgentsSettingsHandler(svc, mcpServer, sm, tr))
+		// Agent SDK settings — Claude Agent SDK auth, sidecar, and run
+		// ceilings. Admin-only because tokens are sensitive and runs cost.
+		r.Get("/settings/agents", AgentSDKSettingsPageHandler(a, svc, sm, tr))
 		r.Get("/agents-settings", redirectGET("/settings/mcp"))
 		r.Get("/mcp-getting-started", redirectGET("/agent-prompts"))
 		r.Get("/agent-wizard", redirectGET("/agent-prompts"))
@@ -310,7 +320,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
-		r.Post("/settings/v2-default", SettingsV2DefaultPostHandler(a, sm))
 	})
 
 	// Admin API (authenticated, JSON responses).
@@ -355,6 +364,17 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// OAuth clients — editors can list and create (revoke is admin-only below).
 			r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
 			r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
+
+			// Agent definitions — editors can CRUD definitions and trigger
+			// manual runs. Settings (auth tokens, smoke test, cleanup) are
+			// admin-only and registered in the admin-scope group below.
+			r.Post("/agents", CreateAgentDefinitionAdminHandler(svc, sm))
+			r.Post("/agents/{slug}/update", UpdateAgentDefinitionAdminHandler(svc, sm))
+			r.Post("/agents/{slug}/delete", DeleteAgentDefinitionAdminHandler(svc, sm))
+			r.Post("/agents/{slug}/enable", EnableAgentAdminHandler(svc))
+			r.Post("/agents/{slug}/disable", DisableAgentAdminHandler(svc))
+			r.Post("/agents/{slug}/run", RunAgentNowAdminHandler(a, svc))
+			r.Post("/agents/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
 		})
 
 		// Admin-only API routes.
@@ -444,6 +464,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/members/{id}/setup-token", RegenerateSetupTokenHandler(svc, sm))
 			r.Delete("/members/{id}", DeleteLoginAccountHandler(svc, sm))
 			r.Post("/users/{id}/wipe", WipeUserDataHandler(a, sm))
+
+			// Agent SDK settings + diagnostics — admin-only because tokens
+			// are sensitive (subscription token, Anthropic API key) and
+			// smoke-test / cleanup cost money or touch the filesystem.
+			r.Post("/agents/settings", UpdateAgentSDKSettingsAdminHandler(a, svc, sm))
+			r.Post("/agents/test", SmokeTestAgentAdminHandler(a, svc))
+			r.Post("/agents/cleanup", AgentCleanupAdminHandler(a, svc))
 		})
 	})
 

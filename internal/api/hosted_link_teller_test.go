@@ -213,7 +213,7 @@ func TestHostedLink_TellerConfig_NotConfigured(t *testing.T) {
 // /complete handler is unaffected by redirect_url — it still returns 204,
 // and the page is responsible for navigating client-side. We assert this
 // because future maintainers might be tempted to issue a 303 here; that
-// would break the SPA's "show 'closed' on no-redirect" branch.
+// would break the closed-no-redirect branch in the admin reauth page.
 func TestHostedLink_CompleteRedirectsWhenSet(t *testing.T) {
 	env := setupHostedLinkTellerEnv(t, configuredTellerCfg())
 	sess, token := env.mintSession(t, service.CreateHostedLinkParams{

@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check web web-install web-dev openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck
 
 PORT ?= 8080
 
@@ -109,12 +109,12 @@ dev-stop:
 		echo "Stopped dev instances on ports 8080-8099: $$pids"; \
 	fi
 
-build: generate web
+build: generate
 	go build -o breadbox ./cmd/breadbox
 
 # build-headless: server + REST + MCP + OAuth + webhooks, NO dashboard assets.
-# Strips internal/admin, internal/templates, and the v2 SPA from the binary
-# via -tags=headless. See .claude/rules/build-tags.md.
+# Strips internal/admin and internal/templates from the binary via
+# -tags=headless. See .claude/rules/build-tags.md.
 build-headless: generate
 	go build -tags=headless -o breadbox ./cmd/breadbox
 
@@ -123,29 +123,6 @@ build-headless: generate
 # drive a Breadbox over HTTP.
 build-lite:
 	go build -tags=lite -o breadbox-cli ./cmd/breadbox
-
-# web-install: install bun dependencies for the v2 SPA. Idempotent — bun
-# install short-circuits when the lockfile is unchanged.
-web-install:
-	@if ! command -v bun &>/dev/null; then \
-		echo "Error: bun is not installed. Install via 'curl -fsSL https://bun.sh/install | bash'."; \
-		exit 1; \
-	fi
-	cd web && bun install --frozen-lockfile
-
-# web: build the v2 SPA bundle. Runs before 'make build' so the Go binary
-# embeds a real bundle instead of the committed stub.
-web: web-install
-	cd web && bun run build
-
-# web-dev: start the Vite dev server with HMR. Proxies /api/* and /web/v1/*
-# to the Go backend on $(PORT). Run 'make dev' in another terminal first.
-# VITE_PORT defaults to PORT+1000 (e.g. backend 8081 → vite 9081) so parallel
-# worktree sessions get deterministic, non-colliding Vite ports. Override
-# with `make web-dev VITE_PORT=...`.
-VITE_PORT ?= $(shell echo $$(($(PORT) + 1000)))
-web-dev: web-install
-	cd web && BREADBOX_BACKEND_PORT=$(PORT) VITE_PORT=$(VITE_PORT) bun run dev
 
 # agent-sidecar: build the standalone breadbox-agent binary that the Go
 # server exec's per Claude Agent SDK run. Output is bin/breadbox-agent —

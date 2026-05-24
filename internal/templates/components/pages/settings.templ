@@ -48,7 +48,6 @@ templ SettingsSystem(p SettingsProps) {
 	</div>
 	<div class="grid gap-6 bb-stagger max-w-2xl">
 		@settingsSystemCard(p)
-		@settingsDefaultUICard(p)
 	</div>
 }
 
@@ -258,42 +257,6 @@ templ settingsSystemCard(p SettingsProps) {
 			<div><span class="text-base-content/40">Uptime</span> <span class="font-medium">{ p.Uptime }</span></div>
 			<div><span class="text-base-content/40">Providers</span> <span class="font-medium">{ fmt.Sprintf("%d configured", p.ProviderCount) }</span></div>
 		</div>
-	</div>
-}
-
-// settingsDefaultUICard renders the "Default landing UI" toggle on the
-// System tab. Transitional — the v1 admin is on track for retirement and
-// this lets a household flip `/` to the v2 SPA in the meantime.
-templ settingsDefaultUICard(p SettingsProps) {
-	<div class="bb-card p-5">
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="layout-dashboard" class="w-4 h-4 text-base-content/60"></i>
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">Default landing UI</h2>
-				<p class="text-xs text-base-content/45">Where signing in (or visiting <code>/</code>) lands you</p>
-			</div>
-		</div>
-		<form method="POST" action="/settings/v2-default" class="mt-1">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<label class="flex items-start gap-3 p-3 rounded-xl bg-base-200/40 cursor-pointer">
-				if p.V2Default {
-					<input type="checkbox" name="v2_default" class="toggle toggle-sm toggle-primary mt-0.5" checked/>
-				} else {
-					<input type="checkbox" name="v2_default" class="toggle toggle-sm toggle-primary mt-0.5"/>
-				}
-				<div class="flex-1 min-w-0">
-					<div class="text-sm font-medium">Use the v2 dashboard at <code>/</code></div>
-					<p class="text-xs text-base-content/50 mt-0.5">
-						When on, visiting the root redirects to <code>/v2/</code>. The v1 admin pages remain reachable at their existing paths during the transition.
-					</p>
-				</div>
-			</label>
-			<div class="mt-4">
-				<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Default UI</button>
-			</div>
-		</form>
 	</div>
 }
 

@@ -19,7 +19,7 @@ import (
 // through CompleteAgentRunDB. This test pins both:
 //   - max_turns_used == def.MaxTurns (the cap snapshot)
 //   - turn_count == result.TurnCount (the actual turns used)
-// so the SPA can render "actual / cap" correctly.
+// so the admin UI can render "actual / cap" correctly.
 func TestOrchestratorRunNow_MaxTurnsUsed_RecordsCapNotTurnCount(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)

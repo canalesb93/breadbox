@@ -37,12 +37,12 @@ func AddServeCmd(root *cobra.Command) {
 		Short: "Start the HTTP server (REST + MCP-over-HTTP + dashboard)",
 		Long: `Run the full breadbox server: REST API, MCP-over-HTTP, OAuth, hosted-link, ` +
 			`webhooks, and the admin dashboard. Use --no-dashboard (or BREADBOX_NO_DASHBOARD=true) ` +
-			`to disable the dashboard, v2 SPA, and /web/v1 routes while keeping the API up.`,
+			`to disable the dashboard while keeping the API up.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runServe(cmd.Context(), Flags(cmd).Version, noDashboard)
 		},
 	}
-	cmd.Flags().BoolVar(&noDashboard, "no-dashboard", os.Getenv("BREADBOX_NO_DASHBOARD") == "true", "disable the admin dashboard, v2 SPA, and /web/v1 routes (REST + MCP + OAuth stay up)")
+	cmd.Flags().BoolVar(&noDashboard, "no-dashboard", os.Getenv("BREADBOX_NO_DASHBOARD") == "true", "disable the admin dashboard (REST + MCP + OAuth stay up)")
 	root.AddCommand(cmd)
 }
 
@@ -135,7 +135,7 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	// Default transcripts to ./transcripts/agents (relative to the cwd
 	// `breadbox serve` was launched from). Iter-1 left this empty, which
 	// silently dropped transcripts — every run row had transcript_path=""
-	// and the v2 SPA's "open transcript" hit 404. Operators can override
+	// and the admin "open transcript" link hit 404. Operators can override
 	// via Settings → Agents → "breadbox-agent transcripts dir" if they
 	// want them elsewhere. Daily cleanup (iter-25) still prunes whatever
 	// path is in effect.

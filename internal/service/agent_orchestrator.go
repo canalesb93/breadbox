@@ -86,7 +86,7 @@ func (o *Orchestrator) NotifyDefinitionChanged() {
 
 // SmokeTest runs the diagnostic round-trip via the orchestrator's existing
 // runner. Bypasses the concurrency semaphore (diagnostic, not a real run)
-// and never touches agent_runs / api_keys. Used by the v2 SPA settings
+// and never touches agent_runs / api_keys. Used by the admin Settings
 // "Test connection" button and the `breadbox agent test` CLI alike.
 func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error) {
 	binaryPath := appconfig.String(ctx, o.svc.Queries, appconfig.KeyAgentRuntimePath, "")
@@ -105,7 +105,7 @@ func (o *Orchestrator) SmokeTest(ctx context.Context) (*agent.SmokeResult, error
 //     wouldn't match the typed value any longer.
 //
 // Cron + webhook paths always pass the zero value; only manual runs from
-// the v2 SPA / CLI / HTTP API construct non-empty overrides.
+// the admin UI / CLI / HTTP API construct non-empty overrides.
 type RunOverrides struct {
 	PromptPrefix   string
 	PromptOverride string
@@ -202,7 +202,7 @@ func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionRespon
 	return o.runLocked(ctx, def, trigger, RunOverrides{})
 }
 
-// RunNowAsyncWith is the non-blocking variant of RunNowWith for the v2 SPA's
+// RunNowAsyncWith is the non-blocking variant of RunNowWith for the admin
 // "Run now" button. It does enough work synchronously to fail fast for
 // operator-visible mistakes (auth missing, binary missing, concurrency locked),
 // then spawns a goroutine for the sidecar invocation + completion + revoke.
@@ -237,7 +237,7 @@ func (o *Orchestrator) RunNowAsyncWith(ctx context.Context, def *AgentDefinition
 	// Hand the slow work off. The goroutine owns: sidecar invocation,
 	// row completion, semaphore release, key revoke. A fresh context with
 	// a generous timeout decouples the run from the HTTP request lifecycle
-	// (the SPA closes the dialog and starts polling the transcript).
+	// (the admin UI closes the dialog and starts polling the transcript).
 	go func() {
 		runCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
