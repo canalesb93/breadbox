@@ -226,6 +226,29 @@
     <div class="bb-progress-bar__fill" id="bb-nav-progress-fill"></div>
   </div>
 
+  {{if .Standalone}}
+  {{- /* Standalone shell — no sidebar, no mobile drawer. Used by the /design
+        sandbox so reviewers can focus on the component under test. The page
+        body still gets all the global head + footer scripts (Alpine, Lucide,
+        cmdk, shortcuts) so x-data interactivity continues to work. */ -}}
+  <div class="bg-base-200 min-h-screen">
+    <!-- Slim top bar with brand + back-to-app link -->
+    <div class="bb-standalone-bar">
+      <a href="/design" class="bb-standalone-brand">
+        <i data-lucide="palette" class="w-4 h-4"></i>
+        <span>Breadbox <span class="text-base-content/40">·</span> Design system</span>
+      </a>
+      <a href="/" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/60">
+        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+        Back to app
+      </a>
+    </div>
+    <main class="p-4 sm:p-6 max-w-6xl mx-auto min-h-screen bb-page-enter">
+      {{template "flash" .}}
+      {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
+    </main>
+  </div>
+  {{else}}
   <div class="drawer lg:drawer-open">
     <input id="bb-drawer" type="checkbox" class="drawer-toggle" />
 
@@ -314,6 +337,7 @@
       </aside>
     </div>
   </div>
+  {{end}}
 
   <!-- Global Confirmation Modal -->
   <div x-data="bbConfirmModal()" x-cloak
