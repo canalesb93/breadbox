@@ -50,7 +50,7 @@ templ SessionDetail(p SessionDetailProps) {
 	} else {
 		<div class="card bg-base-100 shadow-sm">
 			<div class="card-body items-center text-center py-12">
-				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-3"></i>
+				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content opacity-20 mb-3"></i>
 				<h3 class="font-medium text-base-content/70">No tool calls recorded</h3>
 				<p class="text-sm text-base-content/50">This session has no recorded tool calls yet.</p>
 			</div>
@@ -90,7 +90,7 @@ templ sessionDetailToolCard(c SessionDetailToolCall) {
 					if c.HasDuration {
 						<span class="text-xs text-base-content/40 tabular-nums">{ strconv.FormatInt(int64(c.DurationMs), 10) }ms</span>
 					}
-					<i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/30 transition-transform" :class="expanded && 'rotate-180'"></i>
+					<i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content opacity-30 transition-transform" :class="expanded && 'rotate-180'"></i>
 				</span>
 			</div>
 			if c.Reason != "" {

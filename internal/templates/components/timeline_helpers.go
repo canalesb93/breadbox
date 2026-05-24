@@ -73,7 +73,7 @@ func timelineIconColor(tone string) string {
 	case "error":
 		return "text-error"
 	default:
-		return "text-base-content/40"
+		return "text-base-content opacity-40"
 	}
 }
 

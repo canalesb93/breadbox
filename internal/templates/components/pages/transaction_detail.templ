@@ -93,7 +93,7 @@ templ txdHero(p TransactionDetailProps) {
 				}
 			>
 				if p.Transaction.Pending {
-					<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning/70"></i>
+					<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning opacity-70"></i>
 				}
 				<span class={ templ.KV("bb-tx-amount--pending", p.Transaction.Pending) }>{ components.FormatAmount(p.Transaction.Amount) }</span>
 			</p>
@@ -109,7 +109,7 @@ templ txdAccountBanner(p TransactionDetailProps) {
 	<div class="bb-card p-0 mb-4 sm:mb-6 overflow-hidden">
 		<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-3.5">
 			<div class="w-9 h-9 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
-				<i data-lucide="building-2" class="w-5 h-5 text-base-content/40"></i>
+				<i data-lucide="building-2" class="w-5 h-5 text-base-content opacity-40"></i>
 			</div>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 flex-wrap">
@@ -240,7 +240,7 @@ templ txdMain(p TransactionDetailProps) {
 					<button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
 						<template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
 						<span x-text="displayLabel" class="text-sm font-medium flex-1 text-left"></span>
-						<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30"></i>
+						<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30"></i>
 					</button>
 				</div>
 				<div class="flex items-center gap-2 mt-3">
@@ -344,7 +344,7 @@ templ txdActivity(p TransactionDetailProps) {
 		} else {
 			<section aria-labelledby="activity-heading">
 				<header class="flex items-center gap-2 pb-4 mb-4 border-b border-base-300/60">
-					<i data-lucide="activity" class="w-4 h-4 text-base-content/50" aria-hidden="true"></i>
+					<i data-lucide="activity" class="w-4 h-4 text-base-content opacity-50" aria-hidden="true"></i>
 					<h2 id="activity-heading" class="text-base font-semibold text-base-content">Activity</h2>
 				</header>
 				@txdTimelineEmptyComposer(p)
@@ -404,7 +404,7 @@ templ txdTimelineRow(e service.ActivityEntry, now time.Time) {
 // markup so the migration is byte-equivalent.
 templ txdDeletedCommentTile() {
 	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-		<i data-lucide="trash-2" class="w-3 h-3 text-base-content/40"></i>
+		<i data-lucide="trash-2" class="w-3 h-3 text-base-content opacity-40"></i>
 	</span>
 }
 
@@ -513,7 +513,7 @@ templ txdSystemIcon(e service.ActivityEntry) {
 		</span>
 	} else if e.Type == "sync" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="landmark" class="w-3 h-3 text-base-content/60"></i>
+			<i data-lucide="landmark" class="w-3 h-3 text-base-content opacity-60"></i>
 		</span>
 	} else if e.Type == "review" {
 		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdReviewBg(e.ReviewStatus) } aria-hidden="true">
@@ -524,12 +524,12 @@ templ txdSystemIcon(e service.ActivityEntry) {
 			} else if e.ReviewStatus == "skipped" {
 				<i data-lucide="skip-forward" class="w-3 h-3 text-warning"></i>
 			} else {
-				<i data-lucide="scan-search" class="w-3 h-3 text-base-content/50"></i>
+				<i data-lucide="scan-search" class="w-3 h-3 text-base-content opacity-50"></i>
 			}
 		</span>
 	} else {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="circle" class="w-3 h-3 text-base-content/40"></i>
+			<i data-lucide="circle" class="w-3 h-3 text-base-content opacity-40"></i>
 		</span>
 	}
 }
@@ -552,11 +552,11 @@ templ txdCategoryIcon(e service.ActivityEntry) {
 		</span>
 	} else if e.CategoryIcon != nil && *e.CategoryIcon != "" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide={ *e.CategoryIcon } class="w-3 h-3 text-base-content/60"></i>
+			<i data-lucide={ *e.CategoryIcon } class="w-3 h-3 text-base-content opacity-60"></i>
 		</span>
 	} else {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="folder" class="w-3 h-3 text-base-content/50"></i>
+			<i data-lucide="folder" class="w-3 h-3 text-base-content opacity-50"></i>
 		</span>
 	}
 }
@@ -649,7 +649,7 @@ templ txdTimelineComposer(p TransactionDetailProps) {
 templ txdTimelineEmptyComposer(p TransactionDetailProps) {
 	<div class="px-4 sm:px-5 pb-5">
 		<div class="pt-2 pb-5 text-center">
-			<i data-lucide="clock" class="w-5 h-5 text-base-content/20 mx-auto" aria-hidden="true"></i>
+			<i data-lucide="clock" class="w-5 h-5 text-base-content opacity-20 mx-auto" aria-hidden="true"></i>
 			<p class="text-xs text-base-content/40 mt-1.5">No activity yet. Comments, tag changes, and rule hits appear here.</p>
 		</div>
 		<div class="pt-4 border-t border-base-200">
@@ -829,7 +829,7 @@ templ txdInlineCategoryChip(e service.ActivityEntry) {
 			if e.CategoryColor != nil && *e.CategoryColor != "" {
 				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0" style={ "color: " + *e.CategoryColor }></i>
 			} else {
-				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0 text-base-content/60"></i>
+				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0 text-base-content opacity-60"></i>
 			}
 		}
 		<strong class="font-semibold text-base-content break-words">{ e.CategoryName }</strong>

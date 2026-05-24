@@ -296,13 +296,13 @@ templ txFilters(p TransactionsProps) {
 			<div class="border-t border-base-200 pt-4 mb-4" x-data={ txSearchModeInit(p.FilterSearchMode) }>
 				<div class="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1">
 					<div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 hidden sm:flex">
-						<i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="search" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						Search
 					</div>
 					<div class="text-[0.65rem] text-base-content/40 hidden sm:block">Search in</div>
 					<div class="text-[0.65rem] text-base-content/40 hidden sm:block">Match type</div>
 					<div class="col-span-2 sm:hidden text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 mb-1">
-						<i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="search" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						Search
 					</div>
 					<input type="text" name="search" value={ p.FilterSearch } placeholder="Search transactions..." class="input input-sm input-bordered w-full col-span-2 sm:col-span-1"/>
@@ -325,7 +325,7 @@ templ txFilters(p TransactionsProps) {
 			<div class="border-t border-base-200 pt-4 mb-4" x-data="tagFilter">
 				<div class="flex items-center justify-between mb-2">
 					<div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2">
-						<i data-lucide="tags" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="tags" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						Tags
 					</div>
 					<label class="flex items-center gap-1.5 text-[0.65rem] text-base-content/50 cursor-pointer">

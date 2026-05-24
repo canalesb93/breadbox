@@ -82,7 +82,7 @@ templ categoryRow(c service.CategoryResponse) {
 			<div class="flex items-center gap-2 min-w-0 flex-1">
 				<i
 					data-lucide="chevron-right"
-					class="w-3.5 h-3.5 text-base-content/30 transition-transform duration-200 shrink-0"
+					class="w-3.5 h-3.5 text-base-content opacity-30 transition-transform duration-200 shrink-0"
 					:class={ fmt.Sprintf("isOpen('%s') ? 'rotate-90' : ''", c.ID) }
 				></i>
 				<span class={ "font-semibold text-sm truncate", templ.KV("text-base-content/40", c.IsSystem), templ.KV("text-base-content/40 italic", c.Hidden && !c.IsSystem) }>
@@ -179,7 +179,7 @@ templ categoryTileInner(c service.CategoryResponse, child bool) {
 		if child {
 			<span class="w-2 h-2 rounded-full bg-base-content/20"></span>
 		} else {
-			<i data-lucide="tag" class="w-5 h-5 text-primary/60"></i>
+			<i data-lucide="tag" class="w-5 h-5 text-primary opacity-60"></i>
 		}
 	}
 }

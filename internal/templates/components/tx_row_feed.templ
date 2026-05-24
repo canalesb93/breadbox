@@ -80,7 +80,7 @@ templ TxRowFeed(p TxRowFeedProps) {
 		}
 		<!-- Pending mark, kept inline so the row height stays stable. -->
 		if p.Pending {
-			<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning/70" title="Pending — not yet posted"></i>
+			<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70" title="Pending — not yet posted"></i>
 			<span class="sr-only">(pending)</span>
 		}
 		<!-- Amount: leading sign so income (negative in our convention)

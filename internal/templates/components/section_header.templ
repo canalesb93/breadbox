@@ -31,7 +31,7 @@ type SectionHeaderProps struct {
 templ SectionHeader(p SectionHeaderProps) {
 	<header class="flex items-center gap-2 mb-3">
 		if p.Icon != "" {
-			<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content/60 shrink-0"></i>
+			<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content opacity-60 shrink-0"></i>
 		}
 		<h2 class="text-sm font-semibold">{ p.Title }</h2>
 		if p.Count != nil {
