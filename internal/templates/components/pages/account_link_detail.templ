@@ -53,7 +53,7 @@ templ AccountLinkDetail(p AccountLinkDetailProps) {
 			</table>
 		</div>
 		<!-- Mobile card list -->
-		<div class="md:hidden space-y-3 mt-4 bb-stagger">
+		<div class="md:hidden space-y-3 mt-4">
 			for _, m := range p.Matches {
 				@accountLinkDetailMobileCard(m, p.CSRFToken)
 			}

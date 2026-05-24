@@ -128,7 +128,7 @@ templ Connections(p ConnectionsProps) {
 					</div>
 				}
 				<!-- Connection Cards -->
-				<div class="flex flex-col gap-4 bb-stagger" id="bb-connections-list">
+				<div class="flex flex-col gap-4" id="bb-connections-list">
 					for _, c := range p.Connections {
 						@connectionsCard(c)
 					}
@@ -154,7 +154,7 @@ templ Connections(p ConnectionsProps) {
 		<!-- ==================== ACCOUNT LINKS TAB ==================== -->
 		<div x-show="tab === 'links'" x-cloak>
 			if len(p.Links) > 0 {
-				<div class="space-y-3 bb-stagger">
+				<div class="space-y-3">
 					for _, l := range p.Links {
 						@connectionsLinkRow(l, p.CSRFToken)
 					}

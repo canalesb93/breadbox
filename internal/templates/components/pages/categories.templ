@@ -54,7 +54,7 @@ templ Categories(p CategoriesProps) {
 				{ fmt.Sprintf("%d top-level categories", len(p.Categories)) }
 			</div>
 			<div class="bb-card overflow-hidden">
-				<div class="divide-y divide-base-300/40 bb-stagger">
+				<div class="divide-y divide-base-300/40">
 					for _, parent := range p.Categories {
 						@categoryRow(parent)
 					}

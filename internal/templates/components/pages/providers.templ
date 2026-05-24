@@ -28,7 +28,7 @@ templ Providers(p ProvidersProps) {
 			<p class="text-sm text-base-content/50 mt-1">Configure bank data providers for syncing accounts and transactions</p>
 		</div>
 	</div>
-	<div class="grid gap-4 bb-stagger">
+	<div class="grid gap-4">
 		@providersPlaidCard(p, p.ProviderHealth["plaid"])
 		@providersTellerCard(p, p.ProviderHealth["teller"])
 		@providersCSVCard(p.ProviderHealth["csv"])
