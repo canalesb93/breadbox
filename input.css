@@ -56,6 +56,36 @@
 
 @view-transition { navigation: auto; }
 
+/* ─── View Transitions chrome polish ────────────────────────────────
+ * Default cross-document transition fades the WHOLE viewport, which
+ * makes the persistent sidebar/navbar look like they "flashed" too.
+ * Giving them a view-transition-name tells the browser "this is the
+ * same element on both pages" and confines the fade to <main>.
+ *
+ * Tighter duration + iOS-standard ease so the fade feels coincident
+ * with a server-rendered MPA's <100ms TTFB rather than a slow 250ms
+ * default that reads as artificial delay.
+ *
+ * NOTE: We deliberately do NOT name the active sidebar link as its
+ * own group. With a name, the browser interpolates the old and new
+ * bounding boxes, which makes the highlight visibly glide across the
+ * column from the previous link to the new one. Sounds delightful in
+ * theory; in practice it's distracting, especially when the two
+ * active links are far apart or the glide crosses category headers.
+ * Without a name, the active state cross-fades inside the sidebar
+ * group — old highlight fades out in place, new one fades in in
+ * place. Calmer.
+ * ──────────────────────────────────────────────────────────── */
+.bb-sidebar       { view-transition-name: app-sidebar; }
+.bb-mobile-navbar { view-transition-name: app-navbar; }
+.bb-progress-bar  { view-transition-name: app-progress; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
 /* Universal reduced-motion guard. Honors the OS-level "Reduce Motion"
  * toggle (iOS Accessibility, macOS Accessibility, Windows Animations,
  * Linux GNOME Animations) by collapsing every transition/animation to
