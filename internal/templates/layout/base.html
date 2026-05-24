@@ -226,7 +226,16 @@
     <div class="bb-progress-bar__fill" id="bb-nav-progress-fill"></div>
   </div>
 
-  {{if .Standalone}}
+  {{if .Embed}}
+  {{- /* Embed shell — bare HTML for an iframe target. No top bar, no
+        sidebar, no flash, no footer. Only the global <head> scripts
+        (Alpine, Lucide, styles.css) so the embedded demo's
+        interactivity continues to work. Used by /design/c/{slug}?embed=1
+        loaded inside the sandbox's viewport-toggle iframe. */ -}}
+  <main class="p-6">
+    {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
+  </main>
+  {{else if .Standalone}}
   {{- /* Standalone shell — no sidebar, no mobile drawer. Used by the /design
         sandbox so reviewers can focus on the component under test. The page
         body still gets all the global head + footer scripts (Alpine, Lucide,

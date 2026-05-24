@@ -29,7 +29,7 @@ templ DesignComponent(p DesignComponentProps) {
 					class="btn btn-sm join-item"
 					:class="vp === 'tablet' ? 'btn-active' : 'btn-ghost'"
 					@click="vp = 'tablet'"
-					title="Tablet — 768px viewport (736px content)"
+					title="Tablet — 768px"
 					aria-label="Tablet viewport"
 				>
 					<i data-lucide="tablet" class="w-4 h-4"></i>
@@ -39,18 +39,35 @@ templ DesignComponent(p DesignComponentProps) {
 					class="btn btn-sm join-item"
 					:class="vp === 'mobile' ? 'btn-active' : 'btn-ghost'"
 					@click="vp = 'mobile'"
-					title="Mobile — 384px viewport (352px content)"
+					title="Mobile — 390px (iPhone 14)"
 					aria-label="Mobile viewport"
 				>
 					<i data-lucide="smartphone" class="w-4 h-4"></i>
 				</button>
 			</div>
 		</div>
+		<!-- Iframe gives the embedded component its OWN viewport so
+		     Tailwind responsive prefixes (sm:, lg:) trigger based on
+		     the toggle's chosen width, not the outer browser width. -->
 		<div
-			class="bb-card p-6 mx-auto transition-[max-width] duration-200"
-			:class="{ 'max-w-full': vp === 'desktop', 'max-w-[736px]': vp === 'tablet', 'max-w-[352px]': vp === 'mobile' }"
+			class="bb-card p-0 mx-auto overflow-hidden transition-[max-width] duration-200"
+			:class="{ 'max-w-full': vp === 'desktop', 'max-w-[768px]': vp === 'tablet', 'max-w-[390px]': vp === 'mobile' }"
 		>
-			@p.Section.Render()
+			<iframe
+				src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
+				title={ p.Section.Title + " preview" }
+				class="w-full h-[80vh] border-0 bg-base-100"
+				loading="lazy"
+			></iframe>
 		</div>
 	</div>
+}
+
+// DesignComponentEmbed renders the bare embed page — just the
+// section's demo content, no chrome. Loaded inside an iframe by
+// DesignComponent above so the viewport toggle can resize without
+// the outer browser viewport leaking through to Tailwind responsive
+// utilities.
+templ DesignComponentEmbed(p DesignComponentProps) {
+	@p.Section.Render()
 }

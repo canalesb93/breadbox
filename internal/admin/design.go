@@ -29,9 +29,16 @@ func DesignGalleryHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 }
 
 // DesignComponentHandler serves GET /design/c/{slug} — a single
-// component family rendered in isolation. Same admin shell as the
-// gallery (one-click back), but the main column hosts just one
-// section so screenshots focus on the component under test.
+// component family rendered in isolation. Two render modes:
+//
+//   - Default: the standalone shell hosts an iframe pointing at the
+//     `?embed=1` variant of this same route, so the viewport toggle
+//     can resize the iframe and trigger real Tailwind responsive
+//     breakpoints (sm:, lg:, etc.) which key off viewport width.
+//   - `?embed=1`: a bare HTML shell with just the section's demo
+//     markup. Loaded inside the iframe above. No sidebar, no top bar,
+//     no breadcrumb — only the global head scripts (Alpine, Lucide,
+//     daisy CSS) so the demo's interactivity still works.
 func DesignComponentHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
@@ -41,6 +48,13 @@ func DesignComponentHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.H
 			return
 		}
 		data := BaseTemplateData(r, sm, "design", section.Title)
+		if r.URL.Query().Get("embed") == "1" {
+			data["Embed"] = true
+			tr.RenderWithTempl(w, r, data, pages.DesignComponentEmbed(pages.DesignComponentProps{
+				Section: section,
+			}))
+			return
+		}
 		data["Standalone"] = true
 		tr.RenderWithTempl(w, r, data, pages.DesignComponent(pages.DesignComponentProps{
 			Section: section,
