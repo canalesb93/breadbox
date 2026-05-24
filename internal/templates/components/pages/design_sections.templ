@@ -635,6 +635,17 @@ templ SectionEmptyStates() {
 				Compact: true,
 			})
 		}
+		@designExample("Live: components.EmptyState (compact, in card)", "Compact shape wrapped in a bb-card — matches the surrounding list/table card. Optional Clear-filters CTA renders as btn-ghost.") {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:     "receipt",
+				Title:    "No transactions found.",
+				CTAHref:  "#",
+				CTAIcon:  "x",
+				CTALabel: "Clear filters",
+				Compact:  true,
+				InCard:   true,
+			})
+		}
 	</div>
 }
 

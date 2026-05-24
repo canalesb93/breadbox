@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"breadbox/internal/templates/components"
 )
 
 // AgentRunsList renders the v1 admin run-history page. Two modes share the
@@ -242,13 +244,14 @@ templ agentRunsPagination(p AgentRunsListProps) {
 }
 
 templ agentRunsEmpty(p AgentRunsListProps) {
-	<div class="bb-card p-12 text-center">
-		<i data-lucide="search-x" class="w-8 h-8 text-base-content/30 mx-auto mb-3"></i>
-		<p class="text-sm text-base-content/60">No runs match the current filters.</p>
-		<a href={ templ.SafeURL(agentRunsFormAction(p)) } class="btn btn-sm btn-ghost rounded-xl mt-3">
-			Clear filters
-		</a>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:     "search-x",
+		Title:    "No runs match the current filters.",
+		CTAHref:  templ.SafeURL(agentRunsFormAction(p)),
+		CTALabel: "Clear filters",
+		Compact:  true,
+		InCard:   true,
+	})
 }
 
 // AgentRunDetail renders the per-run page: metadata card, operator note,

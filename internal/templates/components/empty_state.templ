@@ -5,20 +5,25 @@ package components
 // items-center` blocks across the admin templ tree (see
 // docs/design-system-audit/components-inventory.md §4).
 //
-// Two shapes:
+// Three shapes:
 //
-//   - Default (Compact=false): full-card hero with a 56×56 tinted icon
-//     tile, title, body copy, and a primary CTA. Used as the page-level
-//     "you have nothing yet" state.
-//   - Compact (Compact=true): inline-block with a small bare icon and
-//     one line of text. Used inside lists/tables for "filters returned
-//     no rows" — no card chrome, no body, no CTA tile.
+//   - Default (Compact=false, InCard ignored): full-card hero with a
+//     56×56 tinted icon tile, title, body copy, and a primary CTA. The
+//     page-level "you have nothing yet" state.
+//   - Compact (Compact=true, InCard=false): inline block — no card
+//     chrome, small bare icon, one line of text, optional ghost CTA.
+//     Use for inline contexts where a card would feel heavy.
+//   - Card-compact (Compact=true, InCard=true): the compact shape
+//     wrapped in a `bb-card` shell. Use when the list/table itself
+//     renders as a card and the empty state should match that container
+//     (transactions list, account detail txn list, agent runs list).
 //
 // CTA precedence: if CustomCTA is set, it renders instead of the
 // simple href/label pair (use when you need multiple buttons, Alpine
 // data attributes, POST forms, etc.). Otherwise a primary
 // `btn-sm rounded-xl` is rendered iff CTAHref and CTALabel are both
-// non-empty. Compact mode never renders a CTA — keep it one line.
+// non-empty. Compact CTAs render as `btn-ghost btn-sm` so they don't
+// dominate the smaller card.
 //
 // Usage:
 //
@@ -39,17 +44,19 @@ type EmptyStateProps struct {
 	CTAIcon   string
 	CTALabel  string
 	CustomCTA templ.Component // overrides the simple href/label CTA
-	Compact   bool            // inline "no results" variant; no card, no CTA
+	Compact   bool            // small inline variant — no 56×56 icon tile
+	InCard    bool            // wrap the Compact variant in a bb-card (ignored when Compact=false)
 }
 
 templ EmptyState(p EmptyStateProps) {
 	if p.Compact {
-		<div class="flex flex-col items-center text-center py-10">
-			if p.Icon != "" {
-				<i data-lucide={ p.Icon } class="w-8 h-8 text-base-content/30 mb-3"></i>
-			}
-			<p class="text-sm text-base-content/50">{ p.Title }</p>
-		</div>
+		if p.InCard {
+			<div class="bb-card">
+				@emptyStateCompactBody(p)
+			</div>
+		} else {
+			@emptyStateCompactBody(p)
+		}
 	} else {
 		<div class="bb-card p-12 text-center">
 			<div class="flex flex-col items-center">
@@ -75,4 +82,25 @@ templ EmptyState(p EmptyStateProps) {
 			</div>
 		</div>
 	}
+}
+
+templ emptyStateCompactBody(p EmptyStateProps) {
+	<div class="flex flex-col items-center text-center py-12 px-6">
+		if p.Icon != "" {
+			<i data-lucide={ p.Icon } class="w-12 h-12 text-base-content/20 mb-2"></i>
+		}
+		<p class="text-sm text-base-content/60">{ p.Title }</p>
+		if p.CustomCTA != nil {
+			<div class="mt-2">
+				@p.CustomCTA
+			</div>
+		} else if p.CTAHref != "" && p.CTALabel != "" {
+			<a href={ p.CTAHref } class="btn btn-ghost btn-sm rounded-xl mt-2">
+				if p.CTAIcon != "" {
+					<i data-lucide={ p.CTAIcon } class="w-3.5 h-3.5"></i>
+				}
+				{ p.CTALabel }
+			</a>
+		}
+	</div>
 }
