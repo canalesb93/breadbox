@@ -73,7 +73,7 @@ func TestFeedTxRefRowPendingPill(t *testing.T) {
 			},
 			mustContain: []string{
 				`data-lucide="clock"`,
-				"text-warning/70",
+				"text-warning opacity-70",
 				"Pending — not yet posted",
 				"(pending)",
 				"Whole Foods",

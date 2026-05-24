@@ -72,7 +72,7 @@ templ ruleDetailHeader(p RuleDetailProps) {
 			<div class="flex items-center gap-4">
 				<div class={ "w-12", "h-12", "rounded-xl", "flex", "items-center", "justify-center", ruleHeaderTileClass(p.Rule.Enabled, isSystem) }>
 					if !p.Rule.Enabled {
-						<i data-lucide="pause" class="w-6 h-6 text-base-content/30"></i>
+						<i data-lucide="pause" class="w-6 h-6 text-base-content opacity-30"></i>
 					} else if isSystem {
 						<i data-lucide="shield" class="w-6 h-6 text-info"></i>
 					} else {
@@ -189,7 +189,7 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 					if p.Rule != nil && p.Rule.CategoryIcon != nil {
 						<i data-lucide={ *p.Rule.CategoryIcon } class="w-4 h-4" style={ ruleCategoryIconColorStyle(p.Rule) }></i>
 					} else {
-						<i data-lucide="tag" class="w-4 h-4 text-base-content/50"></i>
+						<i data-lucide="tag" class="w-4 h-4 text-base-content opacity-50"></i>
 					}
 				</div>
 				<div class="flex-1 min-w-0">
@@ -231,7 +231,7 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 				</div>
 			default:
 				<div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
-					<i data-lucide="settings" class="w-4 h-4 text-base-content/40"></i>
+					<i data-lucide="settings" class="w-4 h-4 text-base-content opacity-40"></i>
 				</div>
 				<div class="flex-1 min-w-0">
 					<p class="text-sm">Unknown action type: <span class="font-semibold">{ a.Type }</span></p>
@@ -505,7 +505,7 @@ templ ruleDetailSyncActivity(p RuleDetailProps) {
 				<span class="label-text text-sm font-medium">Sync Log</span>
 				<span class="text-xs text-base-content/40 ml-2">{ fmt.Sprintf("%d recent syncs", len(p.SyncHistory)) }</span>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-40 transition-transform" :class="open ? 'rotate-180' : ''"></i>
 		</button>
 		<div x-show="open" x-cloak class="px-5 pb-5 space-y-2">
 			for _, h := range p.SyncHistory {

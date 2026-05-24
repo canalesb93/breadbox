@@ -108,7 +108,7 @@ templ backupsScheduleSection(p BackupsProps) {
 	<!-- Schedule Configuration -->
 	<div id="schedule" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#schedule' }">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<i data-lucide="clock" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<i data-lucide="clock" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Schedule</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -120,7 +120,7 @@ templ backupsScheduleSection(p BackupsProps) {
 				</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Configure automatic backup frequency and retention</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
@@ -184,7 +184,7 @@ templ backupsListSection(p BackupsProps) {
 	<!-- Backup List -->
 	<div class="bb-card p-0 overflow-hidden">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 border-b border-base-300">
-			<i data-lucide="archive" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<i data-lucide="archive" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 			<h2 class="font-semibold">Backup Files</h2>
 			<span class="text-xs text-base-content/40 ml-auto tabular-nums">{ fmt.Sprintf("%d files", p.BackupCount) }</span>
 		</div>
@@ -225,7 +225,7 @@ templ backupsRow(b BackupRow, csrf string) {
 	<tr>
 		<td>
 			<div class="flex items-center gap-2">
-				<i data-lucide="file-archive" class="w-4 h-4 text-base-content/30 flex-shrink-0"></i>
+				<i data-lucide="file-archive" class="w-4 h-4 text-base-content opacity-30 flex-shrink-0"></i>
 				<span class="font-mono text-xs">{ b.Filename }</span>
 			</div>
 		</td>
@@ -295,13 +295,13 @@ templ backupsRestoreSection(p BackupsProps) {
 	<!-- Restore from Upload -->
 	<div id="restore" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#restore' }">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<i data-lucide="upload" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<i data-lucide="upload" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Restore from File</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Upload a .sql.gz backup file to restore</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Upload a previously downloaded backup to restore</p>
 			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">

@@ -84,7 +84,7 @@ templ feedHero(p FeedProps) {
 templ feedHeroTile(icon, label, value, sub string) {
 	<div class="bb-card p-4">
 		<div class="flex items-center gap-2">
-			<i data-lucide={ icon } class="w-3.5 h-3.5 text-base-content/40"></i>
+			<i data-lucide={ icon } class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">{ label }</div>
 		</div>
 		<div class="text-2xl font-bold tabular-nums tracking-tight mt-1.5">{ value }</div>
@@ -97,7 +97,7 @@ templ feedHeroTile(icon, label, value, sub string) {
 templ feedHeroSyncTile(p FeedProps) {
 	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline group block" aria-label="Last sync — view sync logs">
 		<div class="flex items-center gap-2">
-			<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/40"></i>
+			<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Last sync</div>
 			<span class={ "ml-auto inline-block w-1.5 h-1.5 rounded-full", feedSyncDotClass(p.Hero.LastSyncStatus) } aria-hidden="true"></span>
 		</div>
@@ -256,7 +256,7 @@ templ feedEmptyState(p FeedProps) {
 // button rather than a quiet link.
 templ feedEmptyFirstRun() {
 	<div class="bb-card p-10 sm:p-12 text-center">
-		<i data-lucide="landmark" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+		<i data-lucide="landmark" class="w-10 h-10 mx-auto mb-3 text-base-content opacity-20"></i>
 		<h2 class="text-lg font-semibold mb-1">Welcome to Breadbox</h2>
 		<p class="text-sm text-base-content/55 max-w-md mx-auto mb-5">
 			Connect your first bank to start filling your feed.
@@ -274,7 +274,7 @@ templ feedEmptyFirstRun() {
 // has a clear way out without scrolling back up.
 templ feedEmptyFiltered(filter string) {
 	<div class="bb-card p-10 sm:p-12 text-center">
-		<i data-lucide="filter" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+		<i data-lucide="filter" class="w-10 h-10 mx-auto mb-3 text-base-content opacity-20"></i>
 		<h2 class="text-lg font-semibold mb-1">{ feedEmptyFilteredHeadline(filter) }</h2>
 		<p class="text-sm text-base-content/55 mb-5">
 			Nothing in this slice today.
@@ -294,7 +294,7 @@ templ feedEmptyNoRecent(p FeedProps) {
 	if p.IsAdmin {
 		<script src="/static/js/admin/components/feed.js"></script>
 		<div class="bb-card p-10 sm:p-12 text-center" x-data="feedSyncNow">
-			<i data-lucide="moon" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+			<i data-lucide="moon" class="w-10 h-10 mx-auto mb-3 text-base-content opacity-20"></i>
 			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
 			<p class="text-sm text-base-content/55 mb-5">
 				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
@@ -317,7 +317,7 @@ templ feedEmptyNoRecent(p FeedProps) {
 		</div>
 	} else {
 		<div class="bb-card p-10 sm:p-12 text-center">
-			<i data-lucide="moon" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+			<i data-lucide="moon" class="w-10 h-10 mx-auto mb-3 text-base-content opacity-20"></i>
 			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
 			<p class="text-sm text-base-content/55 mb-5">
 				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
@@ -494,7 +494,7 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 	}
 	if len(s.RuleOutcomes) > 0 {
 		<div class="mt-1 flex items-center gap-1.5 flex-wrap text-base-content/55">
-			<i data-lucide="zap" class="w-3 h-3 text-primary/70"></i>
+			<i data-lucide="zap" class="w-3 h-3 text-primary opacity-70"></i>
 			for i, ro := range s.RuleOutcomes {
 				if i > 0 {
 					<span class="text-base-content/25">·</span>
@@ -595,7 +595,7 @@ templ feedAgentSessionBody(it FeedItem, s *FeedAgentSession, now time.Time) {
 		</div>
 		if breakdown := feedSessionBreakdown(s); breakdown != "" {
 			<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-				<i data-lucide="sparkles" class="w-3 h-3 text-primary/70"></i>
+				<i data-lucide="sparkles" class="w-3 h-3 text-primary opacity-70"></i>
 				<span>{ breakdown }</span>
 				if dur := feedSessionDuration(s); dur != "" {
 					<span class="text-base-content/30 mx-1">·</span>
@@ -673,7 +673,7 @@ templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
 		if b.Kind == "mixed" {
 			if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
 				<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-					<i data-lucide="sparkles" class="w-3 h-3 text-primary/70"></i>
+					<i data-lucide="sparkles" class="w-3 h-3 text-primary opacity-70"></i>
 					<span>{ breakdown }</span>
 				</div>
 			}

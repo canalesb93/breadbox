@@ -154,7 +154,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<!-- Webhook instructions -->
 						<div class="border-t border-base-300 pt-4">
 							<div class="flex items-center gap-1.5 mb-2">
-								<i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
+								<i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 								<h3 class="text-sm font-medium">Webhook Setup</h3>
 							</div>
 							<p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
@@ -311,7 +311,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<!-- Webhook instructions -->
 						<div class="border-t border-base-300 pt-4">
 							<div class="flex items-center gap-1.5 mb-2">
-								<i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
+								<i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 								<h3 class="text-sm font-medium">Webhook Setup</h3>
 							</div>
 							<p class="text-xs text-base-content/50 mb-2">Teller sends webhooks for account disconnections and other events. To enable:</p>
@@ -357,18 +357,18 @@ templ providersCSVCard(h *service.ProviderHealthSummary) {
 			if h != nil {
 				<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="file-up" class="w-3.5 h-3.5 text-base-content/30"></i>
+						<i data-lucide="file-up" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
 						<span class="text-base-content/50">Imports:</span>
 						<span class="font-medium">{ fmt.Sprintf("%d", h.ConnectionCount) }</span>
 					</div>
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/30"></i>
+						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
 						<span class="text-base-content/50">Accounts:</span>
 						<span class="font-medium">{ fmt.Sprintf("%d", h.AccountCount) }</span>
 					</div>
 					if h.LastSyncTime != nil {
 						<div class="flex items-center gap-1.5">
-							<i data-lucide="clock" class="w-3.5 h-3.5 text-base-content/30"></i>
+							<i data-lucide="clock" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
 							<span class="text-base-content/50">Last import:</span>
 							<span class="font-medium">{ *h.LastSyncTime }</span>
 						</div>
@@ -412,18 +412,18 @@ templ providersStats(h *service.ProviderHealthSummary) {
 	if h != nil {
 		<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm min-w-0">
 			<div class="flex items-center gap-1.5">
-				<i data-lucide="link" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
+				<i data-lucide="link" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
 				<span class="text-base-content/50">Connections:</span>
 				<span class="font-medium">{ fmt.Sprintf("%d", h.ConnectionCount) }</span>
 			</div>
 			<div class="flex items-center gap-1.5">
-				<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
+				<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
 				<span class="text-base-content/50">Accounts:</span>
 				<span class="font-medium">{ fmt.Sprintf("%d", h.AccountCount) }</span>
 			</div>
 			if h.LastSyncTime != nil {
 				<div class="flex items-center gap-1.5 min-w-0">
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
+					<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
 					<span class="text-base-content/50 flex-shrink-0">Last sync:</span>
 					switch h.LastSyncStatus {
 						case "success":
@@ -438,7 +438,7 @@ templ providersStats(h *service.ProviderHealthSummary) {
 				</div>
 			} else if h.ConnectionCount > 0 {
 				<div class="flex items-center gap-1.5">
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
+					<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
 					<span class="text-base-content/40">Never synced</span>
 				</div>
 			}

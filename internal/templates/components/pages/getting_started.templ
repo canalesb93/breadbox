@@ -34,22 +34,22 @@ templ GettingStarted(p GettingStartedProps) {
 			if p.TransactionCount > 0 {
 				<div class="flex flex-wrap gap-4 text-sm tabular-nums">
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="link" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="link" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						<span class="text-base-content/50">Connections</span>
 						<span class="font-semibold">{ components.CommaInt(p.ConnectionCount) }</span>
 					</div>
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						<span class="text-base-content/50">Accounts</span>
 						<span class="font-semibold">{ components.CommaInt(p.AccountCount) }</span>
 					</div>
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="receipt" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="receipt" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						<span class="text-base-content/50">Transactions</span>
 						<span class="font-semibold">{ components.CommaInt(p.TransactionCount) }</span>
 					</div>
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/40"></i>
+						<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						<span class="text-base-content/50">Syncs</span>
 						<span class="font-semibold">{ components.CommaInt(p.SuccessfulSyncs) }</span>
 					</div>

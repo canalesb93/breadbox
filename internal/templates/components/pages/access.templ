@@ -132,7 +132,7 @@ templ accessActiveClientRow(c AccessClientRow, isAdmin bool, csrfToken string) {
 templ accessRevokedClientRow(c AccessClientRow) {
 	<div class="flex items-center gap-3 px-3 sm:px-4 py-3">
 		<div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40 shrink-0">
-			<i data-lucide="fingerprint" class="w-3.5 h-3.5 text-base-content/25"></i>
+			<i data-lucide="fingerprint" class="w-3.5 h-3.5 text-base-content opacity-25"></i>
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
@@ -261,7 +261,7 @@ templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
 templ accessRevokedKeyRow(k AccessKeyRow) {
 	<div class="flex items-center gap-3 px-3 sm:px-4 py-3">
 		<div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40 shrink-0">
-			<i data-lucide="key" class="w-3.5 h-3.5 text-base-content/25"></i>
+			<i data-lucide="key" class="w-3.5 h-3.5 text-base-content opacity-25"></i>
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
