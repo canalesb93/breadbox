@@ -39,7 +39,7 @@ templ DesignComponent(p DesignComponentProps) {
 					class="btn btn-sm join-item"
 					:class="vp === 'mobile' ? 'btn-active' : 'btn-ghost'"
 					@click="vp = 'mobile'"
-					title="Mobile — 390px"
+					title="Mobile — 384px"
 					aria-label="Mobile viewport"
 				>
 					<i data-lucide="smartphone" class="w-4 h-4"></i>
@@ -48,7 +48,7 @@ templ DesignComponent(p DesignComponentProps) {
 		</div>
 		<div
 			class="bb-card p-6 mx-auto transition-[max-width] duration-200"
-			:class="{ 'max-w-full': vp === 'desktop', 'max-w-3xl': vp === 'tablet', 'max-w-[390px]': vp === 'mobile' }"
+			:class="{ 'max-w-full': vp === 'desktop', 'max-w-3xl': vp === 'tablet', 'max-w-sm': vp === 'mobile' }"
 		>
 			@p.Section.Render()
 		</div>
