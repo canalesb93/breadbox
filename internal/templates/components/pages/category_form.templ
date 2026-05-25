@@ -23,7 +23,7 @@ templ CategoryForm(p CategoryFormProps) {
 	@components.CategoryPickerScript()
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	@components.CategoryPickerStyles()
-	<div class="bb-page-header">
+	<div class="bb-page-header max-w-lg mx-auto">
 		<div>
 			<h1 class="bb-page-title">
 				if p.IsEdit {
@@ -41,7 +41,7 @@ templ CategoryForm(p CategoryFormProps) {
 			</p>
 		</div>
 	</div>
-	<div class="max-w-lg" x-data="categoryForm()">
+	<div class="max-w-lg mx-auto" x-data="categoryForm()">
 		<form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
 			<div class="p-5 sm:p-6">
 				<!-- Live preview icon header -->

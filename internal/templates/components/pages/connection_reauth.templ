@@ -42,13 +42,13 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 	}
 	<script src="/static/js/admin/components/connection_reauth.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header">
+	<div class="bb-page-header max-w-lg mx-auto">
 		<div>
 			<h1 class="bb-page-title">Re-authenticate</h1>
 			<p class="text-sm text-base-content/50 mt-1">{ p.InstitutionName } needs to be re-connected</p>
 		</div>
 	</div>
-	<div class="bb-card p-8 max-w-lg">
+	<div class="bb-card p-8 max-w-lg mx-auto">
 		<div
 			x-data="connectionReauth"
 			data-conn-id={ p.ConnID }

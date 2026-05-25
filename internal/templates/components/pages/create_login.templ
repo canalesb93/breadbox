@@ -24,13 +24,13 @@ templ CreateLogin(p CreateLoginProps) {
 }
 
 templ createLoginManage(p CreateLoginProps) {
-	<div class="bb-page-header">
+	<div class="bb-page-header max-w-lg mx-auto">
 		<div>
 			<h1 class="bb-page-title">Manage Login</h1>
 			<p class="text-sm text-base-content/50 mt-1">Login account for { p.UserName }</p>
 		</div>
 	</div>
-	<div class="max-w-lg">
+	<div class="max-w-lg mx-auto">
 		<div
 			class="bb-card p-0 overflow-hidden"
 			x-data={ manageLoginRoleAlpine(p) }
@@ -166,13 +166,13 @@ templ createLoginManage(p CreateLoginProps) {
 }
 
 templ createLoginNew(p CreateLoginProps) {
-	<div class="bb-page-header">
+	<div class="bb-page-header max-w-lg mx-auto">
 		<div>
 			<h1 class="bb-page-title">Create Login</h1>
 			<p class="text-sm text-base-content/50 mt-1">Create a sign-in account for { p.UserName }</p>
 		</div>
 	</div>
-	<div class="max-w-lg" x-data={ newLoginAlpine(p) }>
+	<div class="max-w-lg mx-auto" x-data={ newLoginAlpine(p) }>
 		<template x-if="!done">
 			<form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
 				<!-- Header + fields -->

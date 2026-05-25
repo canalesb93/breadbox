@@ -11,13 +11,13 @@ import "breadbox/internal/templates/components"
 // admin/oauth.go.
 templ OAuthClientNew(p OAuthClientNewProps) {
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header">
+	<div class="bb-page-header max-w-lg mx-auto">
 		<div>
 			<h1 class="bb-page-title">Create OAuth Client</h1>
 			<p class="text-sm text-base-content/50 mt-1">Generate credentials for an external connector (e.g., Claude)</p>
 		</div>
 	</div>
-	<div class="bb-card p-6 max-w-lg">
+	<div class="bb-card p-6 max-w-lg mx-auto">
 		<form method="POST" action="/oauth-clients/new">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			<fieldset class="fieldset mb-5">
