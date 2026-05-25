@@ -163,7 +163,16 @@ func RunAgentNowAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc 
 			return
 		}
 
-		run, err := orchestrator.RunNowWith(r.Context(), def, service.RunOverrides{
+		// Async dispatch: returns the in_progress row immediately, hands the
+		// sidecar invocation + completion + revoke to a goroutine that owns a
+		// fresh 30-minute context. Critical because spending-report / bulk-review
+		// runs routinely exceed the exe.dev proxy's ~8s HTTP timeout; the sync
+		// variant left rows stuck in_progress when the request context cancelled
+		// mid-run (sidecar's orphaned Node child still completed via MCP, but
+		// the persist step failed with context canceled). The list-page UI
+		// already calls window.location.reload() 800ms after the response, so
+		// it doesn't need the completed row — only that the run started.
+		run, err := orchestrator.RunNowAsyncWith(r.Context(), def, service.RunOverrides{
 			PromptPrefix:   promptPrefix,
 			PromptOverride: promptOverride,
 		})
@@ -172,10 +181,18 @@ func RunAgentNowAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc 
 				writeError(w, http.StatusServiceUnavailable, "CONCURRENCY_LOCKED", "Another run is in progress")
 				return
 			}
+			if errors.Is(err, agent.ErrAuthNotConfigured) {
+				writeError(w, http.StatusUnprocessableEntity, "AUTH_NOT_CONFIGURED", err.Error())
+				return
+			}
+			if errors.Is(err, agent.ErrBinaryNotFound) {
+				writeError(w, http.StatusUnprocessableEntity, "BINARY_NOT_FOUND", err.Error())
+				return
+			}
 			writeError(w, http.StatusUnprocessableEntity, "RUN_FAILED", err.Error())
 			return
 		}
-		writeJSON(w, http.StatusOK, run)
+		writeJSON(w, http.StatusAccepted, run)
 	}
 }
 
