@@ -218,6 +218,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionTags() },
 		},
 		{
+			Slug:        "tag-picker-button",
+			Title:       "Tag picker button",
+			Description: "Triggers that open the global tag picker — the inline bb-tag-add chip (transaction detail) and the bulk-toolbar btn-ghost variant (transactions list). Both fire the same open-tag-picker window event.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionTagPickerButton() },
+		},
+		{
 			Slug:        "amounts",
 			Title:       "Amounts",
 			Description: "components.Amount — the canonical renderer for monetary values. Three intents (transaction / balance / cost), three formats (standard / abbreviated / compact), pending modifier. Adopt for every new amount display so coloring and sign don't drift across pages.",
@@ -271,6 +278,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionMultiSelectToolbar() },
 		},
 		{
+			Slug:        "tag-picker",
+			Title:       "Tag picker",
+			Description: "Global picker overlay (singleton in base.html, driven by globalTagPicker()) — multi-tx diff editor: each chip cycles through absent/pending-add/pending-remove/present/mixed states, nothing fires until Apply. Opens via the open-tag-picker window event (see tag-picker-button section for triggers).",
+			Group:       "patterns",
+			Render:      func() templ.Component { return SectionTagPicker() },
+		},
+		{
 			Slug:        "timeline",
 			Title:       "Activity timeline",
 			Description: "GitHub-style row-on-rail primitives shared by /feed and /transactions/{id} — Timeline wrapper (card + prominent variants), day separators, system rows (built-in tones + custom tile), comment rows, inline actor references, and the empty-state.",
@@ -300,6 +314,23 @@ func designTimelineAgo(d time.Duration) string {
 func toastDispatchExample() string {
 	return "window.dispatchEvent(new CustomEvent('bb-toast', {\n" +
 		"  detail: { message: 'Saved', type: 'success' }\n" +
+		"}));"
+}
+
+// tagPickerDispatchExample returns the canonical dispatch snippet for
+// opening the global tag picker. Mirrors the live call sites
+// (transaction_detail.js, transactions.js bulk bar + 't' shortcut). The
+// literal `{` / `}` characters live here as a Go string for the same
+// templ-lexer reason as toastDispatchExample.
+func tagPickerDispatchExample() string {
+	return "window.dispatchEvent(new CustomEvent('open-tag-picker', {\n" +
+		"  detail: {\n" +
+		"    sourceId:       'txd-tag',          // echoed back in tag-selection-commit\n" +
+		"    transactionIds: [txId],             // 1 for inline chip, N for bulk\n" +
+		"    txCount:        1,\n" +
+		"    appliedCounts:  { recurring: 1 },   // {slug: count present across selection}\n" +
+		"    availableTags:  window.__bbAllTags, // registered tags for the chip grid\n" +
+		"  },\n" +
 		"}));"
 }
 
