@@ -10,8 +10,8 @@ package components
 //   - Action:   optional templ.Component for the page's PRIMARY action
 //               (typically a btn-primary). Right-aligned.
 //   - SecondaryAction: optional templ.Component for one secondary action
-//               (ghost-styled by convention — e.g. "Sync All"). Rendered
-//               just before Action.
+//               (secondary-styled by convention — e.g. "Sync All").
+//               Rendered just before Action.
 //   - SubtitleHideOnMobile: when true, applies `hidden sm:block` so the
 //               subtitle disappears on small screens (used on dense
 //               list pages where the subtitle is decorative).
@@ -41,7 +41,7 @@ type PageHeaderProps struct {
 	Icon                 string // optional Lucide icon name
 	SubtitleHideOnMobile bool
 	// SecondaryAction is rendered before Action in the trailing slot.
-	// Convention: ghost-styled button (use PageHeaderSecondaryAction).
+	// Convention: secondary-styled button (use PageHeaderSecondaryAction).
 	SecondaryAction templ.Component
 	// Action is the trailing primary action. Typically constructed with
 	// PageHeaderAction(...) for the common case of a single primary
@@ -93,11 +93,11 @@ templ PageHeaderAction(href templ.SafeURL, icon string, label string) {
 }
 
 // PageHeaderSecondaryAction renders the convention shape for a single
-// secondary action: ghost-styled `<a>` with a leading Lucide icon.
+// secondary action: secondary-styled `<a>` with a leading Lucide icon.
 // For interactive secondary actions (Alpine click handlers, async
 // state) pass a custom templ.Component to PageHeaderProps.SecondaryAction.
 templ PageHeaderSecondaryAction(href templ.SafeURL, icon string, label string) {
-	<a href={ href } class="btn btn-ghost btn-sm gap-2">
+	<a href={ href } class="btn btn-secondary btn-sm gap-2">
 		if icon != "" {
 			<i data-lucide={ icon } class="w-4 h-4"></i>
 		}
