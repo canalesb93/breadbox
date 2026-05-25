@@ -117,6 +117,38 @@ templ SectionButtons() {
 				</button>
 			</div>
 		}
+		@designExample("Join — segmented control", "Use join + join-item btn for mutually-exclusive toggles. Mark the active one with btn-active.") {
+			<div class="join">
+				<button class="btn btn-sm join-item btn-active">All</button>
+				<button class="btn btn-sm join-item">Income</button>
+				<button class="btn btn-sm join-item">Expenses</button>
+				<button class="btn btn-sm join-item">Transfers</button>
+			</div>
+		}
+		@designExample("Join — pagination", "Daisy join replaces the retired .bb-paginator__btn* family. Disable end caps when there's no prev/next.") {
+			<div class="join">
+				<button class="btn btn-sm join-item btn-square" aria-label="Previous" disabled>
+					<i data-lucide="chevron-left" class="w-4 h-4"></i>
+				</button>
+				<button class="btn btn-sm join-item btn-active">1</button>
+				<button class="btn btn-sm join-item">2</button>
+				<button class="btn btn-sm join-item">3</button>
+				<button class="btn btn-sm join-item">…</button>
+				<button class="btn btn-sm join-item">9</button>
+				<button class="btn btn-sm join-item btn-square" aria-label="Next">
+					<i data-lucide="chevron-right" class="w-4 h-4"></i>
+				</button>
+			</div>
+		}
+		@designExample("Join — input + button", "Adjacent input + action share the same rounded shell — no double border, no fiddly rounding.") {
+			<div class="join">
+				<input type="text" placeholder="Search merchants…" class="input input-sm join-item"/>
+				<button class="btn btn-primary btn-sm join-item gap-1.5">
+					<i data-lucide="search" class="w-3.5 h-3.5"></i>
+					Search
+				</button>
+			</div>
+		}
 	</div>
 }
 
