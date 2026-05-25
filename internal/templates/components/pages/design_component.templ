@@ -20,6 +20,7 @@ templ DesignComponent(p DesignComponentProps) {
 			vp: 'desktop',
 			freeWidth: 1320,
 			dragging: false,
+			iframeHeight: 0,
 			onDragStart(e) {
 				e.preventDefault();
 				const self = this;
@@ -30,6 +31,25 @@ templ DesignComponent(p DesignComponentProps) {
 				const onUp = function() { self.dragging = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
 				window.addEventListener('mousemove', onMove);
 				window.addEventListener('mouseup', onUp);
+			},
+			syncIframeHeight(iframe) {
+				const self = this;
+				try {
+					const doc = iframe.contentDocument;
+					if (!doc || !doc.body) return;
+					const measure = function() {
+						const h = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
+						if (h > 0) self.iframeHeight = h;
+					};
+					measure();
+					if (typeof ResizeObserver !== 'undefined') {
+						const ro = new ResizeObserver(measure);
+						ro.observe(doc.documentElement);
+						ro.observe(doc.body);
+					}
+					const mo = new MutationObserver(measure);
+					mo.observe(doc.body, { childList: true, subtree: true, attributes: true, characterData: true });
+				} catch (err) { /* cross-origin or detached; keep last height */ }
 			}
 		}"
 		x-effect="
@@ -118,9 +138,11 @@ templ DesignComponent(p DesignComponentProps) {
 			<iframe
 				src={ templ.SafeURL("/design/c/" + p.Section.Slug + "?embed=1") }
 				title={ p.Section.Title + " preview" }
-				class="h-[80vh] border-0 bg-base-100"
+				class="block border-0 bg-base-100"
 				:class="vp === 'free' ? 'w-[calc(100%-32px)]' : 'w-full'"
-				:style="dragging ? 'pointer-events: none' : ''"
+				:style="'height: ' + (iframeHeight || 480) + 'px' + (dragging ? '; pointer-events: none' : '')"
+				@load="syncIframeHeight($el)"
+				scrolling="no"
 				loading="lazy"
 			></iframe>
 			<!-- Right-edge resize grabber. x-show keeps the element in
