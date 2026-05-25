@@ -78,7 +78,7 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 
 // renderProviders wraps the Providers tab body in the unified Settings shell.
 func renderProviders(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.ProvidersProps) {
-	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabProviders, pages.Providers(props))
+	renderSettingsTab(tr, w, r, data, pages.SettingsTabProviders, pages.Providers(props))
 }
 
 // ProvidersSavePlaidHandler serves POST /admin/providers/plaid.

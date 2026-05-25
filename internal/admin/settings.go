@@ -94,7 +94,7 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		data["PageTitle"] = "Sync"
 		data["CurrentPage"] = "sync"
 		data["Flash"] = GetFlash(r.Context(), sm)
-		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabSync, pages.SettingsSync(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabSync, pages.SettingsSync(props))
 	}
 }
 
@@ -105,7 +105,7 @@ func SecuritySettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		data["PageTitle"] = "Security"
 		data["CurrentPage"] = "security"
 		data["Flash"] = GetFlash(r.Context(), sm)
-		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabSecurity, pages.SettingsSecurity(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabSecurity, pages.SettingsSecurity(props))
 	}
 }
 
@@ -116,7 +116,7 @@ func SystemSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		data["PageTitle"] = "System"
 		data["CurrentPage"] = "system"
 		data["Flash"] = GetFlash(r.Context(), sm)
-		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabSystem, pages.SettingsSystem(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabSystem, pages.SettingsSystem(props))
 	}
 }
 
@@ -127,7 +127,7 @@ func HelpSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 		data["PageTitle"] = "Help"
 		data["CurrentPage"] = "help"
 		data["Flash"] = GetFlash(r.Context(), sm)
-		renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabHelp, pages.SettingsHelp(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabHelp, pages.SettingsHelp(props))
 	}
 }
 
