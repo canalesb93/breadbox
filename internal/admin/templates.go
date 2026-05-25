@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"breadbox/internal/service"
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
@@ -29,16 +28,9 @@ import (
 type componentAdapter func(data any) (templ.Component, error)
 
 // componentRegistry maps the bridge name used in html/template partials
-// (e.g. {{renderComponent "TxRow" .}}) to its typed adapter. Add an entry
+// (e.g. {{renderComponent "Flash" .}}) to its typed adapter. Add an entry
 // here when porting a new partial to templ.
 var componentRegistry = map[string]componentAdapter{
-	"TxRow": func(data any) (templ.Component, error) {
-		tx, err := assertAdminTxRow(data)
-		if err != nil {
-			return nil, err
-		}
-		return components.TxRow(tx), nil
-	},
 	"Flash": func(data any) (templ.Component, error) {
 		f, ok := data.(*Flash)
 		if !ok {
@@ -94,18 +86,6 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdCombo(keys...), nil
 	},
-}
-
-// assertAdminTxRow extracts a service.AdminTransactionRow from data,
-// accepting both value and pointer forms.
-func assertAdminTxRow(data any) (service.AdminTransactionRow, error) {
-	if tx, ok := data.(service.AdminTransactionRow); ok {
-		return tx, nil
-	}
-	if p, ok := data.(*service.AdminTransactionRow); ok && p != nil {
-		return *p, nil
-	}
-	return service.AdminTransactionRow{}, fmt.Errorf("want service.AdminTransactionRow, got %T", data)
 }
 
 // toStringSlice coerces the value passed via renderComponent into a
@@ -279,7 +259,6 @@ var templatePartials = []string{
 	"partials/nav.html",
 	"partials/category_picker.html",
 	"partials/breadcrumb.html",
-	"partials/tx_row.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {

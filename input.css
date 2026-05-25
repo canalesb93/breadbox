@@ -1028,7 +1028,10 @@
   }
 
   .bb-tx-avatar--sm {
-    @apply w-8 h-8 rounded-lg;
+    /* Size-only override — radius stays `rounded-xl` from the base rule so
+     * the compact/feed tile reads as the same shape family as the default
+     * 36×36 avatar (the previous `rounded-lg` here felt visibly sharper). */
+    @apply w-8 h-8;
   }
 
   .bb-tx-avatar--sm i, .bb-tx-avatar--sm svg {
@@ -1069,7 +1072,17 @@
   }
 
   .bb-tx-owner-badge--letter {
-    @apply inline-flex items-center justify-center bg-primary/15 text-primary/80;
+    /* Soft 15 % primary tint over an opaque row-background base so the
+     * avatar tile never bleeds through. Base matches the same `--bb-row-bg`
+     * the ring uses, so the pill, the ring, and the row hover/selected
+     * highlight stay in lock-step. Text keeps the original 80 % to read
+     * as a soft chip rather than a punched-out solid. */
+    @apply inline-flex items-center justify-center text-primary/80;
+    background-color: var(--bb-row-bg, var(--color-base-100, #fff));
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--color-primary) 15%, transparent),
+      color-mix(in srgb, var(--color-primary) 15%, transparent)
+    );
   }
 
   .bb-tx-owner-badge--letter > span {
