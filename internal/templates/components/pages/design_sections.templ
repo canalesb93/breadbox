@@ -149,6 +149,24 @@ templ SectionButtons() {
 				</button>
 			</div>
 		}
+		@designExample("Join — split button (primary + menu)", "Primary action on the left, chevron dropdown on the right — both share the same join shell. Use for an action with a small set of related variants.") {
+			<div class="join">
+				<button class="btn btn-primary btn-sm join-item gap-2">
+					<i data-lucide="plus" class="w-4 h-4"></i>
+					New transaction
+				</button>
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-primary btn-sm join-item btn-square" aria-label="More options">
+						<i data-lucide="chevron-down" class="w-4 h-4"></i>
+					</div>
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-52 p-1 mt-1">
+						<li><a>Manual entry</a></li>
+						<li><a>Import from CSV</a></li>
+						<li><a>From rule template</a></li>
+					</ul>
+				</div>
+			</div>
+		}
 	</div>
 }
 
