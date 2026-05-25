@@ -45,24 +45,12 @@ templ TxRowFeed(p TxRowFeedProps) {
 		class="bb-tx-row-feed flex items-center gap-2 py-1 px-1 -mx-1 rounded-md hover:bg-base-200/70 focus-visible:bg-base-200/70 focus-visible:outline-none transition-colors duration-150 no-underline"
 	>
 		<!-- Category avatar — mirrors TxRowCompact so the feed's coloured
-		     circle reads identically to the /transactions list. Categorised
-		     rows (any color or icon) render the coloured circle; rows
-		     without a category render a neutral grey question-mark. -->
-		<span class="relative shrink-0">
-			if p.CategoryIcon != nil || p.CategoryColor != nil {
-				<span class="bb-tx-avatar bb-tx-avatar--sm" style={ TxAvatarColorStyle(p.CategoryColor) }>
-					if p.CategoryIcon != nil {
-						<i data-lucide={ *p.CategoryIcon } class="w-3.5 h-3.5"></i>
-					} else {
-						<i data-lucide="folder" class="w-3.5 h-3.5"></i>
-					}
-				</span>
-			} else {
-				<span class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--uncategorized">
-					<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>
-				</span>
-			}
-		</span>
+		     circle reads identically to the /transactions list. -->
+		@TxAvatar(TxAvatarProps{
+			Size:          TxAvatarSizeSm,
+			CategoryColor: p.CategoryColor,
+			CategoryIcon:  p.CategoryIcon,
+		})
 		<!-- Description (single line, truncated). Uses provider text, not
 		     merchant name — see component doc. Title-cased so all-caps
 		     bank descriptors ("WHOLEFDS NEW YORK 12345") match the
@@ -80,8 +68,7 @@ templ TxRowFeed(p TxRowFeedProps) {
 		}
 		<!-- Pending mark, kept inline so the row height stays stable. -->
 		if p.Pending {
-			<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70" title="Pending — not yet posted"></i>
-			<span class="sr-only">(pending)</span>
+			@TxPendingClock()
 		}
 		<!-- Amount via the canonical component: income reads as "+$X" in
 		     green, expense as "$X" in the default color. Format=abbreviated

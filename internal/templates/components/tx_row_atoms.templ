@@ -1,0 +1,79 @@
+package components
+
+// TxAvatarSize controls the avatar's outer dimensions. The base size
+// matches TxRow's two-line layout (36×36); --sm matches TxRowCompact +
+// TxRowFeed (32×32). The icon inside switches between w-4 h-4 and
+// w-3.5 h-3.5 to keep optical weight consistent across sizes.
+type TxAvatarSize int
+
+const (
+	TxAvatarSizeDefault TxAvatarSize = iota
+	TxAvatarSizeSm
+)
+
+// TxAvatarProps captures the inputs every transaction-row variant
+// already feeds into the avatar block: category color + icon for the
+// coloured circle, owner identity for the corner badge. Nil/empty
+// fields collapse cleanly — no owner badge, no avatar tint, etc.
+type TxAvatarProps struct {
+	Size          TxAvatarSize
+	CategoryColor *string
+	CategoryIcon  *string
+	// OwnerName drives the title attribute on the corner badge and, in
+	// the letter-fallback path, the rendered glyph (first character).
+	// Empty string means "no owner badge".
+	OwnerName string
+	// OwnerID, when non-nil, swaps the letter fallback for an
+	// avatarURL(id) image. Used for real users; agents and rows
+	// without an effective user fall back to the letter form.
+	OwnerID *string
+	// Class adds extra classes to the outer `relative shrink-0` wrapper.
+	// TxRow uses this to layer `bb-tx-avatar-slot` (CSS hides the slot
+	// on mobile when bulk-select mode is active so the checkbox can
+	// reclaim the horizontal space).
+	Class string
+}
+
+// TxAvatar renders the bb-tx-avatar + optional bb-tx-owner-badge
+// composition shared by TxRow, TxRowCompact, and TxRowFeed. Category
+// tint comes from txAvatarColorStyle so the OKLCH fallback stays in
+// one place; the uncategorised branch swaps to bb-tx-avatar--uncategorized
+// which carries its own neutral background.
+templ TxAvatar(p TxAvatarProps) {
+	<div class={ txAvatarWrapperClass(p.Class) }>
+		if p.CategoryIcon != nil || p.CategoryColor != nil {
+			<div class={ txAvatarClass(p.Size, false) } style={ txAvatarColorStyle(p.CategoryColor) }>
+				if p.CategoryIcon != nil {
+					<i data-lucide={ deref(p.CategoryIcon) } class={ txAvatarIconClass(p.Size) }></i>
+				} else {
+					<i data-lucide="folder" class={ txAvatarIconClass(p.Size) }></i>
+				}
+			</div>
+		} else {
+			<div class={ txAvatarClass(p.Size, true) }>
+				<i data-lucide="circle-off" class={ txAvatarIconClass(p.Size) }></i>
+			</div>
+		}
+		if p.OwnerName != "" {
+			if p.OwnerID != nil {
+				<img src={ avatarURL(deref(p.OwnerID)) } alt="" class="bb-tx-owner-badge" title={ p.OwnerName }/>
+			} else {
+				<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ p.OwnerName }>
+					<span>{ firstChar(p.OwnerName) }</span>
+				</span>
+			}
+		}
+	</div>
+}
+
+// TxPendingClock renders the inline pending indicator shared by all
+// three row variants. Lucide clock icon plus an sr-only "(pending)"
+// label so the row stays accessible without burning visible space.
+templ TxPendingClock() {
+	<i
+		data-lucide="clock"
+		class="w-3 h-3 shrink-0 text-warning opacity-70"
+		title="Pending — not yet posted"
+	></i>
+	<span class="sr-only">(pending)</span>
+}
