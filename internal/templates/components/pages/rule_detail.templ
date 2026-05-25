@@ -413,15 +413,11 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 				}
 				if retro {
 					<div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-						<p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
+						<p class="text-xs text-base-content/40">Run this rule's actions against these existing transactions</p>
 						<button class="btn btn-sm btn-outline w-full sm:w-auto" data-apply-btn @click="openApplyModal()" :disabled="applying">
 							<span x-show="applying" class="loading loading-spinner loading-xs"></span>
 							<i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
-							if p.ActionCategoryName != "" {
-								{ "Categorize as " + p.ActionCategoryName }
-							} else {
-								Categorize as matched category
-							}
+							Apply rule
 						</button>
 					</div>
 				}
