@@ -14,6 +14,21 @@
   <meta name="apple-mobile-web-app-title" content="Breadbox">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <script>
+    // Apply persisted theme override before paint so we don't flash the
+    // wrong theme on reload. Absent value falls through to daisyUI's
+    // prefers-color-scheme default ("light --default, dark --prefersdark"
+    // in input.css). Wrapped in try/catch because localStorage throws in
+    // private-mode Safari and the toggle should degrade gracefully.
+    (function () {
+      try {
+        var t = localStorage.getItem('bb-theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.dataset.theme = t;
+        }
+      } catch (_) { /* best-effort */ }
+    })();
+  </script>
   <link rel="stylesheet" href="/static/css/styles.css">
   <script>
     // Stash the browser's IANA timezone in a cookie so server-rendered date
@@ -372,18 +387,45 @@
     <div class="drawer-side" id="bb-drawer-sidebar">
       <label for="bb-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
       <aside class="bb-sidebar" id="bb-sidebar" aria-label="Main navigation">
-        <!-- Brand + close button row -->
+        <!-- Brand + theme toggle + close button row -->
         <div class="flex items-center justify-between mb-5">
           <a href="/" class="bb-sidebar-brand !mb-0 !px-0 !py-0">
             <i data-lucide="package" class="w-5 h-5"></i>
             Breadbox
           </a>
-          <!-- Close button — only visible on mobile/tablet (< lg) -->
-          <label for="bb-drawer"
-                 class="btn btn-sm btn-square btn-ghost lg:hidden shrink-0"
-                 aria-label="Close navigation menu">
-            <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
-          </label>
+          <div class="flex items-center gap-1 shrink-0">
+            <!-- Theme toggle (sun/moon). Persists override to
+                 localStorage; the inline <head> script reapplies on
+                 next load so reloads don't flash the other theme. -->
+            <label
+              class="swap swap-rotate btn btn-sm btn-square btn-ghost text-base-content/60"
+              title="Toggle theme"
+              x-data="{
+                dark: (document.documentElement.dataset.theme
+                  ? document.documentElement.dataset.theme === 'dark'
+                  : matchMedia('(prefers-color-scheme: dark)').matches),
+              }"
+              @change="
+                document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+                try { localStorage.setItem('bb-theme', dark ? 'dark' : 'light'); } catch (_) {}
+              "
+            >
+              <input
+                type="checkbox"
+                class="sr-only"
+                x-model="dark"
+                aria-label="Toggle theme"
+              />
+              <i data-lucide="sun" class="swap-off w-4 h-4"></i>
+              <i data-lucide="moon" class="swap-on w-4 h-4"></i>
+            </label>
+            <!-- Close button — only visible on mobile/tablet (< lg) -->
+            <label for="bb-drawer"
+                   class="btn btn-sm btn-square btn-ghost lg:hidden"
+                   aria-label="Close navigation menu">
+              <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
+            </label>
+          </div>
         </div>
         <!-- Search trigger -->
         <div class="bb-sidebar-search" x-data @click="$dispatch('open-cmdk')" role="button" tabindex="0" @keydown.enter="$dispatch('open-cmdk')">
