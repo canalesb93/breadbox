@@ -13,13 +13,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
+	"syscall"
 	"time"
 )
 
 // Sidecar locates and exec's the breadbox-agent binary. Implements Runner.
-// Concurrency: holds an internal mutex as a safety net; the orchestrator
-// (added in Iteration 3) is responsible for the server-wide concurrency cap.
+//
+// Concurrency: the orchestrator (internal/service/agent_orchestrator.go)
+// owns the server-wide concurrency cap via its semaphore. Sidecar itself
+// is stateless and safe to call from multiple goroutines — earlier
+// iterations held an internal mutex "as a safety net" but that mutex
+// silently capped real concurrency at 1, contradicting the operator-
+// configurable `agent.max_concurrent` setting.
 type Sidecar struct {
 	// BinaryPath, when set, overrides binary discovery. Wire this from
 	// app_config.agent.runtime_path at startup.
@@ -28,8 +33,6 @@ type Sidecar struct {
 	// TranscriptDir is the root directory for NDJSON transcripts.
 	// One file per run: <TranscriptDir>/<runID>.ndjson. Created if missing.
 	TranscriptDir string
-
-	mu sync.Mutex
 }
 
 // resolveBinary finds the sidecar binary via the shared LocateBinary helper.
@@ -84,9 +87,6 @@ func LocateBinary(explicitPath string) (string, error) {
 // Always returns a non-nil RunResult. The returned error mirrors result.Err
 // when the run failed; callers can prefer one or the other.
 func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (RunResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	start := time.Now()
 	result := RunResult{Status: StatusError}
 
@@ -136,6 +136,34 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 
 	cmd := exec.CommandContext(ctx, bin)
 	cmd.Stdin = bytes.NewReader(specJSON)
+
+	// Process-group lifecycle. The sidecar (a bun-compiled binary) spawns
+	// the SDK's bundled Node child for cli.js. With the stdlib default
+	// (Process.Kill on ctx cancel), only the bun parent receives SIGKILL —
+	// the Node child becomes orphaned to init and keeps running, finishing
+	// MCP work after the orchestrator has already moved on (and after the
+	// per-run API key may already be revoked). See incident: run RK7U4E06,
+	// 2026-05-25.
+	//
+	// Setpgid puts the sidecar in its own group; cmd.Cancel + cmd.WaitDelay
+	// (Go 1.20+) replace the default Kill-the-parent with a group-targeted
+	// SIGKILL that takes down the Node grandchild too.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		// Kill the entire process group (`pgid == cmd.Process.Pid` because
+		// Setpgid made the sidecar its own group leader). SIGKILL rather
+		// than SIGTERM: the SDK doesn't have meaningful cleanup work to
+		// honor here, and the rest of the runtime is already past the
+		// point of caring (ctx canceled means we're tearing the run down).
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	// WaitDelay bounds how long Wait blocks after Cancel runs. Without it
+	// a child that swallowed its pipe close could keep us waiting forever.
+	cmd.WaitDelay = 5 * time.Second
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		result.Err = fmt.Errorf("agent: stdout pipe: %w", err)
@@ -192,7 +220,13 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 		if handler != nil {
 			if herr := handler(evt); herr != nil {
 				handlerErr = herr
-				_ = cmd.Process.Kill()
+				// Kill the whole group, not just the parent — same reasoning
+				// as cmd.Cancel above. The handler-error path is rare (only
+				// fires if the caller's event handler returns non-nil) but
+				// shares the orphan-grandchild risk.
+				if cmd.Process != nil {
+					_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				}
 				// Drain remaining output silently.
 				_, _ = io.Copy(io.Discard, stdout)
 				break
