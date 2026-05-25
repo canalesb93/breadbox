@@ -4,18 +4,6 @@ package pages
 
 import "fmt"
 
-// connDetailHeaderTileBg returns the icon-tile background class by provider.
-func connDetailHeaderTileBg(provider string) string {
-	switch provider {
-	case "plaid":
-		return "bg-info/10"
-	case "teller":
-		return "bg-success/10"
-	default:
-		return "bg-warning/10"
-	}
-}
-
 // connDetailSuccessRateClass returns the success-rate text color class.
 func connDetailSuccessRateClass(rate float64) string {
 	switch {

@@ -91,17 +91,28 @@ func ruleHasRetroactiveAction(actions []service.RuleAction) bool {
 	return false
 }
 
-// ruleHeaderTileClass returns the icon-tile background class for the page
-// header. Mirrors the html/template ternary: disabled → bg-base-200,
-// system → bg-info/10, otherwise bg-success/10.
-func ruleHeaderTileClass(enabled, isSystem bool) string {
+// ruleHeaderIconTone maps rule (enabled, system) to the EntityHeader
+// tile tone: disabled → neutral, system → info, otherwise success.
+func ruleHeaderIconTone(enabled, isSystem bool) components.IconTone {
 	if !enabled {
-		return "bg-base-200"
+		return components.IconToneNeutral
 	}
 	if isSystem {
-		return "bg-info/10"
+		return components.IconToneInfo
 	}
-	return "bg-success/10"
+	return components.IconToneSuccess
+}
+
+// ruleHeaderIconName mirrors ruleHeaderIconTone — the lucide glyph for
+// the tile: disabled → pause, system → shield, otherwise zap.
+func ruleHeaderIconName(enabled, isSystem bool) string {
+	if !enabled {
+		return "pause"
+	}
+	if isSystem {
+		return "shield"
+	}
+	return "zap"
 }
 
 // ruleCreatedByLabel returns the small "Created automatically/Built-in/..."

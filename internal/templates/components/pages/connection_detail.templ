@@ -55,86 +55,15 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 				</div>
 			</div>
 		}
-		<!-- Header with actions -->
-		<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
-			<div class="flex items-center gap-4 min-w-0">
-				<div class={ "w-11 h-11 rounded-xl flex items-center justify-center shrink-0", connDetailHeaderTileBg(p.Provider) }>
-					switch p.Provider {
-						case "plaid":
-							<i data-lucide="building-2" class="w-5 h-5 text-info"></i>
-						case "teller":
-							<i data-lucide="landmark" class="w-5 h-5 text-success"></i>
-						default:
-							<i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
-					}
-				</div>
-				<div class="min-w-0">
-					<div class="flex items-center gap-2.5 flex-wrap">
-						<h1 class="bb-page-title truncate">{ p.InstitutionName }</h1>
-						if p.LastSyncStatus == "error" && p.Status == "active" {
-							<span class="relative group/err">
-								<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
-								if p.LastSyncErrorMessageValid {
-									<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-										<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
-										<span class="text-base-content/70">{ p.LastSyncErrorMessageString }</span>
-									</span>
-								}
-							</span>
-						} else {
-							@templ.Raw(components.StatusBadge(p.Status))
-						}
-						if p.Paused {
-							<span class="badge badge-ghost badge-sm">Paused</span>
-						}
-					</div>
-					<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
-						<span class="capitalize">{ p.Provider }</span>
-						if p.UserNameValid {
-							<span>&middot;</span>
-							<span>{ p.UserName }</span>
-						}
-						if p.LastSyncedAtValid {
-							<span>&middot;</span>
-							<span>{ "Synced " + p.LastSyncedAtRelative }</span>
-						}
-					</div>
-				</div>
-			</div>
-			<div class="flex items-center gap-2 flex-wrap sm:shrink-0">
-				if p.Status == "error" || p.Status == "pending_reauth" {
-					<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline">Re-authenticate</a>
-				}
-				if p.Provider == "csv" {
-					<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline">
-						<i data-lucide="upload" class="w-3.5 h-3.5"></i>
-						Import More
-					</a>
-				}
-				if p.Status == "active" {
-					<button class="btn btn-sm btn-primary" @click="syncConnection()" id="sync-btn">
-						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-						Sync Now
-					</button>
-				}
-				<button class="btn btn-sm btn-ghost" @click="togglePause()" id="pause-btn">
-					if p.Paused {
-						<i data-lucide="play" class="w-3.5 h-3.5"></i>
-						Resume
-					} else {
-						<i data-lucide="pause" class="w-3.5 h-3.5"></i>
-						Pause
-					}
-				</button>
-				<button class="btn btn-sm btn-ghost text-error/70 hover:text-error" x-show="!confirming" @click="confirming = true" id="remove-btn">
-					<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-				</button>
-				<span x-show="confirming" x-cloak class="inline-flex gap-2">
-					<button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
-					<button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
-				</span>
-			</div>
-		</div>
+		@components.EntityHeader(components.EntityHeaderProps{
+			Title:         p.InstitutionName,
+			TitleClass:    "truncate",
+			IconComponent: connDetailIcon(p.Provider),
+			IconTone:      connDetailIconTone(p.Provider),
+			Badges:        connDetailBadges(p),
+			Meta:          connDetailMeta(p),
+			Action:        connDetailActions(p),
+		})
 		<!-- Sync Health Stats -->
 		if p.TotalSyncs > 0 {
 			@connDetailSyncHealth(p)
@@ -157,6 +86,106 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 		<!-- Sync History -->
 		@connDetailSyncHistory(p)
 	</div>
+}
+
+// connDetailIcon renders the provider glyph used inside the
+// EntityHeader tile. Provider-specific icon to avoid the generic
+// data-lucide path (which assumes one icon per page).
+templ connDetailIcon(provider string) {
+	switch provider {
+		case "plaid":
+			<i data-lucide="building-2" class="w-6 h-6"></i>
+		case "teller":
+			<i data-lucide="landmark" class="w-6 h-6"></i>
+		default:
+			<i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
+	}
+}
+
+// connDetailIconTone maps the provider to the EntityHeader tile tone.
+func connDetailIconTone(provider string) components.IconTone {
+	switch provider {
+	case "plaid":
+		return components.IconToneInfo
+	case "teller":
+		return components.IconToneSuccess
+	default:
+		return components.IconToneWarning
+	}
+}
+
+// connDetailBadges renders the inline status chips next to the title:
+// the StatusBadge (or sync-error hover tooltip), plus a Paused badge.
+templ connDetailBadges(p ConnectionDetailProps) {
+	if p.LastSyncStatus == "error" && p.Status == "active" {
+		<span class="relative group/err">
+			<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
+			if p.LastSyncErrorMessageValid {
+				<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
+					<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
+					<span class="text-base-content/70">{ p.LastSyncErrorMessageString }</span>
+				</span>
+			}
+		</span>
+	} else {
+		@templ.Raw(components.StatusBadge(p.Status))
+	}
+	if p.Paused {
+		<span class="badge badge-ghost badge-sm">Paused</span>
+	}
+}
+
+// connDetailMeta renders the bullet-separated meta line: provider,
+// optional owner, optional last-synced timestamp.
+templ connDetailMeta(p ConnectionDetailProps) {
+	<span class="capitalize">{ p.Provider }</span>
+	if p.UserNameValid {
+		<span class="text-base-content/20">·</span>
+		<span>{ p.UserName }</span>
+	}
+	if p.LastSyncedAtValid {
+		<span class="text-base-content/20">·</span>
+		<span>{ "Synced " + p.LastSyncedAtRelative }</span>
+	}
+}
+
+// connDetailActions renders the trailing button cluster: re-auth,
+// import-more (csv), sync-now, pause/resume, and the inline-confirm
+// remove button. Multiple buttons here is a known editorial exception
+// to the "one primary + one secondary" PageHeader rule — collapsing to
+// an OverflowMenu is tracked as follow-up work for connection_detail.
+templ connDetailActions(p ConnectionDetailProps) {
+	if p.Status == "error" || p.Status == "pending_reauth" {
+		<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline">Re-authenticate</a>
+	}
+	if p.Provider == "csv" {
+		<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline">
+			<i data-lucide="upload" class="w-3.5 h-3.5"></i>
+			Import More
+		</a>
+	}
+	if p.Status == "active" {
+		<button class="btn btn-sm btn-primary" @click="syncConnection()" id="sync-btn">
+			<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+			Sync Now
+		</button>
+	}
+	<button class="btn btn-sm btn-ghost" @click="togglePause()" id="pause-btn">
+		if p.Paused {
+			<i data-lucide="play" class="w-3.5 h-3.5"></i>
+			Resume
+		} else {
+			<i data-lucide="pause" class="w-3.5 h-3.5"></i>
+			Pause
+		}
+	</button>
+	<button class="btn btn-sm btn-ghost text-error/70 hover:text-error" x-show="!confirming" @click="confirming = true" id="remove-btn">
+		<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+	</button>
+	<span x-show="confirming" x-cloak class="inline-flex gap-2">
+		<button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
+		<button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
+	</span>
 }
 
 templ connDetailSyncHealth(p ConnectionDetailProps) {

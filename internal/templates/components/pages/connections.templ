@@ -33,41 +33,12 @@ templ Connections(p ConnectionsProps) {
 		x-data={ fmt.Sprintf("{ tab: %q, filterUser: 'all' }", p.Tab) }
 		x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })"
 	>
-		<!-- Page Header -->
-		<div class="bb-page-header">
-			<div class="flex items-baseline gap-3 flex-wrap">
-				<h1 class="bb-page-title">Connections</h1>
-				if len(p.Connections) > 0 {
-					<span class="text-sm text-base-content/40" x-show="tab === 'connections'">{ connectionsCountLabel(len(p.Connections)) }</span>
-				}
-			</div>
-			<div class="flex items-center gap-2 flex-wrap">
-				<div x-show="tab === 'connections'" x-cloak class="flex items-center gap-2">
-					if len(p.Connections) > 0 {
-						<div x-data="syncAllBtn">
-							<button
-								class="btn btn-outline btn-sm gap-2"
-								:disabled="state !== 'idle'"
-								@click="triggerSyncAll()"
-								:title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'"
-							>
-								<i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
-								<span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
-								<i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
-								<span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
-							</button>
-						</div>
-					}
-					<a href="/connections/new" class="btn btn-primary btn-sm">
-						<i data-lucide="plus" class="w-4 h-4"></i>
-						Connect Bank
-					</a>
-				</div>
-				<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm" onclick="document.getElementById('create-link-modal').showModal()">
-					<i data-lucide="plus" class="w-4 h-4"></i> New Link
-				</button>
-			</div>
-		</div>
+		@components.PageHeader(components.PageHeaderProps{
+			Title:           "Connections",
+			Subtitle:        connectionsSubtitle(p),
+			SecondaryAction: connectionsSecondaryAction(p),
+			Action:          connectionsAction(p),
+		})
 		<!-- Tab Switcher -->
 		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
 			<button
@@ -488,6 +459,50 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 			</div>
 		</div>
 	</div>
+}
+
+// connectionsSecondaryAction renders the Sync All button — visible
+// only on the connections tab and only when there is at least one
+// connection. Returns nil when nothing should be shown so the
+// PageHeader's trailing slot doesn't allocate an empty gap.
+func connectionsSecondaryAction(p ConnectionsProps) templ.Component {
+	if len(p.Connections) == 0 {
+		return nil
+	}
+	return connectionsSyncAllBtn()
+}
+
+templ connectionsSyncAllBtn() {
+	<div x-show="tab === 'connections'" x-cloak x-data="syncAllBtn">
+		<button
+			class="btn btn-ghost btn-sm gap-2"
+			:disabled="state !== 'idle'"
+			@click="triggerSyncAll()"
+			:title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'"
+		>
+			<i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
+			<span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
+			<i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
+			<span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
+		</button>
+	</div>
+}
+
+// connectionsAction renders the tab-scoped primary action: Connect Bank
+// on the connections tab, New Link on the links tab.
+func connectionsAction(_ ConnectionsProps) templ.Component {
+	return connectionsActionButtons()
+}
+
+templ connectionsActionButtons() {
+	<a x-show="tab === 'connections'" x-cloak href="/connections/new" class="btn btn-primary btn-sm gap-2">
+		<i data-lucide="plus" class="w-4 h-4"></i>
+		Connect Bank
+	</a>
+	<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm gap-2" onclick="document.getElementById('create-link-modal').showModal()">
+		<i data-lucide="plus" class="w-4 h-4"></i>
+		New Link
+	</button>
 }
 
 templ connectionsCreateLinkModal(p ConnectionsProps) {

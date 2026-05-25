@@ -16,6 +16,16 @@ func connectionsCountLabel(n int) string {
 	return fmt.Sprintf("%d banks", n)
 }
 
+// connectionsSubtitle is the count line that sits in the PageHeader
+// subtitle slot. Empty when there are no connections so the subtitle
+// row collapses.
+func connectionsSubtitle(p ConnectionsProps) string {
+	if len(p.Connections) == 0 {
+		return ""
+	}
+	return connectionsCountLabel(len(p.Connections))
+}
+
 // connectionsAccountSuffix renders the trailing "account"/"accounts"
 // (or compact "acct"/"accts") word, mirroring the original template's
 // per-viewport variants. The leading space is part of the segment because

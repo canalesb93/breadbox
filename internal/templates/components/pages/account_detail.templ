@@ -52,53 +52,49 @@ templ AccountDetail(p AccountDetailProps) {
 }
 
 templ acctHeader(p AccountDetailProps) {
-	<!-- Header -->
-	<div class="bb-page-header">
-		<div class="flex items-center gap-4">
-			<div class="w-12 h-12 rounded-xl bg-base-200 flex items-center justify-center">
-				<i data-lucide={ acctTypeIcon(p.Account.Type) } class="w-6 h-6 text-base-content opacity-50"></i>
-			</div>
-			<div>
-				<h1 class="bb-page-title">{ acctDisplayLabel(p.Account) }</h1>
-				<div class="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
-					{{ typeLabel := accountTypeLabel(p.Account.Type, "") }}
-					{{ subtype := "" }}
-					if p.Account.Subtype != nil {
-						{{ subtype = subtypeSuffix(typeLabel, *p.Account.Subtype) }}
-					}
-					<span class="text-xs text-base-content/40">
-						{ typeLabel }
-						if subtype != "" {
-							@templ.Raw(" &middot; ")
-							{ subtype }
-						}
-					</span>
-					if p.Account.Mask != nil && *p.Account.Mask != "" {
-						<span class="text-xs text-base-content/30">
-							@templ.Raw("&bull;&bull;&bull;&bull;")
-							{ *p.Account.Mask }
-						</span>
-					}
-					if p.Account.Excluded {
-						<span class="badge badge-ghost badge-xs">Excluded</span>
-					}
-					if p.Account.IsDependentLinked {
-						<span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance and transactions are attributed to a linked user and excluded from this user's totals">Linked</span>
-					}
-					if p.Account.ConnectionStatus != nil && *p.Account.ConnectionStatus != "active" {
-						switch *p.Account.ConnectionStatus {
-							case "error":
-								<span class="badge badge-soft badge-error badge-xs">Error</span>
-							case "pending_reauth":
-								<span class="badge badge-soft badge-warning badge-xs">Reauth</span>
-							case "disconnected":
-								<span class="badge badge-ghost badge-xs">Disconnected</span>
-						}
-					}
-				</div>
-			</div>
-		</div>
-	</div>
+	@components.EntityHeader(components.EntityHeaderProps{
+		Title:    acctDisplayLabel(p.Account),
+		Icon:     acctTypeIcon(p.Account.Type),
+		IconTone: components.IconToneNeutral,
+		Badges:   acctHeaderBadges(p),
+		Meta:     acctHeaderMeta(p),
+	})
+}
+
+templ acctHeaderBadges(p AccountDetailProps) {
+	if p.Account.Excluded {
+		<span class="badge badge-ghost badge-sm">Excluded</span>
+	}
+	if p.Account.IsDependentLinked {
+		<span class="badge badge-soft badge-info badge-sm" title="Dependent-linked: balance and transactions are attributed to a linked user and excluded from this user's totals">Linked</span>
+	}
+	if p.Account.ConnectionStatus != nil && *p.Account.ConnectionStatus != "active" {
+		switch *p.Account.ConnectionStatus {
+			case "error":
+				<span class="badge badge-soft badge-error badge-sm">Error</span>
+			case "pending_reauth":
+				<span class="badge badge-soft badge-warning badge-sm">Reauth</span>
+			case "disconnected":
+				<span class="badge badge-ghost badge-sm">Disconnected</span>
+		}
+	}
+}
+
+templ acctHeaderMeta(p AccountDetailProps) {
+	{{ typeLabel := accountTypeLabel(p.Account.Type, "") }}
+	{{ subtype := "" }}
+	if p.Account.Subtype != nil {
+		{{ subtype = subtypeSuffix(typeLabel, *p.Account.Subtype) }}
+	}
+	<span>{ typeLabel }</span>
+	if subtype != "" {
+		<span class="text-base-content/20">·</span>
+		<span>{ subtype }</span>
+	}
+	if p.Account.Mask != nil && *p.Account.Mask != "" {
+		<span class="text-base-content/20">·</span>
+		<span>{ "••••" + *p.Account.Mask }</span>
+	}
 }
 
 templ acctSummaryCards(p AccountDetailProps) {

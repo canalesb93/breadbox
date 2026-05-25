@@ -575,6 +575,14 @@ templ SectionPageHeader() {
 				Action:   components.PageHeaderAction("/categories/new", "plus", "Add Category"),
 			})
 		}
+		@designExample("With secondary + primary action", "One ghost-styled secondary plus one primary. Larger clusters → OverflowMenu in Action.") {
+			@components.PageHeader(components.PageHeaderProps{
+				Title:           "Connections",
+				Subtitle:        "12 connections across 4 providers",
+				SecondaryAction: components.PageHeaderSecondaryAction("#", "refresh-cw", "Sync All"),
+				Action:          components.PageHeaderAction("/connections/new", "plus", "Connect Bank"),
+			})
+		}
 		@designExample("With leading icon", "Reserved for hero pages (Getting Started, etc.).") {
 			@components.PageHeader(components.PageHeaderProps{
 				Title:    "Getting started",
@@ -583,6 +591,58 @@ templ SectionPageHeader() {
 			})
 		}
 	</div>
+}
+
+// ─── Entity header ─────────────────────────────────────────────────────
+
+templ SectionEntityHeader() {
+	<div class="flex flex-col gap-6">
+		@designExample("Default — neutral tile", "Icon tile + title + bullet-separated meta.") {
+			@components.EntityHeader(components.EntityHeaderProps{
+				Title: "Chase Total Checking",
+				Icon:  "wallet",
+				Meta:  components.EntityHeaderMeta("Depository", "Checking", "••••4242"),
+			})
+		}
+		@designExample("With tone + badges", "Tile tone reinforces status; badges sit inline with the title.") {
+			@components.EntityHeader(components.EntityHeaderProps{
+				Title:    "Chase",
+				Icon:     "building-2",
+				IconTone: components.IconToneInfo,
+				Badges:   designEntityHeaderBadgesActive(),
+				Meta:     components.EntityHeaderMeta("plaid", "Jane", "Synced 2h ago"),
+			})
+		}
+		@designExample("Error tone + actions", "Trailing slot supports one secondary + one primary action.") {
+			@components.EntityHeader(components.EntityHeaderProps{
+				Title:           "Bank of America",
+				Icon:             "building-2",
+				IconTone:         components.IconToneError,
+				Badges:           designEntityHeaderBadgesError(),
+				Meta:             components.EntityHeaderMeta("plaid", "Jane", "Last sync failed 1h ago"),
+				SecondaryAction:  components.PageHeaderSecondaryAction("#", "refresh-cw", "Sync"),
+				Action:           components.PageHeaderAction("#", "key-round", "Re-authenticate"),
+			})
+		}
+		@designExample("Long title — truncates", "Pass TitleClass=\"truncate\" or \"break-words\" for long provider strings.") {
+			@components.EntityHeader(components.EntityHeaderProps{
+				Title:      "STARBUCKS COFFEE STORE #4827 — SAN FRANCISCO MARKET ST AUTHORIZATION HOLD",
+				TitleClass: "truncate",
+				Icon:       "coffee",
+				IconTone:   components.IconToneWarning,
+				Meta:       components.EntityHeaderMeta("Nov 14, 2025", "Pending"),
+			})
+		}
+	</div>
+}
+
+templ designEntityHeaderBadgesActive() {
+	<span class="badge badge-soft badge-success badge-sm">Active</span>
+}
+
+templ designEntityHeaderBadgesError() {
+	<span class="badge badge-soft badge-error badge-sm">Error</span>
+	<span class="badge badge-ghost badge-sm">Paused</span>
 }
 
 // ─── Empty states ──────────────────────────────────────────────────────
