@@ -9,6 +9,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Agent NDJSON transcripts are written to /app/transcripts inside
+      # the container (see app_config key agent.transcript_dir, default
+      # "transcripts/agents"). Without this named volume, every
+      # `docker compose up -d` recreates the container and silently
+      # wipes the transcript history — the admin "open transcript" link
+      # then 404s for every prior run. Keep this mount even if you
+      # don't use the agents feature; the directory is empty until an
+      # agent runs.
+      - breadbox_transcripts:/app/transcripts
+      # Uncomment to enable one-click updates from the admin dashboard.
+      # This gives the container access to the Docker daemon.
+      # - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/ready"]
       interval: 30s
@@ -19,10 +32,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # Uncomment to enable one-click updates from the admin dashboard.
-    # This gives the container access to the Docker daemon.
-    # volumes:
-    #   - /var/run/docker.sock:/var/run/docker.sock
 
   db:
     image: postgres:16-alpine
@@ -68,5 +77,6 @@ services:
 
 volumes:
   postgres_data:
+  breadbox_transcripts:
   caddy_data:
   caddy_config:
