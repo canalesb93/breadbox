@@ -22,13 +22,13 @@ import (
 // same CSRF token.
 templ AgentForm(p AgentFormProps) {
 	@components.BreadcrumbNav(agentFormBreadcrumbs(p))
-	<div class="bb-page-header">
+	<div class="bb-page-header max-w-2xl mx-auto">
 		<div>
 			<h1 class="bb-page-title">{ p.Title }</h1>
 			<p class="text-sm text-base-content/50 mt-1">Configure when this agent runs, which tools it can use, and what prompt drives it.</p>
 		</div>
 	</div>
-	<div class="max-w-2xl">
+	<div class="max-w-2xl mx-auto">
 		if p.FormError != "" {
 			<div role="alert" class="bb-form-error mb-4">
 				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
