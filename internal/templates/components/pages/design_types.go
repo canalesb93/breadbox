@@ -194,6 +194,13 @@ func DesignSections() []DesignSection {
 			Group:       "forms",
 			Render:      func() templ.Component { return SectionFilterSearchInput() },
 		},
+		{
+			Slug:        "category-picker",
+			Title:       "Category picker",
+			Description: "Shared `categoryPicker` Alpine factory + `bb-cat-picker` container paired with the four canonical button shells used across the admin (inline tx row, filter bar, assign panel, form select). Every variant routes through the same global overlay (base.html) via data-source-id so behaviour stays consistent.",
+			Group:       "forms",
+			Render:      func() templ.Component { return SectionCategoryPicker() },
+		},
 
 		// ── Data display ────────────────────────────────────────────
 		{

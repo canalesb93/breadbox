@@ -1138,6 +1138,133 @@ templ SectionFilterSearchInput() {
 	</div>
 }
 
+// ─── Category picker ───────────────────────────────────────────────────
+
+// SectionCategoryPicker showcases the four canonical button shells used
+// across the admin for the shared `categoryPicker` Alpine factory:
+//
+//   - Inline (transaction row) — btn btn-ghost btn-xs
+//   - Filter bar               — select select-sm
+//   - Assign panel             — large rounded-xl bg-base-200/50
+//   - Form select              — select w-full bg-base-200/50
+//
+// All variants are live: clicking any of them dispatches the
+// `open-category-picker` window event to the global overlay in
+// base.html, which routes back via data-source-id. We seed
+// window.__bbCategories with the same fixture used by the transaction-
+// rows section so picker labels resolve at first paint.
+templ SectionCategoryPicker() {
+	@components.CategoryPickerScript()
+	@components.CategoryPickerStyles()
+	@templ.JSONScript("design-cat-picker-cats", designTxRowsCategories())
+	<script>
+		(function(){var e=document.getElementById('design-cat-picker-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
+	</script>
+	<div class="flex flex-col gap-6">
+		@designExample("Inline (transaction row)", "btn btn-ghost btn-xs gap-1.5 — the per-row quick-set picker shown xl+ on /transactions and /accounts/{id}. assign mode, allow-empty 'Uncategorized'. Used by tx_row.templ.") {
+			<div class="flex items-center gap-3">
+				<div
+					class="bb-cat-picker"
+					data-picker-source="design-cat-inline"
+					x-data="categoryPicker"
+					data-mode="assign"
+					data-source-id="design-cat-inline"
+					data-placeholder="Uncategorized"
+					data-allow-empty="true"
+					data-empty-label="Uncategorized"
+					data-initial="cat0001"
+				>
+					<button type="button" class="btn btn-ghost btn-xs gap-1.5" @click="openPicker()">
+						<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+						<span x-text="displayLabel" class="text-xs" :class="!selectedId && 'text-base-content/30'">Groceries</span>
+					</button>
+				</div>
+				<code class="text-[0.65rem] text-base-content/50">tx_row.templ</code>
+			</div>
+		}
+		@designExample("Filter bar", "select select-sm w-full text-left — used in the /transactions and /accounts/{id} filter cards. filter mode, allow-empty 'All categories'. Writes selectedSlug into a hidden form input on @category-change.") {
+			<div class="max-w-xs">
+				<div
+					class="bb-cat-picker"
+					data-picker-source="design-cat-filter"
+					x-data="categoryPicker"
+					data-mode="filter"
+					data-source-id="design-cat-filter"
+					data-allow-empty="true"
+					data-empty-label="All categories"
+					data-initial=""
+				>
+					<button type="button" class="select select-sm w-full text-left flex items-center gap-2" @click="openPicker()">
+						<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+						<span x-text="displayLabel" class="text-sm truncate">All categories</span>
+					</button>
+				</div>
+				<p class="text-[0.65rem] text-base-content/40 mt-1.5">transactions.templ · account_detail.templ</p>
+			</div>
+		}
+		@designExample("Assign panel (transaction detail sidebar)", "Large w-full pill in a rounded-xl bg-base-200/50 container with trailing chevron. assign mode, allow-empty 'Uncategorized'. Used by transaction_detail.templ as the primary category control on the per-tx page.") {
+			<div class="max-w-sm">
+				<div
+					class="bb-cat-picker"
+					data-picker-source="design-cat-assign"
+					x-data="categoryPicker"
+					data-mode="assign"
+					data-source-id="design-cat-assign"
+					data-placeholder="Uncategorized"
+					data-allow-empty="true"
+					data-empty-label="Uncategorized"
+					data-initial="cat0002"
+				>
+					<button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
+						<template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
+						<span x-text="displayLabel" class="text-sm font-medium flex-1 text-left">Coffee &amp; Cafés</span>
+						<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30"></i>
+					</button>
+				</div>
+				<p class="text-[0.65rem] text-base-content/40 mt-1.5">transaction_detail.templ</p>
+			</div>
+		}
+		@designExample("Form select (category form parent picker)", "select w-full text-left bg-base-200/50 — used on /categories/new for the optional parent picker. assign mode, allow-empty 'None (top-level)'. Pair it with a small caption beneath when the choice is optional.") {
+			<div class="max-w-sm">
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5">Parent Category</label>
+				<div
+					class="bb-cat-picker"
+					data-picker-source="design-cat-form"
+					x-data="categoryPicker"
+					data-mode="assign"
+					data-source-id="design-cat-form"
+					data-placeholder="None (top-level)"
+					data-allow-empty="true"
+					data-empty-label="None (top-level)"
+					data-initial=""
+				>
+					<button type="button" class="select w-full text-left flex items-center gap-2 bg-base-200/50" @click="openPicker()">
+						<span x-text="displayLabel" class="flex-1 text-sm">None (top-level)</span>
+						<i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
+					</button>
+				</div>
+				<p class="text-xs text-base-content/40 mt-1.5">Leave empty for a top-level category.</p>
+				<p class="text-[0.65rem] text-base-content/40 mt-1.5">category_form.templ</p>
+			</div>
+		}
+		@designExample("Anti-pattern — plain native select", "Bypasses the shared picker: no colored dot, no search, no global overlay, no shake-on-invalid. The rule_form condition-value and action-value pickers both currently fall back to a native select; migrate them to bb-cat-picker.") {
+			<div class="space-y-3 text-sm">
+				<div class="flex flex-wrap items-center gap-3">
+					<select class="select select-xs bg-base-100 w-48">
+						<option>Category...</option>
+						<option>Groceries</option>
+						<option>Coffee and Cafés</option>
+					</select>
+					<code class="text-xs text-base-content/60">rule_form.templ — condition + action</code>
+				</div>
+				<p class="text-xs text-base-content/55">
+					Both spots already have the flat list available as <code>p.FlatCategories</code>; swap the native select for a <code>bb-cat-picker</code> rooted on a <code>data-categories-source</code> JSONScript so the rule editor matches the rest of the admin.
+				</p>
+			</div>
+		}
+	</div>
+}
+
 // ─── Amounts ───────────────────────────────────────────────────────────
 
 templ SectionAmounts() {
