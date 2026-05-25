@@ -65,7 +65,7 @@ type EntityHeaderProps struct {
 
 templ EntityHeader(p EntityHeaderProps) {
 	<div class="bb-page-header">
-		<div class="flex items-center gap-4 min-w-0">
+		<div class="flex items-center gap-4 w-full sm:w-auto sm:flex-1 min-w-0">
 			if p.Icon != "" || p.IconComponent != nil {
 				<div class={ "bb-entity-header__tile", iconToneClass(p.IconTone) }>
 					if p.IconComponent != nil {
