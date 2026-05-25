@@ -322,14 +322,20 @@ func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionRespo
 		}
 		result, runErr := o.runner.Run(runCtx, *spec, handler)
 
-		completedRow, completeErr := o.svc.CompleteAgentRunDB(runCtx, runRow.ID, result, def.MaxTurns)
+		// Use a FRESH context for persist + hit-cap updates so a cancelled
+		// runCtx (timeout, server shutdown, or future caller passing a
+		// shorter parent) doesn't prevent the row from being completed.
+		// Mirrors the runLocked path; same reasoning as the deferred revoke.
+		persistCtx, persistCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer persistCancel()
+		completedRow, completeErr := o.svc.CompleteAgentRunDB(persistCtx, runRow.ID, result, def.MaxTurns)
 		if completeErr != nil {
 			o.logger.Error("orchestrator: persist completed run failed",
 				"agent", def.Slug, "run", runResp.ShortID, "error", completeErr)
 			return
 		}
 		if cap := capFromRunErr(runErr); cap != "" {
-			if _, err := o.svc.SetAgentRunHitCapDB(runCtx, runRow.ID, cap); err != nil {
+			if _, err := o.svc.SetAgentRunHitCapDB(persistCtx, runRow.ID, cap); err != nil {
 				o.logger.Warn("orchestrator: persist hit_cap failed",
 					"agent", def.Slug, "run", runResp.ShortID, "cap", cap, "error", err)
 			}
@@ -422,7 +428,18 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	}
 	result, runErr := o.runner.Run(ctx, *spec, handler)
 
-	completedRow, completeErr := o.svc.CompleteAgentRunDB(ctx, runRow.ID, result, def.MaxTurns)
+	// Persist the completion under a FRESH context. The request-scoped ctx may
+	// already be cancelled — e.g. when the admin "Run now" still went through
+	// the sync path and the exe.dev proxy killed the HTTP request mid-run,
+	// or when the bun-compiled sidecar got SIGKILL'd via CommandContext but
+	// its orphaned Node child kept running and finished the work anyway
+	// (see incident: run RK7U4E06, 2026-05-25). In either case we want the
+	// DB write to succeed so the row reflects reality. The async dispatcher
+	// already passes a fresh ctx so this is a belt-and-suspenders for any
+	// remaining sync callers + future-proofing.
+	persistCtx, persistCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer persistCancel()
+	completedRow, completeErr := o.svc.CompleteAgentRunDB(persistCtx, runRow.ID, result, def.MaxTurns)
 	if completeErr != nil {
 		o.logger.Error("orchestrator: persist completed run failed",
 			"agent", def.Slug, "run", runResp.ShortID, "error", completeErr)
@@ -435,9 +452,9 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 	// Detect cap exhaustion. The sidecar surfaces it through runErr after
 	// having already classified status (max_turns → success, budget → error),
 	// so we record the cap separately for the audit trail without rewriting
-	// status.
+	// status. Same fresh-ctx reasoning as CompleteAgentRunDB above.
 	if cap := capFromRunErr(runErr); cap != "" {
-		if capRow, err := o.svc.SetAgentRunHitCapDB(ctx, runRow.ID, cap); err == nil {
+		if capRow, err := o.svc.SetAgentRunHitCapDB(persistCtx, runRow.ID, cap); err == nil {
 			completedRow = capRow
 		} else {
 			o.logger.Warn("orchestrator: persist hit_cap failed",
