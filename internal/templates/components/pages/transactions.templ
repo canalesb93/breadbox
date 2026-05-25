@@ -48,8 +48,9 @@ templ Transactions(p TransactionsProps) {
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
 	@components.PageHeader(components.PageHeaderProps{
-		Title:    "Transactions",
-		Subtitle: txSubtitle(p),
+		Title:           "Transactions",
+		Subtitle:        txSubtitle(p),
+		SecondaryAction: txExportAction(p),
 	})
 	@txFilters(p)
 	@txToolbar(p)
@@ -100,48 +101,38 @@ func txSubtitle(p TransactionsProps) string {
 	return fmt.Sprintf("%d transaction%s", p.Total, components.PluralS(p.Total))
 }
 
-// txToolbar sits between the filter bar and the results — view-mode
-// segmented control, bulk-select toggle, and the filter-aware
-// Clear / Export buttons. These live here (rather than in the page
-// header) because they're table-scoped affordances.
+// txExportAction renders the Export CSV link in the page header's
+// SecondaryAction slot. Returns nil when there are no transactions to
+// export so the slot collapses.
+func txExportAction(p TransactionsProps) templ.Component {
+	if len(p.Transactions) == 0 {
+		return nil
+	}
+	return txExportLink(p.ExportURL)
+}
+
+templ txExportLink(exportURL string) {
+	<a href={ templ.SafeURL(exportURL) } class="btn btn-ghost btn-sm gap-2" title="Export as CSV">
+		<i data-lucide="download" class="w-4 h-4"></i>
+		Export CSV
+	</a>
+}
+
+// txToolbar sits between the filter bar and the results. After the
+// header-reorg, the only affordance that still belongs here is the
+// filter-scoped Clear button — view-mode + selection toggles now live
+// inside the results shell, and Export CSV is the page header's
+// SecondaryAction. The wrapper is skipped entirely when no filter is
+// active so it doesn't reserve vertical space for nothing.
 templ txToolbar(p TransactionsProps) {
-	<div class="flex items-center justify-end gap-2 mb-3">
-		<!-- View Toggle — daisy join + join-item btn (segmented control). -->
-		<div class="join border border-base-300 bg-base-200" x-data>
-			<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
-				<i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
-				<span class="hidden sm:inline">Grouped</span>
-			</button>
-			<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')" title="Flat list view">
-				<i data-lucide="list" class="w-3.5 h-3.5"></i>
-				<span class="hidden sm:inline">List</span>
-			</button>
-		</div>
-		<!-- Selection mode toggle -->
-		<button
-			type="button"
-			x-data
-			@click="$store.bulk.toggleMode()"
-			class="btn btn-ghost btn-sm gap-2"
-			:class="$store.bulk.selecting && 'bg-primary/10 text-primary'"
-			title="Toggle selection mode"
-		>
-			<i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
-			<span class="hidden sm:inline" x-text="$store.bulk.selecting ? 'Done' : 'Select'"></span>
-		</button>
-		if p.HasAnyFilter() {
+	if p.HasAnyFilter() {
+		<div class="flex items-center justify-end gap-2 mb-3">
 			<a href="/transactions" class="btn btn-ghost btn-sm">
 				<i data-lucide="x" class="w-3.5 h-3.5"></i>
 				<span class="hidden sm:inline">Clear filters</span>
 			</a>
-		}
-		if len(p.Transactions) > 0 {
-			<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm" title="Export as CSV">
-				<i data-lucide="download" class="w-3.5 h-3.5"></i>
-				<span class="hidden sm:inline">Export CSV</span>
-			</a>
-		}
-	</div>
+		</div>
+	}
 }
 
 templ txFilters(p TransactionsProps) {
@@ -413,15 +404,43 @@ templ txSearchFieldOption(value, label, selected string, defaultEmpty bool) {
 
 templ txResultsShell(p TransactionsProps) {
 	<div x-data class="space-y-1">
-		<!-- Toolbar: select-all + keyboard hints -->
+		<!-- Toolbar: select toggle (+ select-all when active) → view toggle → keyboard hints. -->
 		<div class="flex items-center gap-3 px-2 pb-2">
-			<!-- Select all (visible in selection mode). Visibility + checked/indeterminate
-			     state are set imperatively by the bulk store to avoid reactive churn. -->
-			<div x-show="$store.bulk.selecting" x-cloak>
-				<label class="flex items-center gap-2 cursor-pointer" @click.stop>
-					<input type="checkbox" class="checkbox checkbox-sm checkbox-primary" data-tx-selectall-checkbox @change="$store.bulk.toggleAll()"/>
-					<span class="text-xs text-base-content/40">Select all</span>
-				</label>
+			<div class="flex items-center gap-2">
+				<!-- Selection mode toggle. Sits where the bare "Select all" used to live;
+				     when active it flips to "Done" and the Select-all checkbox appears
+				     next to it. -->
+				<button
+					type="button"
+					@click="$store.bulk.toggleMode()"
+					class="btn btn-ghost btn-xs gap-1.5"
+					:class="$store.bulk.selecting && 'bg-primary/10 text-primary'"
+					title="Toggle selection mode"
+				>
+					<i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+					<span x-text="$store.bulk.selecting ? 'Done' : 'Select'"></span>
+				</button>
+				<!-- Select all (visible in selection mode). Visibility + checked/indeterminate
+				     state are set imperatively by the bulk store to avoid reactive churn. -->
+				<div x-show="$store.bulk.selecting" x-cloak>
+					<label class="flex items-center gap-2 cursor-pointer" @click.stop>
+						<input type="checkbox" class="checkbox checkbox-sm checkbox-primary" data-tx-selectall-checkbox @change="$store.bulk.toggleAll()"/>
+						<span class="text-xs text-base-content/40">Select all</span>
+					</label>
+				</div>
+			</div>
+			<!-- View Toggle — daisy join + join-item btn (segmented control).
+			     Sits to the right of the select toggle so view-mode + selection
+			     mode read as a single results-scoped cluster. -->
+			<div class="join border border-base-300 bg-base-200">
+				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
+					<i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
+					<span class="hidden sm:inline">Grouped</span>
+				</button>
+				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')" title="Flat list view">
+					<i data-lucide="list" class="w-3.5 h-3.5"></i>
+					<span class="hidden sm:inline">List</span>
+				</button>
 			</div>
 			<div class="flex-1"></div>
 			<!-- Keyboard shortcuts (desktop only).
