@@ -11,7 +11,7 @@ package pages
 // Endpoint URLs are passed via data-* attrs so the same factory drives
 // admin scope (/-/users/{id}/*) and self scope (/settings/account/*).
 templ MyAccount(p MyAccountProps) {
-	<div class="max-w-2xl mx-auto">
+	<div class="max-w-2xl">
 		<div class="bb-page-header">
 			<div class="min-w-0">
 				<h1 class="bb-page-title">Account</h1>
@@ -52,7 +52,7 @@ templ MyProfile(p MyAccountProps) {
 	// Synchronous (no defer): the page script registers its alpine:init
 	// listener before Alpine fires the event. See user_form.js.
 	<script src="/static/js/admin/components/user_form.js"></script>
-	<div class="max-w-2xl mx-auto">
+	<div class="max-w-2xl">
 		<div class="bb-page-header">
 			<div class="min-w-0">
 				<h1 class="bb-page-title">Profile</h1>

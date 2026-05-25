@@ -13,7 +13,7 @@ templ UserForm(p UserFormProps) {
 	// trail behind this rule.
 	<script src="/static/js/admin/components/user_form.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header max-w-lg mx-auto">
+	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">
 				if p.IsEdit {
@@ -41,7 +41,7 @@ templ UserForm(p UserFormProps) {
 // userFormCreate renders the create flow (Alpine `userForm` factory in
 // static/js/admin/components/user_form.js).
 templ userFormCreate() {
-	<div x-data="userForm" class="max-w-lg mx-auto">
+	<div x-data="userForm" class="max-w-lg">
 		<!-- Success state: show setup URL after login creation -->
 		<template x-if="setupURL">
 			<div class="bb-card p-8">
@@ -171,7 +171,7 @@ templ userFormCreate() {
 // static/js/admin/components/user_form.js). User UUID and the initial
 // hasCustomAvatar flag flow via data-* attrs on the x-data root.
 templ userFormEdit(p UserFormProps) {
-	<div x-data="avatarEditor" data-user-id={ p.UserID } data-has-custom-avatar={ userFormHasAvatarStr(p.User) } class="max-w-lg mx-auto">
+	<div x-data="avatarEditor" data-user-id={ p.UserID } data-has-custom-avatar={ userFormHasAvatarStr(p.User) } class="max-w-lg">
 		<form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
 			<!-- Header + fields -->
 			<div class="p-5 sm:p-6">

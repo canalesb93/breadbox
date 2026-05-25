@@ -25,13 +25,13 @@ templ RuleForm(p RuleFormProps) {
 		@templ.JSONScript("rule-form-data", p.Rule)
 	}
 	<div x-data="ruleForm" data-is-edit={ ruleFormIsEditAttr(p.IsEdit) }>
-		<div class="bb-page-header max-w-2xl mx-auto">
+		<div class="bb-page-header">
 			<div>
 				<h1 class="bb-page-title" x-text="isEdit ? 'Edit Rule' : 'New Rule'"></h1>
 				<p class="text-sm text-base-content/50 mt-1">When transactions match the conditions, the actions are applied automatically.</p>
 			</div>
 		</div>
-		<div class="max-w-2xl mx-auto">
+		<div class="max-w-2xl">
 			<form @submit.prevent="submitRule()" class="bb-card p-0 overflow-hidden">
 				<!-- Top section: icon header + rule name -->
 				<div class="p-5 sm:p-6">
