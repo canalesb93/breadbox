@@ -2276,6 +2276,17 @@
         // stays open through the navigation (see the mobile-drawer IIFE
         // above), so without this the previously-active tab keeps its bold
         // highlight until the new page paints — feels unresponsive.
+        //
+        // The spinner is an inline SVG rotated by a CSS @keyframes
+        // animation, *not* daisy's `loading loading-spinner`. Daisy 5's
+        // spinner relies on SMIL `<animateTransform>` inside a
+        // `mask-image: url("data:…")` data URI, and Chromium / WebKit
+        // rasterize mask SVGs once — the SMIL animation never ticks, and
+        // at frame 0 the stroke-dasharray is `0,150` (zero visible
+        // length), so the spinner appears as an empty box that "freezes"
+        // the instant it's added. A CSS transform animation on an inline
+        // SVG runs on the compositor and stays alive through the
+        // navigation window until paint-holding replaces the document.
         if (window.innerWidth < 1024 && link.classList.contains('bb-sidebar-link')) {
           var sbNav = link.closest('.bb-sidebar-nav');
           if (sbNav) {
@@ -2293,8 +2304,9 @@
             });
             link.classList.add('bb-sidebar-link--active');
             var spinner = document.createElement('span');
-            spinner.className = 'bb-sidebar-loading ml-auto loading loading-spinner loading-xs';
+            spinner.className = 'bb-sidebar-loading ml-auto';
             spinner.setAttribute('aria-hidden', 'true');
+            spinner.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 150"/></svg>';
             link.appendChild(spinner);
           }
         }
