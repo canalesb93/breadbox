@@ -1,36 +1,38 @@
 package components
 
 // PageHeader is the canonical title row at the top of every admin page.
-// Replaces the duplicated `<div class="bb-page-header"><div><h1>...</h1>
-// <p>...</p></div>[<action>]</div>` block that appears in 37 templ files.
 //
 // Slots:
 //   - Title:    required
-//   - Subtitle: optional; rendered as a muted paragraph below the title.
+//   - Subtitle: optional muted paragraph below the title (also used to
+//               carry small dynamic counts, e.g. "237 transactions").
 //   - Icon:     optional Lucide icon name; rendered inline-left of the title.
-//   - Action:   optional templ.Component slot for the page's primary
-//               action (button, link, dropdown). Always right-aligned.
+//   - Action:   optional templ.Component for the page's PRIMARY action
+//               (typically a btn-primary). Right-aligned.
+//   - SecondaryAction: optional templ.Component for one secondary action
+//               (ghost-styled by convention — e.g. "Sync All"). Rendered
+//               just before Action.
 //   - SubtitleHideOnMobile: when true, applies `hidden sm:block` so the
 //               subtitle disappears on small screens (used on dense
 //               list pages where the subtitle is decorative).
 //
 // Conventions:
 //   - Single back-affordance rule: the breadcrumb above this header is
-//     the sole back link. Do not place a `← Back` link in the Action
-//     slot. See docs/design-system.md.
-//   - One primary action only. Cluster of buttons → use a dropdown.
+//     the sole back link. Do not place a `← Back` link in the Action slot.
+//   - At most one primary + one secondary action. Larger clusters →
+//     collapse to an OverflowMenu in the Action slot.
+//   - Detail pages with an icon-tile + badge row + meta row should use
+//     EntityHeader instead.
 //
 // Usage:
 //
 //   @components.PageHeader(components.PageHeaderProps{
-//     Title:    "Categories",
-//     Subtitle: "Organize transactions with a two-level taxonomy",
-//     SubtitleHideOnMobile: true,
+//     Title:    "Connections",
+//     Subtitle: "12 connections across 4 providers",
+//     SecondaryAction: components.PageHeaderSecondaryAction(
+//       templ.SafeURL("#"), "refresh-cw", "Sync All"),
 //     Action: components.PageHeaderAction(
-//       templ.SafeURL("/categories/new"),
-//       "plus",
-//       "Add Category",
-//     ),
+//       templ.SafeURL("/connections/new"), "plus", "Connect Bank"),
 //   })
 
 type PageHeaderProps struct {
@@ -38,9 +40,12 @@ type PageHeaderProps struct {
 	Subtitle             string
 	Icon                 string // optional Lucide icon name
 	SubtitleHideOnMobile bool
-	// Action is rendered in the trailing right-aligned slot. Typically
-	// constructed with PageHeaderAction(...) for the common case of a
-	// single primary link/button.
+	// SecondaryAction is rendered before Action in the trailing slot.
+	// Convention: ghost-styled button (use PageHeaderSecondaryAction).
+	SecondaryAction templ.Component
+	// Action is the trailing primary action. Typically constructed with
+	// PageHeaderAction(...) for the common case of a single primary
+	// link/button.
 	Action templ.Component
 }
 
@@ -63,21 +68,36 @@ templ PageHeader(p PageHeaderProps) {
 				}
 			}
 		</div>
-		if p.Action != nil {
+		if p.SecondaryAction != nil || p.Action != nil {
 			<div class="flex items-center gap-2 shrink-0">
-				@p.Action
+				if p.SecondaryAction != nil {
+					@p.SecondaryAction
+				}
+				if p.Action != nil {
+					@p.Action
+				}
 			</div>
 		}
 	</div>
 }
 
-// PageHeaderAction is a convenience constructor for the most common
-// trailing-slot shape: a primary `<a>` button with a leading Lucide
-// icon and a label. Pages with bespoke trailing content (toggle +
-// button, dropdown, multiple buttons) should pass a custom
-// templ.Component to PageHeaderProps.Action directly.
+// PageHeaderAction renders the most common trailing-slot shape: a
+// primary `<a>` button with a leading Lucide icon and a label.
 templ PageHeaderAction(href templ.SafeURL, icon string, label string) {
 	<a href={ href } class="btn btn-primary btn-sm gap-2">
+		if icon != "" {
+			<i data-lucide={ icon } class="w-4 h-4"></i>
+		}
+		{ label }
+	</a>
+}
+
+// PageHeaderSecondaryAction renders the convention shape for a single
+// secondary action: ghost-styled `<a>` with a leading Lucide icon.
+// For interactive secondary actions (Alpine click handlers, async
+// state) pass a custom templ.Component to PageHeaderProps.SecondaryAction.
+templ PageHeaderSecondaryAction(href templ.SafeURL, icon string, label string) {
+	<a href={ href } class="btn btn-ghost btn-sm gap-2">
 		if icon != "" {
 			<i data-lucide={ icon } class="w-4 h-4"></i>
 		}

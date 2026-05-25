@@ -12,38 +12,13 @@ import (
 // the rendered HTML into base.html's TemplContent slot.
 templ SyncLogDetail(p SyncLogDetailProps) {
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<!-- Header -->
-	<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-		<div class="flex items-center gap-4">
-			<div class={ "w-12 h-12 rounded-xl flex items-center justify-center shrink-0", components.SyncStatusBg(p.Log.Status) }>
-				@syncDetailHeaderIcon(p.Log.Status)
-			</div>
-			<div>
-				<h1 class="bb-page-title">
-					<a href={ templ.SafeURL("/connections/" + p.Log.ConnectionID) } class="hover:text-primary transition-colors">{ p.Log.InstitutionName }</a>
-				</h1>
-				<div class="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-base-content/40">
-					<span class="capitalize">{ p.Log.Provider }</span>
-					<span class="text-base-content/20">·</span>
-					<span class="badge badge-ghost badge-xs">{ p.Log.Trigger }</span>
-					@templ.Raw(components.SyncBadge(p.Log.Status))
-					if p.Log.WarningMessage != "" {
-						<span class="badge badge-warning badge-sm gap-1">
-							<i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
-						</span>
-					}
-					if p.Log.StartedAtRelative != "" {
-						<span class="text-base-content/20">·</span>
-						<span>{ p.Log.StartedAtRelative }</span>
-					}
-					if p.Log.Duration != "" {
-						<span class="text-base-content/20">·</span>
-						<span class="tabular-nums">{ p.Log.Duration }</span>
-					}
-				</div>
-			</div>
-		</div>
-	</div>
+	@components.EntityHeader(components.EntityHeaderProps{
+		Title:         p.Log.InstitutionName,
+		IconComponent: syncDetailHeaderIcon(p.Log.Status),
+		IconTone:      syncDetailIconTone(p.Log.Status),
+		Badges:        syncDetailBadges(p),
+		Meta:          syncDetailMeta(p),
+	})
 	<!-- Summary Stats -->
 	<div class={ "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6", summaryStatsXLClass(len(p.Log.RuleHits) > 0) }>
 		@components.StatTile(components.StatTileProps{
@@ -199,17 +174,55 @@ templ SyncLogDetail(p SyncLogDetailProps) {
 }
 
 // syncDetailHeaderIcon mirrors the inline {{if eq .Log.Status "x"}}…
-// branches that switch the header icon by status.
+// branches that switch the header icon by status. Tile bg is applied
+// separately by EntityHeader via syncDetailIconTone.
 templ syncDetailHeaderIcon(status string) {
 	switch status {
 		case "success":
-			<i data-lucide="check-circle-2" class="w-6 h-6 text-success"></i>
+			<i data-lucide="check-circle-2" class="w-6 h-6"></i>
 		case "error":
-			<i data-lucide="x-circle" class="w-6 h-6 text-error"></i>
+			<i data-lucide="x-circle" class="w-6 h-6"></i>
 		case "in_progress":
-			<i data-lucide="loader" class="w-6 h-6 text-warning animate-spin"></i>
+			<i data-lucide="loader" class="w-6 h-6 animate-spin"></i>
 		default:
-			<i data-lucide="minus-circle" class="w-6 h-6 text-base-content opacity-30"></i>
+			<i data-lucide="minus-circle" class="w-6 h-6"></i>
+	}
+}
+
+// syncDetailIconTone maps a sync-log status to the EntityHeader tile
+// tone. Matches the colors used by components.SyncStatusBg.
+func syncDetailIconTone(status string) components.IconTone {
+	switch status {
+	case "success":
+		return components.IconToneSuccess
+	case "error":
+		return components.IconToneError
+	case "in_progress":
+		return components.IconToneWarning
+	default:
+		return components.IconToneNeutral
+	}
+}
+
+templ syncDetailBadges(p SyncLogDetailProps) {
+	<span class="badge badge-ghost badge-sm">{ p.Log.Trigger }</span>
+	@templ.Raw(components.SyncBadge(p.Log.Status))
+	if p.Log.WarningMessage != "" {
+		<span class="badge badge-warning badge-sm gap-1">
+			<i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
+		</span>
+	}
+}
+
+templ syncDetailMeta(p SyncLogDetailProps) {
+	<span class="capitalize">{ p.Log.Provider }</span>
+	if p.Log.StartedAtRelative != "" {
+		<span class="text-base-content/20">·</span>
+		<span>{ p.Log.StartedAtRelative }</span>
+	}
+	if p.Log.Duration != "" {
+		<span class="text-base-content/20">·</span>
+		<span class="tabular-nums">{ p.Log.Duration }</span>
 	}
 }
 

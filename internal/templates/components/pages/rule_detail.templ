@@ -68,58 +68,59 @@ templ RuleDetail(p RuleDetailProps) {
 templ ruleDetailHeader(p RuleDetailProps) {
 	if p.Rule != nil {
 		{{ isSystem := p.Rule.CreatedByType == "system" }}
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-			<div class="flex items-center gap-4">
-				<div class={ "w-12", "h-12", "rounded-xl", "flex", "items-center", "justify-center", ruleHeaderTileClass(p.Rule.Enabled, isSystem) }>
-					if !p.Rule.Enabled {
-						<i data-lucide="pause" class="w-6 h-6 text-base-content opacity-30"></i>
-					} else if isSystem {
-						<i data-lucide="shield" class="w-6 h-6 text-info"></i>
-					} else {
-						<i data-lucide="zap" class="w-6 h-6 text-success"></i>
-					}
-				</div>
-				<div>
-					<h1 class="bb-page-title">{ p.Rule.Name }</h1>
-					<div class="flex items-center gap-2 mt-0.5 flex-wrap">
-						if p.Rule.Enabled {
-							<span class="badge badge-soft badge-success badge-sm">Enabled</span>
-						} else {
-							<span class="badge badge-ghost badge-sm">Disabled</span>
-						}
-						if isSystem {
-							<span class="badge badge-soft badge-info badge-sm gap-1" title="Built-in system rule">
-								<i data-lucide="shield" class="w-3 h-3"></i>
-								System rule
-							</span>
-						}
-						<span class="badge badge-ghost badge-sm" title="When this rule fires">{ p.TriggerLabel }</span>
-						<span class="text-xs text-base-content/40">{ fmt.Sprintf("Priority %d", p.Rule.Priority) }</span>
-						<span class="text-xs text-base-content/40">·</span>
-						<span class="text-xs text-base-content/40">{ ruleCreatedByLabel(p.Rule.CreatedByType) }</span>
-						if p.Rule.ExpiresAt != nil {
-							<span class="text-xs text-base-content/40">·</span>
-							<span class="text-xs text-warning">{ "Expires " + *p.Rule.ExpiresAt }</span>
-						}
-					</div>
-				</div>
-			</div>
-			<div class="flex items-center gap-2">
-				<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline">
-					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
-				</a>
-				<button class="btn btn-sm btn-ghost" @click="toggleRule()">
-					if p.Rule.Enabled {
-						<i data-lucide="pause" class="w-3.5 h-3.5"></i>
-						Disable
-					} else {
-						<i data-lucide="play" class="w-3.5 h-3.5"></i>
-						Enable
-					}
-				</button>
-			</div>
-		</div>
+		@components.EntityHeader(components.EntityHeaderProps{
+			Title:           p.Rule.Name,
+			Icon:            ruleHeaderIconName(p.Rule.Enabled, isSystem),
+			IconTone:        ruleHeaderIconTone(p.Rule.Enabled, isSystem),
+			Badges:          ruleDetailBadges(p, isSystem),
+			Meta:            ruleDetailMeta(p),
+			SecondaryAction: ruleDetailToggleBtn(p),
+			Action:          ruleDetailEditBtn(p),
+		})
 	}
+}
+
+templ ruleDetailBadges(p RuleDetailProps, isSystem bool) {
+	if p.Rule.Enabled {
+		<span class="badge badge-soft badge-success badge-sm">Enabled</span>
+	} else {
+		<span class="badge badge-ghost badge-sm">Disabled</span>
+	}
+	if isSystem {
+		<span class="badge badge-soft badge-info badge-sm gap-1" title="Built-in system rule">
+			<i data-lucide="shield" class="w-3 h-3"></i>
+			System rule
+		</span>
+	}
+	<span class="badge badge-ghost badge-sm" title="When this rule fires">{ p.TriggerLabel }</span>
+}
+
+templ ruleDetailMeta(p RuleDetailProps) {
+	<span>{ fmt.Sprintf("Priority %d", p.Rule.Priority) }</span>
+	<span class="text-base-content/20">·</span>
+	<span>{ ruleCreatedByLabel(p.Rule.CreatedByType) }</span>
+	if p.Rule.ExpiresAt != nil {
+		<span class="text-base-content/20">·</span>
+		<span class="text-warning">{ "Expires " + *p.Rule.ExpiresAt }</span>
+	}
+}
+
+templ ruleDetailEditBtn(p RuleDetailProps) {
+	<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline">
+		<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+	</a>
+}
+
+templ ruleDetailToggleBtn(p RuleDetailProps) {
+	<button class="btn btn-sm btn-ghost" @click="toggleRule()">
+		if p.Rule.Enabled {
+			<i data-lucide="pause" class="w-3.5 h-3.5"></i>
+			Disable
+		} else {
+			<i data-lucide="play" class="w-3.5 h-3.5"></i>
+			Enable
+		}
+	</button>
 }
 
 // ruleDetailWhatItDoes renders the conditions + actions card.

@@ -1,0 +1,136 @@
+package components
+
+// EntityHeader is the canonical header for a single-entity detail page —
+// account, connection, rule, sync log, transaction, etc. It's the
+// detail-page sibling of PageHeader: same trailing Action /
+// SecondaryAction contract, but the leading column is an icon tile
+// plus a (title + badge row + meta row) stack.
+//
+// Slots:
+//   - Title:           required
+//   - TitleClass:      optional override on the <h1> (e.g. "truncate",
+//                      "break-words", "font-mono") — useful when the
+//                      title is a long provider string or a short_id.
+//   - Icon:            Lucide icon name shown in the colored tile.
+//   - IconTone:        tile tone (primary/info/success/warning/error/neutral).
+//                      Defaults to neutral. Maps to .bb-icon-tile--*.
+//   - IconComponent:   optional custom-rendered icon (e.g. provider SVG).
+//                      When set, Icon is ignored. The tile background is
+//                      still IconTone — pass IconTone="" to suppress.
+//   - Badges:          inline badge row to the right of the title baseline.
+//                      Wrap status chips, "Linked", "Excluded", etc.
+//   - Meta:            text-xs bullet-separated metadata line below.
+//                      Use EntityHeaderMeta(...) for the standard shape.
+//   - Action:          trailing primary action.
+//   - SecondaryAction: trailing secondary (ghost) action.
+//
+// Conventions match PageHeader: at most one primary + one secondary;
+// larger clusters → OverflowMenu in Action.
+//
+// Usage:
+//
+//   @components.EntityHeader(components.EntityHeaderProps{
+//     Title:    p.InstitutionName,
+//     TitleClass: "truncate",
+//     Icon:     "building-2",
+//     IconTone: components.IconToneInfo,
+//     Badges:   connDetailBadges(p),
+//     Meta:     connDetailMeta(p),
+//     Action:   connDetailReauthBtn(p),
+//   })
+
+type IconTone string
+
+const (
+	IconToneDefault IconTone = ""
+	IconTonePrimary IconTone = "primary"
+	IconToneInfo    IconTone = "info"
+	IconToneSuccess IconTone = "success"
+	IconToneWarning IconTone = "warning"
+	IconToneError   IconTone = "error"
+	IconToneNeutral IconTone = "neutral"
+)
+
+type EntityHeaderProps struct {
+	Title           string
+	TitleClass      string
+	Icon            string
+	IconTone        IconTone
+	IconComponent   templ.Component
+	Badges          templ.Component
+	Meta            templ.Component
+	Action          templ.Component
+	SecondaryAction templ.Component
+}
+
+templ EntityHeader(p EntityHeaderProps) {
+	<div class="bb-page-header">
+		<div class="flex items-center gap-4 min-w-0">
+			if p.Icon != "" || p.IconComponent != nil {
+				<div class={ "bb-entity-header__tile", iconToneClass(p.IconTone) }>
+					if p.IconComponent != nil {
+						@p.IconComponent
+					} else {
+						<i data-lucide={ p.Icon } class="w-6 h-6"></i>
+					}
+				</div>
+			}
+			<div class="min-w-0">
+				<div class="flex items-center gap-2.5 flex-wrap">
+					<h1 class={ "bb-page-title", p.TitleClass }>{ p.Title }</h1>
+					if p.Badges != nil {
+						@p.Badges
+					}
+				</div>
+				if p.Meta != nil {
+					<div class="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-base-content/40">
+						@p.Meta
+					</div>
+				}
+			</div>
+		</div>
+		if p.SecondaryAction != nil || p.Action != nil {
+			<div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+				if p.SecondaryAction != nil {
+					@p.SecondaryAction
+				}
+				if p.Action != nil {
+					@p.Action
+				}
+			</div>
+		}
+	</div>
+}
+
+// EntityHeaderMeta wraps the bullet-separated meta row pattern. Pass
+// strings; empty entries are skipped. Bullets are inserted between
+// non-empty entries.
+templ EntityHeaderMeta(parts ...string) {
+	{{ first := true }}
+	for _, part := range parts {
+		if part != "" {
+			if !first {
+				<span class="text-base-content/20">·</span>
+			}
+			<span>{ part }</span>
+			{{ first = false }}
+		}
+	}
+}
+
+func iconToneClass(t IconTone) string {
+	switch t {
+	case IconTonePrimary:
+		return "bb-icon-tile--primary"
+	case IconToneInfo:
+		return "bb-icon-tile--info"
+	case IconToneSuccess:
+		return "bb-icon-tile--success"
+	case IconToneWarning:
+		return "bb-icon-tile--warning"
+	case IconToneError:
+		return "bb-icon-tile--error"
+	default:
+		return "bb-icon-tile--neutral"
+	}
+}

@@ -237,11 +237,19 @@
   .bb-icon-header__tile { @apply flex items-center justify-center w-10 h-10 rounded-xl shrink-0; }
   .bb-icon-header__text { @apply min-w-0; }
 
-  /* Color modifiers for the icon tile. Pair with .bb-icon-header__tile. */
+  /* Color modifiers for the icon tile. Pair with .bb-icon-header__tile
+     (40×40 inside form cards) or .bb-entity-header__tile (48×48 at the
+     top of detail pages — see EntityHeader templ component). */
   .bb-icon-tile--primary { @apply bg-primary/8 text-primary; }
+  .bb-icon-tile--info    { @apply bg-info/10 text-info; }
   .bb-icon-tile--success { @apply bg-success/10 text-success; }
   .bb-icon-tile--warning { @apply bg-warning/10 text-warning; }
   .bb-icon-tile--error   { @apply bg-error/10 text-error; }
+  .bb-icon-tile--neutral { @apply bg-base-200 text-base-content/60; }
+
+  /* Detail-page entity header — 48×48 tile sized for the top-of-page
+     row that pairs an icon with the entity name + badges + meta line. */
+  .bb-entity-header__tile { @apply flex items-center justify-center w-12 h-12 rounded-xl shrink-0; }
 
   /* Action row at the bottom of a sectioned form card.
      Left-aligned on mobile (thumb-reach), right-aligned on sm+. */

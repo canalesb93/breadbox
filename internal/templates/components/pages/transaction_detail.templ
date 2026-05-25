@@ -64,47 +64,51 @@ templ TransactionDetail(p TransactionDetailProps) {
 }
 
 templ txdHero(p TransactionDetailProps) {
-	<!-- Hero: Transaction name + amount -->
-	<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-		<div class="flex items-center gap-3 sm:gap-4 min-w-0">
-			<div class={ "w-12 h-12 rounded-xl flex items-center justify-center shrink-0", txdHeroTileBg(p.Transaction.Amount) }>
-				<i data-lucide={ txdHeroIcon(p.Transaction.Amount) } class={ "w-6 h-6", txdHeroIconColor(p.Transaction.Amount) }></i>
-			</div>
-			<div class="min-w-0 flex-1">
-				<h1 class="bb-page-title break-words">{ p.Transaction.ProviderName }</h1>
-				<div class="flex items-center gap-2 mt-0.5 flex-wrap">
-					<span class="text-xs text-base-content/40">{ components.FormatDate(p.Transaction.Date) }</span>
-					if p.Transaction.ProviderMerchantName != nil && *p.Transaction.ProviderMerchantName != "" {
-						<span class="text-xs text-base-content/30">&middot;</span>
-						<span class="text-xs text-base-content/40">{ components.TitleCase(*p.Transaction.ProviderMerchantName) }</span>
-					}
-					if p.Transaction.Pending {
-						<span class="text-xs text-base-content/30">&middot;</span>
-						<span class="text-xs text-warning/70" title="Not yet posted">Pending</span>
-					}
-				</div>
-			</div>
-		</div>
-		<div class="flex flex-row items-baseline justify-between sm:block sm:text-right shrink-0">
-			<p
-				class="inline-flex items-center gap-2 justify-end"
-				if p.Transaction.Pending {
-					title="Pending — not yet posted"
-				}
-			>
-				if p.Transaction.Pending {
-					<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning opacity-70"></i>
-				}
-				@components.Amount(components.AmountProps{
-					Value:   p.Transaction.Amount,
-					Pending: p.Transaction.Pending,
-					Class:   "text-3xl font-semibold",
-				})
-			</p>
-			if p.Transaction.IsoCurrencyCode != nil && *p.Transaction.IsoCurrencyCode != "" {
-				<p class="text-xs text-base-content/30 mt-0.5 sm:mt-0.5 ml-1 sm:ml-0">{ *p.Transaction.IsoCurrencyCode }</p>
+	@components.EntityHeader(components.EntityHeaderProps{
+		Title:      p.Transaction.ProviderName,
+		TitleClass: "break-words",
+		Icon:       txdHeroIcon(p.Transaction.Amount),
+		IconTone:   txdHeroIconTone(p.Transaction.Amount),
+		Meta:       txdHeroMeta(p),
+		Action:     txdHeroAmount(p),
+	})
+}
+
+templ txdHeroMeta(p TransactionDetailProps) {
+	<span>{ components.FormatDate(p.Transaction.Date) }</span>
+	if p.Transaction.ProviderMerchantName != nil && *p.Transaction.ProviderMerchantName != "" {
+		<span class="text-base-content/20">·</span>
+		<span>{ components.TitleCase(*p.Transaction.ProviderMerchantName) }</span>
+	}
+	if p.Transaction.Pending {
+		<span class="text-base-content/20">·</span>
+		<span class="text-warning/70" title="Not yet posted">Pending</span>
+	}
+}
+
+// txdHeroAmount renders the right-aligned amount + currency block in
+// the EntityHeader trailing slot. This is the transaction page's hero
+// figure — kept large via text-3xl on the Amount component.
+templ txdHeroAmount(p TransactionDetailProps) {
+	<div class="flex flex-col items-end shrink-0">
+		<p
+			class="inline-flex items-center gap-2 justify-end"
+			if p.Transaction.Pending {
+				title="Pending — not yet posted"
 			}
-		</div>
+		>
+			if p.Transaction.Pending {
+				<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning opacity-70"></i>
+			}
+			@components.Amount(components.AmountProps{
+				Value:   p.Transaction.Amount,
+				Pending: p.Transaction.Pending,
+				Class:   "text-3xl font-semibold",
+			})
+		</p>
+		if p.Transaction.IsoCurrencyCode != nil && *p.Transaction.IsoCurrencyCode != "" {
+			<p class="text-xs text-base-content/30 mt-0.5">{ *p.Transaction.IsoCurrencyCode }</p>
+		}
 	</div>
 }
 
@@ -865,16 +869,9 @@ templ txdInlineTagChip(e service.ActivityEntry) {
 
 // ---- helpers ----
 
-// txdHeroTileBg returns the rounded-tile background color class for the
-// hero icon: success when the amount is a credit (negative), error when
-// it's a debit (positive).
-func txdHeroTileBg(amount float64) string {
-	if amount < 0 {
-		return "bg-success/10"
-	}
-	return "bg-error/10"
-}
-
+// txdHeroIcon returns the hero icon name based on amount sign — a
+// credit (negative) shows the inbound arrow, a debit (positive) shows
+// the outbound arrow.
 func txdHeroIcon(amount float64) string {
 	if amount < 0 {
 		return "arrow-down-left"
@@ -882,11 +879,13 @@ func txdHeroIcon(amount float64) string {
 	return "arrow-up-right"
 }
 
-func txdHeroIconColor(amount float64) string {
+// txdHeroIconTone maps the amount sign to the EntityHeader tile tone:
+// credit → success (green), debit → error (red).
+func txdHeroIconTone(amount float64) components.IconTone {
 	if amount < 0 {
-		return "text-success"
+		return components.IconToneSuccess
 	}
-	return "text-error"
+	return components.IconToneError
 }
 
 // txdReviewBg returns the review-icon tile background class.

@@ -116,9 +116,16 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "page-header",
 			Title:       "Page header",
-			Description: "bb-page-header + bb-page-title + optional primary action slot.",
+			Description: "bb-page-header + bb-page-title + optional secondary + primary action slots.",
 			Group:       "layout",
 			Render:      func() templ.Component { return SectionPageHeader() },
+		},
+		{
+			Slug:        "entity-header",
+			Title:       "Entity header",
+			Description: "Detail-page header: icon tile + title + badges + bullet-separated meta + actions. Use components.EntityHeader for account/connection/rule/sync-log/transaction detail pages.",
+			Group:       "layout",
+			Render:      func() templ.Component { return SectionEntityHeader() },
 		},
 		{
 			Slug:        "section-header",

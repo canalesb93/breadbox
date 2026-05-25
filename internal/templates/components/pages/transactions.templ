@@ -47,8 +47,12 @@ templ Transactions(p TransactionsProps) {
 	></div>
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
-	@txPageHeader(p)
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Transactions",
+		Subtitle: txSubtitle(p),
+	})
 	@txFilters(p)
+	@txToolbar(p)
 	if len(p.Transactions) > 0 {
 		@txResultsShell(p)
 	} else {
@@ -87,54 +91,56 @@ templ TransactionsResults(p components.TxResultsProps) {
 	@components.TxResults(p)
 }
 
-templ txPageHeader(p TransactionsProps) {
-	<!-- Page Header -->
-	<div class="bb-page-header">
-		<div class="flex items-baseline gap-3">
-			<h1 class="bb-page-title">Transactions</h1>
-			if p.Total > 0 {
-				<span class="text-sm text-base-content/40 tabular-nums">
-					{ fmt.Sprintf("%d transaction%s", p.Total, components.PluralS(p.Total)) }
-				</span>
-			}
-		</div>
-		<div class="flex items-center gap-2">
-			<!-- View Toggle — daisy join + join-item btn (segmented control). -->
-			<div class="join border border-base-300 bg-base-200" x-data>
-				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
-					<i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
-					<span class="hidden sm:inline">Grouped</span>
-				</button>
-				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')" title="Flat list view">
-					<i data-lucide="list" class="w-3.5 h-3.5"></i>
-					<span class="hidden sm:inline">List</span>
-				</button>
-			</div>
-			<!-- Selection mode toggle -->
-			<button
-				type="button"
-				x-data
-				@click="$store.bulk.toggleMode()"
-				class="btn btn-ghost btn-sm gap-2"
-				:class="$store.bulk.selecting && 'bg-primary/10 text-primary'"
-				title="Toggle selection mode"
-			>
-				<i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
-				<span class="hidden sm:inline" x-text="$store.bulk.selecting ? 'Done' : 'Select'"></span>
+// txSubtitle is the count-line that sits in the PageHeader subtitle slot.
+// Empty when there are no transactions so the subtitle row collapses.
+func txSubtitle(p TransactionsProps) string {
+	if p.Total <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d transaction%s", p.Total, components.PluralS(p.Total))
+}
+
+// txToolbar sits between the filter bar and the results — view-mode
+// segmented control, bulk-select toggle, and the filter-aware
+// Clear / Export buttons. These live here (rather than in the page
+// header) because they're table-scoped affordances.
+templ txToolbar(p TransactionsProps) {
+	<div class="flex items-center justify-end gap-2 mb-3">
+		<!-- View Toggle — daisy join + join-item btn (segmented control). -->
+		<div class="join border border-base-300 bg-base-200" x-data>
+			<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
+				<i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
+				<span class="hidden sm:inline">Grouped</span>
 			</button>
-			if p.HasAnyFilter() {
-				<a href="/transactions" class="btn btn-ghost btn-sm">
-					<i data-lucide="x" class="w-3.5 h-3.5"></i>
-					<span class="hidden sm:inline">Clear filters</span>
-				</a>
-			}
-			if len(p.Transactions) > 0 {
-				<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm" title="Export as CSV">
-					<i data-lucide="download" class="w-3.5 h-3.5"></i>
-					<span class="hidden sm:inline">Export CSV</span>
-				</a>
-			}
+			<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')" title="Flat list view">
+				<i data-lucide="list" class="w-3.5 h-3.5"></i>
+				<span class="hidden sm:inline">List</span>
+			</button>
 		</div>
+		<!-- Selection mode toggle -->
+		<button
+			type="button"
+			x-data
+			@click="$store.bulk.toggleMode()"
+			class="btn btn-ghost btn-sm gap-2"
+			:class="$store.bulk.selecting && 'bg-primary/10 text-primary'"
+			title="Toggle selection mode"
+		>
+			<i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+			<span class="hidden sm:inline" x-text="$store.bulk.selecting ? 'Done' : 'Select'"></span>
+		</button>
+		if p.HasAnyFilter() {
+			<a href="/transactions" class="btn btn-ghost btn-sm">
+				<i data-lucide="x" class="w-3.5 h-3.5"></i>
+				<span class="hidden sm:inline">Clear filters</span>
+			</a>
+		}
+		if len(p.Transactions) > 0 {
+			<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm" title="Export as CSV">
+				<i data-lucide="download" class="w-3.5 h-3.5"></i>
+				<span class="hidden sm:inline">Export CSV</span>
+			</a>
+		}
 	</div>
 }
 
