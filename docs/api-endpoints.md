@@ -298,6 +298,5 @@ Common codes: `VALIDATION_ERROR`, `INVALID_PARAMETER`, `NOT_FOUND`, `UNAUTHORIZE
 
 - [`openapi.yaml`](../openapi.yaml) — machine-readable spec; the drift test (`internal/api/openapi_drift_test.go`) fails CI when chi routes and the spec disagree
 - [`docs/api-reference.md`](api-reference.md) — long-form prose with request/response examples
-- [`docs/headless-api-plan.md`](headless-api-plan.md) — design context for the headless control plane
 - [`.claude/rules/api.md`](../.claude/rules/api.md) — handler/auth conventions
 - [`.claude/rules/api-endpoints.md`](../.claude/rules/api-endpoints.md) — upkeep rule for this file

@@ -381,7 +381,7 @@ Errors:
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` is neither multipart nor JSON |
 | 500 | `INTERNAL_ERROR` | unexpected server failure |
 
-See `docs/csv-import.md` for the full CSV format reference (supported delimiters, BOM handling, dedup hash, bank template list).
+See [CSV import on docs.breadbox.sh](https://docs.breadbox.sh/connections/csv-import) for the full CSV format reference (supported delimiters, BOM handling, dedup hash, bank template list).
 
 ### GET `/connections/{id}`
 

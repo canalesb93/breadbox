@@ -277,7 +277,7 @@ CREATE TYPE connection_status AS ENUM (
 );
 ```
 
-> **Canonical enum values:** The four values above (`active`, `error`, `pending_reauth`, `disconnected`) are the authoritative connection status values for all Breadbox documents. `rest-api.md`, `mcp-server.md`, and `plaid-integration.md` must align to these exact values. `reauth_required`, `syncing`, `pending`, and `disabled` are not valid enum values in this schema.
+> **Canonical enum values:** The four values above (`active`, `error`, `pending_reauth`, `disconnected`) are the authoritative connection status values for all Breadbox documents. Other docs (`mcp-server.md`, `api-reference.md`, `openapi.yaml`, anything on docs.breadbox.sh) must align to these exact values. `reauth_required`, `syncing`, `pending`, and `disabled` are not valid enum values in this schema.
 
 #### Columns
 
@@ -357,7 +357,7 @@ The `(provider, external_id)` unique constraint prevents duplicate connections f
 | `iso_currency_code` | `TEXT` | Yes | `NULL` | ISO-4217 currency code for the balances (e.g., `USD`, `EUR`). `NULL` if Plaid returns an unofficial currency. |
 | `display_name` | `TEXT` | Yes | `NULL` | Optional user-assigned display name. Templates use `COALESCE(display_name, name)` for rendering. Added in Phase 10. |
 | `excluded` | `BOOLEAN` | No | `FALSE` | When `TRUE`, transaction upsert is skipped during sync (balances still refresh). Useful for accounts the user wants to track balances on but not import transactions from. Added in Phase 10. |
-| `last_balance_update` | `TIMESTAMPTZ` | Yes | `NULL` | When the balance columns were last refreshed from the provider. Set after each successful `/accounts/get` call. This is the canonical column name; `plaid-integration.md` should be updated to use `last_balance_update` instead of `balance_updated_at`. |
+| `last_balance_update` | `TIMESTAMPTZ` | Yes | `NULL` | When the balance columns were last refreshed from the provider. Set after each successful `/accounts/get` call. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
 
@@ -481,7 +481,7 @@ CREATE TYPE sync_status AS ENUM (
 );
 ```
 
-> **Canonical enum values:** The three values above (`in_progress`, `success`, `error`) are the authoritative sync log status values. `rest-api.md` uses `completed` and `failed` in its response schema — those are incorrect and must be updated to match this enum. All other documents should align to these values.
+> **Canonical enum values:** The three values above (`in_progress`, `success`, `error`) are the authoritative sync log status values. All other documents (`api-reference.md`, `openapi.yaml`, docs.breadbox.sh) must align to these values.
 
 #### Columns
 

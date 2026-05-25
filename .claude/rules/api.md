@@ -75,7 +75,7 @@ Two shapes, picked per-resource:
 
   The list key matches the resource (`transactions`, `rules`, `reviews`, etc.). Pagination metadata fields (`next_cursor`, `has_more`, `total`, `limit`) are included when meaningful for that endpoint.
 
-There is **no** `{ "data": [...] }` envelope. Old drafts of `docs/rest-api.md` showed one; reality is resource-keyed. When adding a new paginated list endpoint, pick a resource key and follow the paginated shape above.
+There is **no** `{ "data": [...] }` envelope. Responses are resource-keyed. When adding a new paginated list endpoint, pick a resource key and follow the paginated shape above.
 
 ## Pagination
 
