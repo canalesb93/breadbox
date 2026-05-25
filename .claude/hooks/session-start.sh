@@ -1,6 +1,10 @@
 #!/bin/bash
 # Session startup hook for Claude Code.
-# - Remote (web) sessions: installs tools and generates build artifacts from scratch
+# - Remote (web) sessions: installs tools, generates code + CSS, brings up
+#   Postgres with dev + test DBs, mints/persists ENCRYPTION_KEY, builds
+#   bin/breadbox, applies migrations, seeds an admin, and writes
+#   DATABASE_URL / ENCRYPTION_KEY / SERVER_PORT / BB_USER / BB_PASS into
+#   CLAUDE_ENV_FILE so `bin/breadbox serve` works in one command.
 # - Local worktree sessions: verifies build and injects env vars
 #   (file copying is handled by .worktreeinclude)
 
@@ -242,21 +246,110 @@ if command -v npm &>/dev/null; then
   fi
 fi
 
-# --- Test database ---
-echo "==> Setting up test database..."
+# --- Postgres + databases ---
+# Cloud sessions start with no Postgres data dir state guaranteed. Bring up
+# the cluster and ensure both the test DB (used by `make test-integration`)
+# and the dev DB (used by `breadbox serve` and `make dev`) exist with the
+# `breadbox` role. All steps idempotent.
+echo "==> Setting up Postgres + dev/test databases..."
+DB_READY=false
 if command -v pg_isready &>/dev/null; then
-  # Start PostgreSQL if not running
   if ! pg_isready -q 2>/dev/null; then
     pg_ctlcluster 16 main start 2>/dev/null || true
   fi
-  # Create test user and database (idempotent)
   sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='breadbox'" 2>/dev/null | grep -q 1 \
     || sudo -u postgres psql -c "CREATE ROLE breadbox WITH LOGIN PASSWORD 'breadbox'" 2>/dev/null
+  sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='breadbox'" 2>/dev/null | grep -q 1 \
+    || sudo -u postgres createdb -O breadbox breadbox 2>/dev/null
   sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='breadbox_test'" 2>/dev/null | grep -q 1 \
     || sudo -u postgres createdb -O breadbox breadbox_test 2>/dev/null
-  echo "    breadbox_test database ready"
+  echo "    breadbox + breadbox_test databases ready"
+  DB_READY=true
 else
-  echo "WARN: pg_isready not found, skipping test DB setup"
+  echo "WARN: pg_isready not found, skipping DB setup"
+fi
+
+# --- ENCRYPTION_KEY (cloud sessions) ---
+# Mint once and persist to the same cache path worktrees use, so subsequent
+# restarts of the same container reuse the key and any rows encrypted under
+# it (Plaid/Teller tokens, Teller PEMs) keep decrypting.
+KEY_CACHE="$HOME/.local/share/breadbox/dev-encryption-key"
+EK=""
+if [ -f "$KEY_CACHE" ]; then
+  CAND="$(head -1 "$KEY_CACHE" 2>/dev/null | tr -d '\r\n' || true)"
+  if [[ "$CAND" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    EK="$CAND"
+  fi
+fi
+if [ -z "$EK" ]; then
+  if command -v openssl &>/dev/null; then
+    EK="$(openssl rand -hex 32)"
+  else
+    EK="$(od -A n -t x1 -N 32 /dev/urandom | tr -d ' \n')"
+  fi
+  mkdir -p "$(dirname "$KEY_CACHE")"
+  (
+    umask 077
+    printf '%s\n' "$EK" > "$KEY_CACHE.tmp" && mv -f "$KEY_CACHE.tmp" "$KEY_CACHE"
+  ) || echo "WARN: failed to persist ENCRYPTION_KEY cache at $KEY_CACHE"
+  echo "    Minted fresh ENCRYPTION_KEY (cached at $KEY_CACHE)"
+else
+  echo "    Reusing ENCRYPTION_KEY from $KEY_CACHE"
+fi
+
+# --- Env vars for the agent's shell ---
+# Mirrors what the worktree branch above writes: a fresh `breadbox serve`,
+# `bin/breadbox migrate`, etc. should pick the right DB + key + port with
+# no extra exports.
+DB_URL='postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable'
+BB_ADMIN_USER='admin@example.com'
+BB_ADMIN_PASS='password'
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  {
+    [ -z "${DATABASE_URL:-}" ]   && echo "DATABASE_URL=$DB_URL"
+    [ -z "${ENCRYPTION_KEY:-}" ] && echo "ENCRYPTION_KEY=$EK"
+    [ -z "${SERVER_PORT:-}" ]    && echo "SERVER_PORT=8081"
+    [ -z "${PORT:-}" ]           && echo "PORT=8081"
+    [ -z "${BB_USER:-}" ]        && echo "BB_USER=$BB_ADMIN_USER"
+    [ -z "${BB_PASS:-}" ]        && echo "BB_PASS=$BB_ADMIN_PASS"
+  } >> "$CLAUDE_ENV_FILE"
+  echo "    Wrote DATABASE_URL + ENCRYPTION_KEY + SERVER_PORT + BB_USER/BB_PASS to CLAUDE_ENV_FILE"
+fi
+# Also export in-process so the migrate / create-admin steps below see them.
+export DATABASE_URL="$DB_URL"
+export ENCRYPTION_KEY="$EK"
+
+# --- Build the dev binary ---
+# Used by the migrate + create-admin steps below, and reusable by the agent
+# (`bin/breadbox serve`, `bin/breadbox migrate`, etc.).
+echo "==> Building bin/breadbox..."
+mkdir -p bin
+if go build -o bin/breadbox ./cmd/breadbox 2>&1; then
+  echo "    bin/breadbox built"
+else
+  echo "WARN: go build failed — bin/breadbox not available"
+fi
+
+# --- Apply migrations + seed admin ---
+# Goose tracks state in the DB so `migrate up` is a no-op on warm starts.
+# `create-admin` errors with "already exists" on warm starts — fine, swallow
+# it. Credentials are exposed via BB_USER/BB_PASS above so the validate-ui
+# skill can log in without rediscovering them.
+if [ "$DB_READY" = "true" ] && [ -x bin/breadbox ]; then
+  echo "==> Applying migrations to breadbox..."
+  if ! bin/breadbox migrate up 2>&1 | tail -3; then
+    echo "WARN: migrate up failed"
+  fi
+
+  echo "==> Seeding admin user ($BB_ADMIN_USER)..."
+  SEED_OUT="$(bin/breadbox create-admin --username "$BB_ADMIN_USER" --password "$BB_ADMIN_PASS" 2>&1 || true)"
+  case "$SEED_OUT" in
+    *"created successfully"*) echo "    admin created" ;;
+    *"already exists"*)       echo "    admin already exists" ;;
+    *)                        echo "WARN: create-admin: $SEED_OUT" ;;
+  esac
 fi
 
 echo "==> Session setup complete."
+echo "    Next: \`bin/breadbox serve\` (listens on :\$SERVER_PORT, default 8081)."
+echo "    Admin login: $BB_ADMIN_USER / $BB_ADMIN_PASS"
