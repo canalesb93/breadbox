@@ -690,13 +690,11 @@
                   'bb-tagpicker-chip--mixed':          chip.state === 'mixed',
                   'bb-tagpicker-chip--pending-add':    chip.state === 'pending-add',
                   'bb-tagpicker-chip--pending-remove': chip.state === 'pending-remove',
-                  'tooltip tooltip-top':               chip.display_name && chip.display_name !== chip.slug,
                 }"
-                :data-tip="chip.display_name && chip.display_name !== chip.slug ? chip.slug : null"
                 :style="chip.color ? ('--tag-color:' + chip.color) : ''"
                 @click="cycleChip(chip)"
                 x-effect="syncChipGlyph($el, chip.state, chip.icon)"
-                :title="chip.slug">
+                :title="chip.display_name && chip.display_name !== chip.slug ? (chip.display_name + ' — ' + chip.slug) : chip.slug">
                 <!-- Glyph slot — rewritten imperatively on state change.
                      Can't use <template x-if> + lucide here: lucide replaces
                      <i data-lucide> with <svg>, which Alpine no longer tracks,
