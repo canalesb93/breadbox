@@ -2232,6 +2232,34 @@
           mainContent.style.filter = 'blur(1px)';
           mainContent.style.pointerEvents = 'none';
         }
+
+        // Mobile sidebar: optimistically move the active marker to the
+        // clicked tab and show a trailing spinner. The drawer intentionally
+        // stays open through the navigation (see the mobile-drawer IIFE
+        // above), so without this the previously-active tab keeps its bold
+        // highlight until the new page paints — feels unresponsive.
+        if (window.innerWidth < 1024 && link.classList.contains('bb-sidebar-link')) {
+          var sbNav = link.closest('.bb-sidebar-nav');
+          if (sbNav) {
+            // Remember the server-rendered active link the first time we
+            // mutate, so pagehide can restore it before bfcache snapshots.
+            var origActive = sbNav.querySelector('.bb-sidebar-link--active');
+            if (origActive && !sbNav.querySelector('[data-bb-was-active]')) {
+              origActive.setAttribute('data-bb-was-active', '');
+            }
+            sbNav.querySelectorAll('.bb-sidebar-link--active').forEach(function(el) {
+              el.classList.remove('bb-sidebar-link--active');
+            });
+            sbNav.querySelectorAll('.bb-sidebar-loading').forEach(function(el) {
+              el.remove();
+            });
+            link.classList.add('bb-sidebar-link--active');
+            var spinner = document.createElement('span');
+            spinner.className = 'bb-sidebar-loading ml-auto loading loading-spinner loading-xs';
+            spinner.setAttribute('aria-hidden', 'true');
+            link.appendChild(spinner);
+          }
+        }
       });
 
       // Handle form submissions
@@ -2260,6 +2288,26 @@
       // Before unload — ensure bar stays visible
       window.addEventListener('beforeunload', function() {
         if (isActive) setProgress(90);
+      });
+
+      // pagehide fires before the document enters bfcache. Roll back the
+      // mobile-sidebar optimistic state so a back-navigation restoring this
+      // page from cache shows the correct (server-rendered) active tab and
+      // no leftover spinner.
+      window.addEventListener('pagehide', function() {
+        document.querySelectorAll('.bb-sidebar-nav .bb-sidebar-loading').forEach(function(el) {
+          el.remove();
+        });
+        document.querySelectorAll('.bb-sidebar-nav [data-bb-was-active]').forEach(function(el) {
+          var nav = el.closest('.bb-sidebar-nav');
+          if (nav) {
+            nav.querySelectorAll('.bb-sidebar-link--active').forEach(function(other) {
+              other.classList.remove('bb-sidebar-link--active');
+            });
+          }
+          el.classList.add('bb-sidebar-link--active');
+          el.removeAttribute('data-bb-was-active');
+        });
       });
     })();
 
