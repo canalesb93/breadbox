@@ -187,17 +187,44 @@ document.addEventListener('alpine:init', function () {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.text();
         }).then(function (html) {
-          bodyEl.innerHTML = html;
-          self.currentTab = tab;
-          // Execute any inline <script> tags in the fragment so the tab's
-          // Alpine factories / lucide refreshers wire up. innerHTML alone
-          // doesn't run scripts.
-          self._executeScripts(bodyEl);
-          self._refreshIcons();
-          // Scroll body to top — feels jarring otherwise when switching
-          // from a long tab to a short one.
-          var scrollWrap = bodyEl.closest('.overflow-y-auto');
-          if (scrollWrap) scrollWrap.scrollTop = 0;
+          // Parse the fragment OFF-DOM so Alpine's mutation observer
+          // doesn't try to instantiate x-data="avatarEditor" before the
+          // tab's factory script has loaded. We pull the <script src=…>
+          // tags out, load them via <head>, and only THEN drop the
+          // (script-free) HTML into the live body where Alpine wires it
+          // up against the now-registered factories.
+          var template = document.createElement('template');
+          template.innerHTML = html;
+          var frag = template.content;
+          var srcs = [];
+          frag.querySelectorAll('script[src]').forEach(function (s) {
+            srcs.push(s.getAttribute('src'));
+          });
+          // Strip both inline and external scripts from the fragment —
+          // we'll handle execution ourselves. Inline scripts inside tab
+          // bodies are tiny (a few lines of immediate-effect code like
+          // hash-scroll); we re-execute them after the body is mounted.
+          var inlineSources = [];
+          frag.querySelectorAll('script').forEach(function (s) {
+            if (!s.hasAttribute('src')) inlineSources.push(s.textContent);
+            s.parentNode.removeChild(s);
+          });
+
+          return self._loadScripts(srcs).then(function () {
+            // Factories are registered. Safe to attach the body — when
+            // Alpine sees x-data attributes here, it will resolve them
+            // against the registered factories on the first walk.
+            bodyEl.replaceChildren(frag);
+            self.currentTab = tab;
+            // Re-run inline scripts (e.g. hash auto-scroll in
+            // agents_settings). They expect to run after the DOM exists.
+            inlineSources.forEach(function (src) {
+              try { (0, eval)(src); } catch (e) { console.warn('settings tab inline script error:', e); }
+            });
+            self._refreshIcons();
+            var scrollWrap = bodyEl.closest('.overflow-y-auto');
+            if (scrollWrap) scrollWrap.scrollTop = 0;
+          });
         }).catch(function (err) {
           bodyEl.innerHTML = '<div class="alert alert-error rounded-xl text-sm">' +
             'Could not load settings: ' + (err && err.message ? err.message : 'unknown error') +
@@ -205,29 +232,37 @@ document.addEventListener('alpine:init', function () {
         });
       },
 
-      _executeScripts: function (container) {
-        // Re-insert each <script> as a fresh node so the browser runs it.
-        // External scripts (src=...) get a separate node so their load
-        // order is preserved.
-        var scripts = container.querySelectorAll('script');
-        for (var i = 0; i < scripts.length; i++) {
-          var s = scripts[i];
-          var fresh = document.createElement('script');
-          for (var j = 0; j < s.attributes.length; j++) {
-            var a = s.attributes[j];
-            fresh.setAttribute(a.name, a.value);
-          }
-          if (s.src) {
-            // dedupe — if this src is already on the page, skip.
-            if (document.querySelector('script[src="' + s.src + '"]')) {
-              s.parentNode.removeChild(s);
-              continue;
-            }
-          } else {
-            fresh.textContent = s.textContent;
-          }
-          s.parentNode.replaceChild(fresh, s);
-        }
+      // _loadScripts loads a list of external script URLs in parallel,
+      // skipping any that are already on the page. Returns a Promise
+      // that resolves when every script has finished loading (or failed
+      // — we resolve on error too so a single 404 doesn't deadlock the
+      // tab swap). Used by _loadTab to preload tab factories BEFORE
+      // injecting the tab body, sidestepping the Alpine mutation-observer
+      // race.
+      _loadScripts: function (srcs) {
+        var newOnes = srcs.filter(function (src) { return !BB_LOADED_SCRIPTS[src]; });
+        var jobs = newOnes.map(function (src) {
+          return new Promise(function (resolve) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.onload = function () { BB_LOADED_SCRIPTS[src] = true; resolve(); };
+            s.onerror = function () { resolve(); };
+            document.head.appendChild(s);
+          });
+        });
+        return Promise.all(jobs).then(function () {
+          if (newOnes.length === 0) return;
+          // Convention in this codebase: every tab JS registers its
+          // factories inside `document.addEventListener('alpine:init', …)`.
+          // Alpine fires that event ONCE at startup; by the time we
+          // dynamically load a tab script, the event has already passed,
+          // so the listener would never run. Re-dispatch the event so
+          // freshly-loaded scripts get to wire up. Re-dispatch is safe —
+          // Alpine.data(name, fn) and Alpine.store(name, obj) are both
+          // idempotent by name, and no listener in this codebase has a
+          // side effect that wouldn't survive being called twice.
+          document.dispatchEvent(new CustomEvent('alpine:init'));
+        });
       },
 
       _refreshIcons: function () {
@@ -252,6 +287,11 @@ var TAB_META = {
   'backups':   { label: 'Backups',   icon: 'hard-drive' },
   'help':      { label: 'Help',      icon: 'life-buoy' },
 };
+
+// Tracks which tab factory scripts have been loaded into the page so
+// we don't double-fetch them on repeated tab switches. Module-scoped
+// so it survives across Alpine.data factory invocations.
+var BB_LOADED_SCRIPTS = {};
 
 // Skeleton placeholder while a tab fragment is in flight — daisy
 // `skeleton` blocks shaped roughly like the section-card pattern.
