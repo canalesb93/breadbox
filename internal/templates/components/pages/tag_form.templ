@@ -8,7 +8,7 @@ import "breadbox/internal/templates/components"
 // Alpine submit flow) is preserved.
 templ TagForm(p TagFormProps) {
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header max-w-lg mx-auto">
+	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">
 				if p.IsEdit {
@@ -26,7 +26,7 @@ templ TagForm(p TagFormProps) {
 			</p>
 		</div>
 	</div>
-	<div class="max-w-lg mx-auto" x-data="tagForm()">
+	<div class="max-w-lg" x-data="tagForm()">
 		<form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
 			<div class="p-5 sm:p-6">
 				<div class="bb-icon-header">

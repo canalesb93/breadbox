@@ -18,7 +18,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 	     from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/connection_new.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div class="bb-page-header max-w-lg mx-auto">
+	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Connect New Bank</h1>
 			<p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
@@ -26,7 +26,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 	</div>
 	if !p.HasPlaid && !p.HasTeller {
 		<!-- No providers configured -->
-		<div class="bb-card p-8 max-w-lg mx-auto">
+		<div class="bb-card p-8 max-w-lg">
 			<div class="flex flex-col items-center text-center">
 				<div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
 					<i data-lucide="plug-zap" class="w-8 h-8 text-warning"></i>
@@ -41,7 +41,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 	} else {
 		<div x-data="connectionNew" data-teller-env={ p.TellerEnv }>
 			<div id="step-select">
-				<div class="bb-card p-8 max-w-lg mx-auto">
+				<div class="bb-card p-8 max-w-lg">
 					<div class="flex items-center gap-3 mb-6">
 						@components.IconTile("primary", "user-plus")
 						<div>
@@ -111,7 +111,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 				</div>
 			</div>
 			<div id="step-link" class="hidden">
-				<div class="bb-card p-8 max-w-lg mx-auto">
+				<div class="bb-card p-8 max-w-lg">
 					<div class="flex flex-col items-center text-center">
 						<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
 							<i data-lucide="link" class="w-8 h-8 text-primary"></i>
