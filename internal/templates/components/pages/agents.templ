@@ -1,6 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // Agents renders the /agents composite page — Getting Started, Prompt
 // Library, MCP Settings, and Activity tabs. Hosts inside the base layout
@@ -100,24 +104,24 @@ templ agentsActivity(p AgentsProps) {
 			</div>
 		}
 	} else {
-		<div class="bb-card p-12 text-center">
-			<div class="flex flex-col items-center gap-4">
-				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content opacity-20 mb-1"></i>
-				<div>
-					<h3 class="font-medium text-base-content/70">No agent sessions yet</h3>
-					<p class="text-sm text-base-content/50 max-w-md mt-1">Agent activity appears here once an MCP client connects to Breadbox. Start by configuring your first agent.</p>
-				</div>
-				<div class="flex flex-wrap items-center justify-center gap-2">
-					<a href="/agents?tab=guide" class="btn btn-primary btn-sm">
-						<i data-lucide="rocket" class="w-4 h-4"></i> Connect your first agent
-					</a>
-					<a href="/agents?tab=wizard" class="btn btn-ghost btn-sm">
-						<i data-lucide="wand-sparkles" class="w-4 h-4"></i> Browse prompt library
-					</a>
-				</div>
-			</div>
-		</div>
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:      "scroll-text",
+			Title:     "No agent sessions yet",
+			Body:      "Agent activity appears here once an MCP client connects to Breadbox. Start by configuring your first agent.",
+			CustomCTA: agentsActivityEmptyCTAs(),
+		})
 	}
+}
+
+templ agentsActivityEmptyCTAs() {
+	<div class="flex flex-wrap items-center justify-center gap-2">
+		<a href="/agents?tab=guide" class="btn btn-primary btn-sm">
+			<i data-lucide="rocket" class="w-4 h-4"></i> Connect your first agent
+		</a>
+		<a href="/agents?tab=wizard" class="btn btn-ghost btn-sm">
+			<i data-lucide="wand-sparkles" class="w-4 h-4"></i> Browse prompt library
+		</a>
+	</div>
 }
 
 templ agentsSessionCard(s AgentsSessionRow) {

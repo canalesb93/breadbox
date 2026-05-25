@@ -18,9 +18,9 @@ templ Kbd(key string) {
 }
 
 // KbdChord renders a sequence of keys separated by a faint "then" label,
-// mirroring the `.bb-shortcuts-kbd` + `.bb-shortcuts-then` styling used in
-// the help modal. The whole chord hides on touch via the same guards as
-// `Kbd`. Calling with 0 or 1 keys degrades gracefully.
+// using the canonical `.bb-kbd` + `.bb-shortcuts-then` styling. The whole
+// chord hides on touch via the same guards as `Kbd`. Calling with 0 or 1
+// keys degrades gracefully.
 templ KbdChord(keys ...string) {
 	if len(keys) > 0 {
 		// Order matters: `hidden` must come AFTER the layout class, and the

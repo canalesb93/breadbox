@@ -249,9 +249,7 @@ templ deleteCategoryModal() {
 	>
 		<div class="modal-box w-full sm:max-w-md [padding-bottom:calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:[padding-bottom:1.5rem]">
 			<div class="flex items-center gap-3 mb-4">
-				<div class="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center">
-					<i data-lucide="alert-triangle" class="w-5 h-5 text-error"></i>
-				</div>
+				@components.IconTile("error", "alert-triangle")
 				<h3 class="font-bold text-lg">Delete Category</h3>
 			</div>
 			<p class="text-sm text-base-content/70">Are you sure you want to delete <strong x-text="deleteName"></strong>? Affected transactions will be set to Uncategorized.</p>

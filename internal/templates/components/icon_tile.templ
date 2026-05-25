@@ -1,0 +1,26 @@
+package components
+
+// IconTile is the canonical 40×40 rounded tile used as the
+// card-header glyph in form cards, provider cards, and similar
+// composite surfaces. Pairs the documented `.bb-icon-header__tile`
+// geometry with one of the tone modifiers in `input.css`:
+//
+//   primary | accent | info | success | warning | error
+//
+// The icon inside inherits `currentColor` (set by the tone class),
+// so callers do NOT need to add `text-{tone}` to the inner glyph.
+//
+// Use this whenever the surface is a card with an icon in its
+// header. The bespoke variants left in the tree on purpose are:
+//
+//   - `w-10 h-10 rounded-lg bg-base-200/60` neutral-square tile
+//     (connections.templ:227) — a different shape, not a tone.
+//   - Data-driven tone via dynamic `bg-{var}/10` strings
+//     (mcp_settings.templ:100, agent_sdk_settings.templ:46) — these
+//     pass the tone as a runtime value; refactor to IconTile when
+//     they drop down to a fixed enum.
+templ IconTile(tone string, icon string) {
+	<div class={ "bb-icon-header__tile", "bb-icon-tile--" + tone }>
+		<i data-lucide={ icon } class="w-5 h-5"></i>
+	</div>
+}

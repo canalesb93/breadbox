@@ -30,49 +30,57 @@ templ DesignGallery(p DesignGalleryProps) {
 		class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-6"
 	>
 		<aside class="hidden lg:block">
-			// Offsets account for the sticky standalone navbar above (daisy
-			// `navbar` ≈ 4rem). `top-[5.5rem]` = navbar (4rem) + 1.5rem gap
-			// so the outline sits just below the bar. `h-[calc(100vh-7rem)]`
-			// (not max-h) pins it to viewport height with the same 1.5rem
-			// gap mirrored at the bottom, giving a defined scroll context
-			// even when the catalog overflows.
-			<nav class="sticky top-[5.5rem] flex flex-col gap-2 h-[calc(100vh-7rem)] overflow-y-auto pr-1 -mr-1">
-				<div class="relative">
+			// Sticky shell pins the whole sidebar; the search + toolbar are
+			// fixed at the top and only the <nav> below them scrolls.
+			// Offsets: `top-[5.5rem]` = standalone navbar (4rem) + 1.5rem
+			// gap. `h-[calc(100vh-7rem)]` mirrors that gap at the bottom.
+			// Keeping the search out of the scroll container is what stops
+			// daisy `.input`'s `flex-shrink:1` from being squished as the
+			// catalog overflows / as items hide on filter changes.
+			<div class="sticky top-[5.5rem] flex flex-col gap-2 h-[calc(100vh-7rem)]">
+				// Vanilla daisy 5 `<label class="input">` flex pattern,
+				// matching daisy's canonical "search with kbd hint" example.
+				// `shrink-0` keeps the field at its natural height inside
+				// the column flex layout regardless of sibling overflow.
+				<label class="input w-full shrink-0">
 					<i
 						data-lucide="search"
-						class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content opacity-40 pointer-events-none z-10"
+						class="h-[1em] opacity-50 pointer-events-none"
 					></i>
+					// `type="search"` for semantics, but we hide the native
+					// WebKit cancel-button so only our own clear button
+					// renders (touch hitbox + matches design). Escape clears
+					// both the input and the bound filter state — proper
+					// search-field behavior.
 					<input
 						x-ref="filter"
 						x-model="filter"
-						@keydown.escape.stop="$el.blur()"
-						type="text"
+						@keydown.escape.stop="filter = ''; $el.blur()"
+						type="search"
 						placeholder="Filter sections..."
 						aria-label="Filter sections"
 						autocomplete="off"
 						spellcheck="false"
-						class="input input-sm w-full pl-8 pr-14 text-xs"
+						class="grow [&::-webkit-search-cancel-button]:appearance-none"
 					/>
-					<div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-						<template x-if="!filter">
-							<span x-show="!$store.device.isTouch" class="pointer-events-none">
-								@components.KbdCombo("cmd", "k")
-							</span>
-						</template>
-						<template x-if="filter">
-							<button
-								type="button"
-								class="text-base-content/40 hover:text-base-content transition-colors"
-								@click="filter = ''; $refs.filter.focus()"
-								aria-label="Clear filter"
-								title="Clear"
-							>
-								<i data-lucide="x" class="w-3.5 h-3.5"></i>
-							</button>
-						</template>
-					</div>
-				</div>
-				<div class="flex items-center justify-between px-2 pt-1">
+					<template x-if="!filter">
+						<span x-show="!$store.device.isTouch" class="pointer-events-none">
+							@components.KbdCombo("cmd", "k")
+						</span>
+					</template>
+					<template x-if="filter">
+						<button
+							type="button"
+							class="text-base-content/40 hover:text-base-content transition-colors"
+							@click="filter = ''; $refs.filter.focus()"
+							aria-label="Clear filter"
+							title="Clear"
+						>
+							<i data-lucide="x" class="h-[1em]"></i>
+						</button>
+					</template>
+				</label>
+				<div class="flex items-center justify-between px-2 shrink-0">
 					<span class="text-[0.65rem] font-semibold uppercase tracking-wider text-base-content/30">Catalog</span>
 					<button
 						type="button"
@@ -81,15 +89,20 @@ templ DesignGallery(p DesignGalleryProps) {
 						x-text="allOpen ? 'Collapse all' : 'Expand all'"
 					>Collapse all</button>
 				</div>
-				for _, group := range DesignSectionGroups() {
-					@designSidebarGroup(group, SectionsByGroup(p.Sections, group.Slug))
-				}
-				<p
-					x-cloak
-					x-show={ "filter && " + designAllTitlesNoMatchJS(p.Sections) }
-					class="px-2 py-3 text-xs text-base-content/40"
-				>No sections match.</p>
-			</nav>
+				// The scroll context is now just the outline tree. `min-h-0`
+				// is required so flex respects `overflow-y-auto` (otherwise
+				// the nav stretches to fit content and never scrolls).
+				<nav class="flex flex-col gap-1 overflow-y-auto min-h-0 flex-1">
+					for _, group := range DesignSectionGroups() {
+						@designSidebarGroup(group, SectionsByGroup(p.Sections, group.Slug))
+					}
+					<p
+						x-cloak
+						x-show={ "filter && " + designAllTitlesNoMatchJS(p.Sections) }
+						class="px-2 py-3 text-xs text-base-content/40"
+					>No sections match.</p>
+				</nav>
+			</div>
 		</aside>
 		<div class="flex flex-col gap-12 min-w-0">
 			for _, group := range DesignSectionGroups() {

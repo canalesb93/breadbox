@@ -43,9 +43,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 		}
 		if p.ConsecutiveFailures >= 3 && !(p.Status == "error" || p.Status == "pending_reauth") {
 			<div class="bb-card border-warning/30 bg-warning/5 p-5 mb-6 flex items-start gap-4">
-				<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-					<i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
-				</div>
+				@components.IconTile("warning", "alert-triangle")
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">{ fmt.Sprintf("This connection has failed %d syncs in a row", p.ConsecutiveFailures) }</p>
 					<p class="text-sm text-base-content/60 mt-0.5">

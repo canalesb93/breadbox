@@ -239,8 +239,12 @@
 
   /* Color modifiers for the icon tile. Pair with .bb-icon-header__tile
      (40×40 inside form cards) or .bb-entity-header__tile (48×48 at the
-     top of detail pages — see EntityHeader templ component). */
+     top of detail pages — see EntityHeader templ component).
+     `primary` uses /8 for a slightly softer hero tint (the page-defining
+     accent); the semantic tones use /10 so info/success/warning/error
+     read uniformly against each other in nearby cards. */
   .bb-icon-tile--primary { @apply bg-primary/8 text-primary; }
+  .bb-icon-tile--accent  { @apply bg-accent/10 text-accent; }
   .bb-icon-tile--info    { @apply bg-info/10 text-info; }
   .bb-icon-tile--success { @apply bg-success/10 text-success; }
   .bb-icon-tile--warning { @apply bg-warning/10 text-warning; }
@@ -672,8 +676,7 @@
    *
    * Chat-style bubble used by the transaction-detail activity timeline for
    * comment rows. The flat top-left corner visually points at the avatar on
-   * the rail without needing a CSS tail/notch. Future plan: hoist into a
-   * shared .bb-bubble once review cards adopt the same shape. */
+   * the rail without needing a CSS tail/notch. */
   .bb-comment-bubble {
     display: inline-block;
     max-width: 100%;
@@ -851,11 +854,6 @@
 
   .bb-error-message {
     @apply text-sm text-base-content/50 max-w-sm mb-6 leading-relaxed;
-  }
-
-  /* ── Financial Health Score ring ── */
-  .bb-health-ring {
-    stroke: currentColor;
   }
 
   /* ── Button polish ── */
@@ -1342,57 +1340,8 @@
     background-color: transparent;
   }
 
-  /* Palette key hint — shares the .bb-kbd recipe verbatim (Tailwind v4 doesn't
-     allow @apply across @layer components custom classes). */
-  .bb-cmdk-kbd {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
-           text-[0.6rem] font-mono font-medium leading-none
-           rounded px-1;
-    background: oklch(0.97 0 0);
-    color: oklch(0.4 0 0);
-    border: 1px solid oklch(0.9 0 0);
-    box-shadow: 0 1px 0 oklch(0.88 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-cmdk-kbd {
-      background: oklch(0.25 0 0);
-      color: oklch(0.7 0 0);
-      border-color: oklch(0.35 0 0);
-      box-shadow: 0 1px 0 oklch(0.15 0 0);
-    }
-  }
-
-  /* Chord separator used between kbd hints in a palette row ("g" then "d").
-     Matches the help modal's `.bb-shortcuts-then` weight so the same chord
-     reads consistently across both surfaces. */
-  .bb-cmdk-then {
-    @apply text-[0.6rem] text-base-content/30 mx-0.5;
-  }
-
   .bb-cmdk-footer {
     @apply flex items-center justify-between px-4 py-2.5 border-t border-base-300 text-[0.65rem] text-base-content/40;
-  }
-
-  /* Palette footer inline kbd — same recipe as .bb-kbd; only the outer
-     margin is specific to the footer layout. */
-  .bb-cmdk-footer kbd {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
-           text-[0.6rem] font-mono font-medium leading-none
-           rounded px-1 mx-0.5;
-    background: oklch(0.97 0 0);
-    color: oklch(0.4 0 0);
-    border: 1px solid oklch(0.9 0 0);
-    box-shadow: 0 1px 0 oklch(0.88 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-cmdk-footer kbd {
-      background: oklch(0.25 0 0);
-      color: oklch(0.7 0 0);
-      border-color: oklch(0.35 0 0);
-      box-shadow: 0 1px 0 oklch(0.88 0 0);
-    }
   }
 
   .bb-cmdk-empty {
@@ -1674,26 +1623,6 @@
 
   .bb-shortcuts-keys {
     @apply flex items-center gap-1.5;
-  }
-
-  /* Help modal key hint — same recipe as .bb-kbd. */
-  .bb-shortcuts-kbd {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
-           text-[0.6rem] font-mono font-medium leading-none
-           rounded px-1;
-    background: oklch(0.97 0 0);
-    color: oklch(0.4 0 0);
-    border: 1px solid oklch(0.9 0 0);
-    box-shadow: 0 1px 0 oklch(0.88 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-shortcuts-kbd {
-      background: oklch(0.25 0 0);
-      color: oklch(0.7 0 0);
-      border-color: oklch(0.35 0 0);
-      box-shadow: 0 1px 0 oklch(0.15 0 0);
-    }
   }
 
   .bb-shortcuts-then {

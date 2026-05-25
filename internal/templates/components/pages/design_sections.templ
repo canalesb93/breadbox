@@ -524,27 +524,19 @@ templ SectionIcons() {
 				<i data-lucide="receipt" class="w-8 h-8"></i>
 			</div>
 		}
-		@designExample("Icon tiles (bb-icon-tile)", "Colored 40×40 squares for sectioned form-card headers.") {
+		@designExample("Icon tiles (IconTile / bb-icon-tile)", "Colored 40×40 squares for sectioned form-card headers. Use @components.IconTile(tone, icon) — six tones available.") {
 			<div class="flex flex-wrap items-center gap-3">
-				<div class="bb-icon-header__tile bb-icon-tile--primary">
-					<i data-lucide="user-plus" class="w-5 h-5"></i>
-				</div>
-				<div class="bb-icon-header__tile bb-icon-tile--success">
-					<i data-lucide="check" class="w-5 h-5"></i>
-				</div>
-				<div class="bb-icon-header__tile bb-icon-tile--warning">
-					<i data-lucide="alert-triangle" class="w-5 h-5"></i>
-				</div>
-				<div class="bb-icon-header__tile bb-icon-tile--error">
-					<i data-lucide="x" class="w-5 h-5"></i>
-				</div>
+				@components.IconTile("primary", "user-plus")
+				@components.IconTile("accent", "columns")
+				@components.IconTile("info", "building-2")
+				@components.IconTile("success", "check")
+				@components.IconTile("warning", "alert-triangle")
+				@components.IconTile("error", "x")
 			</div>
 		}
 		@designExample("Icon header (form card top)", "bb-icon-header pairs the tile with title + subtitle.") {
 			<div class="bb-icon-header">
-				<div class="bb-icon-header__tile bb-icon-tile--primary">
-					<i data-lucide="key" class="w-5 h-5"></i>
-				</div>
+				@components.IconTile("primary", "key")
 				<div class="bb-icon-header__text">
 					<h3 class="text-sm font-semibold">New API key</h3>
 					<p class="text-xs text-base-content/45">Give your script a way to talk to Breadbox.</p>

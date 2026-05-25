@@ -43,9 +43,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 	<div class="bb-card p-0 overflow-hidden" x-data="providerCard" data-provider="plaid">
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
-				<div class="w-10 h-10 rounded-xl bg-info/8 flex items-center justify-center flex-shrink-0">
-					<i data-lucide="building-2" class="w-5 h-5 text-info"></i>
-				</div>
+				@components.IconTile("info", "building-2")
 				<div class="min-w-0">
 					<h2 class="font-semibold">Plaid</h2>
 					<p class="text-xs text-base-content/40 sm:truncate">Thousands of financial institutions</p>
@@ -184,9 +182,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 	<div class="bb-card p-0 overflow-hidden" x-data="providerCard" data-provider="teller">
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
-				<div class="w-10 h-10 rounded-xl bg-success/8 flex items-center justify-center flex-shrink-0">
-					<i data-lucide="landmark" class="w-5 h-5 text-success"></i>
-				</div>
+				@components.IconTile("success", "landmark")
 				<div class="min-w-0">
 					<h2 class="font-semibold">Teller</h2>
 					<p class="text-xs text-base-content/40 sm:truncate">mTLS certificate authentication</p>
@@ -343,9 +339,7 @@ templ providersCSVCard(h *service.ProviderHealthSummary) {
 	<div class="bb-card p-0 overflow-hidden">
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
 			<div class="flex items-center gap-3 min-w-0">
-				<div class="w-10 h-10 rounded-xl bg-warning/8 flex items-center justify-center flex-shrink-0">
-					<i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
-				</div>
+				@components.IconTile("warning", "file-spreadsheet")
 				<div class="min-w-0">
 					<h2 class="font-semibold">CSV Import</h2>
 					<p class="text-xs text-base-content/40 sm:truncate">Import transactions from bank-exported files</p>
