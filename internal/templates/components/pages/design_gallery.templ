@@ -23,6 +23,11 @@ import (
 // that disables the command palette on this page in favor of focusing
 // the filter input.
 templ DesignGallery(p DesignGalleryProps) {
+	// Section-slug → group-slug map consumed by the Alpine factory's
+	// scroll-spy so it can force-open the containing collapse when a
+	// section scrolls into view. Must precede the <script src> below so
+	// the IIFE finds the payload at parse time.
+	@templ.JSONScript("design-section-groups", DesignSectionGroupMap(p.Sections))
 	<script src="/static/js/admin/components/design_gallery.js"></script>
 	<div
 		x-data="designGallery"
@@ -143,10 +148,23 @@ templ designSidebarGroup(group DesignSectionGroup, sections []DesignSection) {
 			<div class="collapse-content px-0">
 				<ul class="flex flex-col gap-0.5 pl-3 border-l border-base-300/60 ml-2">
 					for _, sec := range sections {
-						<li x-show={ "match('" + sec.Title + "')" }>
+						<li
+							x-show={ "match('" + sec.Title + "')" }
+							class="relative"
+						>
+							// Primary-tinted bar overlays the parent UL's
+							// border-l so the active item reads as a left
+							// accent. `-left-3` lines up with the ul's pl-3.
+							<span
+								x-cloak
+								x-show={ "activeSlug === '" + sec.Slug + "'" }
+								aria-hidden="true"
+								class="absolute -left-3 top-1 bottom-1 w-0.5 rounded-full bg-primary"
+							></span>
 							<a
 								href={ templ.SafeURL("#" + sec.Slug) }
-								class="block text-sm text-base-content/60 hover:text-base-content transition-colors py-1 px-2 rounded-md hover:bg-base-200/40"
+								class="block text-sm transition-colors py-1 px-2 rounded-md"
+								:class={ "activeSlug === '" + sec.Slug + "' ? 'bg-base-200/60 text-base-content font-medium' : 'text-base-content/60 hover:text-base-content hover:bg-base-200/40'" }
 							>
 								{ sec.Title }
 							</a>
@@ -193,6 +211,7 @@ templ designSectionBlock(sec DesignSection) {
 	<section
 		id={ sec.Slug }
 		class="scroll-mt-[5.5rem]"
+		data-design-section="true"
 		x-show={ "match('" + sec.Title + "')" }
 	>
 		<div class="flex items-baseline justify-between gap-3 mb-1">
