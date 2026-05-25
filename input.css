@@ -23,6 +23,116 @@
   themes: light --default, dark --prefersdark;
 }
 
+/* ─── shadcn-flavored daisyUI themes ──────────────────────────────────
+ * Faithful port of the shadcn/ui new-york default palette (oklch source
+ * values from shadcn-ui/ui@apps/v4/app/globals.css) onto daisyUI 5's
+ * token model. Near-zero-chroma grays, inverted primary (dark stamp in
+ * light, light stamp in dark), red destructive.
+ *
+ * Theme names are kept as `light` / `dark` so they override daisyUI's
+ * built-ins — the existing theme-toggle in base.html writes
+ * data-theme="light"/"dark" verbatim, no markup changes needed.
+ *
+ * Semantic colors that shadcn doesn't define (warning/success/info) are
+ * aliased to Tailwind palette tokens — same shades shadcn users compose
+ * inline (amber/emerald/sky 500 → 400 in dark). This keeps daisy
+ * components like alert-warning / badge-success rendering without
+ * inventing a new tone vocabulary.
+ * ──────────────────────────────────────────────────────────────── */
+@plugin "daisyui/theme" {
+  name: "light";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(1 0 0);
+  --color-base-200: oklch(0.97 0 0);
+  --color-base-300: oklch(0.922 0 0);
+  --color-base-content: oklch(0.145 0 0);
+
+  --color-primary: oklch(0.205 0 0);
+  --color-primary-content: oklch(0.985 0 0);
+
+  --color-secondary: oklch(0.97 0 0);
+  --color-secondary-content: oklch(0.205 0 0);
+
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-content: oklch(0.205 0 0);
+
+  --color-neutral: oklch(0.205 0 0);
+  --color-neutral-content: oklch(0.985 0 0);
+
+  --color-info: var(--color-sky-500);
+  --color-info-content: oklch(0.985 0 0);
+
+  --color-success: var(--color-emerald-500);
+  --color-success-content: oklch(0.145 0 0);
+
+  --color-warning: var(--color-amber-500);
+  --color-warning-content: oklch(0.145 0 0);
+
+  --color-error: oklch(0.577 0.245 27.325);
+  --color-error-content: oklch(0.985 0 0);
+
+  --radius-selector: 0.25rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.625rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(0.145 0 0);
+  --color-base-200: oklch(0.205 0 0);
+  --color-base-300: oklch(0.269 0 0);
+  --color-base-content: oklch(0.985 0 0);
+
+  --color-primary: oklch(0.922 0 0);
+  --color-primary-content: oklch(0.205 0 0);
+
+  --color-secondary: oklch(0.269 0 0);
+  --color-secondary-content: oklch(0.985 0 0);
+
+  --color-accent: oklch(0.371 0 0);
+  --color-accent-content: oklch(0.985 0 0);
+
+  --color-neutral: oklch(0.97 0 0);
+  --color-neutral-content: oklch(0.205 0 0);
+
+  --color-info: var(--color-sky-400);
+  --color-info-content: oklch(0.145 0 0);
+
+  --color-success: var(--color-emerald-400);
+  --color-success-content: oklch(0.145 0 0);
+
+  --color-warning: var(--color-amber-400);
+  --color-warning-content: oklch(0.145 0 0);
+
+  --color-error: oklch(0.704 0.191 22.216);
+  --color-error-content: oklch(0.145 0 0);
+
+  --radius-selector: 0.25rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.625rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
 /* Force-include classes that Tailwind's content scanner can't see
    because they live inside dynamic strings (Alpine :class, runtime
    templ expressions, JS className builders).
