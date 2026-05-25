@@ -1161,15 +1161,27 @@
         }
       });
 
-      // Existing behavior: auto-close drawer on mobile when a nav link is tapped.
-      drawerSide.querySelectorAll('a.bb-sidebar-link, button[type="submit"]').forEach(function(link) {
-        link.addEventListener('click', function() {
-          if (isMobile()) {
-            toggle.checked = false;
-            toggle.dispatchEvent(new Event('change'));
-          }
-        });
-      });
+      // INTENTIONALLY no auto-close handler on sidebar nav taps. We let the
+      // drawer stay open right through the navigation — the new document
+      // renders with the drawer closed by default (checkbox state is per-
+      // document, doesn't carry across nav), so visually the drawer covers
+      // the source page until the new page paints over it. No flash of the
+      // source page underneath, no slide-out animation racing the nav.
+      //
+      // On browsers with cross-document View Transitions (Safari 18.2+ /
+      // Chrome 126+), the .bb-sidebar named group (see input.css) makes
+      // this even nicer: the browser interpolates the sidebar's bbox from
+      // "visible on-screen" (old page) to "translated off-screen" (new
+      // page), so the drawer slides out as the main content cross-fades
+      // in — synchronized with the actual nav rather than racing it.
+      //
+      // History: tried defer-until-transitionend (felt slow on prefetched
+      // pages) and snap-close (jarring flash of source page underneath).
+      // Doing nothing turned out to be the cleanest fix.
+      //
+      // Non-nav close paths (Esc, tap outside backdrop, close button) are
+      // handled by the keydown listener above and DaisyUI's native checkbox
+      // toggle — those still animate normally.
     })();
 
     // iOS 26-style scroll fade for mobile sidebar nav
