@@ -94,6 +94,22 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdCombo(keys...), nil
 	},
+	"SettingsModal": func(data any) (templ.Component, error) {
+		m, ok := data.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("SettingsModal: want map[string]any, got %T", data)
+		}
+		isAdmin, _ := m["IsAdmin"].(bool)
+		isEditor, _ := m["IsEditor"].(bool)
+		initialTab, _ := m["SettingsInitialTab"].(string)
+		initialBody, _ := m["SettingsInitialBody"].(template.HTML)
+		return components.SettingsModal(components.SettingsModalProps{
+			IsAdmin:     isAdmin,
+			IsEditor:    isEditor,
+			InitialTab:  initialTab,
+			InitialBody: initialBody,
+		}), nil
+	},
 }
 
 // assertAdminTxRow extracts a service.AdminTransactionRow from data,
@@ -477,6 +493,22 @@ func (tr *TemplateRenderer) RenderWithTempl(w http.ResponseWriter, r *http.Reque
 	}
 	data["TemplContent"] = template.HTML(buf.String())
 	tr.Render(w, r, "_templ_shell.html", data)
+}
+
+// RenderTemplFragment renders a templ component directly to the response
+// with no layout, no nav, no globals. Used for the Settings modal's
+// fragment-swap path: the modal's JS fetches /settings/:tab with the
+// X-Settings-Fragment header and drops the response into the body slot.
+// Bypassing _templ_shell.html keeps the wire payload tiny and avoids the
+// browser re-executing every layout-level <script> tag on each tab swap.
+func (tr *TemplateRenderer) RenderTemplFragment(w http.ResponseWriter, r *http.Request, body templ.Component) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := body.Render(r.Context(), w); err != nil {
+		// At this point we may have already written part of the body —
+		// http.Error would double-write headers and corrupt the stream.
+		// Log + return; the browser surfaces a truncated fragment.
+		log.Printf("RenderTemplFragment: templ render error: %v", err)
+	}
 }
 
 // BaseTemplateData returns the common fields needed by every template as a map.

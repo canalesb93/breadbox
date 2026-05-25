@@ -219,18 +219,6 @@ func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 	}
 }
 
-// MyProfileHandler serves GET /settings/profile -- the Profile tab
-// (avatar + name + email editor). Shares MyAccountProps with the Account
-// tab so both pages render the same identity context.
-func MyProfileHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		props, data := buildMyAccountProps(a, sm, r)
-		data["PageTitle"] = "Profile"
-		data["CurrentPage"] = "profile"
-		renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabProfile, pages.MyProfile(props))
-	}
-}
-
 // LinkAdminToUserHandler serves POST /settings/account/link-user -- link an unlinked admin to a household member.
 func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

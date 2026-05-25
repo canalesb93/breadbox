@@ -11,14 +11,14 @@ import (
 // builds typed props in admin/apikeys.go and the bridge drops the rendered
 // HTML into base.html's TemplContent slot.
 templ Access(p AccessProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">API Keys</h1>
-			<p class="text-sm text-base-content/50 mt-1">API keys and OAuth clients for external access</p>
-		</div>
+	<div class="max-w-3xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "API Keys",
+			Subtitle: "API keys and OAuth clients for external access",
+		})
+		@accessOAuthClientsSection(p)
+		@accessAPIKeysSection(p)
 	</div>
-	@accessOAuthClientsSection(p)
-	@accessAPIKeysSection(p)
 }
 
 // accessOAuthClientsSection renders the OAuth clients block — heading +

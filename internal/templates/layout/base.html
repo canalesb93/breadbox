@@ -399,6 +399,14 @@
   </div>
   {{end}}
 
+  {{- /* Global Settings modal — rendered on every authenticated page so the
+        sidebar gear (and any other entry point that dispatches
+        `open-settings`) can open it without a navigation. The same component
+        also serves cold deep-loads of /settings/* URLs: when SettingsInitialTab
+        is set, the modal opens on boot with the requested tab. Hidden for
+        unauthenticated visitors (no editor role => no settings to show). */ -}}
+  {{if .IsEditor}}{{renderComponent "SettingsModal" .}}{{end}}
+
   <!-- Global Confirmation Modal -->
   <div x-data="bbConfirmModal()" x-cloak
        @bb-confirm.window="showConfirm($event.detail)"
@@ -1015,6 +1023,27 @@
         prefetch(a.href);
       });
     })();
+
+    // settingsTabFromHref returns the modal tab id when `href` points at
+    // a Settings page (e.g. "/settings/sync" → "sync", "/settings" →
+    // "account"). Returns null for non-settings hrefs. Sub-routes like
+    // /settings/api-keys/new aren't a tab — they're a sub-page only
+    // reachable from inside the modal — so we return null and let the
+    // normal full-page nav handle them.
+    var BB_SETTINGS_TABS = ['account','sync','security','system','providers','agents','mcp','api-keys','backups','help'];
+    function settingsTabFromHref(href) {
+      if (!href) return null;
+      // Strip query + hash so /settings?foo=1 still matches.
+      var path = String(href).split('?')[0].split('#')[0];
+      if (path === '/settings' || path === '/settings/') return 'account';
+      if (path.indexOf('/settings/') !== 0) return null;
+      var rest = path.slice('/settings/'.length).replace(/\/$/, '');
+      // Only the bare tab slug is a modal target — sub-routes like
+      // /settings/api-keys/new keep their full-page nav behavior.
+      if (rest.indexOf('/') !== -1) return null;
+      return BB_SETTINGS_TABS.indexOf(rest) !== -1 ? rest : null;
+    }
+    window.bbSettingsTabFromHref = settingsTabFromHref;
 
     // Button loading state helpers for async actions
     window.bbButtonLoading = function(btn) {
@@ -1663,14 +1692,14 @@
         { id: 'nav-transactions', shortcutId: 'global.go.t', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
-        { id: 'nav-connections', shortcutId: 'global.go.c', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
         { id: 'nav-agents', shortcutId: 'global.go.h', group: 'Manage', title: 'Agents', desc: 'Claude Agent SDK runs, prompt library, settings', icon: 'bot', href: '/agents', keywords: 'agent sdk runs prompts library wizard schedule cron mcp setup tools permissions' },
         { id: 'nav-agent-prompts', group: 'Manage', title: 'Prompt library', desc: 'Starter prompt templates for agents', icon: 'sparkles', href: '/agent-prompts', keywords: 'wizard prompt library template starter' },
         { id: 'nav-rules', shortcutId: 'global.go.u', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
         { id: 'nav-categories', shortcutId: 'global.go.a', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
         { id: 'nav-tags', group: 'Manage', title: 'Tags', desc: 'Tag transactions and triage review queue', icon: 'tags', href: '/tags', keywords: 'labels needs-review triage annotations' },
-        { id: 'nav-users', shortcutId: 'global.go.f', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/settings/household', keywords: 'people family members' },
-        // System
+        // System (matches the sidebar's System section)
+        { id: 'sys-connections', shortcutId: 'global.go.c', group: 'System', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
+        { id: 'sys-users', shortcutId: 'global.go.f', group: 'System', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/household', keywords: 'people family members' },
         { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'API Keys', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/settings/api-keys', keywords: 'tokens authentication api keys oauth connector claude access' },
         { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/settings/providers', keywords: 'plaid teller csv bank setup' },
         { id: 'sys-logs', shortcutId: 'global.go.v', group: 'System', title: 'Logs', desc: 'Sync logs, webhook events, agent sessions', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events sessions activity' },
@@ -1681,7 +1710,7 @@
         { id: 'act-connect', shortcutId: 'global.new.c', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
         { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
         { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/settings/api-keys/new', keywords: 'new token' },
-        { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/settings/household/new', keywords: 'new person family' },
+        { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/household/new', keywords: 'new person family' },
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
@@ -1905,6 +1934,15 @@
 
         go(item) {
           if (item.href) {
+            // Settings URLs open the modal in-place instead of full-page
+            // navigating to the empty host shell — keeps the user on
+            // their current page and feels like a true modal.
+            var settingsTab = settingsTabFromHref(item.href);
+            if (settingsTab) {
+              window.dispatchEvent(new CustomEvent('open-settings', { detail: { tab: settingsTab } }));
+              this.closePalette();
+              return;
+            }
             if (window.bbProgress) window.bbProgress.start();
             var main = document.querySelector('main');
             if (main) {
@@ -2244,7 +2282,7 @@
         p: { path: '/settings/providers', label: 'Go to Providers' },
         m: { path: '/settings/mcp',       label: 'Go to MCP Settings' },
         k: { path: '/settings/api-keys',  label: 'Go to API Keys' },
-        f: { path: '/settings/household', label: 'Go to Household' },
+        f: { path: '/household', label: 'Go to Household' },
         h: { path: '/agents',             label: 'Go to Agents' },
         d: { path: '/design',             label: 'Go to Design system' }
       };
@@ -2253,12 +2291,21 @@
         c: { path: '/connections/new',         label: 'New Connection' },
         i: { path: '/connections/import-csv',  label: 'Import CSV' },
         k: { path: '/settings/api-keys/new',   label: 'New API Key' },
-        u: { path: '/settings/household/new',  label: 'New Household Member' }
+        u: { path: '/household/new',  label: 'New Household Member' }
       };
 
       // Soft page-out before a chord-triggered full-page nav. Matches the
       // previous behavior in the hardcoded dispatcher byte-for-byte.
+      //
+      // Settings URLs are special-cased: the chord opens the settings
+      // modal in-place instead of navigating to the empty host page,
+      // which would feel jarring after a single keystroke.
       function navigateTo(path) {
+        var settingsTab = settingsTabFromHref(path);
+        if (settingsTab) {
+          window.dispatchEvent(new CustomEvent('open-settings', { detail: { tab: settingsTab } }));
+          return;
+        }
         if (window.bbProgress) window.bbProgress.start();
         var main = document.querySelector('main');
         if (main) {

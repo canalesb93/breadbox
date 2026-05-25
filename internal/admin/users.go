@@ -161,21 +161,23 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 // renderUserForm renders the create/edit user form via the templ component.
 // Both NewUserHandler and EditUserHandler funnel through here so the page
 // title, breadcrumbs, and IsEdit flag are derived in one place.
+//
+// Household pages are top-level (not inside the Settings modal) — they
+// render directly through tr.RenderWithTempl so the standard sidebar +
+// drawer chrome wrap them.
 func renderUserForm(sm *scs.SessionManager, tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, props pages.UserFormProps) {
 	pageTitle := "Add Family Member"
 	if props.IsEdit && props.User != nil {
 		pageTitle = "Edit " + props.User.Name
 	}
 	data := BaseTemplateData(r, sm, "household", pageTitle)
-	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabHousehold, pages.UserForm(props))
+	tr.RenderWithTempl(w, r, data, pages.UserForm(props))
 }
 
 // renderUsersList drives the household-members page through the templ
-// component, hosted inside the unified Settings shell as the Household
-// tab.
+// component as a standalone top-level page (no Settings shell).
 func renderUsersList(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.UsersProps) {
-	sm := tr.sm
-	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabHousehold, pages.Users(props))
+	tr.RenderWithTempl(w, r, data, pages.Users(props))
 }
 
 // usersListInput collects the values the handler computes for the list
@@ -271,7 +273,7 @@ func NewUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ht
 		renderUserForm(sm, tr, w, r, pages.UserFormProps{
 			IsEdit: false,
 			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Household", Href: "/settings/household"},
+				{Label: "Household", Href: "/household"},
 				{Label: "Add Member"},
 			},
 		})
@@ -300,7 +302,7 @@ func EditUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) h
 			User:   &user,
 			UserID: idStr,
 			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Household", Href: "/settings/household"},
+				{Label: "Household", Href: "/household"},
 				{Label: user.Name},
 			},
 		})
@@ -475,8 +477,8 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				setupURL = scheme + "://" + r.Host + "/setup-account/" + loginAccount.SetupToken.String
 			}
 			breadcrumbs := []Breadcrumb{
-				{Label: "Household", Href: "/settings/household"},
-				{Label: user.Name, Href: "/settings/household/" + idStr + "/edit"},
+				{Label: "Household", Href: "/household"},
+				{Label: user.Name, Href: "/household/" + idStr + "/edit"},
 				{Label: "Login Account"},
 			}
 			data := map[string]any{
@@ -507,8 +509,8 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 		// No login account — show create form.
 		breadcrumbs := []Breadcrumb{
-			{Label: "Household", Href: "/settings/household"},
-			{Label: user.Name, Href: "/settings/household/" + idStr + "/edit"},
+			{Label: "Household", Href: "/household"},
+			{Label: user.Name, Href: "/household/" + idStr + "/edit"},
 			{Label: "Create Login"},
 		}
 		data := map[string]any{
@@ -530,10 +532,10 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 	}
 }
 
-// renderCreateLogin hosts the typed CreateLogin templ component inside
-// the Settings shell as a sub-view of the Household tab.
+// renderCreateLogin hosts the typed CreateLogin templ component as a
+// sub-view of the top-level Household page.
 func renderCreateLogin(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.CreateLoginProps) {
-	renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabHousehold, pages.CreateLogin(props))
+	tr.RenderWithTempl(w, r, data, pages.CreateLogin(props))
 }
 
 // breadcrumbsToComponent converts the admin Breadcrumb slice (used by the
