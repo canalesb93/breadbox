@@ -1,26 +1,34 @@
 package components
 
-// StatTile is the canonical 4-up dashboard metric tile: a tinted icon
-// square on the left, big tabular-nums value + small label on the right,
-// optional secondary description line. Replaces the hand-rolled
-// `bb-card p-4 + flex items-center gap-3 + w-9 h-9 rounded-lg bg-{tone}/10`
-// block currently duplicated across rule_detail / logs / feed /
-// connection_detail / getting_started (see audit #17).
+// StatTile renders a daisy `stat` cell wrapped in its own `stats`
+// container — one card per tile — so it works in any grid arrangement
+// (`StatTileRow` for the canonical 4-up case, hand-rolled grids for
+// 5/6-up rows like sync-log detail). Per-tile chrome trades the
+// connected-dividers look for layout flexibility; the per-tile shape
+// otherwise matches the canonical daisy stat verbatim.
 //
-// Custom shell rather than daisy `stat` — daisy enforces value-below-label
-// typography and `place-self: end` for `stat-figure`, both of which
-// fight the icon-tile-on-left shape we already ship. See the agent
-// rationale in PR description.
+// Daisy parts used (per https://daisyui.com/components/stat/):
+//   - `stats shadow`     — outer card
+//   - `stat`             — content cell
+//   - `stat-figure`      — icon, tone-colored
+//   - `stat-title`       — Label
+//   - `stat-value`       — Value (capped to text-2xl + truncate so long
+//                          strings like "$48,201.55" don't overflow a
+//                          narrow tile and don't wrap into the figure)
+//   - `stat-desc`        — Description
 //
-// Props:
-//   - Icon:        Lucide name. Optional — omit for label-only tiles.
-//   - Label:       required. Rendered as small uppercase metadata.
-//   - Value:       required. Caller formats (CommaInt, fmt.Sprintf, etc).
-//   - Description: optional secondary line below the value.
+// Tone drives the figure icon color only — the number itself stays
+// neutral so it doesn't fight the page.
+//
+// Props (ACI matches the original):
+//   - Icon:        Lucide name. Optional.
+//   - Label:       required. Renders as `stat-title`.
+//   - Value:       required. Renders as `stat-value`.
+//   - Description: optional. Renders as `stat-desc`.
 //   - Tone:        "neutral" (default), "primary", "success", "warning",
-//                  "error", "info". Drives icon-tile bg + icon color only.
-//   - Href:        optional. When set, the tile becomes an <a> with
-//                  bb-card--interactive hover.
+//                  "error", "info". Drives `stat-figure` color.
+//   - Href:        optional. When set, the whole tile is an `<a>` with
+//                  a hover affordance.
 
 type StatTileTone string
 
@@ -42,24 +50,7 @@ type StatTileProps struct {
 	Href        templ.SafeURL // optional; if set, tile becomes a link
 }
 
-func statTileBg(t StatTileTone) string {
-	switch t {
-	case StatTonePrimary:
-		return "bg-primary/10"
-	case StatToneSuccess:
-		return "bg-success/10"
-	case StatToneWarning:
-		return "bg-warning/10"
-	case StatToneError:
-		return "bg-error/10"
-	case StatToneInfo:
-		return "bg-info/10"
-	default:
-		return "bg-base-200/60"
-	}
-}
-
-func statTileIcon(t StatTileTone) string {
+func statTileFigureColor(t StatTileTone) string {
 	switch t {
 	case StatTonePrimary:
 		return "text-primary"
@@ -72,41 +63,41 @@ func statTileIcon(t StatTileTone) string {
 	case StatToneInfo:
 		return "text-info"
 	default:
-		return "text-base-content opacity-40"
+		return "text-base-content/40"
 	}
 }
 
 templ StatTile(p StatTileProps) {
 	if p.Href != "" {
-		<a href={ p.Href } class="bb-card bb-card--interactive p-4 no-underline block">
+		<a href={ p.Href } class="stats shadow w-full no-underline hover:bg-base-200/60 transition-colors">
 			@statTileBody(p)
 		</a>
 	} else {
-		<div class="bb-card p-4">
+		<div class="stats shadow w-full">
 			@statTileBody(p)
 		</div>
 	}
 }
 
 templ statTileBody(p StatTileProps) {
-	<div class="flex items-center gap-3">
+	<div class="stat">
 		if p.Icon != "" {
-			<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statTileBg(p.Tone) }>
-				<i data-lucide={ p.Icon } class={ "w-4 h-4", statTileIcon(p.Tone) }></i>
+			<div class={ "stat-figure", statTileFigureColor(p.Tone) }>
+				<i data-lucide={ p.Icon } class="w-8 h-8"></i>
 			</div>
 		}
-		<div class="min-w-0">
-			<div class="text-2xl font-semibold tabular-nums leading-none truncate">{ p.Value }</div>
-			<div class="text-xs text-base-content/40 mt-1 uppercase tracking-wider">{ p.Label }</div>
-			if p.Description != "" {
-				<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">{ p.Description }</div>
-			}
-		</div>
+		<div class="stat-title">{ p.Label }</div>
+		<div class="stat-value text-2xl tabular-nums">{ p.Value }</div>
+		if p.Description != "" {
+			<div class="stat-desc truncate">{ p.Description }</div>
+		}
 	</div>
 }
 
-// StatTileRow wraps StatTile children in the canonical 2-up / 4-up grid
-// so callers don't re-derive the breakpoint. Use Templ's children block:
+// StatTileRow lays out tiles 1-up on mobile (full-width, room for a
+// big number), 2-up on `sm:` upward, 4-up on `lg:` upward. Use it for
+// the canonical 4-tile dashboard pattern; callers with 5/6 tiles
+// (sync-log detail) compose their own grid wrapper.
 //
 //	@components.StatTileRow() {
 //	  @components.StatTile(...)
@@ -115,7 +106,7 @@ templ statTileBody(p StatTileProps) {
 //	  @components.StatTile(...)
 //	}
 templ StatTileRow() {
-	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
 		{ children... }
 	</div>
 }

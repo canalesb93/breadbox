@@ -163,7 +163,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "stat-tiles",
 			Title:       "Stat tiles",
-			Description: "4-up dashboard metric tiles — icon-on-left, big tabular-nums value. Use components.StatTile + StatTileRow.",
+			Description: "4-up dashboard metric tiles, built on daisy stats — title, big tabular-nums value, tone-colored figure. Use components.StatTile + StatTileRow.",
 			Group:       "layout",
 			Render:      func() templ.Component { return SectionStatTiles() },
 		},

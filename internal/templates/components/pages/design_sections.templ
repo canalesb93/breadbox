@@ -707,7 +707,7 @@ templ SectionEmptyStates() {
 
 templ SectionStatTiles() {
 	<div class="flex flex-col gap-6">
-		@designExample("4-up tile row (canonical dashboard pattern)", "StatTileRow lays out the 2-up / 4-up grid. Tones drive the icon-tile color.") {
+		@designExample("4-up tile row (canonical dashboard pattern)", "StatTileRow stacks on mobile, 2-up at sm:, 4-up at lg:. Each tile is a daisy stats card; tone colors the figure icon.") {
 			@components.StatTileRow() {
 				@components.StatTile(components.StatTileProps{
 					Icon:  "target",

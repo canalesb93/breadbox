@@ -20,7 +20,7 @@ templ SyncLogDetail(p SyncLogDetailProps) {
 		Meta:          syncDetailMeta(p),
 	})
 	<!-- Summary Stats -->
-	<div class={ "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6", summaryStatsXLClass(len(p.Log.RuleHits) > 0) }>
+	<div class={ "grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6", summaryStatsXLClass(len(p.Log.RuleHits) > 0) }>
 		@components.StatTile(components.StatTileProps{
 			Icon:  "plus",
 			Label: "Added",

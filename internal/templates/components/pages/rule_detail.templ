@@ -245,30 +245,32 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 // pending matches, last active).
 templ ruleDetailStats(p RuleDetailProps) {
 	if p.Rule != nil {
-		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-			@components.StatTile(components.StatTileProps{
-				Icon:  "target",
-				Label: "Times matched",
-				Value: components.CommaInt(int64(p.Rule.HitCount)),
-				Tone:  components.StatTonePrimary,
-			})
-			@components.StatTile(components.StatTileProps{
-				Icon:  "layers",
-				Label: "Transactions affected",
-				Value: components.CommaInt(ruleStatsUnique(p.Stats)),
-				Tone:  components.StatToneInfo,
-			})
-			@components.StatTile(components.StatTileProps{
-				Icon:  rulePendingIcon(p),
-				Label: "Untouched matches",
-				Value: rulePendingValue(p),
-				Tone:  rulePendingTone(p),
-			})
-			@components.StatTile(components.StatTileProps{
-				Icon:  "clock",
-				Label: "Last active",
-				Value: ruleLastActiveValue(p),
-			})
+		<div class="mb-4">
+			@components.StatTileRow() {
+				@components.StatTile(components.StatTileProps{
+					Icon:  "target",
+					Label: "Times matched",
+					Value: components.CommaInt(int64(p.Rule.HitCount)),
+					Tone:  components.StatTonePrimary,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  "layers",
+					Label: "Transactions affected",
+					Value: components.CommaInt(ruleStatsUnique(p.Stats)),
+					Tone:  components.StatToneInfo,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  rulePendingIcon(p),
+					Label: "Untouched matches",
+					Value: rulePendingValue(p),
+					Tone:  rulePendingTone(p),
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:  "clock",
+					Label: "Last active",
+					Value: ruleLastActiveValue(p),
+				})
+			}
 		</div>
 	}
 }
