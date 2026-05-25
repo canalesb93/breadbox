@@ -60,7 +60,7 @@ templ Connections(p ConnectionsProps) {
 		</div>
 		<!-- Family Member Filter -->
 		if len(p.Users) > 1 {
-			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto" x-show="tab === 'connections'">
+			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto overflow-y-hidden" x-show="tab === 'connections'">
 				<button
 					@click="filterUser = 'all'"
 					:class="filterUser === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
