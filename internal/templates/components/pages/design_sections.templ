@@ -419,6 +419,229 @@ templ SectionTags() {
 	</div>
 }
 
+// ─── Tag picker button ─────────────────────────────────────────────────
+
+// SectionTagPickerButton documents the two canonical triggers that open
+// the global tag picker. Both dispatch the same `open-tag-picker`
+// window event; only the visual shape differs.
+//
+// The picker overlay itself is a singleton in base.html (see
+// SectionTagPicker for its visual states). Triggers are caller-owned
+// markup; there is no shared templ component yet (2 distinct shapes
+// today, below the 3+ uses extraction threshold).
+templ SectionTagPickerButton() {
+	<div class="flex flex-col gap-6">
+		@designExample("Inline chip (bb-tag bb-tag-add)", "Used on the transaction detail page next to the row of present tags. The label flips between \"Add tag\" and \"Edit tags\" based on whether the transaction already has tags. Sizes: default + lg.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button type="button" class="bb-tag bb-tag-add">
+					<i data-lucide="plus"></i>
+					<span>Add tag</span>
+				</button>
+				<button type="button" class="bb-tag bb-tag-add">
+					<i data-lucide="plus"></i>
+					<span>Edit tags</span>
+				</button>
+				<button type="button" class="bb-tag bb-tag-lg bb-tag-add">
+					<i data-lucide="plus"></i>
+					<span>Add tag</span>
+				</button>
+				<button type="button" class="bb-tag bb-tag-lg bb-tag-add">
+					<i data-lucide="plus"></i>
+					<span>Edit tags</span>
+				</button>
+			</div>
+			<p class="text-xs text-base-content/50 mt-3">
+				Canonical site: <code>transaction_detail.templ</code> — sits in the same wrapping row as the present tag chips.
+			</p>
+		}
+		@designExample("Toolbar action (btn btn-ghost btn-sm)", "Used inside the floating multi-select toolbar on /transactions. Same dispatch contract, different visual because it sits next to other toolbar btn actions (Comment, Categorize).") {
+			<div class="inline-flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-sm px-3 py-2">
+				<button type="button" class="btn btn-ghost btn-sm gap-2" title="Tag selected">
+					<i data-lucide="tag" class="w-3.5 h-3.5"></i>
+					<span class="hidden sm:inline">Tag</span>
+					<span class="hidden sm:inline ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">T</span>
+				</button>
+			</div>
+			<p class="text-xs text-base-content/50 mt-3">
+				Canonical site: <code>static/js/admin/components/transactions.js</code> (<code>#bb-bulk-tag</code>) — injected into the multi-select bar at runtime. Hot-keyed to <code>T</code>.
+			</p>
+		}
+		@designExample("Dispatch contract", "Both triggers fire the same window event. The picker overlay (singleton in base.html) listens via @open-tag-picker.window.") {
+			<pre class="text-xs bg-base-200/60 rounded-lg p-3 overflow-x-auto"><code>{ tagPickerDispatchExample() }</code></pre>
+			<ul class="text-xs text-base-content/60 mt-3 space-y-1 list-disc pl-5">
+				<li><code>sourceId</code> — caller-chosen string echoed back in <code>tag-selection-commit</code>; how the caller knows the commit is for it.</li>
+				<li><code>transactionIds</code> — the transactions whose tags are being edited. 1 for the inline chip, N for the bulk toolbar.</li>
+				<li><code>appliedCounts</code> — map of slug → count present across the selection. count = N means the tag is present on every selected tx (renders as <em>present</em>); 0 &lt; count &lt; N renders as <em>mixed</em>; absent renders as <em>absent</em>.</li>
+				<li><code>availableTags</code> — the registered-tag list to populate chips. Pull from <code>window.__bbAllTags</code>.</li>
+			</ul>
+		}
+	</div>
+}
+
+// ─── Tag picker ────────────────────────────────────────────────────────
+
+// SectionTagPicker documents the global tag picker overlay
+// (.bb-tagpicker-dialog in base.html, driven by the globalTagPicker()
+// Alpine factory). The overlay is a singleton: every trigger across
+// every page opens the same instance.
+//
+// The visual states below are inert HTML — they mirror what the live
+// Alpine factory renders for each chip state. For an end-to-end live
+// demo, the "Open the real picker" button below dispatches the actual
+// open-tag-picker event with sample data, so reviewers can see the
+// singleton in action.
+templ SectionTagPicker() {
+	<div class="flex flex-col gap-6">
+		@designExample("Live demo", "Fires the real open-tag-picker event with sample data. The picker that opens is the singleton from base.html — the same one transactions and transaction detail use. Sample tags are injected inline so the chip grid renders even when no tags are registered on this server.") {
+			<button type="button" class="btn btn-primary btn-sm gap-2" onclick="window.dispatchEvent(new CustomEvent('open-tag-picker', {detail: {sourceId: 'design-sandbox', transactionIds: ['demo-1','demo-2','demo-3'], txCount: 3, appliedCounts: {recurring: 3, 'needs-review': 1}, availableTags: (window.__bbAllTags && window.__bbAllTags.length) ? window.__bbAllTags : [{slug:'recurring',display_name:'Recurring',color:'#10b981',icon:'refresh-cw'},{slug:'needs-review',display_name:'Needs review',color:'#f59e0b',icon:'inbox'},{slug:'subscription',display_name:'subscription',color:'#6366f1',icon:'bookmark'},{slug:'business',display_name:'Business',color:'#0ea5e9',icon:'building'},{slug:'refund',display_name:'Refund',color:'#ef4444',icon:'undo-2'}]}}))">
+				<i data-lucide="tag" class="w-3.5 h-3.5"></i>
+				<span>Open the real picker</span>
+			</button>
+		}
+		@designExample("Chip states", "Each chip in the picker grid carries one of five states. Click cycles a chip through the right column.") {
+			<div class="flex flex-wrap items-center gap-2 max-w-xl">
+				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
+					<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+					<span class="truncate">absent</span>
+				</span>
+				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
+					<span class="bb-tagpicker-chip-glyph"><i data-lucide="check"></i></span>
+					<span class="truncate">present</span>
+				</span>
+				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
+					<span class="bb-tagpicker-chip-glyph"><i data-lucide="minus"></i></span>
+					<span class="truncate">mixed</span>
+				</span>
+				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
+					<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+					<span class="truncate">pending-add</span>
+				</span>
+				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
+					<span class="bb-tagpicker-chip-glyph"><i data-lucide="x"></i></span>
+					<span class="truncate">pending-remove</span>
+				</span>
+			</div>
+			<p class="text-xs text-base-content/50 mt-3">
+				Cycle order: <code>absent</code> → <code>pending-add</code> → <code>absent</code>; <code>present</code> → <code>pending-remove</code> → <code>present</code>; <code>mixed</code> → <code>pending-add</code> → <code>pending-remove</code> → <code>mixed</code>. Nothing fires until <em>Apply</em>.
+			</p>
+		}
+		@designExample("Static layout", "The overlay shape — search input, context strip, chip grid, diff strip, footer. Rendered inert here for layout reference; the live picker opens via the Live demo above.") {
+			<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%; max-width: 32rem;">
+				<div class="bb-catpicker-input-wrap gap-2">
+					<i data-lucide="tag"></i>
+					<input type="text" class="bb-catpicker-input" placeholder="Filter tags or type to create…" value="" readonly/>
+					<div class="bb-cmdk-kbd" style="font-size:0.6rem">esc</div>
+				</div>
+				<div class="bb-tagpicker-context">
+					<i data-lucide="receipt"></i>
+					<span>Editing tags for <strong>3</strong> transactions</span>
+				</div>
+				<div class="bb-tagpicker-body">
+					<div class="bb-tagpicker-grid">
+						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
+							<span class="bb-tagpicker-chip-glyph"><i data-lucide="check"></i></span>
+							<span class="truncate">recurring</span>
+						</button>
+						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
+							<span class="bb-tagpicker-chip-glyph"><i data-lucide="minus"></i></span>
+							<span class="truncate">needs-review</span>
+						</button>
+						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
+							<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+							<span class="truncate">subscription</span>
+						</button>
+						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
+							<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+							<span class="truncate">business</span>
+						</button>
+						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
+							<span class="bb-tagpicker-chip-glyph"><i data-lucide="x"></i></span>
+							<span class="truncate">refund</span>
+						</button>
+					</div>
+				</div>
+				<div class="bb-tagpicker-diff">
+					<span class="bb-tagpicker-diff-pill bb-tagpicker-diff-pill--add">
+						<i data-lucide="plus"></i>
+						<span>1</span>
+						<span>to add</span>
+					</span>
+					<span class="bb-tagpicker-diff-pill bb-tagpicker-diff-pill--remove">
+						<i data-lucide="x"></i>
+						<span>1</span>
+						<span>to remove</span>
+					</span>
+					<button type="button" class="bb-tagpicker-diff-revert ml-auto">Revert</button>
+				</div>
+				<div class="bb-catpicker-footer">
+					<div class="flex items-center gap-3 flex-wrap">
+						<span class="inline-flex items-center gap-1">
+							@components.Kbd("enter")
+							<span>apply</span>
+						</span>
+						<span class="inline-flex items-center gap-1">
+							@components.Kbd("esc")
+							<span>cancel</span>
+						</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<button type="button" class="btn btn-ghost btn-xs">Cancel</button>
+						<button type="button" class="btn btn-primary btn-xs">Apply</button>
+					</div>
+				</div>
+			</div>
+		}
+		@designExample("Inline create", "When the search query is a valid slug that doesn't exist yet, an inline `Create '<slug>'` button appears. Enter on an empty match also fires it.") {
+			<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%; max-width: 28rem;">
+				<div class="bb-catpicker-input-wrap gap-2">
+					<i data-lucide="tag"></i>
+					<input type="text" class="bb-catpicker-input" value="travel" readonly/>
+				</div>
+				<div class="bb-tagpicker-body">
+					<button type="button" class="bb-tagpicker-create-inline">
+						<i data-lucide="plus"></i>
+						<span>Create</span>
+						<code class="font-mono bg-base-100/60 px-1.5 py-0.5 rounded text-[0.7rem]">travel</code>
+						<span class="ml-auto text-[0.65rem] text-base-content/40">
+							<kbd class="bb-kbd">↵</kbd>
+						</span>
+					</button>
+				</div>
+			</div>
+		}
+		@designExample("Empty states", "Two empty shapes: zero registered tags (left) and no match for a non-sluggable query (right).") {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%;">
+					<div class="bb-catpicker-input-wrap gap-2">
+						<i data-lucide="tag"></i>
+						<input type="text" class="bb-catpicker-input" placeholder="Filter tags or type to create…" value="" readonly/>
+					</div>
+					<div class="bb-tagpicker-body">
+						<div class="bb-tagpicker-empty">
+							<i data-lucide="tags"></i>
+							<div class="text-sm">No tags yet</div>
+							<div class="text-xs">Type a slug to create the first one.</div>
+						</div>
+					</div>
+				</div>
+				<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%;">
+					<div class="bb-catpicker-input-wrap gap-2">
+						<i data-lucide="tag"></i>
+						<input type="text" class="bb-catpicker-input" value="Foo Bar!" readonly/>
+					</div>
+					<div class="bb-tagpicker-body">
+						<div class="bb-tagpicker-empty">
+							<i data-lucide="search-x"></i>
+							<div class="text-sm">No matching tags</div>
+							<div class="text-[0.65rem]">Slug must be lowercase letters, numbers, hyphens or colons.</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		}
+	</div>
+}
+
 // ─── Menus & dropdowns ─────────────────────────────────────────────────
 
 templ SectionMenusDropdowns() {
@@ -1440,6 +1663,19 @@ templ SectionTransactionRows() {
 		(function(){var e=document.getElementById('design-tx-rows-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
 	</script>
 	<div class="flex flex-col gap-6">
+		<!-- Variant policy: when to use which row component. The three layouts
+		     share `bb-tx-avatar`, `bb-tx-owner-badge`, the pending-clock atom,
+		     and the canonical `Amount` component (see `tx_row_atoms.templ`),
+		     so the visual language stays in sync; the differences below are
+		     purely about what affordances each surface needs. -->
+		<div class="rounded-xl border border-base-300/50 bg-base-200/30 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use which</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li><code>TxRow</code> — bulk-select + inline category picker + expand panel. The /transactions list and any surface that wants the same editing affordances (account detail, rule detail preview).</li>
+				<li><code>TxRowCompact</code> — read-only dense list. cmdk results, dashboard recents, rule-detail samples. Takes the same <code>AdminTransactionRow</code> as <code>TxRow</code> so callers can swap with no data shape change.</li>
+				<li><code>TxRowFeed</code> — single-line glance row that surfaces the *raw provider description* (not the cleaned merchant). Use inside /feed cards where the parent already conveys when/who/why; do not use for editable lists.</li>
+			</ul>
+		</div>
 		@designExample("TxRow — full row (transactions list)", "Two-line layout with checkbox, avatar, name + meta, inline category picker (xl+), date, amount, expand panel. Used on /transactions.") {
 			<div class="divide-y divide-base-300/40 -mx-5">
 				@components.TxRow(designTxRowsCategorized())

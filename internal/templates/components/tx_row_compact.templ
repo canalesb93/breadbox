@@ -12,35 +12,17 @@ import (
 // category picker, no expand panel. Mirrors the "tx-row-compact" partial.
 templ TxRowCompact(tx service.AdminTransactionRow) {
 	<a href={ templ.SafeURL("/transactions/" + tx.ID) } class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
-		<!-- Category avatar. Categorised rows (any color or icon) render the
-		     coloured circle; uncategorised rows render the neutral
-		     `circle-off` glyph — same convention used in tx_row + tx_row_feed.
-		     Owner identity rides as a corner badge so it shows up across all
+		<!-- Category avatar. Categorised rows render the coloured circle;
+		     uncategorised rows render the neutral `circle-off` glyph. Owner
+		     identity rides as a corner badge so it shows up across all
 		     breakpoints without burning meta-line real estate. -->
-		<div class="relative shrink-0">
-			if tx.CategoryIcon != nil || tx.CategoryColor != nil {
-				<div class="bb-tx-avatar bb-tx-avatar--sm" style={ txAvatarColorStyle(tx.CategoryColor) }>
-					if tx.CategoryIcon != nil {
-						<i data-lucide={ deref(tx.CategoryIcon) } class="w-3.5 h-3.5"></i>
-					} else {
-						<i data-lucide="folder" class="w-3.5 h-3.5"></i>
-					}
-				</div>
-			} else {
-				<div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--uncategorized">
-					<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>
-				</div>
-			}
-			if tx.UserName != "" {
-				if tx.EffectiveUserID != nil {
-					<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="bb-tx-owner-badge" title={ tx.UserName }/>
-				} else {
-					<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ tx.UserName }>
-						<span>{ firstChar(tx.UserName) }</span>
-					</span>
-				}
-			}
-		</div>
+		@TxAvatar(TxAvatarProps{
+			Size:          TxAvatarSizeSm,
+			CategoryColor: tx.CategoryColor,
+			CategoryIcon:  tx.CategoryIcon,
+			OwnerName:     tx.UserName,
+			OwnerID:       tx.EffectiveUserID,
+		})
 		<!-- Name + meta line -->
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-1.5 min-w-0">
@@ -76,12 +58,7 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 		<div class="shrink-0 text-right flex flex-col items-end gap-0.5">
 			<div class="flex items-center justify-end gap-1">
 				if tx.Pending {
-					<i
-						data-lucide="clock"
-						class="w-3 h-3 shrink-0 text-warning opacity-70"
-						title="Pending — not yet posted"
-					></i>
-					<span class="sr-only">(pending)</span>
+					@TxPendingClock()
 				}
 				@Amount(AmountProps{
 					Value:   tx.Amount,
@@ -94,9 +71,12 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 	</a>
 }
 
+// txCompactCatColor paints the tiny 1.5×1.5px meta-line category dot.
+// Shares the neutral fallback with txAvatarColorStyle so categorised
+// vs uncategorised stays visually aligned across the two affordances.
 func txCompactCatColor(color *string) string {
 	if color != nil {
 		return "background-color: " + deref(color)
 	}
-	return "background-color: oklch(0.65 0 0)"
+	return "background-color: " + txNeutralCategoryColor
 }

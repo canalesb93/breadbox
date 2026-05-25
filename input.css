@@ -56,7 +56,53 @@
 
 @view-transition { navigation: auto; }
 
+/* ─── View Transitions chrome polish ────────────────────────────────
+ * Default cross-document transition fades the WHOLE viewport, which
+ * makes the persistent sidebar/navbar look like they "flashed" too.
+ * Giving them a view-transition-name tells the browser "this is the
+ * same element on both pages" and confines the fade to <main>.
+ *
+ * Tighter duration + iOS-standard ease so the fade feels coincident
+ * with a server-rendered MPA's <100ms TTFB rather than a slow 250ms
+ * default that reads as artificial delay.
+ *
+ * NOTE: We deliberately do NOT name the active sidebar link as its
+ * own group. With a name, the browser interpolates the old and new
+ * bounding boxes, which makes the highlight visibly glide across the
+ * column from the previous link to the new one. Sounds delightful in
+ * theory; in practice it's distracting, especially when the two
+ * active links are far apart or the glide crosses category headers.
+ * Without a name, the active state cross-fades inside the sidebar
+ * group — old highlight fades out in place, new one fades in in
+ * place. Calmer.
+ * ──────────────────────────────────────────────────────────── */
+.bb-sidebar       { view-transition-name: app-sidebar; }
+.bb-mobile-navbar { view-transition-name: app-navbar; }
+.bb-progress-bar  { view-transition-name: app-progress; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Universal reduced-motion guard. Honors the OS-level "Reduce Motion"
+ * toggle (iOS Accessibility, macOS Accessibility, Windows Animations,
+ * Linux GNOME Animations) by collapsing every transition/animation to
+ * a near-zero duration and disabling smooth scroll. Recommended pattern
+ * from web.dev / Eric Bailey — scoped to *::before/::after to catch
+ * pseudo-elements, !important to override Tailwind/daisy/our own rules.
+ *
+ * The view-transition pseudo-elements need their own zero-out below
+ * because they're not matched by the universal selector. */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
@@ -1028,7 +1074,10 @@
   }
 
   .bb-tx-avatar--sm {
-    @apply w-8 h-8 rounded-lg;
+    /* Size-only override — radius stays `rounded-xl` from the base rule so
+     * the compact/feed tile reads as the same shape family as the default
+     * 36×36 avatar (the previous `rounded-lg` here felt visibly sharper). */
+    @apply w-8 h-8;
   }
 
   .bb-tx-avatar--sm i, .bb-tx-avatar--sm svg {
@@ -1069,7 +1118,17 @@
   }
 
   .bb-tx-owner-badge--letter {
-    @apply inline-flex items-center justify-center bg-primary/15 text-primary/80;
+    /* Soft 15 % primary tint over an opaque row-background base so the
+     * avatar tile never bleeds through. Base matches the same `--bb-row-bg`
+     * the ring uses, so the pill, the ring, and the row hover/selected
+     * highlight stay in lock-step. Text keeps the original 80 % to read
+     * as a soft chip rather than a punched-out solid. */
+    @apply inline-flex items-center justify-center text-primary/80;
+    background-color: var(--bb-row-bg, var(--color-base-100, #fff));
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--color-primary) 15%, transparent),
+      color-mix(in srgb, var(--color-primary) 15%, transparent)
+    );
   }
 
   .bb-tx-owner-badge--letter > span {
@@ -1134,6 +1193,21 @@
    * ──────────────────────────────────────────────────────────── */
   .modal-box {
     overscroll-behavior: contain;
+  }
+
+  /* ── Suppress WebKit's native search-clear (×) on overlay pickers ──
+   * The cmdk / catpicker / tagpicker inputs are now type="search" so
+   * iOS gets the proper "Search" keyboard key. The flip side is that
+   * WebKit renders a small × clear button at the inline-end edge,
+   * which would visually compete with the existing `esc` kbd chip
+   * already rendered in the same wrap. Hide it on these three only;
+   * standalone search inputs (tx quick-search, filters) keep the
+   * native ×, which is genuinely useful there.
+   * ──────────────────────────────────────────────────────────── */
+  .bb-cmdk-input::-webkit-search-cancel-button,
+  .bb-catpicker-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
   }
 
 

@@ -8,8 +8,11 @@
   <!-- Safari: theme color for status bar / tab bar -->
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
-  <!-- Safari: Add to Home Screen support -->
+  <!-- Safari: Add to Home Screen support. The non-prefixed mobile-web-app-capable
+       is the modern equivalent; Safari still reads the apple-* variant, but
+       browsers warn in console without the standard name. Ship both. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Breadbox">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -29,7 +32,9 @@
       } catch (_) { /* best-effort */ }
     })();
   </script>
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <!-- fetchpriority="high" hints that the app stylesheet is render-blocking and
+       critical. Safari 17.2+ and Chrome 102+ honor it; older browsers ignore. -->
+  <link rel="stylesheet" href="/static/css/styles.css" fetchpriority="high">
   <script>
     // Stash the browser's IANA timezone in a cookie so server-rendered date
     // logic ("Today" buckets, hero "Events today" counters, absolute-time
@@ -617,7 +622,8 @@
       <!-- Search input -->
       <div class="bb-catpicker-input-wrap">
         <i data-lucide="tag"></i>
-        <input type="text"
+        <input type="search"
+          enterkeyhint="search"
           class="bb-catpicker-input"
           placeholder="Search categories..."
           x-ref="catPickerInput"
@@ -689,7 +695,8 @@
       <!-- Search / create input -->
       <div class="bb-catpicker-input-wrap gap-2">
         <i data-lucide="tag"></i>
-        <input type="text"
+        <input type="search"
+          enterkeyhint="search"
           class="bb-catpicker-input"
           placeholder="Filter tags or type to create…"
           x-ref="tagPickerInput"
@@ -725,13 +732,11 @@
                   'bb-tagpicker-chip--mixed':          chip.state === 'mixed',
                   'bb-tagpicker-chip--pending-add':    chip.state === 'pending-add',
                   'bb-tagpicker-chip--pending-remove': chip.state === 'pending-remove',
-                  'tooltip tooltip-top':               chip.display_name && chip.display_name !== chip.slug,
                 }"
-                :data-tip="chip.display_name && chip.display_name !== chip.slug ? chip.slug : null"
                 :style="chip.color ? ('--tag-color:' + chip.color) : ''"
                 @click="cycleChip(chip)"
                 x-effect="syncChipGlyph($el, chip.state, chip.icon)"
-                :title="chip.slug">
+                :title="chip.display_name && chip.display_name !== chip.slug ? (chip.display_name + ' — ' + chip.slug) : chip.slug">
                 <!-- Glyph slot — rewritten imperatively on state change.
                      Can't use <template x-if> + lucide here: lucide replaces
                      <i data-lucide> with <svg>, which Alpine no longer tracks,
@@ -825,7 +830,8 @@
       <!-- Search input -->
       <div class="bb-cmdk-input-wrap">
         <i data-lucide="search"></i>
-        <input type="text"
+        <input type="search"
+          enterkeyhint="search"
           class="bb-cmdk-input"
           placeholder="Type a command or search..."
           x-ref="cmdkInput"

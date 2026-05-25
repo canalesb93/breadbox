@@ -43,90 +43,39 @@ templ TxRow(tx service.AdminTransactionRow) {
 					@change={ fmt.Sprintf("$store.bulk.toggle('%s')", tx.ID) }
 				/>
 			</label>
-			<!-- Category icon / merchant-initial avatar. The `bb-tx-avatar-slot`
-			     class lets CSS hide the slot on mobile while selection mode is on
-			     so the bulk-select checkbox doesn't squeeze the name column.
-			     Owner identity rides as a small badge in the bottom-right corner
-			     so we don't burn meta-line real estate (and so phones don't lose
+			<!-- Category icon / merchant-initial avatar. `bb-tx-avatar-slot`
+			     lets CSS hide the slot on mobile while selection mode is on so
+			     the bulk-select checkbox doesn't squeeze the name column. Owner
+			     identity rides as a small badge in the bottom-right corner so
+			     we don't burn meta-line real estate (and so phones don't lose
 			     attribution entirely — the meta line is hidden <sm). -->
-			<div class="relative shrink-0 bb-tx-avatar-slot">
-				if tx.CategoryIcon != nil || tx.CategoryColor != nil {
-					<div class="bb-tx-avatar" style={ txAvatarColorStyle(tx.CategoryColor) }>
-						if tx.CategoryIcon != nil {
-							<i data-lucide={ deref(tx.CategoryIcon) } class="w-4 h-4"></i>
-						} else {
-							<i data-lucide="folder" class="w-4 h-4"></i>
-						}
-					</div>
-				} else {
-					<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
-						<i data-lucide="circle-off" class="w-4 h-4"></i>
-					</div>
-				}
-				if tx.UserName != "" {
-					if tx.EffectiveUserID != nil {
-						<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="bb-tx-owner-badge" title={ tx.UserName }/>
-					} else {
-						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ tx.UserName }>
-							<span>{ firstChar(tx.UserName) }</span>
-						</span>
-					}
-				}
-			</div>
+			@TxAvatar(TxAvatarProps{
+				CategoryColor: tx.CategoryColor,
+				CategoryIcon:  tx.CategoryIcon,
+				OwnerName:     tx.UserName,
+				OwnerID:       tx.EffectiveUserID,
+				Class:         "bb-tx-avatar-slot",
+			})
 			<!-- Description + meta line -->
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2">
 					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{ tx.Name }</a>
 				</div>
-				<!-- Meta line: hidden on mobile (<sm) — only visible sm+.
-				     On mobile the expand panel shows account/category/date.
-				     On sm+ we show account + compact category (below xl) or
-				     the inline category picker handles it (xl+). -->
+				<!-- Meta line (sm+). Canonical order across every breakpoint:
+				     [Lead] · {Merchant | Category} · Tags · Comments.
+				     Slot 2 holds Merchant at xl+ and Category at sub-xl — they
+				     share the slot so the category label doesn't hop around as
+				     the viewport shrinks. Mobile (<sm) uses the same order in
+				     its dedicated sub-line below, with Date in the lead. -->
 				<div class="hidden sm:flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 min-w-0">
-					<!-- Owner avatar moved to a corner badge on the category icon
-					     (see `bb-tx-owner-badge`) so it shows up across all
-					     breakpoints without burning meta-line space. -->
 					<span class="truncate min-w-0">{ tx.AccountName }</span>
+					<!-- Slot 2 — Merchant (xl+) | Category (sub-xl). Both render
+					     a leading separator inside their conditional so the row
+					     stays clean when neither piece is present. -->
 					if tx.MerchantName != nil && !strings.EqualFold(tx.Name, deref(tx.MerchantName)) {
 						<span class="text-base-content/20 hidden xl:inline">&middot;</span>
 						<span class="text-base-content/40 truncate hidden xl:inline">{ titleCase(deref(tx.MerchantName)) }</span>
 					}
-					if tx.CommentCount > 0 {
-						<span class="text-base-content/20">&middot;</span>
-						<span
-							class="inline-flex items-center gap-0.5 text-base-content/40"
-							title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
-						>
-							<i data-lucide="messages-square" class="w-3 h-3"></i>
-							<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
-						</span>
-					}
-					<!-- Tag container — updated in place by JS on add/remove. Leading
-					     middot separator is inside the container so it vanishes once
-					     the last tag is removed. Chips hidden on mobile via CSS;
-					     the mobile pill below takes their place. -->
-					<span class="bb-tx-tag-container contents" data-tx-tag-container>
-						if len(tx.Tags) > 0 {
-							<span class="text-base-content/20 hidden xl:inline" data-tx-tag-sep>&middot;</span>
-							for _, tag := range tx.Tags {
-								@TagChipSm(TagChipDataFromTx(tag))
-							}
-						}
-					</span>
-					<!-- Compact tag indicator (sm–xl): tag icon + count pill. -->
-					if len(tx.Tags) > 0 {
-						<span
-							class="xl:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
-							data-tx-tag-mobile
-							title={ fmt.Sprintf("%d tag%s", len(tx.Tags), pluralS(len(tx.Tags))) }
-						>
-							<span class="text-base-content/20 mr-0.5">&middot;</span>
-							<i data-lucide="tag" class="w-3 h-3"></i>
-							<span class="text-[0.65rem] tabular-nums font-medium" data-tx-tag-count>{ strconv.Itoa(len(tx.Tags)) }</span>
-						</span>
-					}
-					<!-- Compact category label (sm–xl). Separator stays inside the
-					     conditional so it never orphans when the meta line is empty. -->
 					if tx.CategoryDisplayName != nil {
 						<span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
 						<span class="xl:hidden inline-flex items-center gap-1 shrink min-w-0">
@@ -138,6 +87,41 @@ templ TxRow(tx service.AdminTransactionRow) {
 					} else {
 						<span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
 						<span class="xl:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
+					}
+					<!-- Slot 3 — Tags. Chips at xl+ (rendered via the JS-managed
+					     bb-tx-tag-container so add/remove updates in place); a
+					     [tag] N pill sub-xl where chip wrapping would crowd the
+					     row. The leading middot sits inside the conditional so
+					     it vanishes when the last tag is removed. -->
+					<span class="bb-tx-tag-container contents" data-tx-tag-container>
+						if len(tx.Tags) > 0 {
+							<span class="text-base-content/20 hidden xl:inline" data-tx-tag-sep>&middot;</span>
+							for _, tag := range tx.Tags {
+								@TagChipSm(TagChipDataFromTx(tag))
+							}
+						}
+					</span>
+					if len(tx.Tags) > 0 {
+						<span
+							class="xl:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+							data-tx-tag-mobile
+							title={ fmt.Sprintf("%d tag%s", len(tx.Tags), pluralS(len(tx.Tags))) }
+						>
+							<span class="text-base-content/20 mr-0.5">&middot;</span>
+							<i data-lucide="tag" class="w-3 h-3"></i>
+							<span class="text-[0.65rem] tabular-nums font-medium" data-tx-tag-count>{ strconv.Itoa(len(tx.Tags)) }</span>
+						</span>
+					}
+					<!-- Slot 4 — Comments. -->
+					if tx.CommentCount > 0 {
+						<span class="text-base-content/20">&middot;</span>
+						<span
+							class="inline-flex items-center gap-0.5 text-base-content/40"
+							title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
+						>
+							<i data-lucide="messages-square" class="w-3 h-3"></i>
+							<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
+						</span>
 					}
 				</div>
 				<!-- Mobile-only sub-line (<sm): date + category dot.
@@ -216,12 +200,7 @@ templ TxRow(tx service.AdminTransactionRow) {
 			     locked and the row height stable across pending and settled. -->
 			<div class="w-20 sm:w-24 shrink-0 pl-0 sm:pl-3 flex items-center justify-end gap-1">
 				if tx.Pending {
-					<i
-						data-lucide="clock"
-						class="w-3 h-3 shrink-0 text-warning opacity-70"
-						title="Pending — not yet posted"
-					></i>
-					<span class="sr-only">(pending)</span>
+					@TxPendingClock()
 				}
 				@Amount(AmountProps{
 					Value:   tx.Amount,
@@ -319,13 +298,21 @@ func txMerchantAttr(m *string) string {
 	return strings.ToLower(*m)
 }
 
-// txAvatarColorStyle falls back to the neutral oklch used by the original
-// partial when a category has no color.
+// txNeutralCategoryColor is the OKLCH fallback used everywhere a row
+// surfaces a category color but the row itself has no category. Kept
+// as one constant so the avatar tint, the inline meta dot, and any
+// future surface stay in lock-step.
+const txNeutralCategoryColor = "oklch(0.65 0 0)"
+
+// txAvatarColorStyle returns the `--avatar-color` custom property the
+// `.bb-tx-avatar` rule reads — color-mix(--avatar-color, …) becomes
+// the 12 % tint backdrop and `color: var(--avatar-color)` colors the
+// icon. Falls back to neutral grey for uncategorised rows.
 func txAvatarColorStyle(color *string) string {
 	if color != nil {
 		return "--avatar-color: " + *color
 	}
-	return "--avatar-color: oklch(0.65 0 0)"
+	return "--avatar-color: " + txNeutralCategoryColor
 }
 
 // txCategoryInitial returns the category UUID for the picker's data-initial

@@ -282,8 +282,7 @@ templ txdMain(p TransactionDetailProps) {
 					<template x-for="t in tags" :key="t.slug">
 						<span
 							class="bb-tag bb-tag-lg"
-							:class="t.displayName && t.displayName !== t.slug ? 'tooltip tooltip-top' : ''"
-							:data-tip="t.displayName && t.displayName !== t.slug ? t.slug : null"
+							:title="t.displayName && t.displayName !== t.slug ? (t.displayName + ' — ' + t.slug) : t.slug"
 							:style="t.color ? ('--tag-color:' + t.color) : ''"
 						>
 							<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
