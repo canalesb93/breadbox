@@ -1,0 +1,325 @@
+package pages
+
+import (
+	"fmt"
+	"strings"
+
+	"breadbox/internal/templates/components"
+)
+
+// AccountsList renders the flat /accounts admin page — a single sortable,
+// filterable table of every account the viewer is allowed to see. The
+// per-connection list view still lives on /connections; this page is the
+// account-centric counterpart so the user doesn't have to crack open each
+// connection to find a single account.
+//
+// Alpine factory `accountsList` (filter + sort) lives in
+// static/js/admin/components/accounts.js. Loaded synchronously (no defer)
+// per the convention in docs/design-system.md → "Alpine page components".
+templ AccountsList(p AccountsListProps) {
+	<script src="/static/js/admin/components/accounts.js"></script>
+	<div x-data x-init="$store.shortcuts.setScope('accounts')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	<div x-data="accountsList">
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Accounts",
+			Subtitle:             "Every account across all your connections, in one sortable view.",
+			SubtitleHideOnMobile: true,
+		})
+		<!-- Family-member filter strip (only when 2+ household members) -->
+		if len(p.Users) > 1 {
+			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto overflow-y-hidden">
+				<button
+					@click="filterUser = 'all'"
+					:class="filterUser === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+					class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
+				>
+					<span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
+						<i data-lucide="users" class="w-3 h-3"></i>
+					</span>
+					All
+				</button>
+				for _, u := range p.Users {
+					@accountsListUserFilterBtn(u)
+				}
+			</div>
+		}
+		if p.HasAnyBalance {
+			<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
+				<div class="grid grid-cols-3 divide-x divide-base-300">
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+						<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Net Worth</div>
+						<div class="truncate">
+							@components.Amount(components.AmountProps{
+								Value:  p.NetWorth,
+								Intent: components.AmountBalance,
+								Class:  "text-sm sm:text-2xl font-semibold tracking-tight",
+							})
+						</div>
+					</div>
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+						<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Assets</div>
+						<div class="truncate">
+							@components.Amount(components.AmountProps{
+								Value:  p.TotalAssets,
+								Intent: components.AmountBalance,
+								Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-success",
+							})
+						</div>
+					</div>
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+						<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Liabilities</div>
+						<div class="truncate">
+							@components.Amount(components.AmountProps{
+								Value:  p.TotalLiabilities,
+								Intent: components.AmountCost,
+								Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-error",
+							})
+						</div>
+					</div>
+				</div>
+			</div>
+		}
+		@components.FilterSearchInput(components.FilterSearchInputProps{
+			Placeholder: "Filter accounts...",
+			XModel:      "filter",
+		})
+		<div class="mt-4">
+			if len(p.Accounts) > 0 {
+				@accountsListTable(p)
+			} else {
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:     "wallet",
+					Title:    "No accounts yet",
+					Body:     "Once you connect a bank, every account synced from it shows up here.",
+					CTAHref:  templ.SafeURL("/connections/new"),
+					CTAIcon:  "plus",
+					CTALabel: "Connect a Bank",
+				})
+			}
+		</div>
+	</div>
+	<script>
+		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
+	</script>
+}
+
+templ accountsListUserFilterBtn(u AccountsListUserFilter) {
+	<button
+		@click={ fmt.Sprintf("filterUser = %q", u.ID) }
+		:class={ fmt.Sprintf("filterUser === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", u.ID) }
+		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
+	>
+		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ u.First }</span>
+		{ u.Name }
+	</button>
+}
+
+// accountsListTable wraps the data table in a bb-card. Header is clickable to
+// drive client-side sort via the accountsList Alpine factory.
+templ accountsListTable(p AccountsListProps) {
+	<div class="bb-card overflow-hidden">
+		<div class="overflow-x-auto">
+			<table class="table table-sm">
+				<thead class="text-xs text-base-content/60">
+					<tr>
+						@accountsListSortHeader("name", "Account", "min-w-[12rem]")
+						@accountsListSortHeader("institution", "Institution", "hidden md:table-cell")
+						@accountsListSortHeader("type", "Type", "hidden lg:table-cell")
+						@accountsListSortHeader("owner", "Owner", "hidden lg:table-cell")
+						@accountsListSortHeader("balance", "Balance", "text-right")
+						<th class="w-8"></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, a := range p.Accounts {
+						@accountsListRow(a, p.CSRFToken)
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+// accountsListSortHeader emits one clickable column header. The chevron icon
+// rotates based on the active sort direction.
+templ accountsListSortHeader(key, label, extraClass string) {
+	<th class={ "cursor-pointer select-none whitespace-nowrap", extraClass } @click={ fmt.Sprintf("setSort(%q)", key) }>
+		<span class="inline-flex items-center gap-1">
+			{ label }
+			<span x-show={ fmt.Sprintf("sortKey === %q", key) } x-cloak>
+				<i data-lucide="chevron-down" class="w-3 h-3" :class="sortDir === 'desc' ? '' : 'rotate-180'"></i>
+			</span>
+		</span>
+	</th>
+}
+
+templ accountsListRow(a AccountsListRow, csrfToken string) {
+	<tr
+		data-account-row
+		data-account-id={ a.ID }
+		data-name={ strings.ToLower(a.DisplayName) }
+		data-institution={ strings.ToLower(a.InstitutionName) }
+		data-type={ a.Type }
+		data-owner={ strings.ToLower(a.OwnerName) }
+		data-balance={ fmt.Sprintf("%f", a.BalanceFloat) }
+		data-has-balance={ accountsListBool(a.HasBalance) }
+		data-search={ accountsListSearchIndex(a) }
+		data-filter-user={ a.UserID }
+		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && matches($el)"
+		x-cloak
+		class="hover:bg-base-200/30 transition-colors"
+	>
+		<!-- Account name + icon -->
+		<td>
+			<a href={ templ.SafeURL("/accounts/" + a.ID) } class="flex items-center gap-3 no-underline">
+				<div class="w-8 h-8 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">
+					@accountsListTypeIcon(a.Type)
+				</div>
+				<div class="min-w-0">
+					<div class="flex items-center gap-1.5 flex-wrap">
+						<span class="text-sm font-medium truncate text-base-content">{ a.DisplayName }</span>
+						if a.IsDependentLinked {
+							<span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance attributed to a linked user">Linked</span>
+						}
+						if a.Excluded {
+							<span class="badge badge-soft badge-warning badge-xs" title="Excluded from totals and sync">Excluded</span>
+						}
+					</div>
+					<div class="text-xs text-base-content/40 md:hidden">
+						{ a.InstitutionName }
+						if a.MaskValid {
+							<span class="text-base-content/25">&middot;</span>
+							{ " ····" + a.Mask }
+						}
+					</div>
+				</div>
+			</a>
+		</td>
+		<!-- Institution (md+) -->
+		<td class="hidden md:table-cell text-sm text-base-content/70">
+			<div class="flex items-center gap-2 min-w-0">
+				<span class="truncate">{ a.InstitutionName }</span>
+				if a.MaskValid {
+					<span class="text-xs text-base-content/40">&middot; ····{ a.Mask }</span>
+				}
+				if a.ConnectionStatus == "error" || a.ConnectionStatus == "pending_reauth" {
+					<span class="badge badge-soft badge-warning badge-xs" title="Connection needs attention">Reauth</span>
+				} else if a.ConnectionStatus == "disconnected" {
+					<span class="badge badge-soft badge-error badge-xs">Disconnected</span>
+				}
+			</div>
+		</td>
+		<!-- Type (lg+) -->
+		<td class="hidden lg:table-cell text-sm text-base-content/70 capitalize">
+			{ accountsListTypeLabel(a.Type, a.Subtype, a.SubtypeValid) }
+		</td>
+		<!-- Owner (lg+) -->
+		<td class="hidden lg:table-cell text-sm text-base-content/70">
+			if a.OwnerName != "" {
+				<span class="inline-flex items-center gap-1.5">
+					<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ a.OwnerFirst }</span>
+					{ a.OwnerName }
+				</span>
+			} else {
+				<span class="text-base-content/30">—</span>
+			}
+		</td>
+		<!-- Balance -->
+		<td class="text-right">
+			if a.HasBalance {
+				if a.BalanceFloat < 0 {
+					@components.Amount(components.AmountProps{
+						Value:  a.BalanceFloat,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-medium text-error",
+					})
+				} else {
+					@components.Amount(components.AmountProps{
+						Value:  a.BalanceFloat,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-medium",
+					})
+				}
+			} else {
+				<span class="text-xs text-base-content/30">—</span>
+			}
+		</td>
+		<td class="text-right">
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: fmt.Sprintf("Actions for %s", a.DisplayName),
+				Size:      "xs",
+				Items:     accountsListRowItems(a),
+			})
+		</td>
+	</tr>
+}
+
+templ accountsListTypeIcon(t string) {
+	switch t {
+		case "credit":
+			<i data-lucide="credit-card" class="w-4 h-4 text-base-content opacity-40"></i>
+		case "loan":
+			<i data-lucide="landmark" class="w-4 h-4 text-base-content opacity-40"></i>
+		case "investment":
+			<i data-lucide="trending-up" class="w-4 h-4 text-base-content opacity-40"></i>
+		default:
+			<i data-lucide="wallet" class="w-4 h-4 text-base-content opacity-40"></i>
+	}
+}
+
+// accountsListRowItems builds the overflow-menu items for one row.
+func accountsListRowItems(a AccountsListRow) []components.OverflowMenuItem {
+	items := []components.OverflowMenuItem{
+		{
+			Label:     "View details",
+			Icon:      "external-link",
+			Href:      templ.SafeURL("/accounts/" + a.ID),
+			AriaLabel: fmt.Sprintf("Open %s detail", a.DisplayName),
+		},
+	}
+	if a.Excluded {
+		items = append(items, components.OverflowMenuItem{
+			Label:     "Include in totals",
+			Icon:      "eye",
+			OnClick:   fmt.Sprintf("$dispatch('account-set-excluded', {id: %q, name: %q, excluded: false})", a.ID, a.DisplayName),
+			AriaLabel: fmt.Sprintf("Include %s in totals", a.DisplayName),
+		})
+	} else {
+		items = append(items, components.OverflowMenuItem{
+			Label:     "Exclude from totals",
+			Icon:      "eye-off",
+			OnClick:   fmt.Sprintf("$dispatch('account-set-excluded', {id: %q, name: %q, excluded: true})", a.ID, a.DisplayName),
+			AriaLabel: fmt.Sprintf("Exclude %s from totals", a.DisplayName),
+		})
+	}
+	return items
+}
+
+// accountsListTypeLabel composes the type column text. Falls back to the
+// primary type when subtype is empty.
+func accountsListTypeLabel(t, subtype string, subtypeValid bool) string {
+	if subtypeValid && subtype != "" {
+		return strings.ReplaceAll(subtype, "_", " ")
+	}
+	return t
+}
+
+// accountsListSearchIndex builds the lowercase haystack used by the filter
+// search input.
+func accountsListSearchIndex(a AccountsListRow) string {
+	parts := []string{a.DisplayName, a.InstitutionName, a.Type, a.OwnerName}
+	if a.SubtypeValid {
+		parts = append(parts, a.Subtype)
+	}
+	if a.MaskValid {
+		parts = append(parts, a.Mask)
+	}
+	return strings.ToLower(strings.Join(parts, " "))
+}
+
+func accountsListBool(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}

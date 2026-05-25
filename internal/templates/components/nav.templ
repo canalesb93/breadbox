@@ -55,6 +55,9 @@ templ Nav(p NavProps) {
 		<a href="/transactions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "transactions") }>
 			<i data-lucide="receipt"></i> Transactions
 		</a>
+		<a href="/accounts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "accounts") }>
+			<i data-lucide="wallet"></i> Accounts
+		</a>
 		if p.IsAdmin {
 			<a href="/reports" class={ "bb-sidebar-link", navActive(p.CurrentPage, "reports") }>
 				<i data-lucide="file-text"></i>

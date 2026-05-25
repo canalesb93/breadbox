@@ -206,22 +206,29 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			})
 		}
 
-		// Fetch users for the family member filter subtabs, sorted by account count (descending).
-		users, _ := a.Queries.ListUsers(ctx)
-		// Count accounts per user from the enriched connections.
-		userAccountCount := make(map[[16]byte]int)
+		// Build the provider filter strip: one chip per provider that
+		// actually has a connection in the list, ordered by descending
+		// connection count then alphabetically. The shape of the strip
+		// (chips with icon + label + count) is built here so the templ
+		// can stay markup-only.
+		providerCounts := make(map[string]int)
 		for _, conn := range enriched {
-			if conn.UserID.Valid {
-				userAccountCount[conn.UserID.Bytes] += len(conn.Accounts)
-			}
+			providerCounts[string(conn.Provider)]++
 		}
-		sort.Slice(users, func(i, j int) bool {
-			ci := userAccountCount[users[i].ID.Bytes]
-			cj := userAccountCount[users[j].ID.Bytes]
-			if ci != cj {
-				return ci > cj
+		var providers []pages.ConnectionsProviderFilter
+		for slug, count := range providerCounts {
+			providers = append(providers, pages.ConnectionsProviderFilter{
+				Slug:  slug,
+				Label: providerLabel(slug),
+				Icon:  providerIcon(slug),
+				Count: count,
+			})
+		}
+		sort.Slice(providers, func(i, j int) bool {
+			if providers[i].Count != providers[j].Count {
+				return providers[i].Count > providers[j].Count
 			}
-			return users[i].Name < users[j].Name
+			return providers[i].Label < providers[j].Label
 		})
 
 		data := map[string]any{
@@ -234,7 +241,7 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			Tab:              tab,
 			CSRFToken:        GetCSRFToken(r),
 			Connections:      enriched,
-			Users:            users,
+			Providers:        providers,
 			Links:            links,
 			LinkAccounts:     linkAccounts,
 			NetWorth:         netWorth,
@@ -246,6 +253,36 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 	}
 }
 
+// providerLabel maps a canonical provider slug to the display label shown
+// on the connections filter chips.
+func providerLabel(p string) string {
+	switch p {
+	case "plaid":
+		return "Plaid"
+	case "teller":
+		return "Teller"
+	case "csv":
+		return "CSV"
+	default:
+		return p
+	}
+}
+
+// providerIcon mirrors the per-card icon choice in connections.templ so the
+// chip and the card stay visually consistent.
+func providerIcon(p string) string {
+	switch p {
+	case "plaid":
+		return "building-2"
+	case "teller":
+		return "landmark"
+	case "csv":
+		return "file-spreadsheet"
+	default:
+		return "link"
+	}
+}
+
 // connectionsListInput collects the values the handler computes for the
 // list page. Building props through this struct keeps the conversion from
 // db rows + ad-hoc maps into typed templ props in one place.
@@ -253,7 +290,7 @@ type connectionsListInput struct {
 	Tab              string
 	CSRFToken        string
 	Connections      []ConnectionWithAccounts
-	Users            []db.User
+	Providers        []pages.ConnectionsProviderFilter
 	Links            []service.AccountLinkResponse
 	LinkAccounts     []AccountForLink
 	NetWorth         float64
@@ -274,17 +311,7 @@ func buildConnectionsProps(in connectionsListInput) pages.ConnectionsProps {
 		HasAnyBalance:    in.HasAnyBalance,
 	}
 
-	for _, u := range in.Users {
-		first := ""
-		if u.Name != "" {
-			first = u.Name[:1]
-		}
-		props.Users = append(props.Users, pages.ConnectionsUserFilter{
-			ID:    pgconv.FormatUUID(u.ID),
-			Name:  u.Name,
-			First: first,
-		})
-	}
+	props.Providers = in.Providers
 
 	for _, c := range in.Connections {
 		row := pages.ConnectionsRow{

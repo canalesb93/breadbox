@@ -19,7 +19,7 @@
 // per .claude/rules/ui.md → "Keyboard shortcuts".
 
 // Keyboard navigation for the connections list. Reads the DOM for visible
-// rows (respecting the family-member filter via data-filter-user + Alpine's
+// rows (respecting the provider filter via data-filter-provider + Alpine's
 // x-show display:none) instead of mirroring connection data into a store.
 // The base.html dispatcher already guards against input focus, overlays,
 // and touch devices, so these handlers just do the thing.

@@ -30,7 +30,7 @@ templ Connections(p ConnectionsProps) {
 	-->
 	<div x-data x-init="$store.shortcuts.setScope('connections')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div
-		x-data={ fmt.Sprintf("{ tab: %q, filterUser: 'all' }", p.Tab) }
+		x-data={ fmt.Sprintf("{ tab: %q, filterProvider: 'all' }", p.Tab) }
 		x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })"
 	>
 		@components.PageHeader(components.PageHeaderProps{
@@ -58,21 +58,21 @@ templ Connections(p ConnectionsProps) {
 				Account Links
 			</button>
 		</div>
-		<!-- Family Member Filter -->
-		if len(p.Users) > 1 {
+		<!-- Provider filter — only providers actually configured show up here -->
+		if len(p.Providers) > 1 {
 			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto overflow-y-hidden" x-show="tab === 'connections'">
 				<button
-					@click="filterUser = 'all'"
-					:class="filterUser === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+					@click="filterProvider = 'all'"
+					:class="filterProvider === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
 					class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
 				>
 					<span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
-						<i data-lucide="users" class="w-3 h-3"></i>
+						<i data-lucide="layers" class="w-3 h-3"></i>
 					</span>
 					All
 				</button>
-				for _, u := range p.Users {
-					@connectionsUserFilterBtn(u)
+				for _, prov := range p.Providers {
+					@connectionsProviderFilterBtn(prov)
 				}
 			</div>
 		}
@@ -81,7 +81,7 @@ templ Connections(p ConnectionsProps) {
 			if len(p.Connections) > 0 {
 				<!-- Financial Summary Bar -->
 				if p.HasAnyBalance {
-					<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
+					<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterProvider === 'all'">
 						<div class="grid grid-cols-3 divide-x divide-base-300">
 							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
 								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Net Worth</div>
@@ -172,14 +172,16 @@ templ Connections(p ConnectionsProps) {
 	<!-- /alpine x-data tabs -->
 }
 
-templ connectionsUserFilterBtn(u ConnectionsUserFilter) {
+templ connectionsProviderFilterBtn(prov ConnectionsProviderFilter) {
 	<button
-		@click={ fmt.Sprintf("filterUser = %q", u.ID) }
-		:class={ fmt.Sprintf("filterUser === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", u.ID) }
+		@click={ fmt.Sprintf("filterProvider = %q", prov.Slug) }
+		:class={ fmt.Sprintf("filterProvider === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", prov.Slug) }
 		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
 	>
-		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ u.First }</span>
-		{ u.Name }
+		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+			<i data-lucide={ prov.Icon } class="w-3 h-3"></i>
+		</span>
+		{ prov.Label }
 	</button>
 }
 
@@ -189,8 +191,8 @@ templ connectionsCard(c ConnectionsRow) {
 		data-connection-row
 		data-open-url={ "/connections/" + c.ID }
 		data-edit-url={ "/connections/" + c.ID }
-		data-filter-user={ c.UserID }
-		x-show={ fmt.Sprintf("filterUser === 'all' || filterUser === %q", c.UserID) }
+		data-filter-provider={ c.Provider }
+		x-show={ fmt.Sprintf("filterProvider === 'all' || filterProvider === %q", c.Provider) }
 	>
 		<!-- Connection Header — non-nested interactives (a11y: link + sibling button) -->
 		<div class="group px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
