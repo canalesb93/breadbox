@@ -7,11 +7,9 @@ import (
 	"html/template"
 	"net/http"
 
-	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/a-h/templ"
-	"github.com/alexedwards/scs/v2"
 )
 
 // settingsFragmentHeader marks a request as a Settings modal swap — the
@@ -40,7 +38,6 @@ func renderSettingsTab(
 	tr *TemplateRenderer,
 	w http.ResponseWriter,
 	r *http.Request,
-	sm *scs.SessionManager,
 	data map[string]any,
 	tab string,
 	body templ.Component,
@@ -61,7 +58,3 @@ func renderSettingsTab(
 	data["SettingsInitialBody"] = template.HTML(buf.String())
 	tr.RenderWithTempl(w, r, data, pages.SettingsHost())
 }
-
-// Compile-time guard: keep the import list honest if components ever
-// stops exporting SettingsModalProps. The constant itself is unused.
-var _ = components.SettingsModalTabAccount

@@ -88,7 +88,7 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 
 // renderBackups wraps the Backups tab body in the unified Settings shell.
 func renderBackups(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.BackupsProps) {
-	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabBackups, pages.Backups(props))
+	renderSettingsTab(tr, w, r, data, pages.SettingsTabBackups, pages.Backups(props))
 }
 
 // CreateBackupHandler serves POST /-/backups/create — triggers a manual backup.

@@ -119,7 +119,7 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 
 // renderAccess wraps the Access tab body in the unified Settings shell.
 func renderAccess(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.AccessProps) {
-	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabAccess, pages.Access(props))
+	renderSettingsTab(tr, w, r, data, pages.SettingsTabAccess, pages.Access(props))
 }
 
 // buildAccessKeyRow flattens a service.APIKeyResponse into the templ-side
@@ -165,7 +165,7 @@ func APIKeyNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 // renderAPIKeyNew hosts the typed APIKeyNewProps inside the Settings
 // shell as a sub-view of the API Keys tab so the rail stays visible.
 func renderAPIKeyNew(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.APIKeyNewProps) {
-	renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabAccess, pages.APIKeyNew(props))
+	renderSettingsTab(tr, w, r, data, pages.SettingsTabAccess, pages.APIKeyNew(props))
 }
 
 // APIKeyCreatePageHandler serves POST /admin/api-keys/new.
@@ -219,7 +219,7 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 // renderAPIKeyCreated hosts the typed APIKeyCreatedProps inside the
 // Settings shell as a sub-view of the API Keys tab.
 func renderAPIKeyCreated(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.APIKeyCreatedProps) {
-	renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabAccess, pages.APIKeyCreated(props))
+	renderSettingsTab(tr, w, r, data, pages.SettingsTabAccess, pages.APIKeyCreated(props))
 }
 
 // APIKeyRevokePageHandler serves POST /admin/api-keys/{id}/revoke.

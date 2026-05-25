@@ -215,7 +215,7 @@ func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 		props, data := buildMyAccountProps(a, sm, r)
 		data["PageTitle"] = "Account"
 		data["CurrentPage"] = "account"
-		renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabAccount, pages.MyAccount(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabAccount, pages.MyAccount(props))
 	}
 }
 
