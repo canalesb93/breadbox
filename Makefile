@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-typecheck
+.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-install-user agent-sidecar-typecheck
 
 PORT ?= 8080
 
@@ -134,7 +134,10 @@ build-lite:
 # server exec's per Claude Agent SDK run. Output is bin/breadbox-agent —
 # a self-contained binary with the Bun runtime embedded (~50 MB).
 # The Go server discovers this binary via app_config agent.runtime_path,
-# the BREADBOX_AGENT_BIN env var, or by falling back to ./bin/breadbox-agent.
+# the BREADBOX_AGENT_BIN env var, ./bin/breadbox-agent (cwd-relative),
+# ~/.breadbox/agent-bin/breadbox-agent (per-user — see -install-user
+# target below), then $PATH. Local dev: build once with -install-user and
+# every worktree picks it up; production: the Docker image bakes it in.
 agent-sidecar-install:
 	@if ! command -v bun &>/dev/null; then \
 		echo "Error: bun is not installed. Install via 'curl -fsSL https://bun.sh/install | bash'."; \
@@ -147,6 +150,19 @@ agent-sidecar: agent-sidecar-install
 	@mkdir -p bin
 	@cp agent/sidecar/bin/breadbox-agent bin/breadbox-agent 2>/dev/null || true
 	@echo "Built bin/breadbox-agent (also at agent/sidecar/bin/breadbox-agent)."
+
+# agent-sidecar-install-user: build the sidecar (if not already built) and
+# copy it to ~/.breadbox/agent-bin/breadbox-agent — the per-user slot in
+# LocateBinary's discovery chain (priority 4). Run this ONCE on a fresh
+# machine; from then on every worktree's `breadbox serve` finds it without
+# having to bake a per-worktree `bin/breadbox-agent`. This is the canonical
+# local-dev install path; the worktree session-start hook checks for this
+# file and hints to run this target when missing.
+agent-sidecar-install-user: agent-sidecar
+	@mkdir -p $$HOME/.breadbox/agent-bin
+	@cp bin/breadbox-agent $$HOME/.breadbox/agent-bin/breadbox-agent
+	@chmod +x $$HOME/.breadbox/agent-bin/breadbox-agent
+	@echo "Installed $$HOME/.breadbox/agent-bin/breadbox-agent — discoverable by every worktree."
 
 agent-sidecar-typecheck: agent-sidecar-install
 	cd agent/sidecar && bun run typecheck

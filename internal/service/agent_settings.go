@@ -66,7 +66,7 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte) (*AgentSe
 	runtimePath := appconfig.String(ctx, s.Queries, appconfig.KeyAgentRuntimePath, "")
 	// Default matches serve.go fallback — keeps the Settings → Agents
 	// form showing the active path on a fresh install rather than blank.
-	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
+	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
 	globalBudget := readOptionalFloat(ctx, s.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD)
 
 	return &AgentSettingsResponse{

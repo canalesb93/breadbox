@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"breadbox/internal/agent"
 	"breadbox/internal/appconfig"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -213,7 +214,7 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 			path = *run.TranscriptPath
 		}
 		if path == "" && run.ID != "" {
-			dir := appconfig.String(ctx, svc.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
+			dir := appconfig.String(ctx, svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
 			if dir != "" {
 				path = filepath.Join(dir, run.ID+".ndjson")
 			}

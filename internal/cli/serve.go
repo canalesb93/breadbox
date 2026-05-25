@@ -139,7 +139,7 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	// via Settings → Agents → "breadbox-agent transcripts dir" if they
 	// want them elsewhere. Daily cleanup (iter-25) still prunes whatever
 	// path is in effect.
-	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
+	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
 	agentSidecar := &agent.Sidecar{
 		BinaryPath:    agentRuntimePath,
 		TranscriptDir: agentTranscriptDir,

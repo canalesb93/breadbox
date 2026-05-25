@@ -16,10 +16,12 @@ Recurring AI-powered workflows that run via the Claude Agent SDK and call breadb
      chmod +x ~/.breadbox/agent-bin/breadbox-agent
      ```
    - **Docker image**: nothing to do — the published image bundles `breadbox-agent` at `/usr/local/bin/breadbox-agent`.
-   - **From source** (dev / contributors): `make agent-sidecar` writes `bin/breadbox-agent` next to your repo checkout. Requires `bun`:
+   - **From source** (dev / contributors): `make agent-sidecar-install-user` builds the sidecar and installs it to `~/.breadbox/agent-bin/breadbox-agent` — the per-user slot in the discovery chain. Run it once; every clone and every git worktree picks it up automatically. Requires `bun`:
      ```sh
      curl -fsSL https://bun.sh/install | bash
+     make agent-sidecar-install-user
      ```
+     (`make agent-sidecar` alone writes only `bin/breadbox-agent` next to your repo checkout, which doesn't transfer to sibling worktrees.)
 
    Discovery order is: `agent.runtime_path` (Settings → Agents) → `$BREADBOX_AGENT_BIN` → `./bin/breadbox-agent` (cwd) → `~/.breadbox/agent-bin/breadbox-agent` → `$PATH` lookup.
 3. **Pick a starter agent** from `/agents`. Five defaults are seeded on fresh installs (disabled):
@@ -64,6 +66,15 @@ Exit codes (full reference):
 | 3    | No Anthropic credential configured                       | Paste a token in Settings → Agents (subscription or API key)                |
 | 5    | Sidecar binary not found                                 | Download `breadbox-agent-<os>-<arch>` from [the latest release](https://github.com/canalesb93/breadbox/releases/latest) into `~/.breadbox/agent-bin/` (or your PATH), use the Docker image, or `make agent-sidecar` from source |
 | 1    | Test ran but the sidecar crashed or the model errored    | Re-run with `--verbose` (planned) or check server logs for the sidecar stderr |
+
+### Local development across worktrees
+
+When you work on agents from multiple `claude -w` worktrees against the shared dev DB, two paths bite if they're not stable per machine:
+
+- **Sidecar binary**. Each worktree is a fresh checkout with no `./bin/breadbox-agent`, so the auto-discovery chain has to find the binary somewhere outside the worktree. Run `make agent-sidecar-install-user` once in your main checkout — it installs to `~/.breadbox/agent-bin/breadbox-agent`, which every worktree's `breadbox serve` picks up via priority-4 discovery.
+- **Transcript dir**. The default `agent.transcript_dir` is cwd-relative (`transcripts/agents`), so each worktree's server writes to its own directory. The session-start hook exports `BREADBOX_AGENT_TRANSCRIPT_DIR=$HOME/.local/share/breadbox/transcripts/agents` for worktree sessions so every local server reads + writes from the same place. Operator overrides via Settings → Agents still win (the env var is a fallback default, not an override).
+
+You can verify both are wired by running `breadbox agent test` from any worktree — it should report the resolved binary path and complete a smoke run in under 2s.
 
 ## Architecture (one-line view per layer)
 
