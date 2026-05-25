@@ -82,7 +82,7 @@
   --size-field: 0.25rem;
 
   --border: 1px;
-  --depth: 1;
+  --depth: 2;
   --noise: 0;
 }
 
@@ -129,7 +129,7 @@
   --size-field: 0.25rem;
 
   --border: 1px;
-  --depth: 1;
+  --depth: 2;
   --noise: 0;
 }
 
@@ -325,9 +325,15 @@
   .breadcrumbs { scrollbar-width: none; -ms-overflow-style: none; }
   .breadcrumbs::-webkit-scrollbar { display: none; }
 
-  /* ── Cards: shadcn-style — border, not shadow ── */
+  /* ── Cards: shadcn-style — 1px border + subtle drop shadow ──
+   * shadcn's Card component ships `border ... shadow-sm` (both, not
+   * border-only). The prior "border, not shadow" stance read flatter
+   * than shadcn in side-by-side comparison — added shadow-sm to get
+   * the same gentle lift. Dark mode keeps the color-mix surface lift
+   * below; shadows on dark BG read as a barely-visible halo and
+   * the surface lift carries the elevation cue. */
   .bb-card {
-    @apply bg-base-100 rounded-xl border border-base-300;
+    @apply bg-base-100 rounded-xl border border-base-300 shadow-sm;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
   }
 
