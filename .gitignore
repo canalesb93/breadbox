@@ -51,6 +51,11 @@ internal/db/*.sql.go
 # Backups
 backups/
 
+# Agent SDK transcripts — written cwd-relative by `breadbox serve` /
+# `breadbox agent test` when neither app_config nor
+# BREADBOX_AGENT_TRANSCRIPT_DIR points elsewhere.
+transcripts/
+
 # OS
 .DS_Store
 

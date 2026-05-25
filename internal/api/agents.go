@@ -425,7 +425,7 @@ func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 			path = *run.TranscriptPath
 		}
 		if path == "" && run.ID != "" {
-			dir := appconfig.String(r.Context(), svc.Queries, appconfig.KeyAgentTranscriptDir, "transcripts/agents")
+			dir := appconfig.String(r.Context(), svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
 			if dir != "" {
 				path = filepath.Join(dir, run.ID+".ndjson")
 			}

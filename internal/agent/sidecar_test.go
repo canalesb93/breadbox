@@ -99,6 +99,18 @@ func TestSidecarRun_BinaryNotFound(t *testing.T) {
 	s := &Sidecar{} // no BinaryPath, no env, no ./bin/breadbox-agent
 	t.Setenv("BREADBOX_AGENT_BIN", "")
 	t.Setenv("PATH", "/nonexistent-for-test")
+	// Shadow $HOME so a real ~/.breadbox/agent-bin/breadbox-agent install
+	// (created locally by `make agent-sidecar-install-user`) doesn't
+	// accidentally satisfy step 4 of LocateBinary and bypass the
+	// not-found branch this test is exercising.
+	t.Setenv("HOME", t.TempDir())
+	// And cd into a fresh dir without ./bin/breadbox-agent so step 3
+	// doesn't shortcut either.
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
 
 	res, err := s.Run(context.Background(), JobSpec{
 		RunID:  "x",

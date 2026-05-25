@@ -179,6 +179,32 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
         echo "WARN: no available port in 8081-8099"
       fi
     fi
+
+    # BREADBOX_AGENT_TRANSCRIPT_DIR — share one transcript dir across every
+    # worktree-resident `breadbox serve`. Without this each worktree writes
+    # transcripts to its own ./transcripts/agents/ (cwd-relative default),
+    # so a run launched from worktree A is unreadable when the admin UI is
+    # served by worktree B's process. The path lives outside any worktree
+    # so it survives `claude --rm` and switching branches.
+    if [ -z "${BREADBOX_AGENT_TRANSCRIPT_DIR:-}" ]; then
+      TX_DIR="$HOME/.local/share/breadbox/transcripts/agents"
+      mkdir -p "$TX_DIR" 2>/dev/null || true
+      echo "BREADBOX_AGENT_TRANSCRIPT_DIR=$TX_DIR" >> "$CLAUDE_ENV_FILE"
+      echo "    Set BREADBOX_AGENT_TRANSCRIPT_DIR ($TX_DIR)"
+    fi
+
+    # breadbox-agent binary — auto-discovery checks ./bin, then
+    # ~/.breadbox/agent-bin, then $PATH. Verify at least one slot resolves
+    # and hint if not so the first `breadbox agent test` doesn't fail
+    # with a cryptic "binary not found".
+    if [ ! -x "$PROJECT_DIR/bin/breadbox-agent" ] \
+       && [ ! -x "$HOME/.breadbox/agent-bin/breadbox-agent" ] \
+       && ! command -v breadbox-agent &>/dev/null; then
+      echo "    Note: breadbox-agent sidecar not found in any discovery slot."
+      echo "          Run \`make agent-sidecar-install-user\` in the main repo to"
+      echo "          install it once at ~/.breadbox/agent-bin/breadbox-agent —"
+      echo "          every worktree will pick it up automatically thereafter."
+    fi
   fi
 
   echo "==> Worktree setup complete."

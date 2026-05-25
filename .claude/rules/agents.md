@@ -31,6 +31,13 @@ breadbox mcp                       ← MCP tool registry (read-only or full-acce
 
 When in doubt about where new code belongs, ask: is it admin page shell / form state → `internal/admin/` + the matching `.templ`; is it user input/response shaping → `api/`; is it stateful behavior → `service/`; is it the runner protocol / event shapes → `internal/agent/`; is it sidecar logic → `agent/sidecar/`.
 
+## Local dev across worktrees
+
+Two paths bite worktree workflows because each `claude -w` worktree is a fresh checkout sharing one dev DB:
+
+- **Sidecar binary**: install once with `make agent-sidecar-install-user`. Writes to `~/.breadbox/agent-bin/breadbox-agent` (the priority-4 discovery slot). Per-worktree `bin/breadbox-agent` is NOT in `.worktreeinclude` — it'd cost 50 MB per worktree to copy and the user-home install achieves the same thing once.
+- **Transcript dir**: `agent.DefaultTranscriptDir()` (`internal/agent/transcript_dir.go`) checks `BREADBOX_AGENT_TRANSCRIPT_DIR` before falling back to the cwd-relative default. The session-start hook exports it to `~/.local/share/breadbox/transcripts/agents` for worktree sessions so every local server reads the same dir. Docker / prod containers don't set the env var, so they still default to `/app/transcripts/agents` (which the prod compose file mounts as a named volume). When you add a new call site that resolves `agent.transcript_dir`, use `agent.DefaultTranscriptDir()` as the appconfig fallback — don't hardcode `"transcripts/agents"`.
+
 ## Locked invariants
 
 These are easy to break and painful to re-discover.
