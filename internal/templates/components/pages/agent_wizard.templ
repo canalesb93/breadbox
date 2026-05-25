@@ -1,6 +1,17 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+templ agentWizardNewAgentAction() {
+	<a href="/agents/new" class="btn btn-primary btn-sm gap-2">
+		<i data-lucide="plus" class="w-4 h-4"></i>
+		<span>New agent</span>
+	</a>
+}
 
 // AgentWizard renders the Prompt Library tab inside /agents. Originally
 // pages/agent_wizard.html in the html/template tree. Each prompt card
@@ -9,9 +20,19 @@ import "fmt"
 // fetch-copy-flash flow for its slug.
 templ AgentWizard(p AgentWizardProps) {
 	<script src="/static/js/admin/components/agent_wizard.js"></script>
+	<div x-data x-init="$store.shortcuts.setScope('agent-prompts')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "Prompt library",
+		Subtitle:             "Pre-built prompts you can paste into a new scheduled agent or copy into an ad-hoc MCP session.",
+		SubtitleHideOnMobile: true,
+		Action:               agentWizardNewAgentAction(),
+	})
 	<div role="alert" class="alert alert-info alert-soft text-sm mb-6">
-		<i data-lucide="rocket" class="w-4 h-4"></i>
-		<span>New to MCP agents? Follow the <a href="/agents?tab=guide" class="link font-medium">Getting Started guide</a> to connect your first agent.</span>
+		<i data-lucide="info" class="w-4 h-4"></i>
+		<div class="text-xs">
+			Each card opens a builder where you can toggle blocks, then copy or save as a scheduled agent.
+			Need to connect an external MCP client? See <a href="/settings/mcp" class="link font-medium">MCP settings</a>.
+		</div>
 	</div>
 	<div class="space-y-8">
 		<!-- Section: Bulk Reviews -->
@@ -116,7 +137,7 @@ templ AgentWizard(p AgentWizardProps) {
 					Body:      "Watch for unusual charges, duplicate transactions, or unexpected spending spikes across all accounts.",
 				})
 				<!-- Custom Agent (no card factory — direct link) -->
-				<a href="/agent-wizard/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex items-center border-l-4 border-l-base-300 border-dashed">
+				<a href="/agent-prompts/builder/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex items-center border-l-4 border-l-base-300 border-dashed">
 					<div class="w-12 h-12 rounded-xl bg-base-300/50 flex items-center justify-center group-hover:bg-base-300/70 transition-colors flex-shrink-0 ml-4">
 						<i data-lucide="plus" class="w-5 h-5 text-base-content opacity-40"></i>
 					</div>
@@ -150,15 +171,15 @@ type wizardCardData struct {
 	Body        string
 }
 
-// wizardCard renders one /agent-wizard/{slug} link card with an inline
-// copy button that uses the agentWizardCard Alpine factory.
+// wizardCard renders one /agent-prompts/builder/{slug} link card with an
+// inline copy button that uses the agentWizardCard Alpine factory.
 templ wizardCard(c wizardCardData) {
 	<div
 		x-data="agentWizardCard"
 		class={ "bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group flex items-center border-l-4",
 			"border-l-" + c.Color }
 	>
-		<a href={ templ.SafeURL("/agent-wizard/" + c.Slug) } class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+		<a href={ templ.SafeURL("/agent-prompts/builder/" + c.Slug) } class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
 			<div
 				class={ "w-12 h-12 rounded-xl flex items-center justify-center transition-colors flex-shrink-0 ml-4",
 				"bg-" + c.Color + "/10",
@@ -203,7 +224,7 @@ templ wizardCard(c wizardCardData) {
 			<i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
 			<span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
 		</button>
-		<a href={ templ.SafeURL("/agent-wizard/" + c.Slug) } class="flex-shrink-0 pr-4 no-underline">
+		<a href={ templ.SafeURL("/agent-prompts/builder/" + c.Slug) } class="flex-shrink-0 pr-4 no-underline">
 			<i
 				data-lucide="arrow-right"
 				class={ "w-4 h-4 text-base-content/20 group-hover:translate-x-0.5 transition-all",

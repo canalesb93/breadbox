@@ -1,6 +1,10 @@
 package pages
 
-import "strconv"
+import (
+	"strconv"
+
+	"breadbox/internal/templates/components"
+)
 
 // AgentSDKSettings renders the v1 admin "Agents settings" tab inside the
 // Settings shell — auth + sidecar + execution limits for Claude Agent
@@ -11,12 +15,12 @@ import "strconv"
 // resolves masked credential display strings before render so the templ
 // stays free of nil-handling.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Agents settings</h1>
-			<p class="text-sm text-base-content/50 mt-1">Auth, sidecar binary, and execution limits for Claude Agent SDK runs</p>
-		</div>
-	</div>
+	<script src="/static/js/admin/components/agent_sdk_settings.js"></script>
+	<div x-data x-init="$store.shortcuts.setScope('agents-settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Agents settings",
+		Subtitle: "Auth, sidecar binary, and execution limits for Claude Agent SDK runs.",
+	})
 	if p.FormError != "" {
 		<div role="alert" class="alert alert-error alert-soft mb-4">
 			<i data-lucide="circle-x" class="w-4 h-4"></i>
@@ -328,7 +332,8 @@ templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
 templ agentSDKToolsCard(csrfToken string) {
 	<div
 		class="bb-card p-0 overflow-hidden"
-		x-data={ "{ csrfToken: " + jsString(csrfToken) + ", smokeState: 'idle', smokeResult: null, smokeError: null, cleanupState: 'idle', cleanupResult: null, cleanupError: null, async runSmokeTest() { this.smokeState = 'loading'; this.smokeResult = null; this.smokeError = null; try { const res = await fetch('/-/agents/test', { method: 'POST', headers: { 'X-CSRF-Token': this.csrfToken, 'Accept': 'application/json' } }); const body = await res.json(); if (!res.ok) { this.smokeError = (body && body.error && body.error.message) || ('HTTP ' + res.status); this.smokeState = 'error'; return; } this.smokeResult = body; this.smokeState = 'ok'; } catch (e) { this.smokeError = e.message || 'Request failed'; this.smokeState = 'error'; } }, async runCleanup() { this.cleanupState = 'loading'; this.cleanupResult = null; this.cleanupError = null; try { const res = await fetch('/-/agents/cleanup', { method: 'POST', headers: { 'X-CSRF-Token': this.csrfToken, 'Accept': 'application/json' } }); const body = await res.json(); if (!res.ok) { this.cleanupError = (body && body.error && body.error.message) || ('HTTP ' + res.status); this.cleanupState = 'error'; return; } this.cleanupResult = body; this.cleanupState = 'ok'; } catch (e) { this.cleanupError = e.message || 'Request failed'; this.cleanupState = 'error'; } } }" }
+		x-data="agentSDKDiagnostics"
+		data-csrf={ csrfToken }
 	>
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300">
 			<h2 class="font-semibold">Diagnostics</h2>
