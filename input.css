@@ -82,7 +82,7 @@
   --size-field: 0.25rem;
 
   --border: 1px;
-  --depth: 2;
+  --depth: 0;
   --noise: 0;
 }
 
@@ -129,7 +129,7 @@
   --size-field: 0.25rem;
 
   --border: 1px;
-  --depth: 2;
+  --depth: 0;
   --noise: 0;
 }
 
@@ -977,6 +977,17 @@
 
   .btn:active:not(:disabled) {
     transform: scale(0.97) !important;
+  }
+
+  /*
+   * Subtle drop shadow matching shadcn's Button component (shadow-xs).
+   * With --depth: 0 the daisyUI inset/3D shadow stack evaluates to
+   * transparent, so the button reads as completely flat without this
+   * override. shadcn doesn't shadow transparent buttons (ghost/link),
+   * so they opt out via :not().
+   */
+  .btn:not(.btn-ghost):not(.btn-link) {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
 
   /* Button radius convention — see unlayered .btn-sm / .btn-xs override
