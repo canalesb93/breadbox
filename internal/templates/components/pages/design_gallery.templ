@@ -215,7 +215,7 @@ templ designSectionBlock(sec DesignSection) {
 		data-design-section="true"
 		x-show={ "match('" + sec.Title + "')" }
 	>
-		<div class="flex items-baseline justify-between gap-3 mb-1">
+		<div class="flex flex-col gap-1 mb-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
 			<h3 class="text-lg font-semibold tracking-tight">{ sec.Title }</h3>
 			<a href={ templ.SafeURL("/design/c/" + sec.Slug) } class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
 				<i data-lucide="external-link" class="w-3 h-3"></i>
