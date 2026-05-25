@@ -429,9 +429,7 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 				     "No applications yet" block above) so the absence-of-section no longer
 				     reads as a loading failure. -->
 				<div class="flex flex-col items-center justify-center text-center py-6 gap-2">
-					<div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-						<i data-lucide="check" class="w-5 h-5 text-success"></i>
-					</div>
+					@components.IconTile("success", "check")
 					if retro {
 						if p.Rule.HitCount > 0 {
 							<p class="text-sm text-base-content/60">Nothing left to apply retroactively.</p>
@@ -459,9 +457,7 @@ templ ruleDetailApplyModal(p RuleDetailProps) {
 			<div x-show="showApplyModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="closeApplyModal()">
 				<div class="bb-card max-w-md w-full p-6 bg-base-100 shadow-xl rounded-2xl" role="dialog" aria-modal="true" @keydown.escape.window="closeApplyModal()">
 					<div class="flex items-start gap-3">
-						<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-							<i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
-						</div>
+						@components.IconTile("warning", "alert-triangle")
 						<div class="flex-1 min-w-0">
 							<h3 class="text-base font-semibold">Apply this rule retroactively?</h3>
 							<p class="text-sm text-base-content/60 mt-1">

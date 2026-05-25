@@ -1,6 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // MCPSettings renders the MCP Settings tab inside /agents. Originally
 // pages/mcp_settings.html in the html/template tree. The card-level
@@ -147,9 +151,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 templ mcpSettingsToolsCard(p MCPSettingsProps) {
 	<div id="tools" class="bb-card p-0 overflow-hidden" x-data="mcpSettingsTools">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="wrench" class="w-5 h-5 text-primary"></i>
-			</div>
+			@components.IconTile("primary", "wrench")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Tools Enabled</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -198,11 +200,7 @@ templ mcpSettingsToolRow(t MCPSettingsToolInfo) {
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
 				<span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{ t.Name }</span>
-				if t.Classification == "write" {
-					<span class="badge badge-soft badge-warning badge-xs font-medium">write</span>
-				} else {
-					<span class="badge badge-soft badge-success badge-xs font-medium">read</span>
-				}
+				@components.MCPToolClassBadge(t.Classification)
 			</div>
 			<div class="text-xs text-base-content/40 mt-0.5">{ t.Description }</div>
 		</div>
@@ -212,9 +210,7 @@ templ mcpSettingsToolRow(t MCPSettingsToolInfo) {
 templ mcpSettingsConnectionCard() {
 	<div id="connection" class="bb-card p-0 overflow-hidden" x-data="mcpSettingsConnection">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
-				<i data-lucide="plug" class="w-5 h-5 text-warning"></i>
-			</div>
+			@components.IconTile("warning", "plug")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Connection</h2>
 				<p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
