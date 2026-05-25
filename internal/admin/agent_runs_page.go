@@ -346,6 +346,10 @@ func agentRunRowFromResponse(run service.AgentRunResponse) pages.AgentRunRowProp
 	if run.OperatorNote != nil {
 		row.Note = *run.OperatorNote
 	}
+	if run.ErrorMessage != nil {
+		row.ErrorMessage = *run.ErrorMessage
+		row.ErrorMessageFriendly = pages.AgentRunFriendlyError(row.ErrorMessage)
+	}
 	return row
 }
 

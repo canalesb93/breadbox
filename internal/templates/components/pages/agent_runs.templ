@@ -268,6 +268,9 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 	}
 	@components.BreadcrumbNav(agentRunDetailBreadcrumbs(p))
 	@agentRunDetailHeader(p)
+	if p.Run.Status == "error" && p.Run.ErrorMessage != "" {
+		@agentRunErrorAlert(p.Run)
+	}
 	if p.Error != "" {
 		<div class="alert alert-error alert-soft mb-4">
 			<i data-lucide="triangle-alert" class="w-4 h-4"></i>
@@ -304,6 +307,30 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 			}
 		</div>
 	</div>
+}
+
+// agentRunErrorAlert renders the run's error_message above the metadata
+// card. When the message has a known friendly translation (e.g. the
+// startup orphan-cleanup string) we render the friendly text as the
+// headline and keep the raw message in a smaller secondary line so
+// operators can still grep / paste the original when reporting a bug.
+// Restart-interrupted runs surface as `alert-warning` (retriable);
+// every other error stays `alert-error`.
+templ agentRunErrorAlert(run AgentRunRowProps) {
+	if run.ErrorMessageFriendly != "" {
+		<div class="alert alert-warning alert-soft mb-4">
+			<i data-lucide="rotate-cw" class="w-4 h-4"></i>
+			<div>
+				<div class="font-medium">{ run.ErrorMessageFriendly }</div>
+				<div class="text-xs opacity-70 mt-0.5 font-mono">{ run.ErrorMessage }</div>
+			</div>
+		</div>
+	} else {
+		<div class="alert alert-error alert-soft mb-4">
+			<i data-lucide="triangle-alert" class="w-4 h-4"></i>
+			<span class="whitespace-pre-wrap break-words">{ run.ErrorMessage }</span>
+		</div>
+	}
 }
 
 // agentRunDetailBreadcrumbs builds the breadcrumb trail for the detail

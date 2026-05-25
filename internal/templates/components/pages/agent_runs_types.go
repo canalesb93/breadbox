@@ -76,6 +76,14 @@ type AgentRunRowProps struct {
 	HitCap     string
 	Turns      int
 	Note       string
+
+	// ErrorMessage is the raw error_message column. Empty for non-errored
+	// runs. ErrorMessageFriendly is the operator-friendly translation
+	// (e.g. "interrupted by server restart" → "Interrupted by server
+	// restart — safe to re-run."); empty when no special mapping applies,
+	// in which case the raw message should be rendered as-is.
+	ErrorMessage         string
+	ErrorMessageFriendly string
 }
 
 // AgentRunDetailProps powers the per-run page at /agents/runs/{shortId}.
