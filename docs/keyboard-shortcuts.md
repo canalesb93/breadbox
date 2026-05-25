@@ -18,7 +18,8 @@ Always available — wired once in `internal/templates/layout/base.html`.
 | `Cmd+K` | Open the command palette |
 | `/` | Open the command palette (alt) — pages may reassign `/` locally (e.g. Transactions uses it to focus search) |
 | `Esc` | Close the open dialog / cancel the current overlay |
-| `g` then `d` | Go to Dashboard |
+| `g` then `o` | Go to Feed (overview) |
+| `g` then `d` | Go to Design system |
 | `g` then `t` | Go to Transactions |
 | `g` then `c` | Go to Connections |
 | `g` then `r` | Go to Reviews |

@@ -1659,7 +1659,7 @@
       // palette hint updates automatically.
       var allItems = [
         // Overview
-        { id: 'nav-feed', shortcutId: 'global.go.d', group: 'Overview', title: 'Feed', desc: 'Activity feed across the household', icon: 'rss', href: '/', keywords: 'home feed activity dashboard overview' },
+        { id: 'nav-feed', shortcutId: 'global.go.o', group: 'Overview', title: 'Feed', desc: 'Activity feed across the household', icon: 'rss', href: '/', keywords: 'home feed activity dashboard overview' },
         { id: 'nav-transactions', shortcutId: 'global.go.t', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
@@ -1676,6 +1676,7 @@
         { id: 'sys-logs', shortcutId: 'global.go.v', group: 'System', title: 'Logs', desc: 'Sync logs, webhook events, agent sessions', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events sessions activity' },
         { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/settings/backups', keywords: 'backup restore database dump export' },
         { id: 'sys-settings', shortcutId: 'global.go.s', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
+        { id: 'sys-design', shortcutId: 'global.go.d', group: 'System', title: 'Design system', desc: 'DaisyUI + bb-* component sandbox', icon: 'palette', href: '/design', keywords: 'sandbox gallery components ui daisyui tailwind preview' },
         // Quick Actions
         { id: 'act-connect', shortcutId: 'global.new.c', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
         { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
@@ -2230,7 +2231,7 @@
       // "Go to" navigation — source of truth for `g+<x>` chords. Still exported
       // as plain maps so M0.5 can reuse them to seed palette entries.
       var goRoutes = {
-        d: { path: '/',                   label: 'Go to Feed' },
+        o: { path: '/',                   label: 'Go to Feed' },
         t: { path: '/transactions',       label: 'Go to Transactions' },
         c: { path: '/connections',        label: 'Go to Connections' },
         r: { path: '/reviews',            label: 'Go to Reviews' },
@@ -2244,7 +2245,8 @@
         m: { path: '/settings/mcp',       label: 'Go to MCP Settings' },
         k: { path: '/settings/api-keys',  label: 'Go to API Keys' },
         f: { path: '/settings/household', label: 'Go to Household' },
-        h: { path: '/agents',             label: 'Go to Agents' }
+        h: { path: '/agents',             label: 'Go to Agents' },
+        d: { path: '/design',             label: 'Go to Design system' }
       };
 
       var newRoutes = {
