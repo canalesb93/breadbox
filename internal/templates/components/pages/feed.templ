@@ -439,7 +439,11 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 			<span class="font-semibold">{ feedSyncAction(s) }</span><span class="text-base-content/75">{ feedSyncSubject(s) }</span>
 		</a>
 		if lab := feedProviderLabel(s.Provider); lab != "" {
-			<span class="text-base-content/45">{ lab }</span>
+			<!-- Provider label ("via Plaid") is hidden below sm because
+			     the institution name in the headline already identifies
+			     the source on mobile — the duplication squeezes the
+			     timestamp onto a second line on narrow viewports. -->
+			<span class="text-base-content/45 hidden sm:inline">{ lab }</span>
 		}
 		@feedRowTimestamp(it.TimestampStr, now)
 	</div>
@@ -455,7 +459,10 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-base-content/30" aria-hidden="true"></span>{ fmt.Sprintf("%d removed", s.RemovedCount) }</span>
 			}
 			if s.Trigger != "" && s.Trigger != "cron" {
-				<span class="text-base-content/45">&middot; { feedTriggerLabel(s.Trigger) }</span>
+				<!-- Trigger label ("first sync" / "manual") is secondary
+				     metadata; hide on mobile to keep the counts row
+				     single-line. -->
+				<span class="text-base-content/45 hidden sm:inline">&middot; { feedTriggerLabel(s.Trigger) }</span>
 			}
 		</div>
 	}
@@ -693,11 +700,19 @@ templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
 // every row's headline. We render our own (instead of letting
 // TimelineSystemRowCustomTile auto-append it) so the timestamp lands at
 // the end of the *first* line, not after the multi-line body content.
+//
+// Both the long ("5 minutes ago") and short ("5m ago") renderings ship
+// in the markup; CSS toggles which is visible per viewport so a 390px
+// mobile row keeps the meta line on one row alongside the provider
+// label.
 templ feedRowTimestamp(timestamp string, now time.Time) {
 	if timestamp != "" {
 		<span class="text-base-content/30 mx-0.5">·</span>
 		<span class="tooltip tooltip-top" data-tip={ feedFormatTimestamp(timestamp, now) }>
-			<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ feedFormatTimestamp(timestamp, now) }>{ feedRelativeTimestamp(timestamp, now) }</time>
+			<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ feedFormatTimestamp(timestamp, now) }>
+				<span class="sm:hidden">{ feedRelativeTimestampShort(timestamp, now) }</span>
+				<span class="hidden sm:inline">{ feedRelativeTimestamp(timestamp, now) }</span>
+			</time>
 		</span>
 	}
 }
@@ -1297,6 +1312,19 @@ func feedRelativeTimestamp(s string, now time.Time) string {
 		now = time.Now()
 	}
 	return timefmt.RelativeRFC3339At(s, now)
+}
+
+// feedRelativeTimestampShort is the compact ("5m ago", "2h ago") variant
+// rendered alongside feedRelativeTimestamp; a sm:hidden / hidden sm:inline
+// pair in feedRowTimestamp picks the right form per viewport.
+func feedRelativeTimestampShort(s string, now time.Time) string {
+	if s == "" {
+		return ""
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return timefmt.RelativeShortRFC3339At(s, now)
 }
 
 func feedFormatTimestamp(s string, now time.Time) string {

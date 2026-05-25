@@ -116,15 +116,16 @@ templ timelineCard(p TimelineProps) {
 				}
 			</header>
 		}
-		<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+		<ol class="bb-timeline relative pl-3 sm:pl-5 pr-3 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
 			<!--
 				Continuous left rail. Top/bottom anchored so it threads
 				through every 24px tile (events + day separators) and the
-				composer. left-[28px]/[32px] = container padding (16/20px)
-				+ tile half-width (12px) — keeps the rail centered under
-				every circle on the timeline.
+				composer. Offset = container padding + tile half-width
+				(12px) so the rail stays centered under every 24px
+				circle. Mobile uses pl-3 (12px) + 12 = 24; ≥sm uses pl-5
+				(20px) + 12 = 32.
 			-->
-			<span class="absolute left-[28px] sm:left-[32px] top-2 bottom-12 w-px bg-base-200" aria-hidden="true"></span>
+			<span class="absolute left-[24px] sm:left-[32px] top-2 bottom-12 w-px bg-base-200" aria-hidden="true"></span>
 			{ children... }
 		</ol>
 	</section>
@@ -153,11 +154,11 @@ templ timelineProminent(p TimelineProps) {
 		class="bb-timeline-prominent relative"
 	>
 		if p.Heading != "" {
-			<header class="flex items-center gap-2.5 pb-4 mb-5 border-b border-base-300">
+			<header class="flex items-center gap-2 sm:gap-2.5 pb-3 sm:pb-4 mb-3 sm:mb-5 border-b border-base-300">
 				if p.HeadingIcon != "" {
-					<i data-lucide={ p.HeadingIcon } class="w-5 h-5 text-base-content opacity-70" aria-hidden="true"></i>
+					<i data-lucide={ p.HeadingIcon } class="w-4 h-4 sm:w-5 sm:h-5 text-base-content opacity-70" aria-hidden="true"></i>
 				}
-				<h2 id={ timelineHeadingID(p.Heading) } class="text-lg font-semibold text-base-content tracking-tight">{ p.Heading }</h2>
+				<h2 id={ timelineHeadingID(p.Heading) } class="text-base sm:text-lg font-semibold text-base-content tracking-tight">{ p.Heading }</h2>
 				if p.EventCount > 0 {
 					<span class="bb-timeline-count">{ pluralEvents(p.EventCount) }</span>
 				}
@@ -166,13 +167,15 @@ templ timelineProminent(p TimelineProps) {
 		<!--
 			Prominent rail. Tiles are scaled up to 28px in input.css (see
 			.bb-timeline-prominent overrides), so the rail offset accounts
-			for the larger half-width: 16px (pl-4) + 14px = 30; 20px
-			(sm:pl-5) + 14px = 34. The rail itself is 2px wide and a touch
-			more contrast-y than the card-mode 1px line so it reads against
-			the page surface (not just a card surface).
+			for the larger half-width. On mobile we drop horizontal
+			padding from pl-4 (16px) to pl-2 (8px) to recover ~16px of
+			row width — the rail offset shifts to 21px = 8 + 13 to keep
+			the 2px line centered under each tile. The rail itself is 2px
+			wide and a touch more contrast-y than the card-mode 1px line
+			so it reads against the page surface (not just a card surface).
 		-->
-		<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
-			<span class="absolute left-[29px] sm:left-[33px] top-2 bottom-14 w-[2px] bg-base-300 rounded-full" aria-hidden="true"></span>
+		<ol class="bb-timeline relative pl-2 sm:pl-5 pr-2 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+			<span class="absolute left-[21px] sm:left-[33px] top-2 bottom-14 w-[2px] bg-base-300 rounded-full" aria-hidden="true"></span>
 			{ children... }
 		</ol>
 	</section>
@@ -202,7 +205,7 @@ templ TimelineDay(label string, first bool) {
 // own tile inside the body — but the typical path is to use one of the
 // neutral/info/success/warning/error tones.
 templ TimelineSystemRow(p TimelineRowProps) {
-	<li class="relative flex items-start gap-3 py-2 group">
+	<li class="relative flex items-start gap-2.5 sm:gap-3 py-1.5 sm:py-2 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			if p.IconTone != "custom" {
 				<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", timelineIconBg(p.IconTone) } aria-hidden="true">
@@ -214,19 +217,7 @@ templ TimelineSystemRow(p TimelineRowProps) {
 		</div>
 		<div class="flex-1 min-w-0 text-sm leading-6 text-base-content/75 break-words">
 			{ children... }
-			if p.Origin != "" || p.Timestamp != "" {
-				<span class="text-base-content/40 ml-1">
-					if p.Origin != "" {
-						<span class="italic">&middot; { p.Origin }</span>
-					}
-					if p.Timestamp != "" {
-						<span aria-hidden="true">&middot;</span>
-						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(p.Timestamp, p.Now) }>
-							<time datetime={ p.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(p.Timestamp, p.Now) }>{ relativeTimelineTimestamp(p.Timestamp, p.Now) }</time>
-						</span>
-					}
-				</span>
-			}
+			@timelineMetaSuffix(p.Timestamp, p.Origin, p.Now)
 		</div>
 	</li>
 }
@@ -243,27 +234,51 @@ templ TimelineSystemRow(p TimelineRowProps) {
 // attributes (e.g. `data-comment-id` on a tombstone row that mirrors a comment
 // bubble's row marker). Pass `nil` when no extras are needed.
 templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile, body templ.Component, attrs templ.Attributes) {
-	<li class="relative flex items-start gap-3 py-2 group" { attrs... }>
+	<li class="relative flex items-start gap-2.5 sm:gap-3 py-1.5 sm:py-2 group" { attrs... }>
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			@tile
 		</div>
 		<div class="flex-1 min-w-0 text-sm leading-6 text-base-content/75 break-words">
 			@body
-			if origin != "" || timestamp != "" {
-				<span class="text-base-content/40 ml-1">
-					if origin != "" {
-						<span class="italic">&middot; { origin }</span>
-					}
-					if timestamp != "" {
-						<span aria-hidden="true">&middot;</span>
-						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp, now) }>
-							<time datetime={ timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp, now) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
-						</span>
-					}
-				</span>
-			}
+			@timelineMetaSuffix(timestamp, origin, now)
 		</div>
 	</li>
+}
+
+// timelineMetaSuffix renders the trailing "· origin · 5 minutes ago"
+// span shared by TimelineSystemRow and TimelineSystemRowCustomTile.
+// Two responsive carve-outs trim the line on mobile, where horizontal
+// space is the scarce dimension:
+//
+//   - Origin (rule / sync / during sync / via Teller …) is hidden
+//     below sm. The icon tile already telegraphs the source, so the
+//     italic suffix is duplicative and the most expendable cell.
+//   - The long ("5 minutes ago") and short ("5m ago") renderings of
+//     the timestamp are both emitted; CSS swaps which one is visible.
+//     The compact form lets the meta line stay inline on a 390px
+//     viewport even when the sentence body is long.
+//
+// The middle `·` separator between origin and timestamp is wrapped in
+// the same `hidden sm:inline` so it disappears with the origin.
+templ timelineMetaSuffix(timestamp, origin string, now time.Time) {
+	if origin != "" || timestamp != "" {
+		<span class="text-base-content/40 ml-1">
+			if origin != "" {
+				<span class="italic hidden sm:inline">&middot; { origin }</span>
+			}
+			if timestamp != "" {
+				if origin != "" {
+					<span aria-hidden="true" class="hidden sm:inline">&middot;</span>
+				}
+				<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp, now) }>
+					<time datetime={ timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp, now) }>
+						<span class="sm:hidden">{ relativeTimelineTimestampShort(timestamp, now) }</span>
+						<span class="hidden sm:inline">{ relativeTimelineTimestamp(timestamp, now) }</span>
+					</time>
+				</span>
+			}
+		</span>
+	}
 }
 
 // TimelineCommentRow renders a chat-bubble row: 24px avatar on the rail and
@@ -271,7 +286,7 @@ templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile,
 // bubble body is the children slot so callers can render plain text,
 // markdown, action buttons inside the meta line, etc.
 templ TimelineCommentRow(actor TimelineActor, timestamp string, now time.Time) {
-	<li class="relative flex items-start gap-3 py-2.5 group">
+	<li class="relative flex items-start gap-2.5 sm:gap-3 py-2 sm:py-2.5 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
 			@timelineCommentAvatar(actor)
 		</div>
@@ -284,10 +299,17 @@ templ TimelineCommentRow(actor TimelineActor, timestamp string, now time.Time) {
 						<strong class="font-semibold text-base-content">{ actor.Name }</strong>
 					}
 				}
-				<span class="text-base-content/55">commented</span>
+				<!-- "commented" verb is hidden below sm. The bubble's
+				     speech-tail shape already telegraphs that the row is
+				     a comment, and dropping the word lets the actor +
+				     timestamp stay on one line on a 390px viewport. -->
+				<span class="text-base-content/55 hidden sm:inline">commented</span>
 				if timestamp != "" {
 					<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp, now) }>
-						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp, now) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
+						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp, now) }>
+							<span class="sm:hidden">{ relativeTimelineTimestampShort(timestamp, now) }</span>
+							<span class="hidden sm:inline">{ relativeTimelineTimestamp(timestamp, now) }</span>
+						</time>
 					</span>
 				}
 			</div>

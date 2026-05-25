@@ -596,10 +596,17 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 	-->
 	<div class="flex items-center gap-1.5 px-1 flex-wrap text-sm leading-6 min-w-0">
 		@components.TimelineActorInline(txdCommentActor(e))
-		<span class="text-base-content/55 shrink-0">commented</span>
+		<!-- "commented" verb hidden below sm — the bubble shape already
+		     identifies the row as a comment, and dropping the word keeps
+		     the actor + timestamp + delete-action triplet on one line on
+		     narrow viewports. -->
+		<span class="text-base-content/55 shrink-0 hidden sm:inline">commented</span>
 		if e.Timestamp != "" {
 			<span class="tooltip tooltip-top shrink-0" data-tip={ formatDateTimeStr(e.Timestamp) }>
-				<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
+				<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>
+					<span class="sm:hidden">{ relativeTimeStrShortAt(e.Timestamp, now) }</span>
+					<span class="hidden sm:inline">{ relativeTimeStrAt(e.Timestamp, now) }</span>
+				</time>
 			</span>
 		}
 		if e.CommentID != "" {
@@ -988,6 +995,13 @@ func relativeTimeStr(s string) string {
 // for where now is captured.
 func relativeTimeStrAt(s string, now time.Time) string {
 	return timefmt.RelativeRFC3339At(s, now)
+}
+
+// relativeTimeStrShortAt is the compact ("5m ago") variant rendered next
+// to relativeTimeStrAt; the comment-bubble meta line emits both and uses
+// a sm:hidden / hidden sm:inline pair to pick the right one per viewport.
+func relativeTimeStrShortAt(s string, now time.Time) string {
+	return timefmt.RelativeShortRFC3339At(s, now)
 }
 
 // avatarURLStr mirrors the admin "avatarURL" funcMap for the (user_id,

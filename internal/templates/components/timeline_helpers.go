@@ -117,3 +117,18 @@ func relativeTimelineTimestamp(s string, now time.Time) string {
 	}
 	return timefmt.RelativeRFC3339At(s, now)
 }
+
+// relativeTimelineTimestampShort is the compact ("5m ago", "2h ago",
+// "3d ago", "now") variant rendered alongside the long phrase. The
+// timeline primitives toggle between the two via responsive Tailwind
+// classes so narrow viewports get the compact text and ≥sm viewports
+// keep the prose form.
+func relativeTimelineTimestampShort(s string, now time.Time) string {
+	if s == "" {
+		return ""
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return timefmt.RelativeShortRFC3339At(s, now)
+}

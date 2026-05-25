@@ -129,3 +129,38 @@ func RelativeAt(t, now time.Time) string {
 		return fmt.Sprintf("%d days ago", days)
 	}
 }
+
+// RelativeShortRFC3339At is the compact ("5m ago", "2h ago", "3d ago")
+// variant of RelativeRFC3339At. Used on narrow mobile rows where the
+// long phrasing forces the meta line onto a second line.
+func RelativeShortRFC3339At(s string, now time.Time) string {
+	if s == "" {
+		return ""
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return RelativeShortAt(t, now)
+	}
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return RelativeShortAt(t, now)
+	}
+	return s
+}
+
+// RelativeShortAt renders a compact "<n><unit> ago" string for t relative
+// to now. Unit buckets mirror RelativeAt — minutes / hours / days — but
+// collapse the unit word to a single letter (m / h / d) so the result
+// fits inside a one-line mobile meta row. Sub-minute deltas render as
+// "now" (one syllable, four characters) instead of "just now".
+func RelativeShortAt(t, now time.Time) string {
+	d := now.Sub(t)
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
