@@ -50,11 +50,6 @@ templ feedHero(p FeedProps) {
 		@components.PageHeader(components.PageHeaderProps{
 			Title:    "Feed",
 			Subtitle: "Everything that happened in your breadbox · " + p.Hero.Generated,
-			Action: components.PageHeaderAction(
-				templ.SafeURL("/connections/new"),
-				"plus",
-				"Connect bank",
-			),
 		})
 		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
 			@feedHeroTile("activity", "Events today", fmt.Sprintf("%d", p.Hero.EventsToday), feedHeroSubEvents(p))
