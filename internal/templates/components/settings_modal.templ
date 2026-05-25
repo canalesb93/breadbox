@@ -79,20 +79,22 @@ templ settingsModalHeader() {
 	</div>
 }
 
-// settingsModalMobileRail renders a <details> dropdown on viewports <lg.
-// Matches the desktop rail's tab list but folds into a single pill so the
-// content area gets the full width on phones.
+// settingsModalMobileRail renders a daisy <details class="dropdown"> on
+// viewports <lg. Matches the desktop rail's tab list but folds into a
+// single pill so the content area gets the full width on phones. Daisy's
+// `.dropdown > summary` already hides the native disclosure marker — no
+// list-style hacks needed on the summary.
 templ settingsModalMobileRail(p SettingsModalProps) {
 	<div class="lg:hidden shrink-0 px-4 sm:px-6 py-3 border-b border-base-300 bg-base-100">
 		<details class="dropdown w-full" x-ref="mobileDropdown">
-			<summary class="list-none flex items-center justify-between w-full px-3 py-2.5 rounded-xl bg-base-200/60 ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200 transition-colors [&::-webkit-details-marker]:hidden">
+			<summary class="flex items-center justify-between w-full px-3 py-2.5 rounded-xl bg-base-200/60 border border-base-content/10 cursor-pointer hover:bg-base-200 transition-colors">
 				<span class="flex items-center gap-2.5 min-w-0">
 					<i :data-lucide="currentTabIcon()" class="w-4 h-4 text-base-content opacity-70 shrink-0"></i>
 					<span class="text-sm font-medium truncate" x-text="currentTabLabel()"></span>
 				</span>
 				<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-40 shrink-0"></i>
 			</summary>
-			<ul class="dropdown-content menu mt-2 z-20 w-full bg-base-100 shadow-xl ring-1 ring-base-content/10 p-1 gap-0.5 rounded-xl">
+			<ul class="dropdown-content menu mt-2 z-20 w-full bg-base-100 shadow-xl border border-base-content/10 p-1 gap-0.5 rounded-xl">
 				@settingsModalRailItems(p, true)
 			</ul>
 		</details>

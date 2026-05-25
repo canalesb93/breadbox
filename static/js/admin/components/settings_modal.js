@@ -90,7 +90,12 @@ document.addEventListener('alpine:init', function () {
       // Switches tabs inside an already-open modal. No dialog open/close
       // churn — just a body swap + URL push.
       switchTo: function (tab) {
-        if (!tab || tab === this.currentTab) return;
+        if (!tab) return;
+        // Collapse the mobile dropdown the moment a row is tapped — even
+        // when the tap re-selects the current tab — so the user gets
+        // instant feedback instead of staring at the still-open list.
+        this._closeMobileDropdown();
+        if (tab === this.currentTab) return;
         var self = this;
         this._loadTab(tab).then(function () {
           self._pushUrl(tab, /*replace=*/ false);
