@@ -19,6 +19,14 @@ services:
       # don't use the agents feature; the directory is empty until an
       # agent runs.
       - breadbox_transcripts:/app/transcripts
+      # Scheduled pg_dump backups are written to /var/lib/breadbox/backups
+      # when ENVIRONMENT=docker (see internal/cli/serve.go). Without this
+      # named volume, files live in the container's writable layer and
+      # every `docker compose up -d` wipes them — Settings → Backups
+      # then shows an empty list after every redeploy. Keep this mount
+      # even if you haven't enabled a schedule yet; the directory is
+      # empty until a backup runs.
+      - breadbox_backups:/var/lib/breadbox/backups
       # Uncomment to enable one-click updates from the admin dashboard.
       # This gives the container access to the Docker daemon.
       # - /var/run/docker.sock:/var/run/docker.sock
@@ -78,5 +86,6 @@ services:
 volumes:
   postgres_data:
   breadbox_transcripts:
+  breadbox_backups:
   caddy_data:
   caddy_config:
