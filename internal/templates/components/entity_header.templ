@@ -19,20 +19,25 @@ package components
 //                      still IconTone — pass IconTone="" to suppress.
 //   - Badges:          inline badge row to the right of the title baseline.
 //                      Wrap status chips, "Linked", "Excluded", etc.
+//                      Hidden below sm: — these duplicate state that's
+//                      typically also visible in the page body (info
+//                      grid, status callout). Subtitle takes priority on
+//                      mobile.
 //   - Meta:            text-xs bullet-separated metadata line below.
 //                      Use EntityHeaderMeta(...) for the standard shape.
-//                      Hidden below sm: — duplicate any critical fact in
-//                      the page body / detail grid.
+//                      Visible at every breakpoint — this is the entity's
+//                      subtitle.
 //   - Action:          trailing primary action. Always visible.
 //   - SecondaryAction: trailing secondary (ghost) action. Hidden below
 //                      sm: — keep the destination reachable from the
 //                      page body (info grid, overflow menu, etc.) if it
 //                      matters on mobile.
 //
-// Mobile (< sm) collapse: the icon tile shrinks to 40×40 and the meta
-// row + secondary action are hidden so the header stays a single visual
-// row (icon + title + badges + primary action). Badges remain because
-// they communicate the entity's current state inline with the title.
+// Mobile (< sm) collapse: the icon tile shrinks to 40×40, badges and the
+// secondary action are hidden so the header stays compact (icon + title
+// + subtitle + primary action). Meta survives because the subtitle is
+// the most contextual piece of information after the title; badges are
+// the easiest to drop because their state is duplicated in the page body.
 //
 // Conventions match PageHeader: at most one primary + one secondary;
 // larger clusters → OverflowMenu in Action.
@@ -89,11 +94,13 @@ templ EntityHeader(p EntityHeaderProps) {
 				<div class="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
 					<h1 class={ "bb-page-title min-w-0 max-w-full", p.TitleClass }>{ p.Title }</h1>
 					if p.Badges != nil {
-						@p.Badges
+						<span class="hidden sm:contents">
+							@p.Badges
+						</span>
 					}
 				</div>
 				if p.Meta != nil {
-					<div class="hidden sm:flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-base-content/40 min-w-0">
+					<div class="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-base-content/40 min-w-0">
 						@p.Meta
 					</div>
 				}
