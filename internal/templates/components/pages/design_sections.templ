@@ -960,7 +960,7 @@ templ SectionKbd() {
 		}
 		@designExample("Inline in a toolbar (live ref)", "How the bulk action bar surfaces hotkey hints — passed as Hotkey on MultiSelectToolbarAction.") {
 			<div role="toolbar" aria-label="Selection actions (preview)" class="inline-block">
-				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5">
+				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-field shadow-lg px-4 py-2.5">
 					<button type="button" class="btn btn-ghost btn-sm gap-2">
 						<i data-lucide="tag" class="w-3.5 h-3.5"></i>
 						<span>Tag</span>
@@ -1045,7 +1045,7 @@ templ SectionToast() {
 
 templ SectionMultiSelectToolbar() {
 	<div x-data="{ open: false, count: 3 }" class="flex flex-col gap-6">
-		@designExample("Live demo", "Toggle the floating toolbar. Real-world wiring listens for `multi-select-close` and `multi-select-toggle-all` events to clear / select-all.") {
+		@designExample("Live demo", "Toggle the floating toolbar. Narrow the viewport to see the mobile collapse: ghost actions go icon-only, the primary action stays expanded, and the count chip is hidden when CountHideOnMobile is true. Real-world wiring listens for `multi-select-close` and `multi-select-toggle-all` events to clear / select-all.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<button type="button" class="btn btn-primary btn-sm" @click="open = !open">
 					<span x-show="!open">Show toolbar</span>
@@ -1056,10 +1056,11 @@ templ SectionMultiSelectToolbar() {
 				<span class="text-xs text-base-content/50 ml-2">count = <span x-text="count"></span></span>
 			</div>
 			@components.MultiSelectToolbar(components.MultiSelectToolbarProps{
-				XShow:            "open",
-				CountExpr:        "count",
-				CountToggleEvent: "design-bulk-toggle-all",
-				CloseEvent:       "design-bulk-close",
+				XShow:             "open",
+				CountExpr:         "count",
+				CountToggleEvent:  "design-bulk-toggle-all",
+				CloseEvent:        "design-bulk-close",
+				CountHideOnMobile: true,
 			}) {
 				@components.MultiSelectToolbarAction(components.MultiSelectToolbarActionProps{
 					Icon:    "message-square",
@@ -1086,9 +1087,9 @@ templ SectionMultiSelectToolbar() {
 				@design-bulk-toggle-all.window="count = count > 0 ? 0 : 12"
 			></div>
 		}
-		@designExample("Inline shape (static)", "The pill rendered without the fixed wrapper, for layout reference.") {
+		@designExample("Inline shape (static)", "The pill rendered without the fixed wrapper, for layout reference. The primary action keeps its label at every breakpoint; ghost actions collapse to icon-only under sm.") {
 			<div role="toolbar" aria-label="Selection actions (preview)" class="inline-block">
-				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5">
+				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-field shadow-lg px-4 py-2.5">
 					<button type="button" class="btn btn-ghost btn-sm gap-1.5">
 						<span class="font-bold tabular-nums">3</span>
 						<span class="hidden sm:inline text-base-content/60 font-normal">selected</span>
@@ -1105,7 +1106,7 @@ templ SectionMultiSelectToolbar() {
 					</button>
 					<button type="button" class="btn btn-primary btn-sm gap-2" title="Categorize">
 						<i data-lucide="tags" class="w-3.5 h-3.5"></i>
-						<span class="hidden sm:inline">Categorize</span>
+						<span class="inline">Categorize</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
 					</button>
 					<button type="button" class="btn btn-ghost btn-sm btn-square" title="Clear selection" aria-label="Clear selection">

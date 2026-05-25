@@ -8,8 +8,9 @@ package components
 // Geometry — pinned 1.5rem from the viewport bottom, horizontally
 // centered, with `pointer-events-none` when hidden so it doesn't
 // intercept clicks before it's shown. Children render inside a
-// `bg-base-100 border rounded-2xl shadow-lg` pill matching the bulk-bar
-// shape from the transactions page.
+// `bg-base-100 border rounded-field shadow-lg` pill. The radius
+// matches the daisy button token (`var(--radius-field)`) so the pill
+// and its child `.btn`s share corner geometry.
 //
 // Visibility is Alpine-driven: pass `XShow` (an Alpine boolean
 // expression — typically `selecting && count > 0` or
@@ -44,6 +45,13 @@ type MultiSelectToolbarProps struct {
 	// stays compact on phones.
 	CountLabel string
 
+	// CountHideOnMobile hides the entire count chip (number + label
+	// + the trailing divider) under the sm breakpoint. Use when the
+	// bar already has 3+ actions and the count is taking room from
+	// what the user actually came to tap. Default false — the chip
+	// stays visible and only its trailing "selected" label collapses.
+	CountHideOnMobile bool
+
 	// CountToggleEvent is the custom event dispatched when the user
 	// clicks the count chip — Gmail-style "select all / clear" toggle.
 	// Default `multi-select-toggle-all`. Set to empty string to make
@@ -76,11 +84,11 @@ templ MultiSelectToolbar(p MultiSelectToolbarProps) {
 			x-transition:leave-end="opacity-0 translate-y-2"
 		}
 	>
-		<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">
+		<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-field shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">
 			if p.CountToggleEvent != "" || p.CountExpr != "" {
 				@multiSelectCount(p)
+				<div class={ "w-px h-6 bg-base-300", templ.KV("hidden sm:block", p.CountHideOnMobile) }></div>
 			}
-			<div class="w-px h-6 bg-base-300"></div>
 			{ children... }
 			if p.CloseEvent != "" || p.XShow != "" {
 				<button
@@ -102,7 +110,9 @@ templ MultiSelectToolbar(p MultiSelectToolbarProps) {
 // hotkey-hint kbd). For richer slots (split-button, dropdown, modal
 // trigger) just render a raw `<button>` instead.
 //
-// Variant ""/"ghost" → btn-ghost; "primary" → btn-primary. Always
+// Variant ""/"ghost" → btn-ghost (label collapses to icon-only
+// under sm); "primary" → btn-primary (label stays visible at every
+// breakpoint so the headline action is always tappable). Always
 // btn-sm to match the bulk-bar shape.
 //
 // OnClick is an Alpine handler expression (rendered as `@click`); use
@@ -130,7 +140,7 @@ templ MultiSelectToolbarAction(p MultiSelectToolbarActionProps) {
 			<i data-lucide={ p.Icon } class="w-3.5 h-3.5"></i>
 		}
 		if p.Label != "" {
-			<span class="hidden sm:inline">{ p.Label }</span>
+			<span class={ multiSelectLabelClass(p.Variant) }>{ p.Label }</span>
 		}
 		if p.Hotkey != "" {
 			<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">{ p.Hotkey }</span>
@@ -142,14 +152,14 @@ templ multiSelectCount(p MultiSelectToolbarProps) {
 	if p.CountToggleEvent != "" {
 		<button
 			type="button"
-			class="btn btn-ghost btn-sm gap-1.5"
+			class={ "btn btn-ghost btn-sm gap-1.5", templ.KV("hidden sm:inline-flex", p.CountHideOnMobile) }
 			title="Select all / clear"
 			@click={ dispatchEventJS(p.CountToggleEvent) }
 		>
 			@multiSelectCountInner(p)
 		</button>
 	} else {
-		<div class="px-2 inline-flex items-center gap-1.5 text-sm">
+		<div class={ "px-2 inline-flex items-center gap-1.5 text-sm", templ.KV("hidden sm:inline-flex", p.CountHideOnMobile) }>
 			@multiSelectCountInner(p)
 		</div>
 	}
@@ -182,4 +192,15 @@ func multiSelectActionClass(variant string) string {
 		return "btn btn-primary btn-sm gap-2"
 	}
 	return "btn btn-ghost btn-sm gap-2"
+}
+
+// multiSelectLabelClass chooses the responsive visibility for the
+// action's text label. Ghost actions collapse to icon-only under sm
+// to keep the bar compact on phones; primary actions always show
+// the label so the headline action stays clearly tappable.
+func multiSelectLabelClass(variant string) string {
+	if variant == "primary" {
+		return "inline"
+	}
+	return "hidden sm:inline"
 }
