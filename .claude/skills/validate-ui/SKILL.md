@@ -151,11 +151,12 @@ const pass     = process.env.BB_PASS || '';
 ```
 
 ```bash
-URL=http://localhost:8081/transactions \
+# In cloud sessions, session-start.sh seeds an admin and exports BB_USER /
+# BB_PASS / SERVER_PORT so this just works. Override per-call if needed.
+URL=http://localhost:${SERVER_PORT:-8081}/transactions \
   OUT=/tmp/app-transactions.jpg \
   W=1280 H=800 \
   WAIT_FOR='[data-page="transactions"]' \
-  BB_USER=admin BB_PASS=testpass123 \
   node /tmp/shot.js
 ```
 
