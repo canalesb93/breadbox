@@ -5,8 +5,11 @@
  * Reads one JobSpec as JSON from stdin, executes a Claude Agent SDK query,
  * streams NDJSON events on stdout, and exits.
  *
- * Auth precedence trap: ANTHROPIC_API_KEY wins over CLAUDE_CODE_OAUTH_TOKEN
- * when both are set. We scrub the unused var before invoking the SDK.
+ * Auth: the Go runner (internal/agent/sidecar.go::authEnvFor) sets exactly
+ * one of {ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN} in our process env
+ * before exec. We still defensively scrub the inactive var here so a
+ * misconfigured Go-side caller can't silently land in the precedence trap
+ * (ANTHROPIC_API_KEY wins over CLAUDE_CODE_OAUTH_TOKEN).
  */
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import cliAsset from "@anthropic-ai/claude-agent-sdk/cli.js" with { type: "file" };
@@ -45,12 +48,16 @@ async function readStdin(): Promise<string> {
 }
 
 function configureAuth(spec: JobSpec): void {
+  // The Go runner sets exactly one auth env var on our process env before
+  // exec; here we only scrub the OTHER one so the SDK's "ANTHROPIC_API_KEY
+  // beats CLAUDE_CODE_OAUTH_TOKEN" precedence rule can't bite if both
+  // happen to be set (e.g. operator has ANTHROPIC_API_KEY in their shell
+  // env and breadbox serve inherited it, then configures subscription
+  // mode — Go already scrubs in that path, this is belt-and-suspenders).
   if (spec.auth.mode === "api_key") {
     delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
-    process.env.ANTHROPIC_API_KEY = spec.auth.token;
   } else {
     delete process.env.ANTHROPIC_API_KEY;
-    process.env.CLAUDE_CODE_OAUTH_TOKEN = spec.auth.token;
   }
 }
 
@@ -105,7 +112,19 @@ async function main() {
         maxBudgetUsd: spec.maxBudgetUsd,
         allowedTools: spec.allowedTools.length > 0 ? spec.allowedTools : undefined,
         mcpServers: spec.mcpServers,
+        // Breadbox agents are autonomous — there's no human attached to
+        // answer SDK permission prompts. `dontAsk` denies anything not
+        // pre-approved via allowedTools / our MCP wildcard, which is the
+        // correct posture for a scheduled run.
         permissionMode: "dontAsk",
+        // settingSources defaults to ["user","project","local"] — the SDK
+        // would otherwise load ~/.claude/CLAUDE.md, project-level
+        // .claude/settings.json hooks/skills/permission rules, and any
+        // local override discovered from cwd. In a self-hosted sidecar
+        // the cwd is wherever Go exec'd from, so anyone who can write to
+        // that path can inject agent-run config. Forcing `[]` keeps the
+        // sidecar fully self-contained and reproducible across hosts.
+        settingSources: [],
         resume: spec.sessionId,
         pathToClaudeCodeExecutable,
         executable: "node",

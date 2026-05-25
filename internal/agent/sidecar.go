@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -136,6 +137,12 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 
 	cmd := exec.CommandContext(ctx, bin)
 	cmd.Stdin = bytes.NewReader(specJSON)
+	// Auth flows via env vars set HERE, not via the JSON spec (Token is
+	// `json:"-"` for exactly this reason — keep plaintext secrets out of the
+	// wire format and out of any future log capture of the spec). The Go side
+	// is the single source of truth for which env var is set; the sidecar
+	// process inherits exactly one of {ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN}.
+	cmd.Env = authEnvFor(os.Environ(), spec.Auth)
 
 	// Process-group lifecycle. The sidecar (a bun-compiled binary) spawns
 	// the SDK's bundled Node child for cli.js. With the stdlib default
@@ -294,4 +301,33 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 	}
 
 	return result, result.Err
+}
+
+// authEnvFor returns a copy of `inherited` with both Anthropic auth env vars
+// stripped and exactly one re-added based on auth.Mode. Centralizes the
+// "exactly one auth var, never both" rule on the Go side so a future
+// sidecar regression (or a different sidecar runtime entirely) can't expose
+// the precedence trap.
+//
+// auth.Token may be empty (e.g. unit tests, smoke before auth configured) —
+// in that case neither var is set and the SDK will fail with its own clear
+// "no auth" error rather than us silently sneaking in an inherited value.
+func authEnvFor(inherited []string, auth AuthConfig) []string {
+	out := make([]string, 0, len(inherited)+1)
+	for _, e := range inherited {
+		if strings.HasPrefix(e, "ANTHROPIC_API_KEY=") || strings.HasPrefix(e, "CLAUDE_CODE_OAUTH_TOKEN=") {
+			continue
+		}
+		out = append(out, e)
+	}
+	if auth.Token == "" {
+		return out
+	}
+	switch auth.Mode {
+	case "api_key":
+		out = append(out, "ANTHROPIC_API_KEY="+auth.Token)
+	case "subscription":
+		out = append(out, "CLAUDE_CODE_OAUTH_TOKEN="+auth.Token)
+	}
+	return out
 }
