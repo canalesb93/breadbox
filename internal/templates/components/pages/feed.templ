@@ -47,31 +47,15 @@ templ feedActiveFilterBanner(p FeedProps) {
 // ── Hero band ─────────────────────────────────────────────────────────────
 templ feedHero(p FeedProps) {
 	<header class="mb-6">
-		<div class="flex flex-wrap items-end justify-between gap-3 mb-4">
-			<div class="min-w-0">
-				<h1 class="text-3xl font-bold tracking-tight text-base-content">Feed</h1>
-				<p class="text-sm text-base-content/55 mt-1">
-					<span>Everything that happened in your breadbox</span>
-					<span class="hidden sm:inline">&middot; { p.Hero.Generated }</span>
-				</p>
-			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				<button
-					type="button"
-					class="btn btn-sm btn-ghost"
-					onclick="window.location.reload()"
-					title="Refresh"
-					aria-label="Refresh feed"
-				>
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-					<span class="hidden sm:inline">Refresh</span>
-				</button>
-				<a href="/connections/new" class="btn btn-sm btn-primary" aria-label="Connect a new bank">
-					<i data-lucide="plus" class="w-3.5 h-3.5"></i>
-					<span class="hidden sm:inline">Connect bank</span>
-				</a>
-			</div>
-		</div>
+		@components.PageHeader(components.PageHeaderProps{
+			Title:    "Feed",
+			Subtitle: "Everything that happened in your breadbox · " + p.Hero.Generated,
+			Action: components.PageHeaderAction(
+				templ.SafeURL("/connections/new"),
+				"plus",
+				"Connect bank",
+			),
+		})
 		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
 			@feedHeroTile("activity", "Events today", fmt.Sprintf("%d", p.Hero.EventsToday), feedHeroSubEvents(p))
 			@feedHeroTile("download-cloud", "New transactions", fmt.Sprintf("%d", p.Hero.NewTransactionsToday), "synced today")
