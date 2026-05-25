@@ -73,32 +73,62 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
       echo "    Set DATABASE_URL"
     fi
 
-    # ENCRYPTION_KEY — try running process first (freshest), then on-disk cache.
-    # Cache survives between sessions so a fresh worktree with no `breadbox serve`
-    # running still gets the key without a manual `ps eww` round-trip.
+    # ENCRYPTION_KEY — precedence: .local.env (source of truth) > running process > cache.
+    # .local.env is the canonical store (loaded by godotenv at server start), so we read
+    # it first to avoid the regression where a stale cache silently shadows a rotated key.
+    # Cache survives between sessions so a fresh worktree with no `.local.env` and no
+    # `breadbox serve` running still gets the key without a manual `ps eww` round-trip.
     if [ -z "${ENCRYPTION_KEY:-}" ]; then
       KEY_CACHE="$HOME/.local/share/breadbox/dev-encryption-key"
       EK=""
-      RUNNING_PID="$(pgrep -f 'breadbox serve' | head -1 || true)"
-      if [ -n "$RUNNING_PID" ]; then
-        EK="$(ps eww -p "$RUNNING_PID" 2>/dev/null | tr ' ' '\n' | grep '^ENCRYPTION_KEY=' | cut -d= -f2 || true)"
-        if [ -n "$EK" ]; then
-          mkdir -p "$(dirname "$KEY_CACHE")"
-          umask 077
-          printf '%s\n' "$EK" > "$KEY_CACHE"
-          echo "    Set ENCRYPTION_KEY from running process (cached for future sessions)"
+      EK_SRC=""
+
+      # 1) .local.env in the worktree (copied in by .worktreeinclude)
+      LOCAL_ENV="$PROJECT_DIR/.local.env"
+      if [ -f "$LOCAL_ENV" ]; then
+        CAND="$(grep -E '^ENCRYPTION_KEY=' "$LOCAL_ENV" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'"'\r\n' || true)"
+        if [[ "$CAND" =~ ^[0-9a-fA-F]{64}$ ]]; then
+          EK="$CAND"
+          EK_SRC=".local.env"
         fi
       fi
+
+      # 2) running `breadbox serve` process
+      if [ -z "$EK" ]; then
+        RUNNING_PID="$(pgrep -f 'breadbox serve' | head -1 || true)"
+        if [ -n "$RUNNING_PID" ]; then
+          CAND="$(ps eww -p "$RUNNING_PID" 2>/dev/null | tr ' ' '\n' | grep '^ENCRYPTION_KEY=' | cut -d= -f2- | tr -d '\r' || true)"
+          if [[ "$CAND" =~ ^[0-9a-fA-F]{64}$ ]]; then
+            EK="$CAND"
+            EK_SRC="running process"
+            # Persist to cache for future sessions (atomic write, subshell-scoped umask)
+            mkdir -p "$(dirname "$KEY_CACHE")"
+            (
+              umask 077
+              printf '%s\n' "$EK" > "$KEY_CACHE.tmp" && mv -f "$KEY_CACHE.tmp" "$KEY_CACHE"
+            ) || echo "WARN: failed to persist ENCRYPTION_KEY cache at $KEY_CACHE"
+          fi
+        fi
+      fi
+
+      # 3) on-disk cache (fallback when neither above worked)
       if [ -z "$EK" ] && [ -f "$KEY_CACHE" ]; then
-        EK="$(head -1 "$KEY_CACHE" 2>/dev/null || true)"
-        if [ -n "$EK" ]; then
-          echo "    Set ENCRYPTION_KEY from cache ($KEY_CACHE)"
+        CAND="$(head -1 "$KEY_CACHE" 2>/dev/null | tr -d '\r\n' || true)"
+        if [[ "$CAND" =~ ^[0-9a-fA-F]{64}$ ]]; then
+          EK="$CAND"
+          EK_SRC="cache ($KEY_CACHE)"
+        else
+          echo "WARN: $KEY_CACHE exists but doesn't contain a 64-char hex key; ignoring"
         fi
       fi
+
       if [ -n "$EK" ]; then
         echo "ENCRYPTION_KEY=$EK" >> "$CLAUDE_ENV_FILE"
+        echo "    Set ENCRYPTION_KEY from $EK_SRC"
       else
-        echo "WARN: ENCRYPTION_KEY not found. Start \`breadbox serve\` once in any worktree, or write the 64-char hex key to $KEY_CACHE"
+        echo "WARN: ENCRYPTION_KEY not found. Start \`breadbox serve\` once (so the hook can"
+        echo "      cache the key), or paste just the 64 hex chars (no \`ENCRYPTION_KEY=\`"
+        echo "      prefix, no quotes) into $KEY_CACHE"
       fi
     fi
 
