@@ -75,15 +75,15 @@ templ EntityHeader(p EntityHeaderProps) {
 					}
 				</div>
 			}
-			<div class="min-w-0">
-				<div class="flex items-center gap-2.5 flex-wrap">
-					<h1 class={ "bb-page-title", p.TitleClass }>{ p.Title }</h1>
+			<div class="min-w-0 flex-1">
+				<div class="flex items-center gap-2.5 flex-wrap min-w-0">
+					<h1 class={ "bb-page-title min-w-0 max-w-full", p.TitleClass }>{ p.Title }</h1>
 					if p.Badges != nil {
 						@p.Badges
 					}
 				</div>
 				if p.Meta != nil {
-					<div class="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-base-content/40">
+					<div class="flex items-center gap-1.5 mt-0.5 flex-wrap text-xs text-base-content/40 min-w-0">
 						@p.Meta
 					</div>
 				}
