@@ -28,17 +28,23 @@ type SectionHeaderProps struct {
 	Action     templ.Component
 }
 
+// Mobile: stacks title row + action onto two rows (mirrors bb-page-header)
+// so a long title / wide action button doesn't force the title and count
+// to wrap mid-word. Desktop (sm:): everything on one row, action right-
+// aligned via sm:ml-auto.
 templ SectionHeader(p SectionHeaderProps) {
-	<header class="flex items-center gap-2 mb-3">
-		if p.Icon != "" {
-			<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content opacity-60 shrink-0"></i>
-		}
-		<h2 class="text-sm font-semibold">{ p.Title }</h2>
-		if p.Count != nil {
-			<span class="text-xs text-base-content/40">{ strconv.Itoa(*p.Count) } { sectionHeaderCountLabel(p) }</span>
-		}
+	<header class="flex flex-col items-start gap-2 sm:flex-row sm:items-center mb-3">
+		<div class="flex items-center gap-2 min-w-0 max-w-full">
+			if p.Icon != "" {
+				<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content opacity-60 shrink-0"></i>
+			}
+			<h2 class="text-sm font-semibold min-w-0">{ p.Title }</h2>
+			if p.Count != nil {
+				<span class="text-xs text-base-content/40 whitespace-nowrap shrink-0">{ strconv.Itoa(*p.Count) } { sectionHeaderCountLabel(p) }</span>
+			}
+		</div>
 		if p.Action != nil {
-			<div class="ml-auto shrink-0">
+			<div class="sm:ml-auto shrink-0">
 				@p.Action
 			</div>
 		}
