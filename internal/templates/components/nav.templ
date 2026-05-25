@@ -65,13 +65,6 @@ templ Nav(p NavProps) {
 			</a>
 		}
 		<div class="bb-sidebar-section">Manage</div>
-		<a href="/connections" class={ "bb-sidebar-link", navActive(p.CurrentPage, "connections") }>
-			<i data-lucide="link"></i>
-			<span class="flex-1">Connections</span>
-			if p.ConnectionsAttention > 0 {
-				<span class="bb-nav-badge bb-nav-badge--warn" title={ fmt.Sprintf("%d connections need attention", p.ConnectionsAttention) }>{ badgeCount(p.ConnectionsAttention) }</span>
-			}
-		</a>
 		if p.IsAdmin {
 			<a href="/rules" class={ "bb-sidebar-link", navActive(p.CurrentPage, "rules") }>
 				<i data-lucide="zap"></i> Rules
@@ -87,14 +80,21 @@ templ Nav(p NavProps) {
 		}
 		if p.IsEditor {
 			<div class="bb-sidebar-section">System</div>
+			<a href="/connections" class={ "bb-sidebar-link", navActive(p.CurrentPage, "connections") }>
+				<i data-lucide="link"></i>
+				<span class="flex-1">Connections</span>
+				if p.ConnectionsAttention > 0 {
+					<span class="bb-nav-badge bb-nav-badge--warn" title={ fmt.Sprintf("%d connections need attention", p.ConnectionsAttention) }>{ badgeCount(p.ConnectionsAttention) }</span>
+				}
+			</a>
 			if p.IsAdmin {
+				<a href="/household" class={ "bb-sidebar-link", navActive(p.CurrentPage, "household") }>
+					<i data-lucide="users"></i> Household
+				</a>
 				<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
 					<i data-lucide="scroll-text"></i> Logs
 				</a>
 			}
-			<a href="/settings" class={ navActiveSettings(p.CurrentPage) }>
-				<i data-lucide="settings"></i> Settings
-			</a>
 		}
 		<div class="bb-sidebar-section">Resources</div>
 		if p.IsEditor {
@@ -108,20 +108,43 @@ templ Nav(p NavProps) {
 		@navExternalLink("https://github.com/canalesb93/breadbox", "github", "GitHub")
 	</nav>
 	<!--
-		Footer entrypoint to /settings/account. Settings has its own
-		top-level sidebar entry above; this footer block is just
-		personal-scope.
+		Footer entrypoint to the Settings modal. The clickable card opens
+		the modal at the Account tab; the trailing gear button opens it
+		at whatever tab the user last visited (or Account if none).
+		Settings has no top-level sidebar entry anymore — this card is
+		the only entry point.
 	-->
 	<div class="mt-auto pt-3 border-t border-base-300 px-2">
-		<a href="/settings/account" class={ "flex items-center gap-2.5 py-2.5 px-2.5 rounded-lg no-underline transition-colors hover:bg-base-200/70", navActive(p.CurrentPage, "account") } title="My Account">
-			if p.HasLinkedUser {
-				<img src={ navAvatar(p.SessionUserID, p.SessionAvatarVersion) } alt="" class="bb-sidebar-profile-avatar shrink-0"/>
-			}
-			<div class="flex-1 min-w-0">
-				<div class="bb-sidebar-profile-name">{ navDisplayName(p.UserName, p.AdminUsername) }</div>
-				<div class="bb-sidebar-profile-role">{ p.RoleDisplay }</div>
-			</div>
-		</a>
+		<div class="flex items-center gap-1">
+			<button
+				type="button"
+				class={ "flex-1 flex items-center gap-2.5 py-2.5 px-2.5 rounded-lg no-underline transition-colors hover:bg-base-200/70 text-left", navActive(p.CurrentPage, "account") }
+				title="Open settings"
+				aria-label="Open settings"
+				x-data
+				@click="$dispatch('open-settings', { tab: 'account' })"
+			>
+				if p.HasLinkedUser {
+					<img src={ navAvatar(p.SessionUserID, p.SessionAvatarVersion) } alt="" class="bb-sidebar-profile-avatar shrink-0"/>
+				} else {
+					<i data-lucide="user-circle" class="w-6 h-6 text-base-content/40 shrink-0"></i>
+				}
+				<div class="flex-1 min-w-0">
+					<div class="bb-sidebar-profile-name">{ navDisplayName(p.UserName, p.AdminUsername) }</div>
+					<div class="bb-sidebar-profile-role">{ p.RoleDisplay }</div>
+				</div>
+			</button>
+			<button
+				type="button"
+				class="shrink-0 p-2 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200/70 transition-colors"
+				title="Settings"
+				aria-label="Open settings"
+				x-data
+				@click="$dispatch('open-settings', { tab: 'account' })"
+			>
+				<i data-lucide="settings" class="w-4 h-4"></i>
+			</button>
+		</div>
 	</div>
 }
 
@@ -150,19 +173,6 @@ func navActive(current, page string) string {
 		return "bb-sidebar-link--active"
 	}
 	return ""
-}
-
-// navActiveSettings marks the Settings sidebar entry active whenever the
-// current page is any tab inside the Settings shell — General,
-// Providers, MCP, API Keys, Household, Backups, or Account.
-// bb-sidebar-link drives the visual treatment; this just contributes the
-// modifier.
-func navActiveSettings(current string) string {
-	switch current {
-	case "settings", "sync", "security", "system", "help", "providers", "mcp", "api-keys", "household", "backups", "account", "profile":
-		return "bb-sidebar-link bb-sidebar-link--active"
-	}
-	return "bb-sidebar-link"
 }
 
 func navAvatar(id, version string) string {

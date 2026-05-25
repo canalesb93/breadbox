@@ -1,0 +1,33 @@
+package pages
+
+// settingsTabHeaderProps controls the per-tab header inside the Settings
+// modal. Title is always present; Subtitle is optional. Right is an
+// optional templ.Component rendered to the right side of the title (used
+// by the Account tab for the sign-out button).
+//
+// The intent is to give every settings tab the same opening rhythm so
+// switching tabs reads as moving through a consistent surface rather
+// than landing on differently-shaped pages.
+type settingsTabHeaderProps struct {
+	Title    string
+	Subtitle string
+	Right    templ.Component
+}
+
+// settingsTabHeader is the shared title row for every settings tab.
+// Tighter than the page-level `bb-page-header` because the modal itself
+// already provides the outer "Settings" chrome — the tab header is a
+// section header, not a page header.
+templ settingsTabHeader(p settingsTabHeaderProps) {
+	<div class="flex items-start justify-between gap-4 mb-6">
+		<div class="min-w-0">
+			<h1 class="text-lg font-semibold leading-tight">{ p.Title }</h1>
+			if p.Subtitle != "" {
+				<p class="text-sm text-base-content/50 mt-1 truncate">{ p.Subtitle }</p>
+			}
+		</div>
+		if p.Right != nil {
+			@p.Right
+		}
+	</div>
+}

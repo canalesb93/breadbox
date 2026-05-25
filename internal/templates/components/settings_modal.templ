@@ -1,0 +1,170 @@
+package components
+
+// SettingsModal renders the global Settings dialog mounted in base.html.
+//
+// Layout:
+//   - DaisyUI <dialog class="modal modal-bottom sm:modal-middle"> — slides
+//     up as a sheet on phones, centers on tablet+
+//   - modal-box sized w-11/12 max-w-6xl h-[85vh] on desktop so every tab
+//     gets the same stage regardless of content
+//   - Sticky top bar: title + close
+//   - Left rail (desktop ≥lg) / top dropdown (mobile) — same tab list
+//   - Body container `#bb-settings-body` — swapped in by JS (or
+//     server-pre-filled via InitialBody for cold deep-loads)
+//
+// Behaviour is driven by static/js/admin/components/settings_modal.js.
+templ SettingsModal(p SettingsModalProps) {
+	<script src="/static/js/admin/components/settings_modal.js"></script>
+	<dialog
+		id="bb-settings-modal"
+		class="modal modal-bottom sm:modal-middle"
+		x-data="settingsModal"
+		data-initial-tab={ p.InitialTab }
+		data-initial-prefilled={ initialPrefilled(p) }
+		@open-settings.window="open($event.detail && $event.detail.tab || 'account')"
+		@close="onClose()"
+	>
+		<!--
+			Mobile (default): a true bottom-sheet — full width, rounded
+			only on the top, takes ~95vh so it reads as covering the
+			page. Pair with modal-bottom on the dialog to anchor it.
+			Tablet+ (sm:): the modal centers, takes 11/12 width capped at
+			max-w-6xl, and rounds on every corner — the desktop preview
+			from the design question.
+		-->
+		<div class="modal-box w-full max-w-none rounded-t-2xl rounded-b-none h-[95vh] sm:w-11/12 sm:max-w-6xl sm:rounded-2xl sm:h-[85vh] p-0 overflow-hidden flex flex-col bg-base-100">
+			@settingsModalHeader()
+			<div class="flex-1 min-h-0 flex flex-col lg:flex-row">
+				@settingsModalMobileRail(p)
+				@settingsModalDesktopRail(p)
+				<div class="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 bg-base-100">
+					<div id="bb-settings-body" x-ref="body">
+						if p.InitialBody != "" {
+							@templ.Raw(string(p.InitialBody))
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+		<!--
+			daisy modal-backdrop: a button-form so a backdrop click submits
+			the form (cancel), which fires the dialog's `close` event and
+			our @close listener handles the URL rewind.
+		-->
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+}
+
+// settingsModalHeader renders the sticky top bar — title + close button.
+// The close button submits the embedded dialog form so the dialog's
+// native `close` event fires, which our Alpine factory uses to rewind
+// history (or fall back to navigating home).
+templ settingsModalHeader() {
+	<div class="shrink-0 px-4 sm:px-6 lg:px-8 py-4 border-b border-base-300 flex items-center justify-between gap-3 bg-base-100">
+		<div class="min-w-0 flex items-center gap-2">
+			<i data-lucide="settings" class="w-4 h-4 text-base-content/50 shrink-0"></i>
+			<h2 class="text-base font-semibold leading-tight">Settings</h2>
+		</div>
+		<form method="dialog">
+			<button
+				type="submit"
+				class="btn btn-ghost btn-sm btn-square"
+				aria-label="Close settings"
+			>
+				<i data-lucide="x" class="w-4 h-4"></i>
+			</button>
+		</form>
+	</div>
+}
+
+// settingsModalMobileRail renders a <details> dropdown on viewports <lg.
+// Matches the desktop rail's tab list but folds into a single pill so the
+// content area gets the full width on phones.
+templ settingsModalMobileRail(p SettingsModalProps) {
+	<div class="lg:hidden shrink-0 px-4 sm:px-6 py-3 border-b border-base-300 bg-base-100">
+		<details class="dropdown w-full" x-ref="mobileDropdown">
+			<summary class="list-none flex items-center justify-between w-full px-3 py-2.5 rounded-xl bg-base-200/60 ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200 transition-colors [&::-webkit-details-marker]:hidden">
+				<span class="flex items-center gap-2.5 min-w-0">
+					<i :data-lucide="currentTabIcon()" class="w-4 h-4 text-base-content opacity-70 shrink-0"></i>
+					<span class="text-sm font-medium truncate" x-text="currentTabLabel()"></span>
+				</span>
+				<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-40 shrink-0"></i>
+			</summary>
+			<ul class="dropdown-content menu mt-2 z-20 w-full bg-base-100 shadow-xl ring-1 ring-base-content/10 p-1 gap-0.5 rounded-xl">
+				@settingsModalRailItems(p, true)
+			</ul>
+		</details>
+	</div>
+}
+
+// settingsModalDesktopRail renders the vertical pill rail on lg+.
+templ settingsModalDesktopRail(p SettingsModalProps) {
+	<nav class="hidden lg:flex lg:flex-col gap-0.5 shrink-0 lg:w-60 p-4 lg:p-5 lg:border-r lg:border-base-300 overflow-y-auto bg-base-100">
+		@settingsModalRailItems(p, false)
+	</nav>
+}
+
+// settingsModalRailItems emits the shared tab list — same items, same
+// gating — used by both the mobile dropdown and desktop rail. The
+// `mobile` flag picks the link shape (compact menu li vs. pill).
+templ settingsModalRailItems(p SettingsModalProps, mobile bool) {
+	@settingsModalRailItem(SettingsModalTabAccount, "user-cog", "Account", mobile)
+	if p.IsAdmin {
+		@settingsModalRailItem(SettingsModalTabSync, "refresh-cw", "Sync", mobile)
+		@settingsModalRailItem(SettingsModalTabSecurity, "shield", "Security", mobile)
+		@settingsModalRailItem(SettingsModalTabSystem, "cpu", "System", mobile)
+		@settingsModalRailItem(SettingsModalTabProviders, "plug", "Providers", mobile)
+		@settingsModalRailItem(SettingsModalTabAgents, "sparkles", "Agents", mobile)
+		@settingsModalRailItem(SettingsModalTabMCP, "bot", "MCP", mobile)
+	}
+	if p.IsEditor {
+		@settingsModalRailItem(SettingsModalTabAccess, "key-round", "API Keys", mobile)
+	}
+	if p.IsAdmin {
+		@settingsModalRailItem(SettingsModalTabBackups, "hard-drive", "Backups", mobile)
+		@settingsModalRailItem(SettingsModalTabHelp, "life-buoy", "Help", mobile)
+	}
+}
+
+// settingsModalRailItem renders one tab row. The tab id is held in a
+// data-tab attribute so the active-state + click handler can read it
+// off $el without per-row string interpolation.
+templ settingsModalRailItem(tab, icon, label string, mobile bool) {
+	if mobile {
+		<li>
+			<a
+				href={ settingsTabHref(tab) }
+				data-tab={ tab }
+				class="flex items-center gap-2.5 rounded-lg text-sm px-3 py-2.5 data-[active=true]:bg-base-200 data-[active=true]:text-base-content data-[active=true]:font-medium text-base-content/70"
+				:data-active="currentTab === $el.dataset.tab ? 'true' : 'false'"
+				@click.prevent="switchTo($el.dataset.tab)"
+			>
+				<i data-lucide={ icon } class="w-4 h-4 shrink-0"></i>
+				<span>{ label }</span>
+			</a>
+		</li>
+	} else {
+		<a
+			href={ settingsTabHref(tab) }
+			data-tab={ tab }
+			class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm whitespace-nowrap transition-colors duration-150 no-underline shrink-0 text-base-content/65 hover:bg-base-content/10 hover:text-base-content data-[active=true]:bg-base-content/15 data-[active=true]:text-base-content data-[active=true]:font-medium data-[active=true]:hover:bg-base-content/15"
+			:data-active="currentTab === $el.dataset.tab ? 'true' : 'false'"
+			@click.prevent="switchTo($el.dataset.tab)"
+		>
+			<i data-lucide={ icon } class="w-4 h-4 shrink-0"></i>
+			<span>{ label }</span>
+		</a>
+	}
+}
+
+// initialPrefilled flips to "true" when the server pre-rendered the body
+// so the Alpine factory skips the cold-load fetch. Returns string so it
+// can land directly as an attribute value.
+func initialPrefilled(p SettingsModalProps) string {
+	if p.InitialTab != "" && p.InitialBody != "" {
+		return "true"
+	}
+	return "false"
+}

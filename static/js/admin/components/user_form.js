@@ -1,5 +1,5 @@
-// User-form Alpine factories for /settings/household/new (create) and
-// /settings/household/{id}/edit (edit).
+// User-form Alpine factories for /household/new (create) and
+// /household/{id}/edit (edit).
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 // Two factories ship from this module:
@@ -16,7 +16,7 @@
 // (so the alpine:init listener registers before Alpine fires the event).
 
 document.addEventListener('alpine:init', function () {
-  // Create flow — drives /settings/household/new. Maintains local-only state for the
+  // Create flow — drives /household/new. Maintains local-only state for the
   // name/email/login toggle, the avatar-preview seed, and the two-step
   // submit (user creation + optional login-account creation).
   Alpine.data('userForm', function () {
@@ -89,7 +89,7 @@ document.addEventListener('alpine:init', function () {
         .then(function (userData) {
           if (!self.createLogin) {
             // No login account needed -- redirect.
-            window.location.href = '/settings/household?created=1';
+            window.location.href = '/household?created=1';
             return;
           }
 
@@ -114,7 +114,7 @@ document.addEventListener('alpine:init', function () {
               // Re-initialize Lucide icons for the success state.
               self.$nextTick(function () { if (window.lucide) lucide.createIcons(); });
             } else {
-              window.location.href = '/settings/household?created=1';
+              window.location.href = '/household?created=1';
             }
           });
         })
@@ -129,7 +129,7 @@ document.addEventListener('alpine:init', function () {
     };
   });
 
-  // Edit flow — drives /settings/household/{id}/edit. Reads the user's UUID and the
+  // Edit flow — drives /household/{id}/edit. Reads the user's UUID and the
   // initial hasCustomAvatar boolean from data-* attributes on the x-data
   // root, so the factory body keeps the no-arg shape the convention
   // requires. Handles avatar upload/remove/regenerate plus the name/email
@@ -145,12 +145,12 @@ document.addEventListener('alpine:init', function () {
       submitting: false,
 
       // Endpoint base URLs — read from data-* attrs so the same factory
-      // drives /settings/household/{id}/edit (admin scope) and
+      // drives /household/{id}/edit (admin scope) and
       // /settings/account (self scope). Defaults preserve the original
       // /-/users/{id} behaviour when the page omits the attrs.
       avatarEndpoint: '',
       profileEndpoint: '',
-      successRedirect: '/settings/household',
+      successRedirect: '/household',
 
       init: function () {
         this.userId = this.$el.dataset.userId || '';

@@ -1,77 +1,79 @@
 package pages
 
-// MyAccount renders the member's own /settings/account page. Hosts
-// inside the base layout via TemplateRenderer.RenderWithTempl — the
-// handler builds typed props in admin/members.go and the bridge drops
-// the rendered HTML into base.html's TemplContent slot.
+// MyAccount renders the Account tab inside the Settings modal — the
+// single identity page covering avatar/name/email (when linked), the
+// password change form, and the danger zone.
 //
-// The Profile card shares its visual structure with
-// /settings/household/{id}/edit (icon-header avatar + name/email fields
-// + bb-action-row) by reusing the same `avatarEditor` Alpine factory.
-// Endpoint URLs are passed via data-* attrs so the same factory drives
-// admin scope (/-/users/{id}/*) and self scope (/settings/account/*).
+// Profile and Account were two separate tabs in the legacy SettingsLayout
+// shell; merging them removes the false split between "who I am in the
+// household" and "how I sign in" — both speak about the same person.
+//
+// Hosts inside the base layout via TemplateRenderer.RenderWithTempl. The
+// handler builds typed props in admin/members.go and the modal infra
+// either drops the body into the modal slot (cold deep-load) or returns
+// it as a fragment to the modal's JS swap (in-modal tab switch).
+//
+// The Profile card shares its visual structure with /household/{id}/edit
+// (icon-header avatar + name/email fields + bb-action-row) by reusing
+// the same `avatarEditor` Alpine factory. Endpoint URLs are passed via
+// data-* attrs so the same factory drives admin scope (/-/users/{id}/*)
+// and self scope (/settings/account/*).
 templ MyAccount(p MyAccountProps) {
+	// Synchronous (no defer): the page script registers its alpine:init
+	// listener before Alpine fires the event. See user_form.js.
+	<script src="/static/js/admin/components/user_form.js"></script>
 	<div class="max-w-2xl">
-		<div class="bb-page-header">
-			<div class="min-w-0">
-				<h1 class="bb-page-title">Account</h1>
-				<p class="text-sm text-base-content/50 mt-1 truncate">
-					if p.AdminUsername != "" {
-						Signed in as <span class="text-base-content/70 font-medium">{ p.AdminUsername }</span>
-						if p.RoleDisplay != "" {
-							· { p.RoleDisplay }
-						}
-					} else {
-						Password, sign out, and account data
-					}
-				</p>
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Account",
+			Subtitle: myAccountSubtitle(p),
+			Right:    myAccountSignOutForm(p.CSRFToken),
+		})
+		if p.IsUnlinked {
+			<div role="alert" class="alert alert-warning mb-6 rounded-xl">
+				<i data-lucide="user-plus" class="w-5 h-5"></i>
+				<span>
+					Your admin account isn't linked to a household member yet.
+					<a href="/household" class="link font-medium">Link it from the Household page</a>
+					to set a display name, email, and avatar.
+				</span>
 			</div>
-			<form method="POST" action="/logout" class="shrink-0">
-				if p.CSRFToken != "" {
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				}
-				<button type="submit" class="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content">
-					<i data-lucide="log-out" class="w-4 h-4"></i>
-					Sign out
-				</button>
-			</form>
-		</div>
+		}
 		<div class="space-y-6">
+			if p.UserID != "" {
+				@myAccountProfileCard(p)
+			}
 			@myAccountPasswordCard(p.CSRFToken)
 			@myAccountDangerZone(p.CSRFToken)
 		</div>
 	</div>
 }
 
-// MyProfile renders the Profile tab inside the Settings shell — avatar
-// editor + name + email form. Shares MyAccountProps with MyAccount and
-// reuses the same `avatarEditor` Alpine factory wired at /settings/account
-// endpoints (so updates write to the same backing data the Account tab's
-// header reads).
-templ MyProfile(p MyAccountProps) {
-	// Synchronous (no defer): the page script registers its alpine:init
-	// listener before Alpine fires the event. See user_form.js.
-	<script src="/static/js/admin/components/user_form.js"></script>
-	<div class="max-w-2xl">
-		<div class="bb-page-header">
-			<div class="min-w-0">
-				<h1 class="bb-page-title">Profile</h1>
-				<p class="text-sm text-base-content/50 mt-1">Update your name, email, and avatar</p>
-			</div>
-		</div>
-		if p.IsUnlinked {
-			<div role="alert" class="alert alert-warning mb-6">
-				<i data-lucide="user-plus" class="w-5 h-5"></i>
-				<span>
-					Your admin account isn't linked to a household member yet.
-					<a href="/settings/household" class="link font-medium">Link it from the Household page</a>.
-				</span>
-			</div>
+// myAccountSubtitle picks the line under the "Account" title. Falls back
+// to a generic line when there's no admin username (rare — only true
+// during early setup flows).
+func myAccountSubtitle(p MyAccountProps) string {
+	if p.AdminUsername != "" {
+		base := "Signed in as " + p.AdminUsername
+		if p.RoleDisplay != "" {
+			base += " · " + p.RoleDisplay
 		}
-		if p.UserID != "" {
-			@myAccountProfileCard(p)
+		return base
+	}
+	return "Profile, password, and account data"
+}
+
+// myAccountSignOutForm renders the sign-out button that sits to the
+// right of the Account tab header.
+templ myAccountSignOutForm(csrfToken string) {
+	<form method="POST" action="/logout" class="shrink-0">
+		if csrfToken != "" {
+			<input type="hidden" name="_csrf" value={ csrfToken }/>
 		}
-	</div>
+		<button type="submit" class="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content">
+			<i data-lucide="log-out" class="w-4 h-4"></i>
+			Sign out
+		</button>
+	</form>
 }
 
 // myAccountProfileCard renders the linked household member's profile

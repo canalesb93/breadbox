@@ -11,28 +11,28 @@ import "strconv"
 // resolves masked credential display strings before render so the templ
 // stays free of nil-handling.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Agents settings</h1>
-			<p class="text-sm text-base-content/50 mt-1">Auth, sidecar binary, and execution limits for Claude Agent SDK runs</p>
+	<div class="max-w-3xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Agents",
+			Subtitle: "Auth, sidecar binary, and execution limits for Claude Agent SDK runs",
+		})
+		if p.FormError != "" {
+			<div role="alert" class="alert alert-error alert-soft mb-4">
+				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				<span>{ p.FormError }</span>
+			</div>
+		}
+		if p.FormSuccess != "" {
+			<div role="alert" class="alert alert-success alert-soft mb-4">
+				<i data-lucide="circle-check" class="w-4 h-4"></i>
+				<span>{ p.FormSuccess }</span>
+			</div>
+		}
+		<div class="grid gap-6">
+			@agentSDKStatusCard(p.Status)
+			@agentSDKFormCard(p)
+			@agentSDKToolsCard(p.CSRFToken)
 		</div>
-	</div>
-	if p.FormError != "" {
-		<div role="alert" class="alert alert-error alert-soft mb-4">
-			<i data-lucide="circle-x" class="w-4 h-4"></i>
-			<span>{ p.FormError }</span>
-		</div>
-	}
-	if p.FormSuccess != "" {
-		<div role="alert" class="alert alert-success alert-soft mb-4">
-			<i data-lucide="circle-check" class="w-4 h-4"></i>
-			<span>{ p.FormSuccess }</span>
-		</div>
-	}
-	<div class="grid gap-6">
-		@agentSDKStatusCard(p.Status)
-		@agentSDKFormCard(p)
-		@agentSDKToolsCard(p.CSRFToken)
 	</div>
 }
 

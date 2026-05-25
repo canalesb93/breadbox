@@ -13,18 +13,18 @@ import (
 //
 // POST targets remain at /-/mcp-settings/* — only the GET page moved.
 templ AgentsSettings(p AgentsSettingsProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">MCP Settings</h1>
-			<p class="text-sm text-base-content/50 mt-1">Server instructions, review guidelines, report format, and per-tool toggles</p>
+	<div class="max-w-3xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "MCP",
+			Subtitle: "Server instructions, review guidelines, report format, and per-tool toggles",
+		})
+		<div class="grid gap-6">
+			@agentsSettingsInstructionsCard(p)
+			@agentsSettingsReviewGuidelinesCard(p)
+			@agentsSettingsReportFormatCard(p)
+			@agentsSettingsToolsCard(p)
+			@agentsSettingsConnectionCard()
 		</div>
-	</div>
-	<div class="grid gap-6">
-		@agentsSettingsInstructionsCard(p)
-		@agentsSettingsReviewGuidelinesCard(p)
-		@agentsSettingsReportFormatCard(p)
-		@agentsSettingsToolsCard(p)
-		@agentsSettingsConnectionCard()
 	</div>
 	<script>
 		(function () {
