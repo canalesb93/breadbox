@@ -475,7 +475,7 @@ func connectionsSecondaryAction(p ConnectionsProps) templ.Component {
 templ connectionsSyncAllBtn() {
 	<div x-show="tab === 'connections'" x-cloak x-data="syncAllBtn">
 		<button
-			class="btn btn-ghost btn-sm gap-2"
+			class="btn btn-secondary btn-sm gap-2"
 			:disabled="state !== 'idle'"
 			@click="triggerSyncAll()"
 			:title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'"

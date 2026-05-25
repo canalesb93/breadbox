@@ -112,7 +112,7 @@ func txExportAction(p TransactionsProps) templ.Component {
 }
 
 templ txExportLink(exportURL string) {
-	<a href={ templ.SafeURL(exportURL) } class="btn btn-ghost btn-sm gap-2" title="Export as CSV">
+	<a href={ templ.SafeURL(exportURL) } class="btn btn-secondary btn-sm gap-2" title="Export as CSV">
 		<i data-lucide="download" class="w-4 h-4"></i>
 		Export CSV
 	</a>

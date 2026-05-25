@@ -112,7 +112,7 @@ templ ruleDetailEditBtn(p RuleDetailProps) {
 }
 
 templ ruleDetailToggleBtn(p RuleDetailProps) {
-	<button class="btn btn-sm btn-ghost" @click="toggleRule()">
+	<button class="btn btn-sm btn-secondary" @click="toggleRule()">
 		if p.Rule.Enabled {
 			<i data-lucide="pause" class="w-3.5 h-3.5"></i>
 			Disable
