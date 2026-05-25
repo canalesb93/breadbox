@@ -115,17 +115,17 @@ templ gsStep1(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasMember {
-						<a href="/settings/household" class="btn btn-ghost btn-sm">View Members</a>
+						<a href="/household" class="btn btn-ghost btn-sm">View Members</a>
 					} else {
-						<a href="/settings/household/new" class="btn btn-primary btn-sm">Add Member</a>
+						<a href="/household/new" class="btn btn-primary btn-sm">Add Member</a>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasMember {
-					<a href="/settings/household" class="btn btn-ghost btn-sm">View Members</a>
+					<a href="/household" class="btn btn-ghost btn-sm">View Members</a>
 				} else {
-					<a href="/settings/household/new" class="btn btn-primary btn-sm">Add Member</a>
+					<a href="/household/new" class="btn btn-primary btn-sm">Add Member</a>
 				}
 			</div>
 		</div>

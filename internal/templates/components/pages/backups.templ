@@ -15,30 +15,11 @@ import "fmt"
 templ Backups(p BackupsProps) {
 	<script src="/static/js/admin/components/backups.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('backups')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Backups</h1>
-			<p class="text-sm text-base-content/50 mt-1">Database backup, restore, and scheduled backups</p>
-		</div>
-		<div class="flex items-center gap-2">
-			if p.Error == "" {
-				<form method="POST" action="/-/backups/create">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					if p.PreflightOK {
-						<button type="submit" data-new-backup class="btn btn-primary btn-sm">
-							<i data-lucide="download" class="w-4 h-4"></i>
-							Create Backup Now
-						</button>
-					} else {
-						<button type="submit" data-new-backup class="btn btn-primary btn-sm" disabled title={ p.PreflightMessage }>
-							<i data-lucide="info" class="w-4 h-4"></i>
-							Create Backup Now
-						</button>
-					}
-				</form>
-			}
-		</div>
-	</div>
+	@settingsTabHeader(settingsTabHeaderProps{
+		Title:    "Backups",
+		Subtitle: "Database backup, restore, and scheduled backups",
+		Right:    backupsCreateNowButton(p),
+	})
 	<div class="grid gap-6">
 		<!-- Encryption Key Warning -->
 		<div class="alert alert-warning">
@@ -367,5 +348,27 @@ func scheduleLabel(schedule string) string {
 		return "Weekly"
 	default:
 		return schedule
+	}
+}
+
+// backupsCreateNowButton is the right-side action for the Backups tab
+// header — disabled while the preflight check is failing, hidden when
+// the page is rendering an error.
+templ backupsCreateNowButton(p BackupsProps) {
+	if p.Error == "" {
+		<form method="POST" action="/-/backups/create" class="shrink-0">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			if p.PreflightOK {
+				<button type="submit" data-new-backup class="btn btn-primary btn-sm gap-1.5">
+					<i data-lucide="download" class="w-4 h-4"></i>
+					Create Backup Now
+				</button>
+			} else {
+				<button type="submit" data-new-backup class="btn btn-primary btn-sm gap-1.5" disabled title={ p.PreflightMessage }>
+					<i data-lucide="info" class="w-4 h-4"></i>
+					Create Backup Now
+				</button>
+			}
+		</form>
 	}
 }

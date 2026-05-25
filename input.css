@@ -361,9 +361,12 @@
   .bb-icon-tile--error   { @apply bg-error/10 text-error; }
   .bb-icon-tile--neutral { @apply bg-base-200 text-base-content/60; }
 
-  /* Detail-page entity header — 48×48 tile sized for the top-of-page
-     row that pairs an icon with the entity name + badges + meta line. */
-  .bb-entity-header__tile { @apply flex items-center justify-center w-12 h-12 rounded-xl shrink-0; }
+  /* Detail-page entity header — 40×40 tile on mobile, 48×48 at sm+
+     for the top-of-page row that pairs an icon with the entity name +
+     badges + meta line. The mobile shrink reclaims horizontal space
+     for the title once the meta row and secondary action are hidden
+     (see EntityHeader templ component). */
+  .bb-entity-header__tile { @apply flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl shrink-0; }
 
   /* Action row at the bottom of a sectioned form card.
      Left-aligned on mobile (thumb-reach), right-aligned on sm+. */

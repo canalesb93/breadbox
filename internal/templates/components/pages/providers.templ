@@ -22,16 +22,16 @@ templ Providers(p ProvidersProps) {
 	     Alpine.data() registration runs before Alpine — itself deferred
 	     from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/providers.js"></script>
-	<div class="bb-page-header">
-		<div class="min-w-0">
-			<h1 class="bb-page-title">Providers</h1>
-			<p class="text-sm text-base-content/50 mt-1">Configure bank data providers for syncing accounts and transactions</p>
+	<div class="max-w-3xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Providers",
+			Subtitle: "Configure bank data providers for syncing accounts and transactions",
+		})
+		<div class="grid gap-4">
+			@providersPlaidCard(p, p.ProviderHealth["plaid"])
+			@providersTellerCard(p, p.ProviderHealth["teller"])
+			@providersCSVCard(p.ProviderHealth["csv"])
 		</div>
-	</div>
-	<div class="grid gap-4">
-		@providersPlaidCard(p, p.ProviderHealth["plaid"])
-		@providersTellerCard(p, p.ProviderHealth["teller"])
-		@providersCSVCard(p.ProviderHealth["csv"])
 	</div>
 }
 

@@ -49,7 +49,7 @@ templ Users(p UsersProps) {
 // admin account isn't linked to a household member. Offers two flows:
 // create a new member or link an existing unlinked one.
 templ usersAddMemberAction() {
-	<a href="/settings/household/new" data-new-user class="btn btn-primary btn-sm gap-2">
+	<a href="/household/new" data-new-user class="btn btn-primary btn-sm gap-2">
 		<i data-lucide="plus" class="w-4 h-4"></i>
 		Add Member
 	</a>
@@ -265,7 +265,7 @@ templ usersEmpty() {
 		Icon:     "users",
 		Title:    "No family members yet",
 		Body:     "Add family members to connect their bank accounts and track spending across the household.",
-		CTAHref:  templ.SafeURL("/settings/household/new"),
+		CTAHref:  templ.SafeURL("/household/new"),
 		CTAIcon:  "plus",
 		CTALabel: "Add your first member",
 	})
@@ -280,20 +280,20 @@ func usersOverflowItems(u UsersEnrichedRow) []components.OverflowMenuItem {
 		{
 			Label: "Edit profile",
 			Icon:  "pencil",
-			Href:  templ.SafeURL(fmt.Sprintf("/settings/household/%s/edit", u.ID)),
+			Href:  templ.SafeURL(fmt.Sprintf("/household/%s/edit", u.ID)),
 		},
 	}
 	if u.HasLogin {
 		items = append(items, components.OverflowMenuItem{
 			Label: "Manage login",
 			Icon:  "settings",
-			Href:  templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)),
+			Href:  templ.SafeURL(fmt.Sprintf("/household/%s/create-login", u.ID)),
 		})
 	} else {
 		items = append(items, components.OverflowMenuItem{
 			Label: "Create login",
 			Icon:  "user-plus",
-			Href:  templ.SafeURL(fmt.Sprintf("/settings/household/%s/create-login", u.ID)),
+			Href:  templ.SafeURL(fmt.Sprintf("/household/%s/create-login", u.ID)),
 		})
 	}
 	if u.AccountCount > 0 {

@@ -1,10 +1,6 @@
 package pages
 
-import (
-	"strconv"
-
-	"breadbox/internal/templates/components"
-)
+import "strconv"
 
 // AgentSDKSettings renders the v1 admin "Agents settings" tab inside the
 // Settings shell — auth + sidecar + execution limits for Claude Agent
@@ -15,28 +11,32 @@ import (
 // resolves masked credential display strings before render so the templ
 // stays free of nil-handling.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
+	<!-- Diagnostics-card factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registration runs before Alpine — itself deferred
+	     from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/agent_sdk_settings.js"></script>
-	<div x-data x-init="$store.shortcuts.setScope('agents-settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	@components.PageHeader(components.PageHeaderProps{
-		Title:    "Agents settings",
-		Subtitle: "Auth, sidecar binary, and execution limits for Claude Agent SDK runs.",
-	})
-	if p.FormError != "" {
-		<div role="alert" class="alert alert-error alert-soft mb-4">
-			<i data-lucide="circle-x" class="w-4 h-4"></i>
-			<span>{ p.FormError }</span>
+	<div class="max-w-3xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Agents",
+			Subtitle: "Auth, sidecar binary, and execution limits for Claude Agent SDK runs",
+		})
+		if p.FormError != "" {
+			<div role="alert" class="alert alert-error alert-soft mb-4">
+				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				<span>{ p.FormError }</span>
+			</div>
+		}
+		if p.FormSuccess != "" {
+			<div role="alert" class="alert alert-success alert-soft mb-4">
+				<i data-lucide="circle-check" class="w-4 h-4"></i>
+				<span>{ p.FormSuccess }</span>
+			</div>
+		}
+		<div class="grid gap-6">
+			@agentSDKStatusCard(p.Status)
+			@agentSDKFormCard(p)
+			@agentSDKToolsCard(p.CSRFToken)
 		</div>
-	}
-	if p.FormSuccess != "" {
-		<div role="alert" class="alert alert-success alert-soft mb-4">
-			<i data-lucide="circle-check" class="w-4 h-4"></i>
-			<span>{ p.FormSuccess }</span>
-		</div>
-	}
-	<div class="grid gap-6">
-		@agentSDKStatusCard(p.Status)
-		@agentSDKFormCard(p)
-		@agentSDKToolsCard(p.CSRFToken)
 	</div>
 }
 

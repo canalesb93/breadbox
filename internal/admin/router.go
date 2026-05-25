@@ -95,7 +95,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// 301/308 redirects so any straggling external bookmarks or in-
 		// flight forms continue to work.
 		r.Get("/settings/account", MyAccountHandler(a, sm, tr))
-		r.Get("/settings/profile", MyProfileHandler(a, sm, tr))
+		// Profile was its own tab in the legacy SettingsLayout; it has
+		// since been merged into the Account tab (single identity page
+		// covering avatar + name + email + password + danger zone).
+		// Permanent redirect so any straggling bookmarks land on the new
+		// canonical URL.
+		r.Get("/settings/profile", redirectGET("/settings/account"))
 		r.Post("/settings/account/password", MyAccountChangePasswordHandler(a, sm))
 		r.Put("/settings/account/profile", MyAccountUpdateProfileHandler(a, sm))
 		r.Post("/settings/account/avatar", UploadMyAvatarHandler(a, sm))
@@ -207,21 +212,36 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Legacy onboarding dismiss route — redirect to new handler.
 		r.Post("/onboarding/dismiss", DismissGettingStartedHandler(a, sm))
 
-		r.Route("/settings/household", func(r chi.Router) {
+		// Household — promoted to its own top-level page (no longer a
+		// tab inside the Settings shell). Lives in the sidebar's System
+		// section alongside Logs and Connections.
+		r.Route("/household", func(r chi.Router) {
 			r.Get("/", UsersListHandler(a, sm, tr))
 			r.Get("/new", NewUserHandler(a, sm, tr))
 			r.Get("/{id}/edit", EditUserHandler(a, sm, tr))
 			r.Get("/{id}/create-login", CreateLoginPageHandler(a, tr))
 		})
 
+		// Legacy /settings/household → /household redirects so bookmarks,
+		// inbound links from older agent reports, and the keyboard chord
+		// `g h` (registered before the move) still resolve.
+		r.Get("/settings/household", redirectGET("/household"))
+		r.Get("/settings/household/new", redirectGET("/household/new"))
+		r.Get("/settings/household/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/household/"+chi.URLParam(r, "id")+"/edit", http.StatusMovedPermanently)
+		})
+		r.Get("/settings/household/{id}/create-login", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/household/"+chi.URLParam(r, "id")+"/create-login", http.StatusMovedPermanently)
+		})
+
 		// Legacy /users redirects.
-		r.Get("/users", redirectGET("/settings/household"))
-		r.Get("/users/new", redirectGET("/settings/household/new"))
+		r.Get("/users", redirectGET("/household"))
+		r.Get("/users/new", redirectGET("/household/new"))
 		r.Get("/users/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/settings/household/"+chi.URLParam(r, "id")+"/edit", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/household/"+chi.URLParam(r, "id")+"/edit", http.StatusMovedPermanently)
 		})
 		r.Get("/users/{id}/create-login", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/settings/household/"+chi.URLParam(r, "id")+"/create-login", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/household/"+chi.URLParam(r, "id")+"/create-login", http.StatusMovedPermanently)
 		})
 
 		// Device-code approval page — admin-only because approving mints a

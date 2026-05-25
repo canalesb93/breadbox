@@ -12,49 +12,57 @@ import (
 templ SettingsSync(p SettingsProps) {
 	<script src="/static/js/admin/components/settings.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	@components.PageHeader(components.PageHeaderProps{
-		Title:    "Sync",
-		Subtitle: "Schedule and log retention",
-	})
-	<div class="grid gap-6 max-w-2xl">
-		@settingsSyncSchedule(p)
-		@settingsSyncRetention(p)
+	<div class="max-w-2xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Sync",
+			Subtitle: "Schedule and log retention",
+		})
+		<div class="grid gap-6">
+			@settingsSyncSchedule(p)
+			@settingsSyncRetention(p)
+		</div>
 	</div>
 }
 
 // SettingsSecurity renders the Security tab — encryption key status +
 // pointer to Account for password changes.
 templ SettingsSecurity(p SettingsProps) {
-	@components.PageHeader(components.PageHeaderProps{
-		Title:    "Security",
-		Subtitle: "Encryption key status",
-	})
-	<div class="grid gap-6 max-w-2xl">
-		@settingsSecurityCardFlat(p)
+	<div class="max-w-2xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Security",
+			Subtitle: "Encryption key status",
+		})
+		<div class="grid gap-6">
+			@settingsSecurityCardFlat(p)
+		</div>
 	</div>
 }
 
 // SettingsSystem renders the System tab — version info + update badge.
 templ SettingsSystem(p SettingsProps) {
-	@components.PageHeader(components.PageHeaderProps{
-		Title:    "System",
-		Subtitle: "Version and runtime information",
-	})
-	<div class="grid gap-6 max-w-2xl">
-		@settingsSystemCard(p)
+	<div class="max-w-2xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "System",
+			Subtitle: "Version and runtime information",
+		})
+		<div class="grid gap-6">
+			@settingsSystemCard(p)
+		</div>
 	</div>
 }
 
 // SettingsHelp renders the Help tab — pointer to the Getting Started
 // wizard. The Documentation footer button covers external help.
 templ SettingsHelp(p SettingsProps) {
-	@components.PageHeader(components.PageHeaderProps{
-		Title:    "Help",
-		Subtitle: "Setup guide and resources",
-	})
-	<div class="grid gap-6 max-w-2xl">
-		@settingsHelpCardFlat(p)
-		@settingsHelpDeveloperCard()
+	<div class="max-w-2xl">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Help",
+			Subtitle: "Setup guide and resources",
+		})
+		<div class="grid gap-6">
+			@settingsHelpCardFlat(p)
+			@settingsHelpDeveloperCard()
+		</div>
 	</div>
 }
 
