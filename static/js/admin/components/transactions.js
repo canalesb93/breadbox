@@ -941,12 +941,12 @@ document.addEventListener('DOMContentLoaded', function() {
   var bar = document.createElement('div');
   bar.id = 'bb-bulk-bar';
   bar.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;z-index:40;opacity:0;transform:translateX(-50%) translateY(1rem);pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease';
-  bar.innerHTML = '<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">'
-    + '<button type="button" id="bb-bulk-count-toggle" class="btn btn-ghost btn-sm gap-1.5" title="Select all / clear">'
+  bar.innerHTML = '<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-field shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">'
+    + '<button type="button" id="bb-bulk-count-toggle" class="btn btn-ghost btn-sm gap-1.5 hidden sm:inline-flex" title="Select all / clear">'
     +   '<span id="bb-bulk-count" class="font-bold tabular-nums">0</span>'
     +   '<span class="hidden sm:inline text-base-content/60 font-normal">selected</span>'
     + '</button>'
-    + '<div class="w-px h-6 bg-base-300"></div>'
+    + '<div class="w-px h-6 bg-base-300 hidden sm:block"></div>'
     + '<button type="button" id="bb-bulk-comment" class="btn btn-ghost btn-sm gap-2" title="Add comment">'
     +   '<i data-lucide="message-square" class="w-3.5 h-3.5"></i>'
     +   '<span class="hidden sm:inline">Comment</span>'
@@ -958,7 +958,7 @@ document.addEventListener('DOMContentLoaded', function() {
     + '</button>'
     + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm gap-2" title="Categorize selected">'
     +   '<i data-lucide="tags" class="w-3.5 h-3.5"></i>'
-    +   '<span class="hidden sm:inline">Categorize</span>'
+    +   '<span>Categorize</span>'
     +   '<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>'
     + '</button>'
     + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-square" title="Exit select mode">'
