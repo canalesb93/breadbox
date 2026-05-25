@@ -513,6 +513,27 @@
     @apply opacity-100;
   }
 
+  /* ── Trailing loading spinner on mobile sidebar tap ──
+     Injected by base.html's link-click handler. The visible spin is a
+     CSS @keyframes rotate on an inline SVG (compositor-eligible so it
+     survives the navigation window) — *not* daisy's
+     `loading loading-spinner`, whose SMIL inside `mask-image` is
+     rasterized once by Chromium/WebKit and never animates. */
+  .bb-sidebar-link .bb-sidebar-loading {
+    @apply inline-flex items-center justify-center w-3.5 h-3.5 shrink-0;
+    color: currentColor;
+  }
+  .bb-sidebar-link .bb-sidebar-loading svg {
+    @apply w-3.5 h-3.5 opacity-100;
+    transform-origin: 50% 50%;
+    animation: bb-sidebar-loading-spin 0.7s linear infinite;
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+  @keyframes bb-sidebar-loading-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* ── Sparkle accent for highlighted sidebar links (e.g. Agent Prompts) ── */
   /* Trailing sparkle icon — overrides the generic icon rule above so it
      gets its own size, accent colour, and a gentle pulse to draw the eye. */
