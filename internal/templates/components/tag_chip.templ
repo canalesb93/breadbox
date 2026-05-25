@@ -33,14 +33,11 @@ templ TagChipSm(tag TagChipData) {
 
 templ tagChipBody(class string, tag TagChipData) {
 	<span
-		class={ class, templ.KV("tooltip tooltip-top", tagChipShowTooltip(tag)) }
+		class={ class }
 		if tag.Color != nil {
 			style={ "--tag-color: " + deref(tag.Color) }
 		}
-		if tagChipShowTooltip(tag) {
-			data-tip={ tag.Slug }
-		}
-		title={ tag.Slug }
+		title={ tagChipTitle(tag) }
 	>
 		if tag.Icon != nil {
 			<i data-lucide={ deref(tag.Icon) }></i>
@@ -49,10 +46,13 @@ templ tagChipBody(class string, tag TagChipData) {
 	</span>
 }
 
-// tagChipShowTooltip returns true when the chip's visible label is the
-// display name (so the tooltip reveals what slug it maps to). Tags
-// without a display name already render the slug as their label, so
-// surfacing it in a tooltip would be redundant noise.
-func tagChipShowTooltip(tag TagChipData) bool {
-	return tag.DisplayName != "" && tag.DisplayName != tag.Slug
+// tagChipTitle returns the native `title=` hint surfaced on hover. When
+// the chip's visible label is the display name, the slug is appended so
+// callers can still see what underlying tag they're looking at; when the
+// label already IS the slug, returning just the slug avoids "foo — foo".
+func tagChipTitle(tag TagChipData) string {
+	if tag.DisplayName != "" && tag.DisplayName != tag.Slug {
+		return tag.DisplayName + " — " + tag.Slug
+	}
+	return tag.Slug
 }

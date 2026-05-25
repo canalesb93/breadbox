@@ -55,8 +55,7 @@ templ TagForm(p TagFormProps) {
 					<span class="text-[11px] uppercase tracking-wider text-base-content/40 font-medium shrink-0">Preview</span>
 					<span
 						class="bb-tag"
-						:class="displayName && slug && displayName !== slug ? 'tooltip tooltip-top' : ''"
-						:data-tip="displayName && slug && displayName !== slug ? slug : null"
+						:title="displayName && slug && displayName !== slug ? (displayName + ' — ' + slug) : (slug || 'tag-preview')"
 						:style="'--tag-color:' + (color || '#6366f1')"
 					>
 						<template x-if="icon">
