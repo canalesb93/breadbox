@@ -2,18 +2,29 @@
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 //
-// Owns the inline section filter, per-group open state, and the page-scoped
-// keyboard wiring. Sets shortcuts scope to 'design' on mount so the global
-// `/` binding (which normally opens the command palette) gets shadowed by
-// the design-page binding registered here — pressing `/` focuses the
-// filter input. `cmd+k` is intercepted via a capture-phase window
-// listener so commandPalette()'s @keydown.window handler in base.html
-// never fires on this page; we focus the filter instead.
+// Owns the inline section filter, per-group open state, the page-scoped
+// keyboard wiring, and the scroll-spy that highlights the topmost visible
+// section in the outline sidebar. Sets shortcuts scope to 'design' on
+// mount so the global `/` binding (which normally opens the command
+// palette) gets shadowed by the design-page binding registered here —
+// pressing `/` focuses the filter input. `cmd+k` is intercepted via a
+// capture-phase window listener so commandPalette()'s @keydown.window
+// handler in base.html never fires on this page; we focus the filter
+// instead.
 
 document.addEventListener('alpine:init', function () {
   Alpine.data('designGallery', function () {
     return {
       filter: '',
+      // Slug of the section that's currently topmost on screen. Drives
+      // the active-state styling on every sidebar link.
+      activeSlug: '',
+      // slug → group-slug lookup, seeded from the JSONScript tag emitted
+      // by the templ. Used to auto-expand the containing collapse when a
+      // section becomes active.
+      _groupMap: {},
+      _scrollHandler: null,
+      _scrollTicking: false,
 
       // Per-group accordion state. Keys match the slugs in
       // DesignSectionGroups() (design_types.go). Initialized to all open
@@ -30,24 +41,40 @@ document.addEventListener('alpine:init', function () {
 
       init: function () {
         var reg = window.Alpine && Alpine.store('shortcuts');
-        if (!reg) return;
-        reg.setScope('design');
-        var self = this;
-        reg.register({
-          id: 'design.focus-filter',
-          keys: '/',
-          description: 'Focus section filter',
-          group: 'Actions',
-          scope: 'design',
-          action: function () { self.focusFilter(); },
-        });
+        if (reg) {
+          reg.setScope('design');
+          var self = this;
+          reg.register({
+            id: 'design.focus-filter',
+            keys: '/',
+            description: 'Focus section filter',
+            group: 'Actions',
+            scope: 'design',
+            action: function () { self.focusFilter(); },
+          });
+        }
+
+        // Seed the section→group map from the JSONScript emitted in
+        // the templ. Missing tag = no scroll-spy, but the rest of the
+        // page still works.
+        try {
+          var el = document.getElementById('design-section-groups');
+          if (el) this._groupMap = JSON.parse(el.textContent) || {};
+        } catch (_) { this._groupMap = {}; }
+
+        this.setupScrollSpy();
       },
 
       destroy: function () {
         var reg = window.Alpine && Alpine.store('shortcuts');
-        if (!reg) return;
-        reg.unregister('design.focus-filter');
-        reg.setScope('global');
+        if (reg) {
+          reg.unregister('design.focus-filter');
+          reg.setScope('global');
+        }
+        if (this._scrollHandler) {
+          window.removeEventListener('scroll', this._scrollHandler);
+          window.removeEventListener('resize', this._scrollHandler);
+        }
       },
 
       // True iff the section's title matches the active filter (case-insensitive
@@ -107,6 +134,87 @@ document.addEventListener('alpine:init', function () {
         e.preventDefault();
         e.stopImmediatePropagation();
         this.focusFilter();
+      },
+
+      // Sets up a rAF-throttled scroll listener that finds the topmost
+      // visible section and reflects it in `activeSlug`. Uses the
+      // navbar offset (5.5rem = 88px) — matches the `scroll-mt-[5.5rem]`
+      // applied to each section so a section becomes "active" the
+      // moment its sticky-anchor target crosses the navbar line.
+      setupScrollSpy: function () {
+        var self = this;
+        function sections() {
+          return Array.from(document.querySelectorAll('[data-design-section]'));
+        }
+        if (!sections().length) return;
+
+        var navbarOffset = 88 + 1;
+
+        function pickActive() {
+          var list = sections();
+          var active = '';
+          for (var i = 0; i < list.length; i++) {
+            var s = list[i];
+            // x-show hides via display:none → offsetParent is null. Skip
+            // filtered-out sections so the active state ignores them.
+            if (s.offsetParent === null) continue;
+            var top = s.getBoundingClientRect().top;
+            if (top <= navbarOffset) {
+              active = s.id;
+            } else if (active) {
+              // First section below the cutoff after we already locked
+              // one in — stop. activeSlug stays on the highest one above.
+              break;
+            } else {
+              // Nothing has crossed the cutoff yet (page is at the very
+              // top). Highlight the first visible section anyway so the
+              // outline reflects what's on screen.
+              active = s.id;
+              break;
+            }
+          }
+          if (active && active !== self.activeSlug) {
+            self.activeSlug = active;
+            self.ensureGroupOpen(active);
+            self.scrollSidebarToActive(active);
+          }
+        }
+
+        function onScroll() {
+          if (self._scrollTicking) return;
+          self._scrollTicking = true;
+          window.requestAnimationFrame(function () {
+            self._scrollTicking = false;
+            pickActive();
+          });
+        }
+
+        this._scrollHandler = onScroll;
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
+
+        // Initial pick on next frame so x-show has applied display:none
+        // to filtered sections before we measure offsets.
+        window.requestAnimationFrame(pickActive);
+      },
+
+      // Force-open the collapse that contains the active section so the
+      // highlighted link is actually visible in the sidebar. Leaves
+      // other groups alone — collapsing a different group above the
+      // active one is the user's choice.
+      ensureGroupOpen: function (slug) {
+        var group = this._groupMap[slug];
+        if (group && !this.open[group]) this.open[group] = true;
+      },
+
+      // Scrolls the sidebar so the active link stays in view. Uses
+      // `block: 'nearest'` so this is a no-op when the link is already
+      // visible, and only nudges the scroll position when needed.
+      scrollSidebarToActive: function (slug) {
+        var link = document.querySelector('aside a[href="#' + slug + '"]');
+        if (link && link.scrollIntoView) {
+          link.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
       },
     };
   });

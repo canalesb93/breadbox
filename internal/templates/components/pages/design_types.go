@@ -79,6 +79,18 @@ func SectionsByGroup(sections []DesignSection, groupSlug string) []DesignSection
 	return out
 }
 
+// DesignSectionGroupMap returns a slug → group-slug lookup used by the
+// gallery's scroll-spy: when a section becomes active the Alpine factory
+// resolves the containing group via this map so it can force-open the
+// collapsed group in the sidebar.
+func DesignSectionGroupMap(sections []DesignSection) map[string]string {
+	m := make(map[string]string, len(sections))
+	for _, s := range sections {
+		m[s.Slug] = s.Group
+	}
+	return m
+}
+
 // DesignSections returns the canonical, ordered list of gallery sections.
 // Each entry maps a URL slug to a templ component that demonstrates the
 // component family. To add a new section: write a `templ SectionFoo()`
