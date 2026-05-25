@@ -1,0 +1,104 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// SaveKey renders the /setup/save-key page — a one-time reveal of the
+// encryption key during onboarding. Hosted inside the shared wizard
+// layout so it visually belongs with the rest of the setup flow.
+//
+// The key itself is also still recoverable from .env on the server and
+// from `breadbox reveal-key`; this page exists so the admin doesn't
+// have to SSH in just to copy it into a password manager. Once the
+// admin clicks "I've saved it", setup.encryption_key_acknowledged_at
+// is stamped in app_config and the page redirects away.
+//
+// Uses plain vanilla JS (not Alpine) because the wizard layout
+// deliberately doesn't load Alpine.
+templ SaveKey(p SaveKeyProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		<!-- Self-registering web component: <onepassword-save-button>. Vendored from @1password/save-button 1.3.0. -->
+		<script type="module" src="/static/js/vendor/onepassword-save-button.js"></script>
+		<!-- Page behavior: reveal toggle, clipboard copy, .env download. -->
+		<script src="/static/js/admin/components/setup_save_key.js"></script>
+		<div class="text-center mb-8">
+			<div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
+				<i data-lucide="key-round" class="w-6 h-6 text-primary"></i>
+			</div>
+			<h1 class="text-xl font-semibold tracking-tight">Save your encryption key</h1>
+			<p class="text-sm text-base-content/50 mt-1.5">Breadbox uses this key to encrypt bank credentials at rest. Store it in a password manager before connecting any banks.</p>
+		</div>
+		<div class="space-y-5" data-setup-save-key data-filename={ p.ItemTitle }>
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="encryption-key">ENCRYPTION_KEY</label>
+				<div class="flex flex-col sm:flex-row gap-2">
+					<div class="relative flex-1 min-w-0">
+						<input
+							id="encryption-key"
+							type="password"
+							readonly
+							value={ p.EncryptionKey }
+							class="input input-sm font-mono w-full bg-base-200/50 border-base-300 text-xs truncate pr-10"
+						/>
+						<button
+							type="button"
+							data-action="toggle-reveal"
+							aria-label="Reveal encryption key"
+							class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors"
+						>
+							<i data-lucide="eye" class="w-3.5 h-3.5" data-eye></i>
+							<i data-lucide="eye-off" class="w-3.5 h-3.5 hidden" data-eye-off></i>
+						</button>
+					</div>
+					<button
+						type="button"
+						data-action="copy"
+						class="btn btn-primary btn-sm shrink-0 gap-2 w-full sm:w-auto"
+					>
+						<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
+						<i data-lucide="check" class="w-4 h-4 hidden" data-copy-done></i>
+						<span data-copy-label>Copy</span>
+					</button>
+				</div>
+			</div>
+			<div class="flex flex-col sm:flex-row gap-2 items-stretch">
+				<button
+					type="button"
+					data-action="download"
+					class="btn btn-sm flex-1 gap-2"
+				>
+					<i data-lucide="download" class="w-4 h-4"></i>
+					Download .env line
+				</button>
+				<!-- Inert unless the visitor has the 1Password browser extension installed. -->
+				<onepassword-save-button
+					data-onepassword-type="login"
+					value={ p.OnePasswordValue }
+					class="blue"
+					padding="normal"
+				></onepassword-save-button>
+			</div>
+			<div class="rounded-xl bg-base-200/50 border border-base-300 px-4 py-3 text-xs text-base-content/60">
+				<div class="flex items-start gap-2">
+					<i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-base-content/40"></i>
+					<div>
+						<p class="font-medium text-base-content/70 mb-1">Lost it later?</p>
+						<p>The key is still available in your <code class="font-mono text-primary/70 bg-primary/5 px-1 py-0.5 rounded">.env</code> file on the server, or by running <code class="font-mono text-primary/70 bg-primary/5 px-1 py-0.5 rounded">breadbox reveal-key</code> from the server shell. This page won't show it again after you continue.</p>
+					</div>
+				</div>
+			</div>
+			<form method="POST" action="/setup/save-key">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold transition-colors duration-150">
+					I've saved it -- continue
+					<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+				</button>
+			</form>
+		</div>
+	}
+}

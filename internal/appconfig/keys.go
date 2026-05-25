@@ -38,6 +38,13 @@ const (
 	// KeyAgentRunRetentionDays is the number of days to keep completed
 	// agent_runs rows. Default: 30. 0 disables cleanup.
 	KeyAgentRunRetentionDays = "agent.run_retention_days"
+
+	// KeyEncryptionKeyAcknowledgedAt is the RFC3339 timestamp at which the
+	// admin clicked through the /setup/save-key reveal page. Unset (empty)
+	// means the reveal page is still offered; once set, the page redirects
+	// away. The key itself remains recoverable from .env or the
+	// `breadbox reveal-key` shell command.
+	KeyEncryptionKeyAcknowledgedAt = "setup.encryption_key_acknowledged_at"
 )
 
 // AuthMode values for KeyAgentAuthMode.

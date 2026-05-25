@@ -29,4 +29,9 @@ type GettingStartedProps struct {
 
 	// CSRF token for the dismiss form.
 	CSRFToken string
+
+	// ShouldSaveKey is true when ENCRYPTION_KEY is set in env and the
+	// admin hasn't yet clicked through /setup/save-key. Renders a soft
+	// hint at the top of the page linking to the reveal screen.
+	ShouldSaveKey bool
 }
