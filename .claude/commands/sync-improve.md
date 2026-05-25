@@ -89,7 +89,7 @@ git log main --oneline -15
 ```
 
 Read the relevant source files to understand current state. Cross-reference with docs:
-- `docs/architecture.md`, `docs/data-model.md`, `docs/teller-integration.md`
+- `docs/architecture.md`, `docs/data-model.md`, `.claude/rules/providers.md`, `.claude/rules/sync.md`
 
 ## Phase 2: Choose ONE Improvement
 

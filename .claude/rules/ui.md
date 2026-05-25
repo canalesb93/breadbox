@@ -47,8 +47,7 @@ tree (daisy first → daisy modifier → existing `bb-*` → templ component
 → inline) and the list of justified `bb-*` extensions vs the
 anti-patterns being retired live in **`.claude/rules/daisyui.md`** —
 read it before adding a new `bb-*` class or hand-rolling something
-daisy ships. The two audits in `docs/design-system-audit/` show the
-current state.
+daisy ships.
 
 ## Footguns
 
@@ -143,7 +142,7 @@ Never add a fresh `addEventListener('keydown', ...)` for a UI shortcut — the g
 
 Visible `kbd` hints must use the `Kbd` (single key), `KbdChord` (sequential "g then d"), or `KbdCombo` (blended modifier pill like `⌘K`) components in `internal/templates/components/kbd.templ` (or guard with `x-show="!$store.device.isTouch"`) so they disappear on touch devices. Don't hand-roll new `<kbd>` spans in new code. Symbol mapping (`cmd` → ⌘, `shift` → ⇧, `enter` → ↵, `up`/`down`/`left`/`right` → arrows, etc.) is handled by the shared `kbdGlyph` Go helper and its JS twin `bbKbdGlyph` — keep those in lock-step when adding new glyphs.
 
-Full reference, including the canonical global + per-page shortcut tables and architecture notes, lives in `docs/keyboard-shortcuts.md`.
+For the authoritative runtime list of bindings on any given page, open the `?` modal in the admin UI — the global dispatcher, the `?` help, and `Cmd+K` all read from the same Alpine store.
 
 ## Modal & AJAX patterns
 

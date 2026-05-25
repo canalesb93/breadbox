@@ -276,19 +276,22 @@ pass. See [Doctor](docs/doctor.md) for the full check list and `--json` /
 
 ## Documentation
 
+User-facing docs (install, quickstart, providers, agents, backup): [docs.breadbox.sh](https://docs.breadbox.sh).
+
+Engineering-internal canonical specs in this repo:
+
 - [Architecture](docs/architecture.md) -- system design, provider interface, deployment
 - [Data Model](docs/data-model.md) -- database schema, enums, relationships
-- [REST API](docs/rest-api.md) -- endpoints, authentication, request/response formats
+- [API Reference](docs/api-reference.md) -- prose companion to `openapi.yaml` (the canonical contract)
+- [API Endpoints](docs/api-endpoints.md) -- terse index of every REST endpoint
 - [MCP Server](docs/mcp-server.md) -- tools, resources, usage
-- [Plaid Integration](docs/plaid-integration.md) -- Plaid setup and sync details
-- [Teller Integration](docs/teller-integration.md) -- Teller mTLS setup
-- [CSV Import](docs/csv-import.md) -- CSV file format and import behavior
-- [Admin Dashboard](docs/admin-dashboard.md) -- dashboard pages and features
-- [Agents](docs/agents.md) -- built-in Claude Agent SDK runtime: auth, scheduling, safety caps, transcripts
+- [MCP Tools Reference](docs/mcp-tools-reference.md) -- per-tool contracts
+- [Rule DSL](docs/rule-dsl.md) -- transaction-rule grammar, actions, triggers
 - [Design System](docs/design-system.md) -- UI framework and component reference
-- [Backup & Restore](docs/backup.md) -- database backup strategies
+- [Activity Timeline](docs/activity-timeline.md) -- timeline component contract
 - [Doctor](docs/doctor.md) -- `breadbox doctor` pre-flight / readiness check
 - [CLI Commands](docs/cli-commands.md) -- terse index of every `breadbox <noun> <verb>` command
+- [Stacked PRs](docs/stacked-prs.md) -- when and how to split work into a `gt` stack
 
 ## Contributing
 

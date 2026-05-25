@@ -2,7 +2,7 @@
 
 The Claude Agent SDK integration. Lets a self-hoster schedule recurring AI runs that call breadbox MCP. Replaces the v1 admin "agent prompts" wizard.
 
-User-facing reference: `docs/agents.md`. Sprint history + design decisions: `.claude/sprint-state.md` on the `agents/claude-agent-sdk-sprint` branch.
+User-facing reference: [docs.breadbox.sh/guides/multi-agent-reviewer](https://docs.breadbox.sh/guides/multi-agent-reviewer). Sprint history + design decisions: `.claude/sprint-state.md` on the `agents/claude-agent-sdk-sprint` branch.
 
 ## The five layers
 

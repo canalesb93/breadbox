@@ -107,7 +107,7 @@ For non-trivial features, create a **spec document** in `docs/` alongside the ro
 - Content: problem statement, design decisions, data model changes, API surface, edge cases
 - Keep it focused on the *what and why*, not step-by-step implementation — the roadmap tasks handle the *how*
 
-Existing examples in the project: `docs/data-model.md`, `docs/rest-api.md`, `docs/teller-integration.md`, `docs/csv-import.md`, `docs/design-system.md`.
+Existing examples in the project: `docs/data-model.md`, `docs/architecture.md`, `docs/api-reference.md`, `docs/design-system.md`.
 
 ### Step 4: Present for Review
 

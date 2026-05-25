@@ -18,8 +18,7 @@ this file).
 
 Short version: **daisy first, custom only when daisy can't reach**,
 document every exception, and **always rebuild CSS after touching
-templ files**. The audit at `docs/design-system-audit/` enumerates the
-current state of the codebase.
+templ files**.
 
 ## The decision tree
 
@@ -62,7 +61,7 @@ Always use the daisy component (with our standard overlays only):
 | `loading` | `loading loading-spinner loading-xs/sm/md` | Only `loading-spinner` in practice — acceptable. |
 | `drawer` | `drawer lg:drawer-open` | Single use in `base.html`. |
 | `steps` | `steps steps-horizontal` | Wizard progress. CSV import should be on this. |
-| `tabs` | `tabs tabs-border` (or `tabs-box` for filter-tabs) | **Adopt — currently 0 callers.** See `docs/design-system-audit/daisyui-coverage.md`. |
+| `tabs` | `tabs tabs-border` (or `tabs-box` for filter-tabs) | **Adopt — currently 0 callers.** |
 | `stat` / `stats` | `stats stats-horizontal` | **Adopt for dashboard tiles — currently 0 callers.** |
 | `skeleton` | `skeleton` + Tailwind sizing | **Adopt — `bb-skeleton*` is being retired.** |
 | `kbd` | `kbd kbd-xs/sm` | **Adopt — `bb-*-kbd` duplication is being retired.** |
@@ -163,13 +162,11 @@ Don't pile new `!important` onto daisy classes.
 Open a sprint PR — **don't** write a new `bb-*` class quietly. The
 checklist:
 
-1. Add a section to `docs/design-system-audit/daisyui-coverage.md`
-   explaining why daisy can't reach this case.
-2. Author the templ component (preferred) or `bb-*` class.
-3. Add it to the `/design` sandbox (`internal/templates/components/pages/design_sections.templ` — new section in
+1. Author the templ component (preferred) or `bb-*` class.
+2. Add it to the `/design` sandbox (`internal/templates/components/pages/design_sections.templ` — new section in
    `DesignSections()` in `design_types.go`) with a representative
    variant matrix.
-4. Update `docs/design-system.md` with the canonical usage.
+3. Update `docs/design-system.md` with the canonical usage explaining why daisy can't reach this case.
 
 The sandbox-first rule ensures every new shared component has at
 least one place reviewers can see it without reading the call site.
@@ -319,10 +316,6 @@ land there first, then propagate to live pages.
 ## References
 
 - `docs/design-system.md` — canonical spec
-- `docs/design-system-audit/components-inventory.md` — every recurring
-  v1 admin pattern, with file:line citations
-- `docs/design-system-audit/daisyui-coverage.md` — coverage matrix +
-  remediation roadmap
 - `.claude/rules/ui.md` — general admin UI conventions (validation
   skill, browser automation backends, screenshot upload flow)
 - `https://daisyui.com/llms.txt` — canonical machine-readable

@@ -234,7 +234,7 @@ func agentSubsystemCheck(authMode string, authPresent bool, binaryPath string, b
 		return doctorCheck{
 			Name:    "agent subsystem",
 			Status:  doctorStatusSkip,
-			Message: "not configured (optional — see docs/agents.md)",
+			Message: "not configured (optional — see docs.breadbox.sh/guides/multi-agent-reviewer)",
 		}
 	}
 }
