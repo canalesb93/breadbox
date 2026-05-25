@@ -353,7 +353,35 @@ document.addEventListener('alpine:init', function () {
           self.copied = true;
           self.showToast('Prompt copied to clipboard');
           setTimeout(function () { self.copied = false; }, 2000);
+        }).catch(function () {
+          self.showToast('Failed to copy. Try the Save as agent button instead.', 'error');
         });
+      },
+
+      // saveAsAgent opens the New agent form with the composed prompt
+      // pre-filled. The agent form handler honours a ?prompt= query
+      // param (see internal/admin/agent_form_page.go) and trims surrounding
+      // whitespace. URLs cap at ~6KB in practice on most browsers; if the
+      // prompt exceeds 4KB we fall back to clipboard so users can paste.
+      saveAsAgent: function () {
+        if (this.activeBlocks.length === 0) {
+          this.showToast('Enable at least one block to save as agent', 'info');
+          return;
+        }
+        var body = this.preview;
+        var encoded = encodeURIComponent(body);
+        if (encoded.length > 4000) {
+          var self = this;
+          // Fall back to copy + nav so we don't blow past the URL cap.
+          navigator.clipboard.writeText(body).then(function () {
+            self.showToast('Prompt copied — paste into the new agent form.', 'info');
+            window.location.href = '/agents/new';
+          }).catch(function () {
+            self.showToast('Prompt too large to pass via URL. Use Copy then paste manually.', 'error');
+          });
+          return;
+        }
+        window.location.href = '/agents/new?prompt=' + encoded;
       },
 
       handleKeyboard: function (e) {

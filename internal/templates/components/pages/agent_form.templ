@@ -21,13 +21,12 @@ import (
 // "Delete" form gated by a small Alpine confirm-toggle. Both share the
 // same CSRF token.
 templ AgentForm(p AgentFormProps) {
+	<div x-data x-init="$store.shortcuts.setScope('agents')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@components.BreadcrumbNav(agentFormBreadcrumbs(p))
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">{ p.Title }</h1>
-			<p class="text-sm text-base-content/50 mt-1">Configure when this agent runs, which tools it can use, and what prompt drives it.</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    p.Title,
+		Subtitle: "Configure when this agent runs, which tools it can use, and what prompt drives it.",
+	})
 	<div class="max-w-2xl">
 		if p.FormError != "" {
 			<div role="alert" class="bb-form-error mb-4">
@@ -42,12 +41,12 @@ templ AgentForm(p AgentFormProps) {
 				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Identity</legend>
 				<div class="space-y-4">
 					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-name">Name</label>
-						<input id="agent-name" name="name" type="text" value={ p.Form.Name } class="bb-form-input" placeholder="e.g., Daily triage" required/>
+						@agentFormLabel("agent-name", "Name", true)
+						<input id="agent-name" name="name" type="text" value={ p.Form.Name } class="bb-form-input" placeholder="e.g., Daily triage" maxlength="120" required/>
 						@agentFormFieldError(p.FieldErr("name"))
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-slug">Slug</label>
+						@agentFormLabel("agent-slug", "Slug", true)
 						<input
 							id="agent-slug"
 							name="slug"
@@ -60,6 +59,8 @@ templ AgentForm(p AgentFormProps) {
 							autocorrect="off"
 							autocapitalize="none"
 							spellcheck="false"
+							minlength="2"
+							maxlength="64"
 							required
 						/>
 						<p class="text-xs text-base-content/40 mt-1.5">Lowercase letters, digits, dashes. 2–64 chars. Used in URLs and the audit trail.</p>
@@ -72,7 +73,7 @@ templ AgentForm(p AgentFormProps) {
 				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Trigger</legend>
 				<div class="space-y-4">
 					<div x-data="{ openPresets: false }">
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-schedule-cron">Schedule (cron)</label>
+						@agentFormLabel("agent-schedule-cron", "Schedule (cron)", false)
 						<input
 							id="agent-schedule-cron"
 							name="schedule_cron"
@@ -85,6 +86,7 @@ templ AgentForm(p AgentFormProps) {
 							autocorrect="off"
 							autocapitalize="none"
 							spellcheck="false"
+							maxlength="120"
 						/>
 						<details class="mt-2" @toggle="openPresets = $event.target.open">
 							<summary class="text-xs text-base-content/40 hover:text-base-content/60 cursor-pointer inline-flex items-center gap-1">
@@ -119,7 +121,7 @@ templ AgentForm(p AgentFormProps) {
 					</div>
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-quiet-start">Quiet hours start</label>
+							@agentFormLabel("agent-quiet-start", "Quiet hours start", false)
 							<input
 								id="agent-quiet-start"
 								name="quiet_hours_start"
@@ -129,11 +131,12 @@ templ AgentForm(p AgentFormProps) {
 								placeholder="22:00"
 								pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
 								inputmode="numeric"
+								maxlength="5"
 							/>
 							@agentFormFieldError(p.FieldErr("quiet_hours_start"))
 						</div>
 						<div>
-							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-quiet-end">Quiet hours end</label>
+							@agentFormLabel("agent-quiet-end", "Quiet hours end", false)
 							<input
 								id="agent-quiet-end"
 								name="quiet_hours_end"
@@ -143,6 +146,7 @@ templ AgentForm(p AgentFormProps) {
 								placeholder="07:00"
 								pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
 								inputmode="numeric"
+								maxlength="5"
 							/>
 							@agentFormFieldError(p.FieldErr("quiet_hours_end"))
 						</div>
@@ -155,28 +159,30 @@ templ AgentForm(p AgentFormProps) {
 				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Prompt</legend>
 				<div class="space-y-4">
 					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-system-prompt">System prompt <span class="text-base-content/30 font-normal">(optional)</span></label>
+						@agentFormLabelOptional("agent-system-prompt", "System prompt")
 						<textarea
 							id="agent-system-prompt"
 							name="system_prompt"
 							rows="4"
-							class="textarea w-full bg-base-200/50 font-mono text-sm"
+							maxlength="8000"
+							class="textarea textarea-bordered w-full font-mono text-sm"
 							placeholder="Override the default breadbox agent persona…"
 						>{ p.Form.SystemPrompt }</textarea>
 						<p class="text-xs text-base-content/40 mt-1.5">Leave blank to use the bundled default. Persona / safety invariants — not the per-run task.</p>
 						@agentFormFieldError(p.FieldErr("system_prompt"))
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-prompt">Prompt <span class="text-error">*</span></label>
+						@agentFormLabel("agent-prompt", "Prompt", true)
 						<textarea
 							id="agent-prompt"
 							name="prompt"
 							rows="12"
-							class="textarea w-full bg-base-200/50 font-mono text-sm"
+							maxlength="32000"
+							class="textarea textarea-bordered w-full font-mono text-sm"
 							placeholder="What should this agent do on every run?"
 							required
 						>{ p.Form.Prompt }</textarea>
-						<p class="text-xs text-base-content/40 mt-1.5">Compose from the Prompt Library at <a href="/agent-prompts" class="link link-hover">/agent-prompts</a> and paste here.</p>
+						<p class="text-xs text-base-content/40 mt-1.5">Compose from the <a href="/agent-prompts" class="link link-hover">Prompt Library</a> and paste here.</p>
 						@agentFormFieldError(p.FieldErr("prompt"))
 					</div>
 				</div>
@@ -186,8 +192,8 @@ templ AgentForm(p AgentFormProps) {
 				<legend class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Execution</legend>
 				<div class="space-y-4">
 					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-model">Model</label>
-						<select id="agent-model" name="model" class="bb-form-select select-sm">
+						@agentFormLabel("agent-model", "Model", false)
+						<select id="agent-model" name="model" class="bb-form-select select-sm" required>
 							for _, opt := range p.ModelOptions {
 								@agentFormModelOption(opt, p.Form.Model)
 							}
@@ -196,7 +202,7 @@ templ AgentForm(p AgentFormProps) {
 					</div>
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-max-turns">Max turns</label>
+							@agentFormLabel("agent-max-turns", "Max turns", false)
 							<input
 								id="agent-max-turns"
 								name="max_turns"
@@ -206,11 +212,12 @@ templ AgentForm(p AgentFormProps) {
 								value={ fmt.Sprintf("%d", agentFormMaxTurns(p.Form.MaxTurns)) }
 								class="bb-form-input tabular-nums"
 								inputmode="numeric"
+								required
 							/>
 							@agentFormFieldError(p.FieldErr("max_turns"))
 						</div>
 						<div>
-							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-max-budget">Max budget (USD)</label>
+							@agentFormLabel("agent-max-budget", "Max budget (USD)", false)
 							<input
 								id="agent-max-budget"
 								name="max_budget_usd"
@@ -220,6 +227,7 @@ templ AgentForm(p AgentFormProps) {
 								value={ fmt.Sprintf("%.2f", p.Form.MaxBudgetUSD) }
 								class="bb-form-input tabular-nums"
 								inputmode="decimal"
+								required
 							/>
 							@agentFormFieldError(p.FieldErr("max_budget_usd"))
 						</div>
@@ -233,7 +241,7 @@ templ AgentForm(p AgentFormProps) {
 						@agentFormFieldError(p.FieldErr("tool_scope"))
 					</div>
 					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="agent-allowed-tools">Allowed tools <span class="text-base-content/30 font-normal">(optional)</span></label>
+						@agentFormLabelOptional("agent-allowed-tools", "Allowed tools")
 						<input
 							id="agent-allowed-tools"
 							name="allowed_tools"
@@ -244,6 +252,7 @@ templ AgentForm(p AgentFormProps) {
 							autocorrect="off"
 							autocapitalize="none"
 							spellcheck="false"
+							maxlength="2000"
 						/>
 						<p class="text-xs text-base-content/40 mt-1.5">Comma-separated MCP tool names. Leave blank to allow all tools in scope.</p>
 						@agentFormFieldError(p.FieldErr("allowed_tools"))
@@ -364,6 +373,26 @@ templ agentFormFieldError(msg string) {
 	if msg != "" {
 		<p class="text-error text-xs mt-1">{ msg }</p>
 	}
+}
+
+// agentFormLabel renders a consistent field label. Setting required=true
+// appends a small red asterisk so users can scan required fields quickly,
+// matching the convention already used for the Prompt field.
+templ agentFormLabel(forID, label string, required bool) {
+	<label class="block text-xs font-medium text-base-content/50 mb-1.5" for={ forID }>
+		{ label }
+		if required {
+			<span class="text-error ml-0.5" aria-hidden="true">*</span>
+		}
+	</label>
+}
+
+// agentFormLabelOptional renders a field label with a muted "(optional)"
+// suffix — used for fields the form deliberately treats as nullable.
+templ agentFormLabelOptional(forID, label string) {
+	<label class="block text-xs font-medium text-base-content/50 mb-1.5" for={ forID }>
+		{ label } <span class="text-base-content/30 font-normal">(optional)</span>
+	</label>
 }
 
 // agentFormSubmitAction returns the form action URL based on mode.

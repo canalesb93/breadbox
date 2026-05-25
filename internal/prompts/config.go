@@ -123,31 +123,21 @@ func GetAgentConfig(agentType string) (AgentTypeConfig, bool) {
 	return cfg, ok
 }
 
-// LoadBlock reads a block .md file, parsing title and description from the first lines.
+// LoadBlock reads a block .md file. Block files use YAML frontmatter for
+// metadata (title, description, icon) followed by the markdown body that
+// becomes the actual prompt content. Files without frontmatter fall back to
+// the legacy "first line = title, second line = > description" shape so any
+// stragglers still load.
 func LoadBlock(id string) (Block, error) {
 	data, err := rootprompts.Agent(id)
 	if err != nil {
 		return Block{}, err
 	}
 
-	content := string(data)
-	lines := strings.SplitN(content, "\n", 4)
-
-	var title, description, body string
-
-	if len(lines) >= 1 {
-		title = strings.TrimPrefix(strings.TrimSpace(lines[0]), "# ")
-	}
-	if len(lines) >= 2 {
-		description = strings.TrimPrefix(strings.TrimSpace(lines[1]), "> ")
-	}
-	// Skip blank line between description and body.
-	if len(lines) >= 4 {
-		body = strings.TrimSpace(lines[3])
-	}
+	title, description, body := parseBlockFile(string(data))
 
 	// Prepend the title as an H1 so it appears in the composed prompt, not just the UI.
-	content = body
+	content := body
 	if title != "" {
 		content = "# " + title + "\n\n" + body
 	}
@@ -159,6 +149,53 @@ func LoadBlock(id string) (Block, error) {
 		Content:         content,
 		OriginalContent: content,
 	}, nil
+}
+
+// parseBlockFile pulls title / description / body out of a prompt-block
+// markdown file. Recognises YAML frontmatter delimited by `---` on its own
+// line. Only `title:` and `description:` keys are consumed; everything else
+// in the frontmatter is silently ignored so we can add fields later without
+// breaking older blocks.
+func parseBlockFile(content string) (title, description, body string) {
+	const fence = "---"
+	if strings.HasPrefix(content, fence+"\n") {
+		rest := content[len(fence)+1:]
+		end := strings.Index(rest, "\n"+fence)
+		if end >= 0 {
+			fm := rest[:end]
+			body = strings.TrimLeft(rest[end+len("\n"+fence):], "\n")
+			for _, line := range strings.Split(fm, "\n") {
+				k, v, ok := strings.Cut(line, ":")
+				if !ok {
+					continue
+				}
+				k = strings.TrimSpace(k)
+				v = strings.TrimSpace(v)
+				v = strings.Trim(v, `"'`)
+				switch k {
+				case "title":
+					title = v
+				case "description":
+					description = v
+				}
+			}
+			body = strings.TrimRight(body, "\n")
+			return title, description, body
+		}
+	}
+
+	// Legacy shape: "# Title\n> description\n\nbody…"
+	lines := strings.SplitN(content, "\n", 4)
+	if len(lines) >= 1 {
+		title = strings.TrimPrefix(strings.TrimSpace(lines[0]), "# ")
+	}
+	if len(lines) >= 2 {
+		description = strings.TrimPrefix(strings.TrimSpace(lines[1]), "> ")
+	}
+	if len(lines) >= 4 {
+		body = strings.TrimSpace(lines[3])
+	}
+	return title, description, body
 }
 
 // LoadAgentBlocks loads all blocks for an agent type with roles and enabled state set.

@@ -11,6 +11,10 @@ import "strconv"
 // resolves masked credential display strings before render so the templ
 // stays free of nil-handling.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
+	<!-- Diagnostics-card factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registration runs before Alpine — itself deferred
+	     from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/agent_sdk_settings.js"></script>
 	<div class="max-w-3xl">
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "Agents",
@@ -328,7 +332,8 @@ templ agentSDKLimitsSection(p AgentSDKSettingsProps) {
 templ agentSDKToolsCard(csrfToken string) {
 	<div
 		class="bb-card p-0 overflow-hidden"
-		x-data={ "{ csrfToken: " + jsString(csrfToken) + ", smokeState: 'idle', smokeResult: null, smokeError: null, cleanupState: 'idle', cleanupResult: null, cleanupError: null, async runSmokeTest() { this.smokeState = 'loading'; this.smokeResult = null; this.smokeError = null; try { const res = await fetch('/-/agents/test', { method: 'POST', headers: { 'X-CSRF-Token': this.csrfToken, 'Accept': 'application/json' } }); const body = await res.json(); if (!res.ok) { this.smokeError = (body && body.error && body.error.message) || ('HTTP ' + res.status); this.smokeState = 'error'; return; } this.smokeResult = body; this.smokeState = 'ok'; } catch (e) { this.smokeError = e.message || 'Request failed'; this.smokeState = 'error'; } }, async runCleanup() { this.cleanupState = 'loading'; this.cleanupResult = null; this.cleanupError = null; try { const res = await fetch('/-/agents/cleanup', { method: 'POST', headers: { 'X-CSRF-Token': this.csrfToken, 'Accept': 'application/json' } }); const body = await res.json(); if (!res.ok) { this.cleanupError = (body && body.error && body.error.message) || ('HTTP ' + res.status); this.cleanupState = 'error'; return; } this.cleanupResult = body; this.cleanupState = 'ok'; } catch (e) { this.cleanupError = e.message || 'Request failed'; this.cleanupState = 'error'; } } }" }
+		x-data="agentSDKDiagnostics"
+		data-csrf={ csrfToken }
 	>
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300">
 			<h2 class="font-semibold">Diagnostics</h2>

@@ -16,6 +16,19 @@ import (
 // The handler in internal/admin/agent_runs_page.go decides which based on
 // the URL and fills AgentSlug/AgentName/AgentOptions accordingly.
 templ AgentRunsList(p AgentRunsListProps) {
+	<div x-data x-init="$store.shortcuts.setScope('agent-runs')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	if p.Mode == "agent" {
+		@components.BreadcrumbNav([]components.Breadcrumb{
+			{Label: "Agents", Href: "/agents"},
+			{Label: p.AgentName, Href: "/agents/" + p.AgentSlug + "/edit"},
+			{Label: "Runs"},
+		})
+	} else {
+		@components.BreadcrumbNav([]components.Breadcrumb{
+			{Label: "Agents", Href: "/agents"},
+			{Label: "Run history"},
+		})
+	}
 	@agentRunsHeader(p)
 	@agentRunsFilterBar(p)
 	if len(p.Rows) > 0 {
@@ -27,34 +40,19 @@ templ AgentRunsList(p AgentRunsListProps) {
 }
 
 templ agentRunsHeader(p AgentRunsListProps) {
-	<div class="bb-page-header">
-		<div>
-			if p.Mode == "agent" {
-				<div class="text-xs text-base-content/50 mb-1">
-					<a href="/agents" class="hover:underline">Agents</a>
-					<span class="mx-1">/</span>
-					<span>{ p.AgentName }</span>
-					<span class="mx-1">/</span>
-					<span>Runs</span>
-				</div>
-				<h1 class="bb-page-title">Runs &mdash; { p.AgentName }</h1>
-				<p class="text-sm text-base-content/50 mt-1">
-					History of every run, manual or scheduled, for this agent.
-				</p>
-			} else {
-				<h1 class="bb-page-title">Run history</h1>
-				<p class="text-sm text-base-content/50 mt-1">
-					All agent runs across the household.
-				</p>
-			}
-		</div>
-		<div class="flex items-center gap-2">
-			<a href="/agents" class="btn btn-ghost btn-sm">
-				<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-				Back to agents
-			</a>
-		</div>
-	</div>
+	if p.Mode == "agent" {
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Runs — " + p.AgentName,
+			Subtitle:             "History of every run, manual or scheduled, for this agent.",
+			SubtitleHideOnMobile: true,
+		})
+	} else {
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Run history",
+			Subtitle:             "All agent runs across the household.",
+			SubtitleHideOnMobile: true,
+		})
+	}
 }
 
 templ agentRunsFilterBar(p AgentRunsListProps) {
@@ -130,23 +128,23 @@ templ agentRunsSelectOption(value, label, current string) {
 }
 
 templ agentRunsTable(p AgentRunsListProps) {
-	<div class="bb-card overflow-x-auto">
-		<table class="table table-sm">
+	<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
+		<table class="table table-sm table-zebra-soft">
 			<thead>
-				<tr>
-					<th>Run</th>
+				<tr class="text-xs text-base-content/50">
+					<th class="font-medium">Run</th>
 					if p.Mode == "global" {
-						<th>Agent</th>
+						<th class="font-medium">Agent</th>
 					}
-					<th>Status</th>
-					<th>Trigger</th>
-					<th>Started</th>
-					<th class="text-right">Duration</th>
-					<th class="text-right">Turns</th>
-					<th class="text-right">Cost</th>
-					<th class="text-right">In / Out</th>
-					<th>Hit cap</th>
-					<th>Note</th>
+					<th class="font-medium">Status</th>
+					<th class="font-medium">Trigger</th>
+					<th class="font-medium">Started</th>
+					<th class="font-medium text-right">Duration</th>
+					<th class="font-medium text-right">Turns</th>
+					<th class="font-medium text-right">Cost</th>
+					<th class="font-medium text-right">In / Out</th>
+					<th class="font-medium">Hit cap</th>
+					<th class="font-medium">Note</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -160,40 +158,39 @@ templ agentRunsTable(p AgentRunsListProps) {
 
 templ agentRunsRow(r AgentRunRowProps, mode string) {
 	<tr class="hover:bg-base-200/40">
-		<td>
+		<td class="align-middle">
 			<a href={ templ.SafeURL(fmt.Sprintf("/agents/runs/%s", r.ShortID)) } class="font-mono text-xs text-primary hover:underline">
 				{ r.ShortID }
 			</a>
 		</td>
 		if mode == "global" {
-			<td>
-				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", r.AgentSlug)) } class="hover:underline">
+			<td class="align-middle">
+				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", r.AgentSlug)) } class="text-sm hover:underline">
 					{ r.AgentName }
 				</a>
 			</td>
 		}
-		<td>@agentRunStatusBadge(r.Status)
-</td>
-		<td><span class="text-xs text-base-content/70">{ r.Trigger }</span></td>
-		<td>
+		<td class="align-middle">@agentRunStatusBadge(r.Status)</td>
+		<td class="align-middle"><span class="text-xs text-base-content/70">{ r.Trigger }</span></td>
+		<td class="align-middle">
 			<span class="text-xs tabular-nums" title={ r.StartedAt.Format(time.RFC3339) }>
 				{ formatAgentRunStarted(r.StartedAt) }
 			</span>
 		</td>
-		<td class="text-right tabular-nums text-xs">{ formatAgentRunDuration(r.DurationMs) }</td>
-		<td class="text-right tabular-nums text-xs">{ strconv.Itoa(r.Turns) }</td>
-		<td class="text-right text-xs tabular-nums">
+		<td class="align-middle text-right tabular-nums text-xs">{ formatAgentRunDuration(r.DurationMs) }</td>
+		<td class="align-middle text-right tabular-nums text-xs">{ strconv.Itoa(r.Turns) }</td>
+		<td class="align-middle text-right text-xs tabular-nums">
 			@agentRunCost(r.CostUSD, "text-xs")
 		</td>
-		<td class="text-right tabular-nums text-xs whitespace-nowrap">{ formatAgentRunTokens(r.TokensIn, r.TokensOut) }</td>
-		<td>
+		<td class="align-middle text-right tabular-nums text-xs whitespace-nowrap">{ formatAgentRunTokens(r.TokensIn, r.TokensOut) }</td>
+		<td class="align-middle">
 			if r.HitCap != "" {
 				<span class="badge badge-soft badge-warning badge-xs">{ r.HitCap }</span>
 			} else {
 				<span class="text-xs text-base-content/30">&mdash;</span>
 			}
 		</td>
-		<td class="max-w-[16rem]">
+		<td class="align-middle max-w-[16rem]">
 			if r.Note != "" {
 				<span class="text-xs text-base-content/60 line-clamp-1" title={ r.Note }>{ truncateAgentRunNote(r.Note, 60) }</span>
 			} else {
@@ -265,13 +262,15 @@ templ agentRunsEmpty(p AgentRunsListProps) {
 // historically avoids that and meta-refresh is good enough for a
 // transcript that grows slowly (each turn is several seconds at minimum).
 templ AgentRunDetail(p AgentRunDetailProps) {
+	<div x-data x-init="$store.shortcuts.setScope('agent-run-detail')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	if p.RefreshSeconds > 0 {
 		<meta http-equiv="refresh" content={ strconv.Itoa(p.RefreshSeconds) }/>
 	}
+	@components.BreadcrumbNav(agentRunDetailBreadcrumbs(p))
 	@agentRunDetailHeader(p)
 	if p.Error != "" {
-		<div class="alert alert-error my-4">
-			<i data-lucide="alert-triangle" class="w-4 h-4"></i>
+		<div class="alert alert-error alert-soft mb-4">
+			<i data-lucide="triangle-alert" class="w-4 h-4"></i>
 			<span>{ p.Error }</span>
 		</div>
 	}
@@ -283,44 +282,53 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 
 templ agentRunDetailHeader(p AgentRunDetailProps) {
 	<div class="bb-page-header">
-		<div>
-			<div class="text-xs text-base-content/50 mb-1">
-				<a href="/agents" class="hover:underline">Agents</a>
-				<span class="mx-1">/</span>
-				if p.Run.AgentSlug != "" {
-					<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", p.Run.AgentSlug)) } class="hover:underline">
-						{ runDetailAgentDisplay(p.Run) }
-					</a>
-					<span class="mx-1">/</span>
-				}
-				<a href="/agents/runs" class="hover:underline">Runs</a>
-				<span class="mx-1">/</span>
-				<span class="font-mono">{ p.Run.ShortID }</span>
-			</div>
-			<div class="flex items-center gap-3">
+		<div class="min-w-0">
+			<div class="flex items-center gap-3 flex-wrap">
 				<h1 class="bb-page-title font-mono">{ p.Run.ShortID }</h1>
 				@agentRunStatusBadge(p.Run.Status)
 				if p.RefreshSeconds > 0 {
-					<span class="text-xs text-base-content/40">
-						(refreshing every { strconv.Itoa(p.RefreshSeconds) }s)
+					<span class="text-xs text-base-content/40 inline-flex items-center gap-1">
+						<span class="loading loading-spinner loading-xs"></span>
+						refreshing every { strconv.Itoa(p.RefreshSeconds) }s
 					</span>
 				}
 			</div>
-		</div>
-		<div class="flex items-center gap-2">
-			if p.Run.AgentSlug != "" {
-				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", p.Run.AgentSlug)) } class="btn btn-ghost btn-sm">
-					<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-					Back to runs
-				</a>
-			} else {
-				<a href="/agents/runs" class="btn btn-ghost btn-sm">
-					<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-					Back to runs
-				</a>
+			if p.Run.AgentName != "" {
+				<p class="text-sm text-base-content/50 mt-1">
+					{ p.Run.AgentName }
+					if p.Run.Trigger != "" {
+						<span class="mx-1">·</span>
+						<span class="capitalize">{ p.Run.Trigger }</span>
+					}
+				</p>
 			}
 		</div>
 	</div>
+}
+
+// agentRunDetailBreadcrumbs builds the breadcrumb trail for the detail
+// page — Agents › <agent name> › Runs › <short ID>.
+func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
+	out := []components.Breadcrumb{
+		{Label: "Agents", Href: "/agents"},
+	}
+	if p.Run.AgentSlug != "" {
+		out = append(out, components.Breadcrumb{
+			Label: runDetailAgentDisplay(p.Run),
+			Href:  "/agents/" + p.Run.AgentSlug + "/edit",
+		})
+		out = append(out, components.Breadcrumb{
+			Label: "Runs",
+			Href:  "/agents/" + p.Run.AgentSlug + "/runs",
+		})
+	} else {
+		out = append(out, components.Breadcrumb{
+			Label: "Runs",
+			Href:  "/agents/runs",
+		})
+	}
+	out = append(out, components.Breadcrumb{Label: p.Run.ShortID})
+	return out
 }
 
 templ agentRunDetailMetadata(p AgentRunDetailProps) {
@@ -373,13 +381,13 @@ templ agentRunDetailNote(p AgentRunDetailProps) {
 			Operator note
 		</h2>
 		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/agents/runs/%s/note", p.Run.ShortID)) }>
-			<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			<textarea
 				name="note"
 				maxlength="2000"
 				rows="3"
-				placeholder="Add a note about this run..."
-				class="textarea w-full text-sm"
+				placeholder="Add a note about this run…"
+				class="textarea textarea-sm w-full"
 			>{ p.Run.Note }</textarea>
 			<div class="flex items-center justify-end mt-2">
 				<button type="submit" class="btn btn-sm btn-primary">Save note</button>

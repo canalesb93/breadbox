@@ -313,7 +313,7 @@ func parseAgentDefinitionForm(r *http.Request) (service.CreateAgentDefinitionPar
 	p.Model = strings.TrimSpace(r.FormValue("model"))
 	p.ToolScope = strings.TrimSpace(r.FormValue("tool_scope"))
 	p.Enabled = r.FormValue("enabled") == "on" || r.FormValue("enabled") == "true"
-	p.TriggerOnSyncComplete = r.FormValue("trigger_on_sync_complete") == "on"
+	p.TriggerOnSyncComplete = r.FormValue("trigger_on_sync_complete") == "on" || r.FormValue("trigger_on_sync_complete") == "true"
 
 	if v := strings.TrimSpace(r.FormValue("system_prompt")); v != "" {
 		p.SystemPrompt = &v

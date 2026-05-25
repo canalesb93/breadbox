@@ -2,53 +2,8 @@
 
 package pages
 
-import "breadbox/internal/service"
-
-// AgentsTab is one of the four tabs the /agents composite page renders.
-type AgentsTab string
-
-const (
-	AgentsTabGuide    AgentsTab = "guide"
-	AgentsTabWizard   AgentsTab = "wizard"
-	AgentsTabSettings AgentsTab = "settings"
-	AgentsTabActivity AgentsTab = "activity"
-)
-
-// AgentsSessionRow is the projection of one MCP session for the Activity tab.
-// The handler in admin/agents_page.go fills these in; the templ component
-// only knows about strings/ints.
-type AgentsSessionRow struct {
-	ShortID         string
-	Purpose         string
-	APIKeyName      string
-	AgentName       string
-	HasReport       bool
-	ToolCallCount   int64
-	CreatedAtRel    string
-}
-
-// AgentsProps is the typed payload for the composite Agents() templ
-// component. It contains the union of data the four old html/templates
-// shared (see internal/admin/agents_page.go).
-type AgentsProps struct {
-	Tab AgentsTab
-
-	// Guide tab.
-	Guide MCPGuideProps
-
-	// Wizard tab.
-	Wizard AgentWizardProps
-
-	// Settings tab.
-	Settings MCPSettingsProps
-
-	// Activity tab.
-	Sessions           []AgentsSessionRow
-	SessionsPage       int
-	SessionsTotalPages int
-}
-
-// MCPGuideProps powers the Getting Started tab.
+// MCPGuideProps powers the standalone "Getting Started" guide page (renders
+// instructions for connecting an external MCP client to Breadbox).
 type MCPGuideProps struct {
 	MCPServerURL    string
 	HasAPIKeys      bool
@@ -62,7 +17,7 @@ type AgentWizardStatsProps struct {
 	TotalAccounts  int64
 }
 
-// AgentWizardProps powers the Prompt Library tab.
+// AgentWizardProps powers the /agent-prompts prompt-library page.
 type AgentWizardProps struct {
 	Stats AgentWizardStatsProps
 }
@@ -108,20 +63,4 @@ type MCPSettingsClient struct {
 	DefaultReviewGuidelines string `json:"defaultReviewGuidelines"`
 	ReportFormat            string `json:"reportFormat"`
 	DefaultReportFormat     string `json:"defaultReportFormat"`
-}
-
-// AgentsSessionFromService projects one service.MCPSessionResponse into
-// the templ-friendly AgentsSessionRow shape, using a relativeTime helper
-// supplied by the caller (admin package). Kept here so the handler can
-// build the slice with one .Map() call.
-func AgentsSessionFromService(s service.MCPSessionResponse, rel func(string) string) AgentsSessionRow {
-	return AgentsSessionRow{
-		ShortID:       s.ShortID,
-		Purpose:       s.Purpose,
-		APIKeyName:    s.APIKeyName,
-		AgentName:     s.AgentName,
-		HasReport:     s.ReportID != nil && *s.ReportID != "",
-		ToolCallCount: s.ToolCallCount,
-		CreatedAtRel:  rel(s.CreatedAt),
-	}
 }
