@@ -89,15 +89,15 @@ templ StatTile(p StatTileProps) {
 }
 
 templ statTileBody(p StatTileProps) {
-	<div class="flex items-center gap-3">
+	<div class="flex items-center gap-2.5 sm:gap-3">
 		if p.Icon != "" {
-			<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", statTileBg(p.Tone) }>
+			<div class={ "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0", statTileBg(p.Tone) }>
 				<i data-lucide={ p.Icon } class={ "w-4 h-4", statTileIcon(p.Tone) }></i>
 			</div>
 		}
-		<div class="min-w-0">
-			<div class="text-2xl font-semibold tabular-nums leading-none truncate">{ p.Value }</div>
-			<div class="text-xs text-base-content/40 mt-1 uppercase tracking-wider">{ p.Label }</div>
+		<div class="min-w-0 flex-1">
+			<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate">{ p.Value }</div>
+			<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">{ p.Label }</div>
 			if p.Description != "" {
 				<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">{ p.Description }</div>
 			}
