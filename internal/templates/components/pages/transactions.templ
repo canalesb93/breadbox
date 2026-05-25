@@ -177,7 +177,8 @@ templ txFilters(p TransactionsProps) {
 					<circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
 				</svg>
 				<input
-					type="text"
+					type="search"
+					enterkeyhint="search"
 					id="bb-quick-search"
 					placeholder="Search transactions..."
 					class="input pl-9 pr-9 w-full text-sm bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200 h-10"
@@ -311,7 +312,7 @@ templ txFilters(p TransactionsProps) {
 						<i data-lucide="search" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
 						Search
 					</div>
-					<input type="text" name="search" value={ p.FilterSearch } placeholder="Search transactions..." class="input input-sm w-full col-span-2 sm:col-span-1"/>
+					<input type="search" enterkeyhint="search" name="search" value={ p.FilterSearch } placeholder="Search transactions..." class="input input-sm w-full col-span-2 sm:col-span-1"/>
 					<select name="search_field" class="select select-sm w-full">
 						@txSearchFieldOption("all", "Name & Merchant", p.FilterSearchField, true)
 						@txSearchFieldOption("name", "Name only", p.FilterSearchField, false)
