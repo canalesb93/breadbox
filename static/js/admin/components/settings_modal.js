@@ -48,6 +48,7 @@ document.addEventListener('alpine:init', function () {
             this.$nextTick(function () {
               self._showModal();
               self._refreshIcons();
+              self._consumePageFlashIntoToast();
             });
           } else {
             // No pre-rendered body — fetch it and then open.
@@ -67,6 +68,16 @@ document.addEventListener('alpine:init', function () {
         // When the user goes forward to a /settings/* URL, re-open.
         window.addEventListener('popstate', function () {
           self._onPopState();
+        });
+
+        // Intercept POST submits originating from tabs in this dialog so
+        // settings forms don't trigger a full page navigation (which
+        // would (a) render the flash banner outside the modal, (b) reset
+        // our history-rewind counter, breaking the X button). Fragment
+        // POSTs round-trip through the same `X-Settings-Fragment`
+        // protocol used for tab loads.
+        this.$el.addEventListener('submit', function (e) {
+          self._onSubmit(e);
         });
       },
 
@@ -110,20 +121,17 @@ document.addEventListener('alpine:init', function () {
         }
         // Rewind the URL pushes this instance made, so we land back on
         // the page the user was actually on. If we never pushed (cold
-        // deep-load with no prior history we own), navigate home so the
-        // user isn't stranded on a blank /settings/* URL.
+        // deep-load with no prior history we own), go home — the user
+        // explicitly tapped Close on a /settings/* URL, so dumping them
+        // on whatever happened to be one slot back in browser history
+        // (often another /settings/* page that would just re-open the
+        // modal) is confusing.
         if (this._pushed > 0) {
           var steps = this._pushed;
           this._pushed = 0;
           history.go(-steps);
         } else {
-          // Cold deep-load — if the browser has any prior history, use
-          // it; otherwise drop to /.
-          if (window.history.length > 1) {
-            history.back();
-          } else {
-            window.location.replace('/');
-          }
+          window.location.replace('/');
         }
       },
 
@@ -190,51 +198,215 @@ document.addEventListener('alpine:init', function () {
           headers: { 'X-Settings-Fragment': '1', 'Accept': 'text/html' },
         }).then(function (res) {
           if (!res.ok) throw new Error('HTTP ' + res.status);
+          // Tab GETs don't currently set X-BB-Flash-*, but it costs
+          // nothing to forward in case a future handler does.
+          self._showFlashFromHeaders(res.headers);
           return res.text();
         }).then(function (html) {
-          // Parse the fragment OFF-DOM so Alpine's mutation observer
-          // doesn't try to instantiate x-data="avatarEditor" before the
-          // tab's factory script has loaded. We pull the <script src=…>
-          // tags out, load them via <head>, and only THEN drop the
-          // (script-free) HTML into the live body where Alpine wires it
-          // up against the now-registered factories.
-          var template = document.createElement('template');
-          template.innerHTML = html;
-          var frag = template.content;
-          var srcs = [];
-          frag.querySelectorAll('script[src]').forEach(function (s) {
-            srcs.push(s.getAttribute('src'));
-          });
-          // Strip both inline and external scripts from the fragment —
-          // we'll handle execution ourselves. Inline scripts inside tab
-          // bodies are tiny (a few lines of immediate-effect code like
-          // hash-scroll); we re-execute them after the body is mounted.
-          var inlineSources = [];
-          frag.querySelectorAll('script').forEach(function (s) {
-            if (!s.hasAttribute('src')) inlineSources.push(s.textContent);
-            s.parentNode.removeChild(s);
-          });
-
-          return self._loadScripts(srcs).then(function () {
-            // Factories are registered. Safe to attach the body — when
-            // Alpine sees x-data attributes here, it will resolve them
-            // against the registered factories on the first walk.
-            bodyEl.replaceChildren(frag);
-            self.currentTab = tab;
-            // Re-run inline scripts (e.g. hash auto-scroll in
-            // agents_settings). They expect to run after the DOM exists.
-            inlineSources.forEach(function (src) {
-              try { (0, eval)(src); } catch (e) { console.warn('settings tab inline script error:', e); }
-            });
-            self._refreshIcons();
-            var scrollWrap = bodyEl.closest('.overflow-y-auto');
-            if (scrollWrap) scrollWrap.scrollTop = 0;
-          });
+          return self._swapBody(html, tab);
         }).catch(function (err) {
           bodyEl.innerHTML = '<div class="alert alert-error rounded-xl text-sm">' +
             'Could not load settings: ' + (err && err.message ? err.message : 'unknown error') +
             '</div>';
         });
+      },
+
+      // _onSubmit handles every form submit dispatched inside the
+      // dialog. Forms living in #bb-settings-body get hijacked into a
+      // fragment-POST so the modal stays open and feedback renders as
+      // an in-dialog toast instead of as a page-level banner. Forms
+      // outside the body slot (the close button's <form method="dialog">
+      // and the modal-backdrop button) are left to the browser.
+      _onSubmit: function (e) {
+        var form = e.target;
+        if (!form || form.tagName !== 'FORM') return;
+        if (form.method && form.method.toLowerCase() === 'dialog') return;
+        var bodyEl = this.$refs.body || document.getElementById('bb-settings-body');
+        if (!bodyEl || !bodyEl.contains(form)) return;
+        // Only POSTs flow through here. GET forms (search filters etc.)
+        // belong to whatever page they sit on.
+        var method = (form.method || 'GET').toUpperCase();
+        if (method !== 'POST') return;
+
+        e.preventDefault();
+        this._submitForm(form);
+      },
+
+      _submitForm: function (form) {
+        var self = this;
+        var action = form.action || window.location.href;
+        var data = new FormData(form);
+        // Disable submit buttons so a frantic double-click doesn't
+        // double-post. We re-enable on completion (success or error) —
+        // on success the buttons usually get replaced by the body swap
+        // anyway, but on the keep-current-body error path they need to
+        // come back.
+        var buttons = Array.prototype.slice.call(form.querySelectorAll('button, input[type=submit]'));
+        buttons.forEach(function (b) { b.disabled = true; });
+        var reenable = function () {
+          buttons.forEach(function (b) { b.disabled = false; });
+        };
+
+        return fetch(action, {
+          method: 'POST',
+          body: data,
+          credentials: 'same-origin',
+          // `redirect: 'follow'` (default) so the server's 303-after-POST
+          // round-trips through the GET handler, which honors the
+          // fragment header and returns just the tab body.
+          headers: { 'X-Settings-Fragment': '1', 'Accept': 'text/html' },
+        }).then(function (res) {
+          var serverToldUs = !!res.headers.get('X-BB-Flash-Message');
+          self._showFlashFromHeaders(res.headers);
+          // If the redirect target sits outside the settings shell
+          // (password change → /login, etc.), fall back to a hard
+          // navigation so the user actually lands on that page.
+          var finalUrl = res.url || action;
+          var dest = parseSettingsRedirect(finalUrl);
+          if (!dest.settings) {
+            window.location.href = finalUrl;
+            return null;
+          }
+          // Bare /settings redirects (used by Sync + Retention) are
+          // ambiguous about the tab — fall back to whichever tab the
+          // user was on, since that's also what the server rendered
+          // into the fragment.
+          var targetTab = dest.tab || self.currentTab;
+          if (!res.ok) {
+            // Server returned an error fragment (validation failure,
+            // 500, etc.). Surface it inside the modal — body still
+            // contains the form so the user can retry.
+            reenable();
+            if (!serverToldUs) {
+              self._showToast('error', 'Save failed (HTTP ' + res.status + ').');
+            }
+            return res.text().then(function (html) {
+              return self._swapBody(html, targetTab);
+            });
+          }
+          return res.text().then(function (html) {
+            return self._swapBody(html, targetTab).then(function () {
+              // Keep the URL bar in sync only when the server explicitly
+              // named a different tab. Bare /settings redirects leave
+              // the URL alone — the visible tab didn't change.
+              if (dest.tab && window.location.pathname !== '/settings/' + dest.tab) {
+                self._pushUrl(dest.tab, false);
+                self._pushed += 1;
+              }
+            });
+          });
+        }).catch(function (err) {
+          reenable();
+          self._showToast('error', 'Save failed: ' + (err && err.message ? err.message : 'network error'));
+        });
+      },
+
+      // _swapBody replaces #bb-settings-body with a freshly-fetched
+      // fragment, preserving the same alpine:init re-dispatch dance
+      // _loadTab used to use inline. Extracted so the form-submit path
+      // gets identical script-load semantics.
+      _swapBody: function (html, tab) {
+        var self = this;
+        var bodyEl = this.$refs.body || document.getElementById('bb-settings-body');
+        if (!bodyEl) return Promise.reject(new Error('no settings body slot'));
+
+        // Parse the fragment OFF-DOM so Alpine's mutation observer
+        // doesn't try to instantiate x-data="avatarEditor" before the
+        // tab's factory script has loaded. We pull the <script src=…>
+        // tags out, load them via <head>, and only THEN drop the
+        // (script-free) HTML into the live body where Alpine wires it
+        // up against the now-registered factories.
+        var template = document.createElement('template');
+        template.innerHTML = html;
+        var frag = template.content;
+        var srcs = [];
+        frag.querySelectorAll('script[src]').forEach(function (s) {
+          srcs.push(s.getAttribute('src'));
+        });
+        // Strip both inline and external scripts from the fragment —
+        // we'll handle execution ourselves. Inline scripts inside tab
+        // bodies are tiny (a few lines of immediate-effect code like
+        // hash-scroll); we re-execute them after the body is mounted.
+        var inlineSources = [];
+        frag.querySelectorAll('script').forEach(function (s) {
+          if (!s.hasAttribute('src')) inlineSources.push(s.textContent);
+          s.parentNode.removeChild(s);
+        });
+
+        return self._loadScripts(srcs).then(function () {
+          bodyEl.replaceChildren(frag);
+          self.currentTab = tab;
+          inlineSources.forEach(function (src) {
+            try { (0, eval)(src); } catch (e) { console.warn('settings tab inline script error:', e); }
+          });
+          self._refreshIcons();
+          var scrollWrap = bodyEl.closest('.overflow-y-auto');
+          if (scrollWrap) scrollWrap.scrollTop = 0;
+        });
+      },
+
+      // _showFlashFromHeaders renders a toast for the response if the
+      // server set X-BB-Flash-*. Empty / missing headers no-op. The
+      // type defaults to "info" so an empty type still surfaces, but
+      // we explicitly tolerate the success/error/warning trio.
+      _showFlashFromHeaders: function (headers) {
+        var type = headers.get('X-BB-Flash-Type') || '';
+        var raw = headers.get('X-BB-Flash-Message') || '';
+        if (!raw) return;
+        // Go's url.QueryEscape (server side) encodes spaces as `+`,
+        // which decodeURIComponent ignores — swap them to %20 first so
+        // the round-trip survives.
+        var message;
+        try { message = decodeURIComponent(raw.replace(/\+/g, '%20')); } catch (_) { message = raw; }
+        this._showToast(type, message);
+      },
+
+      // _consumePageFlashIntoToast moves the layout's flash banner
+      // (rendered inside <main> by html/template on cold deep-loads)
+      // into the in-modal toast, then hides the banner. Without this,
+      // cold-loading /settings/sync right after a redirect-with-flash
+      // would show the flash behind the modal AND we'd lose it once
+      // the modal closes.
+      _consumePageFlashIntoToast: function () {
+        var banner = document.querySelector('main [data-bb-flash]');
+        if (!banner) return;
+        var type = banner.getAttribute('data-bb-flash') || '';
+        var message = (banner.getAttribute('data-bb-flash-message') || banner.textContent || '').trim();
+        if (!message) return;
+        this._showToast(type, message);
+        banner.remove();
+      },
+
+      // _showToast mounts an alert inside the dialog's toast slot. The
+      // success toast auto-dismisses; error/warning stay until the
+      // user dismisses them.
+      _showToast: function (type, message) {
+        var slot = this.$refs.toast;
+        if (!slot) return;
+        var tone = ({
+          success: 'alert-success',
+          error:   'alert-error',
+          warning: 'alert-warning',
+        })[type] || 'alert-info';
+        // Clear any previous toast — only one shown at a time keeps the
+        // dialog uncluttered.
+        slot.replaceChildren();
+        var node = document.createElement('div');
+        node.className = 'alert ' + tone + ' alert-soft rounded-xl shadow-lg pointer-events-auto max-w-md text-sm';
+        node.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        node.textContent = message;
+        slot.appendChild(node);
+        if (type !== 'error' && type !== 'warning') {
+          var t = setTimeout(function () {
+            if (node.isConnected) node.remove();
+          }, 4000);
+          node.addEventListener('click', function () {
+            clearTimeout(t);
+            node.remove();
+          });
+        } else {
+          node.addEventListener('click', function () { node.remove(); });
+        }
       },
 
       // _loadScripts loads a list of external script URLs in parallel,
@@ -297,6 +469,30 @@ var TAB_META = {
 // we don't double-fetch them on repeated tab switches. Module-scoped
 // so it survives across Alpine.data factory invocations.
 var BB_LOADED_SCRIPTS = {};
+
+// parseSettingsRedirect classifies a fetch response URL relative to the
+// settings shell. Used by the form-submit interceptor to decide between
+// an in-modal body swap and a hard navigation.
+//
+// Returns an object:
+//   { settings: true,  tab: 'sync' }   — URL is /settings/<tab>
+//   { settings: true,  tab: null    }  — URL is bare /settings (ambiguous;
+//                                        keep the current tab + URL)
+//   { settings: false }                — URL is outside the shell; the
+//                                        caller should hard-navigate.
+function parseSettingsRedirect(rawUrl) {
+  try {
+    var u = new URL(rawUrl, window.location.href);
+    if (u.origin !== window.location.origin) return { settings: false };
+    var m = u.pathname.match(/^\/settings(?:\/([\w-]+))?\/?$/);
+    if (!m) return { settings: false };
+    var tab = m[1] || null;
+    if (tab && !TAB_META[tab]) return { settings: false };
+    return { settings: true, tab: tab };
+  } catch (_) {
+    return { settings: false };
+  }
+}
 
 // Skeleton placeholder while a tab fragment is in flight — daisy
 // `skeleton` blocks shaped roughly like the section-card pattern.

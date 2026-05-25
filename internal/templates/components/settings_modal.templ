@@ -47,6 +47,19 @@ templ SettingsModal(p SettingsModalProps) {
 			</div>
 		</div>
 		<!--
+			In-dialog toast slot. Lives inside the <dialog> so it joins the
+			browser's top-layer stacking context and renders above the modal
+			(toasts placed in the document body are obscured by the dialog's
+			backdrop). settings_modal.js injects alert children here in
+			response to X-BB-Flash-* headers from fragment POSTs.
+		-->
+		<div
+			class="toast toast-center toast-bottom z-[60] pointer-events-none"
+			x-ref="toast"
+			aria-live="polite"
+			aria-atomic="true"
+		></div>
+		<!--
 			daisy modal-backdrop: a button-form so a backdrop click submits
 			the form (cancel), which fires the dialog's `close` event and
 			our @close listener handles the URL rewind.

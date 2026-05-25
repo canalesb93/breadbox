@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"html/template"
 	"net/http"
+	"net/url"
 
 	"breadbox/internal/templates/components/pages"
 
@@ -13,9 +14,20 @@ import (
 )
 
 // settingsFragmentHeader marks a request as a Settings modal swap — the
-// modal's Alpine factory sends it on every fetch. Handlers branch on it
-// to return just the tab body instead of the full host page.
+// modal's Alpine factory sends it on every fetch (GET tab loads and
+// POST form submits). Handlers branch on it to return just the tab body
+// instead of the full host page; the modal then follows any 303 with
+// the same header so the redirect target also lands as a fragment.
 const settingsFragmentHeader = "X-Settings-Fragment"
+
+// Response headers carrying a one-shot flash inside a fragment response.
+// The modal reads these and renders the message as an in-dialog toast,
+// instead of relying on the layout-level flash partial (which renders
+// inside <main>, behind the open modal).
+const (
+	settingsFlashTypeHeader    = "X-BB-Flash-Type"
+	settingsFlashMessageHeader = "X-BB-Flash-Message"
+)
 
 // renderSettingsTab wraps the given tab body in a settings-host page and
 // renders it inside base.html with the global SettingsModal pre-opened on
@@ -43,6 +55,10 @@ func renderSettingsTab(
 	body templ.Component,
 ) {
 	if r.Header.Get(settingsFragmentHeader) == "1" {
+		if f, ok := data["Flash"].(*Flash); ok && f != nil && f.Message != "" {
+			w.Header().Set(settingsFlashTypeHeader, f.Type)
+			w.Header().Set(settingsFlashMessageHeader, url.QueryEscape(f.Message))
+		}
 		tr.RenderTemplFragment(w, r, body)
 		return
 	}
