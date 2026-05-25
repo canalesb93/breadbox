@@ -15,10 +15,13 @@ const HttpServerConfig = z.object({
 
 export const McpServerConfigSchema = z.union([StdioServerConfig, HttpServerConfig]);
 
-// Auth: exactly one of subscription OAuth token or Anthropic API key.
+// Auth mode: metadata only. The actual secret is delivered via env vars
+// (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN) set by the Go runner's
+// cmd.Env before exec — NEVER through this spec — so plaintext tokens
+// can't leak via stdin captures, /proc snapshots, or a stray log of the
+// spec object. See internal/agent/sidecar.go::authEnvFor.
 const AuthConfigSchema = z.object({
   mode: z.enum(["subscription", "api_key"]),
-  token: z.string().min(1),
 });
 
 // JobSpec: the JSON document read from stdin.

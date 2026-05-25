@@ -15,12 +15,32 @@ type MCPServerConfig struct {
 }
 
 // AuthConfig carries credentials for one run. Mode picks which env var the
-// sidecar sets; the other is unset before invoking the SDK to avoid the
-// precedence trap where ANTHROPIC_API_KEY silently wins over CLAUDE_CODE_OAUTH_TOKEN.
+// runner sets on the sidecar process; the other is unset before exec to
+// avoid the precedence trap where ANTHROPIC_API_KEY silently wins over
+// CLAUDE_CODE_OAUTH_TOKEN.
+//
+// Token is `json:"-"` deliberately: secrets never travel via the sidecar's
+// stdin JSON, only as scoped env vars that Sidecar.Run sets on cmd.Env.
+// This closes the leak class where any future `slog.Warn("spec", spec)`
+// or similar would otherwise put the plaintext token in logs / OTel.
 type AuthConfig struct {
-	Mode  string `json:"mode"`  // "subscription" | "api_key"
-	Token string `json:"token"` // sk-ant-oat01-… (subscription) or sk-ant-… (api_key)
+	Mode  string `json:"mode"`  // "subscription" | "api_key" — metadata, safe on the wire
+	Token string `json:"-"`     // sk-ant-oat01-… or sk-ant-…; flows to sidecar via env, NEVER JSON
 }
+
+// String returns a redacted representation safe for logs / %v formatting.
+// Without this an inadvertent `fmt.Sprintf("%+v", spec)` in any handler
+// would print the plaintext token. Belt-and-suspenders alongside `json:"-"`.
+func (a AuthConfig) String() string {
+	suffix := ""
+	if n := len(a.Token); n >= 4 {
+		suffix = a.Token[n-4:]
+	}
+	return "AuthConfig{Mode=" + a.Mode + ", Token=…" + suffix + "}"
+}
+
+// GoString mirrors String for `%#v` formatting (verbose / debug log style).
+func (a AuthConfig) GoString() string { return a.String() }
 
 // JobSpec is the JSON document written to the sidecar's stdin.
 // camelCase JSON tags match the TypeScript sidecar's zod schema.
