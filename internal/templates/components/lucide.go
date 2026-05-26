@@ -1,3 +1,5 @@
+//go:build !headless && !lite
+
 package components
 
 import "html/template"
