@@ -59,6 +59,14 @@ templ Transactions(p TransactionsProps) {
 	} else {
 		@txEmptyState(p)
 	}
+	<!-- Page-level skeleton for /transactions, available for any future
+	     client-side refresh / AJAX swap (e.g. paginator / view-mode change
+	     without a page reload). Mirrors the SSR content area above
+	     (search + filter-toggle row, results toolbar, results region) so
+	     swap-in doesn't shift the page. Exposed in /design#loading. -->
+	<template id="bb-transactions-skeleton-template">
+		@components.TransactionsSkeleton()
+	</template>
 	<!-- Floating bulk action bar is created via JS in <body> to avoid parent transform breaking position:fixed -->
 	if p.IsReviewQueue() {
 		@txReviewQueueShortcuts()
