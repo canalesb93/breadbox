@@ -19,6 +19,7 @@ import (
 templ CategoryForm(p CategoryFormProps) {
 	if !p.IsEdit {
 		@templ.JSONScript("category-form-picker-data", p.Categories)
+		<script src="/static/js/admin/slug.js"></script>
 	}
 	@components.CategoryPickerScript()
 	@components.BreadcrumbNav(p.Breadcrumbs)
@@ -89,6 +90,23 @@ templ CategoryForm(p CategoryFormProps) {
 						/>
 					</div>
 					if !p.IsEdit {
+						<!-- Slug preview (read-only, server-derived from display name) -->
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="slug_preview">
+								Slug <span class="text-base-content/30">(auto-generated)</span>
+							</label>
+							<input
+								type="text"
+								id="slug_preview"
+								:value="window.bbSlugifyCategory ? window.bbSlugifyCategory(displayName) : ''"
+								class="bb-form-input font-mono text-sm bg-base-200/40 text-base-content/60"
+								readonly
+								disabled
+								tabindex="-1"
+								placeholder="generated from display name"
+							/>
+							<p class="text-xs text-base-content/40 mt-1.5">Generated automatically. A numeric suffix (<code>_2</code>, <code>_3</code>, &hellip;) is appended if this slug already exists.</p>
+						</div>
 						<!-- Parent picker (create mode only) -->
 						<div>
 							<label class="block text-xs font-medium text-base-content/50 mb-1.5">Parent Category</label>

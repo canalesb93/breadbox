@@ -25,6 +25,11 @@
 // combining mark; the [^a-z0-9]+ collapse drops the mark together with
 // any spaces, so "Café Bar" -> "cafe-bar" without an explicit diacritic
 // strip step.
+//
+// Categories use a slightly different rule (underscores, not hyphens, and
+// "&" is folded to a separator) — bbSlugifyCategory mirrors the server-side
+// service.GenerateSlug in internal/service/categories.go exactly so the
+// preview shown to users matches what the server actually writes.
 
 (function () {
   function slugify(name) {
@@ -34,6 +39,15 @@
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 64);
+  }
+
+  function slugifyCategory(name) {
+    return String(name == null ? '' : name)
+      .toLowerCase()
+      .replace(/[ \-&]/g, '_')
+      .replace(/[^a-z0-9_]/g, '')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
   }
 
   function wire(nameId, slugId) {
@@ -54,5 +68,6 @@
   }
 
   window.bbSlugify = slugify;
+  window.bbSlugifyCategory = slugifyCategory;
   window.bbWireSlugInput = wire;
 })();
