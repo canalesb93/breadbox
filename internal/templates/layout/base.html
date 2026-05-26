@@ -367,7 +367,7 @@
              aria-label="My Account"
              title="My Account">
             {{if .SessionUserID}}
-            <img src="/avatars/{{.SessionUserID}}" alt="" class="w-7 h-7 rounded-full object-cover" />
+            {{renderComponent "UserAvatar" (userAvatarProps .SessionUserID .SessionAvatarVersion .AdminUsername "lg")}}
             {{else}}
             <i data-lucide="user-circle" class="w-5 h-5" aria-hidden="true"></i>
             {{end}}

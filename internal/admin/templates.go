@@ -86,6 +86,13 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdCombo(keys...), nil
 	},
+	"UserAvatar": func(data any) (templ.Component, error) {
+		p, ok := data.(components.UserAvatarProps)
+		if !ok {
+			return nil, fmt.Errorf("UserAvatar: want components.UserAvatarProps, got %T", data)
+		}
+		return components.UserAvatar(p), nil
+	},
 	"SettingsModal": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
@@ -262,6 +269,21 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
 			"strs":            func(vals ...string) []string { return vals },
 			"renderComponent": renderTemplComponent,
+			// userAvatarProps constructs a UserAvatarProps from the
+			// BaseTemplateData fields html/template partials carry,
+			// for use through renderComponent. Kept inline so the
+			// mobile-navbar trigger in base.html stays a one-liner
+			// rather than a bespoke partial. size is the literal
+			// UserAvatarSize slug ("md" / "lg" / etc).
+			"userAvatarProps": func(id, version, name, size string) components.UserAvatarProps {
+				return components.UserAvatarProps{
+					ID:         id,
+					Version:    version,
+					Name:       name,
+					Size:       components.UserAvatarSize(size),
+					Decorative: true,
+				}
+			},
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {

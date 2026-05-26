@@ -46,11 +46,25 @@ const (
 	// `breadbox reveal-key` shell command.
 	KeyEncryptionKeyAcknowledgedAt = "setup.encryption_key_acknowledged_at"
 
-	// KeyAvatarStyle is the DiceBear style slug used for auto-generated
-	// user identicons (https://www.dicebear.com). Operators can change
-	// the style from Settings → System. Uploaded avatars are unaffected.
-	// Default: "shapes" (set in internal/avatar).
+	// KeyAvatarStyle is the legacy single-style key. New code reads
+	// KeyAvatarUserStyle for user avatars and KeyAvatarAgentStyle for
+	// agent avatars; this key is retained for back-compat — the
+	// startup loader copies it into KeyAvatarUserStyle when the latter
+	// is unset so existing deployments keep their configured style.
+	//
+	// Deprecated: use KeyAvatarUserStyle.
 	KeyAvatarStyle = "avatar.dicebear_style"
+
+	// KeyAvatarUserStyle is the DiceBear style slug used for user
+	// identicons. Operators pick it from Settings → System.
+	// Default: "shapes" (set in internal/avatar).
+	KeyAvatarUserStyle = "avatar.dicebear_style_user"
+
+	// KeyAvatarAgentStyle is the DiceBear style slug used for agent
+	// identicons. Agents render distinct avatars from users so an
+	// AI-authored activity row reads unambiguously against a human
+	// one. Default: "bottts" (robot-style identicons).
+	KeyAvatarAgentStyle = "avatar.dicebear_style_agent"
 )
 
 // AuthMode values for KeyAgentAuthMode.

@@ -148,14 +148,6 @@ func navActive(current, page string) string {
 	return ""
 }
 
-func navAvatar(id, version string) string {
-	base := avatarURL(id)
-	if version != "" {
-		return base + "?v=" + version
-	}
-	return base
-}
-
 // navDisplayName picks the friendliest available name for the sidebar
 // footer: linked household-member name first (e.g. "Ricardo"), then the
 // auth_accounts.username (often an email), then a generic "Admin".

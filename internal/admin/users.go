@@ -4,10 +4,10 @@ package admin
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"net/mail"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/app"
@@ -216,7 +216,7 @@ func buildUsersProps(in usersListInput) pages.UsersProps {
 			Name:            eu.Name,
 			Email:           pgconv.TextOr(eu.Email, ""),
 			HasEmail:        eu.Email.Valid,
-			AvatarURL:       usersAvatarURL(uid, eu.UpdatedAt),
+			AvatarVersion:   usersAvatarVersion(eu.UpdatedAt),
 			AccountCount:    eu.AccountCount,
 			ConnectionCount: eu.ConnectionCount,
 		}
@@ -253,19 +253,15 @@ func buildUsersProps(in usersListInput) pages.UsersProps {
 	return props
 }
 
-// usersAvatarURL builds the per-user avatar URL with a cache-busting `v`
-// query param keyed on UpdatedAt. Mirrors the funcMap "avatarURL" helper
-// in admin/templates.go for the (UUID, Timestamptz) call shape used by
-// the prior users.html template.
-func usersAvatarURL(formattedID string, updatedAt pgtype.Timestamptz) string {
-	if formattedID == "" {
-		return "/avatars/unknown"
+// usersAvatarVersion returns the per-user cache-bust suffix (the
+// updated_at unix timestamp as a string) for components.UserAvatar's
+// Version prop. URL construction itself lives inside the shared
+// component (components.AvatarURLWith) so all callers stay aligned.
+func usersAvatarVersion(updatedAt pgtype.Timestamptz) string {
+	if !updatedAt.Valid {
+		return ""
 	}
-	base := "/avatars/" + formattedID
-	if updatedAt.Valid {
-		base += fmt.Sprintf("?v=%d", updatedAt.Time.Unix())
-	}
-	return base
+	return strconv.FormatInt(updatedAt.Time.Unix(), 10)
 }
 
 // NewUserHandler serves GET /admin/users/new.

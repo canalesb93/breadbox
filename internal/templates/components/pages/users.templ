@@ -136,7 +136,14 @@ templ usersMemberCard(u UsersEnrichedRow) {
 		<div class="p-4 sm:p-6 pb-4">
 			<div class="flex items-center justify-between gap-3">
 				<div class="flex items-center gap-4 min-w-0">
-					<img src={ u.AvatarURL } alt="" class="w-12 h-12 rounded-full object-cover shrink-0"/>
+					@components.UserAvatar(components.UserAvatarProps{
+						ID:         u.ID,
+						Name:       u.Name,
+						Version:    u.AvatarVersion,
+						Size:       components.UserAvatar2XL,
+						Decorative: true,
+						Class:      "shrink-0",
+					})
 					<div>
 						<div class="flex items-center gap-2 flex-wrap">
 							<h3 class="font-semibold text-base">{ u.Name }</h3>
