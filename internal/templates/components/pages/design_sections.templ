@@ -1382,6 +1382,96 @@ templ SectionKbd() {
 				</div>
 			</div>
 		}
+		@designExample("Inside a button (trailing hint)", "kbd inline at the trailing edge of a button. Surface-aware: on a solid-tone button (primary/secondary/accent/neutral) the kbd inverts to a translucent base-100 tint with white-ish glyph; on ghost / soft / outline it keeps the muted base-200 ground.") {
+			<div class="flex flex-wrap items-center gap-3">
+				<button type="button" class="btn btn-primary btn-sm gap-2">
+					Submit
+					@components.KbdCombo("cmd", "enter")
+				</button>
+				<button type="button" class="btn btn-neutral btn-sm gap-2">
+					Save draft
+					@components.Kbd("s")
+				</button>
+				<button type="button" class="btn btn-ghost btn-sm gap-2">
+					Cancel
+					@components.Kbd("esc")
+				</button>
+				<button type="button" class="btn btn-outline btn-sm gap-2">
+					Open
+					@components.KbdCombo("cmd", "o")
+				</button>
+				<button type="button" class="btn btn-soft btn-sm gap-2">
+					Delete
+					@components.KbdCombo("cmd", "shift", "delete")
+				</button>
+			</div>
+		}
+		@designExample("Inside a tooltip (hover hint)", "daisy `tooltip` renders text via ::before from data-tip — for a true kbd-in-tooltip surface, hand-roll a hoverable wrapper with an absolute popover. The kbd auto-inverts against the dark tooltip ground via .tooltip / [role=\"tooltip\"] descendant rules.") {
+			<div class="flex flex-wrap items-center gap-4">
+				<div class="relative inline-block group" role="tooltip-host">
+					<button type="button" class="btn btn-ghost btn-sm gap-2" aria-describedby="kbd-tt-1">
+						@components.LucideIcon("search", "w-3.5 h-3.5")
+						Search
+					</button>
+					<div
+						id="kbd-tt-1"
+						role="tooltip"
+						class="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
+						       hidden group-hover:flex group-focus-within:flex
+						       items-center gap-2
+						       bg-neutral text-neutral-content
+						       rounded-md px-2 py-1.5 text-xs whitespace-nowrap
+						       shadow-lg z-10
+						       after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2
+						       after:border-4 after:border-transparent after:border-t-neutral"
+					>
+						<span>Open search</span>
+						@components.KbdCombo("cmd", "k")
+					</div>
+				</div>
+				<div class="relative inline-block group" role="tooltip-host">
+					<button type="button" class="btn btn-primary btn-sm gap-2" aria-describedby="kbd-tt-2">
+						@components.LucideIcon("send-horizontal", "w-3.5 h-3.5")
+						Submit comment
+					</button>
+					<div
+						id="kbd-tt-2"
+						role="tooltip"
+						class="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
+						       hidden group-hover:flex group-focus-within:flex
+						       items-center gap-2
+						       bg-neutral text-neutral-content
+						       rounded-md px-2 py-1.5 text-xs whitespace-nowrap
+						       shadow-lg z-10
+						       after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2
+						       after:border-4 after:border-transparent after:border-t-neutral"
+					>
+						<span>Submit and post</span>
+						@components.KbdCombo("cmd", "enter")
+					</div>
+				</div>
+				<div class="relative inline-block group" role="tooltip-host">
+					<button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Close" aria-describedby="kbd-tt-3">
+						@components.LucideIcon("x", "w-4 h-4")
+					</button>
+					<div
+						id="kbd-tt-3"
+						role="tooltip"
+						class="absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
+						       hidden group-hover:flex group-focus-within:flex
+						       items-center gap-2
+						       bg-neutral text-neutral-content
+						       rounded-md px-2 py-1.5 text-xs whitespace-nowrap
+						       shadow-lg z-10
+						       after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2
+						       after:border-4 after:border-transparent after:border-t-neutral"
+					>
+						<span>Dismiss</span>
+						@components.Kbd("esc")
+					</div>
+				</div>
+			</div>
+		}
 		@designExample("Glyph mapping reference", "Tokens auto-translate to symbols via kbdGlyph (Go) / bbKbdGlyph (JS). Keep the two in sync when adding new glyphs.") {
 			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
 				for _, g := range kbdGlyphRefs() {
