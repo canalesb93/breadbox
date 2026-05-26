@@ -16,8 +16,7 @@ import "breadbox/internal/templates/components"
 //     page, hung off the sidebar's System section.
 const (
 	SettingsTabAccount   = components.SettingsModalTabAccount
-	SettingsTabSync      = components.SettingsModalTabSync
-	SettingsTabSecurity  = components.SettingsModalTabSecurity
+	SettingsTabGeneral   = components.SettingsModalTabGeneral
 	SettingsTabSystem    = components.SettingsModalTabSystem
 	SettingsTabProviders = components.SettingsModalTabProviders
 	SettingsTabAgents    = components.SettingsModalTabAgents

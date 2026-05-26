@@ -127,8 +127,7 @@ templ settingsModalDesktopRail(p SettingsModalProps) {
 templ settingsModalRailItems(p SettingsModalProps, mobile bool) {
 	@settingsModalRailItem(SettingsModalTabAccount, "user-cog", "Account", mobile)
 	if p.IsAdmin {
-		@settingsModalRailItem(SettingsModalTabSync, "refresh-cw", "Sync", mobile)
-		@settingsModalRailItem(SettingsModalTabSecurity, "shield", "Security", mobile)
+		@settingsModalRailItem(SettingsModalTabGeneral, "sliders-horizontal", "General", mobile)
 		@settingsModalRailItem(SettingsModalTabSystem, "cpu", "System", mobile)
 		@settingsModalRailItem(SettingsModalTabProviders, "plug", "Providers", mobile)
 		@settingsModalRailItem(SettingsModalTabAgents, "sparkles", "Agents", mobile)

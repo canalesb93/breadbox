@@ -33,7 +33,7 @@ func formatNextSync(nextRun time.Time) string {
 }
 
 // buildSettingsProps assembles the typed SettingsProps shared by every
-// /settings/* General-family tab (Sync, Security, System, Help). Each
+// /settings/* General-family tab (General, System, Help). Each
 // tab handler builds full props (cheap — a few DB lookups + version
 // check) and renders only the section it owns.
 func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[string]any) {
@@ -90,30 +90,21 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	return props, data
 }
 
-// SettingsGetHandler serves GET /settings — the Sync tab is the default
-// landing for the Settings entry. /settings/sync renders the same.
+// SettingsGetHandler serves GET /settings — the General tab is the
+// default landing for the Settings entry. /settings/general renders
+// the same.
 func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		props, data := buildSettingsProps(a, r)
-		data["PageTitle"] = "Sync"
-		data["CurrentPage"] = "sync"
+		data["PageTitle"] = "General"
+		data["CurrentPage"] = "general"
 		data["Flash"] = GetFlash(r.Context(), sm)
-		renderSettingsTab(tr, w, r, data, pages.SettingsTabSync, pages.SettingsSync(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabGeneral, pages.SettingsGeneral(props))
 	}
 }
 
-// SecuritySettingsHandler serves GET /settings/security.
-func SecuritySettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		props, data := buildSettingsProps(a, r)
-		data["PageTitle"] = "Security"
-		data["CurrentPage"] = "security"
-		data["Flash"] = GetFlash(r.Context(), sm)
-		renderSettingsTab(tr, w, r, data, pages.SettingsTabSecurity, pages.SettingsSecurity(props))
-	}
-}
-
-// SystemSettingsHandler serves GET /settings/system.
+// SystemSettingsHandler serves GET /settings/system — combines security
+// (encryption key) and runtime/version info on a single tab.
 func SystemSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		props, data := buildSettingsProps(a, r)
@@ -217,7 +208,7 @@ func SettingsAvatarStylePostHandler(a *app.App, sm *scs.SessionManager) http.Han
 
 		style := strings.TrimSpace(r.FormValue("avatar_style"))
 		if !avatar.IsValidStyle(style) {
-			FlashRedirect(w, r, sm, "error", "Invalid avatar style.", "/settings/system")
+			FlashRedirect(w, r, sm, "error", "Invalid avatar style.", "/settings/general")
 			return
 		}
 
@@ -226,13 +217,13 @@ func SettingsAvatarStylePostHandler(a *app.App, sm *scs.SessionManager) http.Han
 			Value: pgconv.Text(style),
 		}); err != nil {
 			a.Logger.Error("save avatar style", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to save avatar style.", "/settings/system")
+			FlashRedirect(w, r, sm, "error", "Failed to save avatar style.", "/settings/general")
 			return
 		}
 		avatar.SetStyle(style)
 
 		SetFlash(ctx, sm, "success", "Avatar style updated.")
-		http.Redirect(w, r, "/settings/system", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/general", http.StatusSeeOther)
 	}
 }
 

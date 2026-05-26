@@ -47,11 +47,11 @@ type SettingsModalProps struct {
 
 // SettingsModalTab identifiers — mirror the old SettingsLayout constants
 // minus Profile (merged into Account) and Household (promoted to its own
-// top-level page).
+// top-level page). Security folds into System, and the legacy Sync tab
+// became General (general settings: schedule, retention, avatars).
 const (
 	SettingsModalTabAccount   = "account"
-	SettingsModalTabSync      = "sync"
-	SettingsModalTabSecurity  = "security"
+	SettingsModalTabGeneral   = "general"
 	SettingsModalTabSystem    = "system"
 	SettingsModalTabProviders = "providers"
 	SettingsModalTabAgents    = "agents"
