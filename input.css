@@ -249,6 +249,24 @@
    */
   svg.lucide { color: rgb(from currentColor r g b / 1); }
 
+  /* Brand icons follow the same pointer-events rule as lucide — they
+   * always sit inside an interactive parent (link, button, card
+   * header) and shouldn't intercept clicks. */
+  svg.brand, svg.brand * { pointer-events: none; }
+
+  /* Brand marks ship with their official brand fills baked into the
+   * <path> rather than inheriting currentColor — the marks ARE the
+   * brand, recolouring them defeats the point. Black-on-light marks
+   * (GitHub, Anthropic, MCP) need a flip in dark mode so they don't
+   * disappear on a base-100 surface. Plaid blue and Claude orange
+   * already contrast in both modes. Teller is multi-color and stays. */
+  @media (prefers-color-scheme: dark) {
+    svg.brand-github path,
+    svg.brand-anthropic path,
+    svg.brand-model-context-protocol path,
+    svg.brand-plaid path { fill: #fff; }
+  }
+
   /*
    * Pre-hydration size for Lucide placeholders.
    *

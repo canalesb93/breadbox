@@ -16,11 +16,16 @@ package components
 //   - "danger"     — error-tinted border + error-tinted icon (use for
 //                    destructive sections like "Danger zone")
 type SettingsSectionProps struct {
-	Icon    string
-	Title   string
-	Caption string
-	Right   templ.Component
-	Variant string
+	Icon string
+	// BrandIcon, when set, replaces Icon with a vendored brand SVG
+	// (see brand.templ). Monochrome brand marks inherit the same
+	// muted icon color the Lucide path uses; multi-color marks
+	// (Teller) render in brand colors.
+	BrandIcon string
+	Title     string
+	Caption   string
+	Right     templ.Component
+	Variant   string
 	// Form wraps the children in a <form> so a single in-section Save
 	// button (use the Footer slot) submits all of its rows at once.
 	// Omit for sections that hold auto-save rows only — those wrap
@@ -91,7 +96,9 @@ templ settingsSectionHeader(p SettingsSectionProps) {
 	if p.Title != "" || p.Right != nil {
 		<header class="bb-settings-section__header">
 			<div class="bb-settings-section__heading">
-				if p.Icon != "" {
+				if p.BrandIcon != "" {
+					@BrandIcon(p.BrandIcon, settingsSectionIconClasses(p.Variant))
+				} else if p.Icon != "" {
 					<i data-lucide={ p.Icon } class={ settingsSectionIconClasses(p.Variant) }></i>
 				}
 				<div class="min-w-0">

@@ -194,9 +194,9 @@ templ agentsSettingsToolRow(t AgentsSettingsTool) {
 templ agentsSettingsConnectionSection() {
 	<div id="connection" x-data="{ copiedConfig: false }">
 		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:    "plug",
-			Title:   "Connection",
-			Caption: "Endpoints and config for connecting MCP agents",
+			BrandIcon: "model-context-protocol",
+			Title:     "Connection",
+			Caption:   "Endpoints and config for connecting MCP agents",
 		}) {
 			@components.SettingsRow(components.SettingsRowProps{
 				Label: "HTTP endpoint",
