@@ -784,6 +784,11 @@ templ SectionLoading() {
 				@components.TxResultsSkeleton()
 			</div>
 		}
+		@designExample("Transactions page skeleton", "Placeholder mirroring /transactions content area — search + filter-toggle row, results toolbar (select / view-mode / kbd hints), and the results region (delegated to TxResultsSkeleton). Primitive is exposed here for future AJAX swaps (paginator / view-mode change without a page reload); /transactions is full-SSR today.") {
+			<div x-data x-init="if (window.Alpine && Alpine.store && !Alpine.store('txView')) Alpine.store('txView', { mode: 'grouped', setMode(m) { this.mode = m; } })" class="max-w-4xl">
+				@components.TransactionsSkeleton()
+			</div>
+		}
 		@designExample("Accounts list skeleton", "Placeholder mirroring /accounts — summary stats (Net Worth / Assets / Liabilities), filter input, and the sortable table. Primitive is exposed here for future AJAX swaps and adjacent account panels; /accounts is full-SSR today.") {
 			<div class="max-w-4xl">
 				@components.AccountsListSkeleton()

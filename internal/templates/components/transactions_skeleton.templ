@@ -1,0 +1,45 @@
+package components
+
+// TransactionsSkeleton renders a placeholder mirroring the /transactions
+// page content area — the search + filter-toggle row, the results
+// toolbar (select / view mode / kbd hints), and the results region
+// (delegated to TxResultsSkeleton so grouped/list both match the real
+// layout).
+//
+// /transactions is full-SSR today; this primitive is exposed in
+// /design#loading so it's ready for the eventual AJAX/refresh swap
+// (e.g. paginator / view-mode change without a page reload) and
+// discoverable to anyone wiring loading states for adjacent
+// transaction surfaces.
+//
+// The PageHeader is intentionally NOT included — mirrors the
+// agents/categories/etc. convention where the header stays live
+// across swaps and only the dynamic content area is replaced.
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md,
+// the hand-rolled `bb-skeleton*` family is being retired).
+templ TransactionsSkeleton() {
+	<div aria-hidden="true">
+		<!-- Search + filter-toggle row (mirrors txFilters collapsed state) -->
+		<div class="mb-6">
+			<div class="flex items-center gap-3">
+				<div class="skeleton h-10 flex-1 rounded-lg"></div>
+				<div class="skeleton h-10 w-28 shrink-0 rounded-lg"></div>
+			</div>
+		</div>
+		<!-- Results toolbar (mirrors txResultsShell toolbar) -->
+		<div class="flex items-center gap-3 px-2 pb-2">
+			<div class="skeleton h-6 w-16 rounded-md"></div>
+			<div class="skeleton h-6 w-32 rounded-md"></div>
+			<div class="flex-1"></div>
+			<div class="hidden sm:flex items-center gap-3">
+				for i := 0; i < 5; i++ {
+					<div class="skeleton h-3 w-12"></div>
+				}
+			</div>
+		</div>
+		<!-- Results region — delegates to the existing TxResultsSkeleton
+		     so the grouped/list view-mode branches stay in one place. -->
+		@TxResultsSkeleton()
+	</div>
+}
