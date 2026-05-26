@@ -2670,14 +2670,19 @@
   border-radius: 0.5rem;
   overflow: visible;
 }
-/* Header bar (was the "Name commented X ago" meta line) */
+/* Header bar (was the "Name commented X ago" meta line).
+ * The card carries a 1px border + 0.5rem outer radius, so the header
+ * sits one pixel inside the curve. Match the inner curve exactly
+ * (outer radius minus border width) — using the same 0.5rem here
+ * leaves the gray fill curving inside the border arc, exposing a
+ * thin wedge of the white card background at the top corners. */
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child {
   background: color-mix(in srgb, var(--color-base-200) 60%, transparent);
   border-bottom: 1px solid var(--color-base-300);
   padding: 0.5rem 0.875rem;
   margin: 0;
-  border-top-left-radius: 0.5rem;
-  border-top-right-radius: 0.5rem;
+  border-top-left-radius: calc(0.5rem - 1px);
+  border-top-right-radius: calc(0.5rem - 1px);
 }
 /* Body (was the chat-bubble) */
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) .bb-comment-bubble {
