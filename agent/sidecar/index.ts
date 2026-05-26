@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { JobSpecSchema, type JobSpec } from "./spec";
-import { emit, emitError } from "./events";
+import { emit, emitError, ERROR_CODE } from "./events";
 
 // resolveCliPath extracts the bundled cli.js to a real path on disk so the
 // SDK's fs.existsSync check can see it. Inside a `bun build --compile`
@@ -109,7 +109,7 @@ async function main() {
     transcriptPath = spec.transcriptPath;
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
-    emitError(`spec parse: ${e.message}`, e.stack);
+    emitError(`spec parse: ${e.message}`, e.stack, undefined, ERROR_CODE.SPEC_INVALID);
     process.exit(2);
   }
 
@@ -280,11 +280,16 @@ async function main() {
     // event + non-zero exit so the orchestrator records something the
     // operator can actually read in the transcript drawer.
     if (messageCount === 0) {
+      // Zero messages typically means an auth failure (SDK aborted before
+      // emitting anything) or a spawn failure (cli.js subprocess didn't
+      // start). Default to AUTH since that's by far the more common cause
+      // in practice — the spawn case is closed by pathToClaudeCodeExecutable.
       emitError(
-        "agent SDK stream ended without yielding any messages — likely a subprocess spawn failure (executable not on PATH?) or an invalid auth credential" +
+        "agent SDK stream ended without yielding any messages — likely an invalid auth credential or subprocess spawn failure" +
           formatStderr(stderrBuf),
         undefined,
         transcriptPath,
+        ERROR_CODE.AUTH,
       );
     } else {
       emitError(
@@ -292,12 +297,29 @@ async function main() {
           formatStderr(stderrBuf),
         undefined,
         transcriptPath,
+        ERROR_CODE.API,
       );
     }
     process.exit(1);
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
-    emitError(e.message + formatStderr(stderrBuf), e.stack, transcriptPath);
+    // Best-effort classification of the thrown error. The SDK wraps most
+    // failures but some (network) leak through as raw fetch errors. We
+    // classify off e.message + the captured stderr so e.g. an "EPERM
+    // open ~/.claude.json" line in stderr would still surface as
+    // RunErrorCodeUnknown — accurate, since none of our buckets cover
+    // host-FS issues, and the operator gets the raw stderr appended
+    // either way.
+    const haystack = (e.message + " " + stderrBuf.join("")).toLowerCase();
+    let code: (typeof ERROR_CODE)[keyof typeof ERROR_CODE] = ERROR_CODE.UNKNOWN;
+    if (haystack.includes("unauthorized") || haystack.includes("invalid api key") || haystack.includes("invalid_api_key")) {
+      code = ERROR_CODE.AUTH;
+    } else if (haystack.includes("overloaded") || haystack.includes("rate limit")) {
+      code = ERROR_CODE.API;
+    } else if (haystack.includes("enotfound") || haystack.includes("econnrefused") || haystack.includes("fetch failed")) {
+      code = ERROR_CODE.NETWORK;
+    }
+    emitError(e.message + formatStderr(stderrBuf), e.stack, transcriptPath, code);
     process.exit(1);
   }
 }
@@ -315,17 +337,17 @@ function formatStderr(buf: string[]): string {
 }
 
 process.on("SIGTERM", () => {
-  emitError("sidecar interrupted: SIGTERM");
+  emitError("sidecar interrupted: SIGTERM", undefined, undefined, ERROR_CODE.INTERRUPTED);
   process.exit(130);
 });
 
 process.on("SIGINT", () => {
-  emitError("sidecar interrupted: SIGINT");
+  emitError("sidecar interrupted: SIGINT", undefined, undefined, ERROR_CODE.INTERRUPTED);
   process.exit(130);
 });
 
 main().catch((err) => {
   const e = err instanceof Error ? err : new Error(String(err));
-  emitError(e.message, e.stack);
+  emitError(e.message, e.stack, undefined, ERROR_CODE.UNKNOWN);
   process.exit(1);
 });

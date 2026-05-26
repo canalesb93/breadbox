@@ -23,3 +23,19 @@ UPDATE api_keys SET last_used_at = NOW() WHERE id = $1;
 
 -- name: CountActiveApiKeys :one
 SELECT COUNT(*) FROM api_keys WHERE revoked_at IS NULL;
+
+-- name: CleanupOrphanedAgentApiKeys :execresult
+-- Reaps `actor_type='agent'` API keys that were minted for one run, never
+-- revoked (orchestrator crashed / SIGKILL'd mid-run before its deferred
+-- revoke could fire), and are old enough that the run could not still be
+-- in flight. Run on serve startup. Idempotent.
+--
+-- 1 hour grace covers any pathological long-running agent without risk —
+-- legitimate runs cap at agent.max_budget_usd and agent.max_turns anyway,
+-- and the orchestrator wraps each run in a 30-minute hard timeout (see
+-- RunNowAsyncWith).
+UPDATE api_keys
+SET revoked_at = NOW()
+WHERE actor_type = 'agent'
+  AND revoked_at IS NULL
+  AND created_at < NOW() - INTERVAL '1 hour';
