@@ -271,6 +271,64 @@ The canonical pattern for create/edit/settings forms. A sectioned card with a co
 - **No back link inside `.bb-page-header`.** The breadcrumb above the header is the sole back affordance — see the [Page Header](#page-header-bb-page-header) section above. The Cancel button in the bottom action row is the only secondary navigation the form needs.
 - For destructive operations, add a **separate** `bb-card bb-danger-card` below — never mix the save action with the delete action in one card.
 
+### Error surfacing — banner vs badge
+
+Errors and warnings should appear in **exactly one place** per page. When the same error is communicated as both a badge in the entity header *and* an alert banner below, the banner always wins — drop the badge.
+
+**Pick one surface per condition:**
+
+| Condition | Use |
+|---|---|
+| Error has a **message + action** the user must take (reauth, fix-it button, "view details") | **Banner / alert card** — full-width, prominent, contains the action |
+| Error is a **transient state on a list row** with no per-row action | **Badge** — compact, scannable across many rows |
+| Entity is in a **neutral state** (Active, Paused, Stale, Manual trigger) | **Badge** — these are state indicators, not duplicates of an error message |
+
+**Decision rule (canonical):**
+
+> If a banner or alert card on this page surfaces an error or required action, the entity header (or row header) must **not** also render a chip for that same condition. The banner carries the message; the chip would be a second copy of the same signal.
+
+Neutral metadata badges (`Paused`, `Stale`, trigger label, `Manual`, etc.) are **orthogonal** to the error and stay regardless of whether a banner is present — they communicate different facts.
+
+**Implementation pattern.** Compute a `hasErrorBanner` predicate from the same conditions the banner uses, then gate the status chip on `!hasErrorBanner`. Example from `connection_detail.templ`:
+
+```go
+// connDetailHasErrorBanner mirrors the two banner conditions above the
+// EntityHeader (reauth-required + 3+ consecutive failures). The status
+// chips inside connDetailBadges read this so they don't duplicate the
+// same signal as an inline pill.
+func connDetailHasErrorBanner(p ConnectionDetailProps) bool {
+    if p.Status == "error" || p.Status == "pending_reauth" {
+        return true
+    }
+    if p.ConsecutiveFailures >= 3 {
+        return true
+    }
+    return false
+}
+```
+
+```templ
+templ connDetailBadges(p ConnectionDetailProps) {
+    if !connDetailHasErrorBanner(p) {
+        // status / sync-error chip — suppressed when a banner is canonical
+        @templ.Raw(components.StatusBadge(p.Status))
+    }
+    if p.Paused {
+        <span class="badge badge-ghost badge-sm">Paused</span>  <!-- orthogonal: always shown -->
+    }
+}
+```
+
+**What this fixes.** Before the consolidation, `/connections/{id}` rendered a full red banner ("This connection needs re-authentication" + Re-authenticate button) AND a `Reauth` chip beside the title, and `/sync-logs/{id}` rendered a "warning" chip beside the title AND a Warning detail card below. Both were two visual carriers of the same fact. After: banner wins, chip disappears.
+
+**Anti-patterns to avoid:**
+
+- A status chip + alert banner saying the same thing on the same page.
+- A "Sync Error" hover-tooltip chip when the row already has a banner below explaining the same error.
+- Stacking a header chip on top of a row-level error banner inside the same card.
+
+When in doubt: **delete the chip, keep the banner**. The banner has the message + the action; the chip is just a colored label of the same fact.
+
 
 ## 3. Form patterns
 
