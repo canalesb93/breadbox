@@ -21,6 +21,6 @@ package components
 //     they drop down to a fixed enum.
 templ IconTile(tone string, icon string) {
 	<div class={ "bb-icon-header__tile", "bb-icon-tile--" + tone }>
-		<i data-lucide={ icon } class="w-5 h-5"></i>
+		@LucideIcon(icon, "w-5 h-5")
 	</div>
 }

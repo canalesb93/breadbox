@@ -39,7 +39,7 @@ templ createLoginManage(p CreateLoginProps) {
 			<div class="p-5 sm:p-6">
 				<div class="bb-icon-header">
 					<div class="bb-icon-header__tile bb-icon-tile--primary">
-						<i data-lucide="key" class="w-5 h-5"></i>
+						@components.LucideIcon("key", "w-5 h-5")
 					</div>
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold truncate">{ p.LoginUsername }</h2>
@@ -67,7 +67,7 @@ templ createLoginManage(p CreateLoginProps) {
 				</div>
 				<template x-if="error">
 					<div role="alert" class="bb-form-error mt-4">
-						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 						<span x-text="error"></span>
 					</div>
 				</template>
@@ -75,11 +75,11 @@ templ createLoginManage(p CreateLoginProps) {
 			<!-- Action row -->
 			<div class="bb-action-row">
 				<span x-show="saved" x-transition.opacity class="text-xs text-success inline-flex items-center gap-1 mr-2">
-					<i data-lucide="check" class="w-3.5 h-3.5"></i> Saved
+					@components.LucideIcon("check", "w-3.5 h-3.5") Saved
 				</span>
 				<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 				<button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary gap-1.5 min-w-32">
-					<span x-show="!saving" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+					<span x-show="!saving" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
 					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>
@@ -92,7 +92,7 @@ templ createLoginManage(p CreateLoginProps) {
 			>
 				<div class="bb-icon-header">
 					<div class="bb-icon-header__tile bb-icon-tile--warning">
-						<i data-lucide="link" class="w-5 h-5"></i>
+						@components.LucideIcon("link", "w-5 h-5")
 					</div>
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold">Setup Link</h2>
@@ -138,7 +138,7 @@ templ createLoginManage(p CreateLoginProps) {
 				<div class="flex items-center gap-2 shrink-0">
 					<template x-if="!confirming">
 						<button @click="confirming = true" class="btn btn-error btn-soft btn-sm">
-							<i data-lucide="user-x" class="w-4 h-4"></i>
+							@components.LucideIcon("user-x", "w-4 h-4")
 							Delete Login
 						</button>
 					</template>
@@ -147,7 +147,7 @@ templ createLoginManage(p CreateLoginProps) {
 							<button @click="confirming = false" :disabled="deleting" class="btn btn-ghost btn-sm">Cancel</button>
 							<button @click="confirmDelete()" :disabled="deleting" class="btn btn-error btn-sm gap-1.5 min-w-28">
 								<span x-show="!deleting" class="inline-flex items-center gap-1.5">
-									<i data-lucide="user-x" class="w-3.5 h-3.5"></i> Confirm Delete
+									@components.LucideIcon("user-x", "w-3.5 h-3.5") Confirm Delete
 								</span>
 								<span x-show="deleting" class="loading loading-spinner loading-xs"></span>
 							</button>
@@ -157,7 +157,7 @@ templ createLoginManage(p CreateLoginProps) {
 			</div>
 			<template x-if="error">
 				<div role="alert" class="bb-form-error mt-3">
-					<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+					@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 					<span x-text="error"></span>
 				</div>
 			</template>
@@ -179,7 +179,7 @@ templ createLoginNew(p CreateLoginProps) {
 				<div class="p-5 sm:p-6">
 					<div class="bb-icon-header">
 						<div class="bb-icon-header__tile bb-icon-tile--primary">
-							<i data-lucide="user-plus" class="w-5 h-5"></i>
+							@components.LucideIcon("user-plus", "w-5 h-5")
 						</div>
 						<div class="bb-icon-header__text">
 							<h2 class="text-sm font-semibold">New login account</h2>
@@ -209,7 +209,7 @@ templ createLoginNew(p CreateLoginProps) {
 						</div>
 						<template x-if="error">
 							<div role="alert" class="bb-form-error">
-								<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+								@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 								<span x-text="error"></span>
 							</div>
 						</template>
@@ -219,7 +219,7 @@ templ createLoginNew(p CreateLoginProps) {
 				<div class="bb-action-row">
 					<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 					<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-						<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i>Create Login</span>
+						<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("user-plus", "w-3.5 h-3.5") Create Login</span>
 						<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 					</button>
 				</div>
@@ -231,7 +231,7 @@ templ createLoginNew(p CreateLoginProps) {
 				<div class="p-5 sm:p-6">
 					<div class="bb-icon-header">
 						<div class="bb-icon-header__tile bb-icon-tile--success">
-							<i data-lucide="circle-check" class="w-5 h-5"></i>
+							@components.LucideIcon("circle-check", "w-5 h-5")
 						</div>
 						<div class="bb-icon-header__text">
 							<h2 class="text-sm font-semibold">Login created</h2>
@@ -263,7 +263,7 @@ templ createLoginNew(p CreateLoginProps) {
 				<!-- Action row -->
 				<div class="bb-action-row">
 					<a href="/household" class="btn btn-sm btn-primary gap-1.5">
-						<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("arrow-left", "w-3.5 h-3.5")
 						Back to Household
 					</a>
 				</div>

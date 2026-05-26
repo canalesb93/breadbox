@@ -1,5 +1,7 @@
 package pages
 
+
+import "breadbox/internal/templates/components"
 // DesignComponent renders /design/c/{slug} — a single component family
 // rendered in isolation on the page. Same admin shell as the gallery
 // (so navigation back is one click), but the main column hosts just one
@@ -161,7 +163,7 @@ templ DesignComponent(p DesignComponentProps) {
 				aria-label="Drag horizontally to resize preview"
 				title="Drag horizontally to resize"
 			>
-				<i data-lucide="grip-vertical" class="w-4 h-4 text-primary/70 group-hover:text-primary"></i>
+				@components.LucideIcon("grip-vertical", "w-4 h-4 text-primary/70 group-hover:text-primary")
 			</button>
 		</div>
 	</div>

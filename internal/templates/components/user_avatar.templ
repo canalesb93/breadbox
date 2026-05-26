@@ -47,7 +47,7 @@ templ UserAvatar(p UserAvatarProps) {
 			/>
 		} else if p.IsAgent {
 			<span class={ userAvatarAgentClass(p) } aria-hidden="true">
-				<i data-lucide="bot" class={ userAvatarBotIconClass(p.Size) }></i>
+				@LucideIcon("bot", userAvatarBotIconClass(p.Size))
 			</span>
 		} else {
 			<span class={ userAvatarFallbackClass(p) } aria-hidden="true">

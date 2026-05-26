@@ -106,13 +106,13 @@ templ TxResults(p TxResultsProps) {
 				<!-- First -->
 				if p.Page > 2 {
 					<a href={ paginatorURL(p.PaginationBase, 1) } class="join-item btn btn-sm btn-ghost" title="First page">
-						<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+						@LucideIcon("chevrons-left", "w-3.5 h-3.5")
 					</a>
 				}
 				<!-- Previous -->
 				if p.Page > 1 {
 					<a href={ paginatorURL(p.PaginationBase, p.Page-1) } class="join-item btn btn-sm btn-ghost" title="Previous page">
-						<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+						@LucideIcon("chevron-left", "w-3.5 h-3.5")
 					</a>
 				}
 				<!-- Page numbers -->
@@ -128,13 +128,13 @@ templ TxResults(p TxResultsProps) {
 				<!-- Next -->
 				if p.Page < p.TotalPages {
 					<a href={ paginatorURL(p.PaginationBase, p.Page+1) } class="join-item btn btn-sm btn-ghost" title="Next page">
-						<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+						@LucideIcon("chevron-right", "w-3.5 h-3.5")
 					</a>
 				}
 				<!-- Last -->
 				if p.Page < p.TotalPages-1 {
 					<a href={ paginatorURL(p.PaginationBase, p.TotalPages) } class="join-item btn btn-sm btn-ghost" title="Last page">
-						<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+						@LucideIcon("chevrons-right", "w-3.5 h-3.5")
 					</a>
 				}
 			</div>

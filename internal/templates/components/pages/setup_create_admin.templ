@@ -1,6 +1,9 @@
 package pages
 
-import "breadbox/internal/templates/components/layout"
+import (
+	"breadbox/internal/templates/components/layout"
+	"breadbox/internal/templates/components"
+)
 
 // CreateAdminProps carries the data the first-run admin setup page needs.
 // Rendered at GET/POST /setup when no auth accounts exist yet. Error is the
@@ -31,7 +34,7 @@ templ CreateAdmin(p CreateAdminProps) {
 		</div>
 		if p.Error != "" {
 			<div role="alert" class="alert alert-error alert-soft rounded-xl mb-6">
-				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 				<span>{ p.Error }</span>
 			</div>
 		}
@@ -91,7 +94,7 @@ templ CreateAdmin(p CreateAdminProps) {
 			<p class="text-xs text-base-content/40 text-center">You'll be able to add other family members after setup.</p>
 			<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold transition-colors duration-150 mt-1">
 				Get Started
-				<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+				@components.LucideIcon("arrow-right", "w-4 h-4 ml-1")
 			</button>
 		</form>
 	}

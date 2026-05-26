@@ -57,10 +57,10 @@ templ Toast() {
 				x-transition:leave-end="opacity-0 translate-y-2"
 				class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2 pointer-events-auto max-w-[calc(100vw-2rem)]"
 			>
-				<template x-if="t.type === 'success'"><i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i></template>
-				<template x-if="t.type === 'error'"><i data-lucide="x-circle" class="w-4 h-4 text-error shrink-0"></i></template>
-				<template x-if="t.type === 'warning'"><i data-lucide="alert-triangle" class="w-4 h-4 text-warning shrink-0"></i></template>
-				<template x-if="t.type === 'info'"><i data-lucide="info" class="w-4 h-4 text-info shrink-0"></i></template>
+				<template x-if="t.type === 'success'">@LucideIcon("check", "w-4 h-4 text-success shrink-0")</template>
+				<template x-if="t.type === 'error'">@LucideIcon("x-circle", "w-4 h-4 text-error shrink-0")</template>
+				<template x-if="t.type === 'warning'">@LucideIcon("alert-triangle", "w-4 h-4 text-warning shrink-0")</template>
+				<template x-if="t.type === 'info'">@LucideIcon("info", "w-4 h-4 text-info shrink-0")</template>
 				<span class="text-sm font-medium" x-text="t.message"></span>
 				<button
 					type="button"
@@ -68,7 +68,7 @@ templ Toast() {
 					aria-label="Dismiss notification"
 					@click="dismiss(t.id)"
 				>
-					<i data-lucide="x" class="w-3.5 h-3.5"></i>
+					@LucideIcon("x", "w-3.5 h-3.5")
 				</button>
 			</div>
 		</template>

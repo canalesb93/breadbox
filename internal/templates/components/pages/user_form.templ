@@ -72,7 +72,7 @@ templ userFormCreate() {
 				</div>
 				<p class="text-xs text-base-content/40 mb-6">This link expires in 7 days. You can regenerate it from the Household page.</p>
 				<a href="/household" class="btn btn-ghost btn-sm">
-					<i data-lucide="arrow-left" class="w-4 h-4"></i>
+					@components.LucideIcon("arrow-left", "w-4 h-4")
 					Back to Household
 				</a>
 			</div>
@@ -90,7 +90,7 @@ templ userFormCreate() {
 							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
 							title="Shuffle pattern"
 						>
-							<i data-lucide="refresh-cw" class="w-4 h-4 text-white"></i>
+							@components.LucideIcon("refresh-cw", "w-4 h-4 text-white")
 						</button>
 					</div>
 					<div>
@@ -156,7 +156,7 @@ templ userFormCreate() {
 					</template>
 					<div class="flex gap-3 pt-2">
 						<button type="submit" class="btn btn-primary btn-sm whitespace-nowrap" :disabled="submitting">
-							<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Create Member</span>
+							<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("plus", "w-4 h-4") Create Member</span>
 							<span x-show="submitting" class="loading loading-spinner loading-sm"></span>
 						</button>
 						<a href="/household" class="btn btn-ghost btn-sm">Cancel</a>
@@ -185,16 +185,16 @@ templ userFormEdit(p UserFormProps) {
 							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
 							title="Upload photo"
 						>
-							<i data-lucide="camera" class="w-4 h-4 text-white"></i>
+							@components.LucideIcon("camera", "w-4 h-4 text-white")
 						</button>
 						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
 					</div>
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold truncate">{ userFormName(p.User) }</h2>
 						<p class="text-xs text-base-content/45">
-							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="upload" class="w-3 h-3"></i>Upload photo</button>
+							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("upload", "w-3 h-3") Upload photo</button>
 							<span class="text-base-content/20">·</span>
-							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate</button>
+							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("refresh-cw", "w-3 h-3") Regenerate</button>
 							<template x-if="hasCustomAvatar">
 								<span>
 									<span class="text-base-content/20">·</span>
@@ -206,7 +206,7 @@ templ userFormEdit(p UserFormProps) {
 				</div>
 				<template x-if="avatarError">
 					<div role="alert" class="bb-form-error mb-4">
-						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 						<span x-text="avatarError"></span>
 					</div>
 				</template>
@@ -248,7 +248,7 @@ templ userFormEdit(p UserFormProps) {
 					</div>
 					<template x-if="formError">
 						<div role="alert" class="bb-form-error">
-							<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+							@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 							<span x-text="formError"></span>
 						</div>
 					</template>
@@ -258,7 +258,7 @@ templ userFormEdit(p UserFormProps) {
 			<div class="bb-action-row">
 				<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-					<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
 					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>

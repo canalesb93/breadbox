@@ -8,7 +8,7 @@ import (
 
 templ agentWizardNewAgentAction() {
 	<a href="/agents/new" class="btn btn-primary btn-sm gap-2">
-		<i data-lucide="plus" class="w-4 h-4"></i>
+		@components.LucideIcon("plus", "w-4 h-4")
 		<span>New agent</span>
 	</a>
 }
@@ -28,7 +28,7 @@ templ AgentWizard(p AgentWizardProps) {
 		Action:               agentWizardNewAgentAction(),
 	})
 	<div role="alert" class="alert alert-info alert-soft text-sm mb-6">
-		<i data-lucide="info" class="w-4 h-4"></i>
+		@components.LucideIcon("info", "w-4 h-4")
 		<div class="text-xs">
 			Each card opens a builder where you can toggle blocks, then copy or save as a scheduled agent.
 			Need to connect an external MCP client? See <a href="/settings/mcp" class="link font-medium">MCP settings</a>.
@@ -139,7 +139,7 @@ templ AgentWizard(p AgentWizardProps) {
 				<!-- Custom Agent (no card factory — direct link) -->
 				<a href="/agent-prompts/builder/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex items-center border-l-4 border-l-base-300 border-dashed">
 					<div class="w-12 h-12 rounded-xl bg-base-300/50 flex items-center justify-center group-hover:bg-base-300/70 transition-colors flex-shrink-0 ml-4">
-						<i data-lucide="plus" class="w-5 h-5 text-base-content opacity-40"></i>
+						@components.LucideIcon("plus", "w-5 h-5 text-base-content opacity-40")
 					</div>
 					<div class="flex-1 px-4 py-3.5 min-w-0">
 						<div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-0.5">
@@ -148,7 +148,7 @@ templ AgentWizard(p AgentWizardProps) {
 						<p class="text-xs text-base-content/50 leading-relaxed">Start from scratch with your own goals and instructions. Full access to all prompt blocks.</p>
 					</div>
 					<div class="flex-shrink-0 pr-4">
-						<i data-lucide="arrow-right" class="w-4 h-4 text-base-content opacity-20 group-hover:text-base-content group-hover:opacity-40 group-hover:translate-x-0.5 transition-all"></i>
+						@components.LucideIcon("arrow-right", "w-4 h-4 text-base-content opacity-20 group-hover:text-base-content group-hover:opacity-40 group-hover:translate-x-0.5 transition-all")
 					</div>
 				</a>
 			</div>
@@ -185,7 +185,7 @@ templ wizardCard(c wizardCardData) {
 				"bg-" + c.Color + "/10",
 				"group-hover:bg-" + c.Color + "/15" }
 			>
-				<i data-lucide={ c.Icon } class={ "w-5 h-5", "text-" + c.Color }></i>
+				@components.LucideIcon(c.Icon, "w-5 h-5 " + "text-" + c.Color)
 			</div>
 			<div class="flex-1 px-4 py-3.5 min-w-0">
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-0.5">

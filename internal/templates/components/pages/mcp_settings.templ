@@ -102,7 +102,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 			     the secondary color has almost no contrast against the light background,
 			     making the icon look transparent/ghostly. Use info or primary instead. -->
 			<div class={ "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0", "bg-" + c.IconColor + "/10" }>
-				<i data-lucide={ c.Icon } class={ "w-5 h-5", "text-" + c.IconColor }></i>
+				@components.LucideIcon(c.Icon, "w-5 h-5 " + "text-" + c.IconColor)
 			</div>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">{ c.Title }</h2>
@@ -119,7 +119,7 @@ templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
 			<div class="px-4 sm:px-5 py-4">
 				if c.ShowWarning {
 					<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs">
-						<i data-lucide="triangle-alert" class="w-4 h-4"></i>
+						@components.LucideIcon("triangle-alert", "w-4 h-4")
 						<span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
 					</div>
 				}
@@ -233,10 +233,10 @@ templ mcpSettingsConnectionCard() {
 						<pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{ stdioConfigJSON() }</pre>
 						<button class="btn btn-sm btn-ghost absolute top-2 right-2" @click.stop="copyStdioConfig()">
 							<template x-if="!copiedConfig">
-								<span class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> Copy</span>
+								<span class="flex items-center gap-1">@components.LucideIcon("copy", "w-4 h-4") Copy</span>
 							</template>
 							<template x-if="copiedConfig">
-								<span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-4 h-4"></i> Copied!</span>
+								<span class="flex items-center gap-1 text-success">@components.LucideIcon("check", "w-4 h-4") Copied!</span>
 							</template>
 						</button>
 					</div>

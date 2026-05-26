@@ -113,7 +113,7 @@ templ timelineCard(p TimelineProps) {
 		if p.Heading != "" {
 			<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
 				if p.HeadingIcon != "" {
-					<i data-lucide={ p.HeadingIcon } class="w-4 h-4 text-base-content opacity-40" aria-hidden="true"></i>
+					@LucideIcon(p.HeadingIcon, "w-4 h-4 text-base-content opacity-40")
 				}
 				<h2 id={ timelineHeadingID(p.Heading) } class="text-sm font-semibold text-base-content/60">{ p.Heading }</h2>
 				if p.EventCount > 0 {
@@ -160,7 +160,7 @@ templ timelineProminent(p TimelineProps) {
 		if p.Heading != "" {
 			<header class="flex items-center gap-2.5 pb-4 mb-5 border-b border-base-300">
 				if p.HeadingIcon != "" {
-					<i data-lucide={ p.HeadingIcon } class="w-5 h-5 text-base-content opacity-70" aria-hidden="true"></i>
+					@LucideIcon(p.HeadingIcon, "w-5 h-5 text-base-content opacity-70")
 				}
 				<h2 id={ timelineHeadingID(p.Heading) } class="text-lg font-semibold text-base-content tracking-tight">{ p.Heading }</h2>
 				if p.EventCount > 0 {
@@ -212,7 +212,7 @@ templ TimelineSystemRow(p TimelineRowProps) {
 			if p.IconTone != "custom" {
 				<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", timelineIconBg(p.IconTone) } aria-hidden="true">
 					if p.Icon != "" {
-						<i data-lucide={ p.Icon } class={ "w-3 h-3", timelineIconColor(p.IconTone) }></i>
+						@LucideIcon(p.Icon, "w-3 h-3 " + timelineIconColor(p.IconTone))
 					}
 				</span>
 			}
@@ -327,7 +327,7 @@ templ TimelineCommentRowRaw(avatar templ.Component, attrs templ.Attributes) {
 // the divider; this primitive renders only the icon + message.
 templ TimelineEmpty(message string) {
 	<div class="text-center">
-		<i data-lucide="clock" class="w-5 h-5 text-base-content opacity-20 mx-auto" aria-hidden="true"></i>
+		@LucideIcon("clock", "w-5 h-5 text-base-content opacity-20 mx-auto")
 		<p class="text-xs text-base-content/40 mt-1.5">{ message }</p>
 	</div>
 }
@@ -367,7 +367,7 @@ templ timelineCommentAvatar(actor TimelineActor) {
 // background. The card variant keeps base-100 verbatim.
 templ TimelineCommentTile() {
 	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-		<i data-lucide="message-square" class="w-3 h-3 text-base-content opacity-55"></i>
+		@LucideIcon("message-square", "w-3 h-3 text-base-content opacity-55")
 	</span>
 }
 

@@ -13,7 +13,7 @@ paths:
 - `html/template` (standard library), no templating engine.
 - **DaisyUI 5 + Tailwind CSS v4** via `tailwindcss-extra` standalone CLI. **No Node.js**.
 - **Alpine.js v3** via CDN for interactivity. No build step.
-- **Lucide** icons via CDN. `data-lucide="icon-name"` attributes replaced with inline SVG by `lucide.createIcons()`.
+- **Lucide** icons rendered as inline SVG at server-render time via the `@LucideIcon` templ component / `{{ lucide ... }}` html/template func (backed by `github.com/kaugesaar/lucide-go`). The runtime `lucide.min.js` bundle still loads for the small set of Alpine-driven icons whose name is computed in JS — see the **Icons** section below.
 
 ## CSS build
 
@@ -154,7 +154,15 @@ Touching the activity card on `/transactions/{id}` — or anything that wants to
 
 ## Icons
 
-Lucide names only. Nav-level icons are stable; don't rename on a whim (users build muscle memory). Current nav: `home`, `credit-card`, `receipt`, `folder`, `link-2` (account links), `users`, `key`, `bot` (MCP), `list-filter` (rules), `inbox` (reviews), `flag` (reports), `scroll` (sync logs), `settings`.
+**Default to server-rendered SVG.** In templ files (`internal/templates/components/**/*.templ`), call `@LucideIcon("name", "class")` for the in-`components` package, or `@components.LucideIcon("name", "class")` from sibling packages (`pages`, `layout`). Pass `""` for class when none is needed. For a per-category color that can't be a static class, use `@LucideIconWithStyle("name", "class", styleExpr)` — the only callers today are category-color icons (`categoryIconColor`, `ruleCategoryIconColorStyle`).
+
+In the html/template-rendered `base.html`, the equivalent is `{{ lucide "name" "class" }}` — registered via `components.LucideFuncMap()` in `internal/admin/templates.go`.
+
+Output is `<svg aria-hidden="true" class="lucide lucide-{name} ...">` with the `lucide` class always present (load-bearing for `svg.lucide` rules in `input.css` — pointer-events neutralisation and alpha-strip on overlapping strokes).
+
+**When to keep the `<i data-lucide>` placeholder pattern.** The runtime `lucide.createIcons()` path is still alive for icons whose name is bound at JS runtime — Alpine `:data-lucide="..."`, `x-show`/`x-cloak` toggles where the same `<i>` is reused across states, JS-injected category/tag pickers, cmdk results, toast templates. Don't migrate these. The MutationObserver in `base.html` keeps watching for new `<i data-lucide>:not(svg)` insertions and the bundle still ships deferred.
+
+**Picking icon names.** Lucide names only. Nav-level icons are stable; don't rename on a whim (users build muscle memory). Current nav: `home`, `credit-card`, `receipt`, `folder`, `link-2` (account links), `users`, `key`, `bot` (MCP), `list-filter` (rules), `inbox` (reviews), `flag` (reports), `scroll` (sync logs), `settings`.
 
 ## Validation / PR evidence
 

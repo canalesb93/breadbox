@@ -44,7 +44,7 @@ templ agentsHeaderActions(modalID string, runDisabled bool) {
 	<div class="flex items-center gap-2 shrink-0">
 		if runDisabled {
 			<button type="button" class="btn btn-sm btn-ghost gap-2" disabled title="Agents need configuration before runs can fire">
-				<i data-lucide="play" class="w-4 h-4"></i>
+				@components.LucideIcon("play", "w-4 h-4")
 				<span>Run an agent</span>
 			</button>
 		} else {
@@ -53,12 +53,12 @@ templ agentsHeaderActions(modalID string, runDisabled bool) {
 				class="btn btn-sm btn-ghost gap-2"
 				onclick={ openAgentRunModal(modalID) }
 			>
-				<i data-lucide="play" class="w-4 h-4"></i>
+				@components.LucideIcon("play", "w-4 h-4")
 				<span>Run an agent</span>
 			</button>
 		}
 		<a href="/agents/new" class="btn btn-sm btn-primary gap-2">
-			<i data-lucide="plus" class="w-4 h-4"></i>
+			@components.LucideIcon("plus", "w-4 h-4")
 			<span>New agent</span>
 		</a>
 	</div>
@@ -103,7 +103,7 @@ templ agentRunModal(p agentRunModalProps) {
 		<div class="modal-box rounded-xl max-w-xl">
 			<form method="dialog">
 				<button type="button" class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="Close" onclick="this.closest('dialog').close()">
-					<i data-lucide="x" class="w-4 h-4"></i>
+					@components.LucideIcon("x", "w-4 h-4")
 				</button>
 			</form>
 			<h3 class="text-base font-semibold mb-3">Run an agent</h3>
@@ -112,13 +112,13 @@ templ agentRunModal(p agentRunModalProps) {
 			</p>
 			if len(p.Options) == 0 {
 				<div class="bb-card p-6 text-center text-sm text-base-content/60">
-					<i data-lucide="bot-off" class="w-5 h-5 mx-auto opacity-40 mb-2"></i>
+					@components.LucideIcon("bot-off", "w-5 h-5 mx-auto opacity-40 mb-2")
 					<div>No enabled agents yet.</div>
 					<a href="/agents/new" class="link link-primary text-xs mt-2 inline-block">Create your first agent →</a>
 				</div>
 			} else {
 				<label class="input input-sm w-full mb-3">
-					<i data-lucide="search" class="w-3.5 h-3.5 opacity-60"></i>
+					@components.LucideIcon("search", "w-3.5 h-3.5 opacity-60")
 					<input
 						type="text"
 						placeholder="Filter agents…"
@@ -130,7 +130,7 @@ templ agentRunModal(p agentRunModalProps) {
 					<template x-for="opt in filtered" :key="opt.Slug">
 						<div class="flex items-center gap-3 px-3 py-2.5 hover:bg-base-200/50">
 							<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-								<i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+								@components.LucideIcon("bot", "w-4 h-4 text-primary")
 							</div>
 							<div class="min-w-0 flex-1">
 								<div class="text-sm font-medium truncate" x-text="opt.Name"></div>
@@ -143,7 +143,7 @@ templ agentRunModal(p agentRunModalProps) {
 								@click="prefix = lastPrefixFor(opt.Slug)"
 								:title="'Use last prefix: ' + lastPrefixFor(opt.Slug)"
 							>
-								<i data-lucide="rotate-cw" class="w-3 h-3"></i>
+								@components.LucideIcon("rotate-cw", "w-3 h-3")
 								<span class="hidden sm:inline">Last prefix</span>
 							</button>
 							<button
@@ -152,7 +152,7 @@ templ agentRunModal(p agentRunModalProps) {
 								@click="run(opt.Slug)"
 								:disabled="busy"
 							>
-								<i data-lucide="play" class="w-3 h-3"></i>
+								@components.LucideIcon("play", "w-3 h-3")
 								Run
 							</button>
 						</div>

@@ -43,24 +43,24 @@ templ Nav(p NavProps) {
 		if p.ShowGettingStarted {
 			<div class="bb-sidebar-section">Setup</div>
 			<a href="/getting-started" class={ "bb-sidebar-link", navActive(p.CurrentPage, "getting-started") }>
-				<i data-lucide="compass"></i>
+				@LucideIcon("compass", "")
 				<span class="flex-1">Getting Started</span>
 			</a>
 		}
 		<div class="bb-sidebar-section">Overview</div>
 		<a href="/" class={ "bb-sidebar-link", navActive(p.CurrentPage, "feed") }>
-			<i data-lucide="rss"></i>
+			@LucideIcon("rss", "")
 			<span class="flex-1">Feed</span>
 		</a>
 		<a href="/transactions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "transactions") }>
-			<i data-lucide="receipt"></i> Transactions
+			@LucideIcon("receipt", "") Transactions
 		</a>
 		<a href="/accounts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "accounts") }>
-			<i data-lucide="wallet"></i> Accounts
+			@LucideIcon("wallet", "") Accounts
 		</a>
 		if p.IsAdmin {
 			<a href="/reports" class={ "bb-sidebar-link", navActive(p.CurrentPage, "reports") }>
-				<i data-lucide="file-text"></i>
+				@LucideIcon("file-text", "")
 				<span class="flex-1">Reports</span>
 				if p.UnreadReports > 0 {
 					<span class="bb-nav-badge" title={ fmt.Sprintf("%d unread reports", p.UnreadReports) }>{ badgeCount(p.UnreadReports) }</span>
@@ -70,27 +70,27 @@ templ Nav(p NavProps) {
 		<div class="bb-sidebar-section">Manage</div>
 		if p.IsEditor {
 			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
-				<i data-lucide="bot-message-square"></i>
+				@LucideIcon("bot-message-square", "")
 				<span>Agents</span>
 			</a>
 		}
 		if p.IsAdmin {
 			<a href="/rules" class={ "bb-sidebar-link", navActive(p.CurrentPage, "rules") }>
-				<i data-lucide="zap"></i> Rules
+				@LucideIcon("zap", "") Rules
 			</a>
 			<a href="/categories" class={ "bb-sidebar-link", navActive(p.CurrentPage, "categories") }>
-				<i data-lucide="folder"></i> Categories
+				@LucideIcon("folder", "") Categories
 			</a>
 		}
 		if p.IsEditor {
 			<a href="/tags" class={ "bb-sidebar-link", navActive(p.CurrentPage, "tags") }>
-				<i data-lucide="tags"></i> Tags
+				@LucideIcon("tags", "") Tags
 			</a>
 		}
 		if p.IsEditor {
 			<div class="bb-sidebar-section">System</div>
 			<a href="/connections" class={ "bb-sidebar-link", navActive(p.CurrentPage, "connections") }>
-				<i data-lucide="link"></i>
+				@LucideIcon("link", "")
 				<span class="flex-1">Connections</span>
 				if p.ConnectionsAttention > 0 {
 					<span class="bb-nav-badge bb-nav-badge--warn" title={ fmt.Sprintf("%d connections need attention", p.ConnectionsAttention) }>{ badgeCount(p.ConnectionsAttention) }</span>
@@ -98,10 +98,10 @@ templ Nav(p NavProps) {
 			</a>
 			if p.IsAdmin {
 				<a href="/household" class={ "bb-sidebar-link", navActive(p.CurrentPage, "household") }>
-					<i data-lucide="users"></i> Household
+					@LucideIcon("users", "") Household
 				</a>
 				<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
-					<i data-lucide="scroll-text"></i> Logs
+					@LucideIcon("scroll-text", "") Logs
 				</a>
 			}
 		}
@@ -135,9 +135,9 @@ templ navExternalLink(href, icon, label string) {
 		rel="noopener noreferrer"
 		class="bb-sidebar-link group"
 	>
-		<i data-lucide={ icon }></i>
+		@LucideIcon(icon, "")
 		<span class="flex-1">{ label }</span>
-		<i data-lucide="square-arrow-out-up-right" class="bb-nav-external-arrow"></i>
+		@LucideIcon("square-arrow-out-up-right", "bb-nav-external-arrow")
 	</a>
 }
 

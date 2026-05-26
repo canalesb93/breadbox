@@ -92,7 +92,7 @@ templ statTileBody(p StatTileProps) {
 	<div class="flex items-center gap-2.5 sm:gap-3">
 		if p.Icon != "" {
 			<div class={ "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0", statTileBg(p.Tone) }>
-				<i data-lucide={ p.Icon } class={ "w-4 h-4", statTileIcon(p.Tone) }></i>
+				@LucideIcon(p.Icon, "w-4 h-4 " + statTileIcon(p.Tone))
 			</div>
 		}
 		<div class="min-w-0 flex-1">

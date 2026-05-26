@@ -49,7 +49,7 @@ templ RuleDetail(p RuleDetailProps) {
 		@ruleDetailStats(p)
 		if p.Rule != nil && p.Rule.HitCount > 0 && p.Stats != nil && p.Stats.UniqueTransactions == 0 {
 			<p class="text-xs text-base-content/40 mb-4 px-1">
-				<i data-lucide="info" class="w-3 h-3 inline-block -mt-0.5"></i>
+				@components.LucideIcon("info", "w-3 h-3 inline-block -mt-0.5")
 				Per-transaction tracking was recently enabled. The "Transactions affected" count will update as this rule runs in future syncs.
 			</p>
 		}
@@ -88,7 +88,7 @@ templ ruleDetailBadges(p RuleDetailProps, isSystem bool) {
 	}
 	if isSystem {
 		<span class="badge badge-soft badge-info badge-sm gap-1" title="Built-in system rule">
-			<i data-lucide="shield" class="w-3 h-3"></i>
+			@components.LucideIcon("shield", "w-3 h-3")
 			System rule
 		</span>
 	}
@@ -107,17 +107,17 @@ templ ruleDetailMeta(p RuleDetailProps) {
 
 templ ruleDetailEditBtn(p RuleDetailProps) {
 	<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline">
-		<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+		@components.LucideIcon("pencil", "w-3.5 h-3.5") Edit
 	</a>
 }
 
 templ ruleDetailToggleBtn(p RuleDetailProps) {
 	<button class="btn btn-sm btn-secondary" @click="toggleRule()">
 		if p.Rule.Enabled {
-			<i data-lucide="pause" class="w-3.5 h-3.5"></i>
+			@components.LucideIcon("pause", "w-3.5 h-3.5")
 			Disable
 		} else {
-			<i data-lucide="play" class="w-3.5 h-3.5"></i>
+			@components.LucideIcon("play", "w-3.5 h-3.5")
 			Enable
 		}
 	</button>
@@ -148,7 +148,7 @@ templ ruleDetailWhatItDoes(p RuleDetailProps) {
 					if matchAll {
 						<div class="flex items-center gap-3 p-3 bg-info/5 border border-info/15 rounded-xl">
 							<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-								<i data-lucide="infinity" class="w-4 h-4 text-info"></i>
+								@components.LucideIcon("infinity", "w-4 h-4 text-info")
 							</div>
 							<div class="flex-1 min-w-0">
 								<p class="text-sm font-medium">All transactions</p>
@@ -188,9 +188,9 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 			case "set_category":
 				<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={ ruleCategoryTileBgStyle(p.Rule) }>
 					if p.Rule != nil && p.Rule.CategoryIcon != nil {
-						<i data-lucide={ *p.Rule.CategoryIcon } class="w-4 h-4" style={ ruleCategoryIconColorStyle(p.Rule) }></i>
+						@components.LucideIconWithStyle(*p.Rule.CategoryIcon, "w-4 h-4", ruleCategoryIconColorStyle(p.Rule))
 					} else {
-						<i data-lucide="tag" class="w-4 h-4 text-base-content opacity-50"></i>
+						@components.LucideIcon("tag", "w-4 h-4 text-base-content opacity-50")
 					}
 				</div>
 				<div class="flex-1 min-w-0">
@@ -208,7 +208,7 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 				</div>
 			case "add_tag":
 				<div class="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-					<i data-lucide="hash" class="w-4 h-4 text-warning"></i>
+					@components.LucideIcon("hash", "w-4 h-4 text-warning")
 				</div>
 				<div class="flex-1 min-w-0">
 					<p class="text-sm">Add tag <span class="font-semibold">{ a.TagSlug }</span></p>
@@ -216,7 +216,7 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 				</div>
 			case "remove_tag":
 				<div class="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
-					<i data-lucide="minus-circle" class="w-4 h-4 text-error"></i>
+					@components.LucideIcon("minus-circle", "w-4 h-4 text-error")
 				</div>
 				<div class="flex-1 min-w-0">
 					<p class="text-sm">Remove tag <span class="font-semibold">{ a.TagSlug }</span></p>
@@ -224,7 +224,7 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 				</div>
 			case "add_comment":
 				<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-					<i data-lucide="message-square" class="w-4 h-4 text-info"></i>
+					@components.LucideIcon("message-square", "w-4 h-4 text-info")
 				</div>
 				<div class="flex-1 min-w-0">
 					<p class="text-sm">Add comment</p>
@@ -232,7 +232,7 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 				</div>
 			default:
 				<div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
-					<i data-lucide="settings" class="w-4 h-4 text-base-content opacity-40"></i>
+					@components.LucideIcon("settings", "w-4 h-4 text-base-content opacity-40")
 				</div>
 				<div class="flex-1 min-w-0">
 					<p class="text-sm">Unknown action type: <span class="font-semibold">{ a.Type }</span></p>
@@ -300,10 +300,10 @@ templ ruleDetailRecentApplications(p RuleDetailProps) {
 								<div class="flex items-center justify-end px-4 pt-2 text-[0.65rem] uppercase tracking-wider text-base-content/40">
 									<span class="inline-flex items-center gap-1">
 										if meta.AppliedBy == "retroactive" {
-											<i data-lucide="rewind" class="w-3 h-3"></i>
+											@components.LucideIcon("rewind", "w-3 h-3")
 											retroactive
 										} else {
-											<i data-lucide="wrench" class="w-3 h-3"></i>
+											@components.LucideIcon("wrench", "w-3 h-3")
 											{ meta.AppliedBy }
 										}
 									</span>
@@ -478,7 +478,7 @@ templ ruleDetailApplyModal(p RuleDetailProps) {
 					     category button) was rendered behind the z-50 backdrop and
 					     therefore invisible whenever apply failed — see #701. -->
 					<div x-show="applyError" x-cloak role="alert" class="alert alert-error text-xs mt-4">
-						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 						<span x-text="applyError"></span>
 					</div>
 					<div class="flex items-center justify-end gap-2 mt-5">
@@ -529,9 +529,9 @@ templ ruleDetailSyncRow(h map[string]any) {
 		<div class="flex items-center gap-3">
 			<div class={ "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", syncStatusBgClass(status) }>
 				if status == "success" {
-					<i data-lucide="check" class="w-4 h-4 text-success"></i>
+					@components.LucideIcon("check", "w-4 h-4 text-success")
 				} else {
-					<i data-lucide="x" class="w-4 h-4 text-error"></i>
+					@components.LucideIcon("x", "w-4 h-4 text-error")
 				}
 			</div>
 			<div>

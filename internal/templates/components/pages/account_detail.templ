@@ -174,7 +174,7 @@ templ acctSettings(p AccountDetailProps) {
 	<div class="bb-card p-0 overflow-hidden mb-6" x-data="{ open: false }">
 		<button class="w-full flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer" @click="open = !open">
 			<div class="flex items-center gap-2">
-				<i data-lucide="settings" class="w-4 h-4 text-base-content opacity-50"></i>
+				@components.LucideIcon("settings", "w-4 h-4 text-base-content opacity-50")
 				<span class="text-sm font-semibold text-base-content/50">Account Settings</span>
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-40 transition-transform duration-200" :class="open && 'rotate-180'"></i>
@@ -236,13 +236,13 @@ templ acctTransactionsHeader(p AccountDetailProps) {
 			<div class="flex items-center gap-2">
 				if acctHasFilters(p) {
 					<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-sm">
-						<i data-lucide="x" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("x", "w-3.5 h-3.5")
 						<span class="hidden sm:inline">Clear filters</span>
 					</a>
 				}
 				if len(p.Transactions) > 0 {
 					<a href={ templ.SafeURL(p.ExportURL) } class="btn btn-ghost btn-sm" title="Export as CSV">
-						<i data-lucide="download" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("download", "w-3.5 h-3.5")
 						<span class="hidden sm:inline">CSV</span>
 					</a>
 				}
@@ -252,7 +252,7 @@ templ acctTransactionsHeader(p AccountDetailProps) {
 					:class="filtersOpen ? 'btn-primary' : 'btn-ghost'"
 					@click="filtersOpen = !filtersOpen"
 				>
-					<i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
 					<span class="hidden sm:inline">Filters</span>
 					if acctHasFilters(p) {
 						<span class="badge badge-xs" :class="filtersOpen ? 'badge-primary-content' : 'badge-primary'">Active</span>
@@ -321,7 +321,7 @@ templ acctFilterPanel(p AccountDetailProps) {
 		<div class="bb-filter-actions">
 			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-sm btn-ghost">Reset</a>
 			<button type="submit" class="btn btn-sm btn-primary">
-				<i data-lucide="search" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("search", "w-3.5 h-3.5")
 				Apply Filters
 			</button>
 		</div>
@@ -363,13 +363,13 @@ templ acctPagination(p AccountDetailProps) {
 			<!-- First -->
 			if p.Page > 2 {
 				<a href={ acctPageURL(p.PaginationBase, 1) } class="join-item btn btn-sm btn-ghost" title="First page">
-					<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("chevrons-left", "w-3.5 h-3.5")
 				</a>
 			}
 			<!-- Previous -->
 			if p.Page > 1 {
 				<a href={ acctPageURL(p.PaginationBase, p.Page-1) } class="join-item btn btn-sm btn-ghost" title="Previous page">
-					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("chevron-left", "w-3.5 h-3.5")
 				</a>
 			}
 			<!-- Page numbers -->
@@ -387,13 +387,13 @@ templ acctPagination(p AccountDetailProps) {
 			<!-- Next -->
 			if p.Page < p.TotalPages {
 				<a href={ acctPageURL(p.PaginationBase, p.Page+1) } class="join-item btn btn-sm btn-ghost" title="Next page">
-					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("chevron-right", "w-3.5 h-3.5")
 				</a>
 			}
 			<!-- Last -->
 			if p.Page < p.TotalPages-1 {
 				<a href={ acctPageURL(p.PaginationBase, p.TotalPages) } class="join-item btn btn-sm btn-ghost" title="Last page">
-					<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("chevrons-right", "w-3.5 h-3.5")
 				</a>
 			}
 		</div>

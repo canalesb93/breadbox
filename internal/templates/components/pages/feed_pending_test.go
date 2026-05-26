@@ -72,7 +72,7 @@ func TestFeedTxRefRowPendingPill(t *testing.T) {
 				Pending:      true,
 			},
 			mustContain: []string{
-				`data-lucide="clock"`,
+				`lucide-clock`,
 				"text-warning opacity-70",
 				"Pending — not yet posted",
 				"(pending)",
@@ -135,7 +135,7 @@ func TestFeedTxRefRowPendingPill(t *testing.T) {
 				CategorySlug:        ptrString("food_and_drink_groceries"),
 			},
 			mustContain: []string{
-				`data-lucide="shopping-cart"`,
+				`lucide-shopping-cart`,
 				"bb-tx-avatar bb-tx-avatar--sm",
 			},
 			mustOmit: []string{

@@ -101,7 +101,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 	}>
 		<summary class="collapse-title text-sm font-medium">
 			<div class="flex items-center gap-2 flex-wrap">
-				<i data-lucide="filter" class="w-4 h-4 text-base-content/50"></i>
+				@components.LucideIcon("filter", "w-4 h-4 text-base-content/50")
 				<span>Filters</span>
 				@agentRunsActiveChips(p)
 			</div>
@@ -158,7 +158,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 				</div>
 				<div class="bb-filter-actions flex items-center gap-2">
 					<button type="submit" class="btn btn-sm btn-primary">
-						<i data-lucide="filter" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("filter", "w-3.5 h-3.5")
 						Apply
 					</button>
 					<a href="/agents" class="btn btn-sm btn-ghost">Clear</a>
@@ -174,7 +174,7 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 templ agentRunsActiveChips(p AgentRunsListProps) {
 	if p.Filters.AgentSlug != "" {
 		<span class="badge badge-soft badge-primary badge-xs gap-1">
-			<i data-lucide="bot" class="w-2.5 h-2.5"></i>
+			@components.LucideIcon("bot", "w-2.5 h-2.5")
 			{ agentRunsResolveAgentName(p, p.Filters.AgentSlug) }
 		</span>
 	}
@@ -219,14 +219,14 @@ templ agentRunsPagination(p AgentRunsListProps) {
 		<div class="join">
 			if p.Offset > 0 {
 				<a href={ templ.SafeURL(agentRunsPageHref(p, prevOffset(p.Offset, p.Limit))) } class="join-item btn btn-sm btn-ghost" title="Previous page">
-					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("chevron-left", "w-3.5 h-3.5")
 					Prev
 				</a>
 			}
 			if len(p.Rows) >= p.Limit {
 				<a href={ templ.SafeURL(agentRunsPageHref(p, p.Offset+p.Limit)) } class="join-item btn btn-sm btn-ghost" title="Next page">
 					Next
-					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("chevron-right", "w-3.5 h-3.5")
 				</a>
 			}
 		</div>

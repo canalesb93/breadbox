@@ -1,6 +1,9 @@
 package pages
 
-import "breadbox/internal/templates/components/layout"
+import (
+	"breadbox/internal/templates/components/layout"
+	"breadbox/internal/templates/components"
+)
 
 // OAuthAuthorizeProps carries the data the OAuth consent page needs.
 // Rendered at GET /oauth/authorize when an admin session is active. Scope
@@ -32,7 +35,7 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 			<div class="bb-card p-8 max-w-md w-full">
 				<div class="flex flex-col items-center text-center mb-6">
 					<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-						<i data-lucide="shield-check" class="w-8 h-8 text-primary"></i>
+						@components.LucideIcon("shield-check", "w-8 h-8 text-primary")
 					</div>
 					<h2 class="text-lg font-semibold mb-1">Authorize Access</h2>
 					<p class="text-sm text-base-content/50">
@@ -43,16 +46,16 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 					<div class="text-xs font-medium text-base-content/50 mb-2">This will allow the application to:</div>
 					<ul class="space-y-2">
 						<li class="flex items-center gap-2 text-sm">
-							<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+							@components.LucideIcon("check", "w-4 h-4 text-success shrink-0")
 							Read your transactions, accounts, and categories
 						</li>
 						if p.Scope != "read_only" {
 							<li class="flex items-center gap-2 text-sm">
-								<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+								@components.LucideIcon("check", "w-4 h-4 text-success shrink-0")
 								Categorize transactions and manage rules
 							</li>
 							<li class="flex items-center gap-2 text-sm">
-								<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+								@components.LucideIcon("check", "w-4 h-4 text-success shrink-0")
 								Use MCP tools in read/write mode
 							</li>
 						}
@@ -68,7 +71,7 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 					<input type="hidden" name="code_challenge_method" value={ p.CodeChallengeMethod }/>
 					<div class="flex gap-3">
 						<button type="submit" name="action" value="approve" class="btn btn-primary flex-1">
-							<i data-lucide="check" class="w-4 h-4"></i>
+							@components.LucideIcon("check", "w-4 h-4")
 							Authorize
 						</button>
 						<button type="submit" name="action" value="deny" class="btn btn-ghost flex-1">

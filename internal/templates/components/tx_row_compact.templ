@@ -47,7 +47,7 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 						class="inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
 						title={ fmt.Sprintf("%d comment%s", tx.CommentCount, pluralS(tx.CommentCount)) }
 					>
-						<i data-lucide="messages-square" class="w-3 h-3"></i>
+						@LucideIcon("messages-square", "w-3 h-3")
 						<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
 					</span>
 				}

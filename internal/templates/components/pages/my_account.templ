@@ -1,5 +1,7 @@
 package pages
 
+
+import "breadbox/internal/templates/components"
 // MyAccount renders the Account tab inside the Settings modal — the
 // single identity page covering avatar/name/email (when linked), the
 // password change form, and the danger zone.
@@ -30,7 +32,7 @@ templ MyAccount(p MyAccountProps) {
 		})
 		if p.IsUnlinked {
 			<div role="alert" class="alert alert-warning mb-6 rounded-xl">
-				<i data-lucide="user-plus" class="w-5 h-5"></i>
+				@components.LucideIcon("user-plus", "w-5 h-5")
 				<span>
 					Your admin account isn't linked to a household member yet.
 					<a href="/household" class="link font-medium">Link it from the Household page</a>
@@ -70,7 +72,7 @@ templ myAccountSignOutForm(csrfToken string) {
 			<input type="hidden" name="_csrf" value={ csrfToken }/>
 		}
 		<button type="submit" class="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content">
-			<i data-lucide="log-out" class="w-4 h-4"></i>
+			@components.LucideIcon("log-out", "w-4 h-4")
 			Sign out
 		</button>
 	</form>
@@ -100,16 +102,16 @@ templ myAccountProfileCard(p MyAccountProps) {
 							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
 							title="Upload photo"
 						>
-							<i data-lucide="camera" class="w-4 h-4 text-white"></i>
+							@components.LucideIcon("camera", "w-4 h-4 text-white")
 						</button>
 						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
 					</div>
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold truncate">Profile</h2>
 						<p class="text-xs text-base-content/45 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="upload" class="w-3 h-3"></i>Upload photo</button>
+							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("upload", "w-3 h-3") Upload photo</button>
 							<span class="text-base-content/20">·</span>
-							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate</button>
+							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("refresh-cw", "w-3 h-3") Regenerate</button>
 							<template x-if="hasCustomAvatar">
 								<span class="inline-flex items-center gap-1.5">
 									<span class="text-base-content/20">·</span>
@@ -121,7 +123,7 @@ templ myAccountProfileCard(p MyAccountProps) {
 				</div>
 				<template x-if="avatarError">
 					<div role="alert" class="bb-form-error mb-4">
-						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 						<span x-text="avatarError"></span>
 					</div>
 				</template>
@@ -162,7 +164,7 @@ templ myAccountProfileCard(p MyAccountProps) {
 					</div>
 					<template x-if="formError">
 						<div role="alert" class="bb-form-error">
-							<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+							@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 							<span x-text="formError"></span>
 						</div>
 					</template>
@@ -170,7 +172,7 @@ templ myAccountProfileCard(p MyAccountProps) {
 			</div>
 			<div class="bb-action-row">
 				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-					<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
 					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>
@@ -189,7 +191,7 @@ templ myAccountPasswordCard(csrfToken string) {
 		<div class="p-5 sm:p-6">
 			<div class="bb-icon-header">
 				<div class="bb-icon-header__tile bg-base-200/60">
-					<i data-lucide="lock" class="w-4 h-4 text-base-content opacity-50"></i>
+					@components.LucideIcon("lock", "w-4 h-4 text-base-content opacity-50")
 				</div>
 				<div class="bb-icon-header__text">
 					<h2 class="text-sm font-semibold">Change password</h2>
@@ -235,7 +237,7 @@ templ myAccountPasswordCard(csrfToken string) {
 		</div>
 		<div class="bb-action-row">
 			<button type="submit" class="btn btn-sm btn-primary gap-1.5">
-				<i data-lucide="save" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("save", "w-3.5 h-3.5")
 				Update password
 			</button>
 		</div>
@@ -249,7 +251,7 @@ templ myAccountDangerZone(csrfToken string) {
 		<div class="p-5 sm:p-6">
 			<div class="bb-icon-header">
 				<div class="bb-icon-header__tile bg-error/10">
-					<i data-lucide="alert-triangle" class="w-4 h-4 text-error"></i>
+					@components.LucideIcon("alert-triangle", "w-4 h-4 text-error")
 				</div>
 				<div class="bb-icon-header__text">
 					<h2 class="text-sm font-semibold text-error">Danger zone</h2>
@@ -258,7 +260,7 @@ templ myAccountDangerZone(csrfToken string) {
 			</div>
 			<template x-if="!confirmWipe">
 				<button @click="confirmWipe = true" type="button" class="btn btn-error btn-sm btn-outline gap-1.5">
-					<i data-lucide="trash-2" class="w-4 h-4"></i>
+					@components.LucideIcon("trash-2", "w-4 h-4")
 					Wipe my data
 				</button>
 			</template>

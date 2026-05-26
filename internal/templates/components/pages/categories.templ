@@ -171,9 +171,9 @@ templ categoryIconTile(c service.CategoryResponse, child bool) {
 templ categoryTileInner(c service.CategoryResponse, child bool) {
 	if c.Icon != nil && *c.Icon != "" {
 		if child {
-			<i data-lucide={ *c.Icon } class="w-3.5 h-3.5" style={ categoryIconColor(c.Color) }></i>
+			@components.LucideIconWithStyle(*c.Icon, "w-3.5 h-3.5", categoryIconColor(c.Color))
 		} else {
-			<i data-lucide={ *c.Icon } class="w-5 h-5" style={ categoryIconColor(c.Color) }></i>
+			@components.LucideIconWithStyle(*c.Icon, "w-5 h-5", categoryIconColor(c.Color))
 		}
 	} else if c.Color != nil && *c.Color != "" {
 		if child {
@@ -185,7 +185,7 @@ templ categoryTileInner(c service.CategoryResponse, child bool) {
 		if child {
 			<span class="w-2 h-2 rounded-full bg-base-content/20"></span>
 		} else {
-			<i data-lucide="tag" class="w-5 h-5 text-primary opacity-60"></i>
+			@components.LucideIcon("tag", "w-5 h-5 text-primary opacity-60")
 		}
 	}
 }
@@ -227,7 +227,7 @@ func categoryRowItems(c service.CategoryResponse) []components.OverflowMenuItem 
 
 templ categoriesNewCategoryAction() {
 	<a href="/categories/new" data-new-category class="btn btn-sm btn-primary gap-2">
-		<i data-lucide="plus" class="w-4 h-4"></i>
+		@components.LucideIcon("plus", "w-4 h-4")
 		Add Category
 	</a>
 }

@@ -1,5 +1,7 @@
 package pages
 
+
+import "breadbox/internal/templates/components"
 // SettingsHost is the "background page" rendered when a /settings/* URL
 // is hit directly (cold deep-link). The modal opens on top of it via the
 // SettingsModal mounted globally in base.html — this just provides the
@@ -11,7 +13,7 @@ package pages
 // Alpine factory navigates them home — they won't dwell on this view.
 templ SettingsHost() {
 	<div class="max-w-2xl mx-auto py-12 text-center text-base-content/40">
-		<i data-lucide="settings" class="w-8 h-8 mx-auto mb-3 opacity-60"></i>
+		@components.LucideIcon("settings", "w-8 h-8 mx-auto mb-3 opacity-60")
 		<p class="text-sm">Loading settings…</p>
 		<noscript>
 			<p class="text-xs mt-2">

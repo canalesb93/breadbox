@@ -77,7 +77,7 @@ templ OverflowMenu(p OverflowMenuProps) {
 		aria-label={ p.AriaLabel }
 		style={ "anchor-name:" + anchorName }
 	>
-		<i data-lucide="ellipsis-vertical" class={ overflowMenuIconClass(p.Size) }></i>
+		@LucideIcon("ellipsis-vertical", overflowMenuIconClass(p.Size))
 	</button>
 	<ul
 		id={ popoverID }
@@ -96,7 +96,7 @@ templ overflowMenuItem(it OverflowMenuItem) {
 		<li class="disabled">
 			<span class="text-base-content/40 cursor-not-allowed" aria-label={ overflowAria(it) }>
 				if it.Icon != "" {
-					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
+					@LucideIcon(it.Icon, "w-3.5 h-3.5")
 				}
 				{ it.Label }
 			</span>
@@ -110,7 +110,7 @@ templ overflowMenuItem(it OverflowMenuItem) {
 				@click="$el.closest('[popover]')?.hidePopover()"
 			>
 				if it.Icon != "" {
-					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
+					@LucideIcon(it.Icon, "w-3.5 h-3.5")
 				}
 				{ it.Label }
 			</a>
@@ -124,7 +124,7 @@ templ overflowMenuItem(it OverflowMenuItem) {
 				@click={ overflowItemClickHandler(it.OnClick) }
 			>
 				if it.Icon != "" {
-					<i data-lucide={ it.Icon } class="w-3.5 h-3.5"></i>
+					@LucideIcon(it.Icon, "w-3.5 h-3.5")
 				}
 				{ it.Label }
 			</button>

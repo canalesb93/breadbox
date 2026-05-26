@@ -38,7 +38,7 @@ templ AgentsList(p AgentsListProps) {
 					{ fmt.Sprintf("%d agent%s", len(p.Agents), components.PluralS(int64(len(p.Agents)))) }
 				</div>
 				<a href="/agent-prompts" class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
-					<i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("book-open", "w-3.5 h-3.5")
 					Prompt library
 				</a>
 			</div>
@@ -120,7 +120,7 @@ func agentsListToRunModalOptions(rows []AgentsListRowProps) []AgentRunsAgentOpti
 
 templ agentsListStatusBanner(s AgentSubsystemStatusProps) {
 	<div role="alert" class="alert alert-warning alert-soft mb-4">
-		<i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
+		@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
 		<div class="flex-1">
 			<div class="font-semibold text-sm">Agents need configuration</div>
 			<div class="text-xs opacity-80">
@@ -143,10 +143,10 @@ templ agentsListEmpty() {
 templ agentsListEmptyCTAs() {
 	<div class="flex items-center gap-2">
 		<a href="/agents/new" class="btn btn-primary btn-sm">
-			<i data-lucide="plus" class="w-4 h-4"></i> Create your first agent
+			@components.LucideIcon("plus", "w-4 h-4") Create your first agent
 		</a>
 		<a href="/agent-prompts" class="btn btn-ghost btn-sm">
-			<i data-lucide="book-open" class="w-4 h-4"></i> Prompt library
+			@components.LucideIcon("book-open", "w-4 h-4") Prompt library
 		</a>
 	</div>
 }
@@ -163,7 +163,7 @@ templ agentsListRow(a AgentsListRowProps) {
 				</a>
 				if a.TriggerOnSyncComplete {
 					<span class="badge badge-soft badge-info badge-xs gap-1" title="Fires after every successful sync">
-						<i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i>
+						@components.LucideIcon("refresh-cw", "w-2.5 h-2.5")
 						sync
 					</span>
 				}
@@ -178,7 +178,7 @@ templ agentsListRow(a AgentsListRowProps) {
 		<td class="align-middle text-xs">
 			if a.ScheduleCron != "" {
 				<div class="inline-flex items-center gap-1 text-base-content/70">
-					<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("clock", "w-3.5 h-3.5")
 					<span class="font-mono">{ a.ScheduleCron }</span>
 				</div>
 				if a.SchedulePretty != "" {

@@ -36,7 +36,7 @@ templ SectionHeader(p SectionHeaderProps) {
 	<header class="flex flex-col items-start gap-2 sm:flex-row sm:items-center mb-3">
 		<div class="flex items-center gap-2 min-w-0 max-w-full">
 			if p.Icon != "" {
-				<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content opacity-60 shrink-0"></i>
+				@LucideIcon(p.Icon, "w-4 h-4 text-base-content opacity-60 shrink-0")
 			}
 			<h2 class="text-sm font-semibold min-w-0">{ p.Title }</h2>
 			if p.Count != nil {

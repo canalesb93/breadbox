@@ -123,7 +123,7 @@ templ agentRunRowAvatar(status string) {
 		if status == "in_progress" {
 			<span class="loading loading-spinner loading-sm text-info"></span>
 		} else {
-			<i data-lucide={ agentRunAvatarIcon(status) } class={ "w-4 h-4", agentRunAvatarIconColor(status) }></i>
+			@LucideIcon(agentRunAvatarIcon(status), "w-4 h-4 " + agentRunAvatarIconColor(status))
 		}
 	</div>
 }
@@ -135,12 +135,12 @@ templ agentRunRowAvatar(status string) {
 templ agentRunAccessoryIcons(p AgentRunRowProps) {
 	if p.Trigger != "" && p.Trigger != "cron" {
 		<span class="tooltip tooltip-top shrink-0" data-tip={ "Triggered by " + p.Trigger }>
-			<i data-lucide={ agentRunTriggerIcon(p.Trigger) } class="w-3 h-3 text-base-content/40"></i>
+			@LucideIcon(agentRunTriggerIcon(p.Trigger), "w-3 h-3 text-base-content/40")
 		</span>
 	}
 	if p.HitCap != "" {
 		<span class="tooltip tooltip-top shrink-0" data-tip={ "Hit cap: " + p.HitCap }>
-			<i data-lucide="circle-gauge" class="w-3 h-3 text-warning/80"></i>
+			@LucideIcon("circle-gauge", "w-3 h-3 text-warning/80")
 		</span>
 	}
 }
@@ -152,7 +152,7 @@ templ agentRunAccessoryIcons(p AgentRunRowProps) {
 templ agentRunRowBody(p AgentRunRowProps) {
 	if p.Status == "error" && (p.ErrorMessageFriendly != "" || p.ErrorMessage != "") {
 		<div class="mt-0.5 inline-flex items-center gap-1.5 text-xs text-error/90 min-w-0">
-			<i data-lucide="triangle-alert" class="w-3 h-3 shrink-0"></i>
+			@LucideIcon("triangle-alert", "w-3 h-3 shrink-0")
 			<span class="line-clamp-1">
 				if p.ErrorMessageFriendly != "" {
 					{ p.ErrorMessageFriendly }
@@ -180,7 +180,7 @@ templ agentRunRowBody(p AgentRunRowProps) {
 		</div>
 	} else if p.Note != "" {
 		<div class="mt-0.5 inline-flex items-center gap-1.5 text-xs text-base-content/55 min-w-0">
-			<i data-lucide="sticky-note" class="w-3 h-3 shrink-0 opacity-60"></i>
+			@LucideIcon("sticky-note", "w-3 h-3 shrink-0 opacity-60")
 			<span class="line-clamp-1 italic" title={ p.Note }>{ p.Note }</span>
 		</div>
 	}

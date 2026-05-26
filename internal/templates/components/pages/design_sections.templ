@@ -80,15 +80,15 @@ templ SectionButtons() {
 		@designExample("With icons", "Icon size: w-4 h-4 for btn-sm, w-3.5 h-3.5 for btn-xs. Gap: gap-2 / gap-1.5.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<button class="btn btn-primary btn-sm gap-2">
-					<i data-lucide="plus" class="w-4 h-4"></i>
+					@components.LucideIcon("plus", "w-4 h-4")
 					New connection
 				</button>
 				<button class="btn btn-ghost btn-sm gap-2">
-					<i data-lucide="refresh-cw" class="w-4 h-4"></i>
+					@components.LucideIcon("refresh-cw", "w-4 h-4")
 					Sync
 				</button>
 				<button class="btn btn-ghost btn-xs gap-1.5">
-					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("pencil", "w-3.5 h-3.5")
 					Edit
 				</button>
 			</div>
@@ -96,13 +96,13 @@ templ SectionButtons() {
 		@designExample("Icon-only (square)", "btn-square keeps it 1:1. Vanilla daisy radius applies — same as text buttons.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<button class="btn btn-ghost btn-sm btn-square" aria-label="Edit">
-					<i data-lucide="pencil" class="w-4 h-4"></i>
+					@components.LucideIcon("pencil", "w-4 h-4")
 				</button>
 				<button class="btn btn-ghost btn-xs btn-square" aria-label="Edit">
-					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("pencil", "w-3.5 h-3.5")
 				</button>
 				<button class="btn btn-ghost btn-sm btn-square" aria-label="More">
-					<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+					@components.LucideIcon("ellipsis-vertical", "w-5 h-5")
 				</button>
 			</div>
 		}
@@ -112,7 +112,7 @@ templ SectionButtons() {
 					<span class="loading loading-spinner loading-xs"></span>
 				</button>
 				<button class="btn btn-primary btn-sm gap-2 min-w-32" disabled>
-					<i data-lucide="save" class="w-4 h-4"></i>
+					@components.LucideIcon("save", "w-4 h-4")
 					Save
 				</button>
 			</div>
@@ -128,7 +128,7 @@ templ SectionButtons() {
 		@designExample("Join — pagination", "Daisy join replaces the retired .bb-paginator__btn* family. Disable end caps when there's no prev/next.") {
 			<div class="join">
 				<button class="btn btn-sm join-item btn-square" aria-label="Previous" disabled>
-					<i data-lucide="chevron-left" class="w-4 h-4"></i>
+					@components.LucideIcon("chevron-left", "w-4 h-4")
 				</button>
 				<button class="btn btn-sm join-item btn-active">1</button>
 				<button class="btn btn-sm join-item">2</button>
@@ -136,7 +136,7 @@ templ SectionButtons() {
 				<button class="btn btn-sm join-item">…</button>
 				<button class="btn btn-sm join-item">9</button>
 				<button class="btn btn-sm join-item btn-square" aria-label="Next">
-					<i data-lucide="chevron-right" class="w-4 h-4"></i>
+					@components.LucideIcon("chevron-right", "w-4 h-4")
 				</button>
 			</div>
 		}
@@ -144,7 +144,7 @@ templ SectionButtons() {
 			<div class="join">
 				<input type="text" placeholder="Search merchants…" class="input input-sm join-item"/>
 				<button class="btn btn-primary btn-sm join-item gap-1.5">
-					<i data-lucide="search" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("search", "w-3.5 h-3.5")
 					Search
 				</button>
 			</div>
@@ -152,12 +152,12 @@ templ SectionButtons() {
 		@designExample("Join — split button (primary + menu)", "Primary action on the left, chevron dropdown on the right — both share the same join shell. Use for an action with a small set of related variants.") {
 			<div class="join">
 				<button class="btn btn-primary btn-sm join-item gap-2">
-					<i data-lucide="plus" class="w-4 h-4"></i>
+					@components.LucideIcon("plus", "w-4 h-4")
 					New transaction
 				</button>
 				<div class="dropdown dropdown-end">
 					<div tabindex="0" role="button" class="btn btn-primary btn-sm join-item btn-square" aria-label="More options">
-						<i data-lucide="chevron-down" class="w-4 h-4"></i>
+						@components.LucideIcon("chevron-down", "w-4 h-4")
 					</div>
 					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-52 p-1 mt-1">
 						<li><a>Manual entry</a></li>
@@ -217,32 +217,32 @@ templ SectionAlerts() {
 		@designExample("Page-level alerts", "role=\"alert\" + rounded-xl + mb-6. Use the matching alert-{type} color.") {
 			<div class="flex flex-col gap-3">
 				<div role="alert" class="alert alert-success">
-					<i data-lucide="check-circle" class="w-5 h-5"></i>
+					@components.LucideIcon("check-circle", "w-5 h-5")
 					<span>Backup created successfully.</span>
 				</div>
 				<div role="alert" class="alert alert-info">
-					<i data-lucide="info" class="w-5 h-5"></i>
+					@components.LucideIcon("info", "w-5 h-5")
 					<span>Sync starts in 5 minutes.</span>
 				</div>
 				<div role="alert" class="alert alert-warning">
-					<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+					@components.LucideIcon("alert-triangle", "w-5 h-5")
 					<span>2 connections need reauth.</span>
 				</div>
 				<div role="alert" class="alert alert-error">
-					<i data-lucide="x-circle" class="w-5 h-5"></i>
+					@components.LucideIcon("x-circle", "w-5 h-5")
 					<span>Failed to revoke API key.</span>
 				</div>
 			</div>
 		}
 		@designExample("Soft variant", "Less prominent — embed inside content rather than over page chrome.") {
 			<div role="alert" class="alert alert-warning alert-soft">
-				<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+				@components.LucideIcon("alert-triangle", "w-5 h-5")
 				<span>Read-only keys cannot trigger syncs.</span>
 			</div>
 		}
 		@designExample("Inline form error (bb-form-error)", "Tighter than alert; sits flush inside a form card.") {
 			<div role="alert" class="bb-form-error">
-				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 				<span>Password must be at least 8 characters.</span>
 			</div>
 		}
@@ -287,7 +287,7 @@ templ SectionCards() {
 						<p class="text-xs text-base-content/50 mt-0.5">All transactions and accounts will be removed. This cannot be undone.</p>
 					</div>
 					<button class="btn btn-error btn-soft btn-sm shrink-0 gap-2">
-						<i data-lucide="trash-2" class="w-4 h-4"></i>
+						@components.LucideIcon("trash-2", "w-4 h-4")
 						Delete
 					</button>
 				</div>
@@ -426,15 +426,15 @@ templ SectionTags() {
 		@designExample("Tag sizes", "Pill-shaped, colored via --tag-color CSS variable. Size variants are modifiers — always pair with the base .bb-tag class.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="bb-tag bb-tag-sm" style="--tag-color:#f59e0b">
-					<i data-lucide="inbox"></i>
+					@components.LucideIcon("inbox", "")
 					<span>Needs review</span>
 				</span>
 				<span class="bb-tag" style="--tag-color:#10b981">
-					<i data-lucide="check"></i>
+					@components.LucideIcon("check", "")
 					<span>Reconciled</span>
 				</span>
 				<span class="bb-tag bb-tag-lg" style="--tag-color:#6366f1">
-					<i data-lucide="bookmark"></i>
+					@components.LucideIcon("bookmark", "")
 					<span>Subscription</span>
 				</span>
 			</div>
@@ -442,27 +442,27 @@ templ SectionTags() {
 		@designExample("Ghost (unselected filter state)", "Faded variant for filter-bar tag toggles.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="bb-tag bb-tag-ghost" style="--tag-color:#0ea5e9">
-					<i data-lucide="building"></i>
+					@components.LucideIcon("building", "")
 					<span>Business</span>
 				</span>
 				<span class="bb-tag bb-tag-ghost" style="--tag-color:#a855f7">
-					<i data-lucide="plane"></i>
+					@components.LucideIcon("plane", "")
 					<span>Travel</span>
 				</span>
 			</div>
 		}
 		@designExample("Add (dashed)", "Ghost \"+ Add tag\" chip — same shape, dashed border.") {
 			<button type="button" class="bb-tag bb-tag-add">
-				<i data-lucide="plus"></i>
+				@components.LucideIcon("plus", "")
 				<span>Add tag</span>
 			</button>
 		}
 		@designExample("Interactive + removable", "Inline × button. Hover the chip to reveal.") {
 			<span class="bb-tag bb-tag-interactive" style="--tag-color:#ef4444">
-				<i data-lucide="tag"></i>
+				@components.LucideIcon("tag", "")
 				<span>Refund</span>
 				<button type="button" class="bb-tag-remove" aria-label="Remove tag">
-					<i data-lucide="x"></i>
+					@components.LucideIcon("x", "")
 				</button>
 			</span>
 		}
@@ -484,19 +484,19 @@ templ SectionTagPickerButton() {
 		@designExample("Inline chip (bb-tag bb-tag-add)", "Used on the transaction detail page next to the row of present tags. The label flips between \"Add tag\" and \"Edit tags\" based on whether the transaction already has tags. Sizes: default + lg.") {
 			<div class="flex flex-wrap items-center gap-2">
 				<button type="button" class="bb-tag bb-tag-add">
-					<i data-lucide="plus"></i>
+					@components.LucideIcon("plus", "")
 					<span>Add tag</span>
 				</button>
 				<button type="button" class="bb-tag bb-tag-add">
-					<i data-lucide="plus"></i>
+					@components.LucideIcon("plus", "")
 					<span>Edit tags</span>
 				</button>
 				<button type="button" class="bb-tag bb-tag-lg bb-tag-add">
-					<i data-lucide="plus"></i>
+					@components.LucideIcon("plus", "")
 					<span>Add tag</span>
 				</button>
 				<button type="button" class="bb-tag bb-tag-lg bb-tag-add">
-					<i data-lucide="plus"></i>
+					@components.LucideIcon("plus", "")
 					<span>Edit tags</span>
 				</button>
 			</div>
@@ -507,7 +507,7 @@ templ SectionTagPickerButton() {
 		@designExample("Toolbar action (btn btn-ghost btn-sm)", "Used inside the floating multi-select toolbar on /transactions. Same dispatch contract, different visual because it sits next to other toolbar btn actions (Comment, Categorize).") {
 			<div class="inline-flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-sm px-3 py-2">
 				<button type="button" class="btn btn-ghost btn-sm gap-2" title="Tag selected">
-					<i data-lucide="tag" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("tag", "w-3.5 h-3.5")
 					<span class="hidden sm:inline">Tag</span>
 					<span class="hidden sm:inline ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">T</span>
 				</button>
@@ -544,30 +544,30 @@ templ SectionTagPicker() {
 	<div class="flex flex-col gap-6">
 		@designExample("Live demo", "Fires the real open-tag-picker event with sample data. The picker that opens is the singleton from base.html — the same one transactions and transaction detail use. Sample tags are injected inline so the chip grid renders even when no tags are registered on this server.") {
 			<button type="button" class="btn btn-primary btn-sm gap-2" onclick="window.dispatchEvent(new CustomEvent('open-tag-picker', {detail: {sourceId: 'design-sandbox', transactionIds: ['demo-1','demo-2','demo-3'], txCount: 3, appliedCounts: {recurring: 3, 'needs-review': 1}, availableTags: (window.__bbAllTags && window.__bbAllTags.length) ? window.__bbAllTags : [{slug:'recurring',display_name:'Recurring',color:'#10b981',icon:'refresh-cw'},{slug:'needs-review',display_name:'Needs review',color:'#f59e0b',icon:'inbox'},{slug:'subscription',display_name:'subscription',color:'#6366f1',icon:'bookmark'},{slug:'business',display_name:'Business',color:'#0ea5e9',icon:'building'},{slug:'refund',display_name:'Refund',color:'#ef4444',icon:'undo-2'}]}}))">
-				<i data-lucide="tag" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("tag", "w-3.5 h-3.5")
 				<span>Open the real picker</span>
 			</button>
 		}
 		@designExample("Chip states", "Each chip in the picker grid carries one of five states. Click cycles a chip through the right column.") {
 			<div class="flex flex-wrap items-center gap-2 max-w-xl">
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
-					<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
 					<span class="truncate">absent</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
-					<span class="bb-tagpicker-chip-glyph"><i data-lucide="check"></i></span>
+					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("check", "")</span>
 					<span class="truncate">present</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
-					<span class="bb-tagpicker-chip-glyph"><i data-lucide="minus"></i></span>
+					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("minus", "")</span>
 					<span class="truncate">mixed</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
-					<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
 					<span class="truncate">pending-add</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
-					<span class="bb-tagpicker-chip-glyph"><i data-lucide="x"></i></span>
+					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("x", "")</span>
 					<span class="truncate">pending-remove</span>
 				</span>
 			</div>
@@ -578,46 +578,46 @@ templ SectionTagPicker() {
 		@designExample("Static layout", "The overlay shape — search input, context strip, chip grid, diff strip, footer. Rendered inert here for layout reference; the live picker opens via the Live demo above.") {
 			<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%; max-width: 32rem;">
 				<div class="bb-catpicker-input-wrap gap-2">
-					<i data-lucide="tag"></i>
+					@components.LucideIcon("tag", "")
 					<input type="text" class="bb-catpicker-input" placeholder="Filter tags or type to create…" value="" readonly/>
 					<div class="bb-cmdk-kbd" style="font-size:0.6rem">esc</div>
 				</div>
 				<div class="bb-tagpicker-context">
-					<i data-lucide="receipt"></i>
+					@components.LucideIcon("receipt", "")
 					<span>Editing tags for <strong>3</strong> transactions</span>
 				</div>
 				<div class="bb-tagpicker-body">
 					<div class="bb-tagpicker-grid">
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
-							<span class="bb-tagpicker-chip-glyph"><i data-lucide="check"></i></span>
+							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("check", "")</span>
 							<span class="truncate">recurring</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
-							<span class="bb-tagpicker-chip-glyph"><i data-lucide="minus"></i></span>
+							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("minus", "")</span>
 							<span class="truncate">needs-review</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
-							<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
 							<span class="truncate">subscription</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
-							<span class="bb-tagpicker-chip-glyph"><i data-lucide="plus"></i></span>
+							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
 							<span class="truncate">business</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
-							<span class="bb-tagpicker-chip-glyph"><i data-lucide="x"></i></span>
+							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("x", "")</span>
 							<span class="truncate">refund</span>
 						</button>
 					</div>
 				</div>
 				<div class="bb-tagpicker-diff">
 					<span class="bb-tagpicker-diff-pill bb-tagpicker-diff-pill--add">
-						<i data-lucide="plus"></i>
+						@components.LucideIcon("plus", "")
 						<span>1</span>
 						<span>to add</span>
 					</span>
 					<span class="bb-tagpicker-diff-pill bb-tagpicker-diff-pill--remove">
-						<i data-lucide="x"></i>
+						@components.LucideIcon("x", "")
 						<span>1</span>
 						<span>to remove</span>
 					</span>
@@ -644,12 +644,12 @@ templ SectionTagPicker() {
 		@designExample("Inline create", "When the search query is a valid slug that doesn't exist yet, an inline `Create '<slug>'` button appears. Enter on an empty match also fires it.") {
 			<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%; max-width: 28rem;">
 				<div class="bb-catpicker-input-wrap gap-2">
-					<i data-lucide="tag"></i>
+					@components.LucideIcon("tag", "")
 					<input type="text" class="bb-catpicker-input" value="travel" readonly/>
 				</div>
 				<div class="bb-tagpicker-body">
 					<button type="button" class="bb-tagpicker-create-inline">
-						<i data-lucide="plus"></i>
+						@components.LucideIcon("plus", "")
 						<span>Create</span>
 						<code class="font-mono bg-base-100/60 px-1.5 py-0.5 rounded text-[0.7rem]">travel</code>
 						<span class="ml-auto text-[0.65rem] text-base-content/40">
@@ -663,12 +663,12 @@ templ SectionTagPicker() {
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 				<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%;">
 					<div class="bb-catpicker-input-wrap gap-2">
-						<i data-lucide="tag"></i>
+						@components.LucideIcon("tag", "")
 						<input type="text" class="bb-catpicker-input" placeholder="Filter tags or type to create…" value="" readonly/>
 					</div>
 					<div class="bb-tagpicker-body">
 						<div class="bb-tagpicker-empty">
-							<i data-lucide="tags"></i>
+							@components.LucideIcon("tags", "")
 							<div class="text-sm">No tags yet</div>
 							<div class="text-xs">Type a slug to create the first one.</div>
 						</div>
@@ -676,12 +676,12 @@ templ SectionTagPicker() {
 				</div>
 				<div class="bb-tagpicker-dialog" style="position: static; transform: none; width: 100%;">
 					<div class="bb-catpicker-input-wrap gap-2">
-						<i data-lucide="tag"></i>
+						@components.LucideIcon("tag", "")
 						<input type="text" class="bb-catpicker-input" value="Foo Bar!" readonly/>
 					</div>
 					<div class="bb-tagpicker-body">
 						<div class="bb-tagpicker-empty">
-							<i data-lucide="search-x"></i>
+							@components.LucideIcon("search-x", "")
 							<div class="text-sm">No matching tags</div>
 							<div class="text-[0.65rem]">Slug must be lowercase letters, numbers, hyphens or colons.</div>
 						</div>
@@ -717,9 +717,9 @@ templ SectionMenusDropdowns() {
 		@designExample("Menu (vertical nav list)", "menu-md / menu-sm.") {
 			<ul class="menu bg-base-100 rounded-xl border border-base-300 w-56">
 				<li class="menu-title">Settings</li>
-				<li><a class="menu-active"><i data-lucide="key" class="w-4 h-4"></i> API keys</a></li>
-				<li><a><i data-lucide="users" class="w-4 h-4"></i> Household</a></li>
-				<li><a><i data-lucide="bot" class="w-4 h-4"></i> MCP</a></li>
+				<li><a class="menu-active">@components.LucideIcon("key", "w-4 h-4") API keys</a></li>
+				<li><a>@components.LucideIcon("users", "w-4 h-4") Household</a></li>
+				<li><a>@components.LucideIcon("bot", "w-4 h-4") MCP</a></li>
 			</ul>
 		}
 	</div>
@@ -839,11 +839,11 @@ templ SectionIcons() {
 	<div class="flex flex-col gap-6">
 		@designExample("Lucide sizes", "Buttons → w-4 h-4 (sm) / w-3.5 h-3.5 (xs). Section headers → w-5 h-5. Empty states → w-8 h-8.") {
 			<div class="flex flex-wrap items-center gap-4 text-base-content/70">
-				<i data-lucide="receipt" class="w-3.5 h-3.5"></i>
-				<i data-lucide="receipt" class="w-4 h-4"></i>
-				<i data-lucide="receipt" class="w-5 h-5"></i>
-				<i data-lucide="receipt" class="w-6 h-6"></i>
-				<i data-lucide="receipt" class="w-8 h-8"></i>
+				@components.LucideIcon("receipt", "w-3.5 h-3.5")
+				@components.LucideIcon("receipt", "w-4 h-4")
+				@components.LucideIcon("receipt", "w-5 h-5")
+				@components.LucideIcon("receipt", "w-6 h-6")
+				@components.LucideIcon("receipt", "w-8 h-8")
 			</div>
 		}
 		@designExample("Icon tiles (IconTile / bb-icon-tile)", "Colored 40×40 squares for sectioned form-card headers. Use @components.IconTile(tone, icon) — six tones available.") {
@@ -975,12 +975,12 @@ templ SectionEmptyStates() {
 			<div class="bb-card p-12 text-center max-w-md mx-auto">
 				<div class="flex flex-col items-center">
 					<div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
-						<i data-lucide="inbox" class="w-7 h-7 text-base-content opacity-30"></i>
+						@components.LucideIcon("inbox", "w-7 h-7 text-base-content opacity-30")
 					</div>
 					<h3 class="text-base font-semibold mb-1">No connections yet</h3>
 					<p class="text-base-content/50 text-sm mb-5 max-w-sm">Link a bank to start importing transactions.</p>
 					<a href="#" class="btn btn-primary btn-sm gap-2">
-						<i data-lucide="plus" class="w-4 h-4"></i>
+						@components.LucideIcon("plus", "w-4 h-4")
 						Add connection
 					</a>
 				</div>
@@ -988,7 +988,7 @@ templ SectionEmptyStates() {
 		}
 		@designExample("Compact (filtered no results)", "Inline, no card chrome.") {
 			<div class="flex flex-col items-center text-center py-10">
-				<i data-lucide="search-x" class="w-8 h-8 text-base-content opacity-30 mb-3"></i>
+				@components.LucideIcon("search-x", "w-8 h-8 text-base-content opacity-30 mb-3")
 				<p class="text-sm text-base-content/50">No transactions match these filters.</p>
 			</div>
 		}
@@ -1393,12 +1393,12 @@ templ SectionKbd() {
 			<div role="toolbar" aria-label="Selection actions (preview)" class="inline-block">
 				<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-field shadow-lg px-4 py-2.5">
 					<button type="button" class="btn btn-ghost btn-sm gap-2">
-						<i data-lucide="tag" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("tag", "w-3.5 h-3.5")
 						<span>Tag</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">T</span>
 					</button>
 					<button type="button" class="btn btn-primary btn-sm gap-2">
-						<i data-lucide="tags" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("tags", "w-3.5 h-3.5")
 						<span>Categorize</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
 					</button>
@@ -1419,7 +1419,7 @@ templ SectionToast() {
 					class="btn btn-sm gap-2 border border-success/30 bg-success/10 text-success hover:bg-success/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Saved', type: 'success'}}))"
 				>
-					<i data-lucide="check" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("check", "w-3.5 h-3.5")
 					Fire success
 				</button>
 				<button
@@ -1427,7 +1427,7 @@ templ SectionToast() {
 					class="btn btn-sm gap-2 border border-error/30 bg-error/10 text-error hover:bg-error/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Could not save: provider rejected the request', type: 'error'}}))"
 				>
-					<i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("x-circle", "w-3.5 h-3.5")
 					Fire error
 				</button>
 				<button
@@ -1435,7 +1435,7 @@ templ SectionToast() {
 					class="btn btn-sm gap-2 border border-warning/30 bg-warning/10 text-warning hover:bg-warning/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: '2 rows updated, 1 skipped', type: 'warning'}}))"
 				>
-					<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5")
 					Fire warning
 				</button>
 				<button
@@ -1443,7 +1443,7 @@ templ SectionToast() {
 					class="btn btn-sm gap-2 border border-info/30 bg-info/10 text-info hover:bg-info/15"
 					onclick="window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Sync starting in the background', type: 'info'}}))"
 				>
-					<i data-lucide="info" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("info", "w-3.5 h-3.5")
 					Fire info
 				</button>
 			</div>
@@ -1452,19 +1452,19 @@ templ SectionToast() {
 		@designExample("Variants (visual reference)", "All four type values rendered as static pills. Real toasts auto-dismiss after ~3 s.") {
 			<div class="flex flex-col gap-2 max-w-md">
 				<div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2" role="status">
-					<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+					@components.LucideIcon("check", "w-4 h-4 text-success shrink-0")
 					<span class="text-sm font-medium">Saved.</span>
 				</div>
 				<div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2" role="alert">
-					<i data-lucide="x-circle" class="w-4 h-4 text-error shrink-0"></i>
+					@components.LucideIcon("x-circle", "w-4 h-4 text-error shrink-0")
 					<span class="text-sm font-medium">Could not revoke API key.</span>
 				</div>
 				<div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2" role="status">
-					<i data-lucide="alert-triangle" class="w-4 h-4 text-warning shrink-0"></i>
+					@components.LucideIcon("alert-triangle", "w-4 h-4 text-warning shrink-0")
 					<span class="text-sm font-medium">2 rows updated, 1 skipped.</span>
 				</div>
 				<div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2" role="status">
-					<i data-lucide="info" class="w-4 h-4 text-info shrink-0"></i>
+					@components.LucideIcon("info", "w-4 h-4 text-info shrink-0")
 					<span class="text-sm font-medium">Sync scheduled.</span>
 				</div>
 			</div>
@@ -1527,21 +1527,21 @@ templ SectionMultiSelectToolbar() {
 					</button>
 					<div class="w-px h-6 bg-base-300"></div>
 					<button type="button" class="btn btn-ghost btn-sm gap-2" title="Comment">
-						<i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("message-square", "w-3.5 h-3.5")
 						<span class="hidden sm:inline">Comment</span>
 					</button>
 					<button type="button" class="btn btn-ghost btn-sm gap-2" title="Tag">
-						<i data-lucide="tag" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("tag", "w-3.5 h-3.5")
 						<span class="hidden sm:inline">Tag</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">T</span>
 					</button>
 					<button type="button" class="btn btn-primary btn-sm gap-2" title="Categorize">
-						<i data-lucide="tags" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("tags", "w-3.5 h-3.5")
 						<span class="inline">Categorize</span>
 						<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
 					</button>
 					<button type="button" class="btn btn-ghost btn-sm btn-square" title="Clear selection" aria-label="Clear selection">
-						<i data-lucide="x" class="w-4 h-4"></i>
+						@components.LucideIcon("x", "w-4 h-4")
 					</button>
 				</div>
 			</div>
@@ -1649,7 +1649,7 @@ templ SectionCategoryPicker() {
 					<button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
 						<template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
 						<span x-text="displayLabel" class="text-sm font-medium flex-1 text-left">Coffee &amp; Cafés</span>
-						<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30"></i>
+						@components.LucideIcon("chevron-down", "w-4 h-4 text-base-content opacity-30")
 					</button>
 				</div>
 				<p class="text-[0.65rem] text-base-content/40 mt-1.5">transaction_detail.templ</p>
@@ -1671,7 +1671,7 @@ templ SectionCategoryPicker() {
 				>
 					<button type="button" class="select w-full text-left flex items-center gap-2 bg-base-200/50" @click="openPicker()">
 						<span x-text="displayLabel" class="flex-1 text-sm">None (top-level)</span>
-						<i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
+						@components.LucideIcon("chevron-down", "w-4 h-4 opacity-40")
 					</button>
 				</div>
 				<p class="text-xs text-base-content/40 mt-1.5">Leave empty for a top-level category.</p>
@@ -1767,12 +1767,12 @@ templ SectionAmounts() {
 				</div>
 				<div class="flex items-baseline gap-4">
 					<span class="text-xs text-base-content/40 w-24 shrink-0">Pending income</span>
-					<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+					@components.LucideIcon("clock", "w-3 h-3 shrink-0 text-warning opacity-70")
 					@components.Amount(components.AmountProps{Value: -52.40, Pending: true, Class: "text-sm font-semibold"})
 				</div>
 				<div class="flex items-baseline gap-4">
 					<span class="text-xs text-base-content/40 w-24 shrink-0">Pending expense</span>
-					<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+					@components.LucideIcon("clock", "w-3 h-3 shrink-0 text-warning opacity-70")
 					@components.Amount(components.AmountProps{Value: 42.10, Pending: true, Class: "text-sm font-semibold"})
 				</div>
 			</div>
@@ -1879,37 +1879,37 @@ templ SectionTransactionRows() {
 			<div class="flex flex-wrap items-end gap-4">
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
-						<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+						@components.LucideIcon("shopping-cart", "w-4 h-4")
 					</div>
 					<code class="text-[0.65rem] text-base-content/50">default</code>
 				</div>
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #22c55e">
-						<i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("shopping-cart", "w-3.5 h-3.5")
 					</div>
 					<code class="text-[0.65rem] text-base-content/50">--sm</code>
 				</div>
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="bb-tx-avatar" style="--avatar-color: #d97706">
-						<i data-lucide="coffee" class="w-4 h-4"></i>
+						@components.LucideIcon("coffee", "w-4 h-4")
 					</div>
 					<code class="text-[0.65rem] text-base-content/50">amber</code>
 				</div>
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="bb-tx-avatar" style="--avatar-color: #0ea5e9">
-						<i data-lucide="home" class="w-4 h-4"></i>
+						@components.LucideIcon("home", "w-4 h-4")
 					</div>
 					<code class="text-[0.65rem] text-base-content/50">sky</code>
 				</div>
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="bb-tx-avatar" style="--avatar-color: #a855f7">
-						<i data-lucide="plane" class="w-4 h-4"></i>
+						@components.LucideIcon("plane", "w-4 h-4")
 					</div>
 					<code class="text-[0.65rem] text-base-content/50">violet</code>
 				</div>
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
-						<i data-lucide="circle-off" class="w-4 h-4"></i>
+						@components.LucideIcon("circle-off", "w-4 h-4")
 					</div>
 					<code class="text-[0.65rem] text-base-content/50">--uncategorized</code>
 				</div>
@@ -1920,7 +1920,7 @@ templ SectionTransactionRows() {
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="relative shrink-0">
 						<div class="bb-tx-avatar" style="--avatar-color: #22c55e">
-							<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+							@components.LucideIcon("shopping-cart", "w-4 h-4")
 						</div>
 						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Alex">
 							<span>A</span>
@@ -1931,7 +1931,7 @@ templ SectionTransactionRows() {
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="relative shrink-0">
 						<div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: #d97706">
-							<i data-lucide="coffee" class="w-3.5 h-3.5"></i>
+							@components.LucideIcon("coffee", "w-3.5 h-3.5")
 						</div>
 						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
 							<span>S</span>
@@ -1942,7 +1942,7 @@ templ SectionTransactionRows() {
 				<div class="flex flex-col items-center gap-1.5">
 					<div class="relative shrink-0">
 						<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
-							<i data-lucide="circle-off" class="w-4 h-4"></i>
+							@components.LucideIcon("circle-off", "w-4 h-4")
 						</div>
 						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Sam">
 							<span>S</span>
@@ -1965,7 +1965,7 @@ templ SectionTransactionRows() {
 				<div class="flex items-center justify-between gap-3">
 					<span class="text-xs text-base-content/50">pending</span>
 					<span class="inline-flex items-center justify-end gap-1">
-						<i data-lucide="clock" class="w-3 h-3 shrink-0 text-warning opacity-70"></i>
+						@components.LucideIcon("clock", "w-3 h-3 shrink-0 text-warning opacity-70")
 						@components.Amount(components.AmountProps{Value: 6.75, Pending: true, Class: "text-sm font-semibold"})
 					</span>
 				</div>
@@ -2206,7 +2206,7 @@ templ SectionTimeline() {
 // stays decoupled from the service-layer types.
 templ timelineSandboxCategoryTile() {
 	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-success/15 ring-4 ring-base-100" aria-hidden="true">
-		<i data-lucide="utensils" class="w-3 h-3 text-success"></i>
+		@components.LucideIcon("utensils", "w-3 h-3 text-success")
 	</span>
 }
 
@@ -2292,7 +2292,7 @@ templ SectionCommandPalette() {
 		@designExample("Full dialog (inline)", "Same input wrap, group label, item types, and footer the live cmdk uses — rendered statically so every variant is visible. No fixed position, list max-height is unconstrained.") {
 			<div class="border border-base-300 rounded-xl bg-base-100 overflow-hidden max-w-[560px] mx-auto shadow-sm">
 				<div class="bb-cmdk-input-wrap">
-					<i data-lucide="search"></i>
+					@components.LucideIcon("search", "")
 					<input class="bb-cmdk-input" placeholder="Type a command or search..." readonly/>
 					<div class="bb-kbd" style="font-size:0.6rem">esc</div>
 				</div>
@@ -2301,7 +2301,7 @@ templ SectionCommandPalette() {
 						<div class="bb-cmdk-group-label">Overview</div>
 						<div class="bb-cmdk-item">
 							<div class="bb-cmdk-generic">
-								<div class="bb-cmdk-item-icon"><i data-lucide="rss"></i></div>
+								<div class="bb-cmdk-item-icon">@components.LucideIcon("rss", "")</div>
 								<div class="bb-cmdk-item-label">
 									<div class="bb-cmdk-item-title">Feed</div>
 									<div class="bb-cmdk-item-desc">Activity feed across the household</div>
@@ -2313,7 +2313,7 @@ templ SectionCommandPalette() {
 						</div>
 						<div class="bb-cmdk-item" data-active="true">
 							<div class="bb-cmdk-generic">
-								<div class="bb-cmdk-item-icon"><i data-lucide="receipt"></i></div>
+								<div class="bb-cmdk-item-icon">@components.LucideIcon("receipt", "")</div>
 								<div class="bb-cmdk-item-label">
 									<div class="bb-cmdk-item-title">Transactions</div>
 									<div class="bb-cmdk-item-desc">View all transactions</div>
@@ -2357,7 +2357,7 @@ templ SectionCommandPalette() {
 			<div class="border border-base-300 rounded-xl bg-base-100 max-w-[560px] mx-auto py-2">
 				<div class="bb-cmdk-item">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon"><i data-lucide="rss"></i></div>
+						<div class="bb-cmdk-item-icon">@components.LucideIcon("rss", "")</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Feed</div>
 							<div class="bb-cmdk-item-desc">Default — neutral icon tile</div>
@@ -2369,7 +2369,7 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="bb-cmdk-item" data-active="true">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon"><i data-lucide="receipt"></i></div>
+						<div class="bb-cmdk-item-icon">@components.LucideIcon("receipt", "")</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Transactions</div>
 							<div class="bb-cmdk-item-desc">Active — primary tint on tile + bg-primary/8 on row</div>
@@ -2381,7 +2381,7 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="bb-cmdk-item">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon"><i data-lucide="plus-circle"></i></div>
+						<div class="bb-cmdk-item-icon">@components.LucideIcon("plus-circle", "")</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Connect a Bank</div>
 						</div>
@@ -2430,7 +2430,7 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="border border-base-300 rounded-xl bg-base-100 overflow-hidden">
 					<div class="bb-cmdk-empty">
-						<i data-lucide="search-x"></i>
+						@components.LucideIcon("search-x", "")
 						<span class="text-sm">No results found</span>
 					</div>
 				</div>
@@ -2563,7 +2563,7 @@ templ SectionUserAvatar() {
 				<div class="flex items-center gap-3">
 					<div class="relative shrink-0">
 						<div class="bb-tx-avatar" style={ components.TxAvatarColorStyle(designSampleColor()) }>
-							<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+							@components.LucideIcon("shopping-cart", "w-4 h-4")
 						</div>
 						<img src={ components.AvatarURL("alice-uuid", "") } alt="" class="bb-tx-owner-badge" title="Alice"/>
 					</div>
@@ -2575,7 +2575,7 @@ templ SectionUserAvatar() {
 				<div class="flex items-center gap-3">
 					<div class="relative shrink-0">
 						<div class="bb-tx-avatar" style={ components.TxAvatarColorStyle(designSampleColor()) }>
-							<i data-lucide="shopping-cart" class="w-4 h-4"></i>
+							@components.LucideIcon("shopping-cart", "w-4 h-4")
 						</div>
 						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Drew">
 							<span>D</span>
@@ -2601,7 +2601,7 @@ templ SectionUserAvatar() {
 					<div class="bb-sidebar-profile-name">Alice Adams</div>
 					<div class="bb-sidebar-profile-role">Admin</div>
 				</div>
-				<i data-lucide="settings" class="w-4 h-4 text-base-content/40 shrink-0"></i>
+				@components.LucideIcon("settings", "w-4 h-4 text-base-content/40 shrink-0")
 			</div>
 		}
 		@designExample("Loading / Lazy / Decorative", "Three independent state flags. Loading swaps in a skeleton circle while waiting for an actor to resolve (optimistic inserts, async hydration). Lazy adds loading=\"lazy\" for below-the-fold avatars. Decorative emits alt=\"\" when the surrounding context already names the actor — almost every timeline call site sets this.") {

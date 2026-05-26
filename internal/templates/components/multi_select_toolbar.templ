@@ -98,7 +98,7 @@ templ MultiSelectToolbar(p MultiSelectToolbarProps) {
 					aria-label="Clear selection"
 					@click={ dispatchEventJS(orDefault(p.CloseEvent, "multi-select-close")) }
 				>
-					<i data-lucide="x" class="w-4 h-4"></i>
+					@LucideIcon("x", "w-4 h-4")
 				</button>
 			}
 		</div>
@@ -137,7 +137,7 @@ templ MultiSelectToolbarAction(p MultiSelectToolbarActionProps) {
 		@click={ p.OnClick }
 	>
 		if p.Icon != "" {
-			<i data-lucide={ p.Icon } class="w-3.5 h-3.5"></i>
+			@LucideIcon(p.Icon, "w-3.5 h-3.5")
 		}
 		if p.Label != "" {
 			<span class={ multiSelectLabelClass(p.Variant) }>{ p.Label }</span>

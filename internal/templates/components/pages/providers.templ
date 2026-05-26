@@ -58,14 +58,14 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 			<!-- Configuration -->
 			<div class="border-t border-base-300 pt-4">
 				<button type="button" class="flex items-center gap-2 text-sm font-medium text-base-content/70 hover:text-base-content w-full" @click="showConfig = !showConfig">
-					<i data-lucide="settings" class="w-4 h-4"></i>
+					@components.LucideIcon("settings", "w-4 h-4")
 					Configuration
 					<i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform duration-200" :class="showConfig && 'rotate-180'"></i>
 				</button>
 				<div x-show="showConfig" x-collapse x-cloak class="mt-4 space-y-4">
 					if p.PlaidFromEnv {
 						<p class="text-sm text-base-content/50 mb-4 flex flex-wrap items-center gap-1.5">
-							<i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
+							@components.LucideIcon("lock", "w-3.5 h-3.5 shrink-0")
 							<span>Configured via environment variables (read-only)</span>
 						</p>
 						<dl class="bb-info-grid">
@@ -144,7 +144,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<!-- Test connection -->
 						<div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
 							<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing">
-								<span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
+								<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5") Test Connection</span>
 								<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
 							</button>
 							<span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
@@ -152,7 +152,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<!-- Webhook instructions -->
 						<div class="border-t border-base-300 pt-4">
 							<div class="flex items-center gap-1.5 mb-2">
-								<i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+								@components.LucideIcon("webhook", "w-3.5 h-3.5 text-base-content opacity-40")
 								<h3 class="text-sm font-medium">Webhook Setup</h3>
 							</div>
 							<p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
@@ -197,14 +197,14 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 			<!-- Configuration -->
 			<div class="border-t border-base-300 pt-4">
 				<button type="button" class="flex items-center gap-2 text-sm font-medium text-base-content/70 hover:text-base-content w-full" @click="showConfig = !showConfig">
-					<i data-lucide="settings" class="w-4 h-4"></i>
+					@components.LucideIcon("settings", "w-4 h-4")
 					Configuration
 					<i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform duration-200" :class="showConfig && 'rotate-180'"></i>
 				</button>
 				<div x-show="showConfig" x-collapse x-cloak class="mt-4 space-y-4">
 					if p.TellerFromEnv {
 						<p class="text-sm text-base-content/50 mb-4 flex flex-wrap items-center gap-1.5">
-							<i data-lucide="lock" class="w-3.5 h-3.5 shrink-0"></i>
+							@components.LucideIcon("lock", "w-3.5 h-3.5 shrink-0")
 							<span>Configured via environment variables (read-only)</span>
 						</p>
 						<dl class="bb-info-grid">
@@ -255,7 +255,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									<h3 class="text-sm font-medium mb-3 text-base-content/60">mTLS Certificate</h3>
 									if p.TellerCertConfigured {
 										<p class="text-sm text-success mb-3 flex items-center gap-1.5">
-											<i data-lucide="check-circle" class="w-4 h-4"></i> Certificate and private key are configured.
+											@components.LucideIcon("check-circle", "w-4 h-4") Certificate and private key are configured.
 										</p>
 									}
 									<div class="form-control mb-3">
@@ -268,7 +268,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 									</div>
 									if !p.HasEncryptionKey {
 										<p class="text-xs text-warning mt-3 flex items-center gap-1.5">
-											<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> ENCRYPTION_KEY must be set to store certificates.
+											@components.LucideIcon("alert-triangle", "w-3.5 h-3.5") ENCRYPTION_KEY must be set to store certificates.
 										</p>
 									}
 								</div>
@@ -299,7 +299,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<!-- Test connection -->
 						<div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
 							<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing">
-								<span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
+								<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5") Test Connection</span>
 								<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
 							</button>
 							<span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
@@ -307,7 +307,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<!-- Webhook instructions -->
 						<div class="border-t border-base-300 pt-4">
 							<div class="flex items-center gap-1.5 mb-2">
-								<i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+								@components.LucideIcon("webhook", "w-3.5 h-3.5 text-base-content opacity-40")
 								<h3 class="text-sm font-medium">Webhook Setup</h3>
 							</div>
 							<p class="text-xs text-base-content/50 mb-2">Teller sends webhooks for account disconnections and other events. To enable:</p>
@@ -351,18 +351,18 @@ templ providersCSVCard(h *service.ProviderHealthSummary) {
 			if h != nil {
 				<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="file-up" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
+						@components.LucideIcon("file-up", "w-3.5 h-3.5 text-base-content opacity-30")
 						<span class="text-base-content/50">Imports:</span>
 						<span class="font-medium">{ fmt.Sprintf("%d", h.ConnectionCount) }</span>
 					</div>
 					<div class="flex items-center gap-1.5">
-						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
+						@components.LucideIcon("wallet", "w-3.5 h-3.5 text-base-content opacity-30")
 						<span class="text-base-content/50">Accounts:</span>
 						<span class="font-medium">{ fmt.Sprintf("%d", h.AccountCount) }</span>
 					</div>
 					if h.LastSyncTime != nil {
 						<div class="flex items-center gap-1.5">
-							<i data-lucide="clock" class="w-3.5 h-3.5 text-base-content opacity-30"></i>
+							@components.LucideIcon("clock", "w-3.5 h-3.5 text-base-content opacity-30")
 							<span class="text-base-content/50">Last import:</span>
 							<span class="font-medium">{ *h.LastSyncTime }</span>
 						</div>
@@ -373,7 +373,7 @@ templ providersCSVCard(h *service.ProviderHealthSummary) {
 			<div class="border-t border-base-300 pt-4">
 				<p class="text-sm text-base-content/60 mb-4">Import transactions from CSV files exported from your bank or financial institution. No API credentials required.</p>
 				<a href="/connections/import-csv" class="btn btn-sm btn-primary btn-outline">
-					<i data-lucide="upload" class="w-4 h-4"></i>
+					@components.LucideIcon("upload", "w-4 h-4")
 					Import CSV File
 				</a>
 			</div>
@@ -406,18 +406,18 @@ templ providersStats(h *service.ProviderHealthSummary) {
 	if h != nil {
 		<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm min-w-0">
 			<div class="flex items-center gap-1.5">
-				<i data-lucide="link" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
+				@components.LucideIcon("link", "w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0")
 				<span class="text-base-content/50">Connections:</span>
 				<span class="font-medium">{ fmt.Sprintf("%d", h.ConnectionCount) }</span>
 			</div>
 			<div class="flex items-center gap-1.5">
-				<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
+				@components.LucideIcon("wallet", "w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0")
 				<span class="text-base-content/50">Accounts:</span>
 				<span class="font-medium">{ fmt.Sprintf("%d", h.AccountCount) }</span>
 			</div>
 			if h.LastSyncTime != nil {
 				<div class="flex items-center gap-1.5 min-w-0">
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
+					@components.LucideIcon("refresh-cw", "w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0")
 					<span class="text-base-content/50 flex-shrink-0">Last sync:</span>
 					switch h.LastSyncStatus {
 						case "success":
@@ -432,7 +432,7 @@ templ providersStats(h *service.ProviderHealthSummary) {
 				</div>
 			} else if h.ConnectionCount > 0 {
 				<div class="flex items-center gap-1.5">
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0"></i>
+					@components.LucideIcon("refresh-cw", "w-3.5 h-3.5 text-base-content opacity-30 flex-shrink-0")
 					<span class="text-base-content/40">Never synced</span>
 				</div>
 			}

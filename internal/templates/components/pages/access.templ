@@ -28,7 +28,7 @@ templ accessOAuthClientsSection(p AccessProps) {
 	<div id="oauth-clients" class="mb-8">
 		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
 			<div class="flex items-center gap-2 min-w-0 flex-1">
-				<i data-lucide="fingerprint" class="w-4 h-4 text-primary shrink-0"></i>
+				@components.LucideIcon("fingerprint", "w-4 h-4 text-primary shrink-0")
 				<h2 class="text-sm font-semibold shrink-0">OAuth Clients</h2>
 				if p.HasAnyClients {
 					<span class="hidden sm:inline text-xs text-base-content/40 truncate">
@@ -42,7 +42,7 @@ templ accessOAuthClientsSection(p AccessProps) {
 				}
 			</div>
 			<a href="/settings/oauth-clients/new" class="btn btn-primary btn-sm btn-soft shrink-0">
-				<i data-lucide="plus" class="w-4 h-4"></i>
+				@components.LucideIcon("plus", "w-4 h-4")
 				Create Client
 			</a>
 		</div>
@@ -87,7 +87,7 @@ templ accessOAuthClientsSection(p AccessProps) {
 templ accessActiveClientRow(c AccessClientRow, isAdmin bool, csrfToken string) {
 	<div class="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-base-200/30 transition-colors" x-data="{ confirming: false }">
 		<div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 shrink-0">
-			<i data-lucide="fingerprint" class="w-3.5 h-3.5 text-primary"></i>
+			@components.LucideIcon("fingerprint", "w-3.5 h-3.5 text-primary")
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
@@ -134,7 +134,7 @@ templ accessActiveClientRow(c AccessClientRow, isAdmin bool, csrfToken string) {
 templ accessRevokedClientRow(c AccessClientRow) {
 	<div class="flex items-center gap-3 px-3 sm:px-4 py-3">
 		<div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40 shrink-0">
-			<i data-lucide="fingerprint" class="w-3.5 h-3.5 text-base-content opacity-25"></i>
+			@components.LucideIcon("fingerprint", "w-3.5 h-3.5 text-base-content opacity-25")
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
@@ -156,7 +156,7 @@ templ accessAPIKeysSection(p AccessProps) {
 	<div id="api-keys">
 		<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
 			<div class="flex items-center gap-2 min-w-0 flex-1">
-				<i data-lucide="key" class="w-4 h-4 text-primary shrink-0"></i>
+				@components.LucideIcon("key", "w-4 h-4 text-primary shrink-0")
 				<h2 class="text-sm font-semibold shrink-0">API Keys</h2>
 				if p.HasAnyKeys {
 					<span class="hidden sm:inline text-xs text-base-content/40 truncate">
@@ -170,7 +170,7 @@ templ accessAPIKeysSection(p AccessProps) {
 				}
 			</div>
 			<a href="/settings/api-keys/new" class="btn btn-primary btn-sm btn-soft shrink-0">
-				<i data-lucide="plus" class="w-4 h-4"></i>
+				@components.LucideIcon("plus", "w-4 h-4")
 				Create Key
 			</a>
 		</div>
@@ -215,7 +215,7 @@ templ accessAPIKeysSection(p AccessProps) {
 templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
 	<div class="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-base-200/30 transition-colors" x-data="{ confirming: false }">
 		<div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8 shrink-0">
-			<i data-lucide="key" class="w-3.5 h-3.5 text-primary"></i>
+			@components.LucideIcon("key", "w-3.5 h-3.5 text-primary")
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
@@ -265,7 +265,7 @@ templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
 templ accessRevokedKeyRow(k AccessKeyRow) {
 	<div class="flex items-center gap-3 px-3 sm:px-4 py-3">
 		<div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40 shrink-0">
-			<i data-lucide="key" class="w-3.5 h-3.5 text-base-content opacity-25"></i>
+			@components.LucideIcon("key", "w-3.5 h-3.5 text-base-content opacity-25")
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">

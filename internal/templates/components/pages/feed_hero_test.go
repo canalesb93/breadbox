@@ -38,7 +38,7 @@ func TestFeedHeroNextSyncSubLine(t *testing.T) {
 				"Wells Fargo",
 				"healthy",
 				"Next sync in ~6h",
-				`data-lucide="clock"`,
+				`lucide-clock`,
 			},
 		},
 		{
