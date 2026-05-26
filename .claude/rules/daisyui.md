@@ -149,7 +149,10 @@ Don't pile new `!important` onto daisy classes.
 
 | Selector | Why |
 |---|---|
-| `.btn { transition: …; !important }` + `.btn:active { transform: scale(0.97) !important }` | Adds the press feedback daisy lacks; `!important` because daisy ships a same-specificity rule. |
+| `.btn { background-clip: padding-box; transition: …; !important }` + `.btn:active:not(:disabled):not([aria-haspopup]) { transform: translateY(1px) !important }` | Nova-flavored press feedback. `translateY` (not `scale`) so ring/border treatments stay crisp; `bg-clip-padding` so the ring doesn't bleed at press; `:not([aria-haspopup])` so dropdown triggers don't bob when opening a menu. `!important` because daisy ships same-specificity transitions. |
+| `.join:has(> .btn-{tone}, …) { box-shadow: ring + drop }` + items inside get `box-shadow: none !important` | Lifts daisy's per-button depth shadow onto the `.join` container so split-buttons render as one unit (no seam at the inner edges of join-items). Scoped via `:has()` to joins containing a solid-tone button — flat joins (pagination, ghost segmented) stay flat. |
+| `.modal-box { box-shadow: …; !important }` | Nova ring + soft drop replaces daisy's default shadow-2xl. `!important` because daisy's plugin layer emits a same-specificity rule that wins on source order otherwise. |
+| `.dropdown-content { box-shadow: ring + drop }` (NO `!important`) | Nova default elevation for floating menus. Deliberately no `!important` so per-caller `shadow-lg`/`shadow-xl` (the daisyui.md-mandated standard dropdown shape, settings_modal tab picker, etc.) still wins by specificity. |
 | `.modal-backdrop { transition: opacity 0.2s ease !important }` | Small backdrop polish. |
 | `[x-collapse] { transition: height …; !important }` | Alpine's `x-collapse` plugin sets inline styles; the rule overrides. |
 | `.drawer-side { z-index: 40 !important }` | Stacks above the sticky mobile navbar (z-30). |
