@@ -7,6 +7,7 @@ import "breadbox/internal/templates/components"
 // html/template version byte-for-byte so behavior (live chip preview,
 // Alpine submit flow) is preserved.
 templ TagForm(p TagFormProps) {
+	<script src="/static/js/admin/slug.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div class="bb-page-header">
 		<div>
@@ -65,6 +66,21 @@ templ TagForm(p TagFormProps) {
 					</span>
 				</div>
 				<div class="space-y-4">
+					<!-- Display name -->
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="display_name">
+							Display Name <span class="text-error">*</span>
+						</label>
+						<input
+							type="text"
+							id="display_name"
+							x-model="displayName"
+							class="bb-form-input"
+							required
+							maxlength="128"
+							placeholder="Needs Review"
+						/>
+					</div>
 					<!-- Slug -->
 					<div>
 						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="slug">
@@ -89,21 +105,6 @@ templ TagForm(p TagFormProps) {
 							/>
 							<p class="text-xs text-base-content/40 mt-1.5">Lowercase, hyphens or colons. Immutable after creation.</p>
 						}
-					</div>
-					<!-- Display name -->
-					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="display_name">
-							Display Name <span class="text-error">*</span>
-						</label>
-						<input
-							type="text"
-							id="display_name"
-							x-model="displayName"
-							class="bb-form-input"
-							required
-							maxlength="128"
-							placeholder="Needs Review"
-						/>
 					</div>
 					<!-- Description -->
 					<div>

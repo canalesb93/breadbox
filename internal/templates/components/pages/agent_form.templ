@@ -29,6 +29,7 @@ templ AgentForm(p AgentFormProps) {
 	<!-- Alpine factory + initial-state JSON. Loaded synchronously (no
 	     defer) so Alpine.data('agentForm', …) registers before Alpine —
 	     itself <script defer> from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/slug.js"></script>
 	<script src="/static/js/admin/components/agent_form.js"></script>
 	@templ.JSONScript("agent-form-data", agentFormInitialJSON(p.Form))
 	@components.BreadcrumbNav(agentFormBreadcrumbs(p))

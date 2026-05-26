@@ -271,6 +271,12 @@ document.addEventListener('alpine:init', function () {
           var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           this.tzLabel = tz || '';
         } catch (e) { this.tzLabel = ''; }
+
+        // Auto-derive slug from the name field while the slug is still
+        // empty / untouched. Edit mode loads with a non-empty slug, so
+        // the wiring treats it as already-touched and stays out of the
+        // way. See static/js/admin/slug.js.
+        if (window.bbWireSlugInput) window.bbWireSlugInput('agent-name', 'agent-slug');
       },
 
       // ---- cron picker ---------------------------------------------------
