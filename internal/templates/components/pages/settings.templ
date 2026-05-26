@@ -4,97 +4,85 @@ import (
 	"fmt"
 	"strconv"
 
-	"breadbox/internal/avatar"
 	"breadbox/internal/templates/components"
 )
 
 // SettingsGeneral renders the General tab — sync schedule, log retention,
 // and the user-avatar style picker. Lands at both /settings (the default
 // Settings entry) and /settings/general.
+//
+// Layout follows .claude/rules/settings.md: one tab header followed by
+// SettingsSections, each a quiet bordered group of SettingsRows. Selects
+// auto-save via SettingsAutoSaveForm — no per-row Save buttons.
 templ SettingsGeneral(p SettingsProps) {
 	<script src="/static/js/admin/components/settings.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	<div class="max-w-2xl">
+	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "General",
 			Subtitle: "Schedule, log retention, and avatars",
 		})
-		<div class="grid gap-6">
-			@settingsSyncSchedule(p)
-			@settingsSyncRetention(p)
-			@settingsAvatarStyleCard(p)
+		<div class="space-y-6">
+			@settingsSyncSection(p)
+			@settingsAvatarsSection(p)
 		</div>
 	</div>
 }
 
-// SettingsSystem renders the System tab — encryption key status,
-// version info, and runtime details. Security folds in here so the
-// admin has one stop for "this server's posture."
+// SettingsSystem renders the System tab — encryption key status and
+// runtime/version info. Security folds in here so the admin has one
+// stop for "this server's posture."
 templ SettingsSystem(p SettingsProps) {
-	<div class="max-w-2xl">
+	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "System",
 			Subtitle: "Security and runtime information",
 		})
-		<div class="grid gap-6">
-			@settingsSecurityCardFlat(p)
-			@settingsSystemCard(p)
+		<div class="space-y-6">
+			@settingsSecuritySection(p)
+			@settingsRuntimeSection(p)
 		</div>
 	</div>
 }
 
 // SettingsHelp renders the Help tab — pointer to the Getting Started
-// wizard. The Documentation footer button covers external help.
+// wizard, links to external docs, and (for developers) a link to the
+// design-system sandbox.
 templ SettingsHelp(p SettingsProps) {
-	<div class="max-w-2xl">
+	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "Help",
 			Subtitle: "Setup guide and resources",
 		})
-		<div class="grid gap-6">
-			@settingsHelpCardFlat(p)
-			@settingsHelpDeveloperCard()
+		<div class="space-y-6">
+			@settingsResourcesSection(p)
+			@settingsDeveloperSection()
 		</div>
 	</div>
 }
 
-templ settingsSyncCard(p SettingsProps) {
-	<div id="sync" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#sync' || location.hash === '#retention' }">
-		<div
-			class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer"
-			:class="expanded && 'border-b border-base-300'"
-			role="button"
-			tabindex="0"
-			:aria-expanded="expanded ? 'true' : 'false'"
-			aria-controls="sync-panel"
-			@click="expanded = !expanded"
-			@keydown.enter.prevent="expanded = !expanded"
-			@keydown.space.prevent="expanded = !expanded"
-		>
-			@components.LucideIcon("refresh-cw", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Sync</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">
-					Every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) }
-					if p.NextSyncTime != "" {
-						· Next: { p.NextSyncTime }
-					}
-					· { fmt.Sprintf("%d logs stored", p.SyncLogCount) }
-				</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Schedule and log retention</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div id="sync-panel" x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<!-- Schedule section -->
-				<form method="POST" action="/settings/sync">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_interval_minutes">
-						Sync Interval
-						@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
-					</label>
-					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm bg-base-200">
+// ---------------------------------------------------------------------
+// General — Sync
+// ---------------------------------------------------------------------
+
+templ settingsSyncSection(p SettingsProps) {
+	<div id="sync">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "refresh-cw",
+			Title:   "Sync",
+			Caption: settingsSyncCaption(p),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Sync interval",
+				Caption: settingsNextSyncCaption(p),
+				For:     "sync_interval_minutes",
+			}) {
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/settings/sync",
+					CSRFToken: p.CSRFToken,
+					Label:     "Sync schedule saved",
+				}) {
+					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm bg-base-200">
 						@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
 						@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
 						@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
@@ -103,47 +91,267 @@ templ settingsSyncCard(p SettingsProps) {
 						@syncIntervalOption(720, p.SyncIntervalMinutes, "Every 12 hours")
 						@syncIntervalOption(1440, p.SyncIntervalMinutes, "Every 24 hours")
 					</select>
-					if p.NextSyncTime != "" {
-						<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-							@components.LucideIcon("clock", "w-3.5 h-3.5")
-							Next sync: { p.NextSyncTime }
-						</p>
-					}
-					<div class="mt-4">
-						<button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
-					</div>
-				</form>
-				<!-- Retention section -->
-				<div class="border-t border-base-300 mt-5 pt-5">
-					<form method="POST" action="/settings/retention">
-						<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-						<div class="flex items-center justify-between mb-3">
-							<label class="text-sm font-medium text-base-content/70" for="sync_log_retention_days">Log Retention</label>
-							<span class="text-xs text-base-content/40 tabular-nums">{ fmt.Sprintf("%d logs stored", p.SyncLogCount) }</span>
-						</div>
-						<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm bg-base-200">
-							@retentionOption(7, p.SyncLogRetentionDays, "7 days")
-							@retentionOption(14, p.SyncLogRetentionDays, "14 days")
-							@retentionOption(30, p.SyncLogRetentionDays, "30 days")
-							@retentionOption(60, p.SyncLogRetentionDays, "60 days")
-							@retentionOption(90, p.SyncLogRetentionDays, "90 days (default)")
-							@retentionOption(180, p.SyncLogRetentionDays, "180 days")
-							@retentionOption(365, p.SyncLogRetentionDays, "1 year")
-							@retentionOption(0, p.SyncLogRetentionDays, "Keep forever")
-						</select>
-						<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-							@components.LucideIcon("clock", "w-3.5 h-3.5")
-							Cleanup runs daily at 3:00 AM
-						</p>
-						<div class="mt-4">
-							<button type="submit" class="btn btn-primary btn-sm">Save Retention</button>
-						</div>
-					</form>
-				</div>
-			</div>
-		</div>
+				}
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Log retention",
+				Caption: fmt.Sprintf("%d logs stored · cleanup runs daily at 3:00 AM", p.SyncLogCount),
+				For:     "sync_log_retention_days",
+			}) {
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/settings/retention",
+					CSRFToken: p.CSRFToken,
+					Label:     "Log retention saved",
+				}) {
+					<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm bg-base-200">
+						@retentionOption(7, p.SyncLogRetentionDays, "7 days")
+						@retentionOption(14, p.SyncLogRetentionDays, "14 days")
+						@retentionOption(30, p.SyncLogRetentionDays, "30 days")
+						@retentionOption(60, p.SyncLogRetentionDays, "60 days")
+						@retentionOption(90, p.SyncLogRetentionDays, "90 days (default)")
+						@retentionOption(180, p.SyncLogRetentionDays, "180 days")
+						@retentionOption(365, p.SyncLogRetentionDays, "1 year")
+						@retentionOption(0, p.SyncLogRetentionDays, "Keep forever")
+					</select>
+				}
+			}
+		}
 	</div>
 }
+
+func settingsSyncCaption(p SettingsProps) string {
+	return "Every " + components.FormatIntervalMinutes(p.SyncIntervalMinutes)
+}
+
+func settingsNextSyncCaption(p SettingsProps) string {
+	if p.NextSyncTime == "" {
+		return ""
+	}
+	return "Next sync: " + p.NextSyncTime
+}
+
+// ---------------------------------------------------------------------
+// General — Avatars
+// ---------------------------------------------------------------------
+
+templ settingsAvatarsSection(p SettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "user-circle",
+		Title:   "Avatars",
+		Caption: "DiceBear styles for auto-generated identicons — uploaded avatars are unaffected",
+	}) {
+		@settingsAvatarPickerRow(p, "user", "Users", p.AvatarUserStyle, userPreviewSeeds())
+		@settingsAvatarPickerRow(p, "agent", "Agents", p.AvatarAgentStyle, agentPreviewSeeds())
+		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+			<p class="text-xs text-base-content/45 leading-snug">
+				Browsers cache avatars for 24h — hard-refresh after changing a style.
+			</p>
+		}
+	}
+}
+
+// settingsAvatarPickerRow renders one actor-bucket picker (User or
+// Agent). actor matches the form field the POST handler dispatches
+// on; both POSTs go to /settings/avatar-style.
+templ settingsAvatarPickerRow(p SettingsProps, actor, label, current string, seeds []string) {
+	<div x-data={ "{ style: $el.dataset.style }" } data-style={ current } class="contents">
+		@components.SettingsRow(components.SettingsRowProps{
+			Label: label,
+			For:   "avatar_style_" + actor,
+			Stack: true,
+		}) {
+			<div class="flex flex-wrap items-center gap-3">
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/settings/avatar-style",
+					CSRFToken: p.CSRFToken,
+					Label:     label + " avatar style saved",
+				}) {
+					<input type="hidden" name="actor" value={ actor }/>
+					<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200" x-model="style">
+						for _, opt := range p.AvatarStyles {
+							if opt.ID == current {
+								<option value={ opt.ID } selected>{ opt.Label }</option>
+							} else {
+								<option value={ opt.ID }>{ opt.Label }</option>
+							}
+						}
+					</select>
+				}
+				<div class="flex items-center gap-2">
+					for _, seed := range seeds {
+						<img
+							class="w-9 h-9 rounded-full bg-base-200"
+							alt={ "Preview " + seed }
+							:src={ avatarPreviewExpr(seed) }
+						/>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// ---------------------------------------------------------------------
+// System — Security
+// ---------------------------------------------------------------------
+
+templ settingsSecuritySection(p SettingsProps) {
+	<div id="security">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "shield",
+			Title:   "Security",
+			Caption: "Required for storing bank credentials at rest",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Encryption key",
+				Caption: settingsEncryptionCaption(p),
+			}) {
+				if p.HasEncryptionKey {
+					<span class="badge badge-soft badge-success badge-sm">Active</span>
+				} else {
+					<span class="badge badge-soft badge-error badge-sm">Not set</span>
+				}
+			}
+			if !p.HasEncryptionKey {
+				@components.SettingsRow(components.SettingsRowProps{
+					Stack: true,
+				}) {
+					<div role="alert" class="alert alert-error alert-soft rounded-xl text-sm">
+						@components.LucideIcon("alert-triangle", "w-4 h-4 shrink-0")
+						<span>Access tokens cannot be stored without an encryption key. Set the <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> environment variable.</span>
+					</div>
+				}
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Password",
+				Caption: "Manage your sign-in password",
+			}) {
+				<a href="/settings/account" class="btn btn-ghost btn-sm">Change in Account</a>
+			}
+		}
+	</div>
+}
+
+func settingsEncryptionCaption(p SettingsProps) string {
+	if p.HasEncryptionKey {
+		return "ENCRYPTION_KEY is set and protecting stored credentials"
+	}
+	return "ENCRYPTION_KEY environment variable is not set"
+}
+
+// ---------------------------------------------------------------------
+// System — Runtime
+// ---------------------------------------------------------------------
+
+templ settingsRuntimeSection(p SettingsProps) {
+	<div id="system">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "cpu",
+			Title:   "Runtime",
+			Caption: "Versions and uptime",
+			Right:   settingsRuntimeUpdateBadge(p),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Breadbox",
+			}) {
+				<span class="text-sm tabular-nums">{ p.Version }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Go",
+			}) {
+				<span class="text-sm">{ p.GoVersion }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "PostgreSQL",
+			}) {
+				<span class="text-sm">{ p.PostgresVersion }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Uptime",
+			}) {
+				<span class="text-sm tabular-nums">{ p.Uptime }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Providers",
+			}) {
+				<span class="text-sm tabular-nums">{ fmt.Sprintf("%d configured", p.ProviderCount) }</span>
+			}
+		}
+	</div>
+}
+
+templ settingsRuntimeUpdateBadge(p SettingsProps) {
+	if p.UpdateAvailable {
+		<a href={ templ.SafeURL(p.LatestURL) } target="_blank" rel="noopener" class="badge badge-warning badge-sm gap-1.5 no-underline" title={ "Release notes for v" + p.LatestVersion }>
+			@components.LucideIcon("arrow-up-circle", "w-3 h-3")
+			Update available — v{ p.LatestVersion }
+		</a>
+	} else if p.Version != "" {
+		<a href="https://github.com/canalesb93/breadbox/releases" target="_blank" rel="noopener" class="badge badge-ghost badge-sm gap-1 no-underline" title="View releases on GitHub">
+			@components.LucideIcon("github", "w-3 h-3")
+			Up to date
+		</a>
+	}
+}
+
+// ---------------------------------------------------------------------
+// Help
+// ---------------------------------------------------------------------
+
+templ settingsResourcesSection(p SettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "life-buoy",
+		Title:   "Resources",
+		Caption: "Walkthroughs and reference",
+	}) {
+		@settingsGettingStartedRow(p)
+		@components.SettingsRowLink(components.SettingsRowLinkProps{
+			Href:     "https://docs.breadbox.sh",
+			Icon:     "book-open",
+			Label:    "Documentation",
+			Caption:  "docs.breadbox.sh",
+			External: true,
+		})
+	}
+}
+
+// Getting Started doesn't fit SettingsRowLink because the trailing
+// affordance is either a button or a form (re-open vs. open).
+templ settingsGettingStartedRow(p SettingsProps) {
+	@components.SettingsRow(components.SettingsRowProps{
+		Label:   "Getting started",
+		Caption: "Step-by-step setup walkthrough",
+	}) {
+		@components.LucideIcon("compass", "w-4 h-4 text-base-content/40 mr-3 hidden")
+		if p.OnboardingDismissed {
+			<form method="POST" action="/getting-started/reopen">
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
+			</form>
+		} else {
+			<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
+		}
+	}
+}
+
+templ settingsDeveloperSection() {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "palette",
+		Title:   "Developer",
+		Caption: "Internal tools for contributors",
+	}) {
+		@components.SettingsRowLink(components.SettingsRowLinkProps{
+			Href:    "/design",
+			Icon:    "palette",
+			Label:   "Design system sandbox",
+			Caption: "Reference gallery for every shared admin-UI component",
+		})
+	}
+}
+
+// ---------------------------------------------------------------------
+// Helpers reused by handlers + by other settings tabs
+// ---------------------------------------------------------------------
 
 templ syncIntervalOption(value, current int, label string) {
 	if value == current {
@@ -170,425 +378,4 @@ templ configSourceBadge(sources map[string]string, key string) {
 		default:
 			<span class="badge badge-ghost badge-sm">default</span>
 	}
-}
-
-templ settingsSecurityCard(p SettingsProps) {
-	<div id="security" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#security' }">
-		<div
-			class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer"
-			:class="expanded && 'border-b border-base-300'"
-			role="button"
-			tabindex="0"
-			:aria-expanded="expanded ? 'true' : 'false'"
-			aria-controls="security-panel"
-			@click="expanded = !expanded"
-			@keydown.enter.prevent="expanded = !expanded"
-			@keydown.space.prevent="expanded = !expanded"
-		>
-			@components.LucideIcon("shield", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Security</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">
-					Encryption { encryptionStatus(p.HasEncryptionKey) }
-				</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption key status · Change password in <a href="/settings/account" class="link link-hover">My Account</a></p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div id="security-panel" x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<!-- Encryption Key Status -->
-				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
-					<div class="flex items-center gap-2.5">
-						@components.LucideIcon("key-round", "w-4 h-4 text-base-content opacity-50")
-						<span class="text-sm font-medium">Encryption Key</span>
-					</div>
-					if p.HasEncryptionKey {
-						<span class="badge badge-success badge-sm">Active</span>
-					} else {
-						<span class="badge badge-error badge-sm">Not Set</span>
-					}
-				</div>
-				if !p.HasEncryptionKey {
-					<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
-						@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
-						Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
-					</div>
-				}
-				<p class="text-xs text-base-content/40 mt-4">
-					Looking to change your password? Manage it in
-					<a href="/settings/account" class="link link-hover font-medium">My Account</a>.
-				</p>
-			</div>
-		</div>
-	</div>
-}
-
-templ settingsSystemCard(p SettingsProps) {
-	<div id="system" class="bb-card p-5">
-		<div class="flex items-center justify-between gap-3 mb-4">
-			<div class="flex items-center gap-3">
-				@components.LucideIcon("cpu", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-				<h2 class="font-semibold">System</h2>
-			</div>
-			if p.UpdateAvailable {
-				<a href={ templ.SafeURL(p.LatestURL) } target="_blank" rel="noopener" class="badge badge-warning badge-sm gap-1.5 no-underline" title={ "Release notes for v" + p.LatestVersion }>
-					@components.LucideIcon("arrow-up-circle", "w-3 h-3")
-					Update available — v{ p.LatestVersion }
-				</a>
-			} else if p.Version != "" {
-				<a href="https://github.com/canalesb93/breadbox/releases" target="_blank" rel="noopener" class="badge badge-ghost badge-sm gap-1 no-underline" title="View releases on GitHub">
-					@components.LucideIcon("github", "w-3 h-3")
-					Up to date
-				</a>
-			}
-		</div>
-		<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-			<div><span class="text-base-content/40">Version</span> <span class="font-medium tabular-nums">{ p.Version }</span></div>
-			<div><span class="text-base-content/40">Go</span> <span class="font-medium">{ p.GoVersion }</span></div>
-			<div><span class="text-base-content/40">PostgreSQL</span> <span class="font-medium">{ p.PostgresVersion }</span></div>
-			<div><span class="text-base-content/40">Uptime</span> <span class="font-medium">{ p.Uptime }</span></div>
-			<div><span class="text-base-content/40">Providers</span> <span class="font-medium">{ fmt.Sprintf("%d configured", p.ProviderCount) }</span></div>
-		</div>
-	</div>
-}
-
-// settingsAvatarStyleCard renders the DiceBear style pickers on the
-// General tab — one for human users, one for AI agents. Each form
-// posts to /settings/avatar-style with its `actor` field set; the
-// live preview is driven by Alpine and routes through the
-// /avatars/preview proxy so both pickers warm the same in-memory
-// cache /avatars/{id} reads from.
-templ settingsAvatarStyleCard(p SettingsProps) {
-	<div class="flex flex-col gap-5">
-		@settingsAvatarStylePicker(settingsAvatarPickerProps{
-			Actor:        "user",
-			Title:        "User Avatars",
-			Description:  "DiceBear style for human-member identicons — uploaded avatars are unaffected.",
-			Icon:         "user-circle",
-			CurrentStyle: p.AvatarUserStyle,
-			Seeds:        userPreviewSeeds(),
-			CSRFToken:    p.CSRFToken,
-			Styles:       p.AvatarStyles,
-		})
-		@settingsAvatarStylePicker(settingsAvatarPickerProps{
-			Actor:        "agent",
-			Title:        "Agent Avatars",
-			Description:  "DiceBear style for AI agents — distinct from the user style so agent-authored activity reads as obviously non-human.",
-			Icon:         "bot",
-			CurrentStyle: p.AvatarAgentStyle,
-			Seeds:        agentPreviewSeeds(),
-			CSRFToken:    p.CSRFToken,
-			Styles:       p.AvatarStyles,
-		})
-	</div>
-}
-
-// settingsAvatarPickerProps captures one picker card's render inputs.
-// Used by settingsAvatarStylePicker so the two cards (user + agent)
-// share markup but differ in actor key, copy, and preview seeds.
-type settingsAvatarPickerProps struct {
-	Actor        string // "user" or "agent" — flows into the form's hidden field
-	Title        string
-	Description  string
-	Icon         string // lucide icon name for the card header tile
-	CurrentStyle string
-	Seeds        []string // four sample seeds for the live preview row
-	CSRFToken    string
-	Styles       []avatar.StyleOption
-}
-
-// settingsAvatarStylePicker renders one picker card. Self-contained
-// x-data scope: the select drives the four preview tiles through the
-// /avatars/preview proxy on every change, no submit needed.
-templ settingsAvatarStylePicker(p settingsAvatarPickerProps) {
-	<div class="bb-card p-5" x-data="{ style: $el.dataset.style }" data-style={ p.CurrentStyle }>
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				@components.LucideIcon(p.Icon, "w-4 h-4 text-base-content opacity-60")
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">{ p.Title }</h2>
-				<p class="text-xs text-base-content/45">{ p.Description }</p>
-			</div>
-		</div>
-		<form method="POST" action="/settings/avatar-style">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<input type="hidden" name="actor" value={ p.Actor }/>
-			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for={ "avatar_style_" + p.Actor }>Style</label>
-			<select id={ "avatar_style_" + p.Actor } name="avatar_style" class="select select-sm w-full max-w-sm bg-base-200" x-model="style">
-				for _, opt := range p.Styles {
-					if opt.ID == p.CurrentStyle {
-						<option value={ opt.ID } selected>{ opt.Label }</option>
-					} else {
-						<option value={ opt.ID }>{ opt.Label }</option>
-					}
-				}
-			</select>
-			<div class="mt-4 flex items-center gap-3">
-				<span class="text-xs text-base-content/40">Preview</span>
-				<div class="flex items-center gap-2">
-					for _, seed := range p.Seeds {
-						<img
-							class="w-10 h-10 rounded-full bg-base-200"
-							alt={ "Preview " + seed }
-							:src={ avatarPreviewExpr(seed) }
-						/>
-					}
-				</div>
-			</div>
-			<div class="mt-4">
-				<button type="submit" class="btn btn-primary btn-sm">Save Style</button>
-			</div>
-			<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-				@components.LucideIcon("info", "w-3.5 h-3.5")
-				Browsers cache avatars for 24h — hard-refresh to see the change immediately.
-			</p>
-		</form>
-	</div>
-}
-
-templ settingsHelpCard(p SettingsProps) {
-	<div id="help" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#help' }">
-		<div
-			class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer"
-			:class="expanded && 'border-b border-base-300'"
-			role="button"
-			tabindex="0"
-			:aria-expanded="expanded ? 'true' : 'false'"
-			aria-controls="help-panel"
-			@click="expanded = !expanded"
-			@keydown.enter.prevent="expanded = !expanded"
-			@keydown.space.prevent="expanded = !expanded"
-		>
-			@components.LucideIcon("life-buoy", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Help</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">Setup guide and documentation</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Resources and guides</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div id="help-panel" x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<div class="flex flex-col gap-3">
-					<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
-						<div class="flex items-center gap-2.5">
-							@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50")
-							<div>
-								<span class="text-sm font-medium">Getting Started Guide</span>
-								<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
-							</div>
-						</div>
-						if p.OnboardingDismissed {
-							<form method="POST" action="/getting-started/reopen">
-								<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-								<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
-							</form>
-						} else {
-							<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
-						}
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
-func encryptionStatus(has bool) string {
-	if has {
-		return "active"
-	}
-	return "not set"
-}
-
-// ---------------------------------------------------------------------
-// Flat (non-accordion) templs used by the new SettingsGeneral/System/Help
-// tab pages. Each renders the same content the legacy accordion cards
-// did, but without the expand/collapse chrome — a tab page IS the
-// disclosure now.
-// ---------------------------------------------------------------------
-templ settingsSyncSchedule(p SettingsProps) {
-	<div class="bb-card p-5">
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content opacity-60")
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">Schedule</h2>
-				<p class="text-xs text-base-content/45">
-					Every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) }
-					if p.NextSyncTime != "" {
-						· Next: { p.NextSyncTime }
-					}
-				</p>
-			</div>
-		</div>
-		<form method="POST" action="/settings/sync">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_interval_minutes">
-				Sync Interval
-				@configSourceBadge(p.ConfigSources, "sync_interval_minutes")
-			</label>
-			<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-sm bg-base-200">
-				@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
-				@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
-				@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
-				@syncIntervalOption(240, p.SyncIntervalMinutes, "Every 4 hours")
-				@syncIntervalOption(480, p.SyncIntervalMinutes, "Every 8 hours")
-				@syncIntervalOption(720, p.SyncIntervalMinutes, "Every 12 hours")
-				@syncIntervalOption(1440, p.SyncIntervalMinutes, "Every 24 hours")
-			</select>
-			if p.NextSyncTime != "" {
-				<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-					@components.LucideIcon("clock", "w-3.5 h-3.5")
-					Next sync: { p.NextSyncTime }
-				</p>
-			}
-			<div class="mt-4">
-				<button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
-			</div>
-		</form>
-	</div>
-}
-
-templ settingsSyncRetention(p SettingsProps) {
-	<div class="bb-card p-5">
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				@components.LucideIcon("archive", "w-4 h-4 text-base-content opacity-60")
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">Log Retention</h2>
-				<p class="text-xs text-base-content/45">{ fmt.Sprintf("%d logs stored", p.SyncLogCount) }</p>
-			</div>
-		</div>
-		<form method="POST" action="/settings/retention">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_log_retention_days">Keep logs for</label>
-			<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm w-full max-w-sm bg-base-200">
-				@retentionOption(7, p.SyncLogRetentionDays, "7 days")
-				@retentionOption(14, p.SyncLogRetentionDays, "14 days")
-				@retentionOption(30, p.SyncLogRetentionDays, "30 days")
-				@retentionOption(60, p.SyncLogRetentionDays, "60 days")
-				@retentionOption(90, p.SyncLogRetentionDays, "90 days (default)")
-				@retentionOption(180, p.SyncLogRetentionDays, "180 days")
-				@retentionOption(365, p.SyncLogRetentionDays, "1 year")
-				@retentionOption(0, p.SyncLogRetentionDays, "Keep forever")
-			</select>
-			<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-				@components.LucideIcon("clock", "w-3.5 h-3.5")
-				Cleanup runs daily at 3:00 AM
-			</p>
-			<div class="mt-4">
-				<button type="submit" class="btn btn-primary btn-sm">Save Retention</button>
-			</div>
-		</form>
-	</div>
-}
-
-templ settingsSecurityCardFlat(p SettingsProps) {
-	<div class="bb-card p-5">
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				@components.LucideIcon("shield", "w-4 h-4 text-base-content opacity-60")
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">Encryption Key</h2>
-				<p class="text-xs text-base-content/45">Required for storing bank credentials</p>
-			</div>
-		</div>
-		<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
-			<div class="flex items-center gap-2.5">
-				@components.LucideIcon("key-round", "w-4 h-4 text-base-content opacity-50")
-				<span class="text-sm font-medium">ENCRYPTION_KEY</span>
-			</div>
-			if p.HasEncryptionKey {
-				<span class="badge badge-success badge-sm">Active</span>
-			} else {
-				<span class="badge badge-error badge-sm">Not Set</span>
-			}
-		</div>
-		if !p.HasEncryptionKey {
-			<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
-				@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
-				Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
-			</div>
-		}
-		<p class="text-xs text-base-content/40 mt-4">
-			Looking to change your password? Manage it in
-			<a href="/settings/account" class="link link-hover font-medium">Account</a>.
-		</p>
-	</div>
-}
-
-templ settingsHelpCardFlat(p SettingsProps) {
-	<div class="bb-card p-5">
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				@components.LucideIcon("life-buoy", "w-4 h-4 text-base-content opacity-60")
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">Resources</h2>
-				<p class="text-xs text-base-content/45">Walkthroughs and reference</p>
-			</div>
-		</div>
-		<div class="flex flex-col gap-3">
-			<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
-				<div class="flex items-center gap-2.5">
-					@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50")
-					<div>
-						<span class="text-sm font-medium">Getting Started Guide</span>
-						<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
-					</div>
-				</div>
-				if p.OnboardingDismissed {
-					<form method="POST" action="/getting-started/reopen">
-						<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-						<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
-					</form>
-				} else {
-					<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
-				}
-			</div>
-			<a href="https://docs.breadbox.sh" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
-				<div class="flex items-center gap-2.5">
-					@components.LucideIcon("book-open", "w-4 h-4 text-base-content opacity-50")
-					<div>
-						<span class="text-sm font-medium">Documentation</span>
-						<p class="text-xs text-base-content/40">docs.breadbox.sh</p>
-					</div>
-				</div>
-				@components.LucideIcon("square-arrow-out-up-right", "w-4 h-4 text-base-content opacity-40")
-			</a>
-		</div>
-	</div>
-}
-
-// settingsHelpDeveloperCard surfaces internal developer-facing tools —
-// currently the design-system sandbox. Lives below the Resources card on
-// the Help tab; intentionally a separate card so the developer-only
-// nature reads at a glance.
-templ settingsHelpDeveloperCard() {
-	<div class="bb-card p-5">
-		<div class="bb-icon-header">
-			<div class="bb-icon-header__tile bg-base-200/60">
-				@components.LucideIcon("palette", "w-4 h-4 text-base-content/60")
-			</div>
-			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">Developer</h2>
-				<p class="text-xs text-base-content/45">Internal tools for contributors</p>
-			</div>
-		</div>
-		<a href="/design" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
-			<div class="flex items-center gap-2.5">
-				@components.LucideIcon("palette", "w-4 h-4 text-base-content/50")
-				<div>
-					<span class="text-sm font-medium">Design system sandbox</span>
-					<p class="text-xs text-base-content/40">Reference gallery for every shared admin-UI component</p>
-				</div>
-			</div>
-			@components.LucideIcon("arrow-right", "w-4 h-4 text-base-content/40")
-		</a>
-	</div>
 }

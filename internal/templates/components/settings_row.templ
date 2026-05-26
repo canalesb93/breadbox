@@ -1,0 +1,112 @@
+package components
+
+// SettingsRowProps controls one row inside a SettingsSection. See
+// .claude/rules/settings.md.
+//
+// The default layout is `[label + caption left] [control right]` in a
+// single line. Set Stack=true when the control is too wide to share
+// the row (textarea, file input, key reveal, code block) — the
+// control then renders full-width below the label.
+//
+// Caption is one short line of context under the label. If the
+// explanation is longer than ~80 chars, put it in its own stacked
+// row beneath the control (label-less, Stack=true).
+type SettingsRowProps struct {
+	Label   string
+	Caption string
+	// Stack flips to full-width layout. The label sits above the
+	// control, the control fills the row. Use for textareas, file
+	// inputs, masked credential editors, or anything wider than a
+	// medium select.
+	Stack bool
+	// HelpRight optionally appears as a small muted hint immediately
+	// to the right of the label (think "from env" / "Required").
+	// Use sparingly — most context belongs in Caption.
+	HelpRight templ.Component
+	// For label associativity (`<label for=…>`). When set, the row
+	// wraps its label slot in a `<label for="ID">`.
+	For string
+}
+
+// SettingsRow renders one row. Pass the control as children.
+templ SettingsRow(p SettingsRowProps) {
+	<div class={ settingsRowClasses(p.Stack) }>
+		if p.Label != "" || p.Caption != "" {
+			<div class="bb-settings-row__main">
+				if p.Label != "" {
+					if p.For != "" {
+						<label for={ p.For } class="bb-settings-row__label">
+							{ p.Label }
+							if p.HelpRight != nil {
+								@p.HelpRight
+							}
+						</label>
+					} else {
+						<div class="bb-settings-row__label">
+							{ p.Label }
+							if p.HelpRight != nil {
+								@p.HelpRight
+							}
+						</div>
+					}
+				}
+				if p.Caption != "" {
+					<p class="bb-settings-row__caption">{ p.Caption }</p>
+				}
+			</div>
+		}
+		<div class="bb-settings-row__control">
+			{ children... }
+		</div>
+	</div>
+}
+
+// SettingsRowLink is a convenience row whose entire surface is a link
+// or button — used for action lists (Help → Resources, Backups →
+// Restore From Upload). The inline icon sits to the LEFT of the label
+// because the row itself is the affordance.
+type SettingsRowLinkProps struct {
+	Href     string
+	Icon     string
+	Label    string
+	Caption  string
+	External bool // adds target="_blank" + rel + an out-arrow on the right
+	Trailing templ.Component
+}
+
+templ SettingsRowLink(p SettingsRowLinkProps) {
+	<a
+		href={ templ.SafeURL(p.Href) }
+		if p.External {
+			target="_blank"
+			rel="noopener noreferrer"
+		}
+		class="bb-settings-row bb-settings-row--link"
+	>
+		if p.Icon != "" {
+			<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content/50 shrink-0"></i>
+		}
+		<div class="bb-settings-row__main">
+			<div class="bb-settings-row__label">{ p.Label }</div>
+			if p.Caption != "" {
+				<p class="bb-settings-row__caption">{ p.Caption }</p>
+			}
+		</div>
+		<div class="bb-settings-row__control">
+			if p.Trailing != nil {
+				@p.Trailing
+			} else if p.External {
+				@LucideIcon("square-arrow-out-up-right", "w-4 h-4 text-base-content/40")
+			} else {
+				@LucideIcon("chevron-right", "w-4 h-4 text-base-content/40")
+			}
+		</div>
+	</a>
+}
+
+func settingsRowClasses(stack bool) string {
+	if stack {
+		return "bb-settings-row bb-settings-row--stack"
+	}
+	return "bb-settings-row"
+}

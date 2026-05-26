@@ -366,6 +366,13 @@ func DesignSections() []DesignSection {
 			Group:       "patterns",
 			Render:      func() templ.Component { return SectionCommandPalette() },
 		},
+		{
+			Slug:        "settings",
+			Title:       "Settings",
+			Description: "SettingsSection / SettingsRow / SettingsAutoSaveForm — the shared shape every /settings/* tab uses. See .claude/rules/settings.md for the design language (anatomy, width, auto-save vs single-Save-per-section, danger variant).",
+			Group:       "patterns",
+			Render:      func() templ.Component { return SectionSettings() },
+		},
 	}
 }
 

@@ -1,0 +1,41 @@
+package components
+
+// SettingsAutoSaveFormProps wraps a single control (select, checkbox)
+// in a form that submits on change, surfacing a small in-modal toast.
+// Use for one-input settings — never for multi-input forms. See
+// .claude/rules/settings.md.
+//
+// The Alpine factory `settingsAutoSave` (in
+// static/js/admin/components/settings.js) listens for `change` events
+// on form controls inside this wrapper and triggers a fetch with the
+// modal's X-Settings-Fragment header, so the server response feeds the
+// modal's toast pipeline.
+type SettingsAutoSaveFormProps struct {
+	Action    string
+	CSRFToken string
+	// Label is the success-toast text the JS shows when the response
+	// header doesn't carry an explicit flash. Defaults to "Saved".
+	Label string
+}
+
+templ SettingsAutoSaveForm(p SettingsAutoSaveFormProps) {
+	<form
+		method="POST"
+		action={ templ.SafeURL(p.Action) }
+		x-data="settingsAutoSave"
+		data-toast-label={ autoSaveLabel(p.Label) }
+		class="contents"
+	>
+		if p.CSRFToken != "" {
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+		}
+		{ children... }
+	</form>
+}
+
+func autoSaveLabel(s string) string {
+	if s == "" {
+		return "Saved"
+	}
+	return s
+}

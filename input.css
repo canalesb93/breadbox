@@ -74,17 +74,15 @@
   --color-error: oklch(0.577 0.245 27.325);
   --color-error-content: oklch(0.985 0 0);
 
-  /* Radii tuned to shadcn Nova: rounded-xl (12px) on cards/modals,
-     rounded-lg (8px) on buttons/inputs, 4px on checkboxes. */
   --radius-selector: 0.25rem;
   --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-box: 0.625rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
 
   --border: 1px;
-  --depth: 1;
+  --depth: 0;
   --noise: 0;
 }
 
@@ -125,13 +123,13 @@
 
   --radius-selector: 0.25rem;
   --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-box: 0.625rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
 
   --border: 1px;
-  --depth: 1;
+  --depth: 0;
   --noise: 0;
 }
 
@@ -327,22 +325,15 @@
   .breadcrumbs { scrollbar-width: none; -ms-overflow-style: none; }
   .breadcrumbs::-webkit-scrollbar { display: none; }
 
-  /* ── Cards: shadcn Nova-style — inset ring, transparent border ──
-     Nova uses `ring-1 ring-foreground/10` on cards instead of a 1px border,
-     so the surface reads flatter and the edge feels like a subtle inset
-     against the page rather than a stamped rectangle. We replicate it via
-     a 0/0/0/1 box-shadow tinted with the base-content foreground.
-
-     IMPORTANT: we keep a `border: 1px solid transparent` here so per-caller
-     `border-{tone}/{alpha}` modifiers (`.bb-danger-card` and the
-     warning/error-banner cards under /sync-logs, /users, /my-account,
-     /tags) still light up — Tailwind `border-{color}` utilities only
-     set `border-color` and rely on the base to provide width + style.
-     Removing the border entirely makes those destructive-action tints
-     silently invisible. */
+  /* ── Cards: shadcn-style — 1px border + subtle drop shadow ──
+   * shadcn's Card component ships `border ... shadow-sm` (both, not
+   * border-only). The prior "border, not shadow" stance read flatter
+   * than shadcn in side-by-side comparison — added shadow-sm to get
+   * the same gentle lift. Dark mode keeps the color-mix surface lift
+   * below; shadows on dark BG read as a barely-visible halo and
+   * the surface lift carries the elevation cue. */
   .bb-card {
-    @apply bg-base-100 rounded-xl border border-transparent;
-    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.08);
+    @apply bg-base-100 rounded-xl border border-base-300 shadow-sm;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
   }
 
@@ -352,29 +343,7 @@
 
   .bb-card--interactive:hover {
     @apply bg-base-200/50;
-    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.12);
-  }
-
-  /* Dark mode: boost the ring opacity so the card edge stays legible
-     against the near-black base. base-content is near-white in dark,
-     so a 0.08 alpha (light-mode value) washes out — 0.14 restores
-     parity with the light-mode visual weight. Two selectors because
-     the theme can be set manually via `<html data-theme="dark">` OR
-     auto-resolved via `prefers-color-scheme` when no data-theme is
-     present (see the toggle-restore script in base.html). */
-  [data-theme="dark"] .bb-card {
-    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.14);
-  }
-  [data-theme="dark"] .bb-card--interactive:hover {
-    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.20);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) .bb-card {
-      box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.14);
-    }
-    :root:not([data-theme]) .bb-card--interactive:hover {
-      box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.20);
-    }
+    border-color: var(--color-base-300);
   }
 
   /* ── Form card primitives ── */
@@ -408,6 +377,77 @@
   /* Action row at the bottom of a sectioned form card.
      Left-aligned on mobile (thumb-reach), right-aligned on sm+. */
   .bb-action-row { @apply p-4 sm:p-5 border-t border-base-300 bg-base-200/20 flex items-center justify-start sm:justify-end gap-2; }
+
+  /* ── Settings surface — see .claude/rules/settings.md ──
+     The shared shape for every /settings/* tab. SettingsSection wraps
+     SettingsRow children; auto-save selects and one-Save-per-section
+     forms both reuse these classes.
+
+     We chose a slightly heavier outline (border-base-300) than .bb-card
+     and a flush, full-bleed header so the section reads as a discrete
+     "group" the way macOS / Linear settings do — not as another card.
+     The header is intentionally quiet (small icon, sm/font-semibold
+     title) — the row labels carry the visual hierarchy. */
+  .bb-settings-section {
+    @apply rounded-2xl border border-base-300 bg-base-100 overflow-hidden;
+  }
+  .bb-settings-section--danger {
+    @apply border-error/30;
+  }
+  .bb-settings-section__header {
+    @apply px-4 sm:px-5 py-3 sm:py-3.5 flex items-center gap-3 border-b border-base-300/80 min-w-0;
+  }
+  .bb-settings-section__heading {
+    @apply flex items-center gap-2.5 min-w-0 flex-1;
+  }
+  .bb-settings-section__caption {
+    @apply text-xs text-base-content/45 mt-0.5 leading-snug;
+  }
+  .bb-settings-section__right {
+    @apply shrink-0 flex items-center gap-2;
+  }
+
+  /* Body is just a stack of rows; dividers between adjacent rows. */
+  .bb-settings-section__body > .bb-settings-row + .bb-settings-row {
+    @apply border-t border-base-300/70;
+  }
+
+  /* The row primitive. Defaults to inline (label left, control right);
+     `--stack` flips to full-width-below for textareas / file inputs /
+     credential editors. Min-height keeps tall controls from making
+     short rows feel cramped next to them. */
+  .bb-settings-row {
+    @apply px-4 sm:px-5 py-3.5 flex items-center gap-4 min-h-[3.25rem];
+  }
+  .bb-settings-row--stack {
+    @apply flex-col items-stretch gap-2;
+  }
+  .bb-settings-row__main {
+    @apply min-w-0 flex-1;
+  }
+  .bb-settings-row__label {
+    @apply text-sm font-medium leading-tight flex items-center gap-2 flex-wrap;
+  }
+  .bb-settings-row__caption {
+    @apply text-xs text-base-content/50 mt-1 leading-snug;
+  }
+  .bb-settings-row__control {
+    @apply shrink-0 flex items-center;
+  }
+  .bb-settings-row--stack .bb-settings-row__control {
+    @apply w-full;
+  }
+  /* When a row IS a link (action list rows), the whole row hovers. */
+  .bb-settings-row--link {
+    @apply hover:bg-base-200/40 transition-colors no-underline cursor-pointer;
+  }
+
+  /* Pinned footer below the section body — typically a bb-action-row
+     carrying the Save button. Border-top keeps it reading as the same
+     surface as the section even when the body has its own dividers. */
+  .bb-settings-section__footer {
+    @apply border-t border-base-300/80 px-4 sm:px-5 py-3 flex items-center justify-end gap-2 bg-base-200/20;
+  }
 
   /* Form inputs/selects with subtle base-200 bg that clears on focus. */
   .bb-form-input { @apply input w-full rounded-xl bg-base-200/50 focus:bg-base-100 transition-colors; }
@@ -1041,74 +1081,26 @@
     @apply text-sm text-base-content/50 max-w-sm mb-6 leading-relaxed;
   }
 
-  /* ── Button polish (Nova-flavored) ──
-     Nova ships a 1px-translate press feedback (`active:translate-y-px`) +
-     `bg-clip-padding` so any ring/border treatment stays crisp on press.
-     We override daisy's same-specificity rule with `!important`. */
+  /* ── Button polish ── */
   .btn {
-    background-clip: padding-box;
     transition: background-color 0.15s ease, color 0.15s ease,
                 border-color 0.15s ease, transform 0.1s ease,
                 box-shadow 0.15s ease, opacity 0.15s ease !important;
   }
 
-  .btn:active:not(:disabled):not([aria-haspopup]) {
-    transform: translateY(1px) !important;
+  .btn:active:not(:disabled) {
+    transform: scale(0.97) !important;
   }
 
-  /* ── Join: unified depth on the bar, not on each segment ──
-     Daisy ships a per-button depth shadow + inset top-highlight (driven
-     by --depth in the light theme). In a `.join` split-button, that
-     highlight rims the inner edge of every .join-item, leaving a
-     visible vertical seam where two solid buttons meet — the eye
-     reads the bar as two stacked rectangles instead of one unit.
-     The drop shadow has the same problem: it ends abruptly at each
-     button's footprint.
-
-     Fix: lift the depth onto the .join container, suppress per-item
-     depth shadow on solid-tone buttons inside. Scoped via :has() to
-     joins that actually contain a solid-tone (.btn-primary etc.)
-     button so ghost-only joins (pagination, segmented filters) stay
-     flat. */
-  .join:has(> .btn-primary, > .btn-secondary, > .btn-accent,
-            > .btn-neutral, > .btn-info, > .btn-success,
-            > .btn-warning, > .btn-error,
-            > .dropdown > .btn-primary, > .dropdown > .btn-secondary,
-            > .dropdown > .btn-accent, > .dropdown > .btn-neutral,
-            > .dropdown > .btn-info, > .dropdown > .btn-success,
-            > .dropdown > .btn-warning, > .dropdown > .btn-error,
-            > .dropdown > [role="button"].btn-primary,
-            > .dropdown > [role="button"].btn-secondary,
-            > .dropdown > [role="button"].btn-accent,
-            > .dropdown > [role="button"].btn-neutral,
-            > .dropdown > [role="button"].btn-info,
-            > .dropdown > [role="button"].btn-success,
-            > .dropdown > [role="button"].btn-warning,
-            > .dropdown > [role="button"].btn-error) {
-    border-radius: var(--radius-field);
-    box-shadow:
-      oklch(from var(--color-base-content) l c h / 0.06) 0 0.5px 0 0.5px inset,
-      oklch(0 0 0 / 0.10) 0 3px 2px -2px,
-      oklch(0 0 0 / 0.10) 0 4px 3px -2px;
-  }
-
-  .join:has(> .btn-primary, > .btn-secondary, > .btn-accent,
-            > .btn-neutral, > .btn-info, > .btn-success,
-            > .btn-warning, > .btn-error,
-            > .dropdown > .btn-primary, > .dropdown > .btn-secondary,
-            > .dropdown > .btn-accent, > .dropdown > .btn-neutral,
-            > .dropdown > .btn-info, > .dropdown > .btn-success,
-            > .dropdown > .btn-warning, > .dropdown > .btn-error,
-            > .dropdown > [role="button"].btn-primary,
-            > .dropdown > [role="button"].btn-secondary,
-            > .dropdown > [role="button"].btn-accent,
-            > .dropdown > [role="button"].btn-neutral,
-            > .dropdown > [role="button"].btn-info,
-            > .dropdown > [role="button"].btn-success,
-            > .dropdown > [role="button"].btn-warning,
-            > .dropdown > [role="button"].btn-error)
-          :is(.btn, [role="button"]).join-item {
-    box-shadow: none !important;
+  /*
+   * Subtle drop shadow matching shadcn's Button component (shadow-xs).
+   * With --depth: 0 the daisyUI inset/3D shadow stack evaluates to
+   * transparent, so the button reads as completely flat without this
+   * override. shadcn doesn't shadow transparent buttons (ghost/link),
+   * so they opt out via :not().
+   */
+  .btn:not(.btn-ghost):not(.btn-link) {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
 
   /* Button radius convention — see unlayered .btn-sm / .btn-xs override
@@ -1428,26 +1420,6 @@
    * ──────────────────────────────────────────────────────────── */
   .modal-box {
     overscroll-behavior: contain;
-    /* Nova-style inset ring on modals — replaces the hard daisy shadow-2xl
-       with a foreground-tinted ring + soft drop. `!important` because
-       daisyUI's plugin layer emits a same-specificity `.modal-box`
-       box-shadow that wins on source order otherwise. */
-    box-shadow:
-      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.10),
-      0 10px 30px -10px oklch(0 0 0 / 0.18) !important;
-  }
-
-  /* Floating menus / dropdown content — same inset-ring treatment so
-     overflow popups read consistently with cards and modals. No
-     !important here: callers that opt into a heavier elevation via
-     Tailwind `shadow-lg`/`shadow-xl` (the daisyui.md-mandated standard
-     dropdown shape, plus settings_modal's tab picker) must keep their
-     stronger shadow. Specificity carries this for callers that don't
-     opt in. */
-  .dropdown-content {
-    box-shadow:
-      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.08),
-      0 6px 20px -6px oklch(0 0 0 / 0.12);
   }
 
   /* ── Suppress WebKit's native search-clear (×) on overlay pickers ──
@@ -2816,19 +2788,14 @@
   border-radius: 0.5rem;
   overflow: visible;
 }
-/* Header bar (was the "Name commented X ago" meta line).
- * The card carries a 1px border + 0.5rem outer radius, so the header
- * sits one pixel inside the curve. Match the inner curve exactly
- * (outer radius minus border width) — using the same 0.5rem here
- * leaves the gray fill curving inside the border arc, exposing a
- * thin wedge of the white card background at the top corners. */
+/* Header bar (was the "Name commented X ago" meta line) */
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child {
   background: color-mix(in srgb, var(--color-base-200) 60%, transparent);
   border-bottom: 1px solid var(--color-base-300);
   padding: 0.5rem 0.875rem;
   margin: 0;
-  border-top-left-radius: calc(0.5rem - 1px);
-  border-top-right-radius: calc(0.5rem - 1px);
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
 }
 /* Body (was the chat-bubble) */
 .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) .bb-comment-bubble {
@@ -3002,568 +2969,3 @@
  * with daisyui.com defaults — adopt daisy theme tokens via the daisy
  * theme builder if a different shape is wanted, don't reintroduce
  * per-size CSS overrides here. */
-
-/* ── bb-prose: server-rendered markdown for agent transcripts (and
- * future report bodies). Pairs with components.Markdown. The class
- * sits on a wrapper <div>; descendant selectors style block + inline
- * elements without bleeding into surrounding admin chrome.
- *
- * Tight vertical rhythm — uses --bb-gap-xs/sm spacing tokens so the
- * prose body lines up with chat-bubble padding in the run detail
- * page. */
-.bb-prose {
-  font-size: 0.875rem;
-  line-height: 1.55;
-  /* Inherit color from the surrounding surface so a .bb-prose nested
-   * inside a daisy chat-bubble-primary picks up primary-content
-   * automatically instead of getting locked to base-content (which
-   * goes invisible on dark bubbles in light mode + on primary bubbles
-   * in dark mode). */
-  color: inherit;
-  word-wrap: break-word;
-}
-.bb-prose > * + * { margin-top: 0.5rem; }
-.bb-prose .bb-prose-p { margin: 0; }
-.bb-prose .bb-prose-h {
-  font-weight: 600;
-  margin-top: 0.75rem;
-  letter-spacing: -0.005em;
-}
-.bb-prose h3.bb-prose-h { font-size: 0.95rem; }
-.bb-prose h4.bb-prose-h { font-size: 0.875rem; opacity: 0.8; }
-.bb-prose .bb-prose-strong { font-weight: 600; /* inherit color so dark bubbles get light bold */ }
-.bb-prose .bb-prose-em { font-style: italic; }
-.bb-prose .bb-prose-strike { opacity: 0.55; text-decoration: line-through; }
-.bb-prose .bb-prose-link {
-  color: var(--color-primary);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in oklch, var(--color-primary) 40%, transparent);
-  text-underline-offset: 2px;
-}
-.bb-prose .bb-prose-link:hover {
-  text-decoration-color: var(--color-primary);
-}
-.bb-prose .bb-prose-icode {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8125rem;
-  padding: 0.0625rem 0.3125rem;
-  border-radius: 0.25rem;
-  background: color-mix(in oklch, var(--color-base-200) 90%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
-}
-.bb-prose .bb-prose-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  background: color-mix(in oklch, var(--color-base-200) 70%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  border-radius: 0.5rem;
-  padding: 0.625rem 0.75rem;
-  overflow-x: auto;
-  white-space: pre;
-}
-.bb-prose .bb-prose-code code { background: transparent; padding: 0; border: 0; }
-.bb-prose .bb-prose-ul, .bb-prose .bb-prose-ol {
-  margin: 0;
-  padding-inline-start: 1.25rem;
-}
-.bb-prose .bb-prose-ul { list-style-type: disc; }
-.bb-prose .bb-prose-ol { list-style-type: decimal; }
-.bb-prose .bb-prose-li { margin: 0.125rem 0; }
-.bb-prose .bb-prose-li::marker { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
-.bb-prose .bb-prose-li-cont { margin: 0.125rem 0 0.25rem 0; color: color-mix(in oklch, var(--color-base-content) 80%, transparent); }
-.bb-prose .bb-prose-quote {
-  margin: 0;
-  padding: 0.25rem 0 0.25rem 0.75rem;
-  border-inline-start: 3px solid color-mix(in oklch, var(--color-primary) 35%, transparent);
-  color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
-  font-style: italic;
-}
-.bb-prose .bb-prose-hr {
-  border: 0;
-  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 80%, transparent);
-  margin: 0.875rem 0;
-}
-.bb-prose .bb-prose-table-wrap { overflow-x: auto; }
-.bb-prose .bb-prose-table {
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-  min-width: 100%;
-}
-.bb-prose .bb-prose-table th,
-.bb-prose .bb-prose-table td {
-  padding: 0.375rem 0.625rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  text-align: start;
-  vertical-align: top;
-}
-.bb-prose .bb-prose-table thead th {
-  font-weight: 600;
-  background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
-  border-bottom: 1px solid var(--color-base-300);
-}
-.bb-prose .bb-prose-table .text-right { text-align: right; }
-.bb-prose .bb-prose-table .text-center { text-align: center; }
-.bb-prose .bb-prose-table .text-left { text-align: left; }
-
-/* ── bb-json: server-rendered JSON viewer with collapsible objects +
- * arrays. Pairs with components.JSONViewer. Token classes are coloured
- * via theme tokens so light/dark works without per-mode overrides. */
-.bb-json-wrap { position: relative; }
-.bb-json-wrap .bb-json-copy {
-  position: absolute;
-  top: 0.375rem;
-  inset-inline-end: 0.375rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.1875rem 0.375rem;
-  border-radius: 0.375rem;
-  background: color-mix(in oklch, var(--color-base-100) 80%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
-  font-size: 0.65rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition: background 0.15s ease, color 0.15s ease;
-  z-index: 2;
-}
-.bb-json-wrap .bb-json-copy:hover {
-  background: var(--color-base-100);
-  color: var(--color-base-content);
-}
-.bb-json-wrap .bb-json-copy.is-copied {
-  background: color-mix(in oklch, var(--color-success) 18%, transparent);
-  color: var(--color-success);
-  border-color: color-mix(in oklch, var(--color-success) 30%, transparent);
-}
-.bb-json {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
-  line-height: 1.55;
-  padding: 0.625rem 0.75rem;
-  border-radius: 0.5rem;
-  background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-  overflow-x: auto;
-  color: var(--color-base-content);
-}
-.bb-json--raw { white-space: pre-wrap; }
-.bb-json-block { display: block; }
-.bb-json-block > .bb-json-summary {
-  list-style: none;
-  cursor: pointer;
-  display: inline;
-}
-.bb-json-block > .bb-json-summary::-webkit-details-marker { display: none; }
-.bb-json-block > .bb-json-summary::marker { content: none; }
-.bb-json-block[open] > .bb-json-summary .bb-json-collapsed,
-.bb-json-block[open] > .bb-json-summary .bb-json-trailing-punct { display: none; }
-.bb-json-block:not([open]) > .bb-json-children,
-.bb-json-block:not([open]) > .bb-json-close { display: none; }
-.bb-json-block > .bb-json-summary::before {
-  content: "▾";
-  display: inline-block;
-  width: 0.875rem;
-  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
-  transition: transform 0.12s ease;
-}
-.bb-json-block:not([open]) > .bb-json-summary::before { content: "▸"; }
-.bb-json-collapsed {
-  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-  font-style: italic;
-  margin-inline: 0.25rem;
-}
-.bb-json-children {
-  padding-inline-start: 1.125rem;
-}
-.bb-json-row { display: block; }
-.bb-json-close {
-  padding-inline-start: 0;
-}
-.bb-json-key {
-  color: var(--color-primary);
-  font-weight: 500;
-}
-.bb-json-string {
-  color: color-mix(in oklch, var(--color-success) 90%, var(--color-base-content));
-}
-.bb-json-num {
-  color: color-mix(in oklch, var(--color-accent) 80%, var(--color-base-content));
-}
-.bb-json-bool {
-  color: color-mix(in oklch, var(--color-warning) 80%, var(--color-base-content));
-  font-weight: 500;
-}
-.bb-json-null {
-  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-  font-style: italic;
-}
-.bb-json-punct {
-  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
-}
-
-/* ── Agent run detail (chat-thread redesign) ─────────────────────────
- * Sticky header + chat-thread transcript + tool-call rows. Pairs with
- * pages.AgentRunDetail + components.Markdown + components.JSONViewer.
- *
- * The chat-thread builds on daisy's `chat` primitive (start/end + image
- * + header + bubble) but tightens the bubble paddings and re-tones the
- * background so a long run feels like a focused transcript rather than
- * a chat app. Tool-call + tool-result rows sit *outside* the daisy
- * chat shapes so they don't get the speech-bubble tail / 70% width cap. */
-.bb-run-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  flex-wrap: wrap;
-}
-.bb-run-header__lead {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.bb-run-header__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 9999px;
-  background: color-mix(in oklch, var(--color-primary) 15%, transparent);
-  color: var(--color-primary);
-  flex-shrink: 0;
-}
-.bb-run-header__id {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  padding: 0.125rem 0.4375rem;
-  border-radius: 0.375rem;
-  background: color-mix(in oklch, var(--color-base-200) 80%, transparent);
-  color: color-mix(in oklch, var(--color-base-content) 75%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-  transition: background 0.15s ease, color 0.15s ease;
-  cursor: pointer;
-}
-.bb-run-header__id:hover {
-  background: var(--color-base-200);
-  color: var(--color-base-content);
-}
-.bb-run-header__id.is-copied {
-  background: color-mix(in oklch, var(--color-success) 18%, transparent);
-  color: var(--color-success);
-  border-color: color-mix(in oklch, var(--color-success) 30%, transparent);
-}
-.bb-run-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
-/* Chat thread layout. The daisy `chat` primitive draws a tail and caps
- * the bubble at 70% width by default; we tighten the spacing rhythm and
- * keep the assistant bubble at full width on small screens so long
- * markdown bodies don't get squeezed. */
-.bb-chat-thread {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-/* Let the markdown body inside a daisy chat-bubble flow to a readable
- * width on wide screens — daisy caps chat-bubble at ~70% but the
- * agent's responses are often long-form, so we widen to a max readable
- * column. The padding and tail come from daisy itself. */
-.chat .chat-bubble {
-  max-width: min(48rem, 100%);
-}
-
-/* bb-chat-bubble overrides daisy's default chat-bubble background.
- * Daisy 5 uses --color-neutral for chat-bubble bg, but the breadbox
- * shadcn theme maps neutral to near-black (oklch ~20%), so the
- * default bubble reads as a heavy dark block even in light mode.
- * Pin to base-200 explicitly so both bubbles match the page's
- * surface palette and stay quiet. Borders + tail still come from
- * daisy itself. */
-.chat .chat-bubble.bb-chat-bubble {
-  background-color: var(--color-base-200);
-  color: var(--color-base-content);
-}
-.chat.chat-start .chat-bubble.bb-chat-bubble::before,
-.chat.chat-end .chat-bubble.bb-chat-bubble::before {
-  /* daisy paints the speech-tail with the same bg-color as the
-   * bubble — pin both so the tail doesn't fall back to neutral. */
-  background-color: var(--color-base-200);
-}
-
-/* Tool call + tool result rows. Compact, click-to-expand. Aligned with
- * the chat thread's gutter so the visual rhythm matches the bubbles
- * above and below them. */
-.bb-tool-row {
-  margin: 0;
-}
-.bb-tool {
-  display: block;
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  background: color-mix(in oklch, var(--color-base-200) 50%, transparent);
-  border-radius: 0.625rem;
-  overflow: hidden;
-}
-.bb-tool__summary {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4375rem 0.625rem;
-  cursor: pointer;
-  list-style: none;
-  font-size: 0.8125rem;
-}
-.bb-tool__summary::-webkit-details-marker { display: none; }
-.bb-tool__summary::marker { content: none; }
-.bb-tool__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.375rem;
-  height: 1.375rem;
-  border-radius: 0.375rem;
-  background: color-mix(in oklch, var(--color-info) 18%, transparent);
-  color: var(--color-info);
-  flex-shrink: 0;
-}
-.bb-tool__icon--result {
-  background: color-mix(in oklch, var(--color-success) 18%, transparent);
-  color: var(--color-success);
-}
-.bb-tool__icon--raw {
-  background: color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
-}
-.bb-tool__label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
-  font-weight: 600;
-}
-.bb-tool__name {
-  font-size: 0.8125rem;
-  color: var(--color-base-content);
-  word-break: break-all;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.bb-tool__time {
-  font-size: 0.65rem;
-  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-  font-variant-numeric: tabular-nums;
-}
-.bb-tool__chev {
-  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-  transition: transform 0.15s ease;
-  flex-shrink: 0;
-}
-.bb-tool[open] .bb-tool__chev { transform: rotate(90deg); }
-.bb-tool__body {
-  padding: 0.5rem 0.625rem 0.625rem 0.625rem;
-  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-  background: var(--color-base-100);
-}
-
-/* Final result + empty-state */
-.bb-run-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 0.875rem;
-  border-radius: 0.75rem;
-  background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-}
-.bb-run-summary__head {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
-}
-.bb-run-summary__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.625rem 1rem;
-}
-@media (min-width: 640px) {
-  .bb-run-summary__grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-}
-.bb-run-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1rem;
-  border-radius: 0.75rem;
-  background: color-mix(in oklch, var(--color-base-200) 40%, transparent);
-  border: 1px dashed color-mix(in oklch, var(--color-base-300) 70%, transparent);
-}
-
-/* Side-panel prompt collapses */
-.bb-run-collapse {
-  display: block;
-  border-radius: 0.5rem;
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-  background: color-mix(in oklch, var(--color-base-200) 50%, transparent);
-  overflow: hidden;
-}
-.bb-run-collapse > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0.625rem;
-  cursor: pointer;
-  list-style: none;
-}
-.bb-run-collapse > summary::-webkit-details-marker { display: none; }
-.bb-run-collapse > summary::marker { content: none; }
-.bb-run-collapse__chev { transition: transform 0.15s ease; }
-.bb-run-collapse[open] .bb-run-collapse__chev { transform: rotate(90deg); }
-.bb-run-collapse__pre {
-  font-size: 0.7rem;
-  line-height: 1.5;
-  padding: 0.5rem 0.625rem 0.625rem 0.625rem;
-  margin: 0;
-  white-space: pre-wrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: var(--color-base-100);
-  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-  max-height: 18rem;
-  overflow-y: auto;
-}
-
-/* Thread within the run page surface: a single shared list rhythm for
- * the inner <ul class="bb-chat-thread">. */
-.bb-run-thread { display: block; }
-
-/* Run-detail "system" event row — subtle informational tier that
- * sits below the chat thread visually. Used for SDK init messages,
- * cost_cap_hit notifications, and anything else the operator wants
- * to know happened but didn't author themselves. Pairs with the
- * pages.agentRunTranscriptEvent "system" case. */
-.bb-system-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: 0.5rem;
-  background: color-mix(in oklch, var(--color-base-200) 35%, transparent);
-  border: 1px dashed color-mix(in oklch, var(--color-base-300) 60%, transparent);
-}
-
-/* "Jump to result" target flash — a brief primary-tinted halo when the
- * sticky-header button scrolls the run summary into view, so the eye
- * catches where the page jumped to. */
-.bb-run-summary--flash {
-  animation: bb-run-summary-flash 1.2s ease-out;
-}
-@keyframes bb-run-summary-flash {
-  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 60%, transparent); }
-  20%  { box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-primary) 30%, transparent); }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-
-/* Agent run-detail sidebar: stay visible while the operator scrolls a
- * long transcript. We pin to the top, leaving room for the breadcrumb
- * row + page padding above. The aside scrolls internally if it grows
- * taller than the viewport (rare — only happens with a lot of reports
- * + a long tools-used list). */
-.bb-run-aside {
-  position: sticky;
-  top: 1rem;
-  align-self: start;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
-  /* Hide the scrollbar gutter to avoid a phantom scroll-track on
-   * sidebars that fit in the viewport. */
-  scrollbar-gutter: stable;
-}
-
-/* Tool call + result combined row. The body now contains two sections
- * (Input / Result) — the section labels carry small directional
- * arrows so the operator can read the call → response flow without
- * reading the JSON. */
-.bb-tool__body--paired {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.bb-tool__section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.bb-tool__section-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
-}
-.bb-tool__section-label--result {
-  color: var(--color-success);
-}
-
-/* Prompt intro — system prompt, user prompt, per-run prefix rendered
- * as the first rows of the chat thread instead of a sidebar card.
- * Closer to chat-app conventions: the conversation starts with the
- * setup messages, collapsed so they don't dominate. */
-.bb-prompt-intro {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed color-mix(in oklch, var(--color-base-300) 70%, transparent);
-}
-.bb-prompt-collapse {
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  border-radius: 0.5rem;
-  background: color-mix(in oklch, var(--color-base-200) 35%, transparent);
-}
-.bb-prompt-collapse > summary {
-  display: flex;
-  align-items: center;
-  gap: 0.4375rem;
-  padding: 0.4375rem 0.625rem;
-  cursor: pointer;
-  list-style: none;
-  color: color-mix(in oklch, var(--color-base-content) 75%, transparent);
-}
-.bb-prompt-collapse > summary::-webkit-details-marker { display: none; }
-.bb-prompt-collapse > summary::marker { content: none; }
-.bb-prompt-collapse__label {
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-.bb-prompt-collapse__chev {
-  margin-left: auto;
-  transition: transform 0.15s ease;
-  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
-}
-.bb-prompt-collapse[open] .bb-prompt-collapse__chev { transform: rotate(90deg); }
-.bb-prompt-collapse__body {
-  padding: 0.5rem 0.75rem 0.75rem 0.75rem;
-  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
-  background: var(--color-base-100);
-}
