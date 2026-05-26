@@ -88,3 +88,77 @@ func resultEventIsEmpty(ev TranscriptEvent) bool {
 		ev.CacheRead == 0 &&
 		ev.CacheWrite == 0
 }
+
+// ToolUsageEntry is one row in the sidebar's "Tools used" breakdown:
+// the stripped tool name (no mcp__breadbox__ prefix) and how many
+// times this run invoked it.
+type ToolUsageEntry struct {
+	Name  string
+	Count int
+}
+
+// ComputeToolUsage walks the transcript and returns per-tool call
+// counts, sorted by count DESC then by name ASC. Drives the sidebar's
+// "Tools used" card. We count tool_use events (not tool_result) so a
+// run that issued a call but never got a result still shows up — the
+// operator probably wants to see the call attempt.
+func ComputeToolUsage(events []TranscriptEvent) []ToolUsageEntry {
+	if len(events) == 0 {
+		return nil
+	}
+	counts := make(map[string]int, 8)
+	for _, ev := range events {
+		if ev.Type != "tool_use" {
+			continue
+		}
+		name := stripMCPPrefix(ev.ToolName)
+		if name == "" {
+			continue
+		}
+		counts[name]++
+	}
+	out := make([]ToolUsageEntry, 0, len(counts))
+	for name, c := range counts {
+		out = append(out, ToolUsageEntry{Name: name, Count: c})
+	}
+	// Sort: count DESC, then name ASC.
+	sortToolUsage(out)
+	return out
+}
+
+func sortToolUsage(s []ToolUsageEntry) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0; j-- {
+			a, b := s[j-1], s[j]
+			if a.Count > b.Count || (a.Count == b.Count && a.Name <= b.Name) {
+				break
+			}
+			s[j-1], s[j] = s[j], s[j-1]
+		}
+	}
+}
+
+// stripMCPPrefix is the canonical mirror of the templ's
+// agentRunToolDisplay helper, lifted out here so non-templ code (the
+// usage rollup) doesn't need to duplicate the constant. Kept private
+// because callers should never need to know about the prefix
+// convention.
+func stripMCPPrefix(name string) string {
+	const mcp = "mcp__breadbox__"
+	if len(name) > len(mcp) && name[:len(mcp)] == mcp {
+		return name[len(mcp):]
+	}
+	return name
+}
+
+// TranscriptHasResultEvent reports whether the transcript contains a
+// (non-empty) `result` event — used by the sticky header to decide
+// whether to render the "Jump to result" anchor button.
+func TranscriptHasResultEvent(events []TranscriptEvent) bool {
+	for _, ev := range events {
+		if ev.Type == "result" {
+			return true
+		}
+	}
+	return false
+}
