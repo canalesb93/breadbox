@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"breadbox/internal/agent"
 	"breadbox/internal/appconfig"
@@ -540,5 +541,75 @@ func TestOrchestratorRunNowWith_OverrideBeatsPrefix(t *testing.T) {
 	}
 	if strings.Contains(capturedPrompt, "this prefix should be ignored") {
 		t.Errorf("prefix leaked through despite override being set: %q", capturedPrompt)
+	}
+}
+
+// TestOrchestratorRunNowAsyncWith_PanicInGoroutineIsRecovered verifies that
+// a panic from the runner (in the async-dispatch goroutine) does NOT
+// crash the breadbox process and DOES mark the run row as errored with a
+// recognizable message. Before the panic-recover deferred handler was
+// added, this scenario would propagate out and SIGABRT the server.
+func TestOrchestratorRunNowAsyncWith_PanicInGoroutineIsRecovered(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateAgentDefinition(t, svc, "orch-panic", true)
+
+	// RunNowAsyncWith preflights agent.LocateBinary before spawning the
+	// goroutine — in CI / fresh envs no sidecar is installed, so without
+	// an override the preflight returns ErrBinaryNotFound as a sync error
+	// and the panic path we want to exercise never runs. Stage any
+	// existing file (we'll never actually exec it; the panickyRunner
+	// substitutes for the real Sidecar).
+	t.Setenv("BREADBOX_AGENT_BIN", "/bin/sh")
+
+	panickyRunner := agent.RunnerFunc(func(ctx context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		panic("runner exploded mid-stream")
+	})
+
+	orch := service.NewOrchestrator(svc, panickyRunner, 1, encKey, slog.Default())
+
+	resp, err := orch.RunNowAsyncWith(context.Background(), def, service.RunOverrides{})
+	if err != nil {
+		t.Fatalf("RunNowAsyncWith: unexpected sync error: %v", err)
+	}
+	if resp.Status != "in_progress" {
+		t.Fatalf("initial Status = %q, want in_progress (async hand-off)", resp.Status)
+	}
+
+	// Poll the run row until it transitions away from in_progress (the
+	// goroutine's recover should mark it error). 5s is generous — the
+	// panic + DB write should complete in tens of ms.
+	deadline := time.Now().Add(5 * time.Second)
+	var final *service.AgentRunResponse
+	for time.Now().Before(deadline) {
+		got, gerr := svc.GetAgentRun(context.Background(), resp.ShortID)
+		if gerr != nil {
+			t.Fatalf("GetAgentRun: %v", gerr)
+		}
+		if got.Status != "in_progress" {
+			final = got
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if final == nil {
+		t.Fatal("run row stayed in_progress past 5s — panic-recover handler didn't update the row")
+	}
+	if final.Status != "error" {
+		t.Errorf("final Status = %q, want error", final.Status)
+	}
+	if final.ErrorMessage == nil || !strings.Contains(*final.ErrorMessage, "panic") {
+		t.Errorf("ErrorMessage = %v, want substring 'panic'", final.ErrorMessage)
+	}
+
+	// Critical: the orchestrator must still be functional after a panic.
+	// Run a second job to prove the goroutine's deferred semaphore release
+	// fired even on the panic path.
+	cleanRunner := agent.RunnerFunc(func(ctx context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		return agent.RunResult{Status: agent.StatusSuccess, DurationMs: 1}, nil
+	})
+	orch2 := service.NewOrchestrator(svc, cleanRunner, 1, encKey, slog.Default())
+	if _, err := orch2.RunNow(context.Background(), def, ""); err != nil {
+		t.Errorf("post-panic RunNow failed (semaphore leaked?): %v", err)
 	}
 }

@@ -76,16 +76,34 @@ export function emit(event: SidecarEvent, _transcriptPath?: string): void {
   writeAll(1, JSON.stringify(event) + "\n");
 }
 
+/**
+ * Stable code values surfaced through the error event's `code` field.
+ * These map 1:1 to the Go side's RunErrorCode* constants in
+ * internal/agent/errors.go; keep both lists in lock-step.
+ */
+export const ERROR_CODE = {
+  AUTH: "auth_error",
+  API: "api_error",
+  NETWORK: "network_error",
+  TOOL: "tool_error",
+  SPEC_INVALID: "spec_invalid",
+  INTERRUPTED: "interrupted",
+  UNKNOWN: "unknown",
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];
+
 export function emitError(
   message: string,
   stack?: string,
   transcriptPath?: string,
+  code: ErrorCode = ERROR_CODE.UNKNOWN,
 ): void {
   emit(
     {
       type: "error",
       ts: Date.now(),
-      data: { message, stack: stack ?? "" },
+      data: { message, stack: stack ?? "", code },
     },
     transcriptPath,
   );

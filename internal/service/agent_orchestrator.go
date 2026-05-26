@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"time"
 
 	"breadbox/internal/agent"
@@ -242,9 +243,36 @@ func (o *Orchestrator) RunNowAsyncWith(ctx context.Context, def *AgentDefinition
 		runCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 		defer o.sem.Release()
+		// Panic recovery — without this a panic from anywhere downstream
+		// (sidecar NDJSON parser, slog handler, DB driver) takes the whole
+		// `breadbox serve` process down. Log and mark the run errored so
+		// the row doesn't lie about its state and operators can see what
+		// happened. The semaphore release above is already deferred so the
+		// concurrency slot is reclaimed either way.
+		defer func() {
+			if r := recover(); r != nil {
+				o.logger.Error("orchestrator: panic in async run goroutine",
+					"agent", def.Slug, "run", resp.ShortID,
+					"panic", r, "stack", string(debug.Stack()))
+				// Best-effort row update under a fresh ctx. Ignore failure —
+				// we're already in disaster recovery and can't surface more.
+				recoverCtx, recoverCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer recoverCancel()
+				_ = o.svc.MarkAgentRunErrorDB(recoverCtx, runUUIDFromResp(resp),
+					fmt.Sprintf("orchestrator panic: %v", r), "")
+			}
+		}()
 		runFn(runCtx)
 	}()
 	return resp, nil
+}
+
+// runUUIDFromResp extracts the run row's UUID from the response, mirroring
+// what o.prepareRun captured but accessible from the goroutine's recover
+// path (which doesn't have direct closure-access to runRow).
+func runUUIDFromResp(resp *AgentRunResponse) pgtype.UUID {
+	u, _ := pgconv.ParseUUID(resp.ID)
+	return u
 }
 
 // prepareRun does the synchronous prep portion of runLocked and returns a

@@ -126,6 +126,17 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	} else if n := cleanupResult.RowsAffected(); n > 0 {
 		logger.Info("cleaned up orphaned agent runs", "count", n)
 	}
+	// Sibling sweep: revoke per-run API keys whose orchestrator never got to
+	// the deferred revoke (process SIGKILL'd, OOM-killed, container restarted
+	// mid-run). The keys would otherwise linger in `api_keys` with
+	// revoked_at = NULL — useless to an attacker without the plaintext but
+	// still valid credentials in DB terms. 1 hour grace easily covers any
+	// legitimate run.
+	if cleanupResult, cerr := a.Queries.CleanupOrphanedAgentApiKeys(ctx); cerr != nil {
+		logger.Warn("failed to clean up orphaned agent API keys", "error", cerr)
+	} else if n := cleanupResult.RowsAffected(); n > 0 {
+		logger.Info("cleaned up orphaned agent API keys", "count", n)
+	}
 	// Default was 1 in iter-1 as a v1 safety net. Lifted to 3 in iter-29 after
 	// 28 iterations of dogfood proved the semaphore + mint-and-revoke survive
 	// concurrent contention. Operators can raise (or lower back to 1) in

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"breadbox/internal/db"
 	"breadbox/internal/testutil"
@@ -257,4 +258,84 @@ func TestDeleteAgentRunsOlderThan(t *testing.T) {
 	if res.RowsAffected() < 1 {
 		t.Errorf("expected at least 1 row deleted, got %d", res.RowsAffected())
 	}
+}
+
+// TestCleanupOrphanedAgentApiKeys covers the startup sweep that revokes
+// per-run agent API keys whose orchestrator never got to the deferred
+// revoke (e.g. SIGKILL'd mid-run). Reaper should revoke old un-revoked
+// agent keys and leave fresh ones + non-agent keys alone.
+func TestCleanupOrphanedAgentApiKeys(t *testing.T) {
+	pool, q := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	// 1) Stale agent key (created > 1 hour ago, never revoked) — should be reaped.
+	staleID := mustInsertOldApiKey(t, pool, "agent", time.Now().Add(-2*time.Hour))
+
+	// 2) Fresh agent key (just minted) — must NOT be reaped.
+	freshID := mustInsertOldApiKey(t, pool, "agent", time.Now())
+
+	// 3) Stale user key — must NOT be reaped (different actor_type).
+	userID := mustInsertOldApiKey(t, pool, "user", time.Now().Add(-2*time.Hour))
+
+	// 4) Already-revoked stale agent key — sweep is a no-op (idempotent).
+	revokedID := mustInsertOldApiKey(t, pool, "agent", time.Now().Add(-2*time.Hour))
+	if _, err := pool.Exec(ctx, `UPDATE api_keys SET revoked_at = NOW() - INTERVAL '1 hour' WHERE id = $1`, revokedID); err != nil {
+		t.Fatalf("pre-revoke fixture: %v", err)
+	}
+
+	res, err := q.CleanupOrphanedAgentApiKeys(ctx)
+	if err != nil {
+		t.Fatalf("CleanupOrphanedAgentApiKeys: %v", err)
+	}
+	if got := res.RowsAffected(); got != 1 {
+		t.Errorf("RowsAffected = %d, want exactly 1 (only the stale agent key)", got)
+	}
+
+	// Verify each fixture ended in the expected state.
+	if !isRevoked(t, pool, staleID) {
+		t.Errorf("stale agent key %v should be revoked but isn't", staleID)
+	}
+	if isRevoked(t, pool, freshID) {
+		t.Errorf("fresh agent key %v should NOT be revoked", freshID)
+	}
+	if isRevoked(t, pool, userID) {
+		t.Errorf("stale user key %v should NOT be revoked (wrong actor_type)", userID)
+	}
+	// revokedID was already revoked — should still be revoked (idempotent).
+	if !isRevoked(t, pool, revokedID) {
+		t.Errorf("pre-revoked key %v unexpectedly un-revoked", revokedID)
+	}
+}
+
+func mustInsertOldApiKey(t *testing.T, pool *pgxpool.Pool, actorType string, createdAt time.Time) pgtype.UUID {
+	t.Helper()
+	ctx := context.Background()
+	var id pgtype.UUID
+	err := pool.QueryRow(ctx, `
+		INSERT INTO api_keys (name, key_hash, key_prefix, scope, actor_type, actor_name, created_at)
+		VALUES ($1, $2, $3, 'read_only', $4, $5, $6)
+		RETURNING id
+	`, "test-"+t.Name()+"-"+actorType+"-"+createdAt.Format("150405.000"),
+		"hash-"+t.Name()+"-"+actorType+"-"+createdAt.Format("150405.000"),
+		"bb_"+actorType[:3],
+		actorType,
+		"test-actor",
+		createdAt,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("insert api_key: %v", err)
+	}
+	return id
+}
+
+func isRevoked(t *testing.T, pool *pgxpool.Pool, id pgtype.UUID) bool {
+	t.Helper()
+	var revoked pgtype.Timestamptz
+	if err := pool.QueryRow(context.Background(), `SELECT revoked_at FROM api_keys WHERE id = $1`, id).Scan(&revoked); err != nil {
+		if err == pgx.ErrNoRows {
+			return false
+		}
+		t.Fatalf("query revoked: %v", err)
+	}
+	return revoked.Valid
 }

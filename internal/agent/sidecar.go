@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -272,15 +271,17 @@ func (s *Sidecar) Run(ctx context.Context, spec JobSpec, handler EventHandler) (
 		result.Err = ctx.Err()
 	case gotError:
 		result.Status = StatusError
-		result.Err = errors.New(lastError.Message)
+		// Build a typed RunError from the structured error event so callers
+		// can branch on Code for retry policy + render a friendly admin UI.
+		// Falls back to RunErrorCodeUnknown when the SDK didn't supply
+		// enough info to classify.
+		result.Err = ClassifyRunError(lastError, stderr.String())
 	case waitErr != nil:
 		result.Status = StatusError
-		// Surface stderr if present to make sidecar crashes debuggable.
-		if stderr.Len() > 0 {
-			result.Err = fmt.Errorf("%w: exit=%v stderr=%s", ErrSidecarFailed, waitErr, stderr.String())
-		} else {
-			result.Err = fmt.Errorf("%w: %v", ErrSidecarFailed, waitErr)
-		}
+		// No structured error event but the process exited non-zero.
+		// Pass a zero ErrorPayload so ClassifyRunError falls through to
+		// stderr-based heuristics.
+		result.Err = ClassifyRunError(ErrorPayload{}, stderr.String()+" (waitErr: "+waitErr.Error()+")")
 	case scanErr != nil:
 		result.Status = StatusError
 		result.Err = fmt.Errorf("agent: scanner error: %w", scanErr)
