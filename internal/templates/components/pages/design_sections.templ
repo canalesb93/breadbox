@@ -1382,9 +1382,16 @@ templ SectionKbd() {
 				</div>
 			</div>
 		}
-		@designExample("Command palette trigger (sidebar)", "Live shape: this is the `.bb-sidebar-search` div that lives at the top of the desktop sidebar — clicking it dispatches `open-cmdk`. Pattern is search-icon + label + trailing KbdCombo hint. The kbd uses the same currentColor-tint surface override as buttons, so it stays legible against the muted base-200/50 trigger surface in both themes.") {
-			<div class="max-w-xs">
-				<div class="bb-sidebar-search" role="button" tabindex="0">
+		@designExample("Command palette trigger (sidebar)", "Live shape: this is the `.bb-sidebar-search` div from the top of the desktop sidebar. Clicking it (or pressing Enter when focused) dispatches `open-cmdk` and actually opens the palette — wired up here so the demo behaves like the live trigger. The kbd uses an opaque `var(--color-base-content)` tint (not currentColor) so it stays legible against the muted bg-base-200/50 surface — currentColor would have inherited the parent's text-base-content/35 translucency and rendered ~5%-alpha.") {
+			<div class="max-w-[13rem]">
+				<div
+					class="bb-sidebar-search"
+					x-data
+					@click="$dispatch('open-cmdk')"
+					@keydown.enter="$dispatch('open-cmdk')"
+					role="button"
+					tabindex="0"
+				>
 					@components.LucideIcon("search", "")
 					<span>Search...</span>
 					<span class="bb-sidebar-search-hint">
