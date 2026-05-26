@@ -42,7 +42,7 @@ type TxRowFeedProps struct {
 templ TxRowFeed(p TxRowFeedProps) {
 	<a
 		href={ templ.SafeURL("/transactions/" + p.ShortID) }
-		class="bb-tx-row-feed flex items-center gap-2 py-1 px-1 -mx-1 rounded-md hover:bg-base-200/70 focus-visible:bg-base-200/70 focus-visible:outline-none transition-colors duration-150 no-underline"
+		class="bb-tx-row-feed flex items-center gap-2 py-1 px-1 -mx-1 rounded-md hover:bg-base-content/5 focus-visible:bg-base-content/5 focus-visible:outline-none transition-colors duration-150 no-underline"
 	>
 		<!-- Category avatar — mirrors TxRowCompact so the feed's coloured
 		     circle reads identically to the /transactions list. -->
