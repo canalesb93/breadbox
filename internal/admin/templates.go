@@ -457,7 +457,7 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 
 // RenderWithTempl hosts a templ-rendered page body inside the existing
 // html/template base layout (nav, drawer, cmd-K palette, progress bar,
-// CSRF shim, Alpine/chart.js scripts). The component is rendered to a
+// CSRF shim, Alpine scripts). The component is rendered to a
 // buffer and passed to the layout via the TemplContent slot added in
 // layout/base.html. Pages migrated to templ call this instead of
 // Render — no base.html rewrite needed. See issue #462.

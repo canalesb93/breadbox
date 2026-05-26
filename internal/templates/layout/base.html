@@ -79,7 +79,6 @@
        and runs createIcons() before DOMContentLoaded. Eliminates the CDN-dependent FOUC where
        <i data-lucide> placeholders rendered empty until the CDN round-trip completed. -->
   <script defer src="/static/js/vendor/lucide.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
   {{if .CSRFToken}}<meta name="csrf-token" content="{{.CSRFToken}}">{{end}}
   <script>
     // Auto-inject CSRF token into all same-origin fetch requests.
