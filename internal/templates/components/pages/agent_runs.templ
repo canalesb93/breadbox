@@ -42,6 +42,13 @@ templ AgentRunsList(p AgentRunsListProps) {
 		} else {
 			@agentRunsEmpty(p)
 		}
+		<!-- Loading skeleton for the runs feed, available for any future
+		     client-side refresh / AJAX filter swap (e.g. re-filtering
+		     without a page reload). Mirrors the SSR layout above so
+		     swap-in doesn't shift the page. Exposed in /design#loading. -->
+		<template id="bb-agent-runs-skeleton-template">
+			@components.AgentRunsListSkeleton()
+		</template>
 	</div>
 	@agentRunModal(agentRunModalProps{
 		ModalID:            "agents-run-modal",

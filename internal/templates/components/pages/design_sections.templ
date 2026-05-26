@@ -809,7 +809,7 @@ templ SectionLoading() {
 				@components.AgentsListSkeleton()
 			</div>
 		}
-		@designExample("Agent runs list skeleton", "Placeholder mirroring /agents/{slug}/runs (and the cross-agent /agents/runs view) — filter bar (Status / Trigger / Hit cap / Start / End + Apply/Clear) and the runs table (Run, Status, Trigger, Started, Duration, Turns, Cost, In/Out, Hit cap, Note). Rows vary the status-pill / hit-cap / note widths so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents/runs is full-SSR today.") {
+		@designExample("Agent runs list skeleton", "Placeholder mirroring the /agents runs landing — 4-up 30d stat row (Runs / Errors / Cost / Avg duration), collapsed filter bar (icon + label + chip slots), and the divided card of rich run rows (icon tile + agent name + short-ID + status badge + trigger pill + meta line + trailing cost). Rows vary widths and toggle the optional error/note slots so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents is full-SSR today.") {
 			<div class="max-w-5xl">
 				@components.AgentRunsListSkeleton()
 			</div>
