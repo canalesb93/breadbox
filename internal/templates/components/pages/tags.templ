@@ -41,6 +41,12 @@ templ Tags(p TagsProps) {
 		} else {
 			@tagsEmpty()
 		}
+		<!-- Loading skeleton for the tags list, available for any future
+		     client-side refresh / picker-preview swap. Mirrors the SSR layout
+		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+		<template id="bb-tags-skeleton-template">
+			@components.TagsSkeleton()
+		</template>
 	</div>
 }
 

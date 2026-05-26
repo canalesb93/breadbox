@@ -1,0 +1,61 @@
+package components
+
+// TagsSkeleton renders a placeholder mirroring the layout of the /tags
+// page — a filter search input, the "N tags" helper line, and a divided
+// card with tag rows. Each row mirrors tagListRow: a chip-shaped pill
+// preview (natural width, capped at ~10–14rem), a slug-shaped code pill
+// + optional description line, a usage-count badge, and a trailing
+// overflow-menu slot. Sized to match the real component so a future
+// swap-in (AJAX refresh, picker preview, adjacent panel) doesn't shift
+// layout.
+//
+// /tags is a full-SSR page today; this primitive is exposed in
+// /design#loading so it's ready for the eventual AJAX swap and
+// discoverable to anyone wiring loading states for adjacent tag-centric
+// panels (e.g. the tag picker / tag-attach autocomplete).
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
+// hand-rolled `bb-skeleton*` family is being retired).
+templ TagsSkeleton() {
+	<div class="space-y-4" aria-hidden="true">
+		<!-- Filter search input -->
+		<div class="skeleton h-10 w-full sm:max-w-sm rounded-xl"></div>
+		<!-- Helper line: "N tags" -->
+		<div class="px-1">
+			<div class="skeleton h-2.5 w-20"></div>
+		</div>
+		<!-- Tag rows card. Widths vary so the skeleton reads as motion. -->
+		<div class="bb-card overflow-hidden">
+			<div class="divide-y divide-base-300/40">
+				@tagsSkeletonRow("w-24", "w-28", "w-10", true)
+				@tagsSkeletonRow("w-32", "w-20", "w-8", false)
+				@tagsSkeletonRow("w-20", "w-36", "w-12", true)
+				@tagsSkeletonRow("w-28", "w-24", "w-8", false)
+				@tagsSkeletonRow("w-16", "w-32", "w-6", false)
+				@tagsSkeletonRow("w-36", "w-16", "w-10", true)
+			</div>
+		</div>
+	</div>
+}
+
+// tagsSkeletonRow mirrors one tag row in /tags: a colored pill chip
+// preview, slug code-pill + optional description, usage-count badge,
+// and the overflow menu. Widths come from the caller so a stack of
+// rows can be varied for motion.
+templ tagsSkeletonRow(chipW string, slugW string, countW string, withDesc bool) {
+	<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3">
+		<!-- Chip preview (rounded-full pill, matches bb-tag shape) -->
+		<div class={ "skeleton h-5 rounded-full shrink-0", chipW }></div>
+		<!-- Slug code pill + optional description -->
+		<div class="flex-1 min-w-0 space-y-1.5">
+			<div class={ "skeleton h-3 rounded-md", slugW }></div>
+			if withDesc {
+				<div class="skeleton h-2.5 w-2/3"></div>
+			}
+		</div>
+		<!-- Usage count -->
+		<div class={ "skeleton h-3 shrink-0", countW }></div>
+		<!-- Overflow menu -->
+		<div class="skeleton h-6 w-6 rounded shrink-0"></div>
+	</div>
+}
