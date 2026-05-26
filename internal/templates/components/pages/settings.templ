@@ -7,48 +7,37 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// SettingsSync renders the Sync tab — schedule + retention. Lands at
-// both /settings (the default Settings entry) and /settings/sync.
-templ SettingsSync(p SettingsProps) {
+// SettingsGeneral renders the General tab — sync schedule, log retention,
+// and the user-avatar style picker. Lands at both /settings (the default
+// Settings entry) and /settings/general.
+templ SettingsGeneral(p SettingsProps) {
 	<script src="/static/js/admin/components/settings.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div class="max-w-2xl">
 		@settingsTabHeader(settingsTabHeaderProps{
-			Title:    "Sync",
-			Subtitle: "Schedule and log retention",
+			Title:    "General",
+			Subtitle: "Schedule, log retention, and avatars",
 		})
 		<div class="grid gap-6">
 			@settingsSyncSchedule(p)
 			@settingsSyncRetention(p)
+			@settingsAvatarStyleCard(p)
 		</div>
 	</div>
 }
 
-// SettingsSecurity renders the Security tab — encryption key status +
-// pointer to Account for password changes.
-templ SettingsSecurity(p SettingsProps) {
-	<div class="max-w-2xl">
-		@settingsTabHeader(settingsTabHeaderProps{
-			Title:    "Security",
-			Subtitle: "Encryption key status",
-		})
-		<div class="grid gap-6">
-			@settingsSecurityCardFlat(p)
-		</div>
-	</div>
-}
-
-// SettingsSystem renders the System tab — version info + update badge
-// + the user-avatar style picker.
+// SettingsSystem renders the System tab — encryption key status,
+// version info, and runtime details. Security folds in here so the
+// admin has one stop for "this server's posture."
 templ SettingsSystem(p SettingsProps) {
 	<div class="max-w-2xl">
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "System",
-			Subtitle: "Version and runtime information",
+			Subtitle: "Security and runtime information",
 		})
 		<div class="grid gap-6">
+			@settingsSecurityCardFlat(p)
 			@settingsSystemCard(p)
-			@settingsAvatarStyleCard(p)
 		</div>
 	</div>
 }
@@ -264,7 +253,7 @@ templ settingsSystemCard(p SettingsProps) {
 }
 
 // settingsAvatarStyleCard renders the DiceBear style picker on the
-// System tab. The select submits via POST /settings/avatar-style;
+// General tab. The select submits via POST /settings/avatar-style;
 // the live preview is driven by Alpine and points at
 // api.dicebear.com so the user can compare styles without
 // reloading the server-rendered identicons.
@@ -369,7 +358,7 @@ func encryptionStatus(has bool) string {
 }
 
 // ---------------------------------------------------------------------
-// Flat (non-accordion) templs used by the new SettingsSync/Security/Help
+// Flat (non-accordion) templs used by the new SettingsGeneral/System/Help
 // tab pages. Each renders the same content the legacy accordion cards
 // did, but without the expand/collapse chrome — a tab page IS the
 // disclosure now.

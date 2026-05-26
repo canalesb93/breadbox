@@ -371,8 +371,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/backups", redirectGET("/settings/backups"))
 
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
-		r.Get("/settings/sync", SettingsGetHandler(a, sm, tr))
-		r.Get("/settings/security", SecuritySettingsHandler(a, sm, tr))
+		r.Get("/settings/general", SettingsGetHandler(a, sm, tr))
+		r.Get("/settings/sync", redirectGET("/settings/general"))
+		r.Get("/settings/security", redirectGET("/settings/system"))
 		r.Get("/settings/system", SystemSettingsHandler(a, sm, tr))
 		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))

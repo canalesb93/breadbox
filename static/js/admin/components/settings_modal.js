@@ -427,7 +427,7 @@ document.addEventListener('alpine:init', function () {
       // _consumePageFlashIntoToast moves the layout's flash banner
       // (rendered inside <main> by html/template on cold deep-loads)
       // into the in-modal toast, then hides the banner. Without this,
-      // cold-loading /settings/sync right after a redirect-with-flash
+      // cold-loading /settings/general right after a redirect-with-flash
       // would show the flash behind the modal AND we'd lose it once
       // the modal closes.
       _consumePageFlashIntoToast: function () {
@@ -517,8 +517,7 @@ document.addEventListener('alpine:init', function () {
 // summary can render the active label/icon without a server round-trip.
 var TAB_META = {
   'account':   { label: 'Account',   icon: 'user-cog' },
-  'sync':      { label: 'Sync',      icon: 'refresh-cw' },
-  'security':  { label: 'Security',  icon: 'shield' },
+  'general':   { label: 'General',   icon: 'sliders-horizontal' },
   'system':    { label: 'System',    icon: 'cpu' },
   'providers': { label: 'Providers', icon: 'plug' },
   'agents':    { label: 'Agents',    icon: 'sparkles' },
