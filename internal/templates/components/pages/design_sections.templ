@@ -775,6 +775,15 @@ templ SectionLoading() {
 				<div class="skeleton h-12 w-full rounded-xl"></div>
 			</div>
 		}
+		@designExample("Transactions search skeleton", "Placeholder for the /transactions search swap. Cloned from a server-rendered <template> in transactions.templ while the debounced fetch is in flight. Uses daisy 'skeleton' instead of the retired hand-rolled animate-pulse shape. Switches between grouped/list view via Alpine's $store.txView.mode.") {
+			<div x-data x-init="if (window.Alpine && Alpine.store && !Alpine.store('txView')) Alpine.store('txView', { mode: 'grouped', setMode(m) { this.mode = m; } })" class="space-y-2 max-w-2xl">
+				<div class="join border border-base-300 bg-base-200">
+					<button type="button" class="join-item btn btn-xs btn-ghost rounded-md" :class="$store.txView && $store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')">Grouped</button>
+					<button type="button" class="join-item btn btn-xs btn-ghost rounded-md" :class="$store.txView && $store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')">List</button>
+				</div>
+				@components.TxResultsSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>
