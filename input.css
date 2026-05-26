@@ -940,10 +940,20 @@
   /* ── Wizard / Auth pages (login, setup, error) ── */
   .bb-wizard-bg {
     /* Mobile: top-aligned with generous top padding so content isn't dead-center
-       in a sea of dark background. sm+: vertically centered as before. */
+       in a sea of dark background. sm+: vertically centered as before.
+       overflow-x clip prevents off-screen children (e.g. the 1Password save
+       button's hidden info modal) from creating a horizontal scrollbar at
+       narrow widths like 320px. */
     @apply bg-base-200 min-h-screen flex items-start justify-center
-           px-4 pt-10 pb-8
+           px-4 pt-10 pb-8 overflow-x-clip
            sm:items-center sm:py-4;
+  }
+  /* Pair with .bb-wizard-bg's overflow-x: clip — without applying it to
+     <html> as well, the document root keeps the larger scrollWidth and
+     mobile browsers may still produce a horizontal scrollbar. Scoped to
+     wizard pages via :has() so non-wizard pages keep their default. */
+  html:has(body.bb-wizard-bg) {
+    overflow-x: clip;
   }
 
   .bb-wizard-orb {

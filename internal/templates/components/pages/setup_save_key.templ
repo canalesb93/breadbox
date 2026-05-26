@@ -24,81 +24,106 @@ templ SaveKey(p SaveKeyProps) {
 		<script type="module" src="/static/js/vendor/onepassword-save-button.js"></script>
 		<!-- Page behavior: reveal toggle, clipboard copy, .env download. -->
 		<script src="/static/js/admin/components/setup_save_key.js"></script>
-		<div class="text-center mb-8">
+		<div class="text-center mb-7">
 			<div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
 				<i data-lucide="key-round" class="w-6 h-6 text-primary"></i>
 			</div>
 			<h1 class="text-xl font-semibold tracking-tight">Save your encryption key</h1>
-			<p class="text-sm text-base-content/50 mt-1.5">Breadbox uses this key to encrypt bank credentials at rest. Store it in a password manager before connecting any banks.</p>
+			<p class="text-sm text-base-content/60 mt-1.5 leading-relaxed">Breadbox uses this key to encrypt bank credentials at rest. Save it to a password manager before connecting any banks.</p>
 		</div>
-		<div class="space-y-5" data-setup-save-key data-filename={ p.ItemTitle }>
+		<div class="space-y-4" data-setup-save-key>
+			<!-- Encryption key display + reveal toggle -->
 			<div>
-				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="encryption-key">ENCRYPTION_KEY</label>
-				<div class="flex flex-col sm:flex-row gap-2">
-					<div class="relative flex-1 min-w-0">
-						<input
-							id="encryption-key"
-							type="password"
-							readonly
-							value={ p.EncryptionKey }
-							class="input input-sm font-mono w-full bg-base-200/50 border-base-300 text-xs truncate pr-10"
-						/>
-						<button
-							type="button"
-							data-action="toggle-reveal"
-							aria-label="Reveal encryption key"
-							class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors"
-						>
-							<i data-lucide="eye" class="w-3.5 h-3.5" data-eye></i>
-							<i data-lucide="eye-off" class="w-3.5 h-3.5 hidden" data-eye-off></i>
-						</button>
-					</div>
+				<div class="flex items-center justify-between mb-1.5">
+					<span class="text-xs font-medium text-base-content/50 tracking-wide">ENCRYPTION_KEY</span>
 					<button
 						type="button"
-						data-action="copy"
-						class="btn btn-primary btn-sm shrink-0 gap-2 w-full sm:w-auto"
+						data-action="toggle-reveal"
+						aria-pressed="false"
+						class="inline-flex items-center gap-1.5 text-xs font-medium text-base-content/50 hover:text-base-content transition-colors py-0.5 px-1 -mx-1 rounded"
 					>
-						<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
-						<i data-lucide="check" class="w-4 h-4 hidden" data-copy-done></i>
-						<span data-copy-label>Copy</span>
+						<i data-lucide="eye" class="w-3.5 h-3.5" data-eye></i>
+						<i data-lucide="eye-off" class="w-3.5 h-3.5 hidden" data-eye-off></i>
+						<span data-toggle-label>Show</span>
 					</button>
 				</div>
+				<div
+					id="encryption-key"
+					data-key-display
+					data-key-value={ p.EncryptionKey }
+					role="textbox"
+					aria-readonly="true"
+					aria-label="Encryption key"
+					tabindex="0"
+					class="bg-base-200/60 border border-base-300 rounded-lg px-3.5 py-3 font-mono text-xs break-all leading-relaxed text-base-content/85 min-h-[3.25rem]"
+				><span data-key-text>{ maskedDots(p.EncryptionKey) }</span></div>
 			</div>
-			<div class="flex flex-col sm:flex-row gap-2 items-stretch">
+			<!-- Stacked action buttons. Copy is the primary path (most users
+			     will pick from clipboard into a password manager); Download
+			     is an alternative; the 1Password button is a bonus that
+			     only does anything if the browser extension is installed. -->
+			<div class="space-y-2">
+				<button
+					type="button"
+					data-action="copy"
+					class="btn btn-primary btn-soft btn-sm w-full h-11 gap-2"
+				>
+					<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
+					<i data-lucide="check" class="w-4 h-4 hidden text-success" data-copy-done></i>
+					<span data-copy-label>Copy to clipboard</span>
+				</button>
 				<button
 					type="button"
 					data-action="download"
-					class="btn btn-sm flex-1 gap-2"
+					class="btn btn-sm h-11 gap-2 w-full"
 				>
-					<i data-lucide="download" class="w-4 h-4"></i>
-					Download .env line
+					<i data-lucide="download" class="w-4 h-4" data-download-icon></i>
+					<i data-lucide="check" class="w-4 h-4 hidden text-success" data-download-done></i>
+					<span data-download-label>Download .env</span>
 				</button>
-				<!-- Inert unless the visitor has the 1Password browser extension installed. -->
-				<onepassword-save-button
-					data-onepassword-type="login"
-					value={ p.OnePasswordValue }
-					class="blue"
-					padding="normal"
-				></onepassword-save-button>
-			</div>
-			<div class="rounded-xl bg-base-200/50 border border-base-300 px-4 py-3 text-xs text-base-content/60">
-				<div class="flex items-start gap-2">
-					<i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-base-content/40"></i>
-					<div>
-						<p class="font-medium text-base-content/70 mb-1">Lost it later?</p>
-						<p>The key is still available in your <code class="font-mono text-primary/70 bg-primary/5 px-1 py-0.5 rounded">.env</code> file on the server, or by running <code class="font-mono text-primary/70 bg-primary/5 px-1 py-0.5 rounded">breadbox reveal-key</code> from the server shell. This page won't show it again after you continue.</p>
-					</div>
+				<!-- The 1Password web component renders inert unless the
+				     visitor has the 1Password browser extension installed.
+				     Sits on its own row at its natural width so we don't
+				     fight its shadow-DOM sizing. -->
+				<div class="flex justify-center pt-0.5">
+					<onepassword-save-button
+						data-onepassword-type="login"
+						value={ p.OnePasswordValue }
+						class="blue"
+						padding="normal"
+					></onepassword-save-button>
 				</div>
 			</div>
-			<form method="POST" action="/setup/save-key">
+			<!-- Lost-it-later callout. Quieter visual weight than a daisy alert. -->
+			<div class="rounded-lg bg-base-200/40 border border-base-300/70 px-3.5 py-3 text-xs text-base-content/60 leading-relaxed">
+				<div class="flex items-start gap-2.5">
+					<i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-base-content/40"></i>
+					<p class="m-0">
+						<span class="font-medium text-base-content/75">Lost it later?</span> The key is also in your server's <kbd class="kbd kbd-xs">.env</kbd> file and printable from the shell with <kbd class="kbd kbd-xs">breadbox reveal-key</kbd>. This page won't show it again after you continue.
+					</p>
+				</div>
+			</div>
+			<form method="POST" action="/setup/save-key" class="pt-1">
 				if p.CSRFToken != "" {
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				}
-				<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold transition-colors duration-150">
-					I've saved it -- continue
+				<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold">
+					I've saved it — continue
 					<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
 				</button>
 			</form>
 		</div>
 	}
+}
+
+// maskedDots returns a string of bullet characters one per rune in
+// the input, used as the initial display before the user clicks
+// "Show". Lives in the template so SSR matches client behaviour
+// exactly (no flash of unmasked content if JS is slow).
+func maskedDots(key string) string {
+	dots := make([]rune, len(key))
+	for i := range dots {
+		dots[i] = '●'
+	}
+	return string(dots)
 }
