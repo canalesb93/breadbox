@@ -78,14 +78,23 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer)
 		}
 
 		// Create household user + admin account in a single transaction.
-		if err := createLinkedAdmin(ctx, a, name, username, hashedPassword); err != nil {
+		account, err := createLinkedAdmin(ctx, a, name, username, hashedPassword)
+		if err != nil {
 			renderCreateAdmin(w, r, sm, name, username, "Failed to create admin account", nil)
 			return
 		}
 
-		// Set flash and redirect to login.
-		SetFlash(ctx, sm, "success", "Admin account created. Sign in to get started.")
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		// Auto-login the freshly created admin so we can land them
+		// directly on the Getting Started guide. Browsers still see the
+		// password field in the submitted form, so password-manager
+		// save prompts continue to work without a separate /login step.
+		if err := sm.RenewToken(ctx); err != nil {
+			a.Logger.Error("setup: renew session token", "error", err)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		SetLoginSessionKeys(ctx, sm, account, a.Queries)
+		http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
 	}
 }
 
@@ -116,11 +125,13 @@ func renderCreateAdmin(w http.ResponseWriter, r *http.Request, sm *scs.SessionMa
 	}
 }
 
-// createLinkedAdmin creates a household user and linked admin auth account in a single transaction.
-func createLinkedAdmin(ctx context.Context, a *app.App, name, username string, hashedPassword []byte) error {
+// createLinkedAdmin creates a household user and linked admin auth account in
+// a single transaction and returns the newly created auth account so the
+// caller can hydrate the session for auto-login.
+func createLinkedAdmin(ctx context.Context, a *app.App, name, username string, hashedPassword []byte) (db.AuthAccount, error) {
 	tx, err := a.DB.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return db.AuthAccount{}, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -131,20 +142,23 @@ func createLinkedAdmin(ctx context.Context, a *app.App, name, username string, h
 		Email: pgconv.Text(username),
 	})
 	if err != nil {
-		return fmt.Errorf("create user: %w", err)
+		return db.AuthAccount{}, fmt.Errorf("create user: %w", err)
 	}
 
-	_, err = qtx.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
+	account, err := qtx.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
 		UserID:         user.ID,
 		Username:       username,
 		HashedPassword: hashedPassword,
 		Role:           RoleAdmin,
 	})
 	if err != nil {
-		return fmt.Errorf("create auth account: %w", err)
+		return db.AuthAccount{}, fmt.Errorf("create auth account: %w", err)
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return db.AuthAccount{}, fmt.Errorf("commit: %w", err)
+	}
+	return account, nil
 }
 
 // programmaticSetupRequest is the JSON body for POST /admin/api/setup.
@@ -257,7 +271,7 @@ func ProgrammaticSetupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 			return
 		}
 
-		if err := createLinkedAdmin(ctx, a, req.Name, req.Username, hashedPassword); err != nil {
+		if _, err := createLinkedAdmin(ctx, a, req.Name, req.Username, hashedPassword); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{
 				"error": "Failed to create admin account",
 			})

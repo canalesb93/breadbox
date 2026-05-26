@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"breadbox/internal/app"
-	"breadbox/internal/appconfig"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -23,8 +22,10 @@ import (
 const feedWindowDays = 3
 
 // FeedHandler serves GET / — the activity-style household home page.
-// Until onboarding is dismissed, the root path redirects to /getting-started
-// (matching the old DashboardHandler behaviour).
+// The Getting Started guide stays linked from the sidebar (driven by
+// `onboarding_dismissed`) so first-run users can still reach it, but the
+// root path no longer bounces there. Post-setup landing happens once,
+// from the setup handler — see CreateAdminHandler in setup.go.
 //
 // The aggregation pipeline is:
 //
@@ -37,12 +38,6 @@ const feedWindowDays = 3
 func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
-		// Redirect to getting-started page if onboarding is not dismissed.
-		if !appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false) {
-			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
-			return
-		}
 
 		// Anchor every wall-clock decision (day buckets, "Today" hero
 		// counters, absolute-time tooltips) to the viewer's browser
