@@ -64,6 +64,13 @@ templ Rules(p RulesProps) {
 		if p.TotalPages > 1 {
 			@rulesPaginator(p)
 		}
+		<!-- Loading skeleton for the rules list, available for any future
+		     client-side refresh / pagination swap (e.g. toggleRule /
+		     deleteRule without a full page reload). Mirrors the SSR layout
+		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+		<template id="bb-rules-skeleton-template">
+			@components.RulesSkeleton()
+		</template>
 	</div>
 }
 

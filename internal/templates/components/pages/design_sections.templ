@@ -814,6 +814,11 @@ templ SectionLoading() {
 				@components.AgentRunsListSkeleton()
 			</div>
 		}
+		@designExample("Rules list skeleton", "Placeholder mirroring /rules — the count + sort-dropdown header strip and a stack of rule cards (9x9 avatar tile, name with optional Disabled/Expired/System badge, compact condition · action · hits subtitle, desktop-only pipeline-stage + last-active stats stack, and edit pencil + kebab action slots). Rows vary the badge / last-active widths so the skeleton reads as motion. Primitive is exposed here for future AJAX swaps (toggleRule / deleteRule without a full page reload); /rules is full-SSR today.") {
+			<div class="max-w-4xl">
+				@components.RulesSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>

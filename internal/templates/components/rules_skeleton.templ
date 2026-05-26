@@ -1,0 +1,88 @@
+package components
+
+// RulesSkeleton renders a placeholder mirroring the layout of the
+// /rules page — the count + sort-dropdown header strip followed by a
+// stack of rule cards (avatar + name + condition/action/hits subtitle,
+// optional pipeline-stage + last-active stats on desktop, edit pencil
+// + overflow kebab). Sized to match the real component so a future
+// swap-in doesn't shift layout.
+//
+// /rules is a full-SSR page today; this primitive is exposed in
+// /design#loading so it's ready for the eventual AJAX/refresh swap
+// (e.g. after toggleRule / deleteRule without a full page reload) and
+// discoverable to anyone wiring loading states for adjacent
+// rules-centric panels.
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
+// hand-rolled `bb-skeleton*` family is being retired).
+templ RulesSkeleton() {
+	<div aria-hidden="true">
+		<!-- Count + sort header strip (mirrors rules.templ:34-54) -->
+		<div class="flex items-center justify-between flex-wrap gap-3 mb-4 px-1">
+			<div class="skeleton h-3 w-32"></div>
+			<div class="skeleton h-6 w-40 rounded-md"></div>
+		</div>
+		<!-- Rule cards -->
+		<div class="space-y-3">
+			for i := 0; i < 6; i++ {
+				@rulesSkeletonRow(i)
+			}
+		</div>
+	</div>
+}
+
+// rulesSkeletonRow mirrors one rulesRow: a 9x9 avatar tile on the left,
+// the name + optional badges row + the compact condition/action/hits
+// subtitle in the middle, the desktop-only priority + last-active stats
+// stack on the right, and the edit pencil + kebab slot at the end.
+// Row index varies the placeholder shapes so the skeleton doesn't look
+// stamped — some rows render a "Disabled"/"Expired"/"System" badge, the
+// last row mimics a rule that has never matched (no last-active line).
+templ rulesSkeletonRow(i int) {
+	<div class="bb-card p-0 relative">
+		<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 sm:py-5">
+			<!-- Avatar (rulesAvatar — 9x9 rounded tile) -->
+			<div class="flex-shrink-0">
+				<div class="skeleton w-9 h-9 rounded-xl"></div>
+			</div>
+			<!-- Main info: name + badges + subtitle -->
+			<div class="flex-1 min-w-0 space-y-1.5">
+				<div class="flex items-center gap-2 flex-wrap">
+					<div class="skeleton h-3.5 w-40 sm:w-56"></div>
+					if i%3 == 0 {
+						<div class="skeleton hidden sm:block h-3.5 w-14 rounded-full"></div>
+					}
+				</div>
+				<!-- Condition · action · hits subtitle -->
+				<div class="flex items-center gap-2">
+					<div class="skeleton h-2.5 w-16"></div>
+					<div class="skeleton h-2.5 w-1 rounded-full"></div>
+					<div class="skeleton h-2.5 w-20"></div>
+					<div class="skeleton h-2.5 w-1 rounded-full"></div>
+					<div class="skeleton h-2.5 w-12"></div>
+				</div>
+			</div>
+			<!-- Right-side stats (desktop+): pipeline stage + last active -->
+			<div class="hidden lg:flex items-center gap-4 flex-shrink-0">
+				<div class="w-12 text-center space-y-1">
+					<div class="skeleton h-3.5 w-6 mx-auto"></div>
+					<div class="skeleton h-2.5 w-10 mx-auto"></div>
+				</div>
+				<div class="w-20 text-center space-y-1">
+					if i == 5 {
+						<div class="skeleton h-3 w-4 mx-auto"></div>
+						<div class="skeleton h-2.5 w-14 mx-auto"></div>
+					} else {
+						<div class="skeleton h-3 w-16 mx-auto"></div>
+						<div class="skeleton h-2.5 w-14 mx-auto"></div>
+					}
+				</div>
+			</div>
+			<!-- Actions: edit pencil + kebab -->
+			<div class="flex items-center justify-end gap-0.5 flex-shrink-0">
+				<div class="skeleton h-6 w-6 rounded-md"></div>
+				<div class="skeleton h-6 w-6 rounded-md"></div>
+			</div>
+		</div>
+	</div>
+}
