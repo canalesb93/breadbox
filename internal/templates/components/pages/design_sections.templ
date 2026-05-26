@@ -2229,24 +2229,24 @@ templ timelineSandboxCommentBody() {
 // SectionAgentRunRows shows the variants of components.AgentRunRow —
 // the row shape rendered on /agents (the runs landing). Built on daisy
 // `list` + `list-row`. The shape is intentionally spare: status icon
-// tile (the row's single status signal), agent name + a compact
-// time/duration on the right of the title row, one optional body line
-// (error → top report → skipped note, in that priority order), and
-// cost. Trigger and cap details surface only as tooltip-only accessory
-// icons; raw shortID, tokens, turns, and the finished-at clock time
-// moved to the run-detail page.
+// tile (the row's single status signal), agent name with a dimmed
+// time suffix as the title (or just the time when ShowAgent is
+// false), one optional body line (error → top report → skipped note,
+// in that priority order), and cost. Trigger and cap details surface
+// only as tooltip-only accessory icons; raw shortID, tokens, turns,
+// and the finished-at clock time moved to the run-detail page.
 templ SectionAgentRunRows() {
 	<div class="flex flex-col gap-6">
 		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
 			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
 			<ul class="space-y-1 list-disc pl-4">
 				<li>Renders one cross-agent feed of recent runs (canonical: <code>/agents</code>) via <code>AgentRunRow</code> + <code>AgentRunRowList</code>. Scaffold is daisy <code>list</code> / <code>list-row</code> — no bespoke wrapper.</li>
-				<li>Show the agent name when the surrounding page is cross-agent; hide it via <code>ShowAgent: false</code> when the page is already scoped to one agent. With the name hidden, the status badge takes the title slot so the row still leads with state.</li>
+				<li>Show the agent name when the surrounding page is cross-agent; hide it via <code>ShowAgent: false</code> when the page is already scoped to one agent. With the name hidden, the dimmed time becomes the title — the icon tile already carries status, so no parallel text badge is needed.</li>
 				<li>When a run produced reports, the top-priority report's title becomes the row's body line; extras collapse into a quiet <code>+N</code> ghost badge. The row links to the run — clicking through reaches the reports.</li>
 				<li>Non-cron triggers and hit-cap signals appear as small tooltip-only icons in the title row. Cron is the default and stays silent.</li>
 			</ul>
 		</div>
-		@designExample("Global feed — every status", "ShowAgent: true. The colored icon tile is the row's single status signal: green check for success, red x for error, info spinner for in-progress, dashed circle for skipped, clock-alert for timeout. The textual status badge was removed from the row — it just repeated the tile.") {
+		@designExample("Global feed — every status", "ShowAgent: true. The agent name leads the title row; the relative time + duration trails as a dimmed suffix. The colored icon tile is the single status signal — green check for success, red x for error, info spinner for in-progress, dashed circle for skipped, clock-alert for timeout.") {
 			@components.AgentRunRowList() {
 				@components.AgentRunRow(designAgentRunRowSuccess())
 				@components.AgentRunRow(designAgentRunRowSuccessWithReport())
@@ -2256,7 +2256,7 @@ templ SectionAgentRunRows() {
 				@components.AgentRunRow(designAgentRunRowTimeout())
 			}
 		}
-		@designExample("Per-agent scope — ShowAgent: false", "Used when the surrounding page is already scoped to one agent (filter chip or breadcrumb conveys the name). The status badge takes the title slot because the agent name is gone.") {
+		@designExample("Per-agent scope — ShowAgent: false", "Used when the surrounding page is already scoped to one agent (filter chip or breadcrumb conveys the name). The relative time takes over as the title since the agent name is suppressed; the icon tile keeps carrying status.") {
 			@components.AgentRunRowList() {
 				@components.AgentRunRow(designAgentRunRowNoAgent(designAgentRunRowSuccess()))
 				@components.AgentRunRow(designAgentRunRowNoAgent(designAgentRunRowError()))
@@ -2269,15 +2269,6 @@ templ SectionAgentRunRows() {
 				@components.AgentRunRow(designAgentRunRowWithReports("critical"))
 				@components.AgentRunRow(designAgentRunRowWithMultipleReports())
 			}
-		}
-		@designExample("Status badge — standalone", "components.AgentRunStatusBadge — still rendered in the run-detail header and on per-agent rows where the agent name is suppressed. In-progress carries a spinner; everything else is a soft daisy badge.") {
-			<div class="flex flex-wrap items-center gap-2">
-				@components.AgentRunStatusBadge("success")
-				@components.AgentRunStatusBadge("error")
-				@components.AgentRunStatusBadge("in_progress")
-				@components.AgentRunStatusBadge("skipped")
-				@components.AgentRunStatusBadge("timeout")
-			</div>
 		}
 	</div>
 }

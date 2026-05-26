@@ -59,12 +59,13 @@ type AgentRunReportRef struct {
 
 // AgentRunRow renders one run as a daisy `list-row` inside an
 // @AgentRunRowList. The shape is deliberately spare: one icon-tile
-// status signal on the left, the agent name + a compact time/duration
-// pair on the right of the title row, an optional single-line body
-// (error → top report → skipped note, in that priority order), and
-// the cost in the trailing column. Trigger and cap details surface as
-// tooltip-only accessory icons; raw shortID, tokens, turns, and the
-// finished-at clock time live on the run-detail page instead.
+// status signal on the left, the agent name with a dimmed time
+// suffix as the title (or just the time when ShowAgent is false),
+// an optional single-line body (error → top report → skipped note,
+// in that priority order), and cost on the right. Trigger and cap
+// details surface as tooltip-only accessory icons; raw shortID,
+// tokens, turns, and the finished-at clock time live on the
+// run-detail page instead.
 templ AgentRunRow(p AgentRunRowProps) {
 	<li
 		class={ "list-row transition-colors hover:bg-base-200/40 items-center",
@@ -80,12 +81,10 @@ templ AgentRunRow(p AgentRunRowProps) {
 				<div class="flex items-center gap-2 min-w-0">
 					if p.ShowAgent && p.AgentName != "" {
 						<span class="font-medium text-sm text-base-content truncate">{ p.AgentName }</span>
-					} else {
-						@AgentRunStatusBadge(p.Status)
 					}
 					@agentRunAccessoryIcons(p)
 					<span
-						class="ml-auto shrink-0 text-xs text-base-content/50 tabular-nums"
+						class="shrink-0 text-xs text-base-content/50 tabular-nums"
 						title={ p.StartedAt.Format(time.RFC3339) }
 					>
 						{ agentRunCompactTime(p.StartedAt, p.DurationMs, p.Status) }
@@ -114,29 +113,6 @@ templ AgentRunRowList() {
 	<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
 		{ children... }
 	</ul>
-}
-
-// AgentRunStatusBadge renders the status pill shared between the runs
-// list, run detail header, and the design sandbox. In-progress rows
-// carry a spinner; everything else is a soft daisy badge.
-templ AgentRunStatusBadge(status string) {
-	switch status {
-		case "success":
-			<span class="badge badge-soft badge-success badge-xs">success</span>
-		case "error":
-			<span class="badge badge-soft badge-error badge-xs">error</span>
-		case "in_progress":
-			<span class="badge badge-soft badge-info badge-xs gap-1">
-				<span class="loading loading-spinner loading-xs"></span>
-				running
-			</span>
-		case "skipped":
-			<span class="badge badge-ghost badge-xs">skipped</span>
-		case "timeout":
-			<span class="badge badge-soft badge-error badge-xs">timeout</span>
-		default:
-			<span class="badge badge-ghost badge-xs">{ status }</span>
-	}
 }
 
 // agentRunRowAvatar renders the leading icon tile. The tone tracks the
