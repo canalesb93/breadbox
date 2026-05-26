@@ -1,0 +1,83 @@
+package components
+
+// TxResultsSkeleton renders a placeholder for the AJAX tx-results fragment
+// while the server fetch is in flight. The transactions search input
+// inserts this via `transactions.js` immediately after the user types
+// (Phase 1) so the result region doesn't go blank during the debounced
+// (500 ms) server fetch in Phase 2.
+//
+// The skeleton mirrors the two view modes that TxResults emits — grouped
+// (date headers + cards of rows) and flat list — via Alpine's `$store.txView.mode`,
+// so the placeholder matches whichever layout the user has selected. The
+// row count (5 per group / 5 in list) is a reasonable default for a page
+// of results without overwhelming the viewport.
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
+// hand-rolled `animate-pulse` + `bg-base-300/30` shape is being retired).
+templ TxResultsSkeleton() {
+	<div id="bb-search-skeleton">
+		<!-- ═══ GROUPED VIEW ═══ -->
+		<template x-if="$store.txView.mode === 'grouped'">
+			<div class="space-y-1" aria-hidden="true">
+				for i := 0; i < 3; i++ {
+					@txSkeletonGroup(5)
+				}
+			</div>
+		</template>
+		<!-- ═══ LIST VIEW ═══ -->
+		<template x-if="$store.txView.mode === 'list'">
+			<div aria-hidden="true">
+				<div class="bb-card overflow-hidden">
+					<div class="divide-y divide-base-300/30">
+						for i := 0; i < 5; i++ {
+							@txSkeletonRow()
+						}
+					</div>
+				</div>
+			</div>
+		</template>
+	</div>
+}
+
+// txSkeletonGroup is one date-grouped block: a header row + a card of
+// transaction-row placeholders, sized to match TxResults' grouped layout.
+templ txSkeletonGroup(rowCount int) {
+	<div>
+		<!-- Date header -->
+		<div class="flex items-center justify-between px-2 pt-4 pb-2">
+			<div class="flex items-center gap-3">
+				<div class="skeleton h-3 w-24"></div>
+				<div class="skeleton h-2.5 w-12"></div>
+			</div>
+			<div class="skeleton h-3 w-14"></div>
+		</div>
+		<!-- Row card -->
+		<div class="bb-card overflow-hidden divide-y divide-base-300/30">
+			for i := 0; i < rowCount; i++ {
+				@txSkeletonRow()
+			}
+		</div>
+	</div>
+}
+
+// txSkeletonRow mirrors TxRow's main flex layout: checkbox slot, avatar,
+// description + meta lines, optional desktop-only date/category, amount.
+// Widths/heights match the real row so the swap-in doesn't shift layout.
+templ txSkeletonRow() {
+	<div class="flex items-center gap-3 px-4 py-3">
+		<!-- Checkbox slot -->
+		<div class="skeleton w-5 h-5 shrink-0"></div>
+		<!-- Avatar -->
+		<div class="skeleton w-9 h-9 rounded-xl shrink-0"></div>
+		<!-- Name + meta line -->
+		<div class="flex-1 min-w-0 space-y-1.5">
+			<div class="skeleton h-3 w-2/5"></div>
+			<div class="skeleton h-2.5 w-1/4"></div>
+		</div>
+		<!-- Desktop meta (date / category) -->
+		<div class="skeleton h-3 w-20 hidden sm:block"></div>
+		<div class="skeleton h-3 w-14 hidden sm:block"></div>
+		<!-- Amount -->
+		<div class="skeleton h-3.5 w-16"></div>
+	</div>
+}

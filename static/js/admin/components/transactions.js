@@ -317,46 +317,25 @@ document.addEventListener('alpine:init', function () {
           }
         });
 
-        // Append skeleton rows to hint that server results are loading
-        var skeletonRow = '<div class="flex items-center gap-3 px-4 py-3 animate-pulse">'
-          + '<div class="w-5 h-5 bg-base-300/30 rounded shrink-0"></div>'
-          + '<div class="w-9 h-9 bg-base-300/30 rounded-xl shrink-0"></div>'
-          + '<div class="flex-1 space-y-1.5"><div class="h-3 bg-base-300/30 rounded w-2/5"></div><div class="h-2.5 bg-base-300/20 rounded w-1/4"></div></div>'
-          + '<div class="h-3 bg-base-300/30 rounded w-20 hidden sm:block"></div>'
-          + '<div class="h-3 bg-base-300/20 rounded w-14 hidden sm:block"></div>'
-          + '<div class="h-3.5 bg-base-300/30 rounded w-16"></div>'
-          + '</div>';
-        var skeletonEl = document.getElementById('bb-search-skeleton');
-        if (skeletonEl) skeletonEl.remove();
-        var skeleton = document.createElement('div');
-        skeleton.id = 'bb-search-skeleton';
-        var mode = (window.Alpine && Alpine.store('txView')) ? Alpine.store('txView').mode : 'grouped';
-        if (mode === 'grouped') {
-          var groups = '';
-          for (var g = 0; g < 3; g++) {
-            groups += '<div class="animate-pulse">'
-              + '<div class="flex items-center justify-between px-2 pt-4 pb-2">'
-              + '<div class="flex items-center gap-3"><div class="h-3 bg-base-300/30 rounded w-24"></div><div class="h-2.5 bg-base-300/20 rounded w-12"></div></div>'
-              + '<div class="h-3 bg-base-300/20 rounded w-14"></div>'
-              + '</div>'
-              + '<div class="bb-card overflow-hidden divide-y divide-base-300/30">' + skeletonRow + '</div>'
-              + '</div>';
-          }
-          skeleton.innerHTML = '<div class="space-y-1">' + groups + '</div>';
-        } else {
-          var rows = '';
-          for (var i = 0; i < 3; i++) {
-            rows += skeletonRow;
-            if (i < 2) rows += '<div class="border-t border-base-300/20"></div>';
-          }
-          skeleton.innerHTML = '<div class="bb-card overflow-hidden"><div class="divide-y divide-base-300/30">' + rows + '</div></div>';
-        }
+        // Insert the loading skeleton (clone of the server-rendered
+        // <template id="bb-tx-skeleton-template"> defined in transactions.templ)
+        // so the result region doesn't go blank while the debounced server
+        // fetch is in flight. Templ owns the markup + sizing; Alpine's
+        // `<template x-if="$store.txView.mode === 'grouped'">` branches
+        // inside the clone pick the right view automatically.
+        var existing = document.getElementById('bb-search-skeleton');
+        if (existing) existing.remove();
+        var tpl = document.getElementById('bb-tx-skeleton-template');
         var resultsEl = document.getElementById('bb-tx-results');
         var paginatorEl = document.getElementById('bb-tx-paginator');
         if (paginatorEl) paginatorEl.style.display = 'none';
-        if (resultsEl) {
-          if (paginatorEl) resultsEl.insertBefore(skeleton, paginatorEl);
-          else resultsEl.appendChild(skeleton);
+        if (tpl && resultsEl) {
+          var clone = tpl.content.cloneNode(true);
+          if (paginatorEl) resultsEl.insertBefore(clone, paginatorEl);
+          else resultsEl.appendChild(clone);
+          // Initialize Alpine on the newly inserted nodes so the
+          // x-if view-mode branches evaluate.
+          if (window.Alpine) Alpine.initTree(resultsEl);
         }
 
         // Phase 2: Server fetch for full results (debounced 500ms)

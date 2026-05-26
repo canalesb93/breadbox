@@ -479,6 +479,14 @@ templ txResultsShell(p TransactionsProps) {
 			@components.TxResults(p.Results)
 		</div>
 		<!-- /bb-tx-results -->
+		<!-- Search loading skeleton — cloned into #bb-tx-results by
+		     transactions.js while the debounced (500 ms) server fetch
+		     is in flight. The two view-mode branches live inside the
+		     component so the clone matches whichever mode the user
+		     has selected. -->
+		<template id="bb-tx-skeleton-template">
+			@components.TxResultsSkeleton()
+		</template>
 	</div>
 }
 
