@@ -91,7 +91,7 @@ templ TxResults(p TxResultsProps) {
 		<div class="bb-paginator" id="bb-tx-paginator">
 			<div class="bb-paginator__info">
 				<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
-					Showing { fmt.Sprintf("%d&ndash;%d", p.ShowingStart, p.ShowingEnd) } of { strconv.Itoa(p.Total) }
+					@templ.Raw(fmt.Sprintf("Showing %d&ndash;%d of %d", p.ShowingStart, p.ShowingEnd, p.Total))
 				</span>
 				<div class="bb-paginator__per-page">
 					<label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
