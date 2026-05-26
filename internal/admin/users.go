@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"breadbox/internal/app"
+	"breadbox/internal/avatar"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/templates/components"
@@ -365,10 +366,16 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	}
 }
 
-// updateUserRequest is the JSON body for PUT /admin/api/users/{id}.
+// updateUserRequest is the JSON body for PUT /admin/api/users/{id} and
+// the self-service PUT /settings/account/profile. AvatarSeed is the
+// "pending" identicon seed staged client-side by the Regenerate
+// button — handlers apply it via clearAvatarUploadAndSetSeed so the
+// uploaded image (if any) is dropped and the new generated identicon
+// takes its place. Empty / omitted leaves the avatar unchanged.
 type updateUserRequest struct {
-	Name  *string `json:"name,omitempty"`
-	Email *string `json:"email"`
+	Name       *string `json:"name,omitempty"`
+	Email      *string `json:"email"`
+	AvatarSeed *string `json:"avatar_seed,omitempty"`
 }
 
 // UpdateUserHandler serves PUT /admin/api/users/{id}.
@@ -434,6 +441,10 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			return
 		}
 
+		if !applyPendingAvatarSeed(a, w, r, userID, req.AvatarSeed) {
+			return
+		}
+
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":         pgconv.FormatUUID(user.ID),
 			"name":       user.Name,
@@ -442,6 +453,43 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			"updated_at": user.UpdatedAt.Time,
 		})
 	}
+}
+
+// applyPendingAvatarSeed persists a Regenerate-button seed staged by
+// the avatarEditor Alpine factory. The form submits the same shape
+// the regenerate POST used to (clear uploaded image + set seed); we
+// just defer that work from the button click to the Save Changes
+// click. A nil/empty seed is a no-op. Invalid seeds (too long, bad
+// charset) are rejected to bound the upstream DiceBear URL + the
+// in-process cache key. Returns false after writing an error
+// response.
+func applyPendingAvatarSeed(a *app.App, w http.ResponseWriter, r *http.Request, userID pgtype.UUID, seed *string) bool {
+	if seed == nil {
+		return true
+	}
+	trimmed := strings.TrimSpace(*seed)
+	if trimmed == "" {
+		return true
+	}
+	if !avatar.IsValidSeed(trimmed) {
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR",
+			"Invalid avatar seed — must be 1-128 chars of letters, digits, dot, dash, or underscore")
+		return false
+	}
+	if err := a.Queries.ClearUserAvatar(r.Context(), userID); err != nil {
+		a.Logger.Error("clear avatar for deferred regenerate", "error", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update avatar")
+		return false
+	}
+	if err := a.Queries.SetUserAvatarSeed(r.Context(), db.SetUserAvatarSeedParams{
+		ID:         userID,
+		AvatarSeed: pgconv.Text(trimmed),
+	}); err != nil {
+		a.Logger.Error("set avatar seed for deferred regenerate", "error", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update avatar")
+		return false
+	}
+	return true
 }
 
 // CreateLoginPageHandler serves GET /users/{id}/create-login -- form to create login account.

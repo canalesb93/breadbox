@@ -375,6 +375,13 @@ func MyAccountUpdateProfileHandler(a *app.App, sm *scs.SessionManager) http.Hand
 			return
 		}
 
+		if !applyPendingAvatarSeed(a, w, r, userID, req.AvatarSeed) {
+			return
+		}
+		if req.AvatarSeed != nil && strings.TrimSpace(*req.AvatarSeed) != "" {
+			bumpAvatarVersion(sm, r)
+		}
+
 		// Refresh the cached display name so the sidebar footer reflects
 		// the edit on the next page render without a re-login.
 		sm.Put(r.Context(), sessionKeyUserName, user.Name)

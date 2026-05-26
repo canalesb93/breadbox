@@ -45,6 +45,12 @@ const (
 	// away. The key itself remains recoverable from .env or the
 	// `breadbox reveal-key` shell command.
 	KeyEncryptionKeyAcknowledgedAt = "setup.encryption_key_acknowledged_at"
+
+	// KeyAvatarStyle is the DiceBear style slug used for auto-generated
+	// user identicons (https://www.dicebear.com). Operators can change
+	// the style from Settings → System. Uploaded avatars are unaffected.
+	// Default: "shapes" (set in internal/avatar).
+	KeyAvatarStyle = "avatar.dicebear_style"
 )
 
 // AuthMode values for KeyAgentAuthMode.
