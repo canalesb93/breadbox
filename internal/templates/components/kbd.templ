@@ -17,10 +17,12 @@ templ Kbd(key string) {
 	<kbd class="bb-kbd hidden sm:inline-flex" x-show="!$store.device.isTouch">{ kbdGlyph(key) }</kbd>
 }
 
-// KbdChord renders a sequence of keys separated by a faint "then" label,
-// using the canonical `.bb-kbd` + `.bb-shortcuts-then` styling. The whole
-// chord hides on touch via the same guards as `Kbd`. Calling with 0 or 1
-// keys degrades gracefully.
+// KbdChord renders a sequence of keys as adjacent .bb-kbd pills with a
+// small gap (e.g. `[G][D]` for the vim-style `g d` chord). Distinct from
+// `KbdCombo` (one fused pill `⌘│K`) by the gap between standalone keys —
+// adjacency reads as "press in sequence" without a verbose "then" label.
+// The whole chord hides on touch via the same guards as `Kbd`. Calling
+// with 0 or 1 keys degrades gracefully.
 templ KbdChord(keys ...string) {
 	if len(keys) > 0 {
 		// Order matters: `hidden` must come AFTER the layout class, and the
@@ -30,10 +32,7 @@ templ KbdChord(keys ...string) {
 		// `sm:inline-flex` handles the desktop layout; nothing competes with
 		// `hidden` at the base breakpoint.
 		<span class="hidden sm:inline-flex items-center gap-1" x-show="!$store.device.isTouch">
-			for i, k := range keys {
-				if i > 0 {
-					<span class="bb-shortcuts-then">then</span>
-				}
+			for _, k := range keys {
 				<kbd class="bb-kbd">{ kbdGlyph(k) }</kbd>
 			}
 		</span>

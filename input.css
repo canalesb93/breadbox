@@ -1420,6 +1420,55 @@
    * ──────────────────────────────────────────────────────────── */
   .modal-box {
     overscroll-behavior: contain;
+    /* Nova-style inset ring on modals — replaces the hard daisy shadow-2xl
+       with a foreground-tinted ring + soft drop. `!important` because
+       daisyUI's plugin layer emits a same-specificity `.modal-box`
+       box-shadow that wins on source order otherwise. NOTE: re-added in
+       this PR after #1548 inadvertently dropped it during rebase. */
+    box-shadow:
+      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.10),
+      0 10px 30px -10px oklch(0 0 0 / 0.18) !important;
+  }
+
+  /* Dark-mode modal lift. daisy 5's `.modal-box` defaults to bg-base-100,
+     but in the dark theme base-100 IS the page background (oklch 0.145),
+     so the modal recesses instead of lifting and the black drop shadow
+     is invisible against the dark backdrop. shadcn solves this with a
+     separate `--popover` token one luminance step lighter than
+     `--background`; daisy 5 doesn't expose that distinction, so we lift
+     the modal surface to base-200 in dark only (light-mode keeps the
+     stock bg-base-100 / white). Also bump the ring + drop opacities so
+     the edge stays legible against the near-black page. Same dual-
+     selector pattern as the .bb-card dark boost above (manual data-theme
+     + auto via prefers-color-scheme when none is set). */
+  [data-theme="dark"] .modal-box {
+    /* `!important` on background-color too — daisy's plugin layer emits
+       `.modal-box { background: var(--color-base-100) }` at the same
+       specificity, which wins source-order. */
+    background-color: var(--color-base-200) !important;
+    box-shadow:
+      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.14),
+      0 20px 40px -12px oklch(0 0 0 / 0.50) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .modal-box {
+      background-color: var(--color-base-200) !important;
+      box-shadow:
+        0 0 0 1px oklch(from var(--color-base-content) l c h / 0.14),
+        0 20px 40px -12px oklch(0 0 0 / 0.50) !important;
+    }
+  }
+
+  /* Floating menus / dropdown content — same inset-ring treatment so
+     overflow popups read consistently with cards and modals. No
+     !important here: callers that opt into a heavier elevation via
+     Tailwind `shadow-lg`/`shadow-xl` (the daisyui.md-mandated standard
+     dropdown shape, settings_modal tab picker) still win by specificity.
+     Re-added in this PR after #1548 inadvertently dropped it. */
+  .dropdown-content {
+    box-shadow:
+      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.08),
+      0 6px 20px -6px oklch(0 0 0 / 0.12);
   }
 
   /* ── Suppress WebKit's native search-clear (×) on overlay pickers ──
@@ -1692,11 +1741,11 @@
   .bb-sidebar-search-hint {
     @apply ml-auto flex items-center gap-0.5 text-[0.6rem] text-base-content/25;
   }
-
-  .bb-sidebar-search-hint kbd {
-    @apply inline-flex items-center justify-center min-w-[1.1rem] h-4 px-0.5
-           text-[0.55rem] font-medium bg-base-200 border border-base-300 rounded;
-  }
+  /* The legacy `.bb-sidebar-search-hint kbd` rule was removed — the hint
+     now renders via the shared `KbdCombo` templ component, which emits
+     `<span class="bb-kbd-combo">` (not `<kbd>`). The kbd inversion happens
+     via the `.bb-sidebar-search .bb-kbd / .bb-kbd-combo` rules near the
+     shortcut-badges block above. */
 
   /* ── Sidebar user profile ── */
   .bb-sidebar-profile {
@@ -1949,10 +1998,6 @@
 
   .bb-shortcuts-keys {
     @apply flex items-center gap-1.5;
-  }
-
-  .bb-shortcuts-then {
-    @apply text-[0.6rem] text-base-content/25;
   }
 
   .bb-shortcuts-footer {
@@ -2391,23 +2436,37 @@
   }
 
   /* When a kbd lives inside ANY .btn or daisy tooltip, the default
-     base-200 ground can collide with the surface. `.btn-soft` (and
-     daisy 5's per-tone soft variants) sit in the base-200 luminance
-     range — a base-200 kbd on a base-200-tinted button is invisible.
-     ghost/outline buttons sit on the page base-100 with a base-200
-     kbd that reads as a faint smudge. Solid-tone surfaces clash too.
+     base-200 ground can collide with the surface. `.btn-soft` sits in
+     the base-200 luminance range — a base-200 kbd on a base-200-tinted
+     button is invisible. ghost/outline buttons sit on the page base-100
+     with a base-200 kbd that reads as a faint smudge. Solid-tone
+     surfaces clash too.
 
      Replace the default ground with `color-mix(currentColor 22%)`
      so the kbd always tints toward whatever foreground colour
-     surrounds it. `currentColor` adapts across every button variant
-     (primary / secondary / accent / neutral / ghost / outline / soft /
-     link / tone-specific) + tooltips + both themes from a single rule,
-     with no per-theme or per-variant override. */
+     surrounds it. `currentColor` adapts across every button variant +
+     tooltips + both themes from a single rule. */
   .btn .bb-kbd,
   .tooltip .bb-kbd,
   [role="tooltip"] .bb-kbd {
     background: color-mix(in oklab, currentColor 22%, transparent);
     color: inherit;
+  }
+
+  /* Sidebar command-palette trigger gets a special-case rule because the
+     parent `.bb-sidebar-search` deliberately sets a translucent text
+     colour (`text-base-content/35`) for the muted "Search..." label.
+     Using `currentColor` would inherit that translucency and produce a
+     ~5% alpha kbd ground (invisible). Use the opaque `--color-base-content`
+     directly so the kbd glyph stays at full saturation and the pill ring
+     gets a 14% tint against the bg-base-200/50 trigger surface. */
+  .bb-sidebar-search .bb-kbd,
+  .bb-sidebar-search .bb-kbd-combo {
+    background: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+    color: var(--color-base-content);
+  }
+  .bb-sidebar-search .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key {
+    border-left-color: color-mix(in oklab, var(--color-base-content) 22%, transparent);
   }
 
   /* Blended modifier pill: ⌘│K rendered as one tight badge with a hairline
@@ -2429,8 +2488,10 @@
     border-left: 1px solid oklch(from var(--color-base-content) l c h / 0.10);
   }
 
-  /* Same currentColor-tint treatment as .bb-kbd above — widened to any
-     .btn so .btn-soft / ghost / outline get the inversion too. */
+  /* Same currentColor-tint treatment as .bb-kbd above for .bb-kbd-combo
+     — widened to any .btn / tooltip so soft / ghost / outline surfaces
+     all read as a tinted inset of the surrounding fg. Sidebar-search is
+     handled by the separate rule above (opaque base-content variant). */
   .btn .bb-kbd-combo,
   .tooltip .bb-kbd-combo,
   [role="tooltip"] .bb-kbd-combo {
