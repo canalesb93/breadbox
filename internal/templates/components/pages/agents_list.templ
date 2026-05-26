@@ -76,6 +76,13 @@ templ AgentsList(p AgentsListProps) {
 		Options:            agentsListToRunModalOptions(p.Agents),
 		LastPromptPrefixes: p.LastPromptPrefixes,
 	})
+	<!-- Loading skeleton for the agents list, available for any future
+	     client-side refresh / AJAX swap (e.g. toggleEnabled / runNow
+	     without a page reload). Mirrors the SSR layout above so swap-in
+	     doesn't shift the page. Exposed in /design#loading. -->
+	<template id="bb-agents-list-skeleton-template">
+		@components.AgentsListSkeleton()
+	</template>
 }
 
 // agentsListHasEnabled returns true if at least one row is enabled,

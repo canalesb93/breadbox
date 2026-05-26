@@ -1,0 +1,104 @@
+package components
+
+// AgentsListSkeleton renders a placeholder mirroring the layout of the
+// /agents page — the row-count + "View all runs" header followed by the
+// agent definitions table (Name, Schedule, Last run, Next run, 30d cost,
+// Enabled toggle, kebab). Sized to match the real component so a future
+// swap-in doesn't shift layout.
+//
+// /agents is a full-SSR page today; this primitive is exposed in
+// /design#loading so it's ready for the eventual AJAX/refresh swap (e.g.
+// after toggleEnabled / runNow without a page reload) and discoverable to
+// anyone wiring loading states for adjacent agent-centric panels.
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
+// hand-rolled `bb-skeleton*` family is being retired).
+templ AgentsListSkeleton() {
+	<div aria-hidden="true">
+		<!-- Count + "View all runs" header strip (mirrors agents_list.templ:34-42) -->
+		<div class="flex items-center justify-between mb-3 px-1">
+			<div class="skeleton h-3 w-16"></div>
+			<div class="skeleton h-3 w-24"></div>
+		</div>
+		<!-- Agents table -->
+		<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
+			<table class="table table-sm">
+				<thead>
+					<tr class="text-xs text-base-content/50">
+						<th><div class="skeleton h-3 w-14"></div></th>
+						<th><div class="skeleton h-3 w-20"></div></th>
+						<th><div class="skeleton h-3 w-16"></div></th>
+						<th><div class="skeleton h-3 w-16"></div></th>
+						<th class="text-right"><div class="skeleton h-3 w-16 ml-auto"></div></th>
+						<th class="text-center w-20"><div class="skeleton h-3 w-14 mx-auto"></div></th>
+						<th class="w-10"></th>
+					</tr>
+				</thead>
+				<tbody>
+					for i := 0; i < 4; i++ {
+						@agentsListSkeletonRow(i)
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+// agentsListSkeletonRow mirrors one agentsListRow: name + optional badges
+// + description on the left, schedule cron + pretty stack, last-run pill +
+// relative time, next-run relative, 30d cost, enabled toggle, kebab slot.
+// Row index varies the placeholder shapes so the skeleton doesn't look
+// stamped (some rows show a sync-trigger badge, others a description line,
+// the last row mimics "never run").
+templ agentsListSkeletonRow(i int) {
+	<tr>
+		<!-- Name + optional sync badge + description -->
+		<td class="align-middle">
+			<div class="flex items-center gap-2">
+				<div class="skeleton h-3.5 w-32"></div>
+				if i%2 == 0 {
+					<div class="skeleton h-3.5 w-10 rounded-full"></div>
+				}
+			</div>
+			if i < 3 {
+				<div class="mt-1">
+					<div class="skeleton h-2.5 w-56"></div>
+				</div>
+			}
+		</td>
+		<!-- Schedule: cron mono line + pretty subline -->
+		<td class="align-middle">
+			<div class="space-y-1.5">
+				<div class="skeleton h-3 w-20"></div>
+				<div class="skeleton h-2.5 w-28"></div>
+			</div>
+		</td>
+		<!-- Last run: pill + relative time -->
+		<td class="align-middle">
+			if i == 3 {
+				<div class="skeleton h-3 w-16"></div>
+			} else {
+				<div class="flex items-center gap-2">
+					<div class="skeleton h-3.5 w-14 rounded-full"></div>
+					<div class="skeleton h-3 w-12"></div>
+				</div>
+			}
+		</td>
+		<!-- Next run relative -->
+		<td class="align-middle">
+			<div class="skeleton h-3 w-10"></div>
+		</td>
+		<!-- 30d cost (right-aligned, tabular) -->
+		<td class="align-middle text-right">
+			<div class="skeleton h-3 w-14 ml-auto"></div>
+		</td>
+		<!-- Enabled toggle slot -->
+		<td class="align-middle text-center">
+			<div class="skeleton h-5 w-9 rounded-full mx-auto"></div>
+		</td>
+		<!-- Overflow-menu slot -->
+		<td class="align-middle text-right">
+			<div class="skeleton h-5 w-5 ml-auto"></div>
+		</td>
+	</tr>
+}
