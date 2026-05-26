@@ -1,6 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // Reports renders the agent-reports inbox page body. Hosts inside the base
 // layout via TemplateRenderer.RenderWithTempl — the handler builds typed
@@ -64,6 +68,12 @@ templ Reports(p ReportsProps) {
 			<p class="text-sm text-base-content/40 max-w-md mx-auto">{ reportsEmptyMessage(p.FilterStatus) }</p>
 		</div>
 	}
+	<!-- Loading skeleton for the reports inbox, available for any future
+	     client-side refresh / filter-tab swap. Mirrors the SSR layout
+	     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+	<template id="bb-reports-skeleton-template">
+		@components.ReportsSkeleton()
+	</template>
 }
 
 // reportsRow renders one inbox row — an anchor wrapping the avatar, meta
