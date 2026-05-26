@@ -274,7 +274,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "agent-run-rows",
 			Title:       "Agent run rows",
-			Description: "components.AgentRunRow + AgentRunRowList — the rich row shape for /agents (runs landing). Status-toned icon tile + agent label + meta + cost block, with inline report chips when the run produced reports.",
+			Description: "components.AgentRunRow + AgentRunRowList — the row shape for /agents (runs landing). Daisy list-row with a single status-toned icon tile, agent name + compact time, one optional body line (error → top report → skipped note), and cost. Trigger / cap details ride along as tooltip-only icons.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},

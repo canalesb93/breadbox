@@ -4,9 +4,9 @@ package components
 // /agents runs landing page — the four-tile 30d stat row (Runs / Errors
 // / Cost / Avg duration), a collapsed filter bar (filter icon + label +
 // active-chip slots), and a divided card of rich run rows (icon tile +
-// agent name + short-ID + status badge + trigger pill + meta line +
-// trailing cost block). Sized to match the real components so a future
-// swap-in doesn't shift layout.
+// agent name + status badge + meta line + trailing cost block). Sized
+// to match the real components so a future swap-in doesn't shift
+// layout.
 //
 // /agents is a full-SSR page today; this primitive is exposed in
 // /design#loading so it's ready for the eventual filter-bar / AJAX swap
@@ -42,8 +42,8 @@ templ AgentRunsListSkeleton() {
 				<div class="ml-auto skeleton w-4 h-4 rounded"></div>
 			</div>
 		</div>
-		<!-- Run rows: rounded card with dividers, mirroring AgentRunRowList -->
-		<div class="rounded-xl bg-base-100 border border-base-300 divide-y divide-base-200 overflow-hidden">
+		<!-- Run rows: daisy list card, mirroring AgentRunRowList -->
+		<div class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
 			for i := 0; i < 6; i++ {
 				@agentRunsListSkeletonRow(i)
 			}
@@ -60,70 +60,42 @@ templ AgentRunsListSkeleton() {
 }
 
 // agentRunsListSkeletonRow mirrors one components.AgentRunRow: leading
-// status-tinted avatar tile, a title row (agent name + short ID +
-// status badge + trigger pill, optional cap chip), a meta line
-// (relative time · duration · turns · tokens), and the trailing cost
-// block on the right. Row index varies the placeholder widths and
-// toggles certain slots (cap chip, error line, note line, in-progress
-// spinner placeholder) so the skeleton reads as motion rather than a
-// stamped grid.
+// 40×40 status-tinted avatar tile, a title row (agent name + a small
+// time pill on the right), an optional body line for errored or
+// reporting runs, and the trailing cost block. Row index varies the
+// placeholder widths and toggles which rows show a body line so the
+// skeleton reads as motion rather than a stamped grid.
 templ agentRunsListSkeletonRow(i int) {
-	<div class="block px-4 py-3">
-		<div class="flex items-start gap-3">
-			<!-- Status-tinted avatar tile -->
-			<div class="skeleton w-9 h-9 rounded-lg shrink-0"></div>
-			<div class="min-w-0 flex-1 space-y-1.5">
-				<!-- Title row: agent name · short ID · status badge · trigger pill (· optional cap chip) -->
-				<div class="flex items-center gap-2 flex-wrap">
-					if i%3 == 0 {
-						<div class="skeleton h-3.5 w-28"></div>
-					} else if i%3 == 1 {
-						<div class="skeleton h-3.5 w-36"></div>
-					} else {
-						<div class="skeleton h-3.5 w-24"></div>
-					}
-					<div class="skeleton h-2.5 w-16"></div>
-					if i%4 == 0 {
-						<div class="skeleton h-4 w-16 rounded-full"></div>
-					} else if i%4 == 1 {
-						<div class="skeleton h-4 w-12 rounded-full"></div>
-					} else if i%4 == 2 {
-						<div class="skeleton h-4 w-20 rounded-full"></div>
-					} else {
-						<div class="skeleton h-4 w-14 rounded-full"></div>
-					}
-					<div class="skeleton h-4 w-14 rounded-full"></div>
-					if i%5 == 0 {
-						<div class="skeleton h-4 w-20 rounded-full"></div>
-					}
-				</div>
-				<!-- Meta line: relative time · duration · turns · tokens -->
-				<div class="flex items-center gap-2 flex-wrap">
-					<div class="skeleton h-2.5 w-16"></div>
-					<div class="skeleton h-2.5 w-10"></div>
-					<div class="skeleton h-2.5 w-12"></div>
-					<div class="skeleton h-2.5 w-20 hidden sm:block"></div>
-				</div>
-				if i == 1 {
-					<!-- Error message line (one row mimics an errored run) -->
-					<div class="flex items-start gap-1.5">
-						<div class="skeleton h-3 w-3 rounded mt-0.5"></div>
-						<div class="skeleton h-2.5 w-48"></div>
-					</div>
+	<div class="list-row items-center">
+		<!-- Status-tinted avatar tile -->
+		<div class="skeleton w-10 h-10 rounded-lg shrink-0"></div>
+		<div class="min-w-0">
+			<!-- Title row: agent name on the left, time on the right -->
+			<div class="flex items-center gap-2 min-w-0">
+				if i%3 == 0 {
+					<div class="skeleton h-3.5 w-28"></div>
+				} else if i%3 == 1 {
+					<div class="skeleton h-3.5 w-36"></div>
+				} else {
+					<div class="skeleton h-3.5 w-24"></div>
 				}
-				if i == 3 {
-					<!-- Operator note line (one row mimics a noted run) -->
-					<div class="flex items-start gap-1.5">
-						<div class="skeleton h-3 w-3 rounded mt-0.5"></div>
-						<div class="skeleton h-2.5 w-40"></div>
-					</div>
-				}
+				<div class="ml-auto skeleton h-2.5 w-16 shrink-0"></div>
 			</div>
-			<!-- Trailing cost block -->
-			<div class="shrink-0 text-right flex flex-col items-end gap-1">
-				<div class="skeleton h-4 w-14"></div>
-				<div class="skeleton h-2.5 w-20 hidden sm:block"></div>
-			</div>
+			if i == 1 {
+				<!-- Body line: error -->
+				<div class="mt-1 flex items-center gap-1.5">
+					<div class="skeleton h-3 w-3 rounded shrink-0"></div>
+					<div class="skeleton h-2.5 w-56"></div>
+				</div>
+			} else if i == 3 {
+				<!-- Body line: report headline -->
+				<div class="mt-1 flex items-center gap-1.5">
+					<div class="skeleton h-3 w-3 rounded shrink-0"></div>
+					<div class="skeleton h-2.5 w-48"></div>
+				</div>
+			}
 		</div>
+		<!-- Trailing cost block -->
+		<div class="shrink-0 self-center skeleton h-4 w-14"></div>
 	</div>
 }
