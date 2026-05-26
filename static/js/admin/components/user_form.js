@@ -144,6 +144,11 @@ document.addEventListener('alpine:init', function () {
       formError: '',
       submitting: false,
 
+      // Regenerate is preview-only — the new seed is staged here and
+      // shipped with the profile PUT so it persists only when the
+      // user actually presses Save Changes.
+      pendingAvatarSeed: '',
+
       // Endpoint base URLs — read from data-* attrs so the same factory
       // drives /household/{id}/edit (admin scope) and
       // /settings/account (self scope). Defaults preserve the original
@@ -219,20 +224,13 @@ document.addEventListener('alpine:init', function () {
       },
 
       regenerate: function () {
-        var self = this;
-        self.avatarError = '';
-        fetch(self.avatarEndpoint + '/regenerate', { method: 'POST' })
-          .then(function (res) {
-            if (!res.ok) return res.json().then(function (d) { throw d; });
-            return res.json();
-          })
-          .then(function () {
-            self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
-            self.hasCustomAvatar = false;
-          })
-          .catch(function (err) {
-            self.avatarError = (err.error || 'Regenerate failed');
-          });
+        // Deferred: shuffle the preview only. The new seed lands in
+        // the DB on Save Changes (PUT body carries avatar_seed).
+        this.avatarError = '';
+        var seed = 'seed-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        this.pendingAvatarSeed = seed;
+        this.avatarSrc = '/avatars/preview/' + encodeURIComponent(seed) + '?v=' + Date.now();
+        this.hasCustomAvatar = false;
       },
 
       submitForm: function () {
@@ -248,10 +246,15 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         self.submitting = true;
 
+        var body = { name: name, email: email || '' };
+        if (self.pendingAvatarSeed) {
+          body.avatar_seed = self.pendingAvatarSeed;
+        }
+
         fetch(self.profileEndpoint, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name, email: email || '' })
+          body: JSON.stringify(body)
         })
         .then(function (res) {
           if (res.ok) {

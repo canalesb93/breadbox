@@ -12,6 +12,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
+	"breadbox/internal/avatar"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/templates/components/pages"
@@ -50,6 +51,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
 	syncLogCount, _ := a.Service.CountSyncLogs(ctx)
 	onboardingDismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
+	avatarStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarStyle, avatar.DefaultStyle)
 
 	nextSyncTime := ""
 	if a.Scheduler != nil {
@@ -70,6 +72,8 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		OnboardingDismissed:  onboardingDismissed,
 		NextSyncTime:         nextSyncTime,
 		ConfigSources:        a.Config.ConfigSources,
+		AvatarStyle:          avatarStyle,
+		AvatarStyles:         avatar.AvailableStyles,
 	}
 	if a.VersionChecker != nil {
 		if updateAvailable, latest, err := a.VersionChecker.CheckForUpdate(ctx); err == nil && updateAvailable != nil && *updateAvailable && latest != nil {
@@ -200,6 +204,35 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			SetFlash(ctx, sm, "success", fmt.Sprintf("Sync log retention set to %d days.", retentionDays))
 		}
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	}
+}
+
+// SettingsAvatarStylePostHandler serves POST /settings/avatar-style.
+// Persists the operator-picked DiceBear style into app_config and
+// updates the in-process default so the next /avatars/{id} render
+// uses it. Uploaded avatars are untouched.
+func SettingsAvatarStylePostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		style := strings.TrimSpace(r.FormValue("avatar_style"))
+		if !avatar.IsValidStyle(style) {
+			FlashRedirect(w, r, sm, "error", "Invalid avatar style.", "/settings/system")
+			return
+		}
+
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   appconfig.KeyAvatarStyle,
+			Value: pgconv.Text(style),
+		}); err != nil {
+			a.Logger.Error("save avatar style", "error", err)
+			FlashRedirect(w, r, sm, "error", "Failed to save avatar style.", "/settings/system")
+			return
+		}
+		avatar.SetStyle(style)
+
+		SetFlash(ctx, sm, "success", "Avatar style updated.")
+		http.Redirect(w, r, "/settings/system", http.StatusSeeOther)
 	}
 }
 

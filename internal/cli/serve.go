@@ -17,6 +17,7 @@ import (
 	"breadbox/internal/api"
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
+	"breadbox/internal/avatar"
 	"breadbox/internal/config"
 	"breadbox/internal/db"
 	"breadbox/internal/service"
@@ -112,6 +113,11 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	} else if n := result.RowsAffected(); n > 0 {
 		logger.Info("cleaned up orphaned sync logs", "count", n)
 	}
+
+	// Push the operator-picked DiceBear style into the avatar package so
+	// /avatars/{id} renders match the Settings → System choice without a
+	// per-request DB lookup.
+	avatar.SetStyle(appconfig.String(ctx, a.Queries, appconfig.KeyAvatarStyle, avatar.DefaultStyle))
 
 	syncTimeout := time.Duration(cfg.SyncTimeoutSeconds) * time.Second
 	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger, syncTimeout)

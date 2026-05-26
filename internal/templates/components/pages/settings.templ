@@ -38,7 +38,8 @@ templ SettingsSecurity(p SettingsProps) {
 	</div>
 }
 
-// SettingsSystem renders the System tab — version info + update badge.
+// SettingsSystem renders the System tab — version info + update badge
+// + the user-avatar style picker.
 templ SettingsSystem(p SettingsProps) {
 	<div class="max-w-2xl">
 		@settingsTabHeader(settingsTabHeaderProps{
@@ -47,6 +48,7 @@ templ SettingsSystem(p SettingsProps) {
 		})
 		<div class="grid gap-6">
 			@settingsSystemCard(p)
+			@settingsAvatarStyleCard(p)
 		</div>
 	</div>
 }
@@ -258,6 +260,57 @@ templ settingsSystemCard(p SettingsProps) {
 			<div><span class="text-base-content/40">Uptime</span> <span class="font-medium">{ p.Uptime }</span></div>
 			<div><span class="text-base-content/40">Providers</span> <span class="font-medium">{ fmt.Sprintf("%d configured", p.ProviderCount) }</span></div>
 		</div>
+	</div>
+}
+
+// settingsAvatarStyleCard renders the DiceBear style picker on the
+// System tab. The select submits via POST /settings/avatar-style;
+// the live preview is driven by Alpine and points at
+// api.dicebear.com so the user can compare styles without
+// reloading the server-rendered identicons.
+templ settingsAvatarStyleCard(p SettingsProps) {
+	<div class="bb-card p-5" x-data="{ style: $el.dataset.style }" data-style={ p.AvatarStyle }>
+		<div class="bb-icon-header">
+			<div class="bb-icon-header__tile bg-base-200/60">
+				<i data-lucide="user-circle" class="w-4 h-4 text-base-content opacity-60"></i>
+			</div>
+			<div class="bb-icon-header__text">
+				<h2 class="text-sm font-semibold">User Avatars</h2>
+				<p class="text-xs text-base-content/45">DiceBear style for auto-generated identicons — uploaded avatars are unaffected</p>
+			</div>
+		</div>
+		<form method="POST" action="/settings/avatar-style">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="avatar_style">Style</label>
+			<select id="avatar_style" name="avatar_style" class="select select-sm w-full max-w-sm bg-base-200" x-model="style">
+				for _, opt := range p.AvatarStyles {
+					if opt.ID == p.AvatarStyle {
+						<option value={ opt.ID } selected>{ opt.Label }</option>
+					} else {
+						<option value={ opt.ID }>{ opt.Label }</option>
+					}
+				}
+			</select>
+			<div class="mt-4 flex items-center gap-3">
+				<span class="text-xs text-base-content/40">Preview</span>
+				<div class="flex items-center gap-2">
+					for _, seed := range []string{"alice", "bob", "casey", "drew"} {
+						<img
+							class="w-10 h-10 rounded-full bg-base-200"
+							alt={ "Preview " + seed }
+							:src={ avatarPreviewExpr(seed) }
+						/>
+					}
+				</div>
+			</div>
+			<div class="mt-4">
+				<button type="submit" class="btn btn-primary btn-sm">Save Style</button>
+			</div>
+			<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+				<i data-lucide="info" class="w-3.5 h-3.5"></i>
+				Browsers cache avatars for 24h — hard-refresh to see the change immediately.
+			</p>
+		</form>
 	</div>
 }
 

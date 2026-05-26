@@ -2,6 +2,16 @@
 
 package pages
 
+import "breadbox/internal/avatar"
+
+// avatarPreviewExpr builds the Alpine `:src` expression for an
+// avatar-style preview tile. The seed is a fixed literal supplied by
+// the templ (alice/bob/casey/drew); the `style` variable comes from
+// the parent x-data block bound to the picker's <select>.
+func avatarPreviewExpr(seed string) string {
+	return "'https://api.dicebear.com/9.x/' + encodeURIComponent(style) + '/svg?seed=" + seed + "'"
+}
+
 // SettingsProps mirrors the field set the old settings.html read off the layout
 // data map. Kept flat so admin/settings.go can copy fields one-to-one.
 type SettingsProps struct {
@@ -25,4 +35,9 @@ type SettingsProps struct {
 	UpdateAvailable bool
 	LatestVersion   string
 	LatestURL       string
+
+	// Avatar style — DiceBear slug used for auto-generated user identicons.
+	// AvatarStyles drives the dropdown options.
+	AvatarStyle  string
+	AvatarStyles []avatar.StyleOption
 }

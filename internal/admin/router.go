@@ -373,6 +373,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
+		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
 	})
 
 	// Admin API (authenticated, JSON responses).
