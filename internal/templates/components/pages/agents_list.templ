@@ -19,70 +19,96 @@ import (
 // sidecar JS file under static/js/admin/components/ per the task brief.
 templ AgentsList(p AgentsListProps) {
 	@agentsListInline()
+	<script src="/static/js/admin/components/agents_run_modal.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('agents')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@components.PageHeader(components.PageHeaderProps{
 		Title:                "Agents",
 		Subtitle:             "Scheduled AI runs that read and act on your Breadbox via MCP.",
 		SubtitleHideOnMobile: true,
-		SecondaryAction:      agentsListPromptLibraryAction(),
-		Action:               agentsListNewAgentAction(),
+		Action:               agentsHeaderActions("agents-run-modal", !p.Status.Ready || !agentsListHasEnabled(p.Agents)),
 	})
-	if !p.Status.Ready {
-		@agentsListStatusBanner(p.Status)
-	}
-	if len(p.Agents) > 0 {
-		<div class="flex items-center justify-between mb-3 px-1">
-			<div class="text-sm text-base-content/40">
-				{ fmt.Sprintf("%d agent%s", len(p.Agents), components.PluralS(int64(len(p.Agents)))) }
+	@agentsTabBar("list")
+	<div class="mt-4">
+		if !p.Status.Ready {
+			@agentsListStatusBanner(p.Status)
+		}
+		if len(p.Agents) > 0 {
+			<div class="flex items-center justify-between mb-3 px-1">
+				<div class="text-sm text-base-content/40">
+					{ fmt.Sprintf("%d agent%s", len(p.Agents), components.PluralS(int64(len(p.Agents)))) }
+				</div>
+				<a href="/agent-prompts" class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
+					<i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+					Prompt library
+				</a>
 			</div>
-			<a href="/agents/runs" class="text-xs text-base-content/50 hover:text-base-content inline-flex items-center gap-1">
-				<i data-lucide="history" class="w-3.5 h-3.5"></i>
-				View all runs
-			</a>
-		</div>
-	}
-	if len(p.Agents) == 0 {
-		@agentsListEmpty()
-	} else {
-		<div
-			x-data={ agentsListData(p.CSRFToken) }
-		>
-			<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
-				<table class="table table-sm table-zebra-soft">
-					<thead>
-						<tr class="text-xs text-base-content/50">
-							<th class="font-medium">Name</th>
-							<th class="font-medium">Schedule</th>
-							<th class="font-medium">Last run</th>
-							<th class="font-medium">Next run</th>
-							<th class="font-medium text-right">30d cost</th>
-							<th class="font-medium text-center w-20">Enabled</th>
-							<th class="w-10"></th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, a := range p.Agents {
-							@agentsListRow(a)
-						}
-					</tbody>
-				</table>
+		}
+		if len(p.Agents) == 0 {
+			@agentsListEmpty()
+		} else {
+			<div x-data={ agentsListData(p.CSRFToken) }>
+				<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
+					<table class="table table-sm table-zebra-soft">
+						<thead>
+							<tr class="text-xs text-base-content/50">
+								<th class="font-medium">Name</th>
+								<th class="font-medium">Schedule</th>
+								<th class="font-medium">Last run</th>
+								<th class="font-medium">Next run</th>
+								<th class="font-medium text-right">30d cost</th>
+								<th class="font-medium text-center w-20">Enabled</th>
+								<th class="w-10"></th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, a := range p.Agents {
+								@agentsListRow(a)
+							}
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
-	}
+		}
+	</div>
+	@agentRunModal(agentRunModalProps{
+		ModalID:            "agents-run-modal",
+		CSRFToken:          p.CSRFToken,
+		Options:            agentsListToRunModalOptions(p.Agents),
+		LastPromptPrefixes: p.LastPromptPrefixes,
+	})
 }
 
-templ agentsListPromptLibraryAction() {
-	<a href="/agent-prompts" class="btn btn-secondary btn-sm gap-2" title="Prompt library">
-		<i data-lucide="book-open" class="w-4 h-4"></i>
-		<span>Prompt library</span>
-	</a>
+// agentsListHasEnabled returns true if at least one row is enabled,
+// so the "Run an agent" header button can render. With zero enabled
+// agents the modal is empty and the action collapses to a disabled
+// hint via agentsHeaderActions.
+func agentsListHasEnabled(rows []AgentsListRowProps) bool {
+	for _, r := range rows {
+		if r.Enabled {
+			return true
+		}
+	}
+	return false
 }
 
-templ agentsListNewAgentAction() {
-	<a href="/agents/new" class="btn btn-primary btn-sm gap-2">
-		<i data-lucide="plus" class="w-4 h-4"></i>
-		<span>New agent</span>
-	</a>
+// agentsListToRunModalOptions projects the table rows onto the modal
+// picker's prop shape so the modal can render alongside the list
+// without an extra service call.
+func agentsListToRunModalOptions(rows []AgentsListRowProps) []AgentRunsAgentOption {
+	out := make([]AgentRunsAgentOption, 0, len(rows))
+	for _, r := range rows {
+		if !r.Enabled {
+			continue
+		}
+		out = append(out, AgentRunsAgentOption{
+			Slug:        r.Slug,
+			Name:        r.Name,
+			Description: r.Description,
+			Enabled:     true,
+			Cost30dUSD:  r.Cost30dUSD,
+		})
+	}
+	return out
 }
 
 templ agentsListStatusBanner(s AgentSubsystemStatusProps) {
@@ -225,7 +251,7 @@ templ agentsListRow(a AgentsListRowProps) {
 						{
 							Label: "View runs",
 							Icon:  "history",
-							Href:  templ.SafeURL(fmt.Sprintf("/agents/%s/runs", a.Slug)),
+							Href:  templ.SafeURL(fmt.Sprintf("/agents?agent=%s", a.Slug)),
 						},
 						{
 							Label:       "Delete",

@@ -59,7 +59,7 @@ func TestGetReport_AllowsReadScope(t *testing.T) {
 	// wipe the seeded data.
 	env := setupReadOnlyEnv(t)
 	created, err := env.Service.CreateAgentReport(t.Context(), "Visible to read-only", "body",
-		service.Actor{Type: "agent", ID: "test-agent", Name: "Test"}, "info", nil, "", "")
+		service.Actor{Type: "agent", ID: "test-agent", Name: "Test"}, "info", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("CreateAgentReport: %v", err)
 	}

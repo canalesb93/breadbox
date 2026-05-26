@@ -2,27 +2,24 @@
 
 package pages
 
-import "time"
+import (
+	"time"
 
-// AgentRunsListProps is the view-model for the v1 admin run-history page.
-// One templ component (AgentRunsList) handles both modes:
-//   - "global": cross-agent run history at /agents/runs.
-//   - "agent":  per-agent run history at /agents/{slug}/runs.
+	"breadbox/internal/templates/components"
+)
+
+// AgentRunsListProps is the view-model for the unified runs page at
+// /agents. There is only one mode — global — with an optional
+// ?agent=<slug> filter that scopes to a single agent (the link from
+// the Agents tab list and the per-agent edit page passes it through).
 //
-// The handler in internal/admin/agent_runs_page.go picks the mode based on
-// whether chi.URLParam(r, "slug") is set, then fills in the right subset of
-// fields (AgentOptions is only used in global mode; AgentSlug/AgentName only
-// in agent mode).
+// Stats is the 30-day rollup rendered in the 4-up StatTileRow at the
+// top of the page. AgentOptions populates the agent filter chip + the
+// "Run an agent" modal picker. Pickers and filters share the dataset
+// so the same list is in two places without an extra query.
 type AgentRunsListProps struct {
-	// Mode is "global" or "agent". Drives the title, breadcrumb, agent
-	// column visibility, and the presence of the agent-filter select.
-	Mode string
-
-	// AgentSlug / AgentName are populated only when Mode == "agent".
-	AgentSlug string
-	AgentName string
-
 	Filters AgentRunsFilterProps
+	Stats   AgentRunsStatsProps
 	Rows    []AgentRunRowProps
 
 	// Total is the count of rows returned by the current filter set; we
@@ -33,11 +30,28 @@ type AgentRunsListProps struct {
 	Limit  int
 	Offset int
 
-	// AgentOptions populates the agent-filter dropdown on the global page.
-	// Empty for Mode == "agent".
+	// AgentOptions doubles as the filter dropdown and the "Run an agent"
+	// modal picker. Only enabled agents are listed for the picker; the
+	// filter dropdown shows every agent so historical runs of a disabled
+	// agent are still searchable.
 	AgentOptions []AgentRunsAgentOption
 
+	// LastPromptPrefixes is map[agent_slug] → most recent operator prefix.
+	// Surfaced in the modal picker as a "Use last prefix" affordance so
+	// the operator doesn't retype context for a frequent run.
+	LastPromptPrefixes map[string]string
+
 	CSRFToken string
+}
+
+// AgentRunsStatsProps is the 30-day rollup rendered as 4 StatTiles
+// above the filter bar. All values are pre-formatted by the handler so
+// the templ doesn't pull in money helpers.
+type AgentRunsStatsProps struct {
+	RunCount30d        int
+	ErrorCount30d      int
+	TotalCostUSD30d    float64
+	AvgDurationSeconds float64
 }
 
 // AgentRunsFilterProps captures the currently-active URL filters so the
@@ -51,40 +65,27 @@ type AgentRunsFilterProps struct {
 	End       string
 }
 
-// AgentRunsAgentOption is one entry in the global-page agent filter.
+// AgentRunsAgentOption is one entry in the global-page agent filter +
+// the "Run an agent" modal picker. Description is the short blurb
+// pulled from the agent's prompt first line so the picker is scannable
+// without opening each agent.
 type AgentRunsAgentOption struct {
-	Slug string
-	Name string
+	Slug        string
+	Name        string
+	Description string
+	Enabled     bool
+	// Cost30dUSD is the 30-day spend rolled up from CostStats30d so the
+	// picker can hint at frequency of use ("$0.21 over 12 runs in 30d").
+	Cost30dUSD float64
+	RunCount30 int
 }
 
-// AgentRunRowProps is one row in the runs table. The handler builds these
-// from service.AgentRunResponse / AgentRunWithAgentResponse, expanding the
-// pointer fields into plain values (zeroes when nil) so the templ doesn't
-// have to nil-check on every cell.
-type AgentRunRowProps struct {
-	ShortID    string
-	AgentSlug  string
-	AgentName  string
-	Status     string
-	Trigger    string
-	StartedAt  time.Time
-	FinishedAt *time.Time
-	DurationMs int64
-	CostUSD    float64
-	TokensIn   int64
-	TokensOut  int64
-	HitCap     string
-	Turns      int
-	Note       string
-
-	// ErrorMessage is the raw error_message column. Empty for non-errored
-	// runs. ErrorMessageFriendly is the operator-friendly translation
-	// (e.g. "interrupted by server restart" → "Interrupted by server
-	// restart — safe to re-run."); empty when no special mapping applies,
-	// in which case the raw message should be rendered as-is.
-	ErrorMessage         string
-	ErrorMessageFriendly string
-}
+// AgentRunRowProps is the one-row shape shared across the runs page,
+// per-run detail header, and the design sandbox. The canonical type
+// lives in `internal/templates/components` so any caller that wants to
+// render an agent run uses the same fields; this alias keeps existing
+// references in the admin handler compiling without churn.
+type AgentRunRowProps = components.AgentRunRowProps
 
 // AgentRunDetailProps powers the per-run page at /agents/runs/{shortId}.
 // SystemPrompt / Prompt are pulled from the agent definition so the

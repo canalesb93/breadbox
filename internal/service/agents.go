@@ -717,6 +717,29 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 	}, nil
 }
 
+// AgentRunsExtraStats30d is the cross-agent rollup that powers the
+// "Errors" + "Avg duration" StatTiles on /agents. Cost + run count
+// come from per-agent CostStats30d rolled up on the caller side; we
+// don't duplicate them here.
+type AgentRunsExtraStats30d struct {
+	ErrorCount         int     `json:"error_count"`
+	AvgDurationSeconds float64 `json:"avg_duration_seconds"`
+}
+
+// GetAgentRunsExtraStats30d returns the 30-day error count + average
+// duration across every agent's runs. Excludes skipped rows from the
+// duration calculation since they have no real workload.
+func (s *Service) GetAgentRunsExtraStats30d(ctx context.Context) (*AgentRunsExtraStats30d, error) {
+	row, err := s.Queries.GetAgentRunsExtraStats30d(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get agent runs extra stats: %w", err)
+	}
+	return &AgentRunsExtraStats30d{
+		ErrorCount:         int(row.ErrorCount),
+		AvgDurationSeconds: row.AvgDurationSeconds,
+	}, nil
+}
+
 // AllAgentRunListParams carries the optional filters for ListAllAgentRuns.
 // Mirrors AgentRunListParams but adds AgentSlugOrID so the caller can
 // optionally narrow to one agent (e.g. the global view with an agent

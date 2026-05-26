@@ -753,7 +753,7 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		actor := service.Actor{Type: "agent", ID: actorID, Name: "ReportingAgent"}
 		report, err := svc.CreateAgentReport(ctx, "Reviewed and cleared 8 transactions",
 			"All 8 looked clean.",
-			actor, "info", []string{"review"}, "", "")
+			actor, "info", []string{"review"}, "", "", "")
 		if err != nil {
 			t.Fatalf("CreateAgentReport: %v", err)
 		}
