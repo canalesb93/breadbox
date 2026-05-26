@@ -54,7 +54,7 @@ templ PageHeader(p PageHeaderProps) {
 		<div class="min-w-0">
 			if p.Icon != "" {
 				<h1 class="bb-page-title flex items-center gap-2">
-					<i data-lucide={ p.Icon } class="w-6 h-6 text-primary shrink-0"></i>
+					@LucideIcon(p.Icon, "w-6 h-6 text-primary shrink-0")
 					<span>{ p.Title }</span>
 				</h1>
 			} else {
@@ -86,7 +86,7 @@ templ PageHeader(p PageHeaderProps) {
 templ PageHeaderAction(href templ.SafeURL, icon string, label string) {
 	<a href={ href } class="btn btn-primary btn-sm gap-2">
 		if icon != "" {
-			<i data-lucide={ icon } class="w-4 h-4"></i>
+			@LucideIcon(icon, "w-4 h-4")
 		}
 		{ label }
 	</a>
@@ -99,7 +99,7 @@ templ PageHeaderAction(href templ.SafeURL, icon string, label string) {
 templ PageHeaderSecondaryAction(href templ.SafeURL, icon string, label string) {
 	<a href={ href } class="btn btn-secondary btn-sm gap-2">
 		if icon != "" {
-			<i data-lucide={ icon } class="w-4 h-4"></i>
+			@LucideIcon(icon, "w-4 h-4")
 		}
 		{ label }
 	</a>

@@ -1,0 +1,62 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+
+	lucide "github.com/kaugesaar/lucide-go"
+)
+
+// LucideIcon renders a Lucide icon as inline SVG at server-render time,
+// replacing the `<i data-lucide="X" class="Y">` + lucide.createIcons()
+// pattern. SSR eliminates the FOUC on cold loads and the JS-parse latency
+// after every navigation.
+//
+// The output `<svg>` ALWAYS carries the `lucide` class — CSS in input.css
+// targets `svg.lucide` for two load-bearing behaviors:
+//   - `pointer-events: none` so icons don't steal clicks from interactive
+//     parents.
+//   - `color: rgb(from currentColor r g b / 1)` strips inherited alpha to
+//     prevent overlapping strokes from stacking into darker pixels at
+//     intersections.
+//
+// Pass "" for class when no extra classes are needed.
+templ LucideIcon(name, class string) {
+	@templ.Raw(renderLucideIcon(name, class, ""))
+}
+
+// LucideIconWithStyle is the same as LucideIcon but also stamps an inline
+// `style` attribute on the SVG — used by category icons that carry a
+// per-row color value that can't be expressed as a static class.
+templ LucideIconWithStyle(name, class, style string) {
+	@templ.Raw(renderLucideIcon(name, class, style))
+}
+
+// renderLucideIcon produces the SVG string. Both the templ component and
+// the html/template "lucide" func go through here so the output is
+// byte-identical regardless of which template system a page is on.
+func renderLucideIcon(name, class, style string) string {
+	// `lucide-{name}` matches what `lucide.createIcons()` stamps on the
+	// generated SVG. Tests target it for icon-presence assertions, and
+	// keeping it ensures CSS authoring stays portable if anyone ever wants
+	// to style a single icon via `.lucide-shopping-cart` etc.
+	merged := "lucide lucide-" + name
+	if class != "" {
+		merged += " " + class
+	}
+	html := string(lucide.Icon(name, map[string]any{"class": merged}))
+	// All Lucide icons we render are decorative — they always sit next to
+	// or inside an element with its own accessible name (button, link,
+	// heading). aria-hidden keeps screen readers from announcing each one
+	// as "graphic". The previous JS-driven path only set this when the
+	// authoring `<i>` had aria-hidden — not 100% adoption.
+	html = strings.Replace(html, "<svg ", `<svg aria-hidden="true" `, 1)
+	if style != "" {
+		// lucide-go does no html-escaping inside attribute values, so the
+		// quoting is our responsibility. Style strings in this codebase
+		// come exclusively from server-side helpers (e.g. categoryIconColor)
+		// that emit CSS — no user input flows here.
+		html = strings.Replace(html, ` class="`, fmt.Sprintf(` style=%q class="`, style), 1)
+	}
+	return html
+}

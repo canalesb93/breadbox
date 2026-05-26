@@ -1,5 +1,7 @@
 package pages
 
+
+import "breadbox/internal/templates/components"
 // PromptBuilder renders the /agent-prompts/builder/{type} prompt builder page. Hosts
 // inside the base layout via TemplateRenderer.RenderWithTempl — the handler
 // passes the typed props and the bridge drops the rendered HTML into
@@ -244,7 +246,7 @@ templ PromptBuilder(p PromptBuilderProps) {
 							:title="activeBlocks.length === 0 ? 'Enable at least one block to preview' : ''"
 							@click="openPreview()"
 						>
-							<i data-lucide="eye" class="w-3.5 h-3.5"></i>
+							@components.LucideIcon("eye", "w-3.5 h-3.5")
 							<span class="hidden sm:inline">Preview</span>
 							<span class="hidden sm:inline ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">P</span>
 						</button>
@@ -254,7 +256,7 @@ templ PromptBuilder(p PromptBuilderProps) {
 							:title="activeBlocks.length === 0 ? 'Enable at least one block to save as agent' : 'Open New agent with this prompt pre-filled'"
 							@click="saveAsAgent()"
 						>
-							<i data-lucide="bot" class="w-3.5 h-3.5"></i>
+							@components.LucideIcon("bot", "w-3.5 h-3.5")
 							<span class="hidden sm:inline">Save as agent</span>
 						</button>
 						<button
@@ -268,7 +270,7 @@ templ PromptBuilder(p PromptBuilderProps) {
 								class="flex items-center gap-1.5 transition-all duration-200"
 								:class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'"
 							>
-								<i data-lucide="copy" class="w-3.5 h-3.5"></i>
+								@components.LucideIcon("copy", "w-3.5 h-3.5")
 								<span>Copy<span class="hidden sm:inline">Prompt</span></span>
 								<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
 							</span>
@@ -276,7 +278,7 @@ templ PromptBuilder(p PromptBuilderProps) {
 								class="absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-200"
 								:class="copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'"
 							>
-								<i data-lucide="check" class="w-3.5 h-3.5"></i>
+								@components.LucideIcon("check", "w-3.5 h-3.5")
 								Copied!
 							</span>
 						</button>

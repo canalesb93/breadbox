@@ -1,6 +1,9 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+	"breadbox/internal/templates/components"
+)
 
 // Backups renders the /admin/backups page body. Hosts inside the base
 // layout via TemplateRenderer.RenderWithTempl. Markup mirrors the
@@ -23,7 +26,7 @@ templ Backups(p BackupsProps) {
 	<div class="grid gap-6">
 		<!-- Encryption Key Warning -->
 		<div class="alert alert-warning">
-			<i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i>
+			@components.LucideIcon("shield-alert", "w-5 h-5 flex-shrink-0")
 			<div>
 				<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
 				<p class="text-xs mt-1 leading-relaxed">
@@ -34,7 +37,7 @@ templ Backups(p BackupsProps) {
 				</p>
 				if !p.HasEncryptionKey {
 					<p class="text-xs mt-2 text-error font-semibold">
-						<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-0.5"></i>
+						@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-0.5")
 						No encryption key is currently set. Bank credentials cannot be stored or restored.
 					</p>
 				}
@@ -42,13 +45,13 @@ templ Backups(p BackupsProps) {
 		</div>
 		if p.Error != "" {
 			<div class="alert alert-error">
-				<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
+				@components.LucideIcon("alert-circle", "w-5 h-5 flex-shrink-0")
 				<span class="text-sm">{ p.Error }</span>
 			</div>
 		} else {
 			if !p.PreflightOK {
 				<div class="alert alert-error">
-					<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
+					@components.LucideIcon("alert-circle", "w-5 h-5 flex-shrink-0")
 					<div>
 						<h3 class="font-semibold text-sm">Backups unavailable</h3>
 						<p class="text-xs mt-1 leading-relaxed">{ p.PreflightMessage }</p>
@@ -89,7 +92,7 @@ templ backupsScheduleSection(p BackupsProps) {
 	<!-- Schedule Configuration -->
 	<div id="schedule" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#schedule' }">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<i data-lucide="clock" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+			@components.LucideIcon("clock", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Schedule</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -133,7 +136,7 @@ templ backupsScheduleSection(p BackupsProps) {
 						</div>
 					</div>
 					<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-						<i data-lucide="folder" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("folder", "w-3.5 h-3.5")
 						Backups stored in: <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">{ p.BackupDir }</code>
 					</p>
 					<div class="mt-4">
@@ -165,13 +168,13 @@ templ backupsListSection(p BackupsProps) {
 	<!-- Backup List -->
 	<div class="bb-card p-0 overflow-hidden">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 border-b border-base-300">
-			<i data-lucide="archive" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+			@components.LucideIcon("archive", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 			<h2 class="font-semibold">Backup Files</h2>
 			<span class="text-xs text-base-content/40 ml-auto tabular-nums">{ fmt.Sprintf("%d files", p.BackupCount) }</span>
 		</div>
 		if p.BackupCount == 0 {
 			<div class="px-4 sm:px-5 py-8 text-center text-sm text-base-content/40">
-				<i data-lucide="database" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+				@components.LucideIcon("database", "w-8 h-8 mx-auto mb-2 opacity-30")
 				if p.PreflightOK {
 					<p>No backups yet. Click "Create Backup Now" to create your first backup.</p>
 				} else {
@@ -206,7 +209,7 @@ templ backupsRow(b BackupRow, csrf string) {
 	<tr>
 		<td>
 			<div class="flex items-center gap-2">
-				<i data-lucide="file-archive" class="w-4 h-4 text-base-content opacity-30 flex-shrink-0"></i>
+				@components.LucideIcon("file-archive", "w-4 h-4 text-base-content opacity-30 flex-shrink-0")
 				<span class="font-mono text-xs">{ b.Filename }</span>
 			</div>
 		</td>
@@ -218,7 +221,7 @@ templ backupsRow(b BackupRow, csrf string) {
 		<td>
 			<div class="flex items-center justify-end gap-1">
 				<a href={ templ.SafeURL(b.DownloadHref) } class="btn btn-ghost btn-xs" title="Download">
-					<i data-lucide="download" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("download", "w-3.5 h-3.5")
 				</a>
 				<form
 					method="POST"
@@ -235,7 +238,7 @@ templ backupsRow(b BackupRow, csrf string) {
 				>
 					<input type="hidden" name="_csrf" value={ csrf }/>
 					<button type="submit" class="btn btn-ghost btn-xs text-warning" title="Restore">
-						<i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("rotate-ccw", "w-3.5 h-3.5")
 					</button>
 				</form>
 				<form
@@ -253,7 +256,7 @@ templ backupsRow(b BackupRow, csrf string) {
 				>
 					<input type="hidden" name="_csrf" value={ csrf }/>
 					<button type="submit" class="btn btn-ghost btn-xs text-error" title="Delete">
-						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("trash-2", "w-3.5 h-3.5")
 					</button>
 				</form>
 			</div>
@@ -276,7 +279,7 @@ templ backupsRestoreSection(p BackupsProps) {
 	<!-- Restore from Upload -->
 	<div id="restore" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#restore' }">
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			<i data-lucide="upload" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+			@components.LucideIcon("upload", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Restore from File</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Upload a .sql.gz backup file to restore</p>
@@ -287,7 +290,7 @@ templ backupsRestoreSection(p BackupsProps) {
 		<div x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-4">
-					<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
 					<strong>Warning:</strong> Restoring a backup will replace all current data. Make sure you have the correct
 					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> that matches the backup,
 					or bank connections will need to be re-linked.
@@ -322,7 +325,7 @@ templ backupsRestoreSection(p BackupsProps) {
 					</div>
 					<div class="mt-4">
 						<button type="submit" class="btn btn-warning btn-sm" :disabled="!filename">
-							<i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+							@components.LucideIcon("rotate-ccw", "w-4 h-4")
 							Restore from Upload
 						</button>
 					</div>
@@ -360,12 +363,12 @@ templ backupsCreateNowButton(p BackupsProps) {
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			if p.PreflightOK {
 				<button type="submit" data-new-backup class="btn btn-primary btn-sm gap-1.5">
-					<i data-lucide="download" class="w-4 h-4"></i>
+					@components.LucideIcon("download", "w-4 h-4")
 					Create Backup Now
 				</button>
 			} else {
 				<button type="submit" data-new-backup class="btn btn-primary btn-sm gap-1.5" disabled title={ p.PreflightMessage }>
-					<i data-lucide="info" class="w-4 h-4"></i>
+					@components.LucideIcon("info", "w-4 h-4")
 					Create Backup Now
 				</button>
 			}

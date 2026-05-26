@@ -108,6 +108,20 @@ var componentRegistry = map[string]componentAdapter{
 // []string. Accepts []string directly (from Go call sites) and []any
 // (produced by the template-side `strs` funcmap). Keeps component
 // adapters tolerant of both paths without caring which one fed them.
+// mergeFuncMaps shallow-merges later maps into the first. Used to combine
+// the admin-side funcMap with helpers exported by sibling packages
+// (e.g. components.LucideFuncMap) without each having to know about the
+// admin renderer's internal layout.
+func mergeFuncMaps(maps ...template.FuncMap) template.FuncMap {
+	out := template.FuncMap{}
+	for _, m := range maps {
+		for k, v := range m {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 func toStringSlice(v any) ([]string, error) {
 	switch s := v.(type) {
 	case []string:
@@ -256,13 +270,20 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 		// to templ via renderComponent. Helpers used only inside templ
 		// pages live in internal/templates/components — not here.
 		// See #462 for the migration history.
-		funcMap: template.FuncMap{
-			// strs collects variadic string args into a []string so
-			// templates can pass slices through `renderComponent`
-			// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
-			"strs":            func(vals ...string) []string { return vals },
-			"renderComponent": renderTemplComponent,
-		},
+		funcMap: mergeFuncMaps(
+			template.FuncMap{
+				// strs collects variadic string args into a []string so
+				// templates can pass slices through `renderComponent`
+				// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
+				"strs":            func(vals ...string) []string { return vals },
+				"renderComponent": renderTemplComponent,
+			},
+			// `lucide` renders an icon as inline SVG at template-render
+			// time — mirrors the @LucideIcon templ component so the
+			// remaining html/template pages don't fall back to the
+			// JS-driven `<i data-lucide>` placeholder.
+			components.LucideFuncMap(),
+		),
 	}
 	if err := tr.parseTemplates(); err != nil {
 		return nil, err

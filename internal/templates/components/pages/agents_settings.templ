@@ -53,7 +53,7 @@ templ agentsSettingsInstructionsCard(p AgentsSettingsProps) {
 		<div x-show="expanded" x-collapse>
 			<div class="px-4 sm:px-5 py-4">
 				<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs">
-					<i data-lucide="triangle-alert" class="w-4 h-4"></i>
+					@components.LucideIcon("triangle-alert", "w-4 h-4")
 					<span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
 				</div>
 				<form method="POST" action="/mcp-settings/instructions">
@@ -227,10 +227,10 @@ templ agentsSettingsConnectionCard() {
 							@click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
 						>
 							<template x-if="!copiedConfig">
-								<span class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> Copy</span>
+								<span class="flex items-center gap-1">@components.LucideIcon("copy", "w-4 h-4") Copy</span>
 							</template>
 							<template x-if="copiedConfig">
-								<span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-4 h-4"></i> Copied!</span>
+								<span class="flex items-center gap-1 text-success">@components.LucideIcon("check", "w-4 h-4") Copied!</span>
 							</template>
 						</button>
 					</div>

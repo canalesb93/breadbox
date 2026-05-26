@@ -44,14 +44,14 @@ templ TxAvatar(p TxAvatarProps) {
 		if p.CategoryIcon != nil || p.CategoryColor != nil {
 			<div class={ txAvatarClass(p.Size, false) } style={ txAvatarColorStyle(p.CategoryColor) }>
 				if p.CategoryIcon != nil {
-					<i data-lucide={ deref(p.CategoryIcon) } class={ txAvatarIconClass(p.Size) }></i>
+					@LucideIcon(deref(p.CategoryIcon), txAvatarIconClass(p.Size))
 				} else {
-					<i data-lucide="folder" class={ txAvatarIconClass(p.Size) }></i>
+					@LucideIcon("folder", txAvatarIconClass(p.Size))
 				}
 			</div>
 		} else {
 			<div class={ txAvatarClass(p.Size, true) }>
-				<i data-lucide="circle-off" class={ txAvatarIconClass(p.Size) }></i>
+				@LucideIcon("circle-off", txAvatarIconClass(p.Size))
 			</div>
 		}
 		if p.OwnerName != "" {
@@ -70,10 +70,8 @@ templ TxAvatar(p TxAvatarProps) {
 // three row variants. Lucide clock icon plus an sr-only "(pending)"
 // label so the row stays accessible without burning visible space.
 templ TxPendingClock() {
-	<i
-		data-lucide="clock"
-		class="w-3 h-3 shrink-0 text-warning opacity-70"
-		title="Pending — not yet posted"
-	></i>
+	<span title="Pending — not yet posted" class="inline-flex">
+		@LucideIcon("clock", "w-3 h-3 shrink-0 text-warning opacity-70")
+	</span>
 	<span class="sr-only">(pending)</span>
 }

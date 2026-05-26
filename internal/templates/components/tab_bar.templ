@@ -54,7 +54,7 @@ templ TabBar(p TabBarProps) {
 				}
 			>
 				if it.Icon != "" {
-					<i data-lucide={ it.Icon } class="w-4 h-4"></i>
+					@LucideIcon(it.Icon, "w-4 h-4")
 				}
 				{ it.Label }
 				if it.Count != nil {

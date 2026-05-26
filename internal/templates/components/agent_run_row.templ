@@ -83,7 +83,7 @@ templ AgentRunRow(p AgentRunRowProps) {
 					@AgentRunStatusBadge(p.Status)
 					if p.Trigger != "" {
 						<span class="badge badge-ghost badge-xs gap-1">
-							<i data-lucide={ agentRunTriggerIcon(p.Trigger) } class="w-2.5 h-2.5"></i>
+							@LucideIcon(agentRunTriggerIcon(p.Trigger), "w-2.5 h-2.5")
 							{ p.Trigger }
 						</span>
 					}
@@ -110,7 +110,7 @@ templ AgentRunRow(p AgentRunRowProps) {
 				</div>
 				if p.Status == "error" && (p.ErrorMessageFriendly != "" || p.ErrorMessage != "") {
 					<div class="mt-1.5 inline-flex items-start gap-1.5 text-xs text-error/90">
-						<i data-lucide="triangle-alert" class="w-3 h-3 mt-0.5 shrink-0"></i>
+						@LucideIcon("triangle-alert", "w-3 h-3 mt-0.5 shrink-0")
 						<span class="line-clamp-1">
 							if p.ErrorMessageFriendly != "" {
 								{ p.ErrorMessageFriendly }
@@ -129,7 +129,7 @@ templ AgentRunRow(p AgentRunRowProps) {
 				}
 				if p.Note != "" {
 					<div class="mt-1.5 inline-flex items-start gap-1.5 text-xs text-base-content/60">
-						<i data-lucide="sticky-note" class="w-3 h-3 mt-0.5 shrink-0 opacity-60"></i>
+						@LucideIcon("sticky-note", "w-3 h-3 mt-0.5 shrink-0 opacity-60")
 						<span class="line-clamp-1 italic" title={ p.Note }>{ p.Note }</span>
 					</div>
 				}
@@ -193,7 +193,7 @@ templ AgentRunStatusBadge(status string) {
 // run status so the row reads as a colored "stoplight" at a glance.
 templ agentRunRowAvatar(status string) {
 	<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", agentRunAvatarTone(status) }>
-		<i data-lucide={ agentRunAvatarIcon(status) } class={ "w-4 h-4", agentRunAvatarIconColor(status) }></i>
+		@LucideIcon(agentRunAvatarIcon(status), "w-4 h-4 " + agentRunAvatarIconColor(status))
 	</div>
 }
 
@@ -208,7 +208,7 @@ templ agentRunReportChip(r AgentRunReportRef) {
 		@click.stop=""
 		title={ "Report: " + r.Title }
 	>
-		<i data-lucide={ agentRunReportChipIcon(r.Priority) } class="w-3 h-3 shrink-0"></i>
+		@LucideIcon(agentRunReportChipIcon(r.Priority), "w-3 h-3 shrink-0")
 		<span class="line-clamp-1">{ r.Title }</span>
 	</a>
 }

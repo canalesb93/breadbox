@@ -46,7 +46,7 @@ templ Connections(p ConnectionsProps) {
 				:class="tab === 'connections' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
 				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
 			>
-				<i data-lucide="link" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("link", "w-3.5 h-3.5")
 				Connections
 			</button>
 			<button
@@ -54,7 +54,7 @@ templ Connections(p ConnectionsProps) {
 				:class="tab === 'links' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
 				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
 			>
-				<i data-lucide="link-2" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("link-2", "w-3.5 h-3.5")
 				Account Links
 			</button>
 		</div>
@@ -67,7 +67,7 @@ templ Connections(p ConnectionsProps) {
 					class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
 				>
 					<span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
-						<i data-lucide="layers" class="w-3 h-3"></i>
+						@components.LucideIcon("layers", "w-3 h-3")
 					</span>
 					All
 				</button>
@@ -151,7 +151,7 @@ templ Connections(p ConnectionsProps) {
 				<div class="bb-card p-12 text-center">
 					<div class="flex flex-col items-center">
 						<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-							<i data-lucide="link-2" class="w-8 h-8 text-base-content opacity-25"></i>
+							@components.LucideIcon("link-2", "w-8 h-8 text-base-content opacity-25")
 						</div>
 						<h3 class="text-lg font-semibold mb-1">No Account Links</h3>
 						<p class="text-sm text-base-content/50 mb-5 max-w-sm">
@@ -159,7 +159,7 @@ templ Connections(p ConnectionsProps) {
 							If two family members connect the same credit card, linking prevents double-counting.
 						</p>
 						<button class="btn btn-primary btn-sm" onclick="document.getElementById('create-link-modal').showModal()">
-							<i data-lucide="plus" class="w-4 h-4"></i> Create First Link
+							@components.LucideIcon("plus", "w-4 h-4") Create First Link
 						</button>
 					</div>
 				</div>
@@ -185,7 +185,7 @@ templ connectionsProviderFilterBtn(prov ConnectionsProviderFilter) {
 		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
 	>
 		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-			<i data-lucide={ prov.Icon } class="w-3 h-3"></i>
+			@components.LucideIcon(prov.Icon, "w-3 h-3")
 		</span>
 		{ prov.Label }
 	</button>
@@ -206,11 +206,11 @@ templ connectionsCard(c ConnectionsRow) {
 				<div class="hidden sm:flex w-10 h-10 rounded-lg bg-base-200/60 items-center justify-center shrink-0">
 					switch c.Provider {
 						case "plaid":
-							<i data-lucide="building-2" class="w-5 h-5 text-info"></i>
+							@components.LucideIcon("building-2", "w-5 h-5 text-info")
 						case "teller":
-							<i data-lucide="landmark" class="w-5 h-5 text-success"></i>
+							@components.LucideIcon("landmark", "w-5 h-5 text-success")
 						default:
-							<i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
+							@components.LucideIcon("file-spreadsheet", "w-5 h-5 text-warning")
 					}
 				</div>
 				<div class="min-w-0">
@@ -229,7 +229,7 @@ templ connectionsCard(c ConnectionsRow) {
 									<span class="badge badge-soft badge-error badge-sm cursor-help">Sync Error</span>
 									if c.LastSyncErrorMessage != "" {
 										<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-											<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
+											<span class="flex items-center gap-1.5 text-error font-medium mb-1">@components.LucideIcon("alert-circle", "w-3 h-3") Last sync failed</span>
 											<span class="text-base-content/70">{ c.LastSyncErrorMessage }</span>
 										</span>
 									}
@@ -305,7 +305,7 @@ templ connectionsCard(c ConnectionsRow) {
 		if c.ErrorMessageValid {
 			<div class="mx-4 sm:mx-6 mb-4 flex items-center justify-between gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
 				<div class="flex items-center gap-2 min-w-0">
-					<i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 shrink-0")
 					<span class="truncate">{ components.ErrorMessage(c.ErrorCode) }</span>
 				</div>
 				if c.Provider != "csv" && (c.ErrorCode == "ITEM_LOGIN_REQUIRED" || c.ErrorCode == "INSUFFICIENT_CREDENTIALS" || c.ErrorCode == "INVALID_CREDENTIALS" || c.Status == "pending_reauth") {
@@ -318,7 +318,7 @@ templ connectionsCard(c ConnectionsRow) {
 		<!-- Error message communicated via badge tooltip on hover -->
 		if c.NewAccountsAvailable {
 			<div class="mx-4 sm:mx-6 mb-4 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
-				<i data-lucide="plus-circle" class="w-3.5 h-3.5 shrink-0"></i>
+				@components.LucideIcon("plus-circle", "w-3.5 h-3.5 shrink-0")
 				<span>New accounts available to link</span>
 			</div>
 		}
@@ -340,13 +340,13 @@ templ connectionsAccountRow(a ConnectionsAccountRow) {
 			<div class="w-7 h-7 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">
 				switch a.Type {
 					case "credit":
-						<i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+						@components.LucideIcon("credit-card", "w-3.5 h-3.5 text-base-content opacity-40")
 					case "loan":
-						<i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+						@components.LucideIcon("landmark", "w-3.5 h-3.5 text-base-content opacity-40")
 					case "investment":
-						<i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+						@components.LucideIcon("trending-up", "w-3.5 h-3.5 text-base-content opacity-40")
 					default:
-						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+						@components.LucideIcon("wallet", "w-3.5 h-3.5 text-base-content opacity-40")
 				}
 			</div>
 			<div class="min-w-0">
@@ -407,18 +407,18 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 				<div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
 					<div class="flex items-center gap-2 min-w-0">
 						<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/8 shrink-0">
-							<i data-lucide="credit-card" class="w-4 h-4 text-primary"></i>
+							@components.LucideIcon("credit-card", "w-4 h-4 text-primary")
 						</div>
 						<div class="min-w-0">
 							<span class="font-semibold text-sm truncate block">{ l.PrimaryAccountName }</span>
 							<span class="text-xs text-base-content/40">{ l.PrimaryUserName }</span>
 						</div>
 					</div>
-					<i data-lucide="arrow-right" class="w-4 h-4 text-base-content opacity-30 shrink-0 hidden sm:block"></i>
-					<i data-lucide="arrow-down" class="w-4 h-4 text-base-content opacity-30 shrink-0 sm:hidden ml-3"></i>
+					@components.LucideIcon("arrow-right", "w-4 h-4 text-base-content opacity-30 shrink-0 hidden sm:block")
+					@components.LucideIcon("arrow-down", "w-4 h-4 text-base-content opacity-30 shrink-0 sm:hidden ml-3")
 					<div class="flex items-center gap-2 min-w-0 sm:ml-0 ml-3">
 						<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-secondary/8 shrink-0">
-							<i data-lucide="credit-card" class="w-4 h-4 text-secondary"></i>
+							@components.LucideIcon("credit-card", "w-4 h-4 text-secondary")
 						</div>
 						<div class="min-w-0">
 							<span class="font-semibold text-sm truncate block">{ l.DependentAccountName }</span>
@@ -432,12 +432,12 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 				<!-- Stats row -->
 				<div class="flex items-center gap-3 sm:gap-4 mt-3 text-xs text-base-content/50 flex-wrap">
 					<span class="flex items-center gap-1">
-						<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success"></i>
+						@components.LucideIcon("check-circle-2", "w-3.5 h-3.5 text-success")
 						{ fmt.Sprintf("%d matched", l.MatchCount) }
 					</span>
 					if l.UnmatchedDependentCount > 0 {
 						<span class="flex items-center gap-1">
-							<i data-lucide="help-circle" class="w-3.5 h-3.5 text-warning"></i>
+							@components.LucideIcon("help-circle", "w-3.5 h-3.5 text-warning")
 							{ fmt.Sprintf("%d unmatched", l.UnmatchedDependentCount) }
 						</span>
 					}
@@ -452,11 +452,11 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 				<form method="POST" action={ templ.SafeURL(connectionsLinkActionURL(l.ID, "reconcile")) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
 					<button type="submit" class="btn btn-ghost btn-xs" title="Run reconciliation">
-						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("refresh-cw", "w-3.5 h-3.5")
 					</button>
 				</form>
 				<a href={ templ.SafeURL("/account-links/" + l.ID) } class="btn btn-ghost btn-xs" title="View matches">
-					<i data-lucide="list" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("list", "w-3.5 h-3.5")
 				</a>
 				<form
 					method="POST"
@@ -467,7 +467,7 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 				>
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
 					<button type="submit" class="btn btn-ghost btn-xs text-error" title="Delete link">
-						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("trash-2", "w-3.5 h-3.5")
 					</button>
 				</form>
 			</div>
@@ -510,11 +510,11 @@ func connectionsAction(_ ConnectionsProps) templ.Component {
 
 templ connectionsActionButtons() {
 	<a x-show="tab === 'connections'" x-cloak href="/connections/new" class="btn btn-primary btn-sm gap-2">
-		<i data-lucide="plus" class="w-4 h-4"></i>
+		@components.LucideIcon("plus", "w-4 h-4")
 		Connect Bank
 	</a>
 	<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm gap-2" onclick="document.getElementById('create-link-modal').showModal()">
-		<i data-lucide="plus" class="w-4 h-4"></i>
+		@components.LucideIcon("plus", "w-4 h-4")
 		New Link
 	</button>
 }

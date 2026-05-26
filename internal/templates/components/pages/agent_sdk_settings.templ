@@ -1,6 +1,9 @@
 package pages
 
-import "strconv"
+import (
+	"strconv"
+	"breadbox/internal/templates/components"
+)
 
 // AgentSDKSettings renders the v1 admin "Agents settings" tab inside the
 // Settings shell — auth + sidecar + execution limits for Claude Agent
@@ -22,13 +25,13 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 		})
 		if p.FormError != "" {
 			<div role="alert" class="alert alert-error alert-soft mb-4">
-				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				@components.LucideIcon("circle-x", "w-4 h-4")
 				<span>{ p.FormError }</span>
 			</div>
 		}
 		if p.FormSuccess != "" {
 			<div role="alert" class="alert alert-success alert-soft mb-4">
-				<i data-lucide="circle-check" class="w-4 h-4"></i>
+				@components.LucideIcon("circle-check", "w-4 h-4")
 				<span>{ p.FormSuccess }</span>
 			</div>
 		}
@@ -49,9 +52,9 @@ templ agentSDKStatusCard(s AgentSDKStatusProps) {
 		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 border-b border-base-300">
 			<div class={ "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0", agentSDKStatusIconClass(s.Ready) }>
 				if s.Ready {
-					<i data-lucide="circle-check" class="w-5 h-5 text-success"></i>
+					@components.LucideIcon("circle-check", "w-5 h-5 text-success")
 				} else {
-					<i data-lucide="triangle-alert" class="w-5 h-5 text-warning"></i>
+					@components.LucideIcon("triangle-alert", "w-5 h-5 text-warning")
 				}
 			</div>
 			<div class="min-w-0 flex-1">
@@ -348,7 +351,7 @@ templ agentSDKToolsCard(csrfToken string) {
 					:disabled="smokeState === 'loading'"
 				>
 					<span x-show="smokeState !== 'loading'" class="flex items-center gap-1.5">
-						<i data-lucide="zap" class="w-4 h-4"></i> Run smoke test
+						@components.LucideIcon("zap", "w-4 h-4") Run smoke test
 					</span>
 					<span x-show="smokeState === 'loading'" x-cloak class="flex items-center gap-1.5">
 						<span class="loading loading-spinner loading-xs"></span> Running…
@@ -361,7 +364,7 @@ templ agentSDKToolsCard(csrfToken string) {
 					:disabled="cleanupState === 'loading'"
 				>
 					<span x-show="cleanupState !== 'loading'" class="flex items-center gap-1.5">
-						<i data-lucide="broom" class="w-4 h-4"></i> Run cleanup now
+						@components.LucideIcon("broom", "w-4 h-4") Run cleanup now
 					</span>
 					<span x-show="cleanupState === 'loading'" x-cloak class="flex items-center gap-1.5">
 						<span class="loading loading-spinner loading-xs"></span> Cleaning…
@@ -384,7 +387,7 @@ templ agentSDKToolsCard(csrfToken string) {
 				</div>
 			</div>
 			<div x-show="smokeState === 'error' && smokeError" x-cloak role="alert" class="alert alert-error alert-soft">
-				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				@components.LucideIcon("circle-x", "w-4 h-4")
 				<span x-text="'Smoke test failed: ' + smokeError"></span>
 			</div>
 			<div x-show="cleanupState === 'ok' && cleanupResult" x-cloak class="rounded-xl bg-base-200/60 p-4 space-y-2">
@@ -396,7 +399,7 @@ templ agentSDKToolsCard(csrfToken string) {
 				</dl>
 			</div>
 			<div x-show="cleanupState === 'error' && cleanupError" x-cloak role="alert" class="alert alert-error alert-soft">
-				<i data-lucide="circle-x" class="w-4 h-4"></i>
+				@components.LucideIcon("circle-x", "w-4 h-4")
 				<span x-text="'Cleanup failed: ' + cleanupError"></span>
 			</div>
 		</div>

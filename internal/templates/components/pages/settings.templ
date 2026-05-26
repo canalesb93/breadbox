@@ -70,7 +70,7 @@ templ settingsSyncCard(p SettingsProps) {
 			@keydown.enter.prevent="expanded = !expanded"
 			@keydown.space.prevent="expanded = !expanded"
 		>
-			<i data-lucide="refresh-cw" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+			@components.LucideIcon("refresh-cw", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Sync</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -104,7 +104,7 @@ templ settingsSyncCard(p SettingsProps) {
 					</select>
 					if p.NextSyncTime != "" {
 						<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-							<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+							@components.LucideIcon("clock", "w-3.5 h-3.5")
 							Next sync: { p.NextSyncTime }
 						</p>
 					}
@@ -131,7 +131,7 @@ templ settingsSyncCard(p SettingsProps) {
 							@retentionOption(0, p.SyncLogRetentionDays, "Keep forever")
 						</select>
 						<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-							<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+							@components.LucideIcon("clock", "w-3.5 h-3.5")
 							Cleanup runs daily at 3:00 AM
 						</p>
 						<div class="mt-4">
@@ -184,7 +184,7 @@ templ settingsSecurityCard(p SettingsProps) {
 			@keydown.enter.prevent="expanded = !expanded"
 			@keydown.space.prevent="expanded = !expanded"
 		>
-			<i data-lucide="shield" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+			@components.LucideIcon("shield", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Security</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
@@ -199,7 +199,7 @@ templ settingsSecurityCard(p SettingsProps) {
 				<!-- Encryption Key Status -->
 				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 					<div class="flex items-center gap-2.5">
-						<i data-lucide="key-round" class="w-4 h-4 text-base-content opacity-50"></i>
+						@components.LucideIcon("key-round", "w-4 h-4 text-base-content opacity-50")
 						<span class="text-sm font-medium">Encryption Key</span>
 					</div>
 					if p.HasEncryptionKey {
@@ -210,7 +210,7 @@ templ settingsSecurityCard(p SettingsProps) {
 				</div>
 				if !p.HasEncryptionKey {
 					<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
-						<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+						@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
 						Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
 					</div>
 				}
@@ -227,17 +227,17 @@ templ settingsSystemCard(p SettingsProps) {
 	<div id="system" class="bb-card p-5">
 		<div class="flex items-center justify-between gap-3 mb-4">
 			<div class="flex items-center gap-3">
-				<i data-lucide="cpu" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+				@components.LucideIcon("cpu", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 				<h2 class="font-semibold">System</h2>
 			</div>
 			if p.UpdateAvailable {
 				<a href={ templ.SafeURL(p.LatestURL) } target="_blank" rel="noopener" class="badge badge-warning badge-sm gap-1.5 no-underline" title={ "Release notes for v" + p.LatestVersion }>
-					<i data-lucide="arrow-up-circle" class="w-3 h-3"></i>
+					@components.LucideIcon("arrow-up-circle", "w-3 h-3")
 					Update available — v{ p.LatestVersion }
 				</a>
 			} else if p.Version != "" {
 				<a href="https://github.com/canalesb93/breadbox/releases" target="_blank" rel="noopener" class="badge badge-ghost badge-sm gap-1 no-underline" title="View releases on GitHub">
-					<i data-lucide="github" class="w-3 h-3"></i>
+					@components.LucideIcon("github", "w-3 h-3")
 					Up to date
 				</a>
 			}
@@ -261,7 +261,7 @@ templ settingsAvatarStyleCard(p SettingsProps) {
 	<div class="bb-card p-5" x-data="{ style: $el.dataset.style }" data-style={ p.AvatarStyle }>
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="user-circle" class="w-4 h-4 text-base-content opacity-60"></i>
+				@components.LucideIcon("user-circle", "w-4 h-4 text-base-content opacity-60")
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">User Avatars</h2>
@@ -296,7 +296,7 @@ templ settingsAvatarStyleCard(p SettingsProps) {
 				<button type="submit" class="btn btn-primary btn-sm">Save Style</button>
 			</div>
 			<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-				<i data-lucide="info" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("info", "w-3.5 h-3.5")
 				Browsers cache avatars for 24h — hard-refresh to see the change immediately.
 			</p>
 		</form>
@@ -316,7 +316,7 @@ templ settingsHelpCard(p SettingsProps) {
 			@keydown.enter.prevent="expanded = !expanded"
 			@keydown.space.prevent="expanded = !expanded"
 		>
-			<i data-lucide="life-buoy" class="w-5 h-5 text-base-content opacity-40 flex-shrink-0"></i>
+			@components.LucideIcon("life-buoy", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Help</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">Setup guide and documentation</p>
@@ -329,7 +329,7 @@ templ settingsHelpCard(p SettingsProps) {
 				<div class="flex flex-col gap-3">
 					<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 						<div class="flex items-center gap-2.5">
-							<i data-lucide="compass" class="w-4 h-4 text-base-content opacity-50"></i>
+							@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50")
 							<div>
 								<span class="text-sm font-medium">Getting Started Guide</span>
 								<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
@@ -367,7 +367,7 @@ templ settingsSyncSchedule(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="refresh-cw" class="w-4 h-4 text-base-content opacity-60"></i>
+				@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content opacity-60")
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Schedule</h2>
@@ -396,7 +396,7 @@ templ settingsSyncSchedule(p SettingsProps) {
 			</select>
 			if p.NextSyncTime != "" {
 				<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-					<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("clock", "w-3.5 h-3.5")
 					Next sync: { p.NextSyncTime }
 				</p>
 			}
@@ -411,7 +411,7 @@ templ settingsSyncRetention(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="archive" class="w-4 h-4 text-base-content opacity-60"></i>
+				@components.LucideIcon("archive", "w-4 h-4 text-base-content opacity-60")
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Log Retention</h2>
@@ -432,7 +432,7 @@ templ settingsSyncRetention(p SettingsProps) {
 				@retentionOption(0, p.SyncLogRetentionDays, "Keep forever")
 			</select>
 			<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-				<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("clock", "w-3.5 h-3.5")
 				Cleanup runs daily at 3:00 AM
 			</p>
 			<div class="mt-4">
@@ -446,7 +446,7 @@ templ settingsSecurityCardFlat(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="shield" class="w-4 h-4 text-base-content opacity-60"></i>
+				@components.LucideIcon("shield", "w-4 h-4 text-base-content opacity-60")
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Encryption Key</h2>
@@ -455,7 +455,7 @@ templ settingsSecurityCardFlat(p SettingsProps) {
 		</div>
 		<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 			<div class="flex items-center gap-2.5">
-				<i data-lucide="key-round" class="w-4 h-4 text-base-content opacity-50"></i>
+				@components.LucideIcon("key-round", "w-4 h-4 text-base-content opacity-50")
 				<span class="text-sm font-medium">ENCRYPTION_KEY</span>
 			</div>
 			if p.HasEncryptionKey {
@@ -466,7 +466,7 @@ templ settingsSecurityCardFlat(p SettingsProps) {
 		</div>
 		if !p.HasEncryptionKey {
 			<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
-				<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+				@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
 				Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
 			</div>
 		}
@@ -481,7 +481,7 @@ templ settingsHelpCardFlat(p SettingsProps) {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="life-buoy" class="w-4 h-4 text-base-content opacity-60"></i>
+				@components.LucideIcon("life-buoy", "w-4 h-4 text-base-content opacity-60")
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Resources</h2>
@@ -491,7 +491,7 @@ templ settingsHelpCardFlat(p SettingsProps) {
 		<div class="flex flex-col gap-3">
 			<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 				<div class="flex items-center gap-2.5">
-					<i data-lucide="compass" class="w-4 h-4 text-base-content opacity-50"></i>
+					@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50")
 					<div>
 						<span class="text-sm font-medium">Getting Started Guide</span>
 						<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
@@ -508,13 +508,13 @@ templ settingsHelpCardFlat(p SettingsProps) {
 			</div>
 			<a href="https://docs.breadbox.sh" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
 				<div class="flex items-center gap-2.5">
-					<i data-lucide="book-open" class="w-4 h-4 text-base-content opacity-50"></i>
+					@components.LucideIcon("book-open", "w-4 h-4 text-base-content opacity-50")
 					<div>
 						<span class="text-sm font-medium">Documentation</span>
 						<p class="text-xs text-base-content/40">docs.breadbox.sh</p>
 					</div>
 				</div>
-				<i data-lucide="square-arrow-out-up-right" class="w-4 h-4 text-base-content opacity-40"></i>
+				@components.LucideIcon("square-arrow-out-up-right", "w-4 h-4 text-base-content opacity-40")
 			</a>
 		</div>
 	</div>
@@ -528,7 +528,7 @@ templ settingsHelpDeveloperCard() {
 	<div class="bb-card p-5">
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="palette" class="w-4 h-4 text-base-content/60"></i>
+				@components.LucideIcon("palette", "w-4 h-4 text-base-content/60")
 			</div>
 			<div class="bb-icon-header__text">
 				<h2 class="text-sm font-semibold">Developer</h2>
@@ -537,13 +537,13 @@ templ settingsHelpDeveloperCard() {
 		</div>
 		<a href="/design" class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 hover:bg-base-200/70 transition-colors no-underline">
 			<div class="flex items-center gap-2.5">
-				<i data-lucide="palette" class="w-4 h-4 text-base-content/50"></i>
+				@components.LucideIcon("palette", "w-4 h-4 text-base-content/50")
 				<div>
 					<span class="text-sm font-medium">Design system sandbox</span>
 					<p class="text-xs text-base-content/40">Reference gallery for every shared admin-UI component</p>
 				</div>
 			</div>
-			<i data-lucide="arrow-right" class="w-4 h-4 text-base-content/40"></i>
+			@components.LucideIcon("arrow-right", "w-4 h-4 text-base-content/40")
 		</a>
 	</div>
 }

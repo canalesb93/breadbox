@@ -48,7 +48,7 @@ templ CSVImport(p CSVImportProps) {
 								class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200 shrink-0"
 								:class="step > s.n ? 'bg-success text-success-content' : step === s.n ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/40'"
 							>
-								<template x-if="step > s.n"><i data-lucide="check" class="w-4 h-4"></i></template>
+								<template x-if="step > s.n">@components.LucideIcon("check", "w-4 h-4")</template>
 								<template x-if="step <= s.n"><span x-text="s.n"></span></template>
 							</div>
 							<span
@@ -80,7 +80,7 @@ templ CSVImport(p CSVImportProps) {
 				</div>
 				if p.ConnectionID != "" {
 					<div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-base-200/50 mb-6">
-						<i data-lucide="link" class="w-4 h-4 text-base-content opacity-50"></i>
+						@components.LucideIcon("link", "w-4 h-4 text-base-content opacity-50")
 						<div class="text-sm">
 							<span class="text-base-content/50">Re-importing to:</span>
 							<span class="font-medium">{ p.ExistingConnectionName }</span>
@@ -104,12 +104,12 @@ templ CSVImport(p CSVImportProps) {
 					<p class="text-xs text-base-content/40 mt-2">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
 				</fieldset>
 				<div id="upload-alert" role="alert" class="hidden alert alert-error alert-soft items-start rounded-xl mb-4 text-sm">
-					<i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+					@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0 mt-0.5")
 					<span id="upload-status"></span>
 				</div>
 				<div class="flex items-center gap-3 pt-2">
 					<button type="button" id="upload-btn" class="btn btn-primary btn-sm" onclick="uploadFile()">
-						<i data-lucide="upload" class="w-4 h-4"></i> Upload &amp; Parse
+						@components.LucideIcon("upload", "w-4 h-4") Upload &amp; Parse
 					</button>
 					<p id="upload-progress" class="text-sm text-base-content/60"></p>
 				</div>
@@ -197,13 +197,13 @@ templ CSVImport(p CSVImportProps) {
 				}
 				<div class="flex items-center gap-3 pt-2">
 					<button type="button" class="btn btn-ghost btn-sm" onclick="window._csvWizard.setStep(1)">
-						<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+						@components.LucideIcon("arrow-left", "w-4 h-4") Back
 					</button>
 					<button type="button" class="btn btn-sm btn-outline" onclick="previewData()">
-						<i data-lucide="eye" class="w-4 h-4"></i> Preview
+						@components.LucideIcon("eye", "w-4 h-4") Preview
 					</button>
 					<button type="button" id="continue-btn" class="btn btn-primary btn-sm hidden" onclick="goToStep3()">
-						Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
+						Continue @components.LucideIcon("arrow-right", "w-4 h-4")
 					</button>
 					<p id="preview-status" class="text-sm text-error"></p>
 				</div>
@@ -213,7 +213,7 @@ templ CSVImport(p CSVImportProps) {
 				<div class="bb-card p-5 max-w-3xl">
 					<div class="flex items-center gap-3 mb-4">
 						<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-info/8">
-							<i data-lucide="table" class="w-4 h-4 text-info"></i>
+							@components.LucideIcon("table", "w-4 h-4 text-info")
 						</div>
 						<h3 class="text-sm font-semibold">Preview (first 10 rows)</h3>
 					</div>
@@ -261,10 +261,10 @@ templ CSVImport(p CSVImportProps) {
 				</div>
 				<div class="flex items-center gap-3">
 					<button type="button" class="btn btn-ghost btn-sm" onclick="goToStep(2)">
-						<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+						@components.LucideIcon("arrow-left", "w-4 h-4") Back
 					</button>
 					<button type="button" id="import-btn" class="btn btn-primary btn-sm" onclick="doImport()">
-						<i data-lucide="download" class="w-4 h-4"></i> Import Transactions
+						@components.LucideIcon("download", "w-4 h-4") Import Transactions
 					</button>
 				</div>
 				<p id="import-status" class="text-sm text-error mt-3"></p>
@@ -275,7 +275,7 @@ templ CSVImport(p CSVImportProps) {
 			<div class="bb-card p-5 sm:p-8 max-w-lg">
 				<div class="flex flex-col items-center text-center mb-8">
 					<div class="w-16 h-16 rounded-xl bg-success/10 flex items-center justify-center mb-4">
-						<i data-lucide="check-circle-2" class="w-8 h-8 text-success"></i>
+						@components.LucideIcon("check-circle-2", "w-8 h-8 text-success")
 					</div>
 					<h2 class="text-lg font-semibold mb-1">Import Complete</h2>
 					<p class="text-sm text-base-content/50">Your transactions have been imported successfully</p>
@@ -307,7 +307,7 @@ templ CSVImport(p CSVImportProps) {
 					</details>
 				</div>
 				<a id="result-link" href="#" class="btn btn-primary btn-sm w-full">
-					View Connection <i data-lucide="arrow-right" class="w-4 h-4"></i>
+					View Connection @components.LucideIcon("arrow-right", "w-4 h-4")
 				</a>
 			</div>
 		</div>

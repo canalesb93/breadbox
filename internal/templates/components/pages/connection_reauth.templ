@@ -58,7 +58,7 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 			class="flex flex-col items-center text-center"
 		>
 			<div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
-				<i data-lucide="shield-alert" class="w-8 h-8 text-warning"></i>
+				@components.LucideIcon("shield-alert", "w-8 h-8 text-warning")
 			</div>
 			<h2 class="text-lg font-semibold mb-1">{ p.InstitutionName }</h2>
 			<p class="text-sm text-base-content/50 mb-1">
@@ -77,10 +77,10 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 					x-cloak
 					@click="startReauth()"
 				>
-					<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
+					@components.LucideIcon("refresh-cw", "w-4 h-4") Retry
 				</button>
 				<a href={ templ.SafeURL("/connections/" + p.ConnID) } class="btn btn-ghost btn-sm">
-					<i data-lucide="x" class="w-4 h-4"></i> Cancel
+					@components.LucideIcon("x", "w-4 h-4") Cancel
 				</a>
 			</div>
 		</div>

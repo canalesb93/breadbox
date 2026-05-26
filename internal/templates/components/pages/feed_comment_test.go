@@ -66,7 +66,7 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 			},
 			mustContain: []string{
 				// Rail tile is the shared message-square, not an avatar.
-				`data-lucide="message-square"`,
+				`lucide-message-square`,
 				// Inline avatar uses the 16px treatment from
 				// TimelineActorInline.
 				`inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom`,
@@ -94,7 +94,7 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 				},
 			},
 			mustContain: []string{
-				`data-lucide="message-square"`,
+				`lucide-message-square`,
 				// Inline bot tile, 16px (w-4 h-4) — distinct from the
 				// 24px (w-6 h-6) rail tile that used to be there.
 				`inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10`,
@@ -163,7 +163,7 @@ func TestFeedAndTxDetailShareInlineActor(t *testing.T) {
 			},
 			mustHave: []string{
 				`bg-primary/10`,
-				`data-lucide="bot"`,
+				`lucide-bot`,
 				`<strong class="font-semibold text-base-content">Categorizer</strong>`,
 			},
 			mustOmit: []string{
@@ -180,7 +180,7 @@ func TestFeedAndTxDetailShareInlineActor(t *testing.T) {
 			},
 			mustOmit: []string{
 				`<img`,
-				`data-lucide="bot"`,
+				`lucide-bot`,
 			},
 		},
 	}

@@ -27,7 +27,7 @@ templ Users(p UsersProps) {
 	})
 	if p.Created {
 		<div role="alert" class="alert alert-success mb-6">
-			<i data-lucide="check-circle" class="w-5 h-5"></i>
+			@components.LucideIcon("check-circle", "w-5 h-5")
 			<span>Member created. <a href="/connections/new" class="link font-medium">Connect a bank for them</a></span>
 		</div>
 	}
@@ -50,7 +50,7 @@ templ Users(p UsersProps) {
 // create a new member or link an existing unlinked one.
 templ usersAddMemberAction() {
 	<a href="/household/new" data-new-user class="btn btn-primary btn-sm gap-2">
-		<i data-lucide="plus" class="w-4 h-4"></i>
+		@components.LucideIcon("plus", "w-4 h-4")
 		Add Member
 	</a>
 }
@@ -60,7 +60,7 @@ templ usersUnlinkedPrompt(p UsersProps) {
 	<div class="bb-card p-0 overflow-hidden mb-6 border-warning/30 bg-warning/[0.03]" x-data="{ mode: 'create', open: true }" x-show="open">
 		<div class="p-4 sm:p-5 flex items-start gap-3">
 			<div class="bb-icon-header__tile bb-icon-tile--warning">
-				<i data-lucide="user-plus" class="w-5 h-5"></i>
+				@components.LucideIcon("user-plus", "w-5 h-5")
 			</div>
 			<div class="min-w-0 flex-1">
 				<h3 class="text-sm font-semibold">Link your admin account to a household member</h3>
@@ -96,7 +96,7 @@ templ usersUnlinkedPrompt(p UsersProps) {
 						class="input input-sm w-full sm:max-w-64 bg-base-200/50"
 					/>
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5 shrink-0">
-						<i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("user-plus", "w-3.5 h-3.5")
 						Create &amp; Link
 					</button>
 				</form>
@@ -117,7 +117,7 @@ templ usersUnlinkedPrompt(p UsersProps) {
 							}
 						</select>
 						<button type="submit" class="btn btn-primary btn-sm gap-1.5 shrink-0">
-							<i data-lucide="link" class="w-3.5 h-3.5"></i>
+							@components.LucideIcon("link", "w-3.5 h-3.5")
 							Link Account
 						</button>
 					</form>
@@ -180,11 +180,11 @@ templ usersMemberCard(u UsersEnrichedRow) {
 			<!-- No accounts state -->
 			<div class="border-t border-base-300 px-4 sm:px-5 py-8 bg-base-200/20 flex-1 flex flex-col items-center justify-center text-center">
 				<div class="w-12 h-12 rounded-xl bg-base-200/60 flex items-center justify-center mb-3">
-					<i data-lucide="landmark" class="w-6 h-6 text-base-content opacity-25"></i>
+					@components.LucideIcon("landmark", "w-6 h-6 text-base-content opacity-25")
 				</div>
 				<p class="text-sm text-base-content/40 mb-3">No bank accounts connected</p>
 				<a href="/connections/new" class="btn btn-ghost btn-sm">
-					<i data-lucide="plus" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("plus", "w-3.5 h-3.5")
 					Connect a bank
 				</a>
 			</div>
@@ -206,15 +206,15 @@ templ usersAccountRow(a UsersAccountRow) {
 		<div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0 hidden sm:flex">
 			switch a.Type {
 				case "depository":
-					<i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+					@components.LucideIcon("landmark", "w-3.5 h-3.5 text-base-content opacity-40")
 				case "credit":
-					<i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+					@components.LucideIcon("credit-card", "w-3.5 h-3.5 text-base-content opacity-40")
 				case "loan":
-					<i data-lucide="banknote" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+					@components.LucideIcon("banknote", "w-3.5 h-3.5 text-base-content opacity-40")
 				case "investment":
-					<i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+					@components.LucideIcon("trending-up", "w-3.5 h-3.5 text-base-content opacity-40")
 				default:
-					<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content opacity-40"></i>
+					@components.LucideIcon("wallet", "w-3.5 h-3.5 text-base-content opacity-40")
 			}
 		</div>
 		<div class="flex-1 min-w-0">

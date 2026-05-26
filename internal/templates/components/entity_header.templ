@@ -87,7 +87,7 @@ templ EntityHeader(p EntityHeaderProps) {
 					if p.IconComponent != nil {
 						@p.IconComponent
 					} else {
-						<i data-lucide={ p.Icon } class="w-5 h-5 sm:w-6 sm:h-6"></i>
+						@LucideIcon(p.Icon, "w-5 h-5 sm:w-6 sm:h-6")
 					}
 				</div>
 			}

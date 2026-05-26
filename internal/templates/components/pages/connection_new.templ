@@ -29,12 +29,12 @@ templ ConnectionNew(p ConnectionNewProps) {
 		<div class="bb-card p-8 max-w-lg">
 			<div class="flex flex-col items-center text-center">
 				<div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
-					<i data-lucide="plug-zap" class="w-8 h-8 text-warning"></i>
+					@components.LucideIcon("plug-zap", "w-8 h-8 text-warning")
 				</div>
 				<h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
 				<p class="text-sm text-base-content/50 mb-6">You need to configure at least one bank provider before creating connections.</p>
 				<a href="/settings/providers" class="btn btn-primary btn-sm">
-					<i data-lucide="settings" class="w-4 h-4"></i> Configure Providers
+					@components.LucideIcon("settings", "w-4 h-4") Configure Providers
 				</a>
 			</div>
 		</div>
@@ -60,7 +60,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 											class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
                         peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
 										>
-											<i data-lucide="building-2" class="w-6 h-6 text-base-content opacity-60"></i>
+											@components.LucideIcon("building-2", "w-6 h-6 text-base-content opacity-60")
 											<span class="text-sm font-medium">Plaid</span>
 										</div>
 									</label>
@@ -76,7 +76,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 											class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
                         peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
 										>
-											<i data-lucide="landmark" class="w-6 h-6 text-base-content opacity-60"></i>
+											@components.LucideIcon("landmark", "w-6 h-6 text-base-content opacity-60")
 											<span class="text-sm font-medium">Teller</span>
 										</div>
 									</label>
@@ -87,7 +87,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 										class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
                         peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
 									>
-										<i data-lucide="file-spreadsheet" class="w-6 h-6 text-base-content opacity-60"></i>
+										@components.LucideIcon("file-spreadsheet", "w-6 h-6 text-base-content opacity-60")
 										<span class="text-sm font-medium">CSV</span>
 									</div>
 								</label>
@@ -104,7 +104,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 						</fieldset>
 						<div class="pt-2">
 							<button type="submit" class="btn btn-primary btn-sm">
-								Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
+								Continue @components.LucideIcon("arrow-right", "w-4 h-4")
 							</button>
 						</div>
 					</form>
@@ -114,17 +114,17 @@ templ ConnectionNew(p ConnectionNewProps) {
 				<div class="bb-card p-8 max-w-lg">
 					<div class="flex flex-col items-center text-center">
 						<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-							<i data-lucide="link" class="w-8 h-8 text-primary"></i>
+							@components.LucideIcon("link", "w-8 h-8 text-primary")
 						</div>
 						<h2 class="text-lg font-semibold mb-1">Connect Bank</h2>
 						<p class="text-sm text-base-content/50 mb-1">Connecting for: <span id="member-name" class="font-semibold text-base-content"></span></p>
 						<p id="link-status" class="text-sm text-base-content/50 mb-6">Opening bank connection dialog...</p>
 						<div class="flex items-center gap-3">
 							<button id="retry-btn" class="btn btn-primary btn-sm hidden">
-								<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
+								@components.LucideIcon("refresh-cw", "w-4 h-4") Retry
 							</button>
 							<button id="back-btn" class="btn btn-ghost btn-sm">
-								<i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+								@components.LucideIcon("arrow-left", "w-4 h-4") Back
 							</button>
 						</div>
 					</div>

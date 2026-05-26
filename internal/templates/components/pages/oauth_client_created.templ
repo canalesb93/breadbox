@@ -29,7 +29,7 @@ templ OAuthClientCreated(p OAuthClientCreatedProps) {
 	<div class="bb-card p-6 max-w-lg" x-data="oauthClientCreated" data-secret={ p.ClientSecret }>
 		<div class="flex items-center gap-3 mb-5">
 			<div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
-				<i data-lucide="check" class="w-5 h-5 text-success"></i>
+				@components.LucideIcon("check", "w-5 h-5 text-success")
 			</div>
 			<div>
 				<h2 class="text-sm font-semibold">{ p.ClientName }</h2>

@@ -98,7 +98,7 @@ templ txdHeroAmount(p TransactionDetailProps) {
 			}
 		>
 			if p.Transaction.Pending {
-				<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning opacity-70"></i>
+				@components.LucideIcon("clock", "w-5 h-5 shrink-0 text-warning opacity-70")
 			}
 			@components.Amount(components.AmountProps{
 				Value:   p.Transaction.Amount,
@@ -117,7 +117,7 @@ templ txdAccountBanner(p TransactionDetailProps) {
 	<div class="bb-card p-0 mb-4 sm:mb-6 overflow-hidden">
 		<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-3.5">
 			<div class="w-9 h-9 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
-				<i data-lucide="building-2" class="w-5 h-5 text-base-content opacity-40"></i>
+				@components.LucideIcon("building-2", "w-5 h-5 text-base-content opacity-40")
 			</div>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 flex-wrap">
@@ -153,7 +153,7 @@ templ txdAccountBanner(p TransactionDetailProps) {
 				</div>
 			}
 			<a href={ templ.SafeURL("/accounts/" + p.AccountID) } class="btn btn-ghost btn-xs shrink-0 ml-auto sm:ml-0">
-				<i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("external-link", "w-3.5 h-3.5")
 			</a>
 		</div>
 	</div>
@@ -254,7 +254,7 @@ templ txdMain(p TransactionDetailProps) {
 					<button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
 						<template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
 						<span x-text="displayLabel" class="text-sm font-medium flex-1 text-left"></span>
-						<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30"></i>
+						@components.LucideIcon("chevron-down", "w-4 h-4 text-base-content opacity-30")
 					</button>
 				</div>
 				<div class="flex items-center gap-2 mt-3">
@@ -294,7 +294,7 @@ templ txdMain(p TransactionDetailProps) {
 								:aria-label="'Remove tag ' + (t.displayName || t.slug)"
 								:title="'Remove tag ' + (t.displayName || t.slug)"
 							>
-								<i data-lucide="x"></i>
+								@components.LucideIcon("x", "")
 							</button>
 						</span>
 					</template>
@@ -308,7 +308,7 @@ templ txdMain(p TransactionDetailProps) {
 						@tag-selection-commit.window="if ($event.detail.sourceId === 'txd-tag') { applyTagDiff($event.detail.adds, $event.detail.removes) }"
 						title="Edit tags"
 					>
-						<i data-lucide="plus"></i>
+						@components.LucideIcon("plus", "")
 						<span x-text="tags.length === 0 ? 'Add tag' : 'Edit tags'"></span>
 					</button>
 				</div>
@@ -357,7 +357,7 @@ templ txdActivity(p TransactionDetailProps) {
 		} else {
 			<section aria-labelledby="activity-heading">
 				<header class="flex items-center gap-2 pb-4 mb-4 border-b border-base-300/60">
-					<i data-lucide="activity" class="w-4 h-4 text-base-content opacity-50" aria-hidden="true"></i>
+					@components.LucideIcon("activity", "w-4 h-4 text-base-content opacity-50")
 					<h2 id="activity-heading" class="text-base font-semibold text-base-content">Activity</h2>
 				</header>
 				@txdTimelineEmptyComposer(p)
@@ -417,7 +417,7 @@ templ txdTimelineRow(e service.ActivityEntry, now time.Time) {
 // markup so the migration is byte-equivalent.
 templ txdDeletedCommentTile() {
 	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-		<i data-lucide="trash-2" class="w-3 h-3 text-base-content opacity-40"></i>
+		@components.LucideIcon("trash-2", "w-3 h-3 text-base-content opacity-40")
 	</span>
 }
 
@@ -513,36 +513,36 @@ templ txdSystemIcon(e service.ActivityEntry) {
 	if e.Type == "tag" {
 		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdTagOuterBg(e.TagAction) } aria-hidden="true">
 			if e.TagAction == "removed" {
-				<i data-lucide="minus" class={ "w-3 h-3", txdTagIconColor(e.TagAction) }></i>
+				@components.LucideIcon("minus", "w-3 h-3 " + txdTagIconColor(e.TagAction))
 			} else {
-				<i data-lucide="plus" class={ "w-3 h-3", txdTagIconColor(e.TagAction) }></i>
+				@components.LucideIcon("plus", "w-3 h-3 " + txdTagIconColor(e.TagAction))
 			}
 		</span>
 	} else if e.Type == "category" {
 		@txdCategoryIcon(e)
 	} else if e.Type == "rule" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-info/15 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="zap" class="w-3 h-3 text-info"></i>
+			@components.LucideIcon("zap", "w-3 h-3 text-info")
 		</span>
 	} else if e.Type == "sync" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="landmark" class="w-3 h-3 text-base-content opacity-60"></i>
+			@components.LucideIcon("landmark", "w-3 h-3 text-base-content opacity-60")
 		</span>
 	} else if e.Type == "review" {
 		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdReviewBg(e.ReviewStatus) } aria-hidden="true">
 			if e.ReviewStatus == "approved" {
-				<i data-lucide="check" class="w-3 h-3 text-success"></i>
+				@components.LucideIcon("check", "w-3 h-3 text-success")
 			} else if e.ReviewStatus == "rejected" {
-				<i data-lucide="x" class="w-3 h-3 text-error"></i>
+				@components.LucideIcon("x", "w-3 h-3 text-error")
 			} else if e.ReviewStatus == "skipped" {
-				<i data-lucide="skip-forward" class="w-3 h-3 text-warning"></i>
+				@components.LucideIcon("skip-forward", "w-3 h-3 text-warning")
 			} else {
-				<i data-lucide="scan-search" class="w-3 h-3 text-base-content opacity-50"></i>
+				@components.LucideIcon("scan-search", "w-3 h-3 text-base-content opacity-50")
 			}
 		</span>
 	} else {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="circle" class="w-3 h-3 text-base-content opacity-40"></i>
+			@components.LucideIcon("circle", "w-3 h-3 text-base-content opacity-40")
 		</span>
 	}
 }
@@ -558,18 +558,18 @@ templ txdCategoryIcon(e service.ActivityEntry) {
 			aria-hidden="true"
 		>
 			if e.CategoryIcon != nil && *e.CategoryIcon != "" {
-				<i data-lucide={ *e.CategoryIcon } class="w-3 h-3" style={ "color: " + *e.CategoryColor }></i>
+				@components.LucideIconWithStyle(*e.CategoryIcon, "w-3 h-3", "color: " + *e.CategoryColor)
 			} else {
-				<i data-lucide="folder" class="w-3 h-3" style={ "color: " + *e.CategoryColor }></i>
+				@components.LucideIconWithStyle("folder", "w-3 h-3", "color: " + *e.CategoryColor)
 			}
 		</span>
 	} else if e.CategoryIcon != nil && *e.CategoryIcon != "" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide={ *e.CategoryIcon } class="w-3 h-3 text-base-content opacity-60"></i>
+			@components.LucideIcon(*e.CategoryIcon, "w-3 h-3 text-base-content opacity-60")
 		</span>
 	} else {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="folder" class="w-3 h-3 text-base-content opacity-50"></i>
+			@components.LucideIcon("folder", "w-3 h-3 text-base-content opacity-50")
 		</span>
 	}
 }
@@ -604,7 +604,7 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 		}
 		if e.CommentID != "" {
 			<button class="shrink-0 sm:ml-auto rounded-md p-1 -m-1 text-base-content/30 hover:text-error hover:bg-error/5 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName } title="Delete comment">
-				<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
+				@components.LucideIcon("trash-2", "w-3.5 h-3.5")
 			</button>
 		}
 	</div>
@@ -646,7 +646,7 @@ templ txdTimelineComposer(p TransactionDetailProps) {
 	<li class="relative flex items-start gap-3 pt-3 pb-1">
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100" aria-hidden="true">
 			<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 ring-4 ring-base-100">
-				<i data-lucide="message-square" class="w-3 h-3 text-primary"></i>
+				@components.LucideIcon("message-square", "w-3 h-3 text-primary")
 			</span>
 		</div>
 		<div class="flex-1 min-w-0">
@@ -662,7 +662,7 @@ templ txdTimelineComposer(p TransactionDetailProps) {
 templ txdTimelineEmptyComposer(p TransactionDetailProps) {
 	<div class="px-4 sm:px-5 pb-5">
 		<div class="pt-2 pb-5 text-center">
-			<i data-lucide="clock" class="w-5 h-5 text-base-content opacity-20 mx-auto" aria-hidden="true"></i>
+			@components.LucideIcon("clock", "w-5 h-5 text-base-content opacity-20 mx-auto")
 			<p class="text-xs text-base-content/40 mt-1.5">No activity yet. Comments, tag changes, and rule hits appear here.</p>
 		</div>
 		<div class="pt-4 border-t border-base-200">
@@ -716,7 +716,7 @@ templ txdComposerCard(p TransactionDetailProps) {
 					</span>
 				</span>
 				<span class="hidden sm:inline-flex items-center gap-1 text-[11px] text-base-content/40" title="Markdown is supported (bold, italic, lists, links, code).">
-					<i data-lucide="markdown" class="w-3.5 h-3.5" aria-hidden="true"></i>
+					@components.LucideIcon("markdown", "w-3.5 h-3.5")
 					<span>Markdown supported</span>
 				</span>
 				<!--
@@ -840,9 +840,9 @@ templ txdInlineCategoryChip(e service.ActivityEntry) {
 		}
 		if e.CategoryIcon != nil && *e.CategoryIcon != "" {
 			if e.CategoryColor != nil && *e.CategoryColor != "" {
-				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0" style={ "color: " + *e.CategoryColor }></i>
+				@components.LucideIconWithStyle(*e.CategoryIcon, "w-3.5 h-3.5 shrink-0", "color: " + *e.CategoryColor)
 			} else {
-				<i data-lucide={ *e.CategoryIcon } class="w-3.5 h-3.5 shrink-0 text-base-content opacity-60"></i>
+				@components.LucideIcon(*e.CategoryIcon, "w-3.5 h-3.5 shrink-0 text-base-content opacity-60")
 			}
 		}
 		<strong class="font-semibold text-base-content break-words">{ e.CategoryName }</strong>

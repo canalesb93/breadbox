@@ -1,6 +1,9 @@
 package pages
 
-import "breadbox/internal/templates/components/layout"
+import (
+	"breadbox/internal/templates/components/layout"
+	"breadbox/internal/templates/components"
+)
 
 // SaveKey renders the /setup/save-key page — a one-time reveal of the
 // encryption key during onboarding. Hosted inside the shared wizard
@@ -26,7 +29,7 @@ templ SaveKey(p SaveKeyProps) {
 		<script src="/static/js/admin/components/setup_save_key.js"></script>
 		<div class="text-center mb-7">
 			<div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
-				<i data-lucide="key-round" class="w-6 h-6 text-primary"></i>
+				@components.LucideIcon("key-round", "w-6 h-6 text-primary")
 			</div>
 			<h1 class="text-xl font-semibold tracking-tight">Save your encryption key</h1>
 			<p class="text-sm text-base-content/60 mt-1.5 leading-relaxed">Breadbox uses this key to encrypt bank credentials at rest. Save it to a password manager before connecting any banks.</p>
@@ -94,14 +97,14 @@ templ SaveKey(p SaveKeyProps) {
 					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
 					title="Requires the 1Password browser extension"
 				>
-					<i data-lucide="key-round" class="w-4 h-4"></i>
+					@components.LucideIcon("key-round", "w-4 h-4")
 					<span>Save in 1Password</span>
 				</button>
 			</div>
 			<!-- Lost-it-later callout. Quieter visual weight than a daisy alert. -->
 			<div class="rounded-lg bg-base-200/40 border border-base-300/70 px-3.5 py-3 text-xs text-base-content/60 leading-relaxed">
 				<div class="flex items-start gap-2.5">
-					<i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-base-content/40"></i>
+					@components.LucideIcon("info", "w-3.5 h-3.5 mt-0.5 shrink-0 text-base-content/40")
 					<p class="m-0">
 						<span class="font-medium text-base-content/75">Lost it later?</span> The key is also in your server's <kbd class="kbd kbd-xs">.env</kbd> file and printable from the shell with <kbd class="kbd kbd-xs">breadbox reveal-key</kbd>. This page won't show it again after you continue.
 					</p>
@@ -113,7 +116,7 @@ templ SaveKey(p SaveKeyProps) {
 				}
 				<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold">
 					I've saved it — continue
-					<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+					@components.LucideIcon("arrow-right", "w-4 h-4 ml-1")
 				</button>
 			</form>
 		</div>

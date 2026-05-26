@@ -40,7 +40,7 @@ templ tagChipBody(class string, tag TagChipData) {
 		title={ tagChipTitle(tag) }
 	>
 		if tag.Icon != nil {
-			<i data-lucide={ deref(tag.Icon) }></i>
+			@LucideIcon(deref(tag.Icon), "")
 		}
 		<span class="truncate">{ tag.DisplayName }</span>
 	</span>

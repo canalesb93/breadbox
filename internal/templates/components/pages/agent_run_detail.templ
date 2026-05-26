@@ -46,7 +46,7 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 		}
 		if p.Error != "" {
 			<div class="alert alert-warning alert-soft mb-4">
-				<i data-lucide="triangle-alert" class="w-4 h-4"></i>
+				@components.LucideIcon("triangle-alert", "w-4 h-4")
 				<span>{ p.Error }</span>
 			</div>
 		}
@@ -78,10 +78,10 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 	<div class="bb-run-header">
 		<div class="bb-run-header__lead">
 			<a href={ templ.SafeURL(agentRunHeaderBackHref(p)) } class="btn btn-ghost btn-sm btn-square" title="Back to runs">
-				<i data-lucide="arrow-left" class="w-4 h-4"></i>
+				@components.LucideIcon("arrow-left", "w-4 h-4")
 			</a>
 			<div class="bb-run-header__icon">
-				<i data-lucide="bot" class="w-4 h-4"></i>
+				@components.LucideIcon("bot", "w-4 h-4")
 			</div>
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 flex-wrap">
@@ -127,7 +127,7 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 					title="Jump to the run's final result bubble"
 					@click="jumpToResult()"
 				>
-					<i data-lucide="flag-triangle-right" class="w-4 h-4"></i>
+					@components.LucideIcon("flag-triangle-right", "w-4 h-4")
 					Jump to result
 				</button>
 			}
@@ -137,7 +137,7 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 					class="btn btn-sm btn-ghost gap-2"
 					title="Run this agent again"
 				>
-					<i data-lucide="play" class="w-4 h-4"></i>
+					@components.LucideIcon("play", "w-4 h-4")
 					Re-run
 				</a>
 			}
@@ -163,7 +163,7 @@ func agentRunHeaderBackHref(p AgentRunDetailProps) string {
 templ agentRunErrorAlert(run AgentRunRowProps) {
 	if run.ErrorMessageFriendly != "" {
 		<div class="alert alert-warning alert-soft mb-4">
-			<i data-lucide="rotate-cw" class="w-4 h-4"></i>
+			@components.LucideIcon("rotate-cw", "w-4 h-4")
 			<div>
 				<div class="font-medium">{ run.ErrorMessageFriendly }</div>
 				<div class="text-xs opacity-70 mt-0.5 font-mono">{ run.ErrorMessage }</div>
@@ -171,7 +171,7 @@ templ agentRunErrorAlert(run AgentRunRowProps) {
 		</div>
 	} else {
 		<div class="alert alert-error alert-soft mb-4">
-			<i data-lucide="triangle-alert" class="w-4 h-4"></i>
+			@components.LucideIcon("triangle-alert", "w-4 h-4")
 			<span class="whitespace-pre-wrap break-words">{ run.ErrorMessage }</span>
 		</div>
 	}
@@ -201,7 +201,7 @@ templ agentRunTranscriptCard(p AgentRunDetailProps) {
 	<div class="bb-card p-4">
 		<div class="flex items-center justify-between mb-3">
 			<h2 class="text-sm font-semibold flex items-center gap-2">
-				<i data-lucide="messages-square" class="w-4 h-4 text-base-content opacity-60"></i>
+				@components.LucideIcon("messages-square", "w-4 h-4 text-base-content opacity-60")
 				Transcript
 			</h2>
 			<div class="flex items-center gap-2">
@@ -211,14 +211,14 @@ templ agentRunTranscriptCard(p AgentRunDetailProps) {
 					}
 				</span>
 				<button type="button" class="btn btn-ghost btn-xs gap-1.5" @click="toggleAll()" :title="allOpen ? 'Collapse all tool calls' : 'Expand all tool calls'">
-					<i data-lucide="list-tree" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("list-tree", "w-3.5 h-3.5")
 					<span x-text="allOpen ? 'Collapse' : 'Expand'"></span>
 				</button>
 			</div>
 		</div>
 		if p.Truncated {
 			<div class="alert alert-warning alert-soft mb-3 text-xs">
-				<i data-lucide="alert-triangle" class="w-4 h-4"></i>
+				@components.LucideIcon("alert-triangle", "w-4 h-4")
 				<span>Showing first { strconv.Itoa(agentRunTranscriptMaxEventsConst) } events. Raw transcript on disk at <code class="font-mono text-[0.7rem]">{ p.TranscriptPath }</code>.</span>
 			</div>
 		}
@@ -240,7 +240,7 @@ const agentRunTranscriptMaxEventsConst = 500
 templ AgentRunTranscriptFragment(p AgentRunDetailProps) {
 	if len(p.Transcript) == 0 {
 		<div class="bb-run-empty">
-			<i data-lucide="hourglass" class="w-8 h-8 text-base-content/30"></i>
+			@components.LucideIcon("hourglass", "w-8 h-8 text-base-content/30")
 			if p.Run.Status == "in_progress" {
 				<p class="text-sm text-base-content/60 mt-3">Transcript fills in as the agent works.</p>
 			} else {
@@ -277,7 +277,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="chat chat-start bb-chat-row">
 				<div class="chat-image avatar avatar-placeholder">
 					<div class="w-7 rounded-full bg-primary/15 text-primary">
-						<i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("sparkles", "w-3.5 h-3.5")
 					</div>
 				</div>
 				<div class="chat-header text-[0.65rem] uppercase tracking-wider text-base-content/50">
@@ -300,7 +300,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="chat chat-end bb-chat-row">
 				<div class="chat-image avatar avatar-placeholder">
 					<div class="w-7 rounded-full bg-base-300 text-base-content/60">
-						<i data-lucide="user" class="w-3.5 h-3.5"></i>
+						@components.LucideIcon("user", "w-3.5 h-3.5")
 					</div>
 				</div>
 				<div class="chat-header text-[0.65rem] uppercase tracking-wider text-base-content/50">
@@ -323,13 +323,13 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="bb-tool-row">
 				<details class="bb-tool" data-tool-event="use">
 					<summary class="bb-tool__summary">
-						<div class="bb-tool__icon"><i data-lucide="wrench" class="w-3.5 h-3.5"></i></div>
+						<div class="bb-tool__icon">@components.LucideIcon("wrench", "w-3.5 h-3.5")</div>
 						<span class="bb-tool__label">Tool call</span>
 						<span class="bb-tool__name font-mono">{ agentRunToolDisplay(ev.ToolName) }</span>
 						if !ev.Timestamp.IsZero() {
 							<time class="bb-tool__time" datetime={ ev.Timestamp.Format(time.RFC3339) }>{ ev.Timestamp.Format("15:04:05") }</time>
 						}
-						<i data-lucide="chevron-right" class="bb-tool__chev w-3.5 h-3.5"></i>
+						@components.LucideIcon("chevron-right", "bb-tool__chev w-3.5 h-3.5")
 					</summary>
 					<div class="bb-tool__body">
 						if ev.ToolInputJSON != "" {
@@ -344,7 +344,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="bb-tool-row">
 				<details class="bb-tool" data-tool-event="result">
 					<summary class="bb-tool__summary">
-						<div class="bb-tool__icon bb-tool__icon--result"><i data-lucide="check-check" class="w-3.5 h-3.5"></i></div>
+						<div class="bb-tool__icon bb-tool__icon--result">@components.LucideIcon("check-check", "w-3.5 h-3.5")</div>
 						<span class="bb-tool__label">Tool result</span>
 						if ev.ToolName != "" {
 							<span class="bb-tool__name font-mono">{ agentRunToolDisplay(ev.ToolName) }</span>
@@ -352,7 +352,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 						if !ev.Timestamp.IsZero() {
 							<time class="bb-tool__time" datetime={ ev.Timestamp.Format(time.RFC3339) }>{ ev.Timestamp.Format("15:04:05") }</time>
 						}
-						<i data-lucide="chevron-right" class="bb-tool__chev w-3.5 h-3.5"></i>
+						@components.LucideIcon("chevron-right", "bb-tool__chev w-3.5 h-3.5")
 					</summary>
 					<div class="bb-tool__body">
 						if ev.ToolResultJSON != "" {
@@ -365,7 +365,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			</li>
 		case "system":
 			<li class="bb-system-row">
-				<i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-base-content/50"></i>
+				@components.LucideIcon("info", "w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-base-content/50")
 				<div class="min-w-0">
 					<div class="text-[0.65rem] uppercase tracking-wider text-base-content/50">System</div>
 					if ev.Text != "" {
@@ -379,7 +379,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 		case "result":
 			<li class="bb-run-summary">
 				<div class="bb-run-summary__head">
-					<i data-lucide="flag-triangle-right" class="w-3.5 h-3.5"></i>
+					@components.LucideIcon("flag-triangle-right", "w-3.5 h-3.5")
 					<span class="text-[0.65rem] uppercase tracking-wider">Final result</span>
 				</div>
 				<div class="bb-run-summary__grid">
@@ -410,7 +410,7 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 		case "error":
 			<li>
 				<div class="alert alert-error alert-soft text-xs">
-					<i data-lucide="alert-circle" class="w-4 h-4"></i>
+					@components.LucideIcon("alert-circle", "w-4 h-4")
 					<div>
 						<div class="font-medium">Error</div>
 						<div class="text-base-content/70">{ ev.Text }</div>
@@ -421,12 +421,12 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="bb-tool-row">
 				<details class="bb-tool">
 					<summary class="bb-tool__summary">
-						<div class="bb-tool__icon bb-tool__icon--raw"><i data-lucide="code-2" class="w-3.5 h-3.5"></i></div>
+						<div class="bb-tool__icon bb-tool__icon--raw">@components.LucideIcon("code-2", "w-3.5 h-3.5")</div>
 						<span class="bb-tool__label">Raw event</span>
 						if ev.Type != "" {
 							<span class="bb-tool__name font-mono">{ ev.Type }</span>
 						}
-						<i data-lucide="chevron-right" class="bb-tool__chev w-3.5 h-3.5"></i>
+						@components.LucideIcon("chevron-right", "bb-tool__chev w-3.5 h-3.5")
 					</summary>
 					<div class="bb-tool__body">
 						@components.JSONViewer(components.JSONViewerProps{Source: ev.RawJSON, MaxDepth: 1, ShowCopy: true})
@@ -498,7 +498,7 @@ templ agentRunNoteCard(p AgentRunDetailProps) {
 	>
 		<div class="flex items-center justify-between mb-2">
 			<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 flex items-center gap-1.5">
-				<i data-lucide="sticky-note" class="w-3 h-3"></i>
+				@components.LucideIcon("sticky-note", "w-3 h-3")
 				Operator note
 			</h3>
 			<button
@@ -507,7 +507,7 @@ templ agentRunNoteCard(p AgentRunDetailProps) {
 				x-show="!editing && !saving"
 				@click="startEdit()"
 			>
-				<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+				@components.LucideIcon("pencil", "w-3.5 h-3.5")
 			</button>
 		</div>
 		<div x-show="!editing" x-cloak>
@@ -562,7 +562,7 @@ templ agentRunToolsCard(p AgentRunDetailProps) {
 	if usage := ComputeToolUsage(p.Transcript); len(usage) > 0 {
 		<div class="bb-card p-4">
 			<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
-				<i data-lucide="wrench" class="w-3 h-3"></i>
+				@components.LucideIcon("wrench", "w-3 h-3")
 				Tools used
 			</h3>
 			<ul class="space-y-1">
@@ -580,7 +580,7 @@ templ agentRunToolsCard(p AgentRunDetailProps) {
 templ agentRunReportsCard(p AgentRunDetailProps) {
 	<div class="bb-card p-4">
 		<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
-			<i data-lucide="file-text" class="w-3 h-3"></i>
+			@components.LucideIcon("file-text", "w-3 h-3")
 			Reports
 		</h3>
 		<ul class="space-y-1.5">
@@ -590,7 +590,7 @@ templ agentRunReportsCard(p AgentRunDetailProps) {
 						href={ templ.SafeURL("/reports/" + rep.ShortID) }
 						class="flex items-start gap-2 text-sm hover:bg-base-200/60 rounded-md px-2 py-1.5 -mx-2 no-underline"
 					>
-						<i data-lucide="file-text" class="w-3.5 h-3.5 mt-0.5 text-base-content/50 flex-shrink-0"></i>
+						@components.LucideIcon("file-text", "w-3.5 h-3.5 mt-0.5 text-base-content/50 flex-shrink-0")
 						<span class="line-clamp-2 text-base-content/80">{ rep.Title }</span>
 					</a>
 				</li>
@@ -606,7 +606,7 @@ templ agentRunPromptCard(p AgentRunDetailProps) {
 	if p.PromptPrefix != "" || p.SystemPrompt != "" || p.Prompt != "" {
 		<div class="bb-card p-4">
 			<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
-				<i data-lucide="message-square" class="w-3 h-3"></i>
+				@components.LucideIcon("message-square", "w-3 h-3")
 				Prompt
 			</h3>
 			<div class="space-y-1">
@@ -614,7 +614,7 @@ templ agentRunPromptCard(p AgentRunDetailProps) {
 					<details class="bb-run-collapse">
 						<summary>
 							<span class="text-xs font-medium">Per-run prefix</span>
-							<i data-lucide="chevron-right" class="bb-run-collapse__chev w-3 h-3"></i>
+							@components.LucideIcon("chevron-right", "bb-run-collapse__chev w-3 h-3")
 						</summary>
 						<pre class="bb-run-collapse__pre">{ p.PromptPrefix }</pre>
 					</details>
@@ -623,7 +623,7 @@ templ agentRunPromptCard(p AgentRunDetailProps) {
 					<details class="bb-run-collapse">
 						<summary>
 							<span class="text-xs font-medium">System prompt</span>
-							<i data-lucide="chevron-right" class="bb-run-collapse__chev w-3 h-3"></i>
+							@components.LucideIcon("chevron-right", "bb-run-collapse__chev w-3 h-3")
 						</summary>
 						<pre class="bb-run-collapse__pre">{ p.SystemPrompt }</pre>
 					</details>
@@ -632,7 +632,7 @@ templ agentRunPromptCard(p AgentRunDetailProps) {
 					<details class="bb-run-collapse">
 						<summary>
 							<span class="text-xs font-medium">User prompt</span>
-							<i data-lucide="chevron-right" class="bb-run-collapse__chev w-3 h-3"></i>
+							@components.LucideIcon("chevron-right", "bb-run-collapse__chev w-3 h-3")
 						</summary>
 						<pre class="bb-run-collapse__pre">{ p.Prompt }</pre>
 					</details>
@@ -645,7 +645,7 @@ templ agentRunPromptCard(p AgentRunDetailProps) {
 templ agentRunTranscriptPathCard(p AgentRunDetailProps) {
 	<div class="bb-card p-3">
 		<div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 mb-1 flex items-center gap-1.5">
-			<i data-lucide="file" class="w-3 h-3"></i>
+			@components.LucideIcon("file", "w-3 h-3")
 			Transcript file
 		</div>
 		<code class="font-mono text-[0.7rem] text-base-content/70 break-all">{ p.TranscriptPath }</code>

@@ -62,7 +62,7 @@ templ TxRowFeed(p TxRowFeedProps) {
 		     carries labels. Hidden on zero so the row stays clean. -->
 		if p.TagCount > 0 {
 			<span class="inline-flex items-center gap-0.5 text-xs text-base-content/45 tabular-nums shrink-0" title={ TxRowFeedTagTitle(p.TagCount) }>
-				<i data-lucide="tag" class="w-3 h-3"></i>
+				@LucideIcon("tag", "w-3 h-3")
 				<span>{ fmt.Sprintf("%d", p.TagCount) }</span>
 			</span>
 		}

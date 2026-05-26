@@ -1,5 +1,7 @@
 package pages
 
+
+import "breadbox/internal/templates/components"
 // MCPGuide renders the Getting Started tab inside /agents. Originally
 // pages/mcp_guide.html in the html/template tree. The Alpine factory
 // lives in static/js/admin/components/mcp_guide.js and reads the MCP
@@ -41,30 +43,30 @@ templ MCPGuide(p MCPGuideProps) {
 						<!-- OAuth -->
 						<div class="rounded-xl border border-base-300 p-4 hover:border-primary/30 transition-colors flex flex-col">
 							<div class="flex items-center gap-2 mb-2">
-								<i data-lucide="fingerprint" class="w-4 h-4 text-primary"></i>
+								@components.LucideIcon("fingerprint", "w-4 h-4 text-primary")
 								<span class="font-medium text-sm">OAuth Client</span>
 								<span class="badge badge-primary badge-xs">Recommended</span>
 							</div>
 							<p class="text-xs text-base-content/50 mb-3 flex-1">Automatic token flow with consent screen. Works with Claude, ChatGPT, and most MCP clients.</p>
 							<div class="flex flex-wrap gap-2">
-								<a href="/oauth-clients/new" class="btn btn-primary btn-xs">Create <i data-lucide="plus" class="w-3.5 h-3.5"></i></a>
+								<a href="/oauth-clients/new" class="btn btn-primary btn-xs">Create @components.LucideIcon("plus", "w-3.5 h-3.5")</a>
 								if p.HasOAuthClients {
-									<a href="/access#oauth-clients" class="btn btn-ghost btn-xs">Manage <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></a>
+									<a href="/access#oauth-clients" class="btn btn-ghost btn-xs">Manage @components.LucideIcon("arrow-right", "w-3.5 h-3.5")</a>
 								}
 							</div>
 						</div>
 						<!-- API Key -->
 						<div class="rounded-xl border border-base-300 p-4 hover:border-primary/30 transition-colors flex flex-col">
 							<div class="flex items-center gap-2 mb-2">
-								<i data-lucide="key" class="w-4 h-4 text-warning"></i>
+								@components.LucideIcon("key", "w-4 h-4 text-warning")
 								<span class="font-medium text-sm">API Key</span>
 								<span class="badge badge-ghost badge-xs">Simple</span>
 							</div>
 							<p class="text-xs text-base-content/50 mb-3 flex-1">Add a header to your agent config. Best for personal use and CLI tools.</p>
 							<div class="flex flex-wrap gap-2">
-								<a href="/api-keys/new" class="btn btn-primary btn-xs">Create <i data-lucide="plus" class="w-3.5 h-3.5"></i></a>
+								<a href="/api-keys/new" class="btn btn-primary btn-xs">Create @components.LucideIcon("plus", "w-3.5 h-3.5")</a>
 								if p.HasAPIKeys {
-									<a href="/access#api-keys" class="btn btn-ghost btn-xs">Manage <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></a>
+									<a href="/access#api-keys" class="btn btn-ghost btn-xs">Manage @components.LucideIcon("arrow-right", "w-3.5 h-3.5")</a>
 								}
 							</div>
 						</div>
@@ -101,10 +103,10 @@ templ MCPGuide(p MCPGuideProps) {
 					</div>
 					<div x-show="showFlavorToggle" x-cloak class="join rounded-lg border border-base-300">
 						<button class="join-item btn btn-xs gap-1.5 border-0" :class="flavor === 'guide' ? 'btn-active' : 'btn-ghost'" @click="flavor = 'guide'">
-							<i data-lucide="book-open" class="w-3.5 h-3.5"></i> Guide
+							@components.LucideIcon("book-open", "w-3.5 h-3.5") Guide
 						</button>
 						<button class="join-item btn btn-xs gap-1.5 border-0" :class="flavor === 'config' ? 'btn-active' : 'btn-ghost'" @click="flavor = 'config'">
-							<i data-lucide="code" class="w-3.5 h-3.5"></i> Config
+							@components.LucideIcon("code", "w-3.5 h-3.5") Config
 						</button>
 					</div>
 				</div>
@@ -125,7 +127,7 @@ templ MCPGuide(p MCPGuideProps) {
 							<li>Breadbox tools should appear in Claude's tool list</li>
 						</ol>
 						<div role="alert" class="alert alert-info alert-soft text-xs">
-							<i data-lucide="lightbulb" class="w-4 h-4"></i>
+							@components.LucideIcon("lightbulb", "w-4 h-4")
 							<span>Claude Desktop supports OAuth natively. If you omit the API key headers, Claude will automatically initiate the OAuth consent flow when connecting.</span>
 						</div>
 						<div class="text-xs text-base-content/40">
@@ -135,7 +137,7 @@ templ MCPGuide(p MCPGuideProps) {
 						</div>
 						<!-- Video placeholder -->
 						<div class="border-2 border-dashed border-base-300 rounded-xl p-8 flex flex-col items-center justify-center text-base-content/30 gap-2">
-							<i data-lucide="play-circle" class="w-8 h-8"></i>
+							@components.LucideIcon("play-circle", "w-8 h-8")
 							<span class="text-xs">Setup walkthrough video coming soon</span>
 						</div>
 					</div>
@@ -180,7 +182,7 @@ templ MCPGuide(p MCPGuideProps) {
 							</button>
 						</div>
 						<div role="alert" class="alert alert-info alert-soft text-xs">
-							<i data-lucide="lightbulb" class="w-4 h-4"></i>
+							@components.LucideIcon("lightbulb", "w-4 h-4")
 							<span>Adding to <code>.mcp.json</code> in your project root shares the config with your team. Use environment variables for the API key.</span>
 						</div>
 					</div>
@@ -202,7 +204,7 @@ templ MCPGuide(p MCPGuideProps) {
 						</ol>
 						<!-- Video placeholder -->
 						<div class="border-2 border-dashed border-base-300 rounded-xl p-8 flex flex-col items-center justify-center text-base-content/30 gap-2">
-							<i data-lucide="play-circle" class="w-8 h-8"></i>
+							@components.LucideIcon("play-circle", "w-8 h-8")
 							<span class="text-xs">Setup walkthrough video coming soon</span>
 						</div>
 					</div>
@@ -268,7 +270,7 @@ templ MCPGuide(p MCPGuideProps) {
 			<div class="px-4 sm:px-5 py-4">
 				<p class="text-sm text-base-content/60 mb-4">Once your agent is connected, use the Agent Wizard to create prompts for common tasks like reviewing transactions, categorizing spending, and generating reports.</p>
 				<a href="/agents?tab=wizard" class="btn btn-primary btn-sm gap-2">
-					<i data-lucide="wand-sparkles" class="w-4 h-4"></i>
+					@components.LucideIcon("wand-sparkles", "w-4 h-4")
 					Open Agent Wizard
 				</a>
 			</div>
