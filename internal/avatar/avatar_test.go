@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -138,6 +139,80 @@ func TestIsValidStyle(t *testing.T) {
 	}
 	if IsValidStyle("") {
 		t.Error("empty string should not be a valid style")
+	}
+}
+
+func TestIsValidSeed(t *testing.T) {
+	tests := []struct {
+		name string
+		seed string
+		want bool
+	}{
+		{"empty rejected", "", false},
+		{"uuid accepted", "8d331c40-28af-4b49-99e8-042c5231b849", true},
+		{"hex random accepted", "abc123def456", true},
+		{"alphanumeric+dash+underscore+dot", "user_2.alt-1", true},
+		{"slash rejected", "shapes/256/bob", false},
+		{"space rejected", "alice bob", false},
+		{"control char rejected", "alice\nbob", false},
+		{"unicode rejected", "alice_éü", false},
+		{"too long rejected", strings.Repeat("a", MaxSeedLength+1), false},
+		{"max length accepted", strings.Repeat("a", MaxSeedLength), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidSeed(tt.seed); got != tt.want {
+				t.Errorf("IsValidSeed(%q) = %v, want %v", tt.seed, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCacheKey_NoSeparatorCollisions(t *testing.T) {
+	// Confirms the hash-based key avoids the old `style + "/" + size +
+	// "/" + seed` collision where seed=`8/bob` under (shapes, 256)
+	// would key-collide with seed=`bob` under (shapes, 256) at size=8.
+	a := cacheKey("shapes", 256, "8/bob")
+	b := cacheKey("shapes", 8, "bob")
+	if a == b {
+		t.Errorf("expected distinct keys, both = %q", a)
+	}
+}
+
+func TestGenerateSVG_CacheCapped(t *testing.T) {
+	// Once cacheCount exceeds maxCacheEntries, the next Store triggers
+	// ResetCache(). Without the cap, a flood of unique seeds would
+	// grow the sync.Map without bound.
+	var hits int32
+	cleanup := withDiceBearMock(t, func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		_, _ = w.Write([]byte(`<svg/>`))
+	})
+	defer cleanup()
+
+	for i := 0; i < maxCacheEntries+10; i++ {
+		_ = GenerateSVG("seed-"+strconv.Itoa(i), 256)
+	}
+	got := cacheCount.Load()
+	if got > int64(maxCacheEntries) {
+		t.Errorf("cacheCount = %d, want <= %d", got, maxCacheEntries)
+	}
+}
+
+func TestGenerateSVGStyled_OverridesGlobal(t *testing.T) {
+	cleanup := withDiceBearMock(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<svg path="` + r.URL.Path + `"/>`))
+	})
+	defer cleanup()
+
+	SetStyle("shapes")
+	got := string(GenerateSVGStyled("alice", 256, "identicon"))
+	if !strings.Contains(got, "/identicon/svg") {
+		t.Errorf("override ignored — expected identicon path in %q", got)
+	}
+	// Global wasn't touched.
+	if Style() != "shapes" {
+		t.Errorf("Style() = %q after override, want shapes", Style())
 	}
 }
 

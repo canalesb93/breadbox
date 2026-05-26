@@ -201,6 +201,9 @@ document.addEventListener('alpine:init', function () {
             self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
             self.hasCustomAvatar = true;
             self.avatarUploading = false;
+            // Upload supersedes any staged Regenerate seed — otherwise
+            // Save Changes would silently wipe the just-uploaded image.
+            self.pendingAvatarSeed = '';
           })
           .catch(function (err) {
             self.avatarError = (err.error || 'Upload failed');
@@ -217,6 +220,9 @@ document.addEventListener('alpine:init', function () {
             if (!res.ok) return res.json().then(function (d) { throw d; });
             self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
             self.hasCustomAvatar = false;
+            // Drop any staged Regenerate seed — Remove resets to the
+            // default-from-UUID identicon, not the staged pattern.
+            self.pendingAvatarSeed = '';
           })
           .catch(function (err) {
             self.avatarError = (err.error || 'Remove failed');

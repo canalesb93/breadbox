@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"breadbox/internal/app"
+	"breadbox/internal/avatar"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/templates/components"
@@ -458,8 +459,10 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 // the avatarEditor Alpine factory. The form submits the same shape
 // the regenerate POST used to (clear uploaded image + set seed); we
 // just defer that work from the button click to the Save Changes
-// click. A nil/empty seed is a no-op. Returns false after writing an
-// error response.
+// click. A nil/empty seed is a no-op. Invalid seeds (too long, bad
+// charset) are rejected to bound the upstream DiceBear URL + the
+// in-process cache key. Returns false after writing an error
+// response.
 func applyPendingAvatarSeed(a *app.App, w http.ResponseWriter, r *http.Request, userID pgtype.UUID, seed *string) bool {
 	if seed == nil {
 		return true
@@ -467,6 +470,11 @@ func applyPendingAvatarSeed(a *app.App, w http.ResponseWriter, r *http.Request, 
 	trimmed := strings.TrimSpace(*seed)
 	if trimmed == "" {
 		return true
+	}
+	if !avatar.IsValidSeed(trimmed) {
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR",
+			"Invalid avatar seed — must be 1-128 chars of letters, digits, dot, dash, or underscore")
+		return false
 	}
 	if err := a.Queries.ClearUserAvatar(r.Context(), userID); err != nil {
 		a.Logger.Error("clear avatar for deferred regenerate", "error", err)

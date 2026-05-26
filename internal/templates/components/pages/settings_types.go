@@ -8,8 +8,14 @@ import "breadbox/internal/avatar"
 // avatar-style preview tile. The seed is a fixed literal supplied by
 // the templ (alice/bob/casey/drew); the `style` variable comes from
 // the parent x-data block bound to the picker's <select>.
+//
+// Tiles route through the server's /avatars/preview proxy rather
+// than hitting api.dicebear.com directly: the proxy honors the
+// avatar package's configured API base URL (test/staging overrides
+// don't bypass it), keeps the admin's browser IP off DiceBear's
+// access logs, and warms the same cache /avatars/{id} uses.
 func avatarPreviewExpr(seed string) string {
-	return "'https://api.dicebear.com/9.x/' + encodeURIComponent(style) + '/svg?seed=" + seed + "'"
+	return "'/avatars/preview/" + seed + "?style=' + encodeURIComponent(style)"
 }
 
 // SettingsProps mirrors the field set the old settings.html read off the layout

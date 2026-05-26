@@ -29,18 +29,18 @@ const maxAvatarUploadSize = 5 << 20 // 5 MB
 // (covers unlinked admin accounts whose session falls back to account UUID).
 func AvatarHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := clampSeed(chi.URLParam(r, "id"))
 
 		uid, err := resolveUUID(idStr)
 		if err != nil {
-			serveGeneratedAvatar(w, r, idStr)
+			serveGeneratedAvatar(w, r, idStr, "")
 			return
 		}
 
 		row, err := a.Queries.GetUserAvatar(r.Context(), uid)
 		if err != nil {
 			// Not a user — generate a stable pattern from the raw ID.
-			serveGeneratedAvatar(w, r, idStr)
+			serveGeneratedAvatar(w, r, idStr, "")
 			return
 		}
 
@@ -53,19 +53,45 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		if row.AvatarSeed.Valid && row.AvatarSeed.String != "" {
 			seed = row.AvatarSeed.String
 		}
-		serveGeneratedAvatar(w, r, seed)
+		serveGeneratedAvatar(w, r, seed, "")
 	}
 }
 
-// AvatarPreviewHandler serves GET /avatars/preview/{seed} — generates a pattern preview.
-// Used by the create member form to show a live preview before the user exists.
+// clampSeed bounds an attacker-supplied path segment to MaxSeedLength
+// so unauthenticated `/avatars/<long-string>` requests can't blow up
+// the upstream DiceBear URL or the cache key. We keep the relaxed
+// charset for back-compat with embed contexts that use arbitrary
+// IDs as identicon seeds; cache capping handles memory pressure.
+func clampSeed(s string) string {
+	if len(s) > avatar.MaxSeedLength {
+		return s[:avatar.MaxSeedLength]
+	}
+	return s
+}
+
+// AvatarPreviewHandler serves GET /avatars/preview/{seed} — generates
+// a pattern preview. Used by the create-member form and by the
+// Settings → System style picker (via ?style=<dicebear-id>).
+//
+// The route is unauthenticated so the preview tiles render before
+// the user is logged in. Seeds and style overrides are validated to
+// bound the upstream URL + cache key; arbitrary input → 400.
 func AvatarPreviewHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		seed := chi.URLParam(r, "seed")
 		if seed == "" {
 			seed = "default"
 		}
-		serveGeneratedAvatar(w, r, seed)
+		if !avatar.IsValidSeed(seed) {
+			http.Error(w, "invalid seed", http.StatusBadRequest)
+			return
+		}
+		styleOverride := r.URL.Query().Get("style")
+		if styleOverride != "" && !avatar.IsValidStyle(styleOverride) {
+			http.Error(w, "invalid style", http.StatusBadRequest)
+			return
+		}
+		serveGeneratedAvatar(w, r, seed, styleOverride)
 	}
 }
 
@@ -81,15 +107,25 @@ func serveUploadedAvatar(w http.ResponseWriter, r *http.Request, data []byte, co
 	w.Write(data)
 }
 
-func serveGeneratedAvatar(w http.ResponseWriter, r *http.Request, seed string) {
-	svg := avatar.GenerateSVG(seed, 256)
+// serveGeneratedAvatar renders a DiceBear SVG. styleOverride is used
+// by the settings preview tiles to render each style on demand;
+// empty string falls back to the global Style().
+//
+// Cache-Control is intentionally shorter than the uploaded-avatar
+// path: generated SVGs flip when the operator changes the style and
+// can fall back to the placeholder during a transient DiceBear
+// outage. 1h fresh + must-revalidate keeps the bytes hot for normal
+// traffic but lets a recovery propagate within the hour instead of
+// pinning the placeholder for a full day.
+func serveGeneratedAvatar(w http.ResponseWriter, r *http.Request, seed, styleOverride string) {
+	svg := avatar.GenerateSVGStyled(seed, 256, styleOverride)
 	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(svg))
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "public, max-age=3600, must-revalidate")
 	w.Header().Set("ETag", etag)
 	w.Write(svg)
 }
