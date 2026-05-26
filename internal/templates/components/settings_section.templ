@@ -1,0 +1,140 @@
+package components
+
+// SettingsSectionProps controls the shared section container used by
+// every /settings/* tab. See .claude/rules/settings.md for the design
+// rules — this is the single approved section shape inside the
+// Settings modal.
+//
+// A section is a quiet, lightly-bordered container with a header row
+// and a body of rows separated by hairline dividers. The header is
+// `[icon? + title + caption?]` on the left and an optional `Right`
+// templ.Component on the right (for a primary action button — never a
+// status badge; surface those inline within a SettingsRow instead).
+//
+// Variant tints the section for special-case visuals:
+//   - "" (default) — neutral, base-300 border
+//   - "danger"     — error-tinted border + error-tinted icon (use for
+//                    destructive sections like "Danger zone")
+type SettingsSectionProps struct {
+	Icon    string
+	Title   string
+	Caption string
+	Right   templ.Component
+	Variant string
+	// Form wraps the children in a <form> so a single in-section Save
+	// button (use the Footer slot) submits all of its rows at once.
+	// Omit for sections that hold auto-save rows only — those wrap
+	// each row in its own form via SettingsAutoSaveForm.
+	Form *SettingsSectionFormProps
+	// Footer optionally renders a row pinned to the bottom of the
+	// section — typically a `bb-action-row` carrying the Save button
+	// for a multi-input section form. Renders below the body with a
+	// shared border-top so it reads as part of the section, not
+	// floating beneath it.
+	Footer templ.Component
+}
+
+// SettingsSectionFormProps describes the <form> wrapper opt-in. Action
+// must be a server-side POST endpoint that handles the section's
+// inputs together.
+type SettingsSectionFormProps struct {
+	Action    string
+	Enctype   string // empty → no enctype attribute (default form encoding)
+	CSRFToken string
+	// Extra holds arbitrary attributes for the form (x-data, autocomplete, etc.).
+	Extra templ.Attributes
+}
+
+// SettingsSection is the canonical wrapper. The body slot is rendered
+// inside `.bb-settings-section__body` — populate it with one or more
+// SettingsRow calls.
+templ SettingsSection(p SettingsSectionProps) {
+	if p.Form != nil {
+		<form
+			method="POST"
+			action={ templ.SafeURL(p.Form.Action) }
+			if p.Form.Enctype != "" {
+				enctype={ p.Form.Enctype }
+			}
+			class={ settingsSectionClasses(p.Variant) }
+			{ p.Form.Extra... }
+		>
+			if p.Form.CSRFToken != "" {
+				<input type="hidden" name="_csrf" value={ p.Form.CSRFToken }/>
+			}
+			@settingsSectionHeader(p)
+			<div class="bb-settings-section__body">
+				{ children... }
+			</div>
+			if p.Footer != nil {
+				<div class="bb-settings-section__footer">
+					@p.Footer
+				</div>
+			}
+		</form>
+	} else {
+		<section class={ settingsSectionClasses(p.Variant) }>
+			@settingsSectionHeader(p)
+			<div class="bb-settings-section__body">
+				{ children... }
+			</div>
+			if p.Footer != nil {
+				<div class="bb-settings-section__footer">
+					@p.Footer
+				</div>
+			}
+		</section>
+	}
+}
+
+templ settingsSectionHeader(p SettingsSectionProps) {
+	if p.Title != "" || p.Right != nil {
+		<header class="bb-settings-section__header">
+			<div class="bb-settings-section__heading">
+				if p.Icon != "" {
+					<i data-lucide={ p.Icon } class={ settingsSectionIconClasses(p.Variant) }></i>
+				}
+				<div class="min-w-0">
+					if p.Title != "" {
+						<h2 class={ settingsSectionTitleClasses(p.Variant) }>{ p.Title }</h2>
+					}
+					if p.Caption != "" {
+						<p class="bb-settings-section__caption">{ p.Caption }</p>
+					}
+				</div>
+			</div>
+			if p.Right != nil {
+				<div class="bb-settings-section__right">
+					@p.Right
+				</div>
+			}
+		</header>
+	}
+}
+
+func settingsSectionClasses(variant string) string {
+	switch variant {
+	case "danger":
+		return "bb-settings-section bb-settings-section--danger"
+	default:
+		return "bb-settings-section"
+	}
+}
+
+func settingsSectionIconClasses(variant string) string {
+	switch variant {
+	case "danger":
+		return "w-4 h-4 text-error shrink-0"
+	default:
+		return "w-4 h-4 text-base-content/45 shrink-0"
+	}
+}
+
+func settingsSectionTitleClasses(variant string) string {
+	switch variant {
+	case "danger":
+		return "text-sm font-semibold text-error leading-tight"
+	default:
+		return "text-sm font-semibold leading-tight"
+	}
+}

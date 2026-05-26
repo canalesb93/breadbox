@@ -2678,3 +2678,204 @@ func designSampleColor() *string {
 	c := "#f97316"
 	return &c
 }
+
+// ─── Settings primitives ───────────────────────────────────────────────
+// Live reference for SettingsSection / SettingsRow / SettingsAutoSaveForm.
+// See .claude/rules/settings.md for the design language.
+
+templ SectionSettings() {
+	<div class="flex flex-col gap-6">
+		@designExample("Section + rows (inline controls)", "The default shape — label/caption left, control right. Used by General > Sync and Backups > Schedule.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "refresh-cw",
+					Title:   "Sync",
+					Caption: "Schedule and log retention",
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "Sync interval",
+						Caption: "Next sync: in 14m",
+					}) {
+						<select class="select select-sm bg-base-200">
+							<option>Every 15 minutes</option>
+							<option selected>Every hour</option>
+							<option>Every 4 hours</option>
+						</select>
+					}
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "Log retention",
+						Caption: "161 logs stored · cleanup runs daily at 3:00 AM",
+					}) {
+						<select class="select select-sm bg-base-200">
+							<option>30 days</option>
+							<option selected>90 days (default)</option>
+							<option>1 year</option>
+						</select>
+					}
+				}
+			</div>
+		}
+		@designExample("Section with right slot (action button)", "Right is for the primary section action — Create, Save, Create Backup Now. Not for status badges (surface those inline within a row).") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "key",
+					Title:   "API Keys",
+					Caption: "4 active · 63 revoked",
+					Right:   designSettingsCreateButton(),
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "MCP Stdio",
+						Caption: "bb_stdio_singleton... · Created May 17, 9:54 AM",
+					}) {
+						<span class="badge badge-soft badge-primary badge-xs">Full Access</span>
+					}
+				}
+			</div>
+		}
+		@designExample("Section with status badge in row", "Section header stays quiet; status reads cleaner inline within a row.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "shield",
+					Title:   "Security",
+					Caption: "Required for storing bank credentials at rest",
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "Encryption key",
+						Caption: "ENCRYPTION_KEY is set and protecting stored credentials",
+					}) {
+						<span class="badge badge-soft badge-success badge-sm">Active</span>
+					}
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "Password",
+						Caption: "Manage your sign-in password",
+					}) {
+						<button class="btn btn-ghost btn-sm">Change in Account</button>
+					}
+				}
+			</div>
+		}
+		@designExample("Stacked row (Stack: true)", "Use when the control is too wide for inline — textareas, file inputs, code blocks, credential editors.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "plug",
+					Title:   "Connection",
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{
+						Label: "HTTP endpoint",
+						Stack: true,
+					}) {
+						<div class="bg-base-200 rounded-lg px-3 py-2 font-mono text-sm break-all text-base-content/70 select-all">https://&lt;host&gt;/mcp</div>
+					}
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "Stdio command",
+						Caption: "Paste into your MCP client's stdio config",
+						Stack:   true,
+					}) {
+						<div class="bg-base-200 rounded-lg px-3 py-2 font-mono text-sm text-base-content/70 select-all">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio</div>
+					}
+				}
+			</div>
+		}
+		@designExample("Multi-input form (Form + Footer)", "Section.Form wraps children in a <form>; Section.Footer pins the Save button at the bottom. One Save per section, never per row.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "lock",
+					Title:   "Change password",
+					Caption: "Pick something at least 8 characters long",
+					Form: &components.SettingsSectionFormProps{
+						Action: "/example/no-op",
+					},
+					Footer: designSettingsSaveButton("Update password"),
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{Label: "Current password", Stack: true, For: "design-current"}) {
+						<input id="design-current" type="password" class="bb-form-input" disabled placeholder="••••••••"/>
+					}
+					@components.SettingsRow(components.SettingsRowProps{Label: "New password", Stack: true, For: "design-new"}) {
+						<input id="design-new" type="password" class="bb-form-input" disabled/>
+					}
+					@components.SettingsRow(components.SettingsRowProps{Label: "Confirm new password", Stack: true, For: "design-confirm"}) {
+						<input id="design-confirm" type="password" class="bb-form-input" disabled/>
+					}
+				}
+			</div>
+		}
+		@designExample("Danger variant", "Variant: \"danger\" tints the border + icon error. Reserve for actions that delete or replace user data — not warnings.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "alert-triangle",
+					Title:   "Danger zone",
+					Caption: "Permanent — bank connections, accounts, and transactions are deleted",
+					Variant: "danger",
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{
+						Label:   "Wipe my data",
+						Caption: "Removes all data for this household",
+					}) {
+						<button class="btn btn-error btn-sm btn-outline gap-1.5">
+							@components.LucideIcon("trash-2", "w-4 h-4")
+							Wipe
+						</button>
+					}
+				}
+			</div>
+		}
+		@designExample("Link-style row (SettingsRowLink)", "The whole row is a link/button. Use for action lists — Help > Resources, Backups > Restore From Upload. Icon on the LEFT because the row IS the affordance.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "life-buoy",
+					Title:   "Resources",
+				}) {
+					@components.SettingsRowLink(components.SettingsRowLinkProps{
+						Href:    "/design",
+						Icon:    "compass",
+						Label:   "Getting started",
+						Caption: "Step-by-step setup walkthrough",
+					})
+					@components.SettingsRowLink(components.SettingsRowLinkProps{
+						Href:     "https://docs.breadbox.sh",
+						Icon:     "book-open",
+						Label:    "Documentation",
+						Caption:  "docs.breadbox.sh",
+						External: true,
+					})
+				}
+			</div>
+		}
+		@designExample("Auto-save form (SettingsAutoSaveForm)", "Wraps a single <select> or checkbox; submits on change. The settings modal picks up the POST and surfaces an in-modal toast. Live example — change the select, watch the network tab.") {
+			<div class="max-w-xl">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:    "user-circle",
+					Title:   "User avatars",
+					Caption: "Saves on change — no Save button.",
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{
+						Label: "Style",
+						For:   "design-avatar-style",
+					}) {
+						@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+							Action: "/example/no-op",
+							Label:  "Avatar style saved",
+						}) {
+							<select id="design-avatar-style" name="avatar_style" class="select select-sm bg-base-200">
+								<option>Rings</option>
+								<option>Shapes</option>
+								<option>Bottts</option>
+							</select>
+						}
+					}
+				}
+			</div>
+		}
+	</div>
+}
+
+templ designSettingsCreateButton() {
+	<button class="btn btn-primary btn-sm btn-soft">
+		@components.LucideIcon("plus", "w-4 h-4")
+		Create Key
+	</button>
+}
+
+templ designSettingsSaveButton(label string) {
+	<button type="submit" class="btn btn-sm btn-primary" disabled>{ label }</button>
+}

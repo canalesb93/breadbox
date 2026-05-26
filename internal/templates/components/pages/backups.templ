@@ -2,72 +2,75 @@ package pages
 
 import (
 	"fmt"
+
 	"breadbox/internal/templates/components"
 )
 
-// Backups renders the /admin/backups page body. Hosts inside the base
-// layout via TemplateRenderer.RenderWithTempl. Markup mirrors the
-// previous html/template version byte-for-byte.
+// Backups renders the Backups tab — schedule, file list, and
+// restore-from-upload. Stats tiles and the file list keep their
+// dedicated visuals (data viz, not settings rows). Everything else
+// follows .claude/rules/settings.md.
 //
 // Page scripts (location.hash auto-scroll + 'n' shortcut registration)
 // live in static/js/admin/components/backups.js per the
-// "Alpine page components" convention in docs/design-system.md. The
-// <script src> is loaded synchronously (no `defer`) so its alpine:init
-// listener registers before Alpine — itself <script defer> in <head> —
-// fires the event.
+// "Alpine page components" convention in docs/design-system.md.
 templ Backups(p BackupsProps) {
 	<script src="/static/js/admin/components/backups.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('backups')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	@settingsTabHeader(settingsTabHeaderProps{
-		Title:    "Backups",
-		Subtitle: "Database backup, restore, and scheduled backups",
-		Right:    backupsCreateNowButton(p),
-	})
-	<div class="grid gap-6">
-		<!-- Encryption Key Warning -->
-		<div class="alert alert-warning">
-			@components.LucideIcon("shield-alert", "w-5 h-5 flex-shrink-0")
-			<div>
-				<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
-				<p class="text-xs mt-1 leading-relaxed">
-					Database backups contain encrypted bank credentials that are useless without the matching
-					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code>.
-					If you lose the key, all bank connections must be re-linked from scratch. Store it in a
-					password manager or secure vault — never commit it to version control.
-				</p>
-				if !p.HasEncryptionKey {
-					<p class="text-xs mt-2 text-error font-semibold">
-						@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-0.5")
-						No encryption key is currently set. Bank credentials cannot be stored or restored.
-					</p>
-				}
-			</div>
-		</div>
-		if p.Error != "" {
-			<div class="alert alert-error">
-				@components.LucideIcon("alert-circle", "w-5 h-5 flex-shrink-0")
-				<span class="text-sm">{ p.Error }</span>
-			</div>
-		} else {
-			if !p.PreflightOK {
+	<div>
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Backups",
+			Subtitle: "Database backup, restore, and scheduled backups",
+			Right:    backupsCreateNowButton(p),
+		})
+		<div class="space-y-6">
+			@backupsEncryptionAlert(p)
+			if p.Error != "" {
 				<div class="alert alert-error">
 					@components.LucideIcon("alert-circle", "w-5 h-5 flex-shrink-0")
-					<div>
-						<h3 class="font-semibold text-sm">Backups unavailable</h3>
-						<p class="text-xs mt-1 leading-relaxed">{ p.PreflightMessage }</p>
-					</div>
+					<span class="text-sm">{ p.Error }</span>
 				</div>
+			} else {
+				if !p.PreflightOK {
+					<div class="alert alert-error">
+						@components.LucideIcon("alert-circle", "w-5 h-5 flex-shrink-0")
+						<div>
+							<h3 class="font-semibold text-sm">Backups unavailable</h3>
+							<p class="text-xs mt-1 leading-relaxed">{ p.PreflightMessage }</p>
+						</div>
+					</div>
+				}
+				@backupsStats(p)
+				@backupsScheduleSection(p)
+				@backupsFilesSection(p)
+				@backupsRestoreSection(p)
 			}
-			@backupsStats(p)
-			@backupsScheduleSection(p)
-			@backupsListSection(p)
-			@backupsRestoreSection(p)
-		}
+		</div>
+	</div>
+}
+
+templ backupsEncryptionAlert(p BackupsProps) {
+	<div class="alert alert-warning rounded-xl">
+		@components.LucideIcon("shield-alert", "w-5 h-5 flex-shrink-0")
+		<div>
+			<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
+			<p class="text-xs mt-1 leading-relaxed">
+				Database backups contain encrypted bank credentials that are useless without the matching
+				<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code>.
+				If you lose the key, all bank connections must be re-linked from scratch. Store it in a
+				password manager or secure vault — never commit it to version control.
+			</p>
+			if !p.HasEncryptionKey {
+				<p class="text-xs mt-2 text-error font-semibold">
+					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-0.5")
+					No encryption key is currently set. Bank credentials cannot be stored or restored.
+				</p>
+			}
+		</div>
 	</div>
 }
 
 templ backupsStats(p BackupsProps) {
-	<!-- Stats -->
 	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 		<div class="bb-card p-4">
 			<div class="text-xs text-base-content/40 mb-1">Backups</div>
@@ -88,64 +91,73 @@ templ backupsStats(p BackupsProps) {
 	</div>
 }
 
+// ---------------------------------------------------------------------
+// Schedule
+// ---------------------------------------------------------------------
+
 templ backupsScheduleSection(p BackupsProps) {
-	<!-- Schedule Configuration -->
-	<div id="schedule" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#schedule' }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.LucideIcon("clock", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Schedule</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">
-					if p.Schedule == "" {
-						Automatic backups disabled
-					} else {
-						{ fmt.Sprintf("Automatic backups enabled · Retention: %d days", p.RetentionDays) }
-					}
-				</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Configure automatic backup frequency and retention</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<form method="POST" action="/-/backups/schedule">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<div class="grid sm:grid-cols-2 gap-4 max-w-lg">
-						<div>
-							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_schedule">Frequency</label>
-							<select id="backup_schedule" name="backup_schedule" class="select select-sm w-full bg-base-200">
-								@scheduleOption("", "Disabled", p.Schedule)
-								@scheduleOption("daily_2am", "Daily at 2:00 AM", p.Schedule)
-								@scheduleOption("daily_3am", "Daily at 3:00 AM", p.Schedule)
-								@scheduleOption("daily_4am", "Daily at 4:00 AM", p.Schedule)
-								@scheduleOption("weekly", "Weekly (Sunday 2:00 AM)", p.Schedule)
-							</select>
-						</div>
-						<div>
-							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_retention_days">Retention</label>
-							<select id="backup_retention_days" name="backup_retention_days" class="select select-sm w-full bg-base-200">
-								@backupsRetentionOption(3, "3 days", p.RetentionDays)
-								@backupsRetentionOption(7, "7 days (default)", p.RetentionDays)
-								@backupsRetentionOption(14, "14 days", p.RetentionDays)
-								@backupsRetentionOption(30, "30 days", p.RetentionDays)
-								@backupsRetentionOption(60, "60 days", p.RetentionDays)
-								@backupsRetentionOption(90, "90 days", p.RetentionDays)
-								@backupsRetentionOption(180, "180 days", p.RetentionDays)
-								@backupsRetentionOption(365, "1 year", p.RetentionDays)
-							</select>
-						</div>
-					</div>
-					<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
-						@components.LucideIcon("folder", "w-3.5 h-3.5")
-						Backups stored in: <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">{ p.BackupDir }</code>
-					</p>
-					<div class="mt-4">
-						<button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
-					</div>
-				</form>
-			</div>
-		</div>
+	<div id="schedule">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "clock",
+			Title:   "Schedule",
+			Caption: backupsScheduleCaption(p),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Frequency",
+				For:   "backup_schedule",
+			}) {
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/-/backups/schedule",
+					CSRFToken: p.CSRFToken,
+					Label:     "Backup schedule saved",
+				}) {
+					<input type="hidden" name="backup_retention_days" value={ fmt.Sprintf("%d", p.RetentionDays) }/>
+					<select id="backup_schedule" name="backup_schedule" class="select select-sm bg-base-200">
+						@scheduleOption("", "Disabled", p.Schedule)
+						@scheduleOption("daily_2am", "Daily at 2:00 AM", p.Schedule)
+						@scheduleOption("daily_3am", "Daily at 3:00 AM", p.Schedule)
+						@scheduleOption("daily_4am", "Daily at 4:00 AM", p.Schedule)
+						@scheduleOption("weekly", "Weekly (Sunday 2:00 AM)", p.Schedule)
+					</select>
+				}
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Retention",
+				For:   "backup_retention_days",
+			}) {
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/-/backups/schedule",
+					CSRFToken: p.CSRFToken,
+					Label:     "Retention saved",
+				}) {
+					<input type="hidden" name="backup_schedule" value={ p.Schedule }/>
+					<select id="backup_retention_days" name="backup_retention_days" class="select select-sm bg-base-200">
+						@backupsRetentionOption(3, "3 days", p.RetentionDays)
+						@backupsRetentionOption(7, "7 days (default)", p.RetentionDays)
+						@backupsRetentionOption(14, "14 days", p.RetentionDays)
+						@backupsRetentionOption(30, "30 days", p.RetentionDays)
+						@backupsRetentionOption(60, "60 days", p.RetentionDays)
+						@backupsRetentionOption(90, "90 days", p.RetentionDays)
+						@backupsRetentionOption(180, "180 days", p.RetentionDays)
+						@backupsRetentionOption(365, "1 year", p.RetentionDays)
+					</select>
+				}
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Storage path",
+				Caption: "Backups are stored on the server filesystem",
+			}) {
+				<code class="text-xs bg-base-300/40 px-2 py-1 rounded font-mono truncate max-w-[18rem]">{ p.BackupDir }</code>
+			}
+		}
 	</div>
+}
+
+func backupsScheduleCaption(p BackupsProps) string {
+	if p.Schedule == "" {
+		return "Automatic backups disabled"
+	}
+	return fmt.Sprintf("Automatic backups enabled · Retention: %d days", p.RetentionDays)
 }
 
 templ scheduleOption(value, label, current string) {
@@ -164,45 +176,51 @@ templ backupsRetentionOption(value int, label string, current int) {
 	}
 }
 
-templ backupsListSection(p BackupsProps) {
-	<!-- Backup List -->
-	<div class="bb-card p-0 overflow-hidden">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 border-b border-base-300">
-			@components.LucideIcon("archive", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-			<h2 class="font-semibold">Backup Files</h2>
-			<span class="text-xs text-base-content/40 ml-auto tabular-nums">{ fmt.Sprintf("%d files", p.BackupCount) }</span>
-		</div>
+// ---------------------------------------------------------------------
+// File list
+// ---------------------------------------------------------------------
+
+templ backupsFilesSection(p BackupsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "archive",
+		Title:   "Backup files",
+		Caption: fmt.Sprintf("%d files on disk", p.BackupCount),
+	}) {
 		if p.BackupCount == 0 {
-			<div class="px-4 sm:px-5 py-8 text-center text-sm text-base-content/40">
-				@components.LucideIcon("database", "w-8 h-8 mx-auto mb-2 opacity-30")
-				if p.PreflightOK {
-					<p>No backups yet. Click "Create Backup Now" to create your first backup.</p>
-				} else {
-					<p class="font-medium text-base-content/60">Backups are paused</p>
-					<p class="mt-1">Resolve the preflight issue shown above, then come back to create your first backup.</p>
-				}
-			</div>
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div class="text-center text-sm text-base-content/40 py-6">
+					@components.LucideIcon("database", "w-8 h-8 mx-auto mb-2 opacity-30")
+					if p.PreflightOK {
+						<p>No backups yet. Click "Create Backup Now" above to create your first backup.</p>
+					} else {
+						<p class="font-medium text-base-content/60">Backups are paused</p>
+						<p class="mt-1">Resolve the preflight issue shown above, then come back to create your first backup.</p>
+					}
+				</div>
+			}
 		} else {
-			<div class="overflow-x-auto">
-				<table class="table table-sm">
-					<thead>
-						<tr>
-							<th>Filename</th>
-							<th>Size</th>
-							<th>Created</th>
-							<th>Type</th>
-							<th class="text-right">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, b := range p.Backups {
-							@backupsRow(b, p.CSRFToken)
-						}
-					</tbody>
-				</table>
-			</div>
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div class="overflow-x-auto -mx-4 sm:-mx-5">
+					<table class="table table-sm">
+						<thead>
+							<tr>
+								<th>Filename</th>
+								<th>Size</th>
+								<th>Created</th>
+								<th>Type</th>
+								<th class="text-right">Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, b := range p.Backups {
+								@backupsRow(b, p.CSRFToken)
+							}
+						</tbody>
+					</table>
+				</div>
+			}
 		}
-	</div>
+	}
 }
 
 templ backupsRow(b BackupRow, csrf string) {
@@ -275,26 +293,30 @@ templ backupsTriggerBadge(trigger string) {
 	}
 }
 
+// ---------------------------------------------------------------------
+// Restore from upload
+// ---------------------------------------------------------------------
+
 templ backupsRestoreSection(p BackupsProps) {
-	<!-- Restore from Upload -->
-	<div id="restore" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#restore' }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.LucideIcon("upload", "w-5 h-5 text-base-content opacity-40 flex-shrink-0")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Restore from File</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">Upload a .sql.gz backup file to restore</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Upload a previously downloaded backup to restore</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-4">
+	<div id="restore">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "upload",
+			Title:   "Restore from file",
+			Caption: "Upload a previously downloaded .sql.gz backup to replace current data",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3">
 					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
 					<strong>Warning:</strong> Restoring a backup will replace all current data. Make sure you have the correct
 					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> that matches the backup,
 					or bank connections will need to be re-linked.
 				</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Backup file",
+				Stack: true,
+				For:   "backup_file",
+			}) {
 				<form
 					method="POST"
 					action="/-/backups/restore"
@@ -308,35 +330,29 @@ templ backupsRestoreSection(p BackupsProps) {
                 cancelLabel: 'Cancel',
                 onConfirm: () => { confirmed = true; $el.requestSubmit(); }
               }) }"
+					class="space-y-3"
 				>
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					<input type="hidden" name="restore_source" value="upload"/>
-					<div class="max-w-md">
-						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_file">Backup File (.sql.gz)</label>
-						<input
-							type="file"
-							id="backup_file"
-							name="backup_file"
-							accept=".sql.gz,.gz"
-							class="file-input file-file-input-sm w-full"
-							@change="filename = $event.target.files[0]?.name || ''"
-							required
-						/>
-					</div>
-					<div class="mt-4">
-						<button type="submit" class="btn btn-warning btn-sm" :disabled="!filename">
-							@components.LucideIcon("rotate-ccw", "w-4 h-4")
-							Restore from Upload
-						</button>
-					</div>
+					<input
+						type="file"
+						id="backup_file"
+						name="backup_file"
+						accept=".sql.gz,.gz"
+						class="file-input file-input-sm w-full"
+						@change="filename = $event.target.files[0]?.name || ''"
+						required
+					/>
+					<button type="submit" class="btn btn-warning btn-sm" :disabled="!filename">
+						@components.LucideIcon("rotate-ccw", "w-4 h-4")
+						Restore from upload
+					</button>
 				</form>
-			</div>
-		</div>
+			}
+		}
 	</div>
 }
 
-// scheduleLabel mirrors the inline `{{if eq .Schedule ""}}Off{{else if eq .Schedule "daily_2am"}}Daily 2am{{…}}{{end}}`
-// branch in the source HTML.
 func scheduleLabel(schedule string) string {
 	switch schedule {
 	case "":
@@ -354,9 +370,6 @@ func scheduleLabel(schedule string) string {
 	}
 }
 
-// backupsCreateNowButton is the right-side action for the Backups tab
-// header — disabled while the preflight check is failing, hidden when
-// the page is rendering an error.
 templ backupsCreateNowButton(p BackupsProps) {
 	if p.Error == "" {
 		<form method="POST" action="/-/backups/create" class="shrink-0">

@@ -7,23 +7,24 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// AgentsSettings renders the Agents tab inside the Settings shell. Hosts
-// the four MCP-config cards (Server Instructions, Review Guidelines,
-// Report Format, Tools Enabled) plus the read-only Connection cheatsheet.
+// AgentsSettings renders the MCP tab — Server Instructions, Review
+// Guidelines, Report Format, Tools Enabled, and a read-only Connection
+// cheatsheet. Each block is a SettingsSection
+// (.claude/rules/settings.md) with its own form / footer save.
 //
-// POST targets remain at /-/mcp-settings/* — only the GET page moved.
+// POST targets remain at /mcp-settings/* — only the visual changed.
 templ AgentsSettings(p AgentsSettingsProps) {
-	<div class="max-w-3xl">
+	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "MCP",
 			Subtitle: "Server instructions, review guidelines, report format, and per-tool toggles",
 		})
-		<div class="grid gap-6">
-			@agentsSettingsInstructionsCard(p)
-			@agentsSettingsReviewGuidelinesCard(p)
-			@agentsSettingsReportFormatCard(p)
-			@agentsSettingsToolsCard(p)
-			@agentsSettingsConnectionCard()
+		<div class="space-y-6">
+			@agentsSettingsInstructionsSection(p)
+			@agentsSettingsReviewGuidelinesSection(p)
+			@agentsSettingsReportFormatSection(p)
+			@agentsSettingsToolsSection(p)
+			@agentsSettingsConnectionSection()
 		</div>
 	</div>
 	<script>
@@ -35,154 +36,142 @@ templ AgentsSettings(p AgentsSettingsProps) {
 	</script>
 }
 
-templ agentsSettingsInstructionsCard(p AgentsSettingsProps) {
+// ---------------------------------------------------------------------
+// Long-form textarea sections (Instructions, Guidelines, Report Format)
+// ---------------------------------------------------------------------
+
+templ agentsSettingsInstructionsSection(p AgentsSettingsProps) {
 	<div
 		id="instructions"
-		class="bb-card p-0 overflow-hidden"
-		x-data={ fmt.Sprintf("{ expanded: location.hash === '#instructions', instructions: %s, defaultInstructions: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your current instructions will be replaced with the default server instructions.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.instructions = this.defaultInstructions; } } }", jsString(p.Instructions), jsString(p.DefaultInstructions)) }
+		x-data={ fmt.Sprintf("{ instructions: %s, defaultInstructions: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your current instructions will be replaced with the default server instructions.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.instructions = this.defaultInstructions; } } }", jsString(p.Instructions), jsString(p.DefaultInstructions)) }
 	>
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.IconTile("info", "scroll-text")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Server Instructions</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">Custom instructions sent to agents when they connect via MCP</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Instructions sent to agents when they connect via MCP</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse>
-			<div class="px-4 sm:px-5 py-4">
-				<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "scroll-text",
+			Title:   "Server Instructions",
+			Caption: "Sent to agents when they connect via MCP",
+			Form: &components.SettingsSectionFormProps{
+				Action:    "/mcp-settings/instructions",
+				CSRFToken: p.CSRFToken,
+			},
+			Footer: agentsSettingsSaveResetFooter("Save Instructions"),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div role="alert" class="alert alert-warning alert-soft text-xs">
 					@components.LucideIcon("triangle-alert", "w-4 h-4")
 					<span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
 				</div>
-				<form method="POST" action="/mcp-settings/instructions">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<div class="form-control mb-4">
-						<textarea name="instructions" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
-						<label class="label">
-							<span class="label-text-alt text-base-content/40" x-text="instructions.length + '/20000'"></span>
-						</label>
-					</div>
-					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm">Save Instructions</button>
-						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
-					</div>
-				</form>
-			</div>
-		</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<textarea name="instructions" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
+				<p class="text-xs text-base-content/40 mt-1.5" x-text="instructions.length + '/20000'"></p>
+			}
+		}
 	</div>
 }
 
-templ agentsSettingsReviewGuidelinesCard(p AgentsSettingsProps) {
+templ agentsSettingsReviewGuidelinesSection(p AgentsSettingsProps) {
 	<div
 		id="review-guidelines"
-		class="bb-card p-0 overflow-hidden"
-		x-data={ fmt.Sprintf("{ expanded: location.hash === '#review-guidelines', guidelines: %s, defaultGuidelines: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your review guidelines will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.guidelines = this.defaultGuidelines; } } }", jsString(p.ReviewGuidelines), jsString(p.DefaultReviewGuidelines)) }
+		x-data={ fmt.Sprintf("{ guidelines: %s, defaultGuidelines: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your review guidelines will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.guidelines = this.defaultGuidelines; } } }", jsString(p.ReviewGuidelines), jsString(p.DefaultReviewGuidelines)) }
 	>
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.IconTile("success", "book-open")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Review Guidelines</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://review-guidelines</code> to agents during reviews</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Guidelines for reviewing transactions and creating rules — agents read this resource before processing reviews</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<form method="POST" action="/mcp-settings/review-guidelines">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<div class="form-control mb-4">
-						<textarea name="review_guidelines" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 20rem" maxlength="30000" x-model="guidelines" placeholder="Review guidelines for agents..."></textarea>
-						<label class="label">
-							<span class="label-text-alt text-base-content/40" x-text="guidelines.length + '/30000'"></span>
-						</label>
-					</div>
-					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm">Save Guidelines</button>
-						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
-					</div>
-				</form>
-			</div>
-		</div>
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "book-open",
+			Title:   "Review Guidelines",
+			Caption: "Served as breadbox://review-guidelines to agents during reviews",
+			Form: &components.SettingsSectionFormProps{
+				Action:    "/mcp-settings/review-guidelines",
+				CSRFToken: p.CSRFToken,
+			},
+			Footer: agentsSettingsSaveResetFooterGuidelines(),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<textarea name="review_guidelines" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 20rem" maxlength="30000" x-model="guidelines" placeholder="Review guidelines for agents..."></textarea>
+				<p class="text-xs text-base-content/40 mt-1.5" x-text="guidelines.length + '/30000'"></p>
+			}
+		}
 	</div>
 }
 
-templ agentsSettingsReportFormatCard(p AgentsSettingsProps) {
+templ agentsSettingsReportFormatSection(p AgentsSettingsProps) {
 	<div
 		id="report-format"
-		class="bb-card p-0 overflow-hidden"
-		x-data={ fmt.Sprintf("{ expanded: location.hash === '#report-format', reportFormat: %s, defaultReportFormat: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your report format will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.reportFormat = this.defaultReportFormat; } } }", jsString(p.ReportFormat), jsString(p.DefaultReportFormat)) }
+		x-data={ fmt.Sprintf("{ reportFormat: %s, defaultReportFormat: %s, async resetToDefaults() { const ok = await bbConfirm({title:'Reset to defaults?',message:'Your report format will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'}); if (ok) { this.reportFormat = this.defaultReportFormat; } } }", jsString(p.ReportFormat), jsString(p.DefaultReportFormat)) }
 	>
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.IconTile("warning", "file-text")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Report Format</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://report-format</code> to agents when submitting reports</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Report structure templates and formatting guidelines — agents read this resource before submitting reports</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<form method="POST" action="/mcp-settings/report-format">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<div class="form-control mb-4">
-						<textarea name="report_format" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 20rem" maxlength="20000" x-model="reportFormat" placeholder="Report format guidelines for agents..."></textarea>
-						<label class="label">
-							<span class="label-text-alt text-base-content/40" x-text="reportFormat.length + '/20000'"></span>
-						</label>
-					</div>
-					<div class="flex flex-wrap gap-2 items-center">
-						<button type="submit" class="btn btn-primary btn-sm">Save Format</button>
-						<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to Defaults</button>
-					</div>
-				</form>
-			</div>
-		</div>
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "file-text",
+			Title:   "Report Format",
+			Caption: "Served as breadbox://report-format to agents when submitting reports",
+			Form: &components.SettingsSectionFormProps{
+				Action:    "/mcp-settings/report-format",
+				CSRFToken: p.CSRFToken,
+			},
+			Footer: agentsSettingsSaveResetFooterReport(),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<textarea name="report_format" class="textarea font-mono text-xs leading-relaxed w-full" style="min-height: 20rem" maxlength="20000" x-model="reportFormat" placeholder="Report format guidelines for agents..."></textarea>
+				<p class="text-xs text-base-content/40 mt-1.5" x-text="reportFormat.length + '/20000'"></p>
+			}
+		}
 	</div>
 }
 
-templ agentsSettingsToolsCard(p AgentsSettingsProps) {
-	<div id="tools" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#tools' }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.IconTile("primary", "wrench")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Tools Enabled</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">{ agentsSettingsToolsSummary(p) }</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Enable or disable individual MCP tools</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4">
-				<p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
-				<form method="POST" action="/mcp-settings/tools">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<div class="space-y-6">
-						for _, g := range p.ToolGroups {
-							<div>
-								<h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2 px-2 sm:px-3">{ g.Name }</h3>
-								<div class="space-y-1">
-									for _, t := range g.Tools {
-										@agentsSettingsToolRow(t)
-									}
-								</div>
-							</div>
-						}
+// Footer slot variants — one per textarea section because the Reset
+// handler is bound to a sibling x-data scope that lives on the section
+// root and the templ component receives no props.
+templ agentsSettingsSaveResetFooter(saveLabel string) {
+	<button type="button" class="btn btn-ghost btn-sm" @click="resetToDefaults()">Reset to defaults</button>
+	<button type="submit" class="btn btn-primary btn-sm">{ saveLabel }</button>
+}
+
+templ agentsSettingsSaveResetFooterGuidelines() {
+	@agentsSettingsSaveResetFooter("Save Guidelines")
+}
+
+templ agentsSettingsSaveResetFooterReport() {
+	@agentsSettingsSaveResetFooter("Save Format")
+}
+
+// ---------------------------------------------------------------------
+// Tools toggle list
+// ---------------------------------------------------------------------
+
+templ agentsSettingsToolsSection(p AgentsSettingsProps) {
+	<div id="tools">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "wrench",
+			Title:   "Tools Enabled",
+			Caption: agentsSettingsToolsSummary(p),
+			Form: &components.SettingsSectionFormProps{
+				Action:    "/mcp-settings/tools",
+				CSRFToken: p.CSRFToken,
+			},
+			Footer: agentsSettingsToolsFooter(),
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<p class="text-xs text-base-content/50">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
+			}
+			for _, g := range p.ToolGroups {
+				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+					<div>
+						<h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2">{ g.Name }</h3>
+						<div class="space-y-1">
+							for _, t := range g.Tools {
+								@agentsSettingsToolRow(t)
+							}
+						</div>
 					</div>
-					<div class="mt-5">
-						<button type="submit" class="btn btn-primary btn-sm">Save Tools</button>
-					</div>
-				</form>
-			</div>
-		</div>
+				}
+			}
+		}
 	</div>
+}
+
+templ agentsSettingsToolsFooter() {
+	<button type="submit" class="btn btn-primary btn-sm">Save Tools</button>
 }
 
 templ agentsSettingsToolRow(t AgentsSettingsTool) {
-	<div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+	<label class="flex items-start gap-3 p-2 rounded-xl hover:bg-base-200/50 transition-colors cursor-pointer">
 		if t.Enabled {
 			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" checked/>
 		} else {
@@ -195,56 +184,56 @@ templ agentsSettingsToolRow(t AgentsSettingsTool) {
 			</div>
 			<div class="text-xs text-base-content/40 mt-0.5">{ t.Description }</div>
 		</div>
+	</label>
+}
+
+// ---------------------------------------------------------------------
+// Connection cheatsheet
+// ---------------------------------------------------------------------
+
+templ agentsSettingsConnectionSection() {
+	<div id="connection" x-data="{ copiedConfig: false }">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "plug",
+			Title:   "Connection",
+			Caption: "Endpoints and config for connecting MCP agents",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "HTTP endpoint",
+				Stack: true,
+			}) {
+				<div class="bg-base-200 rounded-lg px-3 py-2 font-mono text-sm break-all text-base-content/70 select-all">https://&lt;host&gt;/mcp</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Stdio command",
+				Stack: true,
+			}) {
+				<div class="bg-base-200 rounded-lg px-3 py-2 font-mono text-sm text-base-content/70 select-all">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Claude Desktop config (stdio)",
+				Caption: "Drop into ~/Library/Application Support/Claude/claude_desktop_config.json",
+				Stack:   true,
+			}) {
+				<div class="relative">
+					<pre class="bg-base-200 rounded-lg p-4 text-xs font-mono overflow-auto text-base-content/70">{ claudeDesktopConfigJSON() }</pre>
+					<button
+						class="btn btn-sm btn-ghost absolute top-2 right-2"
+						@click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
+					>
+						<template x-if="!copiedConfig">
+							<span class="flex items-center gap-1">@components.LucideIcon("copy", "w-4 h-4") Copy</span>
+						</template>
+						<template x-if="copiedConfig">
+							<span class="flex items-center gap-1 text-success">@components.LucideIcon("check", "w-4 h-4") Copied!</span>
+						</template>
+					</button>
+				</div>
+			}
+		}
 	</div>
 }
 
-templ agentsSettingsConnectionCard() {
-	<div id="connection" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#connection', copiedConfig: false }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-			@components.IconTile("warning", "plug")
-			<div class="min-w-0 flex-1">
-				<h2 class="font-semibold">Connection</h2>
-				<p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
-			</div>
-			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content opacity-30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-		</div>
-		<div x-show="expanded" x-collapse x-cloak>
-			<div class="px-4 sm:px-5 py-4 space-y-5">
-				<div>
-					<h3 class="font-medium text-sm mb-2 text-base-content/60">HTTP Endpoint</h3>
-					<div class="bg-base-200 rounded-xl p-3 font-mono text-sm break-all text-base-content/70">https://&lt;host&gt;/mcp</div>
-				</div>
-				<div>
-					<h3 class="font-medium text-sm mb-2 text-base-content/60">Stdio Command</h3>
-					<div class="bg-base-200 rounded-xl p-3 font-mono text-sm text-base-content/70">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio</div>
-				</div>
-				<div>
-					<h3 class="font-medium text-sm mb-2 text-base-content/60">Claude Desktop Config (stdio)</h3>
-					<div class="relative">
-						<pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{ claudeDesktopConfigJSON() }</pre>
-						<button
-							class="btn btn-sm btn-ghost absolute top-2 right-2"
-							@click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
-						>
-							<template x-if="!copiedConfig">
-								<span class="flex items-center gap-1">@components.LucideIcon("copy", "w-4 h-4") Copy</span>
-							</template>
-							<template x-if="copiedConfig">
-								<span class="flex items-center gap-1 text-success">@components.LucideIcon("check", "w-4 h-4") Copied!</span>
-							</template>
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-}
-
-// agentsSettingsToolsSummary mirrors the
-//	"{{.ToolsEnabledCount}} of {{.ToolsTotalCount}} tools enabled
-//	{{if gt .ToolsDisabledCount 0}} · {{.ToolsDisabledCount}} disabled{{end}}"
-//
-// branch in the source HTML.
 func agentsSettingsToolsSummary(p AgentsSettingsProps) string {
 	base := strconv.Itoa(p.ToolsEnabledCount) + " of " + strconv.Itoa(p.ToolsTotalCount) + " tools enabled"
 	if p.ToolsDisabledCount > 0 {
@@ -253,21 +242,10 @@ func agentsSettingsToolsSummary(p AgentsSettingsProps) string {
 	return base
 }
 
-// jsString quote-escapes a string for embedding directly in a JS object
-// literal. The original html/template version called `printf %q`; templ
-// expressions can't do that mid-string, so we precompute a JS-safe
-// quoted form here.
 func jsString(s string) string {
-	// Use Go's strconv.Quote (matches %q semantics) — JS happily accepts
-	// the result because both languages share the same backslash escapes
-	// for the characters we care about (\n, \t, \", \\, etc.).
 	return strconv.Quote(s)
 }
 
-// claudeDesktopConfigJSON returns the static JSON body used in the
-// Connection card's "Claude Desktop Config" pre-formatted block. Kept as
-// a function so the indented JSON literal stays readable next to the
-// template.
 func claudeDesktopConfigJSON() string {
 	return `{
   "mcpServers": {

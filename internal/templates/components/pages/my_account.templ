@@ -1,30 +1,19 @@
 package pages
 
-
 import "breadbox/internal/templates/components"
-// MyAccount renders the Account tab inside the Settings modal — the
-// single identity page covering avatar/name/email (when linked), the
-// password change form, and the danger zone.
+
+// MyAccount renders the Account tab — profile, password, danger zone.
+// See .claude/rules/settings.md for the shared design language.
 //
-// Profile and Account were two separate tabs in the legacy SettingsLayout
-// shell; merging them removes the false split between "who I am in the
-// household" and "how I sign in" — both speak about the same person.
-//
-// Hosts inside the base layout via TemplateRenderer.RenderWithTempl. The
-// handler builds typed props in admin/members.go and the modal infra
-// either drops the body into the modal slot (cold deep-load) or returns
-// it as a fragment to the modal's JS swap (in-modal tab switch).
-//
-// The Profile card shares its visual structure with /household/{id}/edit
-// (icon-header avatar + name/email fields + bb-action-row) by reusing
-// the same `avatarEditor` Alpine factory. Endpoint URLs are passed via
-// data-* attrs so the same factory drives admin scope (/-/users/{id}/*)
-// and self scope (/settings/account/*).
+// The Profile section is the one place we keep a richer card visual
+// (avatar + name/email side-by-side) — it's the user's identity row
+// and earns the extra weight. Password and Danger Zone use the shared
+// SettingsSection / SettingsRow vocabulary.
 templ MyAccount(p MyAccountProps) {
 	// Synchronous (no defer): the page script registers its alpine:init
 	// listener before Alpine fires the event. See user_form.js.
 	<script src="/static/js/admin/components/user_form.js"></script>
-	<div class="max-w-2xl">
+	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "Account",
 			Subtitle: myAccountSubtitle(p),
@@ -42,17 +31,14 @@ templ MyAccount(p MyAccountProps) {
 		}
 		<div class="space-y-6">
 			if p.UserID != "" {
-				@myAccountProfileCard(p)
+				@myAccountProfileSection(p)
 			}
-			@myAccountPasswordCard(p.CSRFToken)
-			@myAccountDangerZone(p.CSRFToken)
+			@myAccountPasswordSection(p.CSRFToken)
+			@myAccountDangerSection(p.CSRFToken)
 		</div>
 	</div>
 }
 
-// myAccountSubtitle picks the line under the "Account" title. Falls back
-// to a generic line when there's no admin username (rare — only true
-// during early setup flows).
 func myAccountSubtitle(p MyAccountProps) string {
 	if p.AdminUsername != "" {
 		base := "Signed in as " + p.AdminUsername
@@ -64,8 +50,6 @@ func myAccountSubtitle(p MyAccountProps) string {
 	return "Profile, password, and account data"
 }
 
-// myAccountSignOutForm renders the sign-out button that sits to the
-// right of the Account tab header.
 templ myAccountSignOutForm(csrfToken string) {
 	<form method="POST" action="/logout" class="shrink-0">
 		if csrfToken != "" {
@@ -78,11 +62,11 @@ templ myAccountSignOutForm(csrfToken string) {
 	</form>
 }
 
-// myAccountProfileCard renders the linked household member's profile
-// editor. Mirrors userFormEdit's visual structure (icon-header + form
-// fields + bb-action-row) but routes the avatarEditor factory at
-// /settings/account endpoints via data-* attrs.
-templ myAccountProfileCard(p MyAccountProps) {
+// myAccountProfileSection renders the linked household member's profile
+// editor. The avatarEditor Alpine factory drives the avatar upload /
+// regenerate / remove flow and the profile form submit, keyed off
+// data-* attributes.
+templ myAccountProfileSection(p MyAccountProps) {
 	<div
 		x-data="avatarEditor"
 		data-user-id={ p.UserID }
@@ -91,200 +75,219 @@ templ myAccountProfileCard(p MyAccountProps) {
 		data-profile-endpoint="/settings/account/profile"
 		data-success-redirect="/settings/account"
 	>
-		<form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
-			<div class="p-5 sm:p-6">
-				<div class="bb-icon-header">
-					<div class="relative group shrink-0">
-						<img :src="avatarSrc" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-base-300"/>
-						<button
-							type="button"
-							@click="$refs.fileInput.click()"
-							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-							title="Upload photo"
-						>
-							@components.LucideIcon("camera", "w-4 h-4 text-white")
-						</button>
-						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
-					</div>
-					<div class="bb-icon-header__text">
-						<h2 class="text-sm font-semibold truncate">Profile</h2>
-						<p class="text-xs text-base-content/45 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("upload", "w-3 h-3") Upload photo</button>
+		@components.SettingsSection(components.SettingsSectionProps{
+				Icon:    "user",
+				Title:   "Profile",
+				Caption: "Name, email, and avatar",
+				Form: &components.SettingsSectionFormProps{
+					Action: "/settings/account/profile",
+					Extra:  templ.Attributes{"@submit.prevent": "submitForm()"},
+				},
+				Footer: myAccountProfileFooter(),
+			}) {
+				@components.SettingsRow(components.SettingsRowProps{
+					Label:   "Avatar",
+					Caption: "Upload a photo or regenerate the auto-identicon",
+				}) {
+					<div class="flex items-center gap-3">
+						<div class="relative group shrink-0">
+							<img :src="avatarSrc" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-base-300"/>
+							<button
+								type="button"
+								@click="$refs.fileInput.click()"
+								class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+								title="Upload photo"
+							>
+								@components.LucideIcon("camera", "w-4 h-4 text-white")
+							</button>
+							<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
+						</div>
+						<div class="flex items-center gap-2 text-xs">
+							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">
+								@components.LucideIcon("upload", "w-3 h-3")
+								Upload
+							</button>
 							<span class="text-base-content/20">·</span>
-							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("refresh-cw", "w-3 h-3") Regenerate</button>
+							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">
+								@components.LucideIcon("refresh-cw", "w-3 h-3")
+								Regenerate
+							</button>
 							<template x-if="hasCustomAvatar">
-								<span class="inline-flex items-center gap-1.5">
+								<span class="inline-flex items-center gap-2">
 									<span class="text-base-content/20">·</span>
 									<button type="button" @click="removeAvatar()" class="link link-hover text-error/70 hover:text-error">Remove</button>
 								</span>
 							</template>
-						</p>
+						</div>
 					</div>
-				</div>
+				}
 				<template x-if="avatarError">
-					<div role="alert" class="bb-form-error mb-4">
-						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
-						<span x-text="avatarError"></span>
-					</div>
+					@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+						<div role="alert" class="bb-form-error">
+							@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
+							<span x-text="avatarError"></span>
+						</div>
+					}
 				</template>
 				<template x-if="avatarUploading">
-					<p class="text-xs text-base-content/50 mb-4 inline-flex items-center gap-1.5">
-						<span class="loading loading-spinner loading-xs"></span>
-						Uploading photo...
-					</p>
+					@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+						<p class="text-xs text-base-content/50 inline-flex items-center gap-1.5">
+							<span class="loading loading-spinner loading-xs"></span>
+							Uploading photo...
+						</p>
+					}
 				</template>
-				<div class="space-y-4">
-					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">
-							Name <span class="text-error">*</span>
-						</label>
-						<input
-							type="text"
-							id="name"
-							name="name"
-							class="bb-form-input"
-							required
-							maxlength="128"
-							value={ p.UserName }
-							placeholder="e.g., Alex Canales"
-						/>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="email">
-							Email <span class="text-base-content/30">(optional)</span>
-						</label>
-						<input
-							type="email"
-							id="email"
-							name="email"
-							class="bb-form-input"
-							value={ p.UserEmail }
-							placeholder="e.g., alex@example.com"
-						/>
-					</div>
-					<template x-if="formError">
+				@components.SettingsRow(components.SettingsRowProps{
+					Label: "Name",
+					Stack: true,
+					For:   "name",
+				}) {
+					<input
+						type="text"
+						id="name"
+						name="name"
+						class="bb-form-input"
+						required
+						maxlength="128"
+						value={ p.UserName }
+						placeholder="e.g., Alex Canales"
+					/>
+				}
+				@components.SettingsRow(components.SettingsRowProps{
+					Label:   "Email",
+					Caption: "Optional",
+					Stack:   true,
+					For:     "email",
+				}) {
+					<input
+						type="email"
+						id="email"
+						name="email"
+						class="bb-form-input"
+						value={ p.UserEmail }
+						placeholder="e.g., alex@example.com"
+					/>
+				}
+				<template x-if="formError">
+					@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
 						<div role="alert" class="bb-form-error">
 							@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
 							<span x-text="formError"></span>
 						</div>
-					</template>
-				</div>
-			</div>
-			<div class="bb-action-row">
-				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
-					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-				</button>
-			</div>
-		</form>
+					}
+				</template>
+			}
 	</div>
 }
 
-// myAccountPasswordCard renders the change-password form using the
-// shared design-system form classes (bb-icon-header, bb-form-input,
-// bb-action-row) so it visually matches myAccountProfileCard.
-templ myAccountPasswordCard(csrfToken string) {
-	<form method="POST" action="/settings/account/password" class="bb-card p-0 overflow-hidden">
-		if csrfToken != "" {
-			<input type="hidden" name="_csrf" value={ csrfToken }/>
-		}
-		<div class="p-5 sm:p-6">
-			<div class="bb-icon-header">
-				<div class="bb-icon-header__tile bg-base-200/60">
-					@components.LucideIcon("lock", "w-4 h-4 text-base-content opacity-50")
-				</div>
-				<div class="bb-icon-header__text">
-					<h2 class="text-sm font-semibold">Change password</h2>
-					<p class="text-xs text-base-content/45">Pick something at least 8 characters long</p>
-				</div>
-			</div>
-			<div class="space-y-4">
-				<div>
-					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="current_password">Current password</label>
-					<input
-						type="password"
-						id="current_password"
-						name="current_password"
-						required
-						autocomplete="current-password"
-						class="bb-form-input"
-					/>
-				</div>
-				<div>
-					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="new_password">New password</label>
-					<input
-						type="password"
-						id="new_password"
-						name="new_password"
-						required
-						autocomplete="new-password"
-						minlength="8"
-						class="bb-form-input"
-					/>
-				</div>
-				<div>
-					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm new password</label>
-					<input
-						type="password"
-						id="confirm_password"
-						name="confirm_password"
-						required
-						autocomplete="new-password"
-						class="bb-form-input"
-					/>
-				</div>
-			</div>
-		</div>
-		<div class="bb-action-row">
-			<button type="submit" class="btn btn-sm btn-primary gap-1.5">
-				@components.LucideIcon("save", "w-3.5 h-3.5")
-				Update password
-			</button>
-		</div>
-	</form>
+templ myAccountProfileFooter() {
+	<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
+		<span x-show="!submitting" class="inline-flex items-center gap-1.5">
+			@components.LucideIcon("save", "w-3.5 h-3.5")
+			Save changes
+		</span>
+		<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+	</button>
 }
 
-// myAccountDangerZone renders the wipe-data card with the two-step
-// confirm Alpine flow. POSTs to /settings/account/wipe-data on confirm.
-templ myAccountDangerZone(csrfToken string) {
-	<div class="bb-card border-error/20 p-0 overflow-hidden" x-data="{ confirmWipe: false }">
-		<div class="p-5 sm:p-6">
-			<div class="bb-icon-header">
-				<div class="bb-icon-header__tile bg-error/10">
-					@components.LucideIcon("alert-triangle", "w-4 h-4 text-error")
-				</div>
-				<div class="bb-icon-header__text">
-					<h2 class="text-sm font-semibold text-error">Danger zone</h2>
-					<p class="text-xs text-base-content/45">Permanent — bank connections, accounts, and transactions are deleted</p>
-				</div>
-			</div>
-			<template x-if="!confirmWipe">
-				<button @click="confirmWipe = true" type="button" class="btn btn-error btn-sm btn-outline gap-1.5">
-					@components.LucideIcon("trash-2", "w-4 h-4")
-					Wipe my data
-				</button>
-			</template>
-			<template x-if="confirmWipe">
-				<div class="space-y-3">
-					<p class="text-sm font-medium text-error">Are you sure? This will permanently delete all your data.</p>
-					<div class="flex gap-2">
+templ myAccountPasswordSection(csrfToken string) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "lock",
+		Title:   "Change password",
+		Caption: "Pick something at least 8 characters long",
+		Form: &components.SettingsSectionFormProps{
+			Action:    "/settings/account/password",
+			CSRFToken: csrfToken,
+		},
+		Footer: myAccountPasswordFooter(),
+	}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Current password",
+				Stack: true,
+				For:   "current_password",
+			}) {
+				<input
+					type="password"
+					id="current_password"
+					name="current_password"
+					required
+					autocomplete="current-password"
+					class="bb-form-input"
+				/>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "New password",
+				Stack: true,
+				For:   "new_password",
+			}) {
+				<input
+					type="password"
+					id="new_password"
+					name="new_password"
+					required
+					autocomplete="new-password"
+					minlength="8"
+					class="bb-form-input"
+				/>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label: "Confirm new password",
+				Stack: true,
+				For:   "confirm_password",
+			}) {
+				<input
+					type="password"
+					id="confirm_password"
+					name="confirm_password"
+					required
+					autocomplete="new-password"
+					class="bb-form-input"
+				/>
+			}
+	}
+}
+
+templ myAccountPasswordFooter() {
+	<button type="submit" class="btn btn-sm btn-primary gap-1.5">
+		@components.LucideIcon("save", "w-3.5 h-3.5")
+		Update password
+	</button>
+}
+
+templ myAccountDangerSection(csrfToken string) {
+	<div x-data="{ confirmWipe: false }">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "alert-triangle",
+			Title:   "Danger zone",
+			Caption: "Permanent — bank connections, accounts, and transactions are deleted",
+			Variant: "danger",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Wipe my data",
+				Caption: "Removes all data for this household",
+			}) {
+				<template x-if="!confirmWipe">
+					<button @click="confirmWipe = true" type="button" class="btn btn-error btn-sm btn-outline gap-1.5">
+						@components.LucideIcon("trash-2", "w-4 h-4")
+						Wipe
+					</button>
+				</template>
+				<template x-if="confirmWipe">
+					<div class="flex items-center gap-2">
 						<form method="POST" action="/settings/account/wipe-data">
 							if csrfToken != "" {
 								<input type="hidden" name="_csrf" value={ csrfToken }/>
 							}
-							<button type="submit" class="btn btn-error btn-sm">Yes, wipe my data</button>
+							<button type="submit" class="btn btn-error btn-sm">Yes, wipe</button>
 						</form>
 						<button @click="confirmWipe = false" type="button" class="btn btn-ghost btn-sm">Cancel</button>
 					</div>
-				</div>
-			</template>
-		</div>
+				</template>
+			}
+		}
 	</div>
 }
 
-// boolStr renders a Go bool as the lowercase string "true" or "false"
-// so it can be passed through a data-* attribute that the Alpine
-// factory parses with strict equality (`=== 'true'`).
 func boolStr(b bool) string {
 	if b {
 		return "true"
