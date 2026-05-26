@@ -29,6 +29,14 @@ import (
 // longer emit `<meta http-equiv="refresh">` — full-page reloads kill
 // scroll position and any open <details> nodes.
 templ AgentRunDetail(p AgentRunDetailProps) {
+	<!-- CDN dependencies for the shared markdown renderer + the
+	     run-detail Alpine factory. Synchronous loads (no defer) so
+	     Alpine.data() registration runs before alpine:init. Mirrors
+	     the convention used by /reports/{id} and the transaction
+	     activity timeline. -->
+	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/markdown.js"></script>
 	<script src="/static/js/admin/components/agent_run_detail.js"></script>
 	<div
 		x-data="agentRunDetail"
@@ -54,14 +62,13 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 			<section class="min-w-0">
 				@agentRunTranscriptCard(p)
 			</section>
-			<aside class="space-y-4">
+			<aside class="bb-run-aside space-y-4">
 				@agentRunStatsCard(p)
 				@agentRunToolsCard(p)
 				@agentRunNoteCard(p)
 				if len(p.Run.Reports) > 0 {
 					@agentRunReportsCard(p)
 				}
-				@agentRunPromptCard(p)
 				if p.TranscriptPath != "" {
 					@agentRunTranscriptPathCard(p)
 				}
@@ -238,6 +245,7 @@ const agentRunTranscriptMaxEventsConst = 500
 // /-/agents/runs/{id}/live admin endpoint can render the fragment
 // without re-rendering the surrounding card chrome.
 templ AgentRunTranscriptFragment(p AgentRunDetailProps) {
+	@agentRunPromptIntro(p)
 	if len(p.Transcript) == 0 {
 		<div class="bb-run-empty">
 			<i data-lucide="hourglass" class="w-8 h-8 text-base-content/30"></i>
@@ -274,7 +282,7 @@ templ AgentRunTranscriptFragment(p AgentRunDetailProps) {
 templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 	switch ev.Type {
 		case "assistant":
-			<li class="chat chat-start bb-chat-row">
+			<li class="chat chat-start">
 				<div class="chat-image avatar avatar-placeholder">
 					<div class="w-7 rounded-full bg-primary/15 text-primary">
 						<i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
@@ -288,16 +296,16 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 						</time>
 					}
 				</div>
-				<div class="chat-bubble bb-chat-bubble bb-chat-bubble--assistant">
+				<div class="chat-bubble chat-bubble-primary">
 					if ev.Text != "" {
-						@components.Markdown(ev.Text)
+						<div class="bb-prose" data-markdown={ ev.Text }></div>
 					} else {
-						<span class="text-xs text-base-content/40 italic">(no text content)</span>
+						<span class="text-xs opacity-60 italic">(no text content)</span>
 					}
 				</div>
 			</li>
 		case "user":
-			<li class="chat chat-end bb-chat-row">
+			<li class="chat chat-end">
 				<div class="chat-image avatar avatar-placeholder">
 					<div class="w-7 rounded-full bg-base-300 text-base-content/60">
 						<i data-lucide="user" class="w-3.5 h-3.5"></i>
@@ -311,9 +319,9 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 						</time>
 					}
 				</div>
-				<div class="chat-bubble bb-chat-bubble bb-chat-bubble--user">
+				<div class="chat-bubble">
 					if ev.Text != "" {
-						<div class="whitespace-pre-wrap text-sm">{ ev.Text }</div>
+						<div class="bb-prose" data-markdown={ ev.Text }></div>
 					} else {
 						<span class="text-xs italic opacity-70">(tool results returned)</span>
 					}
@@ -324,18 +332,36 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 				<details class="bb-tool" data-tool-event="use">
 					<summary class="bb-tool__summary">
 						<div class="bb-tool__icon"><i data-lucide="wrench" class="w-3.5 h-3.5"></i></div>
-						<span class="bb-tool__label">Tool call</span>
+						<span class="bb-tool__label">
+							if ev.ToolResultJSON != "" {
+								Tool
+							} else {
+								Tool call · pending
+							}
+						</span>
 						<span class="bb-tool__name font-mono">{ agentRunToolDisplay(ev.ToolName) }</span>
 						if !ev.Timestamp.IsZero() {
 							<time class="bb-tool__time" datetime={ ev.Timestamp.Format(time.RFC3339) }>{ ev.Timestamp.Format("15:04:05") }</time>
 						}
+						if !ev.ToolResultAt.IsZero() {
+							<span class="bb-tool__time">→ { ev.ToolResultAt.Format("15:04:05") }</span>
+						}
 						<i data-lucide="chevron-right" class="bb-tool__chev w-3.5 h-3.5"></i>
 					</summary>
-					<div class="bb-tool__body">
-						if ev.ToolInputJSON != "" {
-							@components.JSONViewer(components.JSONViewerProps{Source: ev.ToolInputJSON, MaxDepth: 0, ShowCopy: true})
-						} else {
-							<span class="text-xs text-base-content/40 italic">(no input)</span>
+					<div class="bb-tool__body bb-tool__body--paired">
+						<div class="bb-tool__section">
+							<div class="bb-tool__section-label"><i data-lucide="arrow-right" class="w-3 h-3"></i> Input</div>
+							if ev.ToolInputJSON != "" {
+								@components.JSONViewer(components.JSONViewerProps{Source: ev.ToolInputJSON, MaxDepth: 0, ShowCopy: true})
+							} else {
+								<span class="text-xs text-base-content/40 italic">(no input)</span>
+							}
+						</div>
+						if ev.ToolResultJSON != "" {
+							<div class="bb-tool__section">
+								<div class="bb-tool__section-label bb-tool__section-label--result"><i data-lucide="arrow-left" class="w-3 h-3"></i> Result</div>
+								@components.JSONViewer(components.JSONViewerProps{Source: ev.ToolResultJSON, MaxDepth: 0, ShowCopy: true})
+							</div>
 						}
 					</div>
 				</details>
@@ -599,45 +625,51 @@ templ agentRunReportsCard(p AgentRunDetailProps) {
 	</div>
 }
 
-// agentRunPromptCard surfaces what the agent was told. Three optional
-// blocks — per-run prefix, system prompt, user prompt — each in a daisy
-// collapse so the chrome stays out of the way until the operator needs it.
-templ agentRunPromptCard(p AgentRunDetailProps) {
-	if p.PromptPrefix != "" || p.SystemPrompt != "" || p.Prompt != "" {
-		<div class="bb-card p-4">
-			<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
-				<i data-lucide="message-square" class="w-3 h-3"></i>
-				Prompt
-			</h3>
-			<div class="space-y-1">
-				if p.PromptPrefix != "" {
-					<details class="bb-run-collapse">
-						<summary>
-							<span class="text-xs font-medium">Per-run prefix</span>
-							<i data-lucide="chevron-right" class="bb-run-collapse__chev w-3 h-3"></i>
-						</summary>
-						<pre class="bb-run-collapse__pre">{ p.PromptPrefix }</pre>
-					</details>
-				}
-				if p.SystemPrompt != "" {
-					<details class="bb-run-collapse">
-						<summary>
-							<span class="text-xs font-medium">System prompt</span>
-							<i data-lucide="chevron-right" class="bb-run-collapse__chev w-3 h-3"></i>
-						</summary>
-						<pre class="bb-run-collapse__pre">{ p.SystemPrompt }</pre>
-					</details>
-				}
-				if p.Prompt != "" {
-					<details class="bb-run-collapse">
-						<summary>
-							<span class="text-xs font-medium">User prompt</span>
-							<i data-lucide="chevron-right" class="bb-run-collapse__chev w-3 h-3"></i>
-						</summary>
-						<pre class="bb-run-collapse__pre">{ p.Prompt }</pre>
-					</details>
-				}
-			</div>
+// agentRunPromptIntro renders the system/user/prefix prompts as the
+// FIRST entries in the chat thread, before any model turn. Each is in
+// its own collapsed-by-default <details> so the chrome stays out of
+// the way until the operator wants to read them. Bodies render via
+// the shared marked + DOMPurify pipeline (data-markdown) so they look
+// the same as reports and chat bubbles.
+templ agentRunPromptIntro(p AgentRunDetailProps) {
+	if p.SystemPrompt != "" || p.Prompt != "" || p.PromptPrefix != "" {
+		<div class="bb-prompt-intro">
+			if p.SystemPrompt != "" {
+				<details class="bb-prompt-collapse" data-prompt-kind="system">
+					<summary>
+						<i data-lucide="settings" class="w-3.5 h-3.5"></i>
+						<span class="bb-prompt-collapse__label">System prompt</span>
+						<i data-lucide="chevron-right" class="bb-prompt-collapse__chev w-3.5 h-3.5"></i>
+					</summary>
+					<div class="bb-prompt-collapse__body">
+						<div class="bb-prose" data-markdown={ p.SystemPrompt }></div>
+					</div>
+				</details>
+			}
+			if p.Prompt != "" {
+				<details class="bb-prompt-collapse" data-prompt-kind="user">
+					<summary>
+						<i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+						<span class="bb-prompt-collapse__label">User prompt</span>
+						<i data-lucide="chevron-right" class="bb-prompt-collapse__chev w-3.5 h-3.5"></i>
+					</summary>
+					<div class="bb-prompt-collapse__body">
+						<div class="bb-prose" data-markdown={ p.Prompt }></div>
+					</div>
+				</details>
+			}
+			if p.PromptPrefix != "" {
+				<details class="bb-prompt-collapse" data-prompt-kind="prefix">
+					<summary>
+						<i data-lucide="pen-line" class="w-3.5 h-3.5"></i>
+						<span class="bb-prompt-collapse__label">Per-run prefix</span>
+						<i data-lucide="chevron-right" class="bb-prompt-collapse__chev w-3.5 h-3.5"></i>
+					</summary>
+					<div class="bb-prompt-collapse__body">
+						<div class="bb-prose" data-markdown={ p.PromptPrefix }></div>
+					</div>
+				</details>
+			}
 		</div>
 	}
 }

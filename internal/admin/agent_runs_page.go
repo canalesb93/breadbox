@@ -507,9 +507,7 @@ func classifyTranscriptEvent(obj map[string]any, raw string) pages.TranscriptEve
 		if data, ok := obj["data"].(map[string]any); ok {
 			ev.ToolUseID, _ = data["tool_use_id"].(string)
 			if content, ok := data["content"]; ok {
-				if b, err := json.MarshalIndent(content, "", "  "); err == nil {
-					ev.ToolResultJSON = string(b)
-				}
+				ev.ToolResultJSON = prettifyToolResult(content)
 			}
 		}
 	case "result":
@@ -622,12 +620,49 @@ func firstToolResultBlock(obj map[string]any) (found bool, id, contentJSON strin
 		}
 		if t, _ := bm["type"].(string); t == "tool_result" {
 			tid, _ := bm["tool_use_id"].(string)
-			inner := bm["content"]
-			b, _ := json.MarshalIndent(inner, "", "  ")
-			return true, tid, string(b)
+			return true, tid, prettifyToolResult(bm["content"])
 		}
 	}
 	return false, "", ""
+}
+
+// prettifyToolResult turns the SDK-emitted tool_result body into a
+// pretty-printed JSON string for the run-detail page's JSONViewer.
+//
+// The SDK ships the body in three shapes, all of which we want to
+// surface as readable JSON when possible:
+//
+//   - JSON object/array — re-marshal with indentation.
+//   - String containing JSON (this is what MCP servers return for
+//     `tool_result.content` per the SDK protocol) — unwrap the string,
+//     parse it, then re-marshal with indentation. Without this step
+//     the viewer renders an escaped JSON-quoted-string blob and the
+//     keys/values aren't browsable.
+//   - String of plain text — return the string verbatim. The viewer
+//     falls back to a plain <pre> in that case.
+//
+// On any parsing failure we return the original string so the operator
+// always sees something readable.
+func prettifyToolResult(v any) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		// Try to parse the string as JSON; if it works, pretty-print.
+		var parsed any
+		if err := json.Unmarshal([]byte(s), &parsed); err == nil {
+			if b, err := json.MarshalIndent(parsed, "", "  "); err == nil {
+				return string(b)
+			}
+		}
+		// Not JSON — return as-is so the viewer's malformed fallback
+		// renders a readable <pre>.
+		return s
+	}
+	if b, err := json.MarshalIndent(v, "", "  "); err == nil {
+		return string(b)
+	}
+	return ""
 }
 
 func readFloat(m map[string]any, k string) float64 {

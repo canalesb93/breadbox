@@ -34,25 +34,23 @@ var AgentRunFriendlyErrorMappings = []agentRunErrorMapping{
 	},
 }
 
-// FilterTranscriptForDisplay drops events that are present in the
-// NDJSON file but add no signal to the rendered transcript, AND
-// enriches tool_result events with the name of the tool_use they're
-// answering. Two responsibilities in one pass because both touch
-// every event and the live endpoint + the initial render must agree
-// on the result either way.
+// FilterTranscriptForDisplay reshapes the raw NDJSON event slice into
+// the form the run-detail page actually renders:
 //
-// Filtering: `result` events where every numeric field is zero. The
-// Claude Agent SDK sometimes emits an init-shaped result envelope
-// before the actual usage payload, and rendering both as "Final
-// result" bubbles is confusing.
-//
-// Enrichment: builds an id->name index from tool_use events and
-// writes the tool name onto every tool_result whose ToolUseID
-// matches. The chat-thread row then reads "tool result —
-// query_transactions" instead of an anonymous "tool result".
+//  1. Drops zero-valued `result` envelopes (the SDK occasionally emits
+//     an init-shaped result before the real usage payload).
+//  2. Pairs each `tool_use` with its matching `tool_result` (by
+//     ToolUseID), folding the result JSON onto the tool_use event
+//     and dropping the now-redundant tool_result. The chat-thread row
+//     then renders a single expandable showing call → result inline.
+//  3. Enriches any *orphan* tool_result (a tool_result whose ToolUseID
+//     doesn't match any tool_use in this transcript — rare, but
+//     possible if the file is truncated) with its tool name when
+//     resolvable.
 //
 // Callers: the initial server render and the /-/agents/runs/{id}/live
-// poll endpoint.
+// poll endpoint. Pairing must run on both so the in_progress→success
+// transition doesn't visually re-split a previously-paired row.
 func FilterTranscriptForDisplay(events []TranscriptEvent) []TranscriptEvent {
 	if len(events) == 0 {
 		return events
@@ -65,20 +63,79 @@ func FilterTranscriptForDisplay(events []TranscriptEvent) []TranscriptEvent {
 		}
 	}
 
-	// Pass 2: filter + enrich.
+	// Pass 2: find the LATER tool_result for each tool_use ID. We use
+	// "later" so a same-turn tool_use+tool_result pair is matched, but
+	// a runaway agent that re-uses an ID couldn't fold backward.
+	resultByID := make(map[string]TranscriptEvent, len(toolNames))
+	resultIndexByID := make(map[string]int, len(toolNames))
+	for i, ev := range events {
+		if ev.Type != "tool_result" || ev.ToolUseID == "" {
+			continue
+		}
+		// Keep the FIRST tool_result we see for each id — multiple
+		// results for the same id should never happen, but defensive.
+		if _, exists := resultByID[ev.ToolUseID]; !exists {
+			resultByID[ev.ToolUseID] = ev
+			resultIndexByID[ev.ToolUseID] = i
+		}
+	}
+
+	// Pass 3: filter + enrich + pair.
 	out := make([]TranscriptEvent, 0, len(events))
-	for _, ev := range events {
+	for i, ev := range events {
 		if ev.Type == "result" && resultEventIsEmpty(ev) {
 			continue
 		}
-		if ev.Type == "tool_result" && ev.ToolName == "" && ev.ToolUseID != "" {
-			if name, ok := toolNames[ev.ToolUseID]; ok {
-				ev.ToolName = name
+		if ev.Type == "tool_use" && ev.ToolUseID != "" {
+			if r, ok := resultByID[ev.ToolUseID]; ok {
+				// Fold the result JSON onto the tool_use event. The
+				// templ's "tool_use" branch checks ToolResultJSON and
+				// renders the result section when set.
+				ev.ToolResultJSON = r.ToolResultJSON
+				if !r.Timestamp.IsZero() {
+					ev.ToolResultAt = r.Timestamp
+				}
 			}
+			out = append(out, ev)
+			continue
+		}
+		if ev.Type == "tool_result" && ev.ToolUseID != "" {
+			// If this tool_result is paired with an earlier tool_use,
+			// the tool_use branch already folded it in — skip the row.
+			if idx, paired := resultIndexByID[ev.ToolUseID]; paired && idx == i {
+				// Look for a preceding tool_use with the same ID in `out`
+				// — if it's there, we've already emitted the combined
+				// row, so this tool_result is redundant.
+				if hasEarlierToolUse(events[:i], ev.ToolUseID) {
+					continue
+				}
+			}
+			// Orphan tool_result (no preceding tool_use) — enrich name
+			// if we know it and keep the row.
+			if ev.ToolName == "" {
+				if name, ok := toolNames[ev.ToolUseID]; ok {
+					ev.ToolName = name
+				}
+			}
+			out = append(out, ev)
+			continue
 		}
 		out = append(out, ev)
 	}
 	return out
+}
+
+// hasEarlierToolUse reports whether any tool_use event with the given
+// ID appears in `prior`. Used by the pair-folding pass to decide
+// whether a tool_result is now redundant or still an orphan worth
+// rendering.
+func hasEarlierToolUse(prior []TranscriptEvent, id string) bool {
+	for _, ev := range prior {
+		if ev.Type == "tool_use" && ev.ToolUseID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func resultEventIsEmpty(ev TranscriptEvent) bool {
