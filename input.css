@@ -2394,36 +2394,83 @@
     transition: opacity 0.2s ease;
   }
 
-  /* ── Keyboard shortcut badges ── */
+  /* ── Keyboard shortcut badges (shadcn Nova .cn-kbd port) ──
+     Nova reads kbd hints as small *text* pills, not code-style keycaps:
+     `font-sans` (not mono), `text-xs` (12px), `bg-muted` ground, no
+     border, no faux-3D shadow. Reads more like a UI affordance and
+     less like an inline `<code>`.
+
+     Two contexts where we restyle:
+     • Inside a daisy `.tooltip` — the tooltip surface is dark
+       (base-content), so the muted bg/fg gets near-invisible. Invert
+       to `--color-base-100` at 20% on the dark tip, with the tip's
+       own foreground color. Matches Nova's `in-data-[slot=tooltip-content]`
+       override.
+     • Inside a solid-tone `.btn` (primary/secondary/accent/neutral) —
+       the button bg is dark, the surrounding text is white. Same
+       inversion trick. */
   .bb-kbd {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
-           text-[0.6rem] font-mono font-medium leading-none
-           rounded px-1;
+    @apply inline-flex items-center justify-center gap-1
+           min-w-5 h-5 px-1
+           text-xs font-sans font-medium leading-none
+           rounded-sm;
     background: var(--color-base-200);
     color: oklch(from var(--color-base-content) l c h / 0.7);
-    border: 1px solid var(--color-base-300);
-    box-shadow: 0 1px 0 oklch(from var(--color-base-content) l c h / 0.08);
+  }
+
+  /* When a kbd lives inside a daisy tooltip OR a solid-tone .btn, the
+     surrounding surface and the muted base-200/foreground/0.7 combo
+     wash out (the surface is already dark/colored and the muted ground
+     fights the surrounding text). Use a translucent tint of the current
+     foreground so the kbd pill reads as a subtle inset of whatever
+     parent text colour it sits in. `currentColor` adapts automatically
+     across solid-tone buttons, tooltips, and either theme. */
+  .tooltip .bb-kbd,
+  [role="tooltip"] .bb-kbd,
+  .btn-primary .bb-kbd,
+  .btn-secondary .bb-kbd,
+  .btn-accent .bb-kbd,
+  .btn-neutral .bb-kbd {
+    background: color-mix(in oklab, currentColor 18%, transparent);
+    color: inherit;
   }
 
   /* Blended modifier pill: ⌘│K rendered as one tight badge with a hairline
      divider between cells and only the outer corners rounded. Inherits the
-     background / border palette from .bb-kbd so light/dark mode stays in
-     sync — only the shape is different (no per-cell rounding). */
+     background / fg palette from .bb-kbd so light/dark mode stays in sync —
+     only the shape is different (no per-cell rounding). */
   .bb-kbd-combo {
-    @apply inline-flex items-center h-[1.25rem] rounded overflow-hidden
-           font-mono font-medium text-[0.6rem] leading-none;
+    @apply inline-flex items-center h-5 rounded-sm overflow-hidden
+           font-sans font-medium text-xs leading-none;
     background: var(--color-base-200);
     color: oklch(from var(--color-base-content) l c h / 0.7);
-    border: 1px solid var(--color-base-300);
-    box-shadow: 0 1px 0 oklch(from var(--color-base-content) l c h / 0.08);
   }
 
   .bb-kbd-combo__key {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] px-1 h-full;
+    @apply inline-flex items-center justify-center min-w-5 px-1 h-full;
   }
 
   .bb-kbd-combo__key + .bb-kbd-combo__key {
-    border-left: 1px solid var(--color-base-300);
+    border-left: 1px solid oklch(from var(--color-base-content) l c h / 0.10);
+  }
+
+  /* Same currentColor-tint treatment as .bb-kbd above. */
+  .tooltip .bb-kbd-combo,
+  [role="tooltip"] .bb-kbd-combo,
+  .btn-primary .bb-kbd-combo,
+  .btn-secondary .bb-kbd-combo,
+  .btn-accent .bb-kbd-combo,
+  .btn-neutral .bb-kbd-combo {
+    background: color-mix(in oklab, currentColor 18%, transparent);
+    color: inherit;
+  }
+  .tooltip .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
+  [role="tooltip"] .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
+  .btn-primary .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
+  .btn-secondary .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
+  .btn-accent .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
+  .btn-neutral .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key {
+    border-left-color: color-mix(in oklab, currentColor 30%, transparent);
   }
 
   /* ── Triage mode: compact review rows ── */
