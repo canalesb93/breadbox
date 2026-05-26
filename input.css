@@ -2551,6 +2551,22 @@
   padding-right: 1rem;
 }
 
+/* ── Command palette: owner-badge ring tracks the cmdk highlight ──
+ * `.bb-tx-row-compact` and its `:hover` redefine `--bb-row-bg` for the
+ * dashboard-recents case (40 % base-200 mix). Inside the cmdk the *wrapper*
+ * `.bb-cmdk-item` is what paints hover (solid base-200) and active (primary
+ * mix), and the inner anchor's redefinition shadowed the wrapper — the
+ * .bb-tx-owner-badge ring read the anchor's value and stayed nearly white
+ * while the wrapper darkened on hover/active. Force the anchor to inherit
+ * the wrapper's `--bb-row-bg` so the ring (and the letter-badge fill that
+ * shares the var) tracks whatever paint .bb-cmdk-item is applying.
+ *
+ * Unlayered for the same reason as the padding override above. */
+.bb-cmdk-item--tx .bb-tx-row-compact,
+.bb-cmdk-item--tx .bb-tx-row-compact:hover {
+  --bb-row-bg: inherit;
+}
+
 /* ── Activity timeline — prominent overrides ──
  * Has to live unlayered because every rule below targets Tailwind utility
  * classes (w-6, h-6, leading-6, ring-4, py-2.5, …). Inside @layer components
