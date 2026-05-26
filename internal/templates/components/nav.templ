@@ -68,6 +68,12 @@ templ Nav(p NavProps) {
 			</a>
 		}
 		<div class="bb-sidebar-section">Manage</div>
+		if p.IsEditor {
+			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
+				<i data-lucide="bot-message-square"></i>
+				<span>Agents</span>
+			</a>
+		}
 		if p.IsAdmin {
 			<a href="/rules" class={ "bb-sidebar-link", navActive(p.CurrentPage, "rules") }>
 				<i data-lucide="zap"></i> Rules
@@ -98,13 +104,6 @@ templ Nav(p NavProps) {
 					<i data-lucide="scroll-text"></i> Logs
 				</a>
 			}
-		}
-		if p.IsEditor {
-			<div class="bb-sidebar-section">Resources</div>
-			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
-				<i data-lucide="bot-message-square"></i>
-				<span>Agents</span>
-			</a>
 		}
 	</nav>
 	<div class="mt-auto pt-3 border-t border-base-300 px-2">
