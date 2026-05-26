@@ -30,7 +30,7 @@ templ CreateAdmin(p CreateAdminProps) {
 			<p class="text-sm text-base-content/50 mt-1.5">Create your account to start managing your household's finances</p>
 		</div>
 		if p.Error != "" {
-			<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+			<div role="alert" class="alert alert-error alert-soft rounded-xl mb-6">
 				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
 				<span>{ p.Error }</span>
 			</div>

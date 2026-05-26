@@ -26,27 +26,25 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 	<div class="max-w-full overflow-x-hidden" x-data="connectionDetail" data-conn-id={ p.ConnID }>
 		@components.BreadcrumbNav(p.Breadcrumbs)
 		if p.Status == "error" || p.Status == "pending_reauth" {
-			<div class="bb-card border-error/30 bg-error/5 px-5 py-4 mb-6 flex items-center gap-4 flex-wrap">
-				<div class="w-9 h-9 rounded-xl bg-error/10 flex items-center justify-center shrink-0">
-					<i data-lucide="alert-triangle" class="w-4 h-4 text-error"></i>
-				</div>
+			<div role="alert" class="alert alert-error rounded-xl mb-6">
+				<i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">This connection needs re-authentication</p>
 					if p.HasErrorCode {
-						<p class="text-xs text-base-content/50 mt-0.5">{ components.ErrorMessage(p.ErrorCode) }</p>
+						<p class="text-xs opacity-80 mt-0.5">{ components.ErrorMessage(p.ErrorCode) }</p>
 					} else if p.HasErrorMessage {
-						<p class="text-xs text-base-content/50 mt-0.5 truncate">{ p.ErrorMessage }</p>
+						<p class="text-xs opacity-80 mt-0.5 truncate">{ p.ErrorMessage }</p>
 					}
 				</div>
 				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-error shrink-0">Re-authenticate</a>
 			</div>
 		}
 		if p.ConsecutiveFailures >= 3 && !(p.Status == "error" || p.Status == "pending_reauth") {
-			<div class="bb-card border-warning/30 bg-warning/5 p-5 mb-6 flex items-start gap-4">
-				@components.IconTile("warning", "alert-triangle")
+			<div role="alert" class="alert alert-warning alert-soft items-start rounded-xl mb-6">
+				<i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">{ fmt.Sprintf("This connection has failed %d syncs in a row", p.ConsecutiveFailures) }</p>
-					<p class="text-sm text-base-content/60 mt-0.5">
+					<p class="text-sm opacity-80 mt-0.5">
 						Recent syncs have been failing consistently. Check the sync history below for error details.
 						if p.LastErrorAtValid {
 							{ " Last error was " + p.LastErrorAtRelative + "." }
