@@ -37,10 +37,10 @@ templ Providers(p ProvidersProps) {
 templ providersPlaidSection(p ProvidersProps, h *service.ProviderHealthSummary) {
 	<div x-data="providerCard" data-provider="plaid">
 		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:    "building-2",
-			Title:   "Plaid",
-			Caption: "Thousands of financial institutions",
-			Right:   providersStatusBadge(h, p.PlaidConfigured),
+			BrandIcon: "plaid",
+			Title:     "Plaid",
+			Caption:   "Thousands of financial institutions",
+			Right:     providersStatusBadge(h, p.PlaidConfigured),
 		}) {
 			@providersStatsRow(h)
 			if p.PlaidFromEnv {
@@ -154,10 +154,10 @@ templ plaidEnvOption(value, current, label string) {
 templ providersTellerSection(p ProvidersProps, h *service.ProviderHealthSummary) {
 	<div x-data="providerCard" data-provider="teller">
 		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:    "landmark",
-			Title:   "Teller",
-			Caption: "mTLS certificate authentication",
-			Right:   providersStatusBadge(h, p.TellerConfigured),
+			BrandIcon: "teller",
+			Title:     "Teller",
+			Caption:   "mTLS certificate authentication",
+			Right:     providersStatusBadge(h, p.TellerConfigured),
 		}) {
 			@providersStatsRow(h)
 			if p.TellerFromEnv {

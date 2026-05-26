@@ -150,6 +150,7 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 								checked
 							}
 						/>
+						@components.BrandIcon("claude", "w-5 h-5 mt-0.5 shrink-0")
 						<div class="min-w-0 flex-1">
 							<div class="text-sm font-medium">Subscription token <span class="badge badge-soft badge-success badge-xs ml-1">recommended</span></div>
 							<div class="text-xs text-base-content/50 mt-0.5">Generate from <code class="text-xs">claude setup-token</code>. Charges your Claude Pro / Max subscription.</div>
@@ -169,6 +170,7 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 								checked
 							}
 						/>
+						@components.BrandIcon("anthropic", "w-5 h-5 mt-0.5 shrink-0")
 						<div class="min-w-0 flex-1">
 							<div class="text-sm font-medium">API key</div>
 							<div class="text-xs text-base-content/50 mt-0.5">From <a class="link link-hover" href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — pay-as-you-go.</div>

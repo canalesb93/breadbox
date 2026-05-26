@@ -1,0 +1,15 @@
+package components
+
+// BrandIcon renders a vendored brand SVG (in
+// internal/templates/components/brand/*.svg) as inline markup at
+// server-render time — same pattern as LucideIcon, no FOUC.
+//
+// All marks ship with their official brand fills baked into the
+// <path> — the marks ARE the brand, so they don't inherit container
+// color. The dark-mode invert for black-on-light marks lives in
+// input.css under `@media (prefers-color-scheme: dark)`.
+//
+// Pass "" for class when no extra classes are needed.
+templ BrandIcon(slug, class string) {
+	@templ.Raw(renderBrandIcon(slug, class))
+}

@@ -1,5 +1,7 @@
 package components
 
+import "strings"
+
 // SettingsModal renders the global Settings dialog mounted in base.html.
 //
 // Layout:
@@ -131,7 +133,7 @@ templ settingsModalRailItems(p SettingsModalProps, mobile bool) {
 		@settingsModalRailItem(SettingsModalTabSystem, "cpu", "System", mobile)
 		@settingsModalRailItem(SettingsModalTabProviders, "plug", "Providers", mobile)
 		@settingsModalRailItem(SettingsModalTabAgents, "sparkles", "Agents", mobile)
-		@settingsModalRailItem(SettingsModalTabMCP, "bot", "MCP", mobile)
+		@settingsModalRailItem(SettingsModalTabMCP, "brand:model-context-protocol", "MCP", mobile)
 	}
 	if p.IsEditor {
 		@settingsModalRailItem(SettingsModalTabAccess, "key-round", "API Keys", mobile)
@@ -155,7 +157,11 @@ templ settingsModalRailItem(tab, icon, label string, mobile bool) {
 				:data-active="currentTab === $el.dataset.tab ? 'true' : 'false'"
 				@click.prevent="switchTo($el.dataset.tab)"
 			>
-				@LucideIcon(icon, "w-4 h-4 shrink-0")
+				if strings.HasPrefix(icon, "brand:") {
+					@BrandIcon(strings.TrimPrefix(icon, "brand:"), "w-4 h-4 shrink-0")
+				} else {
+					@LucideIcon(icon, "w-4 h-4 shrink-0")
+				}
 				<span>{ label }</span>
 			</a>
 		</li>
@@ -167,7 +173,11 @@ templ settingsModalRailItem(tab, icon, label string, mobile bool) {
 			:data-active="currentTab === $el.dataset.tab ? 'true' : 'false'"
 			@click.prevent="switchTo($el.dataset.tab)"
 		>
-			@LucideIcon(icon, "w-4 h-4 shrink-0")
+			if strings.HasPrefix(icon, "brand:") {
+				@BrandIcon(strings.TrimPrefix(icon, "brand:"), "w-4 h-4 shrink-0")
+			} else {
+				@LucideIcon(icon, "w-4 h-4 shrink-0")
+			}
 			<span>{ label }</span>
 		</a>
 	}
