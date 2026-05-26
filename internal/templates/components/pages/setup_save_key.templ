@@ -1,0 +1,133 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// SaveKey renders the /setup/save-key page — a one-time reveal of the
+// encryption key during onboarding. Hosted inside the shared wizard
+// layout so it visually belongs with the rest of the setup flow.
+//
+// The key itself is also still recoverable from .env on the server and
+// from `breadbox reveal-key`; this page exists so the admin doesn't
+// have to SSH in just to copy it into a password manager. Once the
+// admin clicks "I've saved it", setup.encryption_key_acknowledged_at
+// is stamped in app_config and the page redirects away.
+//
+// Uses plain vanilla JS (not Alpine) because the wizard layout
+// deliberately doesn't load Alpine.
+templ SaveKey(p SaveKeyProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		<!-- Self-registering web component: <onepassword-save-button>. Vendored from @1password/save-button 1.3.0. -->
+		<script type="module" src="/static/js/vendor/onepassword-save-button.js"></script>
+		<!-- Page behavior: reveal toggle, clipboard copy, 1Password proxy. -->
+		<script src="/static/js/admin/components/setup_save_key.js"></script>
+		<div class="text-center mb-7">
+			<div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
+				<i data-lucide="key-round" class="w-6 h-6 text-primary"></i>
+			</div>
+			<h1 class="text-xl font-semibold tracking-tight">Save your encryption key</h1>
+			<p class="text-sm text-base-content/60 mt-1.5 leading-relaxed">Breadbox uses this key to encrypt bank credentials at rest. Save it to a password manager before connecting any banks.</p>
+		</div>
+		<div class="space-y-4" data-setup-save-key>
+			<!-- Encryption key display + reveal toggle. Single line; the
+			     64-char key h-scrolls inside the field rather than wrapping
+			     so the action buttons below stay anchored at a predictable
+			     vertical position. -->
+			<div>
+				<div class="flex items-center justify-between mb-1.5">
+					<span class="text-xs font-medium text-base-content/50 tracking-wide">ENCRYPTION_KEY</span>
+					<button
+						type="button"
+						data-action="toggle-reveal"
+						aria-pressed="false"
+						class="inline-flex items-center gap-1.5 text-xs font-medium text-base-content/50 hover:text-base-content transition-colors py-0.5 px-1 -mx-1 rounded"
+					>
+						<i data-lucide="eye" class="w-3.5 h-3.5" data-eye></i>
+						<i data-lucide="eye-off" class="w-3.5 h-3.5 hidden" data-eye-off></i>
+						<span data-toggle-label>Show</span>
+					</button>
+				</div>
+				<div
+					id="encryption-key"
+					data-key-display
+					data-key-value={ p.EncryptionKey }
+					role="textbox"
+					aria-readonly="true"
+					aria-label="Encryption key"
+					tabindex="0"
+					class="bb-key-display"
+				><span data-key-text>{ maskedDots(p.EncryptionKey) }</span></div>
+			</div>
+			<!-- The 1Password web component is functional but ugly; we
+			     park it off-screen and proxy clicks from our own daisy
+			     button below. Keeping it in the DOM is what gives the
+			     extension something to attach to. -->
+			<onepassword-save-button
+				data-onepassword-type="login"
+				value={ p.OnePasswordValue }
+				class="blue"
+				padding="normal"
+				aria-hidden="true"
+				tabindex="-1"
+				style="position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none"
+			></onepassword-save-button>
+			<!-- Two equal-weight save options. Copy goes to the clipboard;
+			     "Save in 1Password" forwards to the hidden web component.
+			     Both styled identically so neither reads as preferred — the
+			     user picks whichever workflow fits their password manager. -->
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+				<button
+					type="button"
+					data-action="copy"
+					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
+				>
+					<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
+					<i data-lucide="check" class="w-4 h-4 hidden text-success" data-copy-done></i>
+					<span data-copy-label>Copy</span>
+				</button>
+				<button
+					type="button"
+					data-action="save-1password"
+					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
+					title="Requires the 1Password browser extension"
+				>
+					<i data-lucide="key-round" class="w-4 h-4"></i>
+					<span>Save in 1Password</span>
+				</button>
+			</div>
+			<!-- Lost-it-later callout. Quieter visual weight than a daisy alert. -->
+			<div class="rounded-lg bg-base-200/40 border border-base-300/70 px-3.5 py-3 text-xs text-base-content/60 leading-relaxed">
+				<div class="flex items-start gap-2.5">
+					<i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-base-content/40"></i>
+					<p class="m-0">
+						<span class="font-medium text-base-content/75">Lost it later?</span> The key is also in your server's <kbd class="kbd kbd-xs">.env</kbd> file and printable from the shell with <kbd class="kbd kbd-xs">breadbox reveal-key</kbd>. This page won't show it again after you continue.
+					</p>
+				</div>
+			</div>
+			<form method="POST" action="/setup/save-key" class="pt-1">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<button type="submit" class="btn btn-primary w-full h-12 text-base font-semibold">
+					I've saved it — continue
+					<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+				</button>
+			</form>
+		</div>
+	}
+}
+
+// maskedDots returns a string of bullet characters one per rune in
+// the input, used as the initial display before the user clicks
+// "Show". Lives in the template so SSR matches client behaviour
+// exactly (no flash of unmasked content if JS is slow).
+func maskedDots(key string) string {
+	dots := make([]rune, len(key))
+	for i := range dots {
+		dots[i] = '●'
+	}
+	return string(dots)
+}

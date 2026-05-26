@@ -926,10 +926,42 @@
   /* ── Wizard / Auth pages (login, setup, error) ── */
   .bb-wizard-bg {
     /* Mobile: top-aligned with generous top padding so content isn't dead-center
-       in a sea of dark background. sm+: vertically centered as before. */
+       in a sea of dark background. sm+: vertically centered as before.
+       overflow-x clip prevents off-screen children (e.g. the 1Password save
+       button's hidden info modal) from creating a horizontal scrollbar at
+       narrow widths like 320px. */
     @apply bg-base-200 min-h-screen flex items-start justify-center
-           px-4 pt-10 pb-8
+           px-4 pt-10 pb-8 overflow-x-clip
            sm:items-center sm:py-4;
+  }
+  /* Pair with .bb-wizard-bg's overflow-x: clip — without applying it to
+     <html> as well, the document root keeps the larger scrollWidth and
+     mobile browsers may still produce a horizontal scrollbar. Scoped to
+     wizard pages via :has() so non-wizard pages keep their default. */
+  html:has(body.bb-wizard-bg) {
+    overflow-x: clip;
+  }
+
+  /* ── /setup/save-key: single-line scrollable key display.
+     A 64-char hex string is wider than the wizard card on every viewport,
+     so we render it on one line with horizontal scroll inside the field
+     rather than wrapping. Keeps the action buttons below at a predictable
+     vertical position and matches the visual of password-reveal patterns
+     elsewhere (GitHub recovery codes, Auth0 client secrets, etc). */
+  .bb-key-display {
+    @apply bg-base-200/60 border border-base-300 rounded-lg
+           px-3.5 py-3 font-mono text-xs leading-relaxed
+           text-base-content/85
+           whitespace-nowrap overflow-x-auto overscroll-x-contain;
+    /* Thin, theme-aware scrollbar so it doesn't dominate the field. */
+    scrollbar-width: thin;
+  }
+  .bb-key-display::-webkit-scrollbar {
+    height: 6px;
+  }
+  .bb-key-display::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+    border-radius: 3px;
   }
 
   .bb-wizard-orb {

@@ -71,6 +71,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/getting-started/dismiss", DismissGettingStartedHandler(a, sm))
 		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))
 
+		// One-time encryption-key reveal — admin-only, redirects away
+		// once acknowledged. Recovery after that is via .env or
+		// `breadbox reveal-key`.
+		r.With(RequireAdmin(sm)).Get("/setup/save-key", SaveKeyHandler(a, sm, tr))
+		r.With(RequireAdmin(sm)).Post("/setup/save-key", SaveKeyHandler(a, sm, tr))
+
 		r.Route("/connections", func(r chi.Router) {
 			r.Get("/", ConnectionsListHandler(a, svc, sm, tr))
 			r.Get("/{id}", ConnectionDetailHandler(a, sm, tr))

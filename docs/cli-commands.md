@@ -41,6 +41,7 @@ These commands operate on the local box (filesystem, DB, embedded migrations) �
 | `breadbox mcp` | L | MCP server over stdio; Claude Desktop spawns this per session, blocks until stdin closes. Uses a singleton `actor_type='system'` api_keys row so the audit trail attributes every stdio call consistently |
 | `breadbox mcp-stdio` | L | *deprecated — use `breadbox mcp` instead*. Hidden alias kept so existing Claude Desktop configs keep working |
 | `breadbox init` | L | First-run setup: encryption key, first login account, first API key |
+| `breadbox reveal-key` | L | Print the configured `ENCRYPTION_KEY` to stdout for recovery into a password manager. Exit 1 when no key is set |
 | `breadbox migrate [--down] [--to N]` | L | Run goose migrations against `DATABASE_URL` (local-only — there is no remote migration endpoint by design) |
 | `breadbox doctor [--skip-external] [--with-live]` | R/L | Remote mode (when a host is configured) consumes `GET /api/v1/headless/bootstrap`; local mode (no host) keeps the env/DB/provider preflight checks. `--with-live` additionally fires the agent SDK round-trip (~$0.01, local-mode only) |
 | `breadbox agent test` | L | End-to-end smoke test of the Claude Agent SDK subsystem — verifies credential is configured, sidecar binary is discoverable, and a tiny "say OK" prompt round-trips through the SDK. Cost-bounded to ~5¢. Exit 3 = no auth; exit 5 = no binary |
