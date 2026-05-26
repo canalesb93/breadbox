@@ -1,0 +1,187 @@
+package pages
+
+import (
+	"breadbox/internal/templates/components"
+)
+
+// agentsTabBar renders the Runs / Agents two-tab nav shared between
+// /agents (runs landing) and /agents/definitions (agents list). Both
+// pages mount this immediately under the PageHeader so the user can
+// switch contexts without a round-trip to the sidebar.
+//
+// active is the slug of the currently-active tab — "runs" or "list".
+templ agentsTabBar(active string) {
+	@components.TabBar(components.TabBarProps{
+		Variant:   "border",
+		AriaLabel: "Agents sections",
+		Items: []components.TabBarItem{
+			{
+				Label:  "Runs",
+				Href:   "/agents",
+				Icon:   "history",
+				Active: active == "runs",
+			},
+			{
+				Label:  "Agents",
+				Href:   "/agents/definitions",
+				Icon:   "bot",
+				Active: active == "list",
+			},
+		},
+	})
+}
+
+// agentsHeaderActions renders the "New agent" + "Run an agent" pair
+// in the PageHeader trailing slot for both /agents and
+// /agents/definitions. The pair stays stable across tabs so the
+// primary actions don't move around as the operator switches views.
+//
+// runDisabled becomes true when the agent subsystem isn't ready —
+// auth missing or the runtime binary not on PATH. Surfacing the
+// disabled state inline keeps the header from lying about what's
+// possible right now.
+templ agentsHeaderActions(modalID string, runDisabled bool) {
+	<div class="flex items-center gap-2 shrink-0">
+		if runDisabled {
+			<button type="button" class="btn btn-sm btn-ghost gap-2" disabled title="Agents need configuration before runs can fire">
+				<i data-lucide="play" class="w-4 h-4"></i>
+				<span>Run an agent</span>
+			</button>
+		} else {
+			<button
+				type="button"
+				class="btn btn-sm btn-ghost gap-2"
+				onclick={ openAgentRunModal(modalID) }
+			>
+				<i data-lucide="play" class="w-4 h-4"></i>
+				<span>Run an agent</span>
+			</button>
+		}
+		<a href="/agents/new" class="btn btn-sm btn-primary gap-2">
+			<i data-lucide="plus" class="w-4 h-4"></i>
+			<span>New agent</span>
+		</a>
+	</div>
+}
+
+// openAgentRunModal is the click handler that opens the run-an-agent
+// modal dialog. Kept as a Go-side helper so the inline `onclick`
+// stays a single statement and the lint passes.
+script openAgentRunModal(modalID string) {
+	var el = document.getElementById(modalID);
+	if (el && typeof el.showModal === 'function') el.showModal();
+}
+
+// agentRunModalProps carries everything the run-an-agent modal needs
+// to render. The modal renders once per page (mounted from
+// AgentRunsList / AgentsList) and the Alpine factory in
+// static/js/admin/components/agents_run_modal.js drives the search
+// filter + submit POST.
+type agentRunModalProps struct {
+	ModalID            string
+	CSRFToken          string
+	Options            []AgentRunsAgentOption
+	LastPromptPrefixes map[string]string
+}
+
+// agentRunModal renders the daisy modal that lists every enabled
+// agent. Each row carries a "Run" button; an optional prefix textarea
+// at the bottom is applied to whichever agent the operator picks. The
+// payload of agent options + last prefixes is handed to Alpine via a
+// JSON script so the picker logic stays out of the templ tree.
+templ agentRunModal(p agentRunModalProps) {
+	<dialog
+		id={ p.ModalID }
+		class="modal modal-bottom sm:modal-middle"
+		x-data="agentRunModal"
+		data-csrf={ p.CSRFToken }
+	>
+		@templ.JSONScript(p.ModalID+"-data", agentRunModalPayload{
+			Agents:       p.Options,
+			LastPrefixes: p.LastPromptPrefixes,
+		})
+		<div class="modal-box rounded-xl max-w-xl">
+			<form method="dialog">
+				<button type="button" class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="Close" onclick="this.closest('dialog').close()">
+					<i data-lucide="x" class="w-4 h-4"></i>
+				</button>
+			</form>
+			<h3 class="text-base font-semibold mb-3">Run an agent</h3>
+			<p class="text-xs text-base-content/60 mb-3">
+				Fires a one-off manual run against the selected agent. The optional prefix below gives the agent extra context for this run only.
+			</p>
+			if len(p.Options) == 0 {
+				<div class="bb-card p-6 text-center text-sm text-base-content/60">
+					<i data-lucide="bot-off" class="w-5 h-5 mx-auto opacity-40 mb-2"></i>
+					<div>No enabled agents yet.</div>
+					<a href="/agents/new" class="link link-primary text-xs mt-2 inline-block">Create your first agent →</a>
+				</div>
+			} else {
+				<label class="input input-sm w-full mb-3">
+					<i data-lucide="search" class="w-3.5 h-3.5 opacity-60"></i>
+					<input
+						type="text"
+						placeholder="Filter agents…"
+						aria-label="Filter agents"
+						x-model="query"
+					/>
+				</label>
+				<div class="rounded-xl bg-base-100 border border-base-300 divide-y divide-base-200 max-h-72 overflow-y-auto">
+					<template x-for="opt in filtered" :key="opt.Slug">
+						<div class="flex items-center gap-3 px-3 py-2.5 hover:bg-base-200/50">
+							<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+								<i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="text-sm font-medium truncate" x-text="opt.Name"></div>
+								<div class="text-xs text-base-content/50 line-clamp-1" x-text="opt.Description" x-show="opt.Description"></div>
+							</div>
+							<button
+								type="button"
+								class="btn btn-ghost btn-xs"
+								x-show="lastPrefixFor(opt.Slug)"
+								@click="prefix = lastPrefixFor(opt.Slug)"
+								:title="'Use last prefix: ' + lastPrefixFor(opt.Slug)"
+							>
+								<i data-lucide="rotate-cw" class="w-3 h-3"></i>
+								<span class="hidden sm:inline">Last prefix</span>
+							</button>
+							<button
+								type="button"
+								class="btn btn-primary btn-xs gap-1"
+								@click="run(opt.Slug)"
+								:disabled="busy"
+							>
+								<i data-lucide="play" class="w-3 h-3"></i>
+								Run
+							</button>
+						</div>
+					</template>
+					<div class="px-3 py-2 text-xs text-base-content/40 italic" x-show="filtered.length === 0">
+						No agents match this filter.
+					</div>
+				</div>
+				<label class="form-control mt-3">
+					<span class="text-xs text-base-content/60 mb-1">Optional prefix (applies to the next run only)</span>
+					<textarea
+						class="textarea textarea-sm w-full font-mono text-xs"
+						rows="3"
+						placeholder="Focus on Plaid sync errors from the last 24 hours…"
+						x-model="prefix"
+					></textarea>
+				</label>
+			}
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button type="button" aria-label="Close" onclick="this.closest('dialog').close()"></button>
+		</form>
+	</dialog>
+}
+
+// agentRunModalPayload is the JSON payload handed to the Alpine
+// factory via templ.JSONScript. Field names match what the JS reads.
+type agentRunModalPayload struct {
+	Agents       []AgentRunsAgentOption `json:"agents"`
+	LastPrefixes map[string]string      `json:"last_prefixes"`
+}
+

@@ -50,14 +50,19 @@ func AgentsListPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		}
 
 		rows := make([]pages.AgentsListRowProps, 0, len(defs))
+		lastPrefixes := make(map[string]string, len(defs))
 		for _, d := range defs {
 			rows = append(rows, buildAgentsListRow(d))
+			if d.LastPromptPrefix != nil && *d.LastPromptPrefix != "" {
+				lastPrefixes[d.Slug] = *d.LastPromptPrefix
+			}
 		}
 
 		props := pages.AgentsListProps{
-			Agents:    rows,
-			Status:    buildAgentsListStatus(status),
-			CSRFToken: GetCSRFToken(r),
+			Agents:             rows,
+			Status:             buildAgentsListStatus(status),
+			LastPromptPrefixes: lastPrefixes,
+			CSRFToken:          GetCSRFToken(r),
 		}
 
 		data := BaseTemplateData(r, sm, "agents", "Agents")

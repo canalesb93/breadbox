@@ -8,58 +8,100 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// AgentRunsList renders the v1 admin run-history page. Two modes share the
-// same component:
-//   - "global": cross-agent view at /agents/runs.
-//   - "agent":  per-agent view at /agents/{slug}/runs.
+// AgentRunsList renders the v1 admin runs landing page at /agents.
+// One mode: the global, cross-agent feed. The ?agent=<slug> URL
+// parameter scopes the list to a single agent (the link from the
+// Agents-tab table and the per-agent edit page passes it through),
+// and the filter chip in the toolbar surfaces the scope so the
+// operator knows what they're looking at.
 //
-// The handler in internal/admin/agent_runs_page.go decides which based on
-// the URL and fills AgentSlug/AgentName/AgentOptions accordingly.
+// Layout, top-down:
+//   1. PageHeader with the "Run an agent" + "New agent" actions.
+//   2. agentsTabBar — Runs (active) / Agents.
+//   3. agentRunsStats — 4-up StatTileRow (30d rollup).
+//   4. agentRunsFilterBar — collapsed under a summary by default.
+//   5. agentRunRowList — rich rows via @components.AgentRunRow.
+//   6. agentRunsPagination — daisy join paginator.
+//   7. agentRunModal — server-rendered, opened by the header button.
 templ AgentRunsList(p AgentRunsListProps) {
-	<div x-data x-init="$store.shortcuts.setScope('agent-runs')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	if p.Mode == "agent" {
-		@components.BreadcrumbNav([]components.Breadcrumb{
-			{Label: "Agents", Href: "/agents"},
-			{Label: p.AgentName, Href: "/agents/" + p.AgentSlug + "/edit"},
-			{Label: "Runs"},
+	<script src="/static/js/admin/components/agents_run_modal.js"></script>
+	<div x-data x-init="$store.shortcuts.setScope('agents')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "Agents",
+		Subtitle:             "Scheduled AI runs that read and act on your Breadbox via MCP.",
+		SubtitleHideOnMobile: true,
+		Action:               agentsHeaderActions("agents-run-modal", len(p.AgentOptions) == 0),
+	})
+	@agentsTabBar("runs")
+	<div class="mt-4">
+		@agentRunsStats(p.Stats)
+		@agentRunsFilterBar(p)
+		if len(p.Rows) > 0 {
+			@agentRunRowsCard(p)
+			@agentRunsPagination(p)
+		} else {
+			@agentRunsEmpty(p)
+		}
+	</div>
+	@agentRunModal(agentRunModalProps{
+		ModalID:            "agents-run-modal",
+		CSRFToken:          p.CSRFToken,
+		Options:            enabledAgentOptions(p.AgentOptions),
+		LastPromptPrefixes: p.LastPromptPrefixes,
+	})
+}
+
+templ agentRunsStats(s AgentRunsStatsProps) {
+	@components.StatTileRow() {
+		@components.StatTile(components.StatTileProps{
+			Icon:        "history",
+			Label:       "Runs · 30d",
+			Value:       commaInt(int64(s.RunCount30d)),
+			Description: agentRunsStatsRunDescription(s),
+			Tone:        components.StatToneNeutral,
 		})
-	} else {
-		@components.BreadcrumbNav([]components.Breadcrumb{
-			{Label: "Agents", Href: "/agents"},
-			{Label: "Run history"},
+		@components.StatTile(components.StatTileProps{
+			Icon:        "triangle-alert",
+			Label:       "Errors · 30d",
+			Value:       commaInt(int64(s.ErrorCount30d)),
+			Description: agentRunsStatsErrorDescription(s),
+			Tone:        agentRunsErrorTone(s),
 		})
-	}
-	@agentRunsHeader(p)
-	@agentRunsFilterBar(p)
-	if len(p.Rows) > 0 {
-		@agentRunsTable(p)
-		@agentRunsPagination(p)
-	} else {
-		@agentRunsEmpty(p)
+		@components.StatTile(components.StatTileProps{
+			Icon:        "dollar-sign",
+			Label:       "Cost · 30d",
+			Value:       agentRunsFormatMoney(s.TotalCostUSD30d),
+			Description: "Across every completed run",
+			Tone:        components.StatToneNeutral,
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:        "timer",
+			Label:       "Avg duration",
+			Value:       agentRunsFormatAvgDuration(s.AvgDurationSeconds),
+			Description: "Per non-skipped run",
+			Tone:        components.StatToneNeutral,
+		})
 	}
 }
 
-templ agentRunsHeader(p AgentRunsListProps) {
-	if p.Mode == "agent" {
-		@components.PageHeader(components.PageHeaderProps{
-			Title:                "Runs — " + p.AgentName,
-			Subtitle:             "History of every run, manual or scheduled, for this agent.",
-			SubtitleHideOnMobile: true,
-		})
-	} else {
-		@components.PageHeader(components.PageHeaderProps{
-			Title:                "Run history",
-			Subtitle:             "All agent runs across the household.",
-			SubtitleHideOnMobile: true,
-		})
-	}
-}
-
+// agentRunsFilterBar wraps the filter form in a daisy collapse so the
+// page doesn't carry a tall block of inputs above the feed. The
+// summary line shows the active filter chips so the operator can see
+// what's applied without expanding.
 templ agentRunsFilterBar(p AgentRunsListProps) {
-	<div class="bb-card mb-6 p-4">
-		<form method="GET" action={ templ.SafeURL(agentRunsFormAction(p)) } class="bb-filter-form">
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-3">
-				if p.Mode == "global" {
+	<details class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl mt-4 mb-4" if agentRunsHasActiveFilter(p) {
+		open
+	}>
+		<summary class="collapse-title text-sm font-medium">
+			<div class="flex items-center gap-2 flex-wrap">
+				<i data-lucide="filter" class="w-4 h-4 text-base-content/50"></i>
+				<span>Filters</span>
+				@agentRunsActiveChips(p)
+			</div>
+		</summary>
+		<div class="collapse-content">
+			<form method="GET" action="/agents" class="bb-filter-form pt-1">
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-3">
 					<label class="bb-filter-label">
 						Agent
 						<select name="agent" class="select select-sm w-full">
@@ -69,54 +111,78 @@ templ agentRunsFilterBar(p AgentRunsListProps) {
 							}
 						</select>
 					</label>
-				}
-				<label class="bb-filter-label">
-					Status
-					<select name="status" class="select select-sm w-full">
-						<option value="">All statuses</option>
-						@agentRunsSelectOption("success", "Success", p.Filters.Status)
-						@agentRunsSelectOption("error", "Error", p.Filters.Status)
-						@agentRunsSelectOption("in_progress", "In progress", p.Filters.Status)
-						@agentRunsSelectOption("skipped", "Skipped", p.Filters.Status)
-						@agentRunsSelectOption("timeout", "Timeout", p.Filters.Status)
-					</select>
-				</label>
-				<label class="bb-filter-label">
-					Trigger
-					<select name="trigger" class="select select-sm w-full">
-						<option value="">All triggers</option>
-						@agentRunsSelectOption("cron", "Cron", p.Filters.Trigger)
-						@agentRunsSelectOption("manual", "Manual", p.Filters.Trigger)
-						@agentRunsSelectOption("webhook", "Webhook", p.Filters.Trigger)
-					</select>
-				</label>
-				<label class="bb-filter-label">
-					Hit cap
-					<select name="hit_cap" class="select select-sm w-full">
-						<option value="">All</option>
-						@agentRunsSelectOption("any", "Any cap", p.Filters.HitCap)
-						@agentRunsSelectOption("max_turns", "Max turns", p.Filters.HitCap)
-						@agentRunsSelectOption("max_budget", "Max budget", p.Filters.HitCap)
-					</select>
-				</label>
-				<label class="bb-filter-label">
-					Start
-					<input type="date" name="start" value={ p.Filters.Start } class="input input-sm w-full"/>
-				</label>
-				<label class="bb-filter-label">
-					End
-					<input type="date" name="end" value={ p.Filters.End } class="input input-sm w-full"/>
-				</label>
-			</div>
-			<div class="bb-filter-actions flex items-center gap-2">
-				<button type="submit" class="btn btn-sm btn-primary">
-					<i data-lucide="filter" class="w-3.5 h-3.5"></i>
-					Apply
-				</button>
-				<a href={ templ.SafeURL(agentRunsFormAction(p)) } class="btn btn-sm btn-ghost">Clear</a>
-			</div>
-		</form>
-	</div>
+					<label class="bb-filter-label">
+						Status
+						<select name="status" class="select select-sm w-full">
+							<option value="">All statuses</option>
+							@agentRunsSelectOption("success", "Success", p.Filters.Status)
+							@agentRunsSelectOption("error", "Error", p.Filters.Status)
+							@agentRunsSelectOption("in_progress", "In progress", p.Filters.Status)
+							@agentRunsSelectOption("skipped", "Skipped", p.Filters.Status)
+							@agentRunsSelectOption("timeout", "Timeout", p.Filters.Status)
+						</select>
+					</label>
+					<label class="bb-filter-label">
+						Trigger
+						<select name="trigger" class="select select-sm w-full">
+							<option value="">All triggers</option>
+							@agentRunsSelectOption("cron", "Cron", p.Filters.Trigger)
+							@agentRunsSelectOption("manual", "Manual", p.Filters.Trigger)
+							@agentRunsSelectOption("webhook", "Webhook", p.Filters.Trigger)
+						</select>
+					</label>
+					<label class="bb-filter-label">
+						Hit cap
+						<select name="hit_cap" class="select select-sm w-full">
+							<option value="">All</option>
+							@agentRunsSelectOption("any", "Any cap", p.Filters.HitCap)
+							@agentRunsSelectOption("max_turns", "Max turns", p.Filters.HitCap)
+							@agentRunsSelectOption("max_budget", "Max budget", p.Filters.HitCap)
+						</select>
+					</label>
+					<label class="bb-filter-label">
+						Start
+						<input type="date" name="start" value={ p.Filters.Start } class="input input-sm w-full"/>
+					</label>
+					<label class="bb-filter-label">
+						End
+						<input type="date" name="end" value={ p.Filters.End } class="input input-sm w-full"/>
+					</label>
+				</div>
+				<div class="bb-filter-actions flex items-center gap-2">
+					<button type="submit" class="btn btn-sm btn-primary">
+						<i data-lucide="filter" class="w-3.5 h-3.5"></i>
+						Apply
+					</button>
+					<a href="/agents" class="btn btn-sm btn-ghost">Clear</a>
+				</div>
+			</form>
+		</div>
+	</details>
+}
+
+// agentRunsActiveChips renders the small "filtered by X" pill row
+// shown inside the collapse summary so the operator can see active
+// scope without expanding the form.
+templ agentRunsActiveChips(p AgentRunsListProps) {
+	if p.Filters.AgentSlug != "" {
+		<span class="badge badge-soft badge-primary badge-xs gap-1">
+			<i data-lucide="bot" class="w-2.5 h-2.5"></i>
+			{ agentRunsResolveAgentName(p, p.Filters.AgentSlug) }
+		</span>
+	}
+	if p.Filters.Status != "" {
+		<span class="badge badge-soft badge-info badge-xs">{ p.Filters.Status }</span>
+	}
+	if p.Filters.Trigger != "" {
+		<span class="badge badge-ghost badge-xs">{ p.Filters.Trigger }</span>
+	}
+	if p.Filters.HitCap != "" {
+		<span class="badge badge-soft badge-warning badge-xs">cap: { p.Filters.HitCap }</span>
+	}
+	if p.Filters.Start != "" || p.Filters.End != "" {
+		<span class="badge badge-ghost badge-xs">{ agentRunsDateRangeLabel(p.Filters) }</span>
+	}
 }
 
 templ agentRunsSelectOption(value, label, current string) {
@@ -127,101 +193,19 @@ templ agentRunsSelectOption(value, label, current string) {
 	}
 }
 
-templ agentRunsTable(p AgentRunsListProps) {
-	<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
-		<table class="table table-sm table-zebra-soft">
-			<thead>
-				<tr class="text-xs text-base-content/50">
-					<th class="font-medium">Run</th>
-					if p.Mode == "global" {
-						<th class="font-medium">Agent</th>
-					}
-					<th class="font-medium">Status</th>
-					<th class="font-medium">Trigger</th>
-					<th class="font-medium">Started</th>
-					<th class="font-medium text-right">Duration</th>
-					<th class="font-medium text-right">Turns</th>
-					<th class="font-medium text-right">Cost</th>
-					<th class="font-medium text-right">In / Out</th>
-					<th class="font-medium">Hit cap</th>
-					<th class="font-medium">Note</th>
-				</tr>
-			</thead>
-			<tbody>
-				for _, row := range p.Rows {
-					@agentRunsRow(row, p.Mode)
-				}
-			</tbody>
-		</table>
-	</div>
-}
-
-templ agentRunsRow(r AgentRunRowProps, mode string) {
-	<tr class="hover:bg-base-200/40">
-		<td class="align-middle">
-			<a href={ templ.SafeURL(fmt.Sprintf("/agents/runs/%s", r.ShortID)) } class="font-mono text-xs text-primary hover:underline">
-				{ r.ShortID }
-			</a>
-		</td>
-		if mode == "global" {
-			<td class="align-middle">
-				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/runs", r.AgentSlug)) } class="text-sm hover:underline">
-					{ r.AgentName }
-				</a>
-			</td>
+// agentRunRowsCard renders the run feed itself. Wraps every row in
+// the shared components.AgentRunRowList so the surface treatment +
+// divider is consistent with future list pages.
+templ agentRunRowsCard(p AgentRunsListProps) {
+	@components.AgentRunRowList() {
+		for _, r := range p.Rows {
+			@components.AgentRunRow(rowWithAgentToggle(r, p.Filters.AgentSlug == ""))
 		}
-		<td class="align-middle">@agentRunStatusBadge(r.Status)</td>
-		<td class="align-middle"><span class="text-xs text-base-content/70">{ r.Trigger }</span></td>
-		<td class="align-middle">
-			<span class="text-xs tabular-nums" title={ r.StartedAt.Format(time.RFC3339) }>
-				{ formatAgentRunStarted(r.StartedAt) }
-			</span>
-		</td>
-		<td class="align-middle text-right tabular-nums text-xs">{ formatAgentRunDuration(r.DurationMs) }</td>
-		<td class="align-middle text-right tabular-nums text-xs">{ strconv.Itoa(r.Turns) }</td>
-		<td class="align-middle text-right text-xs tabular-nums">
-			@agentRunCost(r.CostUSD, "text-xs")
-		</td>
-		<td class="align-middle text-right tabular-nums text-xs whitespace-nowrap">{ formatAgentRunTokens(r.TokensIn, r.TokensOut) }</td>
-		<td class="align-middle">
-			if r.HitCap != "" {
-				<span class="badge badge-soft badge-warning badge-xs">{ r.HitCap }</span>
-			} else {
-				<span class="text-xs text-base-content/30">&mdash;</span>
-			}
-		</td>
-		<td class="align-middle max-w-[16rem]">
-			if r.Note != "" {
-				<span class="text-xs text-base-content/60 line-clamp-1" title={ r.Note }>{ truncateAgentRunNote(r.Note, 60) }</span>
-			} else {
-				<span class="text-xs text-base-content/30">&mdash;</span>
-			}
-		</td>
-	</tr>
-}
-
-templ agentRunStatusBadge(status string) {
-	switch status {
-		case "success":
-			<span class="badge badge-soft badge-success badge-sm">success</span>
-		case "error":
-			<span class="badge badge-soft badge-error badge-sm">error</span>
-		case "in_progress":
-			<span class="badge badge-soft badge-warning badge-sm gap-1">
-				<span class="loading loading-spinner loading-xs"></span>
-				running
-			</span>
-		case "skipped":
-			<span class="badge badge-soft badge-neutral badge-sm">skipped</span>
-		case "timeout":
-			<span class="badge badge-soft badge-error badge-sm">timeout</span>
-		default:
-			<span class="badge badge-soft badge-sm">{ status }</span>
 	}
 }
 
 templ agentRunsPagination(p AgentRunsListProps) {
-	<div class="bb-paginator">
+	<div class="bb-paginator mt-4">
 		<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
 			{ fmt.Sprintf("Showing %d to %d", p.Offset+1, p.Offset+len(p.Rows)) }
 		</span>
@@ -243,14 +227,24 @@ templ agentRunsPagination(p AgentRunsListProps) {
 }
 
 templ agentRunsEmpty(p AgentRunsListProps) {
-	@components.EmptyState(components.EmptyStateProps{
-		Icon:     "search-x",
-		Title:    "No runs match the current filters.",
-		CTAHref:  templ.SafeURL(agentRunsFormAction(p)),
-		CTALabel: "Clear filters",
-		Compact:  true,
-		InCard:   true,
-	})
+	if agentRunsHasActiveFilter(p) {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:     "search-x",
+			Title:    "No runs match the current filters.",
+			CTAHref:  templ.SafeURL("/agents"),
+			CTALabel: "Clear filters",
+			Compact:  true,
+			InCard:   true,
+		})
+	} else {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:    "history",
+			Title:   "No agent runs yet.",
+			Body:    "Schedule an agent or trigger one manually to see runs land here.",
+			Compact: true,
+			InCard:  true,
+		})
+	}
 }
 
 // AgentRunDetail renders the per-run page: metadata card, operator note,
@@ -288,7 +282,7 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 		<div class="min-w-0">
 			<div class="flex items-center gap-3 flex-wrap">
 				<h1 class="bb-page-title font-mono">{ p.Run.ShortID }</h1>
-				@agentRunStatusBadge(p.Run.Status)
+				@components.AgentRunStatusBadge(p.Run.Status)
 				if p.RefreshSeconds > 0 {
 					<span class="text-xs text-base-content/40 inline-flex items-center gap-1">
 						<span class="loading loading-spinner loading-xs"></span>
@@ -298,7 +292,7 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 			</div>
 			if p.Run.AgentName != "" {
 				<p class="text-sm text-base-content/50 mt-1">
-					{ p.Run.AgentName }
+					<a href={ templ.SafeURL("/agents?agent=" + p.Run.AgentSlug) } class="hover:underline">{ p.Run.AgentName }</a>
 					if p.Run.Trigger != "" {
 						<span class="mx-1">·</span>
 						<span class="capitalize">{ p.Run.Trigger }</span>
@@ -314,8 +308,6 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 // startup orphan-cleanup string) we render the friendly text as the
 // headline and keep the raw message in a smaller secondary line so
 // operators can still grep / paste the original when reporting a bug.
-// Restart-interrupted runs surface as `alert-warning` (retriable);
-// every other error stays `alert-error`.
 templ agentRunErrorAlert(run AgentRunRowProps) {
 	if run.ErrorMessageFriendly != "" {
 		<div class="alert alert-warning alert-soft mb-4">
@@ -334,7 +326,9 @@ templ agentRunErrorAlert(run AgentRunRowProps) {
 }
 
 // agentRunDetailBreadcrumbs builds the breadcrumb trail for the detail
-// page — Agents › <agent name> › Runs › <short ID>.
+// page — Agents › <agent name> › <short ID>. The agent crumb routes
+// back to /agents?agent=<slug> (the filtered runs view) instead of the
+// old per-agent runs URL.
 func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
 	out := []components.Breadcrumb{
 		{Label: "Agents", Href: "/agents"},
@@ -342,16 +336,7 @@ func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
 	if p.Run.AgentSlug != "" {
 		out = append(out, components.Breadcrumb{
 			Label: runDetailAgentDisplay(p.Run),
-			Href:  "/agents/" + p.Run.AgentSlug + "/edit",
-		})
-		out = append(out, components.Breadcrumb{
-			Label: "Runs",
-			Href:  "/agents/" + p.Run.AgentSlug + "/runs",
-		})
-	} else {
-		out = append(out, components.Breadcrumb{
-			Label: "Runs",
-			Href:  "/agents/runs",
+			Href:  "/agents?agent=" + p.Run.AgentSlug,
 		})
 	}
 	out = append(out, components.Breadcrumb{Label: p.Run.ShortID})
@@ -398,6 +383,22 @@ templ agentRunDetailMetadata(p AgentRunDetailProps) {
 				</div>
 			}
 		</div>
+		if len(p.Run.Reports) > 0 {
+			<div class="mt-3 pt-3 border-t border-base-200">
+				<div class="text-base-content/50 text-xs mb-2">Reports produced by this run</div>
+				<div class="flex flex-wrap gap-2">
+					for _, rep := range p.Run.Reports {
+						<a
+							href={ templ.SafeURL("/reports/" + rep.ShortID) }
+							class="inline-flex items-center gap-1.5 text-xs rounded-md border border-base-300 px-2 py-1 hover:bg-base-200/60 no-underline"
+						>
+							<i data-lucide="file-text" class="w-3 h-3"></i>
+							<span class="line-clamp-1 max-w-xs">{ rep.Title }</span>
+						</a>
+					}
+				</div>
+			</div>
+		}
 	</div>
 }
 
@@ -579,21 +580,50 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 // Helpers
 // ====================================================================
 
-// agentRunsFormAction returns the URL the filter form posts to. Per-agent
-// pages stay scoped to /agents/{slug}/runs so Apply preserves the agent
-// scope; the global page lives at /agents/runs.
-func agentRunsFormAction(p AgentRunsListProps) string {
-	if p.Mode == "agent" && p.AgentSlug != "" {
-		return "/agents/" + p.AgentSlug + "/runs"
-	}
-	return "/agents/runs"
+// rowWithAgentToggle flips the ShowAgent flag on a row based on
+// whether the surrounding page is in single-agent scope. Doing it
+// here keeps the handler free of the toggle and ensures the row
+// component is rendered consistently.
+func rowWithAgentToggle(r AgentRunRowProps, showAgent bool) AgentRunRowProps {
+	r.ShowAgent = showAgent
+	return r
 }
 
-// agentRunsPageHref builds a paging URL preserving the current filter set
-// and swapping in the new offset. Kept lightweight (manual encode) so we
-// don't need url.Values from the templ side.
+// enabledAgentOptions filters the picker payload to enabled agents
+// only. Disabled agents stay searchable in the filter dropdown but
+// can't be run from the modal — running a disabled agent would just
+// fail at the orchestrator gate, surfacing as a 422 mid-modal.
+func enabledAgentOptions(opts []AgentRunsAgentOption) []AgentRunsAgentOption {
+	out := make([]AgentRunsAgentOption, 0, len(opts))
+	for _, o := range opts {
+		if o.Enabled {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+func agentRunsHasActiveFilter(p AgentRunsListProps) bool {
+	f := p.Filters
+	return f.AgentSlug != "" || f.Status != "" || f.Trigger != "" ||
+		f.HitCap != "" || f.Start != "" || f.End != ""
+}
+
+// agentRunsResolveAgentName looks up the display name for a slug
+// inside the filter chip; falls back to the slug verbatim when we
+// don't have a name in the options.
+func agentRunsResolveAgentName(p AgentRunsListProps, slug string) string {
+	for _, o := range p.AgentOptions {
+		if o.Slug == slug {
+			return o.Name
+		}
+	}
+	return slug
+}
+
+// agentRunsPageHref builds a paging URL preserving the current filter
+// set and swapping in the new offset.
 func agentRunsPageHref(p AgentRunsListProps, offset int) string {
-	base := agentRunsFormAction(p)
 	q := ""
 	add := func(k, v string) {
 		if v == "" {
@@ -606,9 +636,7 @@ func agentRunsPageHref(p AgentRunsListProps, offset int) string {
 		}
 		q += k + "=" + v
 	}
-	if p.Mode == "global" {
-		add("agent", p.Filters.AgentSlug)
-	}
+	add("agent", p.Filters.AgentSlug)
 	add("status", p.Filters.Status)
 	add("trigger", p.Filters.Trigger)
 	add("hit_cap", p.Filters.HitCap)
@@ -618,7 +646,7 @@ func agentRunsPageHref(p AgentRunsListProps, offset int) string {
 		add("limit", strconv.Itoa(p.Limit))
 	}
 	add("offset", strconv.Itoa(offset))
-	return base + q
+	return "/agents" + q
 }
 
 func prevOffset(current, limit int) int {
@@ -629,9 +657,6 @@ func prevOffset(current, limit int) int {
 	return v
 }
 
-// formatAgentRunStarted returns a compact "Jan 02 15:04" timestamp. We
-// don't have access to the relativeTime helper here (admin package), so a
-// fixed format is fine for an admin table.
 func formatAgentRunStarted(t time.Time) string {
 	if t.IsZero() {
 		return "—"
@@ -663,8 +688,7 @@ func formatAgentRunDuration(ms int64) string {
 
 // agentRunCost renders an agent-run cost cell via the canonical Amount
 // component (Intent: AmountCost, Precision: 4 for sub-cent values).
-// Zero/negative costs render an em-dash placeholder, matching the prior
-// formatAgentRunCost behavior.
+// Zero/negative costs render an em-dash placeholder.
 templ agentRunCost(v float64, extraClass string) {
 	if v > 0 {
 		@components.Amount(components.AmountProps{
@@ -685,16 +709,96 @@ func formatAgentRunTokens(in, out int64) string {
 	return fmt.Sprintf("%d / %d", in, out)
 }
 
-func truncateAgentRunNote(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "…"
-}
-
 func runDetailAgentDisplay(r AgentRunRowProps) string {
 	if r.AgentName != "" {
 		return r.AgentName
 	}
 	return r.AgentSlug
+}
+
+// agentRunsFormatMoney formats a USD cost for a stat tile.
+func agentRunsFormatMoney(v float64) string {
+	if v <= 0 {
+		return "$0"
+	}
+	if v < 1 {
+		return fmt.Sprintf("$%.3f", v)
+	}
+	return fmt.Sprintf("$%.2f", v)
+}
+
+func agentRunsFormatAvgDuration(secs float64) string {
+	if secs <= 0 {
+		return "—"
+	}
+	if secs < 60 {
+		return fmt.Sprintf("%.1fs", secs)
+	}
+	mins := secs / 60.0
+	return fmt.Sprintf("%.1fm", mins)
+}
+
+func agentRunsStatsRunDescription(s AgentRunsStatsProps) string {
+	if s.RunCount30d == 0 {
+		return "No runs in the last 30 days"
+	}
+	return "All triggers · last 30 days"
+}
+
+func agentRunsStatsErrorDescription(s AgentRunsStatsProps) string {
+	if s.RunCount30d == 0 {
+		return "—"
+	}
+	rate := float64(s.ErrorCount30d) / float64(s.RunCount30d) * 100
+	return fmt.Sprintf("%.1f%% failure rate", rate)
+}
+
+func agentRunsErrorTone(s AgentRunsStatsProps) components.StatTileTone {
+	if s.RunCount30d == 0 {
+		return components.StatToneNeutral
+	}
+	rate := float64(s.ErrorCount30d) / float64(s.RunCount30d)
+	switch {
+	case rate >= 0.25:
+		return components.StatToneError
+	case rate >= 0.10:
+		return components.StatToneWarning
+	default:
+		return components.StatToneNeutral
+	}
+}
+
+func agentRunsDateRangeLabel(f AgentRunsFilterProps) string {
+	switch {
+	case f.Start != "" && f.End != "":
+		return f.Start + " → " + f.End
+	case f.Start != "":
+		return "from " + f.Start
+	case f.End != "":
+		return "until " + f.End
+	default:
+		return ""
+	}
+}
+
+// commaInt renders an int64 with thousands separators (",").
+// Local utility — the wider codebase has a similar one in helpers but
+// it's behind a build tag, so we keep this small inline copy.
+func commaInt(n int64) string {
+	s := strconv.FormatInt(n, 10)
+	if n < 0 {
+		return "-" + commaInt(-n)
+	}
+	if len(s) <= 3 {
+		return s
+	}
+	head := len(s) % 3
+	out := s[:head]
+	for i := head; i < len(s); i += 3 {
+		if out != "" {
+			out += ","
+		}
+		out += s[i : i+3]
+	}
+	return out
 }

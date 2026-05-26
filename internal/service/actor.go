@@ -75,6 +75,36 @@ func ContextWithAPIKeyLegacy(ctx context.Context, id, name string) context.Conte
 	})
 }
 
+// AgentRunShortIDFromContext returns the agent_runs.short_id this
+// request is acting under, derived from the API key's name. Returns
+// "" when the request isn't running under a per-run agent key.
+//
+// API keys minted by Orchestrator.MintRunAPIKey are named
+// "agent:<slug>:<runShortID>" (see internal/service/agents.go). Any
+// future change to that format must update this parser in lock-step.
+func AgentRunShortIDFromContext(ctx context.Context) string {
+	v, ok := ctx.Value(ctxKeyAPIKey).(apiKeyCtxValue)
+	if !ok {
+		return ""
+	}
+	const prefix = "agent:"
+	if len(v.name) <= len(prefix) || v.name[:len(prefix)] != prefix {
+		return ""
+	}
+	rest := v.name[len(prefix):]
+	lastColon := -1
+	for i := len(rest) - 1; i >= 0; i-- {
+		if rest[i] == ':' {
+			lastColon = i
+			break
+		}
+	}
+	if lastColon < 0 || lastColon == len(rest)-1 {
+		return ""
+	}
+	return rest[lastColon+1:]
+}
+
 // ActorFromContext builds an Actor from the request context.
 // The actor's Type reflects the API key's actor_type column ('user',
 // 'agent', or 'system'). Display name falls back to the API key's own

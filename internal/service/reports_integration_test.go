@@ -15,7 +15,7 @@ func TestCreateAgentReport_Success(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "agent-1", Name: "TestAgent"}
 
-	report, err := svc.CreateAgentReport(context.Background(), "Test Report", "Report body content", actor, "info", []string{"tag1"}, "", "")
+	report, err := svc.CreateAgentReport(context.Background(), "Test Report", "Report body content", actor, "info", []string{"tag1"}, "", "", "")
 	if err != nil {
 		t.Fatalf("CreateAgentReport: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestCreateAgentReport_DefaultPriority(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "agent-1", Name: "TestAgent"}
 
-	report, err := svc.CreateAgentReport(context.Background(), "Test", "Body", actor, "", nil, "", "")
+	report, err := svc.CreateAgentReport(context.Background(), "Test", "Body", actor, "", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("CreateAgentReport: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestCreateAgentReport_WithAuthorOverride(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "agent-1", Name: "DefaultName"}
 
-	report, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "warning", nil, "CustomAuthor", "")
+	report, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "warning", nil, "CustomAuthor", "", "")
 	if err != nil {
 		t.Fatalf("CreateAgentReport: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestCreateAgentReport_MissingTitle(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "agent-1", Name: "TestAgent"}
 
-	_, err := svc.CreateAgentReport(context.Background(), "", "Body", actor, "info", nil, "", "")
+	_, err := svc.CreateAgentReport(context.Background(), "", "Body", actor, "info", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for missing title")
 	}
@@ -88,7 +88,7 @@ func TestCreateAgentReport_MissingBody(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "agent-1", Name: "TestAgent"}
 
-	_, err := svc.CreateAgentReport(context.Background(), "Title", "", actor, "info", nil, "", "")
+	_, err := svc.CreateAgentReport(context.Background(), "Title", "", actor, "info", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for missing body")
 	}
@@ -98,7 +98,7 @@ func TestCreateAgentReport_InvalidPriority(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "agent-1", Name: "TestAgent"}
 
-	_, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "urgent", nil, "", "")
+	_, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "urgent", nil, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for invalid priority")
 	}
@@ -112,7 +112,7 @@ func TestCreateAgentReport_TooManyTags(t *testing.T) {
 		tags[i] = "tag"
 	}
 
-	_, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "info", tags, "", "")
+	_, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "info", tags, "", "", "")
 	if err == nil {
 		t.Fatal("expected error for too many tags")
 	}
@@ -134,7 +134,7 @@ func TestListAgentReports_WithData(t *testing.T) {
 	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
 
 	for i := 0; i < 3; i++ {
-		_, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "")
+		_, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "", "")
 		if err != nil {
 			t.Fatalf("create report %d: %v", i, err)
 		}
@@ -185,7 +185,7 @@ func TestCountUnreadAgentReports_WithReports(t *testing.T) {
 	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
 
 	for i := 0; i < 3; i++ {
-		_, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "")
+		_, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "", "")
 		if err != nil {
 			t.Fatalf("create report %d: %v", i, err)
 		}
@@ -204,7 +204,7 @@ func TestMarkAgentReportRead(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
 
-	report, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "")
+	report, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "", "")
 	if err != nil {
 		t.Fatalf("CreateAgentReport: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestMarkAllAgentReportsRead(t *testing.T) {
 	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
 
 	for i := 0; i < 3; i++ {
-		_, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "")
+		_, err := svc.CreateAgentReport(context.Background(), "Report", "Body", actor, "info", nil, "", "", "")
 		if err != nil {
 			t.Fatalf("create report %d: %v", i, err)
 		}
@@ -260,8 +260,8 @@ func TestListUnreadAgentReports(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
 
-	report1, _ := svc.CreateAgentReport(context.Background(), "R1", "Body1", actor, "info", nil, "", "")
-	_, _ = svc.CreateAgentReport(context.Background(), "R2", "Body2", actor, "warning", nil, "", "")
+	report1, _ := svc.CreateAgentReport(context.Background(), "R1", "Body1", actor, "info", nil, "", "", "")
+	_, _ = svc.CreateAgentReport(context.Background(), "R2", "Body2", actor, "warning", nil, "", "", "")
 
 	// Mark one as read
 	svc.MarkAgentReportRead(context.Background(), report1.ID)
@@ -300,7 +300,7 @@ func TestCreateAgentReport_AllPriorities(t *testing.T) {
 		t.Run(p, func(t *testing.T) {
 			// Tables are NOT truncated between sub-tests, so all 3 accumulate.
 			// We just validate creation works.
-			report, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, p, nil, "", "")
+			report, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, p, nil, "", "", "")
 			if err != nil {
 				t.Fatalf("create report with priority %q: %v", p, err)
 			}

@@ -2144,3 +2144,57 @@ templ timelineSandboxCommentBody() {
 		<a href="#" class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">Whole Foods Market</a>
 	</div>
 }
+
+// ─── Agent run rows ───────────────────────────────────────────────────────
+
+// SectionAgentRunRows shows the variants of components.AgentRunRow —
+// the rich row shape rendered on /agents (the runs landing). The
+// fixtures here cover every status (success / error / in-progress /
+// skipped / timeout), surface the inline report-chip variants (info /
+// warning / critical priority), and exercise the ShowAgent toggle
+// (global view vs single-agent view).
+templ SectionAgentRunRows() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Renders one cross-agent feed of recent runs (canonical: <code>/agents</code>) via <code>AgentRunRow</code> + <code>AgentRunRowList</code>.</li>
+				<li>Show the agent name when the surrounding page is cross-agent; hide it via <code>ShowAgent: false</code> when the page is already scoped to one agent (e.g. <code>?agent=slug</code> filter chip applied).</li>
+				<li><code>AgentRunReportRef</code> chips render inline when the run produced reports via <code>submit_report</code>. Priority tone (info / warning / critical) drives the chip border + icon.</li>
+			</ul>
+		</div>
+		@designExample("Global feed — every status", "ShowAgent: true. Status drives the leading icon-tile tone + status badge. Error rows surface the error message inline; reports surface as priority-toned chips.") {
+			@components.AgentRunRowList() {
+				@components.AgentRunRow(designAgentRunRowSuccess())
+				@components.AgentRunRow(designAgentRunRowSuccessWithReport())
+				@components.AgentRunRow(designAgentRunRowError())
+				@components.AgentRunRow(designAgentRunRowInProgress())
+				@components.AgentRunRow(designAgentRunRowSkipped())
+				@components.AgentRunRow(designAgentRunRowTimeout())
+			}
+		}
+		@designExample("Per-agent scope — ShowAgent: false", "Used when the surrounding page is already scoped to one agent (filter chip or breadcrumb conveys the name). Status badge moves to the front of the title row since the agent name is gone.") {
+			@components.AgentRunRowList() {
+				@components.AgentRunRow(designAgentRunRowNoAgent(designAgentRunRowSuccess()))
+				@components.AgentRunRow(designAgentRunRowNoAgent(designAgentRunRowError()))
+			}
+		}
+		@designExample("Inline report chips by priority", "Reports rendered via AgentRunReportRef. Tone shifts with priority — critical / warning lift out of the neutral chip palette.") {
+			@components.AgentRunRowList() {
+				@components.AgentRunRow(designAgentRunRowWithReports("info"))
+				@components.AgentRunRow(designAgentRunRowWithReports("warning"))
+				@components.AgentRunRow(designAgentRunRowWithReports("critical"))
+				@components.AgentRunRow(designAgentRunRowWithMultipleReports())
+			}
+		}
+		@designExample("Status badge — standalone", "components.AgentRunStatusBadge — also used in the run-detail header and elsewhere. In-progress carries a spinner; everything else is a soft daisy badge.") {
+			<div class="flex flex-wrap items-center gap-2">
+				@components.AgentRunStatusBadge("success")
+				@components.AgentRunStatusBadge("error")
+				@components.AgentRunStatusBadge("in_progress")
+				@components.AgentRunStatusBadge("skipped")
+				@components.AgentRunStatusBadge("timeout")
+			</div>
+		}
+	</div>
+}

@@ -174,16 +174,36 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			http.Redirect(w, r, "/settings/oauth-clients/"+chi.URLParam(r, "id")+"/created", http.StatusMovedPermanently)
 		})
 
-		// Agents — Claude Agent SDK admin pages. List, create/edit forms,
-		// run history, run detail (with NDJSON transcript). The v1 prompt
-		// library lives at /agent-prompts as a starter-prompt composer
-		// that hands off into /agents/new via copy-to-clipboard.
-		r.Get("/agents", AgentsListPageHandler(svc, sm, tr))
+		// Agents — Claude Agent SDK admin pages.
+		//
+		// IA: /agents is the **runs landing** (the most interesting
+		// surface; what happened, when, with what outcome). The Agents
+		// list (the definitions table) moves to /agents/definitions and
+		// both share a 2-tab nav rendered immediately below the
+		// PageHeader. /agents?agent=<slug> filters the runs feed to one
+		// agent, which subsumes the old /agents/{slug}/runs route.
+		// Legacy /agents/runs and /agents/{slug}/runs 301-redirect.
+		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr))
+		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
 		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
 		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
-		r.Get("/agents/{slug}/runs", AgentRunsListPageHandler(svc, sm, tr))
-		r.Get("/agents/runs", AgentRunsListPageHandler(svc, sm, tr))
 		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr))
+		r.Get("/agents/runs", func(w http.ResponseWriter, r *http.Request) {
+			// Preserve query params so bookmarked filter URLs still work.
+			target := "/agents"
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+		})
+		r.Get("/agents/{slug}/runs", func(w http.ResponseWriter, r *http.Request) {
+			slug := chi.URLParam(r, "slug")
+			target := "/agents?agent=" + slug
+			if r.URL.RawQuery != "" {
+				target += "&" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+		})
 
 		// Prompt library — the v1 wizard. Authors a starter prompt that
 		// gets pasted into the SDK agent form.
