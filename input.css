@@ -74,9 +74,11 @@
   --color-error: oklch(0.577 0.245 27.325);
   --color-error-content: oklch(0.985 0 0);
 
+  /* Radii tuned to shadcn Nova: rounded-xl (12px) on cards/modals,
+     rounded-lg (8px) on buttons/inputs, 4px on checkboxes. */
   --radius-selector: 0.25rem;
   --radius-field: 0.5rem;
-  --radius-box: 0.625rem;
+  --radius-box: 0.75rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -123,7 +125,7 @@
 
   --radius-selector: 0.25rem;
   --radius-field: 0.5rem;
-  --radius-box: 0.625rem;
+  --radius-box: 0.75rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -325,9 +327,22 @@
   .breadcrumbs { scrollbar-width: none; -ms-overflow-style: none; }
   .breadcrumbs::-webkit-scrollbar { display: none; }
 
-  /* ── Cards: shadcn-style — border, not shadow ── */
+  /* ── Cards: shadcn Nova-style — inset ring, transparent border ──
+     Nova uses `ring-1 ring-foreground/10` on cards instead of a 1px border,
+     so the surface reads flatter and the edge feels like a subtle inset
+     against the page rather than a stamped rectangle. We replicate it via
+     a 0/0/0/1 box-shadow tinted with the base-content foreground.
+
+     IMPORTANT: we keep a `border: 1px solid transparent` here so per-caller
+     `border-{tone}/{alpha}` modifiers (`.bb-danger-card` and the
+     warning/error-banner cards under /sync-logs, /users, /my-account,
+     /tags) still light up — Tailwind `border-{color}` utilities only
+     set `border-color` and rely on the base to provide width + style.
+     Removing the border entirely makes those destructive-action tints
+     silently invisible. */
   .bb-card {
-    @apply bg-base-100 rounded-xl border border-base-300;
+    @apply bg-base-100 rounded-xl border border-transparent;
+    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.08);
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
   }
 
@@ -337,7 +352,29 @@
 
   .bb-card--interactive:hover {
     @apply bg-base-200/50;
-    border-color: var(--color-base-300);
+    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.12);
+  }
+
+  /* Dark mode: boost the ring opacity so the card edge stays legible
+     against the near-black base. base-content is near-white in dark,
+     so a 0.08 alpha (light-mode value) washes out — 0.14 restores
+     parity with the light-mode visual weight. Two selectors because
+     the theme can be set manually via `<html data-theme="dark">` OR
+     auto-resolved via `prefers-color-scheme` when no data-theme is
+     present (see the toggle-restore script in base.html). */
+  [data-theme="dark"] .bb-card {
+    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.14);
+  }
+  [data-theme="dark"] .bb-card--interactive:hover {
+    box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.20);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .bb-card {
+      box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.14);
+    }
+    :root:not([data-theme]) .bb-card--interactive:hover {
+      box-shadow: 0 0 0 1px oklch(from var(--color-base-content) l c h / 0.20);
+    }
   }
 
   /* ── Form card primitives ── */
@@ -1004,15 +1041,74 @@
     @apply text-sm text-base-content/50 max-w-sm mb-6 leading-relaxed;
   }
 
-  /* ── Button polish ── */
+  /* ── Button polish (Nova-flavored) ──
+     Nova ships a 1px-translate press feedback (`active:translate-y-px`) +
+     `bg-clip-padding` so any ring/border treatment stays crisp on press.
+     We override daisy's same-specificity rule with `!important`. */
   .btn {
+    background-clip: padding-box;
     transition: background-color 0.15s ease, color 0.15s ease,
                 border-color 0.15s ease, transform 0.1s ease,
                 box-shadow 0.15s ease, opacity 0.15s ease !important;
   }
 
-  .btn:active:not(:disabled) {
-    transform: scale(0.97) !important;
+  .btn:active:not(:disabled):not([aria-haspopup]) {
+    transform: translateY(1px) !important;
+  }
+
+  /* ── Join: unified depth on the bar, not on each segment ──
+     Daisy ships a per-button depth shadow + inset top-highlight (driven
+     by --depth in the light theme). In a `.join` split-button, that
+     highlight rims the inner edge of every .join-item, leaving a
+     visible vertical seam where two solid buttons meet — the eye
+     reads the bar as two stacked rectangles instead of one unit.
+     The drop shadow has the same problem: it ends abruptly at each
+     button's footprint.
+
+     Fix: lift the depth onto the .join container, suppress per-item
+     depth shadow on solid-tone buttons inside. Scoped via :has() to
+     joins that actually contain a solid-tone (.btn-primary etc.)
+     button so ghost-only joins (pagination, segmented filters) stay
+     flat. */
+  .join:has(> .btn-primary, > .btn-secondary, > .btn-accent,
+            > .btn-neutral, > .btn-info, > .btn-success,
+            > .btn-warning, > .btn-error,
+            > .dropdown > .btn-primary, > .dropdown > .btn-secondary,
+            > .dropdown > .btn-accent, > .dropdown > .btn-neutral,
+            > .dropdown > .btn-info, > .dropdown > .btn-success,
+            > .dropdown > .btn-warning, > .dropdown > .btn-error,
+            > .dropdown > [role="button"].btn-primary,
+            > .dropdown > [role="button"].btn-secondary,
+            > .dropdown > [role="button"].btn-accent,
+            > .dropdown > [role="button"].btn-neutral,
+            > .dropdown > [role="button"].btn-info,
+            > .dropdown > [role="button"].btn-success,
+            > .dropdown > [role="button"].btn-warning,
+            > .dropdown > [role="button"].btn-error) {
+    border-radius: var(--radius-field);
+    box-shadow:
+      oklch(from var(--color-base-content) l c h / 0.06) 0 0.5px 0 0.5px inset,
+      oklch(0 0 0 / 0.10) 0 3px 2px -2px,
+      oklch(0 0 0 / 0.10) 0 4px 3px -2px;
+  }
+
+  .join:has(> .btn-primary, > .btn-secondary, > .btn-accent,
+            > .btn-neutral, > .btn-info, > .btn-success,
+            > .btn-warning, > .btn-error,
+            > .dropdown > .btn-primary, > .dropdown > .btn-secondary,
+            > .dropdown > .btn-accent, > .dropdown > .btn-neutral,
+            > .dropdown > .btn-info, > .dropdown > .btn-success,
+            > .dropdown > .btn-warning, > .dropdown > .btn-error,
+            > .dropdown > [role="button"].btn-primary,
+            > .dropdown > [role="button"].btn-secondary,
+            > .dropdown > [role="button"].btn-accent,
+            > .dropdown > [role="button"].btn-neutral,
+            > .dropdown > [role="button"].btn-info,
+            > .dropdown > [role="button"].btn-success,
+            > .dropdown > [role="button"].btn-warning,
+            > .dropdown > [role="button"].btn-error)
+          :is(.btn, [role="button"]).join-item {
+    box-shadow: none !important;
   }
 
   /* Button radius convention — see unlayered .btn-sm / .btn-xs override
@@ -1332,6 +1428,26 @@
    * ──────────────────────────────────────────────────────────── */
   .modal-box {
     overscroll-behavior: contain;
+    /* Nova-style inset ring on modals — replaces the hard daisy shadow-2xl
+       with a foreground-tinted ring + soft drop. `!important` because
+       daisyUI's plugin layer emits a same-specificity `.modal-box`
+       box-shadow that wins on source order otherwise. */
+    box-shadow:
+      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.10),
+      0 10px 30px -10px oklch(0 0 0 / 0.18) !important;
+  }
+
+  /* Floating menus / dropdown content — same inset-ring treatment so
+     overflow popups read consistently with cards and modals. No
+     !important here: callers that opt into a heavier elevation via
+     Tailwind `shadow-lg`/`shadow-xl` (the daisyui.md-mandated standard
+     dropdown shape, plus settings_modal's tab picker) must keep their
+     stronger shadow. Specificity carries this for callers that don't
+     opt in. */
+  .dropdown-content {
+    box-shadow:
+      0 0 0 1px oklch(from var(--color-base-content) l c h / 0.08),
+      0 6px 20px -6px oklch(0 0 0 / 0.12);
   }
 
   /* ── Suppress WebKit's native search-clear (×) on overlay pickers ──
