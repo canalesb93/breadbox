@@ -472,9 +472,10 @@ func classifyTranscriptEvent(obj map[string]any, raw string) pages.TranscriptEve
 		// see "no text content" for the tool-only assistant message.
 		// We could iterate content[] for tool_use too, but the
 		// constraint says "don't gold-plate" — grouping is non-trivial.
-		if toolUse, name, input := firstToolUseBlock(obj); toolUse {
+		if toolUse, id, name, input := firstToolUseBlock(obj); toolUse {
 			ev.Type = "tool_use"
 			ev.ToolName = name
+			ev.ToolUseID = id
 			ev.ToolInputJSON = input
 		}
 	case "user_message":
@@ -483,8 +484,9 @@ func classifyTranscriptEvent(obj map[string]any, raw string) pages.TranscriptEve
 		// A user_message often carries tool_result blocks. Surface the
 		// first one as a tool_result event if there is one; otherwise
 		// fall back to user text.
-		if hasResult, resultJSON := firstToolResultBlock(obj); hasResult {
+		if hasResult, id, resultJSON := firstToolResultBlock(obj); hasResult {
 			ev.Type = "tool_result"
+			ev.ToolUseID = id
 			ev.ToolResultJSON = resultJSON
 		} else {
 			ev.Text = extractMessageText(obj)
@@ -493,6 +495,7 @@ func classifyTranscriptEvent(obj map[string]any, raw string) pages.TranscriptEve
 		ev.Type = "tool_use"
 		if data, ok := obj["data"].(map[string]any); ok {
 			ev.ToolName, _ = data["name"].(string)
+			ev.ToolUseID, _ = data["id"].(string)
 			if input, ok := data["input"]; ok {
 				if b, err := json.MarshalIndent(input, "", "  "); err == nil {
 					ev.ToolInputJSON = string(b)
@@ -502,6 +505,7 @@ func classifyTranscriptEvent(obj map[string]any, raw string) pages.TranscriptEve
 	case "tool_result":
 		ev.Type = "tool_result"
 		if data, ok := obj["data"].(map[string]any); ok {
+			ev.ToolUseID, _ = data["tool_use_id"].(string)
 			if content, ok := data["content"]; ok {
 				if b, err := json.MarshalIndent(content, "", "  "); err == nil {
 					ev.ToolResultJSON = string(b)
@@ -569,18 +573,18 @@ func extractMessageText(obj map[string]any) string {
 	return out
 }
 
-func firstToolUseBlock(obj map[string]any) (found bool, name, inputJSON string) {
+func firstToolUseBlock(obj map[string]any) (found bool, id, name, inputJSON string) {
 	data, ok := obj["data"].(map[string]any)
 	if !ok {
-		return false, "", ""
+		return false, "", "", ""
 	}
 	msg, ok := data["message"].(map[string]any)
 	if !ok {
-		return false, "", ""
+		return false, "", "", ""
 	}
 	content, ok := msg["content"].([]any)
 	if !ok {
-		return false, "", ""
+		return false, "", "", ""
 	}
 	for _, block := range content {
 		bm, ok := block.(map[string]any)
@@ -589,26 +593,27 @@ func firstToolUseBlock(obj map[string]any) (found bool, name, inputJSON string) 
 		}
 		if t, _ := bm["type"].(string); t == "tool_use" {
 			n, _ := bm["name"].(string)
+			tid, _ := bm["id"].(string)
 			input := bm["input"]
 			b, _ := json.MarshalIndent(input, "", "  ")
-			return true, n, string(b)
+			return true, tid, n, string(b)
 		}
 	}
-	return false, "", ""
+	return false, "", "", ""
 }
 
-func firstToolResultBlock(obj map[string]any) (found bool, contentJSON string) {
+func firstToolResultBlock(obj map[string]any) (found bool, id, contentJSON string) {
 	data, ok := obj["data"].(map[string]any)
 	if !ok {
-		return false, ""
+		return false, "", ""
 	}
 	msg, ok := data["message"].(map[string]any)
 	if !ok {
-		return false, ""
+		return false, "", ""
 	}
 	content, ok := msg["content"].([]any)
 	if !ok {
-		return false, ""
+		return false, "", ""
 	}
 	for _, block := range content {
 		bm, ok := block.(map[string]any)
@@ -616,12 +621,13 @@ func firstToolResultBlock(obj map[string]any) (found bool, contentJSON string) {
 			continue
 		}
 		if t, _ := bm["type"].(string); t == "tool_result" {
+			tid, _ := bm["tool_use_id"].(string)
 			inner := bm["content"]
 			b, _ := json.MarshalIndent(inner, "", "  ")
-			return true, string(b)
+			return true, tid, string(b)
 		}
 	}
-	return false, ""
+	return false, "", ""
 }
 
 func readFloat(m map[string]any, k string) float64 {

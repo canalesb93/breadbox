@@ -182,12 +182,22 @@ templ SectionAgentRunChat() {
 		}
 		@designExample(
 			"Tool call + result rows",
-			"Tool events render as compact rows that expand into the JSONViewer. We strip the `mcp__breadbox__` prefix from tool names so the row stays readable. Color tone: blue tile for `tool_use`, green for `tool_result`.",
+			"Tool events render as compact rows that expand into the JSONViewer. We strip the `mcp__breadbox__` prefix from tool names so the row stays readable. Tool results inherit the name of the tool_use they're answering (via tool_use_id) so the operator can pair them at a glance. Color tone: blue tile for `tool_use`, green for `tool_result`.",
 		) {
 			<div class="bb-card p-4 max-w-2xl">
 				<ul class="bb-chat-thread">
 					@agentRunTranscriptEvent(designChatToolUseEvent(), 0)
 					@agentRunTranscriptEvent(designChatToolResultEvent(), 1)
+				</ul>
+			</div>
+		}
+		@designExample(
+			"System events",
+			"SDK init messages, cost_cap_hit, and other non-conversational events render as a subtle row beneath the chat thread. Dashed border + neutral icon to keep them out of the way.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				<ul class="bb-chat-thread">
+					@agentRunTranscriptEvent(designChatSystemEvent(), 0)
 				</ul>
 			</div>
 		}
@@ -230,6 +240,7 @@ func designChatToolUseEvent() TranscriptEvent {
 	return TranscriptEvent{
 		Type:          "tool_use",
 		ToolName:      "mcp__breadbox__query_transactions",
+		ToolUseID:     "toolu_demo_01",
 		ToolInputJSON: `{"start": "2026-04-25", "limit": 100, "categories": ["groceries", "subscriptions"]}`,
 		Timestamp:     time.Now().Add(-2 * time.Minute),
 	}
@@ -238,8 +249,18 @@ func designChatToolUseEvent() TranscriptEvent {
 func designChatToolResultEvent() TranscriptEvent {
 	return TranscriptEvent{
 		Type:           "tool_result",
+		ToolName:       "mcp__breadbox__query_transactions",
+		ToolUseID:      "toolu_demo_01",
 		ToolResultJSON: `{"count": 47, "sample": [{"merchant": "Whole Foods", "amount": 42.18}, {"merchant": "Spotify", "amount": 9.99}], "has_more": true}`,
 		Timestamp:      time.Now().Add(-1*time.Minute - 50*time.Second),
+	}
+}
+
+func designChatSystemEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:      "system",
+		Text:      "Cost cap reached: stopping after 5 turns. Remaining budget: $0.00.",
+		Timestamp: time.Now().Add(-30 * time.Second),
 	}
 }
 

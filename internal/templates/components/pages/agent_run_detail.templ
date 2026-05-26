@@ -334,6 +334,9 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 					<summary class="bb-tool__summary">
 						<div class="bb-tool__icon bb-tool__icon--result"><i data-lucide="check-check" class="w-3.5 h-3.5"></i></div>
 						<span class="bb-tool__label">Tool result</span>
+						if ev.ToolName != "" {
+							<span class="bb-tool__name font-mono">{ agentRunToolDisplay(ev.ToolName) }</span>
+						}
 						if !ev.Timestamp.IsZero() {
 							<time class="bb-tool__time" datetime={ ev.Timestamp.Format(time.RFC3339) }>{ ev.Timestamp.Format("15:04:05") }</time>
 						}
@@ -347,6 +350,19 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 						}
 					</div>
 				</details>
+			</li>
+		case "system":
+			<li class="bb-system-row">
+				<i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-base-content/50"></i>
+				<div class="min-w-0">
+					<div class="text-[0.65rem] uppercase tracking-wider text-base-content/50">System</div>
+					if ev.Text != "" {
+						<div class="text-xs text-base-content/70 mt-0.5 whitespace-pre-wrap break-words">{ ev.Text }</div>
+					}
+					if !ev.Timestamp.IsZero() {
+						<time class="text-[0.65rem] text-base-content/40 tabular-nums" datetime={ ev.Timestamp.Format(time.RFC3339) }>{ ev.Timestamp.Format("15:04:05") }</time>
+					}
+				</div>
 			</li>
 		case "result":
 			<li class="bb-run-summary">

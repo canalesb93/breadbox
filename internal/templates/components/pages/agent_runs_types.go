@@ -152,6 +152,15 @@ type TranscriptEvent struct {
 	ToolInputJSON  string
 	ToolResultJSON string
 
+	// ToolUseID is the SDK-assigned correlation ID. tool_use events
+	// carry their own ID; tool_result events carry the ID of the
+	// tool_use they're answering. The enrichment pass in
+	// FilterTranscriptForDisplay writes the tool's name onto every
+	// tool_result whose ToolUseID matches a known tool_use, so the
+	// rendered row can read "tool result — query_transactions" instead
+	// of an anonymous "tool result".
+	ToolUseID string
+
 	// CostUSD / token counts are populated for type=="result".
 	CostUSD     float64
 	TokensIn    int64
