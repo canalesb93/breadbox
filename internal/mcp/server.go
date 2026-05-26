@@ -194,6 +194,49 @@ func (s *MCPServer) resolveTransportID(req *mcpsdk.CallToolRequest) string {
 	return s.stdioFallbackTransportID
 }
 
+// rebindActorFromClientInfo upgrades the ctx's actor identity to the
+// per-client agent key resolved from the MCP `initialize` handshake's
+// clientInfo block. Returns the original ctx unchanged when there's
+// no session, no initialize-params, or the service helper fails — the
+// pre-PR behaviour (Local MCP fallback singleton attached at process
+// start, or the HTTP request's own API key) is preserved.
+//
+// MUST be called BEFORE ensureAuditSession in the dispatcher.
+// ensureAuditSession reads ActorFromContext(ctx) to stamp the
+// mcp_sessions row's api_key_id + api_key_name on first call, and
+// those columns never re-stamp. Rebinding after the session row is
+// created would permanently record the wrong key for every session.
+func (s *MCPServer) rebindActorFromClientInfo(ctx context.Context, req *mcpsdk.CallToolRequest, transportID string) context.Context {
+	if req == nil || req.Session == nil {
+		return ctx
+	}
+	ip := req.Session.InitializeParams()
+	if ip == nil || ip.ClientInfo == nil {
+		return ctx
+	}
+	transport := "stdio"
+	if id := req.Session.ID(); id != "" && id != transportID {
+		// HTTP sessions advertise their MCP-Session-Id; stdio falls
+		// back to the per-process transport id we stamped ourselves.
+		transport = "http"
+	}
+	clientInfo := service.MCPClientInfo{
+		Name:       ip.ClientInfo.Name,
+		Version:    ip.ClientInfo.Version,
+		Title:      ip.ClientInfo.Title,
+		WebsiteURL: ip.ClientInfo.WebsiteURL,
+	}
+	key, err := s.svc.EnsureMCPClientAgentKey(ctx, clientInfo, transport)
+	if err != nil || key == nil {
+		// Service-layer fallback already returned the Local MCP
+		// singleton when possible; outright failure means the
+		// migration hasn't applied. Keep the existing ctx so the
+		// caller's pre-PR behaviour stays intact.
+		return ctx
+	}
+	return service.ContextWithAPIKey(ctx, key)
+}
+
 // ensureAuditSession resolves (lazy-creating on first call) the
 // mcp_sessions row bound to a transport id and returns its UUID as a
 // string for LogToolCall. Captures clientInfo from the initialize
@@ -448,6 +491,18 @@ func makeToolDefLogged[T any](spec ToolSpec, handler func(context.Context, *mcps
 				// audit trail captures clientInfo without requiring
 				// agents to explicitly call create_session.
 				transportID := s.resolveTransportID(req)
+
+				// Upgrade the actor from whatever auth/middleware put
+				// on the ctx (typically the stdio "Local MCP" singleton
+				// or an HTTP API key) to the per-client agent identity
+				// keyed off clientInfo + transport. MUST happen before
+				// ensureAuditSession runs — that helper reads
+				// ActorFromContext(ctx) to stamp mcp_sessions.api_key_id
+				// and mcp_sessions.api_key_name on first call, and those
+				// columns are write-once. Doing this swap after would
+				// permanently record the wrong key for every session.
+				ctx = s.rebindActorFromClientInfo(ctx, req, transportID)
+
 				auditSessionID := s.ensureAuditSession(ctx, req, transportID)
 
 				// Optional per-call reason via _meta.reason — replaces the

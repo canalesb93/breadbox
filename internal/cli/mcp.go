@@ -51,13 +51,21 @@ func AddMCPCmd(root *cobra.Command) {
 	root.AddCommand(legacy)
 }
 
-// runMCPStdio launches the stdio MCP server. The body is the same as
-// cmd/breadbox/main.go::runMCPStdio with one change: instead of fabricating
-// an in-memory `agent` context, it ensures a singleton system-actor row
-// exists in api_keys and attaches that to the context. The new check
-// constraint on api_keys.actor_type rejects a synthetic id of "stdio"
-// because no row matches it; the singleton key gives every stdio audit
-// row a real `system` actor to point at.
+// runMCPStdio launches the stdio MCP server. Process-start attaches
+// the "Local MCP" fallback agent identity to the root ctx so any code
+// path that runs before the MCP `initialize` handshake completes (or
+// comes from a client that omits clientInfo entirely) has a valid
+// actor. The dispatcher (`MCPServer.makeToolDefLogged`) upgrades the
+// ctx to a per-client agent identity on each tool call once clientInfo
+// is available, so tool-call-level attribution stays sharp without
+// touching this bootstrap.
+//
+// The fallback row is the relabelled stdio singleton (see migration
+// 20260526092106_api_keys_client_fingerprint.sql) — same UUID, same
+// key_prefix as the pre-PR singleton, now with actor_type='agent',
+// actor_name='Local MCP', and client_fingerprint='unknown@@stdio'.
+// Pre-PR annotations that reference that UUID re-render correctly
+// through the agent branch without any data backfill.
 func runMCPStdio(parent context.Context, version string) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -75,15 +83,14 @@ func runMCPStdio(parent context.Context, version string) error {
 	}
 	defer a.DB.Close()
 
-	// Ensure a system-actor API key row exists so ContextWithAPIKey can
-	// point at a real `actor_type='system'` record. The plaintext is never
-	// exposed externally — this row is purely a DB-side anchor for the
-	// audit trail.
-	systemKey, err := ensureStdioSystemKey(ctx, a.Queries)
+	// Attach the Local MCP fallback identity. The dispatcher swaps in
+	// per-client keys once clientInfo arrives; this is just the safe
+	// floor for anything that runs before then.
+	fallbackKey, err := ensureLocalMCPFallbackKey(ctx, a.Queries)
 	if err != nil {
-		return fmt.Errorf("ensure stdio system key: %w", err)
+		return fmt.Errorf("ensure local mcp fallback key: %w", err)
 	}
-	ctx = service.ContextWithAPIKey(ctx, systemKey)
+	ctx = service.ContextWithAPIKey(ctx, fallbackKey)
 
 	mcpServer := breadboxmcp.NewMCPServer(a.Service, version)
 
@@ -114,16 +121,24 @@ func runMCPStdio(parent context.Context, version string) error {
 	return server.Run(ctx, &mcpsdk.StdioTransport{})
 }
 
-// stdioSystemKeyPrefix is the unique prefix of the singleton stdio key
-// row. It's looked up by prefix on each startup; missing rows are
-// inserted with actor_type='system', actor_name='stdio'.
+// stdioSystemKeyPrefix is the prefix of the legacy stdio singleton row,
+// kept as a stable lookup handle. The migration relabels its actor
+// fields in place; new installs (no migration history to relabel)
+// create the row fresh below in the agent-typed shape.
 const stdioSystemKeyPrefix = "bb_stdio_singleton"
 
-// ensureStdioSystemKey looks up (or creates) the stdio singleton api_keys
-// row that ContextWithAPIKey attaches to all stdio MCP calls. The
-// returned db.ApiKey lets the actor be attributed as system/stdio in the
-// audit log.
-func ensureStdioSystemKey(ctx context.Context, q *db.Queries) (*db.ApiKey, error) {
+// ensureLocalMCPFallbackKey returns the "Local MCP" fallback agent
+// identity row that gets attached to the root ctx at process start.
+// Used by anything that runs before the MCP `initialize` handshake
+// completes — the dispatcher upgrades to a per-client agent identity
+// per tool call once clientInfo is available.
+//
+// On an existing install the migration has already relabelled the
+// stdio singleton to actor_type='agent' / actor_name='Local MCP' /
+// client_fingerprint='unknown@@stdio'; this helper just looks it up.
+// On a fresh install with no prior stdio history the row doesn't
+// exist yet, so we create it in the agent-typed shape directly.
+func ensureLocalMCPFallbackKey(ctx context.Context, q *db.Queries) (*db.ApiKey, error) {
 	key, err := q.GetApiKeyByPrefix(ctx, stdioSystemKeyPrefix)
 	if err == nil {
 		return &key, nil
@@ -131,17 +146,12 @@ func ensureStdioSystemKey(ctx context.Context, q *db.Queries) (*db.ApiKey, error
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
-	// The hash is a fixed sentinel — the row is never used as a valid
-	// credential at the HTTP layer (no client can present a "key" whose
-	// SHA-256 equals this literal string). Its only job is to be a
-	// stable api_keys row for ContextWithAPIKey to attach to.
-	row, err := q.CreateApiKey(ctx, db.CreateApiKeyParams{
-		Name:      "MCP Stdio",
-		KeyHash:   "stdio-singleton-not-a-real-credential",
-		KeyPrefix: stdioSystemKeyPrefix,
-		Scope:     "full_access",
-		ActorType: "system",
-		ActorName: pgText("stdio"),
+	row, err := q.CreateMCPClientApiKey(ctx, db.CreateMCPClientApiKeyParams{
+		Name:              "mcp-client:" + service.MCPClientFallbackFingerprint,
+		KeyHash:           "mcp-client-not-a-real-credential:" + service.MCPClientFallbackFingerprint,
+		KeyPrefix:         stdioSystemKeyPrefix,
+		ActorName:         pgText(service.MCPClientFallbackActorName),
+		ClientFingerprint: pgText(service.MCPClientFallbackFingerprint),
 	})
 	if err != nil {
 		return nil, err
