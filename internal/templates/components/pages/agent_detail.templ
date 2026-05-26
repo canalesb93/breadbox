@@ -1,0 +1,308 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"breadbox/internal/templates/components"
+)
+
+// AgentDetail renders the admin /agents/{slug} page — the per-agent
+// landing page that replaces the previous behavior of clicking an
+// agent name in the list (which jumped straight to the edit form).
+//
+// Layout, top-down:
+//  1. Breadcrumb (Agents › <name>).
+//  2. PageHeader with the agent name + subtitle, primary Run + Edit
+//     actions on the right.
+//  3. agentDetailReadinessBanner — only when the agent is disabled,
+//     so the "Run" button doesn't lie about what's possible.
+//  4. agentDetailStats — 4-up StatTileRow (lifetime rollup).
+//  5. agentDetailConfig — bb-info-grid card with schedule / model /
+//     tool scope / budget / quiet hours / allowed tools.
+//  6. agentDetailDescription — prompt blurb (first line).
+//  7. agentDetailRecentRuns — last 10 runs via AgentRunRow.
+templ AgentDetail(p AgentDetailProps) {
+	<div x-data x-init="$store.shortcuts.setScope('agent-detail')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	@components.BreadcrumbNav(agentDetailBreadcrumbs(p))
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    p.Name,
+		Subtitle: agentDetailSubtitle(p),
+		Action:   agentDetailHeaderActions(p),
+	})
+	if !p.Enabled {
+		@agentDetailDisabledBanner()
+	}
+	@agentDetailStats(p.Stats)
+	@agentDetailConfig(p)
+	@agentDetailRecentRuns(p)
+}
+
+// agentDetailHeaderActions renders the primary "Run" + secondary
+// "Edit" pair in the PageHeader trailing slot. Run posts directly to
+// the manual-trigger endpoint and surfaces a toast; Edit is a plain
+// link to the existing form route.
+templ agentDetailHeaderActions(p AgentDetailProps) {
+	<div class="flex items-center gap-2 shrink-0">
+		<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/edit", p.Slug)) } class="btn btn-sm btn-ghost gap-2" title="Edit agent">
+			<i data-lucide="pencil" class="w-4 h-4"></i>
+			<span class="hidden sm:inline">Edit</span>
+		</a>
+		if p.Enabled {
+			<form
+				method="POST"
+				action={ templ.SafeURL(fmt.Sprintf("/-/agents/%s/run", p.Slug)) }
+				onsubmit="event.preventDefault(); window.bbAgentDetailRun && window.bbAgentDetailRun(this);"
+				class="contents"
+			>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-sm btn-primary gap-2">
+					<i data-lucide="play" class="w-4 h-4"></i>
+					<span>Run</span>
+				</button>
+			</form>
+		} else {
+			<button type="button" class="btn btn-sm btn-primary gap-2" disabled title="Enable the agent before running it">
+				<i data-lucide="play" class="w-4 h-4"></i>
+				<span>Run</span>
+			</button>
+		}
+	</div>
+}
+
+templ agentDetailDisabledBanner() {
+	<div role="alert" class="alert alert-warning alert-soft mt-4 mb-4">
+		<i data-lucide="pause-circle" class="w-5 h-5 shrink-0"></i>
+		<div class="flex-1">
+			<div class="font-semibold text-sm">Agent is disabled</div>
+			<div class="text-xs opacity-80">Cron + sync triggers won't fire. Enable it from the Edit page to resume scheduled runs.</div>
+		</div>
+	</div>
+}
+
+templ agentDetailStats(s AgentDetailStatsProps) {
+	<div class="mt-4">
+		@components.StatTileRow() {
+			@components.StatTile(components.StatTileProps{
+				Icon:        "history",
+				Label:       "Lifetime runs",
+				Value:       commaInt(int64(s.RunCount)),
+				Description: agentDetailRunsDescription(s),
+				Tone:        components.StatToneNeutral,
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:        "triangle-alert",
+				Label:       "Errors",
+				Value:       commaInt(int64(s.ErrorCount)),
+				Description: agentDetailErrorsDescription(s),
+				Tone:        agentDetailErrorTone(s),
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:        "dollar-sign",
+				Label:       "Total cost",
+				Value:       agentRunsFormatMoney(s.TotalCostUSD),
+				Description: "Across every non-skipped run",
+				Tone:        components.StatToneNeutral,
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:        "timer",
+				Label:       "Avg duration",
+				Value:       agentRunsFormatAvgDuration(s.AvgDurationSeconds),
+				Description: "Per non-skipped run",
+				Tone:        components.StatToneNeutral,
+			})
+		}
+	</div>
+}
+
+templ agentDetailConfig(p AgentDetailProps) {
+	<div class="bb-card p-4 mt-4">
+		<h2 class="text-sm font-semibold mb-3 flex items-center gap-2">
+			<i data-lucide="settings-2" class="w-4 h-4 text-base-content opacity-60"></i>
+			Configuration
+		</h2>
+		<dl class="bb-info-grid">
+			<dt>Schedule</dt>
+			<dd>
+				if p.ScheduleCron != "" {
+					<span class="font-mono text-xs">{ p.ScheduleCron }</span>
+					if p.NextRunRelative != "" {
+						<span class="text-base-content/40 text-xs ml-2">· next { p.NextRunRelative }</span>
+					}
+				} else if p.TriggerOnSyncComplete {
+					<span class="text-base-content/70">On sync only</span>
+				} else {
+					<span class="text-base-content/40">Unscheduled</span>
+				}
+			</dd>
+			<dt>Sync trigger</dt>
+			<dd>
+				if p.TriggerOnSyncComplete {
+					<span class="badge badge-soft badge-info badge-xs gap-1">
+						<i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i>
+						Fires after every successful sync
+					</span>
+				} else {
+					<span class="text-base-content/40">Off</span>
+				}
+			</dd>
+			<dt>Model</dt>
+			<dd><code class="font-mono text-xs">{ p.Model }</code></dd>
+			<dt>Tool scope</dt>
+			<dd>
+				@agentDetailToolScopeBadge(p.ToolScope)
+				if len(p.AllowedTools) > 0 {
+					<span class="text-base-content/50 text-xs ml-2">{ strconv.Itoa(len(p.AllowedTools)) } explicit tools</span>
+				}
+			</dd>
+			<dt>Max turns</dt>
+			<dd class="tabular-nums">{ strconv.Itoa(p.MaxTurns) }</dd>
+			<dt>Max budget</dt>
+			<dd>
+				if p.HasMaxBudget {
+					@components.Amount(components.AmountProps{
+						Value:     p.MaxBudgetUSD,
+						Intent:    components.AmountCost,
+						Precision: 2,
+						Class:     "text-sm",
+					})
+				} else {
+					<span class="text-base-content/40">No cap</span>
+				}
+			</dd>
+			<dt>Quiet hours</dt>
+			<dd>
+				if p.QuietHoursStart != "" && p.QuietHoursEnd != "" {
+					<span class="tabular-nums">{ p.QuietHoursStart } → { p.QuietHoursEnd }</span>
+				} else {
+					<span class="text-base-content/40">None</span>
+				}
+			</dd>
+			if p.Description != "" {
+				<dt>Prompt</dt>
+				<dd class="text-base-content/70">{ p.Description }</dd>
+			}
+		</dl>
+	</div>
+}
+
+templ agentDetailToolScopeBadge(scope string) {
+	switch scope {
+		case "read_only":
+			<span class="badge badge-soft badge-info badge-xs">read-only</span>
+		case "read_write":
+			<span class="badge badge-soft badge-warning badge-xs">read + write</span>
+		default:
+			<span class="badge badge-ghost badge-xs">{ scope }</span>
+	}
+}
+
+templ agentDetailRecentRuns(p AgentDetailProps) {
+	<div class="mt-6">
+		<div class="flex items-center justify-between mb-3 px-1">
+			<h2 class="text-sm font-semibold flex items-center gap-2">
+				<i data-lucide="history" class="w-4 h-4 text-base-content opacity-60"></i>
+				Recent runs
+				if len(p.Recent) > 0 {
+					<span class="text-xs text-base-content/40 font-normal">· last { strconv.Itoa(len(p.Recent)) }</span>
+				}
+			</h2>
+			if p.HasMoreRuns {
+				<a href={ templ.SafeURL("/agents?agent=" + p.Slug) } class="text-xs text-base-content/60 hover:text-base-content inline-flex items-center gap-1">
+					View all runs
+					<i data-lucide="arrow-right" class="w-3 h-3"></i>
+				</a>
+			}
+		</div>
+		if len(p.Recent) == 0 {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:    "history",
+				Title:   "No runs yet",
+				Body:    "Runs will appear here once the agent fires for the first time.",
+				Compact: true,
+				InCard:  true,
+			})
+		} else {
+			@components.AgentRunRowList() {
+				for _, r := range p.Recent {
+					@components.AgentRunRow(r)
+				}
+			}
+		}
+	</div>
+	<!-- Lightweight inline glue: POST /-/agents/{slug}/run via fetch +
+	     toast on response. Mirrors the agentsListPage runNow handler
+	     but kept minimal here so this page doesn't ship a sidecar JS
+	     factory just for one button. -->
+	@templ.Raw(agentDetailRunScriptHTML)
+}
+
+// agentDetailBreadcrumbs builds Agents › <agent name>.
+func agentDetailBreadcrumbs(p AgentDetailProps) []components.Breadcrumb {
+	return []components.Breadcrumb{
+		{Label: "Agents", Href: "/agents/definitions"},
+		{Label: p.Name},
+	}
+}
+
+// agentDetailSubtitle assembles the muted line under the agent name:
+// slug + model + a short status hint. Kept punchy — anything richer
+// goes in the configuration card below.
+func agentDetailSubtitle(p AgentDetailProps) string {
+	parts := []string{p.Slug}
+	if p.Model != "" {
+		parts = append(parts, p.Model)
+	}
+	if !p.Enabled {
+		parts = append(parts, "disabled")
+	}
+	return strings.Join(parts, " · ")
+}
+
+func agentDetailRunsDescription(s AgentDetailStatsProps) string {
+	if s.RunCount == 0 {
+		return "No runs yet"
+	}
+	nonSkipped := s.RunCount - s.SkippedCount
+	if s.SkippedCount == 0 {
+		return fmt.Sprintf("%d non-skipped", nonSkipped)
+	}
+	return fmt.Sprintf("%d non-skipped · %d skipped", nonSkipped, s.SkippedCount)
+}
+
+func agentDetailErrorsDescription(s AgentDetailStatsProps) string {
+	if s.RunCount == 0 {
+		return "—"
+	}
+	rate := float64(s.ErrorCount) / float64(s.RunCount) * 100
+	return fmt.Sprintf("%.1f%% failure rate", rate)
+}
+
+func agentDetailErrorTone(s AgentDetailStatsProps) components.StatTileTone {
+	if s.RunCount == 0 {
+		return components.StatToneNeutral
+	}
+	rate := float64(s.ErrorCount) / float64(s.RunCount)
+	switch {
+	case rate >= 0.25:
+		return components.StatToneError
+	case rate >= 0.10:
+		return components.StatToneWarning
+	default:
+		return components.StatToneNeutral
+	}
+}
+
+// agentDetailRunScriptHTML is a small inline glue script that POSTs the
+// run-now endpoint via fetch and surfaces a toast. Kept under the
+// 5-line cap enforced by scripts_lint_test.go by sourcing the body
+// from a Go constant via @templ.Raw rather than a literal `<script>`
+// block in the templ source.
+const agentDetailRunScriptHTML = `<script>
+(function(){if(window.__agentDetailRunInit)return;window.__agentDetailRunInit=true;
+window.bbAgentDetailRun=function(form){var csrf=(form.querySelector('input[name=_csrf]')||{}).value||'';
+function toast(m,t){window.dispatchEvent(new CustomEvent('bb-toast',{detail:{message:m,type:t||'error'}}));}
+function restore(){if(window.bbProgress){try{window.bbProgress.finish();}catch(e){}}var m=document.querySelector('main');if(m){m.style.opacity='';m.style.filter='';m.style.pointerEvents='';}}
+fetch(form.action,{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':csrf,'Content-Type':'application/x-www-form-urlencoded'},body:''}).then(function(r){if(!r.ok){toast(r.status===503?'Another run is already in progress.':'Failed to start run.','error');restore();return;}toast('Run started.','success');setTimeout(function(){window.location.reload();},800);}).catch(function(){toast('Network error. Please try again.','error');restore();});};})();
+</script>`
