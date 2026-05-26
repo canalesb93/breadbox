@@ -498,7 +498,11 @@ templ txdActorInline(e service.ActivityEntry) {
 // txdActor adapts a system-event ActivityEntry into the shared
 // TimelineActor shape used by `TimelineActorInline`. UserID +
 // Version are passed straight through — UserAvatar builds the
-// URL on the render side via components.AvatarURLWith.
+// URL on the render side via components.AvatarURLWith. System
+// actors render with the bot tile and no ID — historic system
+// actor_ids reference api_keys rows whose UUID is not a valid
+// users.id; passing them through would render a humanoid DiceBear
+// seeded on that UUID (the stdio MCP singleton bug).
 func txdActor(e service.ActivityEntry) components.TimelineActor {
 	a := components.TimelineActor{Name: e.ActorName}
 	switch e.ActorType {
@@ -513,6 +517,8 @@ func txdActor(e service.ActivityEntry) components.TimelineActor {
 			a.UserID = *e.ActorID
 			a.Version = e.ActorAvatarVersion
 		}
+	case "system":
+		a.IsAgent = true
 	}
 	return a
 }
@@ -638,7 +644,10 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 // TimelineActor shape so `TimelineActorInline` can render its 16px
 // avatar. Users get an image URL; agents get an agent-styled
 // identicon when they carry an ID and the bot fallback otherwise;
-// system actors render as just the bold name.
+// system actors render with the bot tile and no ID — historic system
+// actor_ids reference api_keys rows whose UUID is not a valid
+// users.id, so passing them through would render a humanoid DiceBear
+// seeded on that UUID (the stdio MCP singleton bug).
 func txdCommentActor(e service.ActivityEntry) components.TimelineActor {
 	a := components.TimelineActor{Name: e.ActorName}
 	switch e.ActorType {
@@ -653,6 +662,8 @@ func txdCommentActor(e service.ActivityEntry) components.TimelineActor {
 			a.UserID = *e.ActorID
 			a.Version = e.ActorAvatarVersion
 		}
+	case "system":
+		a.IsAgent = true
 	}
 	return a
 }
