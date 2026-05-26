@@ -168,6 +168,12 @@ templ Connections(p ConnectionsProps) {
 		<!-- /links tab -->
 		<!-- Create Account Link Modal -->
 		@connectionsCreateLinkModal(p)
+		<!-- Loading skeleton for the connections list, available for any future
+		     client-side refresh / pagination swap. Mirrors the SSR layout
+		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+		<template id="bb-connections-skeleton-template">
+			@components.ConnectionsSkeleton()
+		</template>
 	</div>
 	<!-- /alpine x-data tabs -->
 }
