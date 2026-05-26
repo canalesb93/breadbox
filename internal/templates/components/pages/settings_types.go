@@ -18,6 +18,20 @@ func avatarPreviewExpr(seed string) string {
 	return "'/avatars/preview/" + seed + "?style=' + encodeURIComponent(style)"
 }
 
+// agentPreviewSeeds is the canonical seed list for the Agent style
+// picker preview tiles. Distinct from the user list (alice / bob /
+// casey / drew) so an operator comparing the two cards reads them as
+// different actor categories at a glance.
+func agentPreviewSeeds() []string {
+	return []string{"categorizer", "auditor", "reviewer", "scout"}
+}
+
+// userPreviewSeeds is the seed list for the User style picker tiles.
+// Held here so the two pickers stay symmetrical when one is extended.
+func userPreviewSeeds() []string {
+	return []string{"alice", "bob", "casey", "drew"}
+}
+
 // SettingsProps mirrors the field set the old settings.html read off the layout
 // data map. Kept flat so admin/settings.go can copy fields one-to-one.
 type SettingsProps struct {
@@ -42,8 +56,11 @@ type SettingsProps struct {
 	LatestVersion   string
 	LatestURL       string
 
-	// Avatar style — DiceBear slug used for auto-generated user identicons.
-	// AvatarStyles drives the dropdown options.
-	AvatarStyle  string
-	AvatarStyles []avatar.StyleOption
+	// Avatar styles — DiceBear slugs used for auto-generated
+	// identicons. AvatarUserStyle drives human users; AvatarAgentStyle
+	// drives AI agents. AvatarStyles is the shared catalog of options
+	// for both dropdowns.
+	AvatarUserStyle  string
+	AvatarAgentStyle string
+	AvatarStyles     []avatar.StyleOption
 }

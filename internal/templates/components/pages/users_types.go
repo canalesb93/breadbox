@@ -29,7 +29,7 @@ type UsersEnrichedRow struct {
 	Name              string
 	Email             string
 	HasEmail          bool
-	AvatarURL         string // already-built /avatars/<id>?v=<unix>
+	AvatarVersion     string // updated_at unix timestamp; threaded through UserAvatar's Version prop
 	AccountCount      int
 	ConnectionCount   int64
 	HasCreatedAt      bool

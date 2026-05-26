@@ -1,0 +1,58 @@
+package components
+
+// UserAvatar renders a person/agent identity badge — the shared
+// shape used by the sidebar profile, transaction owner badges, the
+// activity timeline (rail tile + inline actor), settings preview
+// tiles, and the user-form preview. Built on the DiceBear-backed
+// `/avatars/{id}` endpoint (see internal/avatar).
+//
+// Three render paths:
+//
+//   - <img> when ID (or SrcOverride) is set and the actor is a user.
+//     URL is built via AvatarURL(id, version); version is the
+//     session avatar_v cache-buster.
+//   - Bot tile when IsAgent is true — `bg-primary/10` ring with a
+//     lucide "bot" glyph sized to the variant.
+//   - Letter fallback when neither ID nor IsAgent is set — first
+//     A–Z / 0–9 char of Name, or "?" if Name is empty too.
+//
+// Pick a Size from the UserAvatarSize palette unless your caller has
+// genuinely bespoke sizing — `bb-tx-owner-badge` is the documented
+// exception (14px + absolute + box-shadow + per-row tinting). In
+// that case pass Size="" + Class="bb-tx-owner-badge"; the component
+// emits the inner glyph and lets the class drive everything else.
+//
+// Title overrides the tooltip + alt text; defaults to Name. Use
+// Ring + Inline to opt into the timeline-rail and inline-in-text
+// treatments respectively (see TimelineCommentRow / TimelineActorInline
+// for the call sites).
+templ UserAvatar(p UserAvatarProps) {
+	<span
+		class={ userAvatarWrapperClass(p) }
+		if t := userAvatarTitle(p); t != "" && !p.Loading {
+			title={ t }
+		}
+	>
+		if p.Loading {
+			<span class="skeleton w-full h-full rounded-full" aria-hidden="true" aria-busy="true"></span>
+		} else if userAvatarHasImage(p) {
+			<img
+				src={ userAvatarSrc(p) }
+				alt={ userAvatarAlt(p) }
+				class={ userAvatarImgClass(p) }
+				if attr := userAvatarLoadingAttr(p); attr != "" {
+					loading={ attr }
+				}
+				decoding="async"
+			/>
+		} else if p.IsAgent {
+			<span class={ userAvatarAgentClass(p) } aria-hidden="true">
+				@LucideIcon("bot", userAvatarBotIconClass(p.Size))
+			</span>
+		} else {
+			<span class={ userAvatarFallbackClass(p) } aria-hidden="true">
+				<span class={ userAvatarLetterClass(p.Size, userAvatarTwoLetters(p.Name, p.Size)) }>{ userAvatarLetters(p.Name, p.Size) }</span>
+			</span>
+		}
+	</span>
+}

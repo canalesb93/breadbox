@@ -73,12 +73,17 @@ type TimelineRowProps struct {
 	Now       time.Time // Request-level now anchor threaded through to the relative-time helper so day-bucket labels and per-row timestamps can never disagree across midnight. Zero → render-time time.Now() fallback.
 }
 
-// TimelineActor is reused inside comment rows.
+// TimelineActor is reused inside comment rows. UserID + Version
+// drive the avatar URL through the shared components.AvatarURL
+// helper — no caller-side URL stringing. IsAgent flips both the
+// avatar style (when UserID is set) and the fallback render
+// (bot tile when UserID is empty).
 type TimelineActor struct {
-	Name      string
-	AvatarURL string // When set, an <img> avatar is used. Falls back to initials/bot tile.
-	IsAgent   bool   // When true, renders the bot-tile fallback instead of initials.
-	HRef      string // Optional link target wrapping the actor name.
+	Name    string
+	UserID  string // users.id / agent_definitions.id; empty + non-agent → letter fallback
+	Version string // avatar-version cache-buster (avatar_v on session, ActorAvatarVersion on activity rows)
+	IsAgent bool   // routes the avatar URL to ?type=agent and triggers the bot fallback when UserID is empty
+	HRef    string // Optional link target wrapping the actor name.
 }
 
 // Timeline renders the section wrapper (header + rail + ordered list). The
@@ -328,18 +333,25 @@ templ TimelineEmpty(message string) {
 }
 
 // timelineCommentAvatar renders the 24px avatar tile for a comment row.
+// Delegates to UserAvatar with Ring=true so the same primitive renders
+// the sidebar profile, the cmdk row, and this rail tile — the tile
+// chrome (4px ring against base-100) comes from the Ring flag.
+//
+// When UserID is set the URL flows through components.AvatarURL with
+// the right actor-type query param (?type=agent for agents). When
+// UserID is empty + IsAgent fires the bot-tile fallback; otherwise
+// the letter-initials fallback.
 templ timelineCommentAvatar(actor TimelineActor) {
-	if actor.AvatarURL != "" {
-		<img src={ actor.AvatarURL } alt={ actor.Name + " avatar" } class="w-6 h-6 rounded-full object-cover border border-base-300 ring-4 ring-base-100" title={ actor.Name }/>
-	} else if actor.IsAgent {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 border border-base-300 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
-			@LucideIcon("bot", "w-3 h-3 text-primary")
-		</span>
-	} else {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
-			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ firstChar(actor.Name) }</span>
-		</span>
-	}
+	@UserAvatar(UserAvatarProps{
+		Name:       actor.Name,
+		ID:         actor.UserID,
+		Version:    actor.Version,
+		IsAgent:    actor.IsAgent,
+		Size:       UserAvatarMd,
+		Ring:       true,
+		Decorative: true,
+		Lazy:       true,
+	})
 }
 
 // TimelineCommentTile renders the 24px rail tile for a comment row — the
@@ -370,12 +382,18 @@ templ TimelineCommentTile() {
 // avatar slot uses `align-text-bottom` so the baseline lines up with the
 // surrounding `leading-6` text, and `mr-1` reproduces the legacy spacing.
 templ TimelineActorInline(actor TimelineActor) {
-	if actor.AvatarURL != "" {
-		<img src={ actor.AvatarURL } alt="" class="inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom mr-1" aria-hidden="true"/>
-	} else if actor.IsAgent {
-		<span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 border border-base-300 align-text-bottom mr-1" aria-hidden="true">
-			@LucideIcon("bot", "w-2.5 h-2.5 text-primary")
-		</span>
+	if actor.UserID != "" || actor.IsAgent {
+		@UserAvatar(UserAvatarProps{
+			Name:       actor.Name,
+			ID:         actor.UserID,
+			Version:    actor.Version,
+			IsAgent:    actor.IsAgent,
+			Size:       UserAvatarXS,
+			Inline:     true,
+			Class:      "mr-1",
+			Decorative: true,
+			Lazy:       true,
+		})
 	}
 	if actor.Name != "" {
 		if actor.HRef != "" {

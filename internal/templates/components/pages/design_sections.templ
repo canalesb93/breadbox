@@ -2227,22 +2227,26 @@ templ timelineSandboxCommentBody() {
 // ─── Agent run rows ───────────────────────────────────────────────────────
 
 // SectionAgentRunRows shows the variants of components.AgentRunRow —
-// the rich row shape rendered on /agents (the runs landing). The
-// fixtures here cover every status (success / error / in-progress /
-// skipped / timeout), surface the inline report-chip variants (info /
-// warning / critical priority), and exercise the ShowAgent toggle
-// (global view vs single-agent view).
+// the row shape rendered on /agents (the runs landing). Built on daisy
+// `list` + `list-row`. The shape is intentionally spare: status icon
+// tile (the row's single status signal), agent name with a dimmed
+// time suffix as the title (or just the time when ShowAgent is
+// false), one optional body line (error → top report → skipped note,
+// in that priority order), and cost. Trigger and cap details surface
+// only as tooltip-only accessory icons; raw shortID, tokens, turns,
+// and the finished-at clock time moved to the run-detail page.
 templ SectionAgentRunRows() {
 	<div class="flex flex-col gap-6">
 		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
 			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
 			<ul class="space-y-1 list-disc pl-4">
-				<li>Renders one cross-agent feed of recent runs (canonical: <code>/agents</code>) via <code>AgentRunRow</code> + <code>AgentRunRowList</code>.</li>
-				<li>Show the agent name when the surrounding page is cross-agent; hide it via <code>ShowAgent: false</code> when the page is already scoped to one agent (e.g. <code>?agent=slug</code> filter chip applied).</li>
-				<li><code>AgentRunReportRef</code> chips render inline when the run produced reports via <code>submit_report</code>. Priority tone (info / warning / critical) drives the chip border + icon.</li>
+				<li>Renders one cross-agent feed of recent runs (canonical: <code>/agents</code>) via <code>AgentRunRow</code> + <code>AgentRunRowList</code>. Scaffold is daisy <code>list</code> / <code>list-row</code> — no bespoke wrapper.</li>
+				<li>Show the agent name when the surrounding page is cross-agent; hide it via <code>ShowAgent: false</code> when the page is already scoped to one agent. With the name hidden, the dimmed time becomes the title — the icon tile already carries status, so no parallel text badge is needed.</li>
+				<li>When a run produced reports, the top-priority report's title becomes the row's body line; extras collapse into a quiet <code>+N</code> ghost badge. The row links to the run — clicking through reaches the reports.</li>
+				<li>Non-cron triggers and hit-cap signals appear as small tooltip-only icons in the title row. Cron is the default and stays silent.</li>
 			</ul>
 		</div>
-		@designExample("Global feed — every status", "ShowAgent: true. Status drives the leading icon-tile tone + status badge. Error rows surface the error message inline; reports surface as priority-toned chips.") {
+		@designExample("Global feed — every status", "ShowAgent: true. The agent name leads the title row; the relative time + duration trails as a dimmed suffix. The colored icon tile is the single status signal — green check for success, red x for error, info spinner for in-progress, dashed circle for skipped, clock-alert for timeout.") {
 			@components.AgentRunRowList() {
 				@components.AgentRunRow(designAgentRunRowSuccess())
 				@components.AgentRunRow(designAgentRunRowSuccessWithReport())
@@ -2252,28 +2256,19 @@ templ SectionAgentRunRows() {
 				@components.AgentRunRow(designAgentRunRowTimeout())
 			}
 		}
-		@designExample("Per-agent scope — ShowAgent: false", "Used when the surrounding page is already scoped to one agent (filter chip or breadcrumb conveys the name). Status badge moves to the front of the title row since the agent name is gone.") {
+		@designExample("Per-agent scope — ShowAgent: false", "Used when the surrounding page is already scoped to one agent (filter chip or breadcrumb conveys the name). The relative time takes over as the title since the agent name is suppressed; the icon tile keeps carrying status.") {
 			@components.AgentRunRowList() {
 				@components.AgentRunRow(designAgentRunRowNoAgent(designAgentRunRowSuccess()))
 				@components.AgentRunRow(designAgentRunRowNoAgent(designAgentRunRowError()))
 			}
 		}
-		@designExample("Inline report chips by priority", "Reports rendered via AgentRunReportRef. Tone shifts with priority — critical / warning lift out of the neutral chip palette.") {
+		@designExample("Reports as the body line", "When a run produced reports, the top-priority report's title becomes the row's body line — that's the actual outcome an operator wants to read. Tone follows priority (info / warning / critical). Multi-report runs collapse extras into a quiet +N ghost badge.") {
 			@components.AgentRunRowList() {
 				@components.AgentRunRow(designAgentRunRowWithReports("info"))
 				@components.AgentRunRow(designAgentRunRowWithReports("warning"))
 				@components.AgentRunRow(designAgentRunRowWithReports("critical"))
 				@components.AgentRunRow(designAgentRunRowWithMultipleReports())
 			}
-		}
-		@designExample("Status badge — standalone", "components.AgentRunStatusBadge — also used in the run-detail header and elsewhere. In-progress carries a spinner; everything else is a soft daisy badge.") {
-			<div class="flex flex-wrap items-center gap-2">
-				@components.AgentRunStatusBadge("success")
-				@components.AgentRunStatusBadge("error")
-				@components.AgentRunStatusBadge("in_progress")
-				@components.AgentRunStatusBadge("skipped")
-				@components.AgentRunStatusBadge("timeout")
-			</div>
 		}
 	</div>
 }
@@ -2442,4 +2437,244 @@ templ SectionCommandPalette() {
 			</div>
 		}
 	</div>
+}
+
+// ─── User avatar ───────────────────────────────────────────────────────
+
+templ SectionUserAvatar() {
+	<div class="flex flex-col gap-6">
+		@designExample("Size scale", "Seven sizes cover every surface that renders a person/agent identity. Pick the one that matches the call site, not the largest that fits. The component threads the pixel size through to /avatars/{id}?size=N so the backend fetches a pre-sized SVG.") {
+			<div class="flex flex-wrap items-end gap-6">
+				@designUserAvatarSwatch("xs · 16px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarXS})
+				@designUserAvatarSwatch("sm · 20px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarSm})
+				@designUserAvatarSwatch("md · 24px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarMd})
+				@designUserAvatarSwatch("lg · 32px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarLg})
+				@designUserAvatarSwatch("xl · 40px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarXL})
+				@designUserAvatarSwatch("2xl · 48px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatar2XL})
+				@designUserAvatarSwatch("3xl · 56px", components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatar3XL})
+			</div>
+		}
+		@designExample("Image — backed by /avatars/{id}", "ID flows through components.AvatarURL(id, version). Pass Version (the user's updated_at unix timestamp) to bust the browser cache after the operator uploads a new photo or regenerates the seed.") {
+			<div class="flex flex-wrap items-center gap-4">
+				@components.UserAvatar(components.UserAvatarProps{ID: "alice-uuid", Name: "Alice Adams", Size: components.UserAvatarLg})
+				@components.UserAvatar(components.UserAvatarProps{ID: "bob-uuid", Name: "Bob Bennett", Size: components.UserAvatarLg})
+				@components.UserAvatar(components.UserAvatarProps{ID: "casey-uuid", Name: "Casey Cole", Size: components.UserAvatarLg})
+				@components.UserAvatar(components.UserAvatarProps{ID: "drew-uuid", Name: "Drew Dawson", Size: components.UserAvatarLg, Version: "1735776000"})
+			</div>
+		}
+		@designExample("Agents — dual style + bot fallback", "IsAgent has two render paths. With an ID set, the URL routes through ?type=agent and the server picks the configured agent DiceBear style (default \"bottts\") — distinct from the user style so agent activity reads as obviously non-human. With no ID, the bot-tile fallback fires.") {
+			<div class="flex flex-col gap-4">
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Agent identicon (ID + IsAgent)</span>
+					@components.UserAvatar(components.UserAvatarProps{ID: "agent-cat", Name: "Categorizer", IsAgent: true, Size: components.UserAvatarMd})
+					@components.UserAvatar(components.UserAvatarProps{ID: "agent-cat", Name: "Categorizer", IsAgent: true, Size: components.UserAvatarLg})
+					@components.UserAvatar(components.UserAvatarProps{ID: "agent-cat", Name: "Categorizer", IsAgent: true, Size: components.UserAvatarXL})
+					@components.UserAvatar(components.UserAvatarProps{ID: "agent-cat", Name: "Categorizer", IsAgent: true, Size: components.UserAvatar2XL})
+					@components.UserAvatar(components.UserAvatarProps{ID: "agent-aud", Name: "Auditor", IsAgent: true, Size: components.UserAvatar2XL})
+					@components.UserAvatar(components.UserAvatarProps{ID: "agent-rev", Name: "Reviewer", IsAgent: true, Size: components.UserAvatar2XL})
+				</div>
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Bot fallback (IsAgent only)</span>
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarXS})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarSm})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarMd})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarLg})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarXL})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatar2XL})
+				</div>
+			</div>
+		}
+		@designExample("Letter fallback — no ID, no IsAgent", "First initial when the name is a single word; first + last initials when it has two or more (\"Alice Canales\" → \"AC\"). The xs / sm sizes always render a single letter to keep the 16–20px tile from crowding. Falls to \"?\" when Name is empty too.") {
+			<div class="flex flex-col gap-4">
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Two-word name</span>
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice Canales", Size: components.UserAvatarXS})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice Canales", Size: components.UserAvatarSm})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice Canales", Size: components.UserAvatarMd})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice Canales", Size: components.UserAvatarLg})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice Canales", Size: components.UserAvatarXL})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice Canales", Size: components.UserAvatar2XL})
+				</div>
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Single-word name</span>
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice", Size: components.UserAvatarXS})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice", Size: components.UserAvatarSm})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice", Size: components.UserAvatarMd})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice", Size: components.UserAvatarLg})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice", Size: components.UserAvatarXL})
+					@components.UserAvatar(components.UserAvatarProps{Name: "Alice", Size: components.UserAvatar2XL})
+				</div>
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Empty (renders "?")</span>
+					@components.UserAvatar(components.UserAvatarProps{Name: "", Size: components.UserAvatarMd})
+					@components.UserAvatar(components.UserAvatarProps{Name: "", Size: components.UserAvatarLg})
+					@components.UserAvatar(components.UserAvatarProps{Name: "", Size: components.UserAvatarXL})
+				</div>
+			</div>
+		}
+		@designExample("Ring — timeline rail tile (Ring: true)", "Adds the 4px ring-base-100 chrome that threads the avatar through the activity-timeline rail. The bb-timeline-prominent variant CSS remaps the ring colour to base-200 so the same tile works against either a card or a page surface.") {
+			<div class="bb-card p-5 max-w-md">
+				<ol class="relative pl-4">
+					<span class="absolute left-[28px] top-2 bottom-2 w-px bg-base-200" aria-hidden="true"></span>
+					<li class="relative flex items-start gap-3 py-2.5">
+						<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
+							@components.UserAvatar(components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarMd, Ring: true})
+						</div>
+						<div class="flex-1 min-w-0 text-sm">
+							<div class="flex items-center gap-1.5">
+								<strong class="font-semibold">Alice</strong>
+								<span class="text-base-content/55">commented</span>
+								<span class="text-base-content/40">· 5 minutes ago</span>
+							</div>
+							<div class="text-base-content/70 mt-1">Got the receipt for this — tagging as business.</div>
+						</div>
+					</li>
+					<li class="relative flex items-start gap-3 py-2.5">
+						<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
+							@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarMd, Ring: true})
+						</div>
+						<div class="flex-1 min-w-0 text-sm">
+							<div class="flex items-center gap-1.5">
+								<strong class="font-semibold">Categorizer</strong>
+								<span class="text-base-content/55">applied rule · 2 hours ago</span>
+							</div>
+						</div>
+					</li>
+				</ol>
+			</div>
+		}
+		@designExample("Inline — in-text actor reference (Inline: true)", "Switches the wrapper to inline-flex + align-text-bottom so the avatar sits on the same baseline as the surrounding text run. Pair with Size XS for system-row sentences and comment meta lines; Size Sm reads bigger and works in headline copy. Used by components.TimelineActorInline on /feed and /transactions/{id}.") {
+			<div class="flex flex-col gap-2 text-sm leading-6">
+				<div>
+					@components.UserAvatar(components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarXS, Inline: true, Class: "mr-1"})
+					<strong class="font-semibold">Alice</strong>
+					<span class="text-base-content/65">commented on</span>
+					<a href="#" class="font-semibold hover:text-primary">Whole Foods</a>
+				</div>
+				<div>
+					@components.UserAvatar(components.UserAvatarProps{Name: "Categorizer", IsAgent: true, Size: components.UserAvatarXS, Inline: true, Class: "mr-1"})
+					<strong class="font-semibold">Categorizer</strong>
+					<span class="text-base-content/65">applied rule on Whole Foods</span>
+				</div>
+			</div>
+		}
+		@designExample("Tx owner badge — bespoke geometry", "The 14px corner badge that sits on a transaction row's category avatar uses its own `.bb-tx-owner-badge` class (w-3.5 h-3.5 + absolute + row-tinted box-shadow). It's the documented exception to the size scale; the rest of the avatar markup (img / letter fallback) still flows through the standard helpers so URL construction stays centralized.") {
+			<div class="bb-card p-4 flex flex-wrap gap-6">
+				<div class="flex items-center gap-3">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar" style={ components.TxAvatarColorStyle(designSampleColor()) }>
+							@components.LucideIcon("shopping-cart", "w-4 h-4")
+						</div>
+						<img src={ components.AvatarURL("alice-uuid", "") } alt="" class="bb-tx-owner-badge" title="Alice"/>
+					</div>
+					<div class="text-sm">
+						<div class="font-medium">Whole Foods</div>
+						<div class="text-xs text-base-content/50">Alice paid · 2 days ago</div>
+					</div>
+				</div>
+				<div class="flex items-center gap-3">
+					<div class="relative shrink-0">
+						<div class="bb-tx-avatar" style={ components.TxAvatarColorStyle(designSampleColor()) }>
+							@components.LucideIcon("shopping-cart", "w-4 h-4")
+						</div>
+						<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title="Drew">
+							<span>D</span>
+						</span>
+					</div>
+					<div class="text-sm">
+						<div class="font-medium">Costco</div>
+						<div class="text-xs text-base-content/50">Drew paid · 4 days ago</div>
+					</div>
+				</div>
+			</div>
+		}
+		@designExample("Sidebar profile — live call site", "The sidebar's account trigger renders UserAvatar at Size Lg with Class \"bb-sidebar-profile-avatar\" so the opacity transition on hover stays attached to the inner img. The wrapper handles size, shape, and the letter fallback for not-yet-linked accounts.") {
+			<div class="bb-card p-3 max-w-sm flex items-center gap-2.5">
+				@components.UserAvatar(components.UserAvatarProps{
+					ID:      "alice-uuid",
+					Name:    "Alice",
+					Size:    components.UserAvatarLg,
+					Class:   "bb-sidebar-profile-avatar",
+					Version: "1735776000",
+				})
+				<div class="flex-1 min-w-0">
+					<div class="bb-sidebar-profile-name">Alice Adams</div>
+					<div class="bb-sidebar-profile-role">Admin</div>
+				</div>
+				@components.LucideIcon("settings", "w-4 h-4 text-base-content/40 shrink-0")
+			</div>
+		}
+		@designExample("Loading / Lazy / Decorative", "Three independent state flags. Loading swaps in a skeleton circle while waiting for an actor to resolve (optimistic inserts, async hydration). Lazy adds loading=\"lazy\" for below-the-fold avatars. Decorative emits alt=\"\" when the surrounding context already names the actor — almost every timeline call site sets this.") {
+			<div class="flex flex-col gap-4 text-sm">
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Loading</span>
+					@components.UserAvatar(components.UserAvatarProps{Size: components.UserAvatarSm, Loading: true})
+					@components.UserAvatar(components.UserAvatarProps{Size: components.UserAvatarMd, Loading: true})
+					@components.UserAvatar(components.UserAvatarProps{Size: components.UserAvatarLg, Loading: true})
+					@components.UserAvatar(components.UserAvatarProps{Size: components.UserAvatarXL, Loading: true})
+					@components.UserAvatar(components.UserAvatarProps{Size: components.UserAvatar2XL, Loading: true})
+				</div>
+				<div class="flex flex-wrap items-center gap-4">
+					<span class="text-xs text-base-content/40 w-32">Lazy + Decorative</span>
+					@components.UserAvatar(components.UserAvatarProps{ID: "alice-uuid", Name: "Alice", Size: components.UserAvatarLg, Lazy: true, Decorative: true})
+					<code class="text-xs text-base-content/50">→ &lt;img loading="lazy" alt=""&gt;</code>
+				</div>
+			</div>
+		}
+		@designExample("URL helpers — single source of truth", "Every server-rendered avatar URL flows through one of three helpers. AvatarURL is user-side; AgentAvatarURL appends ?type=agent so the server picks the agent style; AvatarURLWith threads size + actor + version in one shot for the component-side renderer.") {
+			<div class="flex flex-col gap-2 text-xs font-mono">
+				<div class="flex items-center gap-3">
+					<span class="text-base-content/40 w-64">AvatarURL("alice", "1735776000")</span>
+					<code class="px-2 py-1 rounded bg-base-200">{ components.AvatarURL("alice", "1735776000") }</code>
+				</div>
+				<div class="flex items-center gap-3">
+					<span class="text-base-content/40 w-64">AgentAvatarURL("cat", "1735776000")</span>
+					<code class="px-2 py-1 rounded bg-base-200">{ components.AgentAvatarURL("cat", "1735776000") }</code>
+				</div>
+				<div class="flex items-center gap-3">
+					<span class="text-base-content/40 w-64">AvatarURLWith("a", "v1", "user", 32)</span>
+					<code class="px-2 py-1 rounded bg-base-200">{ components.AvatarURLWith("a", "v1", "user", 32) }</code>
+				</div>
+				<div class="flex items-center gap-3">
+					<span class="text-base-content/40 w-64">AvatarURL("", "")</span>
+					<code class="px-2 py-1 rounded bg-base-200">{ components.AvatarURL("", "") }</code>
+				</div>
+			</div>
+		}
+		@designExample("Alpine-bound previews — settings + user form", "Three surfaces drive the avatar src from Alpine state instead of a server-rendered ID: the settings → System User-style picker (alice/bob/casey/drew seeds), the matching Agent-style picker (categorizer/auditor/reviewer/scout seeds), and the user-form create/edit (avatar seed shuffles client-side until the user saves). They use plain <img :src=\"…\"> bindings against the /avatars/preview proxy rather than UserAvatar so the dynamic binding stays trivial.") {
+			<div class="flex flex-col gap-3">
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-base-content/40 w-24">User seeds</span>
+					for _, seed := range []string{"alice", "bob", "casey", "drew"} {
+						<img class="w-10 h-10 rounded-full bg-base-200" alt={ "Preview " + seed } src={ "/avatars/preview/" + seed }/>
+					}
+				</div>
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-base-content/40 w-24">Agent seeds</span>
+					for _, seed := range []string{"categorizer", "auditor", "reviewer", "scout"} {
+						<img class="w-10 h-10 rounded-full bg-base-200" alt={ "Preview " + seed } src={ "/avatars/preview/" + seed + "?style=bottts" }/>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// designUserAvatarSwatch renders one entry in the size-scale demo: a
+// label + the avatar at that size. The bottom-aligned flex layout makes
+// every size visually anchor to the same baseline so the scale reads
+// at a glance.
+templ designUserAvatarSwatch(label string, p components.UserAvatarProps) {
+	<div class="flex flex-col items-center gap-2">
+		@components.UserAvatar(p)
+		<code class="text-[0.65rem] text-base-content/50 font-mono">{ label }</code>
+	</div>
+}
+
+// designSampleColor returns a stable demo category color for the
+// tx-owner-badge example. The colored circle behind the corner badge
+// is decorative — value picked so the badge contrast reads clearly.
+func designSampleColor() *string {
+	c := "#f97316"
+	return &c
 }

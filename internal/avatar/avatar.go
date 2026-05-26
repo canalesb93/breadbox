@@ -1,11 +1,19 @@
-// Package avatar fetches user identicons from the DiceBear HTTP API
-// (https://www.dicebear.com) and processes uploaded image files.
+// Package avatar fetches user/agent identicons from the DiceBear HTTP
+// API (https://www.dicebear.com) and processes uploaded image files.
 //
-// The current DiceBear style is stored in app_config under
-// avatar.dicebear_style and pushed into the package via SetStyle at
-// server startup and from the settings POST handler. GenerateSVG
-// caches fetched SVGs in-process keyed by (style, seed, size) so a
-// warm server serves identicons without round-tripping to DiceBear.
+// The package tracks two DiceBear styles — one for human users
+// (avatar.dicebear_style_user, default "shapes") and one for AI
+// agents (avatar.dicebear_style_agent, default "bottts") — so a
+// human-authored activity row reads unambiguously against an
+// agent-authored one. Both values live in app_config and are pushed
+// into the package via SetUserStyle / SetAgentStyle at server
+// startup and from the Settings → System POST handlers. The legacy
+// avatar.dicebear_style key remains a back-compat alias that the
+// startup loader copies into the user-style slot.
+//
+// GenerateSVG caches fetched SVGs in-process keyed by (style, seed,
+// size) so a warm server serves identicons without round-tripping to
+// DiceBear.
 package avatar
 
 import (
@@ -23,9 +31,20 @@ import (
 )
 
 const (
-	// DefaultStyle is used when no app_config value is set. "shapes"
-	// keeps the previous abstract-geometric aesthetic.
+	// DefaultStyle is the fallback when no app_config value is set
+	// for the user identicon style. "shapes" keeps the previous
+	// abstract-geometric aesthetic. Retained as the legacy alias.
 	DefaultStyle = "shapes"
+
+	// DefaultUserStyle is the fallback for user identicons. Same as
+	// DefaultStyle; the alias exists so the per-actor accessors stay
+	// symmetrical with DefaultAgentStyle.
+	DefaultUserStyle = "shapes"
+
+	// DefaultAgentStyle is the fallback for agent identicons. "bottts"
+	// is DiceBear's canonical robot style — agents read as obviously
+	// non-human against the user fallback aesthetic.
+	DefaultAgentStyle = "bottts"
 
 	// DefaultAPIBaseURL is the DiceBear v9 HTTP API root. Tests
 	// override this via SetAPIBaseURL.
@@ -50,37 +69,98 @@ const (
 )
 
 var (
-	styleAtomic  atomic.Value // string
-	baseURL      atomic.Value // string
-	defaultHTTPC = &http.Client{Timeout: httpTimeout}
-	httpClient   atomic.Value // *http.Client — overridable in tests
-	cache        sync.Map     // string -> []byte
-	cacheCount   atomic.Int64 // entries currently in cache; bounded by maxCacheEntries
+	userStyleAtomic  atomic.Value // string — DiceBear style for users
+	agentStyleAtomic atomic.Value // string — DiceBear style for agents
+	baseURL          atomic.Value // string
+	defaultHTTPC     = &http.Client{Timeout: httpTimeout}
+	httpClient       atomic.Value // *http.Client — overridable in tests
+	cache            sync.Map     // string -> []byte
+	cacheCount       atomic.Int64 // entries currently in cache; bounded by maxCacheEntries
 )
 
 func init() {
-	styleAtomic.Store(DefaultStyle)
+	userStyleAtomic.Store(DefaultUserStyle)
+	agentStyleAtomic.Store(DefaultAgentStyle)
 	baseURL.Store(DefaultAPIBaseURL)
 	httpClient.Store(defaultHTTPC)
 }
 
-// SetStyle overrides the DiceBear style at runtime. Call from server
-// startup (with the value loaded from app_config) and from the
-// settings POST handler when the operator changes the style.
-func SetStyle(s string) {
+// SetUserStyle overrides the DiceBear style used for user identicons.
+// Call from server startup (with the value loaded from
+// app_config[avatar.dicebear_style_user]) and from the settings POST
+// handler when the operator changes the style.
+func SetUserStyle(s string) {
 	if s == "" {
-		s = DefaultStyle
+		s = DefaultUserStyle
 	}
-	styleAtomic.Store(s)
+	userStyleAtomic.Store(s)
 }
 
-// Style returns the currently configured DiceBear style.
-func Style() string {
-	v, _ := styleAtomic.Load().(string)
+// SetAgentStyle overrides the DiceBear style used for agent
+// identicons. Call from server startup
+// (app_config[avatar.dicebear_style_agent]) and from the settings
+// POST handler when the operator changes the style.
+func SetAgentStyle(s string) {
+	if s == "" {
+		s = DefaultAgentStyle
+	}
+	agentStyleAtomic.Store(s)
+}
+
+// SetStyle sets the legacy single-style key. Routes to SetUserStyle
+// so existing callers (older startup code, legacy POST handlers) keep
+// working without breaking the user/agent split.
+//
+// Deprecated: use SetUserStyle.
+func SetStyle(s string) { SetUserStyle(s) }
+
+// UserStyle returns the currently configured DiceBear style for
+// users.
+func UserStyle() string {
+	v, _ := userStyleAtomic.Load().(string)
 	if v == "" {
-		return DefaultStyle
+		return DefaultUserStyle
 	}
 	return v
+}
+
+// AgentStyle returns the currently configured DiceBear style for
+// agents.
+func AgentStyle() string {
+	v, _ := agentStyleAtomic.Load().(string)
+	if v == "" {
+		return DefaultAgentStyle
+	}
+	return v
+}
+
+// Style returns the legacy single style. Routes to UserStyle so old
+// callers keep returning the human-side value (which is what they
+// rendered before the user/agent split).
+//
+// Deprecated: use UserStyle or StyleForActor.
+func Style() string { return UserStyle() }
+
+// ActorType is the discriminator for which DiceBear style to use.
+// Empty + invalid values resolve to ActorUser.
+type ActorType string
+
+const (
+	ActorUser  ActorType = "user"
+	ActorAgent ActorType = "agent"
+)
+
+// StyleForActor returns the configured DiceBear style for the given
+// actor type. Empty / unknown actor types fall back to the user
+// style — the safer default since the legacy avatar render path was
+// human-side.
+func StyleForActor(t ActorType) string {
+	switch t {
+	case ActorAgent:
+		return AgentStyle()
+	default:
+		return UserStyle()
+	}
 }
 
 // SetAPIBaseURL overrides the DiceBear API base URL. Test-only entry
@@ -112,7 +192,9 @@ func ResetCache() {
 }
 
 // GenerateSVG fetches a DiceBear avatar SVG for the given seed using
-// the global style (or per-call override via GenerateSVGStyled).
+// the user-side global style. For agent-side renders or per-call
+// overrides use GenerateSVGStyled or GenerateSVGForActor.
+//
 // Cached in memory keyed by (style, size, seed); cache is hard-
 // capped at maxCacheEntries so adversarial unauthenticated traffic
 // to /avatars/preview/{seed} can't OOM the process. On upstream
@@ -125,13 +207,22 @@ func GenerateSVG(seed string, size int) []byte {
 	return GenerateSVGStyled(seed, size, "")
 }
 
+// GenerateSVGForActor is GenerateSVG with an actor-type selector
+// instead of an explicit style. Used by /avatars/{id} when the
+// handler resolves an ID to a user vs agent and wants the right
+// configured style without hardcoding the slug.
+func GenerateSVGForActor(seed string, size int, actor ActorType) []byte {
+	return GenerateSVGStyled(seed, size, StyleForActor(actor))
+}
+
 // GenerateSVGStyled is GenerateSVG with a per-call style override.
 // Used by the settings-page preview tiles so the operator can see
-// each style before saving without flipping the global.
+// each style before saving without flipping the global, and by
+// GenerateSVGForActor to route by actor type.
 func GenerateSVGStyled(seed string, size int, styleOverride string) []byte {
 	st := styleOverride
 	if st == "" {
-		st = Style()
+		st = UserStyle()
 	}
 	key := cacheKey(st, size, seed)
 	if v, ok := cache.Load(key); ok {

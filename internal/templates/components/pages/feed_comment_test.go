@@ -68,8 +68,15 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 				// Rail tile is the shared message-square, not an avatar.
 				`lucide-message-square`,
 				// Inline avatar uses the 16px treatment from
-				// TimelineActorInline.
-				`inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom`,
+				// TimelineActorInline — now rendered via the shared
+				// UserAvatar component (Size XS + Inline + Class="mr-1").
+				`w-4 h-4`,
+				`align-text-bottom`,
+				`/avatars/user-abc`,
+				// XS-sized avatars thread ?size=16 through to the
+				// backend so DiceBear returns a smaller SVG payload.
+				`size=16`,
+				`v=v1`,
 				// Bold actor name + verb.
 				`Alice`,
 				`commented on`,
@@ -97,7 +104,10 @@ func TestFeedCommentRowUsesSharedCommentTile(t *testing.T) {
 				`lucide-message-square`,
 				// Inline bot tile, 16px (w-4 h-4) — distinct from the
 				// 24px (w-6 h-6) rail tile that used to be there.
-				`inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10`,
+				// Rendered by UserAvatar's IsAgent branch.
+				`w-4 h-4`,
+				`bg-primary/10`,
+				`lucide-bot`,
 				`Categorizer`,
 				`commented on`,
 			},
@@ -146,12 +156,21 @@ func TestFeedAndTxDetailShareInlineActor(t *testing.T) {
 		{
 			name: "user_with_avatar",
 			actor: components.TimelineActor{
-				Name:      "Alice",
-				AvatarURL: "/avatars/user-abc?v=v1",
+				Name:    "Alice",
+				UserID:  "user-abc",
+				Version: "v1",
 			},
 			mustHave: []string{
-				`<img src="/avatars/user-abc?v=v1"`,
-				`inline-block w-4 h-4 rounded-full object-cover border border-base-300 align-text-bottom mr-1`,
+				// URL is built by UserAvatar from UserID + Version,
+				// with ?size=16 threaded through for the XS variant.
+				`/avatars/user-abc`,
+				`v=v1`,
+				`size=16`,
+				// Inline 16px treatment now flows through UserAvatar
+				// (Size XS + Inline + Class="mr-1").
+				`w-4 h-4`,
+				`align-text-bottom`,
+				`mr-1`,
 				`<strong class="font-semibold text-base-content">Alice</strong>`,
 			},
 		},

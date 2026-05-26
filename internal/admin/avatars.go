@@ -27,20 +27,32 @@ const maxAvatarUploadSize = 5 << 20 // 5 MB
 // AvatarHandler serves GET /avatars/{id} — returns uploaded image or generated SVG.
 // Looks up the user by UUID. If not found, generates a pattern from the raw ID string
 // (covers unlinked admin accounts whose session falls back to account UUID).
+//
+// Query params:
+//
+//	?type=user|agent — picks which configured DiceBear style to use.
+//	                   Default "user". Agent identicons use a separate
+//	                   style (default "bottts") so agent activity reads
+//	                   as obviously non-human.
+//	?size=N          — requested pixel size; clamped to [32, 512].
+//	                   Passed through to DiceBear so big tiles fetch
+//	                   crisper SVGs and small tiles fetch lighter ones.
 func AvatarHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := clampSeed(chi.URLParam(r, "id"))
+		actor := parseActorType(r)
+		size := parseAvatarSize(r)
 
 		uid, err := resolveUUID(idStr)
 		if err != nil {
-			serveGeneratedAvatar(w, r, idStr, "")
+			serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 			return
 		}
 
 		row, err := a.Queries.GetUserAvatar(r.Context(), uid)
 		if err != nil {
 			// Not a user — generate a stable pattern from the raw ID.
-			serveGeneratedAvatar(w, r, idStr, "")
+			serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 			return
 		}
 
@@ -53,8 +65,42 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		if row.AvatarSeed.Valid && row.AvatarSeed.String != "" {
 			seed = row.AvatarSeed.String
 		}
-		serveGeneratedAvatar(w, r, seed, "")
+		serveGeneratedAvatarForActor(w, r, seed, actor, size)
 	}
+}
+
+// parseActorType reads the `?type=` query param and normalises it
+// into an avatar.ActorType. Anything other than "agent" falls back
+// to ActorUser — the safer default because the previous single-style
+// behavior was user-side.
+func parseActorType(r *http.Request) avatar.ActorType {
+	if r.URL.Query().Get("type") == string(avatar.ActorAgent) {
+		return avatar.ActorAgent
+	}
+	return avatar.ActorUser
+}
+
+// parseAvatarSize reads the `?size=` query param and clamps it into
+// the supported range. Returns 256 (the legacy default) when the
+// param is missing or invalid. Bounded to [32, 512] so an attacker
+// can't fan out cache entries by spamming arbitrary sizes — the
+// component-side enum only emits 16, 20, 24, 32, 40, 48, 56, 256.
+func parseAvatarSize(r *http.Request) int {
+	raw := r.URL.Query().Get("size")
+	if raw == "" {
+		return 256
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return 256
+	}
+	if n < 32 {
+		return 32
+	}
+	if n > 512 {
+		return 512
+	}
+	return n
 }
 
 // clampSeed bounds an attacker-supplied path segment to MaxSeedLength
@@ -91,7 +137,7 @@ func AvatarPreviewHandler() http.HandlerFunc {
 			http.Error(w, "invalid style", http.StatusBadRequest)
 			return
 		}
-		serveGeneratedAvatar(w, r, seed, styleOverride)
+		serveGeneratedAvatar(w, r, seed, styleOverride, parseAvatarSize(r))
 	}
 }
 
@@ -107,9 +153,10 @@ func serveUploadedAvatar(w http.ResponseWriter, r *http.Request, data []byte, co
 	w.Write(data)
 }
 
-// serveGeneratedAvatar renders a DiceBear SVG. styleOverride is used
-// by the settings preview tiles to render each style on demand;
-// empty string falls back to the global Style().
+// serveGeneratedAvatar renders a DiceBear SVG with an explicit style
+// override + size. Used by the settings preview tiles to render each
+// style on demand; empty styleOverride falls back to the configured
+// user style.
 //
 // Cache-Control is intentionally shorter than the uploaded-avatar
 // path: generated SVGs flip when the operator changes the style and
@@ -117,8 +164,25 @@ func serveUploadedAvatar(w http.ResponseWriter, r *http.Request, data []byte, co
 // outage. 1h fresh + must-revalidate keeps the bytes hot for normal
 // traffic but lets a recovery propagate within the hour instead of
 // pinning the placeholder for a full day.
-func serveGeneratedAvatar(w http.ResponseWriter, r *http.Request, seed, styleOverride string) {
-	svg := avatar.GenerateSVGStyled(seed, 256, styleOverride)
+func serveGeneratedAvatar(w http.ResponseWriter, r *http.Request, seed, styleOverride string, size int) {
+	svg := avatar.GenerateSVGStyled(seed, size, styleOverride)
+	writeAvatarSVG(w, r, svg)
+}
+
+// serveGeneratedAvatarForActor is the actor-typed variant — the URL
+// carried `?type=user|agent` so we look up the right configured
+// style rather than passing a literal slug. Threaded through from
+// /avatars/{id} where the styleOverride knob isn't exposed.
+func serveGeneratedAvatarForActor(w http.ResponseWriter, r *http.Request, seed string, actor avatar.ActorType, size int) {
+	svg := avatar.GenerateSVGForActor(seed, size, actor)
+	writeAvatarSVG(w, r, svg)
+}
+
+// writeAvatarSVG owns the ETag + Cache-Control headers shared by both
+// serve paths. Lives separately so adding a new render path (e.g. a
+// signed-URL variant in the future) doesn't accidentally diverge the
+// cache contract.
+func writeAvatarSVG(w http.ResponseWriter, r *http.Request, svg []byte) {
 	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(svg))
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)

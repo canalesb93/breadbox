@@ -114,10 +114,19 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 		logger.Info("cleaned up orphaned sync logs", "count", n)
 	}
 
-	// Push the operator-picked DiceBear style into the avatar package so
-	// /avatars/{id} renders match the Settings → System choice without a
-	// per-request DB lookup.
-	avatar.SetStyle(appconfig.String(ctx, a.Queries, appconfig.KeyAvatarStyle, avatar.DefaultStyle))
+	// Push the operator-picked DiceBear styles into the avatar package
+	// so /avatars/{id} renders match the Settings → System choices
+	// without a per-request DB lookup. Two styles: one for human users,
+	// one for AI agents. The legacy single-key `avatar.dicebear_style`
+	// remains a back-compat alias — when the user-specific key is
+	// unset we fall through to it so existing deployments keep their
+	// configured style.
+	userStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarUserStyle, "")
+	if userStyle == "" {
+		userStyle = appconfig.String(ctx, a.Queries, appconfig.KeyAvatarStyle, avatar.DefaultUserStyle)
+	}
+	avatar.SetUserStyle(userStyle)
+	avatar.SetAgentStyle(appconfig.String(ctx, a.Queries, appconfig.KeyAvatarAgentStyle, avatar.DefaultAgentStyle))
 
 	syncTimeout := time.Duration(cfg.SyncTimeoutSeconds) * time.Second
 	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger, syncTimeout)

@@ -412,20 +412,23 @@ templ feedReportTile(priority string) {
 
 // feedActorTile is the avatar tile used for actor-driven rows
 // (agent_session, bulk_action). Mirrors the per-tx timeline avatar tile so
-// the same person looks identical on both surfaces. We pass a single 24px
-// tile through the rail's ring-4 ring-base-200 scaffolding.
+// the same person looks identical on both surfaces. The shared
+// UserAvatar primitive owns the tile shape; `bb-timeline-prominent`
+// remaps ring-base-100 → ring-base-200 via CSS so the feed surface
+// keeps its page-background-tinted ring without duplicating the rule
+// at the call site. Decorative=true: the actor's name is already
+// announced in the surrounding row sentence.
 templ feedActorTile(actorType, actorID, version, name string) {
-	if actorType == "user" && actorID != "" {
-		<img src={ feedAvatarURL(actorID, version) } alt={ name + " avatar" } class="w-6 h-6 rounded-full object-cover border border-base-300 ring-4 ring-base-200" title={ name }/>
-	} else if actorType == "agent" {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/12 border border-base-300 ring-4 ring-base-200" aria-hidden="true" title={ name }>
-			@components.LucideIcon("bot", "w-3 h-3 text-primary")
-		</span>
-	} else {
-		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-100 border border-base-300 ring-4 ring-base-200" aria-hidden="true" title={ name }>
-			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ feedFirstChar(name) }</span>
-		</span>
-	}
+	@components.UserAvatar(components.UserAvatarProps{
+		Name:       name,
+		ID:         actorID,
+		Version:    version,
+		IsAgent:    actorType == "agent",
+		Size:       components.UserAvatarMd,
+		Ring:       true,
+		Decorative: true,
+		Lazy:       true,
+	})
 }
 
 // ── Row body templates ────────────────────────────────────────────────────
@@ -796,15 +799,22 @@ func feedCommentPeek(body string) string {
 }
 
 // feedCommentActor builds the shared TimelineActor for a feed comment so
-// the inline-actor renderer can do its job uniformly. Users get an avatar
-// URL (or fall through to initials when the ID is missing); agents get the
-// bot fallback; system actors render as just the name (no glyph).
+// the inline-actor renderer can do its job uniformly. UserID + Version
+// flow straight through to UserAvatar which builds the URL. Users +
+// agents both render a DiceBear identicon when they carry an ID (the
+// agent style is configured separately in Settings → System); agents
+// without an ID fall through to the bot tile; pure system actors
+// render as just the bold name.
 func feedCommentActor(c *FeedComment) components.TimelineActor {
 	a := components.TimelineActor{Name: feedActorDisplay(c.ActorName, c.ActorType)}
-	if c.ActorType == "user" && c.ActorID != "" {
-		a.AvatarURL = feedAvatarURL(c.ActorID, c.ActorAvatarVersion)
-	} else if c.ActorType == "agent" {
+	switch c.ActorType {
+	case "user":
+		a.UserID = c.ActorID
+		a.Version = c.ActorAvatarVersion
+	case "agent":
 		a.IsAgent = true
+		a.UserID = c.ActorID
+		a.Version = c.ActorAvatarVersion
 	}
 	return a
 }
@@ -867,13 +877,6 @@ templ feedTxRefList(samples []FeedTransactionRef, additional int) {
 
 // ── String helpers ────────────────────────────────────────────────────────
 
-func feedAvatarURL(id, version string) string {
-	base := "/avatars/" + id
-	if version != "" {
-		return base + "?v=" + version
-	}
-	return base
-}
 
 func feedActorDisplay(name, actorType string) string {
 	if name != "" {
@@ -1012,13 +1015,6 @@ func feedNonEmpty(a, fallback string) string {
 		return a
 	}
 	return fallback
-}
-
-func feedFirstChar(s string) string {
-	for _, r := range s {
-		return string(r)
-	}
-	return ""
 }
 
 func feedSyncDotClass(status string) string {

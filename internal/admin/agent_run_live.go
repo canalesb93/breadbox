@@ -124,14 +124,12 @@ func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		}
 		payload.TranscriptHTML = buf.String()
 
-		// Render the status badge so the in_progress→success transition
-		// can update without a page reload.
-		buf.Reset()
-		if err := components.AgentRunStatusBadge(run.Status).Render(ctx, &buf); err != nil {
-			writeAdminError(w, http.StatusInternalServerError, "RENDER_ERROR", "Failed to render status badge")
-			return
-		}
-		payload.StatusBadgeHTML = buf.String()
+		// Status badge for terminal states only, inlined here so we
+		// stay on plain daisy `badge` markup. in_progress sends an
+		// empty fragment — the "live" indicator on the header meta
+		// line carries that state, and loading shouldn't sit inside
+		// a badge.
+		payload.StatusBadgeHTML = agentRunLiveStatusBadgeHTML(run.Status)
 
 		if row.DurationMs > 0 {
 			payload.DurationMs = row.DurationMs
@@ -164,6 +162,25 @@ func writeAdminError(w http.ResponseWriter, status int, code, message string) {
 	b.Error.Code = code
 	b.Error.Message = message
 	writeAdminJSON(w, status, b)
+}
+
+// agentRunLiveStatusBadgeHTML returns the inline daisy badge markup
+// the live-update endpoint patches into the header. Terminal states
+// get a soft daisy badge; in_progress returns "" because the "live"
+// indicator below the header already carries that state.
+func agentRunLiveStatusBadgeHTML(status string) string {
+	switch status {
+	case "success":
+		return `<span class="badge badge-soft badge-success badge-xs">success</span>`
+	case "error":
+		return `<span class="badge badge-soft badge-error badge-xs">error</span>`
+	case "skipped":
+		return `<span class="badge badge-ghost badge-xs">skipped</span>`
+	case "timeout":
+		return `<span class="badge badge-soft badge-error badge-xs">timeout</span>`
+	default:
+		return ""
+	}
 }
 
 // dummy reference to avoid "imported and not used" when the rest of the

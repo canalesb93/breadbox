@@ -51,7 +51,14 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
 	syncLogCount, _ := a.Service.CountSyncLogs(ctx)
 	onboardingDismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
-	avatarStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarStyle, avatar.DefaultStyle)
+	// User style: prefer the new per-actor key; fall back to the
+	// legacy single-key for deployments that haven't migrated yet so
+	// the System tab still shows the operator's prior choice.
+	userAvatarStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarUserStyle, "")
+	if userAvatarStyle == "" {
+		userAvatarStyle = appconfig.String(ctx, a.Queries, appconfig.KeyAvatarStyle, avatar.DefaultUserStyle)
+	}
+	agentAvatarStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarAgentStyle, avatar.DefaultAgentStyle)
 
 	nextSyncTime := ""
 	if a.Scheduler != nil {
@@ -72,7 +79,8 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		OnboardingDismissed:  onboardingDismissed,
 		NextSyncTime:         nextSyncTime,
 		ConfigSources:        a.Config.ConfigSources,
-		AvatarStyle:          avatarStyle,
+		AvatarUserStyle:      userAvatarStyle,
+		AvatarAgentStyle:     agentAvatarStyle,
 		AvatarStyles:         avatar.AvailableStyles,
 	}
 	if a.VersionChecker != nil {
@@ -199,9 +207,10 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 }
 
 // SettingsAvatarStylePostHandler serves POST /settings/avatar-style.
-// Persists the operator-picked DiceBear style into app_config and
-// updates the in-process default so the next /avatars/{id} render
-// uses it. Uploaded avatars are untouched.
+// Routes by the `actor` form field: "user" (default) persists into
+// KeyAvatarUserStyle, "agent" into KeyAvatarAgentStyle. Updates the
+// in-process default so the next /avatars/{id} render uses it.
+// Uploaded avatars are untouched.
 func SettingsAvatarStylePostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -212,17 +221,40 @@ func SettingsAvatarStylePostHandler(a *app.App, sm *scs.SessionManager) http.Han
 			return
 		}
 
+		actor := strings.TrimSpace(r.FormValue("actor"))
+		if actor == "" {
+			actor = "user"
+		}
+		var (
+			key       string
+			applyFunc func(string)
+			label     string
+		)
+		switch actor {
+		case "agent":
+			key = appconfig.KeyAvatarAgentStyle
+			applyFunc = avatar.SetAgentStyle
+			label = "Agent avatar style"
+		case "user":
+			key = appconfig.KeyAvatarUserStyle
+			applyFunc = avatar.SetUserStyle
+			label = "User avatar style"
+		default:
+			FlashRedirect(w, r, sm, "error", "Invalid actor type.", "/settings/system")
+			return
+		}
+
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   appconfig.KeyAvatarStyle,
+			Key:   key,
 			Value: pgconv.Text(style),
 		}); err != nil {
-			a.Logger.Error("save avatar style", "error", err)
+			a.Logger.Error("save avatar style", "error", err, "actor", actor)
 			FlashRedirect(w, r, sm, "error", "Failed to save avatar style.", "/settings/general")
 			return
 		}
-		avatar.SetStyle(style)
+		applyFunc(style)
 
-		SetFlash(ctx, sm, "success", "Avatar style updated.")
+		SetFlash(ctx, sm, "success", label+" updated.")
 		http.Redirect(w, r, "/settings/general", http.StatusSeeOther)
 	}
 }

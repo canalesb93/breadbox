@@ -265,6 +265,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionAmounts() },
 		},
 		{
+			Slug:        "user-avatar",
+			Title:       "User avatar",
+			Description: "components.UserAvatar — the shared identity badge used by the sidebar profile, transaction owner badge, activity-timeline rail tile + inline actor, and settings preview. Backed by the DiceBear /avatars/{id} endpoint with components.AvatarURL as the single source of truth for URL construction.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionUserAvatar() },
+		},
+		{
 			Slug:        "transaction-rows",
 			Title:       "Transaction rows",
 			Description: "TxRow / TxRowCompact / TxRowFeed and their building blocks (bb-tx-avatar, bb-tx-owner-badge, bb-tx-amount). The same avatar + amount shapes carry across every surface that lists transactions.",
@@ -274,7 +281,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "agent-run-rows",
 			Title:       "Agent run rows",
-			Description: "components.AgentRunRow + AgentRunRowList — the rich row shape for /agents (runs landing). Status-toned icon tile + agent label + meta + cost block, with inline report chips when the run produced reports.",
+			Description: "components.AgentRunRow + AgentRunRowList — the row shape for /agents (runs landing). Daisy list-row with a single status-toned icon tile, agent name + compact time, one optional body line (error → top report → skipped note), and cost. Trigger / cap details ride along as tooltip-only icons.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},
