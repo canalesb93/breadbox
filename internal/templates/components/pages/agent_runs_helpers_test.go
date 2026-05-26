@@ -48,7 +48,9 @@ func TestFilterTranscriptForDisplay_KeepsResultWithJustCacheData(t *testing.T) {
 	}
 }
 
-func TestFilterTranscriptForDisplay_EnrichesToolResultWithName(t *testing.T) {
+func TestFilterTranscriptForDisplay_PairFoldDropsRedundantResultRows(t *testing.T) {
+	// Same shape as before, but now we expect the tool_use rows to
+	// absorb their matching tool_result and drop the redundant rows.
 	in := []TranscriptEvent{
 		{Type: "tool_use", ToolUseID: "toolu_a", ToolName: "query_transactions"},
 		{Type: "tool_use", ToolUseID: "toolu_b", ToolName: "list_categories"},
@@ -56,14 +58,14 @@ func TestFilterTranscriptForDisplay_EnrichesToolResultWithName(t *testing.T) {
 		{Type: "tool_result", ToolUseID: "toolu_b", ToolResultJSON: `[]`},
 	}
 	out := FilterTranscriptForDisplay(in)
-	if len(out) != 4 {
-		t.Fatalf("expected 4 events, got %d", len(out))
+	if len(out) != 2 {
+		t.Fatalf("expected 2 paired events, got %d: %+v", len(out), out)
 	}
-	if out[2].ToolName != "query_transactions" {
-		t.Errorf("expected first tool_result enriched with query_transactions, got %q", out[2].ToolName)
+	if out[0].ToolName != "query_transactions" || out[0].ToolResultJSON != `{"count": 47}` {
+		t.Errorf("expected first row to fold in tool_result for toolu_a, got %+v", out[0])
 	}
-	if out[3].ToolName != "list_categories" {
-		t.Errorf("expected second tool_result enriched with list_categories, got %q", out[3].ToolName)
+	if out[1].ToolName != "list_categories" || out[1].ToolResultJSON != `[]` {
+		t.Errorf("expected second row to fold in tool_result for toolu_b, got %+v", out[1])
 	}
 }
 
@@ -90,6 +92,38 @@ func TestComputeToolUsage(t *testing.T) {
 	}
 	if got[2].Name != "list_categories" || got[2].Count != 1 {
 		t.Errorf("expected list_categories=1 third, got %+v", got[2])
+	}
+}
+
+func TestFilterTranscriptForDisplay_PairsToolUseWithToolResult(t *testing.T) {
+	in := []TranscriptEvent{
+		{Type: "tool_use", ToolUseID: "toolu_a", ToolName: "query_transactions", ToolInputJSON: `{"limit":10}`},
+		{Type: "tool_use", ToolUseID: "toolu_b", ToolName: "list_categories", ToolInputJSON: `{}`},
+		{Type: "tool_result", ToolUseID: "toolu_a", ToolResultJSON: `{"count":47}`},
+		{Type: "tool_result", ToolUseID: "toolu_b", ToolResultJSON: `[]`},
+	}
+	out := FilterTranscriptForDisplay(in)
+	if len(out) != 2 {
+		t.Fatalf("expected 2 paired tool_use rows, got %d: %+v", len(out), out)
+	}
+	if out[0].Type != "tool_use" || out[0].ToolName != "query_transactions" || out[0].ToolResultJSON != `{"count":47}` {
+		t.Errorf("first row: expected paired query_transactions, got %+v", out[0])
+	}
+	if out[1].Type != "tool_use" || out[1].ToolName != "list_categories" || out[1].ToolResultJSON != `[]` {
+		t.Errorf("second row: expected paired list_categories, got %+v", out[1])
+	}
+}
+
+func TestFilterTranscriptForDisplay_KeepsOrphanToolUseUnpaired(t *testing.T) {
+	in := []TranscriptEvent{
+		{Type: "tool_use", ToolUseID: "toolu_pending", ToolName: "query_transactions", ToolInputJSON: `{"limit":10}`},
+	}
+	out := FilterTranscriptForDisplay(in)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(out))
+	}
+	if out[0].ToolResultJSON != "" {
+		t.Errorf("orphan tool_use should not get a result fold-in, got %q", out[0].ToolResultJSON)
 	}
 }
 

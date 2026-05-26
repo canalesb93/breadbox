@@ -161,6 +161,12 @@ type TranscriptEvent struct {
 	// of an anonymous "tool result".
 	ToolUseID string
 
+	// ToolResultAt is the timestamp of the matching tool_result, set
+	// only on tool_use events that have been paired with a result by
+	// FilterTranscriptForDisplay. The chat-thread row uses it to
+	// surface a "→ <time>" caption on the combined call + result row.
+	ToolResultAt time.Time
+
 	// CostUSD / token counts are populated for type=="result".
 	CostUSD     float64
 	TokensIn    int64

@@ -174,6 +174,16 @@ templ DesignComponent(p DesignComponentProps) {
 // DesignComponent above so the viewport toggle can resize without
 // the outer browser viewport leaking through to Tailwind responsive
 // utilities.
+//
+// The marked + DOMPurify + shared markdown.js scripts load here so
+// any sandbox sample that uses the canonical `data-markdown="…"`
+// pattern (the agent-run-chat section, future report-body section)
+// renders inside the iframe without each section having to load them
+// individually. Cost is one extra script load on iframe pages that
+// don't use markdown — negligible.
 templ DesignComponentEmbed(p DesignComponentProps) {
+	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/markdown.js"></script>
 	@p.Section.Render()
 }

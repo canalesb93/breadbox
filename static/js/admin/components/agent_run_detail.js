@@ -133,6 +133,14 @@ document.addEventListener('alpine:init', function () {
       // The server returns the rendered transcript fragment + a few
       // scalar fields so we don't need to re-fetch the whole page or
       // round-trip individual events.
+      //
+      // Streaming polish:
+      //   - Skip the DOM patch if the transcript HTML is byte-identical
+      //     to the previous render. Avoids collapsing every <details>
+      //     and re-initing lucide on a no-op tick.
+      //   - Anchor scroll position by whether the user was near the
+      //     bottom before the patch. If they were reading further up,
+      //     we don't yank the page down on every new event.
       applyLive: function (body) {
         if (!body) return;
         var prevEventCount = -1;
@@ -142,21 +150,35 @@ document.addEventListener('alpine:init', function () {
         }
         if (typeof body.transcriptHTML === 'string') {
           var threadEl = this.$refs.thread;
-          if (threadEl) {
+          // Skip when nothing changed — saves the full innerHTML swap
+          // (which would collapse every <details> and re-run lucide).
+          if (threadEl && body.transcriptHTML !== this._lastTranscriptHTML) {
+            this._lastTranscriptHTML = body.transcriptHTML;
+            // Remember whether the operator was anchored at the bottom
+            // BEFORE we patch — sticky-bottom is the conventional
+            // chat-app affordance, but if they're reading from above we
+            // shouldn't yank them.
+            var wasAtBottom = nearViewportBottom();
             threadEl.innerHTML = body.transcriptHTML;
             // Re-init lucide icons for any newly-injected <i data-lucide>.
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
               window.lucide.createIcons();
             }
-            // If new events landed AND the run is still in_progress,
-            // smoothly scroll the thread so the operator sees them
-            // arrive. We skip this on a no-op patch (same event count)
-            // so reading from above the fold doesn't get yanked down.
+            // Run the shared markdown scanner against the new bubbles.
+            // Idempotent — already-rendered nodes are skipped via the
+            // markdown.js dataset.markdownRendered guard.
+            if (typeof window.bbRenderMarkdown === 'function') {
+              window.bbRenderMarkdown(threadEl);
+            }
+            // Only auto-scroll when (a) more events landed AND (b) the
+            // operator was already near the bottom. That keeps "reading
+            // from the middle while a run streams" usable.
             if (
               this.status === 'in_progress' &&
               typeof body.eventCount === 'number' &&
               prevEventCount >= 0 &&
-              body.eventCount > prevEventCount
+              body.eventCount > prevEventCount &&
+              wasAtBottom
             ) {
               var self = this;
               this.$nextTick(function () { self.scrollThreadToBottom(true); });
@@ -204,12 +226,18 @@ document.addEventListener('alpine:init', function () {
       },
 
       toggleAll: function () {
-        this.allOpen = !this.allOpen;
-        var details = this.$el.querySelectorAll('.bb-tool, .bb-run-collapse');
-        details.forEach(function (d) {
-          if (this.allOpen) d.setAttribute('open', '');
+        // Inside an Alpine @click handler, `this.$el` resolves to the
+        // element the directive is on (the button) — NOT the component
+        // root. Use `this.$root` to scope the query to the run-detail
+        // x-data root. Capture the new state in a local up front so
+        // the forEach callback isn't tangled in proxy/`this` quirks.
+        var shouldOpen = !this.allOpen;
+        this.allOpen = shouldOpen;
+        var root = this.$root || document;
+        root.querySelectorAll('.bb-tool, .bb-prompt-collapse').forEach(function (d) {
+          if (shouldOpen) d.setAttribute('open', '');
           else d.removeAttribute('open');
-        }, this);
+        });
       },
 
       // jumpToResult scrolls the page so the run's "Final result"
@@ -335,6 +363,24 @@ function copyText(s) {
     document.body.removeChild(ta);
     resolve(ok);
   });
+}
+
+// nearViewportBottom returns true when the viewport is within ~120px
+// of the bottom of the document — the threshold we use to decide
+// whether to keep an in_progress run anchored at the latest event.
+// 120px is roughly two chat-bubble heights, generous enough that a
+// reader at the end of the visible transcript is still considered
+// "anchored" even if they haven't scrolled the very last pixel.
+function nearViewportBottom() {
+  var scrollY = window.scrollY || window.pageYOffset || 0;
+  var viewportH = window.innerHeight || document.documentElement.clientHeight;
+  var docH = Math.max(
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight,
+    document.body.offsetHeight,
+    document.documentElement.offsetHeight
+  );
+  return docH - (scrollY + viewportH) < 120;
 }
 
 function formatDurationMs(ms) {
