@@ -2868,7 +2868,12 @@
 .bb-prose {
   font-size: 0.875rem;
   line-height: 1.55;
-  color: var(--color-base-content);
+  /* Inherit color from the surrounding surface so a .bb-prose nested
+   * inside a daisy chat-bubble-primary picks up primary-content
+   * automatically instead of getting locked to base-content (which
+   * goes invisible on dark bubbles in light mode + on primary bubbles
+   * in dark mode). */
+  color: inherit;
   word-wrap: break-word;
 }
 .bb-prose > * + * { margin-top: 0.5rem; }
@@ -2879,10 +2884,10 @@
   letter-spacing: -0.005em;
 }
 .bb-prose h3.bb-prose-h { font-size: 0.95rem; }
-.bb-prose h4.bb-prose-h { font-size: 0.875rem; color: color-mix(in oklch, var(--color-base-content) 80%, transparent); }
-.bb-prose .bb-prose-strong { font-weight: 600; color: var(--color-base-content); }
+.bb-prose h4.bb-prose-h { font-size: 0.875rem; opacity: 0.8; }
+.bb-prose .bb-prose-strong { font-weight: 600; /* inherit color so dark bubbles get light bold */ }
 .bb-prose .bb-prose-em { font-style: italic; }
-.bb-prose .bb-prose-strike { color: color-mix(in oklch, var(--color-base-content) 50%, transparent); }
+.bb-prose .bb-prose-strike { opacity: 0.55; text-decoration: line-through; }
 .bb-prose .bb-prose-link {
   color: var(--color-primary);
   text-decoration: underline;
