@@ -1,0 +1,98 @@
+package components
+
+// ConnectionsSkeleton renders a placeholder mirroring the layout of the
+// /connections page — the three-stat summary card (Net Worth / Assets /
+// Liabilities) plus a stack of connection cards (each with provider icon,
+// institution name, status badge, meta row, sync button, balance, and
+// nested account rows). Sized to match the real component so a future
+// swap-in doesn't shift layout.
+//
+// /connections is a full-SSR page today; this primitive is exposed in
+// /design#loading so it's ready for the eventual AJAX/refresh swap and
+// discoverable to anyone wiring loading states for adjacent
+// connection-centric panels.
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
+// hand-rolled `bb-skeleton*` family is being retired).
+templ ConnectionsSkeleton() {
+	<div aria-hidden="true">
+		<!-- Summary card: Net Worth / Assets / Liabilities -->
+		<div class="bb-card p-0 overflow-hidden mb-6">
+			<div class="grid grid-cols-3 divide-x divide-base-300">
+				for i := 0; i < 3; i++ {
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0 space-y-2">
+						<div class="skeleton h-2.5 w-16"></div>
+						<div class="skeleton h-6 sm:h-7 w-24"></div>
+					</div>
+				}
+			</div>
+		</div>
+		<!-- Connection cards -->
+		<div class="flex flex-col gap-4">
+			for i := 0; i < 4; i++ {
+				@connectionsSkeletonCard(i)
+			}
+		</div>
+	</div>
+}
+
+// connectionsSkeletonCard mirrors one connectionsCard: icon tile + name + status
+// badge + meta line on the left, sync button + balance + account count on the
+// right, and a couple of nested account rows beneath. The first card includes
+// nested account rows; subsequent ones alternate to keep the skeleton from
+// looking too uniform.
+templ connectionsSkeletonCard(i int) {
+	<div class="bb-card overflow-hidden">
+		<!-- Header row -->
+		<div class="px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
+			<div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+				<!-- Provider icon tile (desktop only) -->
+				<div class="skeleton hidden sm:block w-10 h-10 rounded-lg shrink-0"></div>
+				<div class="min-w-0 space-y-1.5">
+					<!-- Institution name + status badge -->
+					<div class="flex items-center gap-2">
+						<div class="skeleton h-4 w-32 sm:w-40"></div>
+						<div class="skeleton h-4 w-14 rounded-full"></div>
+					</div>
+					<!-- Meta row: user · provider · last sync -->
+					<div class="flex items-center gap-2">
+						<div class="skeleton h-2.5 w-16"></div>
+						<div class="skeleton h-2.5 w-12"></div>
+						<div class="skeleton h-2.5 w-20"></div>
+					</div>
+				</div>
+			</div>
+			<!-- Right side: sync button + balance + count -->
+			<div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+				<div class="skeleton w-8 h-8 rounded-full shrink-0"></div>
+				<div class="space-y-1.5 text-right">
+					<div class="skeleton h-4 sm:h-5 w-20 ml-auto"></div>
+					<div class="skeleton h-2.5 w-14 ml-auto"></div>
+				</div>
+			</div>
+		</div>
+		<!-- Nested account rows (only on every other card to break up uniformity) -->
+		if i%2 == 0 {
+			<div class="border-t border-base-300">
+				for j := 0; j < 2; j++ {
+					@connectionsSkeletonAccountRow()
+				}
+			</div>
+		}
+	</div>
+}
+
+// connectionsSkeletonAccountRow mirrors connectionsAccountRow: a small icon
+// tile, account name + subtype/mask line, and a right-aligned balance.
+templ connectionsSkeletonAccountRow() {
+	<div class="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-base-300 last:border-b-0">
+		<div class="flex items-center gap-3 min-w-0">
+			<div class="skeleton w-7 h-7 rounded-md shrink-0"></div>
+			<div class="min-w-0 space-y-1.5">
+				<div class="skeleton h-3 w-32"></div>
+				<div class="skeleton h-2.5 w-20"></div>
+			</div>
+		</div>
+		<div class="skeleton h-3.5 w-16"></div>
+	</div>
+}

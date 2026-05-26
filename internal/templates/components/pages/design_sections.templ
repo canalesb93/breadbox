@@ -789,6 +789,11 @@ templ SectionLoading() {
 				@components.AccountsListSkeleton()
 			</div>
 		}
+		@designExample("Connections list skeleton", "Placeholder mirroring /connections — summary stats (Net Worth / Assets / Liabilities) plus a stack of connection cards (provider icon, institution name + status badge, meta row, sync button, balance, nested account rows). Primitive is exposed here for future AJAX swaps; /connections is full-SSR today.") {
+			<div class="max-w-4xl">
+				@components.ConnectionsSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>
