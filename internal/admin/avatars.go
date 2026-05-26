@@ -25,15 +25,21 @@ import (
 const maxAvatarUploadSize = 5 << 20 // 5 MB
 
 // AvatarHandler serves GET /avatars/{id} — returns uploaded image or generated SVG.
-// Looks up the user by UUID. If not found, generates a pattern from the raw ID string
-// (covers unlinked admin accounts whose session falls back to account UUID).
+// Lookup order: users.id → api_keys.id → raw-seed fallback. The api_keys
+// branch lets agent identities (HTTP MCP keys, future per-client stdio
+// keys) render with the agent-style DiceBear even when the URL was
+// built from just an actor_id (notification deep-links, embedded
+// avatars) and doesn't carry an explicit ?type=agent param.
 //
 // Query params:
 //
 //	?type=user|agent — picks which configured DiceBear style to use.
 //	                   Default "user". Agent identicons use a separate
 //	                   style (default "bottts") so agent activity reads
-//	                   as obviously non-human.
+//	                   as obviously non-human. When the id resolves to
+//	                   an api_keys row with actor_type='agent', the
+//	                   handler upgrades the style to "agent" regardless
+//	                   of what ?type= said.
 //	?size=N          — requested pixel size; clamped to [32, 512].
 //	                   Passed through to DiceBear so big tiles fetch
 //	                   crisper SVGs and small tiles fetch lighter ones.
@@ -50,22 +56,34 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		}
 
 		row, err := a.Queries.GetUserAvatar(r.Context(), uid)
-		if err != nil {
-			// Not a user — generate a stable pattern from the raw ID.
+		if err == nil {
+			if row.AvatarData != nil && row.AvatarContentType.Valid {
+				serveUploadedAvatar(w, r, row.AvatarData, row.AvatarContentType.String)
+				return
+			}
+			seed := pgconv.FormatUUID(uid)
+			if row.AvatarSeed.Valid && row.AvatarSeed.String != "" {
+				seed = row.AvatarSeed.String
+			}
+			serveGeneratedAvatarForActor(w, r, seed, actor, size)
+			return
+		}
+
+		// Not a user — try api_keys next. Annotations written by
+		// agents store the api_keys row UUID in actor_id and avatar
+		// URLs are built from it. When the row is an agent key,
+		// upgrade the actor type so the agent DiceBear style wins
+		// regardless of the URL's ?type= param.
+		if key, kerr := a.Queries.GetApiKey(r.Context(), uid); kerr == nil {
+			if key.ActorType == "agent" {
+				actor = avatar.ActorAgent
+			}
 			serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 			return
 		}
 
-		if row.AvatarData != nil && row.AvatarContentType.Valid {
-			serveUploadedAvatar(w, r, row.AvatarData, row.AvatarContentType.String)
-			return
-		}
-
-		seed := pgconv.FormatUUID(uid)
-		if row.AvatarSeed.Valid && row.AvatarSeed.String != "" {
-			seed = row.AvatarSeed.String
-		}
-		serveGeneratedAvatarForActor(w, r, seed, actor, size)
+		// Unknown id — generate a stable pattern from the raw string.
+		serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 	}
 }
 

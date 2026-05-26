@@ -418,17 +418,35 @@ templ feedReportTile(priority string) {
 // keeps its page-background-tinted ring without duplicating the rule
 // at the call site. Decorative=true: the actor's name is already
 // announced in the surrounding row sentence.
+//
+// `system` actor rows render with the bot tile (no humanoid <img>) and
+// their stored ID is dropped — system actor_ids historically point at
+// api_keys rows (e.g. the stdio MCP singleton) whose UUID is not a
+// valid users.id, so /avatars/{id} would otherwise fall through to a
+// human-style DiceBear seeded on that UUID.
 templ feedActorTile(actorType, actorID, version, name string) {
 	@components.UserAvatar(components.UserAvatarProps{
 		Name:       name,
-		ID:         actorID,
+		ID:         feedActorAvatarID(actorType, actorID),
 		Version:    version,
-		IsAgent:    actorType == "agent",
+		IsAgent:    actorType == "agent" || actorType == "system",
 		Size:       components.UserAvatarMd,
 		Ring:       true,
 		Decorative: true,
 		Lazy:       true,
 	})
+}
+
+// feedActorAvatarID returns the ID UserAvatar should treat as the
+// avatar subject. For `system` actors we deliberately drop the stored
+// actor_id so UserAvatar takes the bot-tile fallback instead of
+// rendering a humanoid `<img>` seeded on (e.g.) the stdio singleton's
+// api_keys UUID.
+func feedActorAvatarID(actorType, actorID string) string {
+	if actorType == "system" {
+		return ""
+	}
+	return actorID
 }
 
 // ── Row body templates ────────────────────────────────────────────────────
@@ -802,9 +820,10 @@ func feedCommentPeek(body string) string {
 // the inline-actor renderer can do its job uniformly. UserID + Version
 // flow straight through to UserAvatar which builds the URL. Users +
 // agents both render a DiceBear identicon when they carry an ID (the
-// agent style is configured separately in Settings → System); agents
-// without an ID fall through to the bot tile; pure system actors
-// render as just the bold name.
+// agent style is configured separately in Settings → System). System
+// actors render with the bot tile and no ID — historic system actor_ids
+// reference api_keys rows whose UUID is not a valid users.id; passing
+// them through would render a humanoid DiceBear seeded on that UUID.
 func feedCommentActor(c *FeedComment) components.TimelineActor {
 	a := components.TimelineActor{Name: feedActorDisplay(c.ActorName, c.ActorType)}
 	switch c.ActorType {
@@ -815,6 +834,8 @@ func feedCommentActor(c *FeedComment) components.TimelineActor {
 		a.IsAgent = true
 		a.UserID = c.ActorID
 		a.Version = c.ActorAvatarVersion
+	case "system":
+		a.IsAgent = true
 	}
 	return a
 }
