@@ -190,6 +190,13 @@ func DesignSections() []DesignSection {
 			Group:       "navigation",
 			Render:      func() templ.Component { return SectionOverflowMenu() },
 		},
+		{
+			Slug:        "sidebar-user-menu",
+			Title:       "Sidebar user menu",
+			Description: "Consolidated identity + actions popover at the bottom of the sidebar. Trigger shows avatar + display name + role; popover holds Settings, Documentation, GitHub, an editor-only /design shortcut, and a destructive Sign out below an <hr> separator. Use components.SidebarUserMenu.",
+			Group:       "navigation",
+			Render:      func() templ.Component { return SectionSidebarUserMenu() },
+		},
 
 		// ── Forms ───────────────────────────────────────────────────
 		{
