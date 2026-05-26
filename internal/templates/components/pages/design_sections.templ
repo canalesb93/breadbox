@@ -794,6 +794,11 @@ templ SectionLoading() {
 				@components.ConnectionsSkeleton()
 			</div>
 		}
+		@designExample("Reports inbox skeleton", "Placeholder mirroring /reports — page header, filter tabs (All / Unread / Read + count + mark-all-read), and a divided card of inbox rows (bot avatar, meta line with optional priority dot + tag chips, title message bubble, mark-read + chevron actions). Primitive is exposed here for future AJAX swaps and adjacent agent-report panels (e.g. dashboard inbox preview); /reports is full-SSR today.") {
+			<div class="max-w-3xl">
+				@components.ReportsSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>
