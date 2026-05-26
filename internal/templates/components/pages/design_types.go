@@ -271,6 +271,27 @@ func DesignSections() []DesignSection {
 			Group:       "data",
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},
+		{
+			Slug:        "agent-run-chat",
+			Title:       "Agent run chat thread",
+			Description: "The chat-thread variants the /agents/runs/{id} detail page composes — assistant + user bubbles (daisy chat), tool_use + tool_result rows (expand to JSON viewer), final result bubble, and the soft-alert error row. Pairs with the markdown-prose + json-viewer sections.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionAgentRunChat() },
+		},
+		{
+			Slug:        "markdown-prose",
+			Title:       "Markdown prose",
+			Description: "components.Markdown renders agent-emitted text as a safe HTML fragment wrapped in .bb-prose. Supports paragraphs, headers (##/###), emphasis, inline + fenced code, lists (one nest level), GFM tables, blockquotes, and http/https/mailto links. Drives the assistant chat bubble on the run-detail page and will land in the reports body next.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionMarkdownProse() },
+		},
+		{
+			Slug:        "json-viewer",
+			Title:       "JSON viewer",
+			Description: "components.JSONViewer pretty-prints a JSON payload with collapsible objects + arrays and an optional copy-to-clipboard button. Powers the tool_use / tool_result rows on the run-detail transcript.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionJSONViewer() },
+		},
 
 		// ── Feedback ────────────────────────────────────────────────
 		{

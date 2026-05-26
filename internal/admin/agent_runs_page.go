@@ -232,10 +232,14 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 			CSRFToken:    GetCSRFToken(r),
 		}
 
-		// in_progress runs auto-refresh so the transcript fills in.
-		if run.Status == "in_progress" {
-			props.RefreshSeconds = 5
-		}
+		// Live updates: the templ root emits an `agentRunDetail`
+		// Alpine factory that polls /-/agents/runs/{shortId}/live every
+		// 3 s while status=in_progress and patches the rendered
+		// transcript HTML in place. The legacy
+		// <meta http-equiv="refresh"> page reload is gone — it lost
+		// scroll position and any open <details> nodes on every tick.
+		// The polling cadence lives in the templ (pollSeconds) since it
+		// depends on the rendered status.
 
 		// Resolve the transcript path. Falls back to the deterministic path
 		// the same way internal/api/agents.go::GetAgentRunTranscriptHandler
