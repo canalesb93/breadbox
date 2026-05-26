@@ -16,6 +16,7 @@ import cliAsset from "@anthropic-ai/claude-agent-sdk/cli.js" with { type: "file"
 import { existsSync, mkdirSync, writeFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 import { JobSpecSchema, type JobSpec } from "./spec";
 import { emit, emitError } from "./events";
 
@@ -24,6 +25,12 @@ import { emit, emitError } from "./events";
 // binary, cliAsset resolves to a bunfs path that the SDK's spawn helper
 // cannot read. We materialize once per process startup, cached by mtime+
 // size so repeated cold-starts on the same binary reuse the extracted copy.
+//
+// Also writes a sibling package.json with {"type": "module"} so node
+// (the executable we pin in query()) treats the extracted .js as ESM.
+// Without it node refuses to load the SDK's import statements and the
+// spawned subprocess exits 1 with no useful event — surfacing here as
+// "Claude Code process exited with code 1".
 async function resolveCliPath(): Promise<string> {
   const dir = join(tmpdir(), "breadbox-agent-sidecar");
   mkdirSync(dir, { recursive: true });
@@ -31,6 +38,10 @@ async function resolveCliPath(): Promise<string> {
   const cached = join(dir, `cli-${bytes.length}.js`);
   if (!existsSync(cached) || statSync(cached).size !== bytes.length) {
     writeFileSync(cached, bytes);
+  }
+  const pkgPath = join(dir, "package.json");
+  if (!existsSync(pkgPath)) {
+    writeFileSync(pkgPath, '{"type":"module"}');
   }
   return cached;
 }
@@ -61,6 +72,29 @@ function configureAuth(spec: JobSpec): void {
   }
 }
 
+// configureRuntimeEnv carves out an isolated HOME so the spawned Claude
+// Code subprocess writes its config (~/.claude.json + transcript cache
+// + fs.watch state) into a per-run scratch dir instead of fighting the
+// operator's logged-in Claude Code CLI for the global file. Without
+// this the subprocess dies at startup with
+//   EPERM: operation not permitted, open '/Users/<u>/.claude.json'
+// any time another Claude process (cmux, the user's own session, a
+// concurrent agent run) is holding the global config — the run never
+// reaches the prompt and the operator gets an opaque
+// "Claude Code process exited with code 1".
+function configureRuntimeEnv(spec: JobSpec): void {
+  const scratch = join(
+    tmpdir(),
+    `breadbox-agent-home-${spec.runId || randomBytes(4).toString("hex")}`,
+  );
+  mkdirSync(scratch, { recursive: true });
+  process.env.HOME = scratch;
+  // CLAUDE_CONFIG_DIR is the explicit override Claude Code 2.x honors
+  // when set; we set both so the cli.js init path can pick whichever
+  // it consults first.
+  process.env.CLAUDE_CONFIG_DIR = scratch;
+}
+
 async function main() {
   let spec: JobSpec;
   let transcriptPath: string | undefined;
@@ -80,6 +114,7 @@ async function main() {
   }
 
   configureAuth(spec);
+  configureRuntimeEnv(spec);
 
   // Track cumulative cost defensively even though the SDK enforces maxBudgetUsd.
   let cumulativeCostUsd = 0;
@@ -100,6 +135,13 @@ async function main() {
   // silently with zero messages, which we'd misclassify as a clean
   // success with $0/0-turn metrics. Pinning to "node" makes the spawn
   // deterministic and matches the runtime apk install in the Dockerfile.
+  // Buffer stderr from the spawned Claude Code subprocess so we can
+  // surface it on the error event below. The SDK swallows stderr by
+  // default; without this the failure message that lands on the run row
+  // is the useless "Claude Code process exited with code 1" — which
+  // tells operators nothing about what actually went wrong.
+  const stderrBuf: string[] = [];
+
   try {
     const stream = query({
       prompt: spec.prompt,
@@ -128,6 +170,9 @@ async function main() {
         resume: spec.sessionId,
         pathToClaudeCodeExecutable,
         executable: "node",
+        stderr: (chunk: string) => {
+          stderrBuf.push(chunk);
+        },
       },
     });
 
@@ -236,13 +281,15 @@ async function main() {
     // operator can actually read in the transcript drawer.
     if (messageCount === 0) {
       emitError(
-        "agent SDK stream ended without yielding any messages — likely a subprocess spawn failure (executable not on PATH?) or an invalid auth credential",
+        "agent SDK stream ended without yielding any messages — likely a subprocess spawn failure (executable not on PATH?) or an invalid auth credential" +
+          formatStderr(stderrBuf),
         undefined,
         transcriptPath,
       );
     } else {
       emitError(
-        `agent SDK stream ended after ${messageCount} message(s) without emitting a result event`,
+        `agent SDK stream ended after ${messageCount} message(s) without emitting a result event` +
+          formatStderr(stderrBuf),
         undefined,
         transcriptPath,
       );
@@ -250,9 +297,21 @@ async function main() {
     process.exit(1);
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
-    emitError(e.message, e.stack, transcriptPath);
+    emitError(e.message + formatStderr(stderrBuf), e.stack, transcriptPath);
     process.exit(1);
   }
+}
+
+// formatStderr trims and prefixes the captured Claude Code subprocess
+// stderr onto the breadbox-facing error message. Empty buffers stay
+// empty so successful runs don't get a trailing "—" stub.
+function formatStderr(buf: string[]): string {
+  const joined = buf.join("").trim();
+  if (!joined) return "";
+  // Cap at ~2 KB so a misbehaving subprocess doesn't blow up the row.
+  const max = 2048;
+  const body = joined.length > max ? joined.slice(0, max) + " …(truncated)" : joined;
+  return `\n\n— stderr —\n${body}`;
 }
 
 process.on("SIGTERM", () => {

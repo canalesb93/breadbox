@@ -13,17 +13,19 @@ import (
 )
 
 // SmokeResult is the outcome of a single SmokeTest invocation. Used by
-// `breadbox agent test` and (later) `breadbox doctor`.
+// `breadbox agent test`, `breadbox doctor`, and the admin Settings →
+// Agents diagnostics panel (which reads the snake_case JSON keys
+// below via Alpine x-text bindings).
 type SmokeResult struct {
-	AuthMode      string  // "subscription" | "api_key"
-	BinaryPath    string  // resolved path to breadbox-agent
-	Model         string  // model that ran
-	DurationMs    int64
-	TotalCostUSD  float64
-	InputTokens   int
-	OutputTokens  int
-	StopReason    string
-	AssistantText string // first text block from the assistant
+	AuthMode      string  `json:"auth_mode"`      // "subscription" | "api_key"
+	BinaryPath    string  `json:"binary_path"`    // resolved path to breadbox-agent
+	Model         string  `json:"model"`          // model that ran
+	DurationMs    int64   `json:"duration_ms"`
+	TotalCostUSD  float64 `json:"total_cost_usd"`
+	InputTokens   int     `json:"input_tokens"`
+	OutputTokens  int     `json:"output_tokens"`
+	StopReason    string  `json:"stop_reason"`
+	AssistantText string  `json:"response"` // first text block from the assistant
 }
 
 // SmokeTestPrompt is the tiny diagnostic prompt sent to the model. Deliberately
@@ -145,9 +147,15 @@ func SmokeTest(ctx context.Context, r SmokeAuthReader, encKey []byte, runner Run
 		return nil, fmt.Errorf("smoke: run sidecar: %w", err)
 	}
 
+	// Resolve the binary path the runner actually used so the diagnostic
+	// surface shows where the sidecar was discovered (per-user install,
+	// PATH lookup, dev `./bin/breadbox-agent`, etc.) instead of the
+	// empty appconfig override.
+	resolvedBinary, _ := LocateBinary(sidecarPath)
+
 	return &SmokeResult{
 		AuthMode:      authMode,
-		BinaryPath:    sidecarPath,
+		BinaryPath:    resolvedBinary,
 		Model:         model,
 		DurationMs:    result.DurationMs,
 		TotalCostUSD:  result.TotalCostUSD,
