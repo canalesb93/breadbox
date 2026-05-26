@@ -57,7 +57,7 @@ func renderSettingsTab(
 	if r.Header.Get(settingsFragmentHeader) == "1" {
 		if f, ok := data["Flash"].(*Flash); ok && f != nil && f.Message != "" {
 			w.Header().Set(settingsFlashTypeHeader, f.Type)
-			w.Header().Set(settingsFlashMessageHeader, url.QueryEscape(f.Message))
+			w.Header().Set(settingsFlashMessageHeader, url.QueryEscape(truncateFlash(f.Message)))
 		}
 		tr.RenderTemplFragment(w, r, body)
 		return
@@ -73,4 +73,18 @@ func renderSettingsTab(
 	data["SettingsInitialTab"] = tab
 	data["SettingsInitialBody"] = template.HTML(buf.String())
 	tr.RenderWithTempl(w, r, data, pages.SettingsHost())
+}
+
+// truncateFlash bounds flash messages we ship via response headers.
+// Provider error paths (Plaid, Teller) can wrap upstream HTTP bodies
+// with arbitrary length — keeping the header line under ~1KB plays
+// nicely with the default `proxy_buffer_size` in nginx/caddy and
+// avoids leaking pages of provider detail into proxy access logs.
+const settingsFlashMaxLen = 512
+
+func truncateFlash(s string) string {
+	if len(s) <= settingsFlashMaxLen {
+		return s
+	}
+	return s[:settingsFlashMaxLen-1] + "…"
 }

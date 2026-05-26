@@ -164,11 +164,20 @@ document.addEventListener('alpine:init', function () {
         else history.pushState({ bbSettings: tab }, '', url);
       },
 
+      // _pushPath is the multi-segment variant — used by the form-submit
+      // interceptor when the server redirects to a subpath like
+      // /settings/api-keys/{id}/created.
+      _pushPath: function (path, tab) {
+        history.pushState({ bbSettings: tab }, '', path);
+      },
+
       _onPopState: function () {
         // Read the new URL and decide whether the modal should be open.
-        var match = window.location.pathname.match(/^\/settings(?:\/([\w-]+))?\/?$/);
-        if (match) {
-          var tab = match[1] || 'account';
+        // Accept multi-segment paths (e.g. /settings/api-keys/{id}/created)
+        // so back/forward through a creation flow stays in the modal.
+        var dest = parseSettingsRedirect(window.location.href);
+        if (dest.settings) {
+          var tab = dest.tab || 'account';
           var self = this;
           if (this.currentTab !== tab) {
             this._loadTab(tab).then(function () {
@@ -187,6 +196,20 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         var bodyEl = this.$refs.body || document.getElementById('bb-settings-body');
         if (!bodyEl) return Promise.reject(new Error('no settings body slot'));
+        // Defer tab GETs while a submit is in flight: the server's
+        // session flash is one-shot, and an interleaved GET would
+        // consume it before the submit's redirect GET arrives, eating
+        // the toast that belongs to the save.
+        if (self._submitInFlight) {
+          return new Promise(function (resolve) {
+            var poll = setInterval(function () {
+              if (!self._submitInFlight) {
+                clearInterval(poll);
+                resolve(self._loadTab(tab));
+              }
+            }, 50);
+          });
+        }
         // Render a lightweight loading state — daisy skeleton blocks
         // matching the section card shape.
         bodyEl.innerHTML = SKELETON_HTML;
@@ -227,6 +250,14 @@ document.addEventListener('alpine:init', function () {
         // belong to whatever page they sit on.
         var method = (form.method || 'GET').toUpperCase();
         if (method !== 'POST') return;
+        // Bail if the form's own listener already prevented the
+        // submit — Alpine's `@submit.prevent` (bb-confirm dialogs on
+        // Backups, etc.) cancels the real submit and dispatches a
+        // confirmation step that re-invokes `requestSubmit()` on the
+        // user's OK. Our listener bubbles after Alpine's; firing
+        // _submitForm here would post the form even though Alpine
+        // wanted to wait for the confirm.
+        if (e.defaultPrevented) return;
 
         e.preventDefault();
         this._submitForm(form);
@@ -246,6 +277,13 @@ document.addEventListener('alpine:init', function () {
         var reenable = function () {
           buttons.forEach(function (b) { b.disabled = false; });
         };
+
+        // Block parallel tab GETs while this submit is in flight. The
+        // server's session flash is one-shot: an interleaved
+        // `_loadTab` would consume the flash that belongs to this
+        // POST's redirect target, so the user wouldn't see the toast.
+        self._submitInFlight = true;
+        var clearInFlight = function () { self._submitInFlight = false; };
 
         return fetch(action, {
           method: 'POST',
@@ -272,6 +310,12 @@ document.addEventListener('alpine:init', function () {
           // user was on, since that's also what the server rendered
           // into the fragment.
           var targetTab = dest.tab || self.currentTab;
+          // Same-tab refresh: skip the inline-script re-eval (so the
+          // agents-tab hash-scroll IIFE doesn't snap the viewport on
+          // every save) and preserve the modal's scroll position (so
+          // the user stays next to the form they just submitted).
+          var sameTab = targetTab === self.currentTab;
+          var swapOpts = { skipInlineScripts: sameTab, preserveScroll: sameTab };
           if (!res.ok) {
             // Server returned an error fragment (validation failure,
             // 500, etc.). Surface it inside the modal — body still
@@ -281,16 +325,20 @@ document.addEventListener('alpine:init', function () {
               self._showToast('error', 'Save failed (HTTP ' + res.status + ').');
             }
             return res.text().then(function (html) {
-              return self._swapBody(html, targetTab);
+              return self._swapBody(html, targetTab, swapOpts);
             });
           }
           return res.text().then(function (html) {
-            return self._swapBody(html, targetTab).then(function () {
-              // Keep the URL bar in sync only when the server explicitly
-              // named a different tab. Bare /settings redirects leave
-              // the URL alone — the visible tab didn't change.
-              if (dest.tab && window.location.pathname !== '/settings/' + dest.tab) {
-                self._pushUrl(dest.tab, false);
+            return self._swapBody(html, targetTab, swapOpts).then(function () {
+              // Keep the URL bar in sync with the server's redirect
+              // target. We push the FULL pathname (not just
+              // /settings/<tab>) so multi-segment routes like
+              // /settings/api-keys/{id}/created survive in the address
+              // bar and back/forward navigates correctly. Bare
+              // /settings redirects leave the URL alone — the visible
+              // tab didn't change.
+              if (dest.tab && window.location.pathname !== dest.path) {
+                self._pushPath(dest.path, dest.tab);
                 self._pushed += 1;
               }
             });
@@ -298,17 +346,27 @@ document.addEventListener('alpine:init', function () {
         }).catch(function (err) {
           reenable();
           self._showToast('error', 'Save failed: ' + (err && err.message ? err.message : 'network error'));
-        });
+        }).then(clearInFlight, clearInFlight);
       },
 
       // _swapBody replaces #bb-settings-body with a freshly-fetched
       // fragment, preserving the same alpine:init re-dispatch dance
       // _loadTab used to use inline. Extracted so the form-submit path
       // gets identical script-load semantics.
-      _swapBody: function (html, tab) {
+      //
+      // opts.skipInlineScripts skips re-running inline <script> blocks
+      //   from the fragment — used on same-tab post-submit refresh so
+      //   hash-scroll IIFEs don't snap the viewport on every save.
+      // opts.preserveScroll keeps the modal's scroll position intact
+      //   across the swap — also used on same-tab refresh so the user
+      //   stays next to the form they just submitted, instead of
+      //   getting yanked back to the top of the tab.
+      _swapBody: function (html, tab, opts) {
         var self = this;
         var bodyEl = this.$refs.body || document.getElementById('bb-settings-body');
         if (!bodyEl) return Promise.reject(new Error('no settings body slot'));
+        var skipInline = !!(opts && opts.skipInlineScripts);
+        var preserveScroll = !!(opts && opts.preserveScroll);
 
         // Parse the fragment OFF-DOM so Alpine's mutation observer
         // doesn't try to instantiate x-data="avatarEditor" before the
@@ -326,22 +384,27 @@ document.addEventListener('alpine:init', function () {
         // Strip both inline and external scripts from the fragment —
         // we'll handle execution ourselves. Inline scripts inside tab
         // bodies are tiny (a few lines of immediate-effect code like
-        // hash-scroll); we re-execute them after the body is mounted.
+        // hash-scroll); we re-execute them after the body is mounted
+        // unless the caller opted out (same-tab refresh).
         var inlineSources = [];
         frag.querySelectorAll('script').forEach(function (s) {
           if (!s.hasAttribute('src')) inlineSources.push(s.textContent);
           s.parentNode.removeChild(s);
         });
 
+        var scrollWrap = bodyEl.closest('.overflow-y-auto');
+        var savedScroll = preserveScroll && scrollWrap ? scrollWrap.scrollTop : 0;
+
         return self._loadScripts(srcs).then(function () {
           bodyEl.replaceChildren(frag);
           self.currentTab = tab;
-          inlineSources.forEach(function (src) {
-            try { (0, eval)(src); } catch (e) { console.warn('settings tab inline script error:', e); }
-          });
+          if (!skipInline) {
+            inlineSources.forEach(function (src) {
+              try { (0, eval)(src); } catch (e) { console.warn('settings tab inline script error:', e); }
+            });
+          }
           self._refreshIcons();
-          var scrollWrap = bodyEl.closest('.overflow-y-auto');
-          if (scrollWrap) scrollWrap.scrollTop = 0;
+          if (scrollWrap) scrollWrap.scrollTop = preserveScroll ? savedScroll : 0;
         });
       },
 
@@ -475,20 +538,37 @@ var BB_LOADED_SCRIPTS = {};
 // an in-modal body swap and a hard navigation.
 //
 // Returns an object:
-//   { settings: true,  tab: 'sync' }   — URL is /settings/<tab>
-//   { settings: true,  tab: null    }  — URL is bare /settings (ambiguous;
-//                                        keep the current tab + URL)
-//   { settings: false }                — URL is outside the shell; the
-//                                        caller should hard-navigate.
+//   { settings: true,  tab: 'api-keys', path: '/settings/api-keys/abc/created',
+//     hash: '' }                              — inside the shell, the first
+//                                              segment maps to a rail tab.
+//   { settings: true,  tab: null,       path: '/settings', hash: '' }
+//                                            — bare /settings (ambiguous;
+//                                              caller keeps the current tab).
+//   { settings: false }                      — outside the shell; caller
+//                                              hard-navigates.
+//
+// The api-keys tab also serves /settings/oauth-clients/* (a sibling URL
+// prefix that renders the same Access page), so we map it to the same
+// rail tab. Unknown first segments fall through to {settings:false} so
+// a future /settings/<new-prefix> URL we forgot to wire here doesn't
+// silently take over an existing tab.
+var SETTINGS_SUBPATH_TAB = {
+  'oauth-clients': 'api-keys',
+};
+
 function parseSettingsRedirect(rawUrl) {
   try {
     var u = new URL(rawUrl, window.location.href);
     if (u.origin !== window.location.origin) return { settings: false };
-    var m = u.pathname.match(/^\/settings(?:\/([\w-]+))?\/?$/);
+    var m = u.pathname.match(/^\/settings(?:\/([\w-]+)(?:\/.*)?)?\/?$/);
     if (!m) return { settings: false };
-    var tab = m[1] || null;
-    if (tab && !TAB_META[tab]) return { settings: false };
-    return { settings: true, tab: tab };
+    var first = m[1] || null;
+    if (!first) {
+      return { settings: true, tab: null, path: u.pathname, hash: u.hash || '' };
+    }
+    var tab = TAB_META[first] ? first : (SETTINGS_SUBPATH_TAB[first] || null);
+    if (!tab) return { settings: false };
+    return { settings: true, tab: tab, path: u.pathname, hash: u.hash || '' };
   } catch (_) {
     return { settings: false };
   }

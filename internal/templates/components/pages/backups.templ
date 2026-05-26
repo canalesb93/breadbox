@@ -223,15 +223,15 @@ templ backupsRow(b BackupRow, csrf string) {
 				<form
 					method="POST"
 					action={ templ.SafeURL(b.RestoreAction) }
-					x-data
-					@submit.prevent="$dispatch('bb-confirm', {
+					x-data="{ confirmed: false }"
+					@submit="if (!confirmed) { $event.preventDefault(); $dispatch('bb-confirm', {
                         title: 'Restore this backup?',
                         message: 'This will replace all current data with the contents of this backup. This action cannot be undone.',
                         variant: 'danger',
                         confirmLabel: 'Restore',
                         cancelLabel: 'Cancel',
-                        onConfirm: () => $el.submit()
-                      })"
+                        onConfirm: () => { confirmed = true; $el.requestSubmit(); }
+                      }) }"
 				>
 					<input type="hidden" name="_csrf" value={ csrf }/>
 					<button type="submit" class="btn btn-ghost btn-xs text-warning" title="Restore">
@@ -241,15 +241,15 @@ templ backupsRow(b BackupRow, csrf string) {
 				<form
 					method="POST"
 					action={ templ.SafeURL(b.DeleteAction) }
-					x-data
-					@submit.prevent="$dispatch('bb-confirm', {
+					x-data="{ confirmed: false }"
+					@submit="if (!confirmed) { $event.preventDefault(); $dispatch('bb-confirm', {
                         title: 'Delete this backup?',
                         message: 'The backup file will be permanently removed from disk.',
                         variant: 'danger',
                         confirmLabel: 'Delete',
                         cancelLabel: 'Cancel',
-                        onConfirm: () => $el.submit()
-                      })"
+                        onConfirm: () => { confirmed = true; $el.requestSubmit(); }
+                      }) }"
 				>
 					<input type="hidden" name="_csrf" value={ csrf }/>
 					<button type="submit" class="btn btn-ghost btn-xs text-error" title="Delete">
@@ -296,15 +296,15 @@ templ backupsRestoreSection(p BackupsProps) {
 					method="POST"
 					action="/-/backups/restore"
 					enctype="multipart/form-data"
-					x-data="{ filename: '' }"
-					@submit.prevent="$dispatch('bb-confirm', {
+					x-data="{ filename: '', confirmed: false }"
+					@submit="if (!confirmed) { $event.preventDefault(); $dispatch('bb-confirm', {
                 title: 'Restore database from upload?',
                 message: 'This will replace ALL current data with the contents of the uploaded file. This action cannot be undone.',
                 variant: 'danger',
                 confirmLabel: 'Restore',
                 cancelLabel: 'Cancel',
-                onConfirm: () => $el.submit()
-              })"
+                onConfirm: () => { confirmed = true; $el.requestSubmit(); }
+              }) }"
 				>
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					<input type="hidden" name="restore_source" value="upload"/>
