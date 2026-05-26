@@ -100,8 +100,21 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 						<i data-lucide="clipboard" class="w-3 h-3" x-show="!copiedRunId"></i>
 						<i data-lucide="check" class="w-3 h-3" x-show="copiedRunId" x-cloak></i>
 					</button>
+					<!-- Status badge for terminal states only. in_progress
+					     stays empty here — the "live" indicator in the meta
+					     line below already announces the running state, and
+					     loading states shouldn't sit inside a badge. -->
 					<span x-ref="status">
-						@components.AgentRunStatusBadge(p.Run.Status)
+						switch p.Run.Status {
+							case "success":
+								<span class="badge badge-soft badge-success badge-xs">success</span>
+							case "error":
+								<span class="badge badge-soft badge-error badge-xs">error</span>
+							case "skipped":
+								<span class="badge badge-ghost badge-xs">skipped</span>
+							case "timeout":
+								<span class="badge badge-soft badge-error badge-xs">timeout</span>
+						}
 					</span>
 				</div>
 				<div class="text-xs text-base-content/50 mt-0.5 flex items-center gap-1.5 flex-wrap">
