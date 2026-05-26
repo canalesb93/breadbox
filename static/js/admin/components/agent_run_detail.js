@@ -61,6 +61,30 @@ document.addEventListener('alpine:init', function () {
         if (this.pollSeconds > 0 && this.status === 'in_progress') {
           var self2 = this;
           this.pollTimer = setTimeout(function () { self2.poll(); }, this.pollSeconds * 1000);
+          // For long in_progress runs the operator usually wants to
+          // see what just happened — anchor the view at the bottom
+          // of the thread on first paint.
+          this.$nextTick(function () { self2.scrollThreadToBottom(false); });
+        }
+      },
+
+      // scrollThreadToBottom snaps the chat thread to its last event.
+      // We only run this for in_progress runs — a finished run should
+      // open at the top so the operator reads the conversation in
+      // order. `smooth` toggles the scroll-behaviour: false for the
+      // initial anchor (the operator hasn't moved yet), true after a
+      // live-poll patch (so they notice new content land).
+      scrollThreadToBottom: function (smooth) {
+        var thread = this.$refs.thread;
+        if (!thread) return;
+        // We may be scrolling either the inner thread element (when it
+        // has its own overflow) or the window (when the page itself
+        // grows). Try the inner element first.
+        try {
+          thread.scrollIntoView({ block: 'end', behavior: smooth ? 'smooth' : 'auto' });
+        } catch (e) {
+          // older browsers — fall back to a manual offset
+          window.scrollTo(0, document.body.scrollHeight);
         }
       },
 
@@ -111,6 +135,11 @@ document.addEventListener('alpine:init', function () {
       // round-trip individual events.
       applyLive: function (body) {
         if (!body) return;
+        var prevEventCount = -1;
+        if (this.$refs.eventCount) {
+          var m = (this.$refs.eventCount.textContent || '').match(/(\d+)/);
+          if (m) prevEventCount = parseInt(m[1], 10);
+        }
         if (typeof body.transcriptHTML === 'string') {
           var threadEl = this.$refs.thread;
           if (threadEl) {
@@ -118,6 +147,19 @@ document.addEventListener('alpine:init', function () {
             // Re-init lucide icons for any newly-injected <i data-lucide>.
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
               window.lucide.createIcons();
+            }
+            // If new events landed AND the run is still in_progress,
+            // smoothly scroll the thread so the operator sees them
+            // arrive. We skip this on a no-op patch (same event count)
+            // so reading from above the fold doesn't get yanked down.
+            if (
+              this.status === 'in_progress' &&
+              typeof body.eventCount === 'number' &&
+              prevEventCount >= 0 &&
+              body.eventCount > prevEventCount
+            ) {
+              var self = this;
+              this.$nextTick(function () { self.scrollThreadToBottom(true); });
             }
           }
         }

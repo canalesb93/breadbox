@@ -267,7 +267,11 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 					props.Error = "Transcript file not available: " + perr.Error()
 				}
 			} else {
-				props.Transcript = events
+				// Drop empty `result` envelopes (zero cost + zero tokens
+				// across the board) — the SDK occasionally emits one
+				// before the real usage payload and rendering both as
+				// "Final result" bubbles is confusing.
+				props.Transcript = pages.FilterTranscriptForDisplay(events)
 				props.Truncated = truncated
 			}
 		}

@@ -33,3 +33,35 @@ var AgentRunFriendlyErrorMappings = []agentRunErrorMapping{
 		message: "Interrupted by a server restart — safe to re-run.",
 	},
 }
+
+// FilterTranscriptForDisplay drops events that are present in the
+// NDJSON file but add no signal to the rendered transcript. Currently
+// just `result` events where every numeric field is zero: the SDK
+// sometimes emits an init-shaped result envelope before the actual
+// usage payload, and rendering both as "Final result" bubbles is
+// confusing (the operator sees a row of zeros followed by the real one).
+//
+// Callers: the initial server render and the /-/agents/runs/{id}/live
+// poll endpoint — both feed events through here so the live patch
+// matches what the operator already saw on first paint.
+func FilterTranscriptForDisplay(events []TranscriptEvent) []TranscriptEvent {
+	if len(events) == 0 {
+		return events
+	}
+	out := make([]TranscriptEvent, 0, len(events))
+	for _, ev := range events {
+		if ev.Type == "result" && resultEventIsEmpty(ev) {
+			continue
+		}
+		out = append(out, ev)
+	}
+	return out
+}
+
+func resultEventIsEmpty(ev TranscriptEvent) bool {
+	return ev.CostUSD == 0 &&
+		ev.TokensIn == 0 &&
+		ev.TokensOut == 0 &&
+		ev.CacheRead == 0 &&
+		ev.CacheWrite == 0
+}

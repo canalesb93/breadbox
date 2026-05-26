@@ -99,6 +99,9 @@ func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		var truncated bool
 		if path != "" {
 			events, truncated, _ = parseTranscriptFile(path, agentRunTranscriptMaxEvents)
+			// Match the initial server render — drop zero-valued result
+			// envelopes so the live patch doesn't reintroduce them.
+			events = pages.FilterTranscriptForDisplay(events)
 		}
 
 		props := pages.AgentRunDetailProps{
