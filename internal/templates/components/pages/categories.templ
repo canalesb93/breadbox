@@ -58,6 +58,12 @@ templ Categories(p CategoriesProps) {
 		} else {
 			@categoriesEmpty()
 		}
+		<!-- Loading skeleton for the categories list, available for any future
+		     client-side refresh / picker-preview swap. Mirrors the SSR layout
+		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+		<template id="bb-categories-skeleton-template">
+			@components.CategoriesSkeleton()
+		</template>
 	</div>
 	@deleteCategoryModal()
 	<script>

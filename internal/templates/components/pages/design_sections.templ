@@ -799,6 +799,11 @@ templ SectionLoading() {
 				@components.TagsSkeleton()
 			</div>
 		}
+		@designExample("Categories skeleton", "Placeholder mirroring /categories — filter input, helper line, and a divided card with parent rows plus expanded subcategory groups. Primitive is exposed here for future AJAX swaps and adjacent category-centric panels (e.g. category picker); /categories is full-SSR today.") {
+			<div class="max-w-3xl">
+				@components.CategoriesSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>
