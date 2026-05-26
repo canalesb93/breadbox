@@ -104,6 +104,14 @@ function tagForm() {
     error: '',
     presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c'],
 
+    init: function() {
+      // Auto-derive slug from the display name while the slug field is
+      // still empty / untouched. Edit mode renders a read-only <code>
+      // for the slug (no input element) so wireSlugInput is a no-op.
+      // See static/js/admin/slug.js.
+      if (window.bbWireSlugInput) window.bbWireSlugInput('display_name', 'slug');
+    },
+
     restorePageState: function() {
       if (window.bbProgress) window.bbProgress.finish();
       var main = document.querySelector('main');
