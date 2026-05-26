@@ -3141,6 +3141,24 @@
   max-width: min(48rem, 100%);
 }
 
+/* bb-chat-bubble overrides daisy's default chat-bubble background.
+ * Daisy 5 uses --color-neutral for chat-bubble bg, but the breadbox
+ * shadcn theme maps neutral to near-black (oklch ~20%), so the
+ * default bubble reads as a heavy dark block even in light mode.
+ * Pin to base-200 explicitly so both bubbles match the page's
+ * surface palette and stay quiet. Borders + tail still come from
+ * daisy itself. */
+.chat .chat-bubble.bb-chat-bubble {
+  background-color: var(--color-base-200);
+  color: var(--color-base-content);
+}
+.chat.chat-start .chat-bubble.bb-chat-bubble::before,
+.chat.chat-end .chat-bubble.bb-chat-bubble::before {
+  /* daisy paints the speech-tail with the same bg-color as the
+   * bubble — pin both so the tail doesn't fall back to neutral. */
+  background-color: var(--color-base-200);
+}
+
 /* Tool call + tool result rows. Compact, click-to-expand. Aligned with
  * the chat thread's gutter so the visual rhythm matches the bubbles
  * above and below them. */
