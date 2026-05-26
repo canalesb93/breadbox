@@ -1185,6 +1185,55 @@ templ SectionOverflowMenu() {
 	</div>
 }
 
+// ─── Sidebar user menu ─────────────────────────────────────────────────
+
+templ SectionSidebarUserMenu() {
+	<div class="flex flex-col gap-6">
+		@designExample("Linked household member (editor)", "Avatar comes from the linked household user. Editor role unlocks the `/design` shortcut. Click the trigger to open the popover — Settings, the external links, and the destructive Sign out (below an `<hr>`) live inside.") {
+			<div class="bb-card w-[15rem] p-2">
+				@components.SidebarUserMenu(components.SidebarUserMenuProps{
+					CurrentPage:          "transactions",
+					IsEditor:             true,
+					HasLinkedUser:        true,
+					SessionUserID:        "demo-user",
+					SessionAvatarVersion: "1",
+					AdminUsername:        "ricardo@example.com",
+					UserName:             "Ricardo",
+					RoleDisplay:          "Admin",
+					CSRFToken:            "demo-csrf",
+				})
+			</div>
+		}
+		@designExample("Unlinked admin (email only)", "Without a household link the trigger renders a generic user-circle icon and falls back to the auth username (typically the email).") {
+			<div class="bb-card w-[15rem] p-2">
+				@components.SidebarUserMenu(components.SidebarUserMenuProps{
+					CurrentPage:   "feed",
+					IsEditor:      true,
+					HasLinkedUser: false,
+					AdminUsername: "admin@example.com",
+					RoleDisplay:   "Editor",
+					CSRFToken:     "demo-csrf",
+				})
+			</div>
+		}
+		@designExample("Viewer role (no design shortcut)", "Non-editor roles don't see the `/design` shortcut — it's gated behind `IsEditor`. Same identity surface otherwise.") {
+			<div class="bb-card w-[15rem] p-2">
+				@components.SidebarUserMenu(components.SidebarUserMenuProps{
+					CurrentPage:          "reports",
+					IsEditor:             false,
+					HasLinkedUser:        true,
+					SessionUserID:        "demo-viewer",
+					SessionAvatarVersion: "1",
+					AdminUsername:        "guest@example.com",
+					UserName:             "Guest",
+					RoleDisplay:          "Viewer",
+					CSRFToken:            "demo-csrf",
+				})
+			</div>
+		}
+	</div>
+}
+
 // ─── Section header ────────────────────────────────────────────────────
 
 templ SectionSectionHeader() {

@@ -99,54 +99,26 @@ templ Nav(p NavProps) {
 				</a>
 			}
 		}
-		<div class="bb-sidebar-section">Resources</div>
 		if p.IsEditor {
+			<div class="bb-sidebar-section">Resources</div>
 			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
 				<i data-lucide="bot-message-square"></i>
 				<span>Agents</span>
 			</a>
 		}
-		@navExternalLink("https://docs.breadbox.sh", "book-open", "Documentation")
-		@navExternalLink("https://github.com/canalesb93/breadbox", "github", "GitHub")
 	</nav>
-	<!--
-		Footer entrypoint to the Settings modal. The clickable card opens
-		the modal at the Account tab; the trailing gear button opens it
-		at whatever tab the user last visited (or Account if none).
-		Settings has no top-level sidebar entry anymore — this card is
-		the only entry point.
-	-->
 	<div class="mt-auto pt-3 border-t border-base-300 px-2">
-		<div class="flex items-center gap-1">
-			<button
-				type="button"
-				class={ "flex-1 flex items-center gap-2.5 py-2.5 px-2.5 rounded-lg no-underline transition-colors hover:bg-base-200/70 text-left", navActive(p.CurrentPage, "account") }
-				title="Open settings"
-				aria-label="Open settings"
-				x-data
-				@click="$dispatch('open-settings', { tab: 'account' })"
-			>
-				if p.HasLinkedUser {
-					<img src={ navAvatar(p.SessionUserID, p.SessionAvatarVersion) } alt="" class="bb-sidebar-profile-avatar shrink-0"/>
-				} else {
-					<i data-lucide="user-circle" class="w-6 h-6 text-base-content/40 shrink-0"></i>
-				}
-				<div class="flex-1 min-w-0">
-					<div class="bb-sidebar-profile-name">{ navDisplayName(p.UserName, p.AdminUsername) }</div>
-					<div class="bb-sidebar-profile-role">{ p.RoleDisplay }</div>
-				</div>
-			</button>
-			<button
-				type="button"
-				class="shrink-0 p-2 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200/70 transition-colors"
-				title="Settings"
-				aria-label="Open settings"
-				x-data
-				@click="$dispatch('open-settings', { tab: 'account' })"
-			>
-				<i data-lucide="settings" class="w-4 h-4"></i>
-			</button>
-		</div>
+		@SidebarUserMenu(SidebarUserMenuProps{
+			CurrentPage:          p.CurrentPage,
+			IsEditor:             p.IsEditor,
+			HasLinkedUser:        p.HasLinkedUser,
+			SessionUserID:        p.SessionUserID,
+			SessionAvatarVersion: p.SessionAvatarVersion,
+			AdminUsername:        p.AdminUsername,
+			UserName:             p.UserName,
+			RoleDisplay:          p.RoleDisplay,
+			CSRFToken:            p.CSRFToken,
+		})
 	</div>
 }
 
