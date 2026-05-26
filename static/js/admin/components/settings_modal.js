@@ -210,11 +210,16 @@ document.addEventListener('alpine:init', function () {
             }, 50);
           });
         }
-        // Render a lightweight loading state — daisy skeleton blocks
-        // matching the section card shape.
-        bodyEl.innerHTML = SKELETON_HTML;
+        // Track the in-flight tab so the swap doesn't clobber a newer
+        // user click. We don't paint the skeleton synchronously —
+        // sub-120ms responses (warm cache, dev loop) shouldn't show
+        // any loading chrome at all.
         this.currentTab = tab;
-        this._refreshIcons();
+        var skeletonTimer = setTimeout(function () {
+          if (self.currentTab !== tab) return; // user moved on
+          bodyEl.innerHTML = bbBuildSettingsSkeleton(tab);
+          self._refreshIcons();
+        }, 120);
 
         return fetch('/settings/' + tab, {
           credentials: 'same-origin',
@@ -226,8 +231,10 @@ document.addEventListener('alpine:init', function () {
           self._showFlashFromHeaders(res.headers);
           return res.text();
         }).then(function (html) {
+          clearTimeout(skeletonTimer);
           return self._swapBody(html, tab);
         }).catch(function (err) {
+          clearTimeout(skeletonTimer);
           bodyEl.innerHTML = '<div class="alert alert-error rounded-xl text-sm">' +
             'Could not load settings: ' + (err && err.message ? err.message : 'unknown error') +
             '</div>';
@@ -573,12 +580,99 @@ function parseSettingsRedirect(rawUrl) {
   }
 }
 
-// Skeleton placeholder while a tab fragment is in flight — daisy
-// `skeleton` blocks shaped roughly like the section-card pattern.
-var SKELETON_HTML = [
-  '<div class="space-y-4">',
-  '  <div class="skeleton h-6 w-40 rounded-md"></div>',
-  '  <div class="skeleton h-32 w-full rounded-2xl"></div>',
-  '  <div class="skeleton h-24 w-full rounded-2xl"></div>',
-  '</div>',
-].join('');
+// bbBuildSettingsSkeleton returns a placeholder HTML shaped like the
+// requested tab — tab header on top, then SettingsSection-shaped
+// blocks each carrying SettingsRow-shaped placeholders. Sharing the
+// real settings CSS (bb-settings-section, bb-settings-row) means the
+// skeleton-to-content swap is positional rather than a layout shift,
+// so anything past the 120ms paint guard reads as the same surface
+// fading in instead of a separate loading screen.
+//
+// Section row counts are deliberately approximate — they don't need
+// to match the live tab exactly to feel cohesive; the goal is the
+// right number of bordered groups at the right height.
+function bbBuildSettingsSkeleton(tab) {
+  var spec = BB_TAB_SKELETONS[tab] || BB_TAB_SKELETONS._default;
+  var parts = ['<div>'];
+  parts.push(bbSkeletonHeader());
+  if (spec.alert) parts.push(bbSkeletonAlert());
+  if (spec.stats) parts.push(bbSkeletonStatsGrid(spec.stats));
+  parts.push('<div class="space-y-6">');
+  spec.sections.forEach(function (rows) {
+    parts.push(bbSkeletonSection(rows));
+  });
+  parts.push('</div></div>');
+  return parts.join('');
+}
+
+function bbSkeletonHeader() {
+  return [
+    '<div class="mb-6">',
+    '  <div class="skeleton h-6 w-32 rounded-md"></div>',
+    '  <div class="skeleton h-3.5 w-72 max-w-full rounded-md mt-2 opacity-70"></div>',
+    '</div>',
+  ].join('');
+}
+
+function bbSkeletonSection(rowCount) {
+  var n = Math.max(1, rowCount || 1);
+  var rows = '';
+  for (var i = 0; i < n; i++) rows += bbSkeletonRow();
+  return [
+    '<section class="bb-settings-section">',
+    '  <header class="bb-settings-section__header">',
+    '    <div class="skeleton w-4 h-4 rounded-md shrink-0"></div>',
+    '    <div class="flex-1 min-w-0">',
+    '      <div class="skeleton h-3.5 w-28 rounded-md"></div>',
+    '      <div class="skeleton h-3 w-56 max-w-full rounded-md mt-1.5 opacity-70"></div>',
+    '    </div>',
+    '  </header>',
+    '  <div class="bb-settings-section__body">',
+    rows,
+    '  </div>',
+    '</section>',
+  ].join('');
+}
+
+function bbSkeletonRow() {
+  return [
+    '<div class="bb-settings-row">',
+    '  <div class="bb-settings-row__main">',
+    '    <div class="skeleton h-3.5 w-32 rounded-md"></div>',
+    '    <div class="skeleton h-3 w-48 max-w-full rounded-md mt-2 opacity-70"></div>',
+    '  </div>',
+    '  <div class="bb-settings-row__control">',
+    '    <div class="skeleton h-8 w-28 rounded-lg"></div>',
+    '  </div>',
+    '</div>',
+  ].join('');
+}
+
+function bbSkeletonAlert() {
+  // Backups tops with a warning alert; mirror its rough shape so the
+  // page doesn't reflow when the real alert paints.
+  return '<div class="skeleton h-20 w-full rounded-xl mb-6"></div>';
+}
+
+function bbSkeletonStatsGrid(n) {
+  var tiles = '';
+  for (var i = 0; i < n; i++) {
+    tiles += '<div class="skeleton h-20 rounded-2xl"></div>';
+  }
+  return '<div class="grid grid-cols-2 sm:grid-cols-' + n + ' gap-3 mb-6">' + tiles + '</div>';
+}
+
+// Row counts per section, per tab. Approximate — see comment on
+// bbBuildSettingsSkeleton.
+var BB_TAB_SKELETONS = {
+  'general':   { sections: [2, 3] },
+  'system':    { sections: [3, 5] },
+  'help':      { sections: [2, 1] },
+  'account':   { sections: [4, 3, 1] },
+  'api-keys':  { sections: [3, 4] },
+  'backups':   { alert: true, stats: 4, sections: [3, 2, 2] },
+  'providers': { sections: [4, 4, 2] },
+  'agents':    { sections: [3, 5, 2] },
+  'mcp':       { sections: [2, 2, 2, 3, 3] },
+  '_default':  { sections: [3, 3] },
+};
