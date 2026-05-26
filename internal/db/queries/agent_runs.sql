@@ -208,3 +208,25 @@ SELECT
     ), 0)::float8 / 1000.0)::float8                      AS avg_duration_seconds
 FROM agent_runs
 WHERE started_at >= NOW() - INTERVAL '30 days';
+
+-- name: GetAgentLifetimeStats :one
+-- Per-agent lifetime rollup powering the StatTile row on the agent
+-- detail page (/agents/{slug}). Includes total runs, errors, total
+-- cost, and average duration. Skipped runs (quiet hours, concurrency
+-- lock) are excluded from the cost + duration aggregates since they
+-- represent no real workload; they ARE counted in run_count so the
+-- operator sees the full history. Returns a single row (with zeros)
+-- even when the agent has no runs yet.
+SELECT
+    COUNT(*)::int                                          AS run_count,
+    COUNT(*) FILTER (WHERE status = 'skipped')::int        AS skipped_count,
+    COUNT(*) FILTER (WHERE status = 'error')::int          AS error_count,
+    COALESCE(
+        SUM(total_cost_usd) FILTER (WHERE status != 'skipped'),
+        0
+    )::numeric(12,4)                                       AS total_cost_usd,
+    (COALESCE(AVG(duration_ms) FILTER (
+        WHERE status != 'skipped' AND duration_ms IS NOT NULL
+    ), 0)::float8 / 1000.0)::float8                        AS avg_duration_seconds
+FROM agent_runs
+WHERE agent_definition_id = $1;

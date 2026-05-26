@@ -740,6 +740,40 @@ func (s *Service) GetAgentRunsExtraStats30d(ctx context.Context) (*AgentRunsExtr
 	}, nil
 }
 
+// AgentLifetimeStats is the per-agent lifetime rollup powering the
+// agent detail page (/agents/{slug}). Skipped runs are excluded from
+// cost + duration aggregates but counted in RunCount; SkippedCount
+// surfaces the breakdown so the UI can label tiles honestly.
+type AgentLifetimeStats struct {
+	RunCount           int     `json:"run_count"`
+	SkippedCount       int     `json:"skipped_count"`
+	ErrorCount         int     `json:"error_count"`
+	TotalCostUSD       float64 `json:"total_cost_usd"`
+	AvgDurationSeconds float64 `json:"avg_duration_seconds"`
+}
+
+// GetAgentLifetimeStats returns the lifetime rollup for one agent.
+// Accepts a UUID or short_id / slug via resolveAgentDefinition; returns
+// a zero-valued struct (not nil) when the agent has no runs yet.
+func (s *Service) GetAgentLifetimeStats(ctx context.Context, agentSlugOrID string) (*AgentLifetimeStats, error) {
+	def, err := s.resolveAgentDefinition(ctx, agentSlugOrID)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.GetAgentLifetimeStats(ctx, def.ID)
+	if err != nil {
+		return nil, fmt.Errorf("get agent lifetime stats: %w", err)
+	}
+	cost, _ := pgconv.NumericToFloat(row.TotalCostUsd)
+	return &AgentLifetimeStats{
+		RunCount:           int(row.RunCount),
+		SkippedCount:       int(row.SkippedCount),
+		ErrorCount:         int(row.ErrorCount),
+		TotalCostUSD:       cost,
+		AvgDurationSeconds: row.AvgDurationSeconds,
+	}, nil
+}
+
 // AllAgentRunListParams carries the optional filters for ListAllAgentRuns.
 // Mirrors AgentRunListParams but adds AgentSlugOrID so the caller can
 // optionally narrow to one agent (e.g. the global view with an agent

@@ -186,6 +186,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr))
 		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
 		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
+		// /agents/{slug} is the per-agent landing page (lifetime stats +
+		// last 10 runs); /agents/{slug}/edit remains the form, reachable
+		// from the detail page's Edit button.
+		r.Get("/agents/{slug}", AgentDetailPageHandler(svc, sm, tr))
 		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
 		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr))
 		r.Get("/agents/runs", func(w http.ResponseWriter, r *http.Request) {

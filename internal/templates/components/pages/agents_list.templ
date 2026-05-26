@@ -158,7 +158,7 @@ templ agentsListRow(a AgentsListRowProps) {
 	>
 		<td class="align-middle">
 			<div class="flex items-center gap-2">
-				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s/edit", a.Slug)) } class="font-medium text-sm hover:underline">
+				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s", a.Slug)) } class="font-medium text-sm hover:underline">
 					{ a.Name }
 				</a>
 				if a.TriggerOnSyncComplete {
