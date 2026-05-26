@@ -936,13 +936,12 @@
                          item declares a shortcutId that matches a registered
                          spec. Hidden on touch ($store.device.isTouch) so
                          phones/tablets don't display a key hint that can
-                         never fire. Chord tokens carry a `then` flag so the
-                         separator interleaves correctly ('g' then 'd'). -->
+                         never fire. Chord tokens render as adjacent pills
+                         ('g' 'd') with a small gap — no inline "then" label. -->
                     <template x-if="shortcutTokensFor(item).length > 0">
                       <div class="bb-cmdk-item-shortcut" x-show="!$store.device.isTouch">
                         <template x-for="(tok, ti) in shortcutTokensFor(item)" :key="ti">
                           <span>
-                            <span x-show="tok.then" class="bb-shortcuts-then">then</span>
                             <!-- Blended combo pill: renders ⌘│K as one tight
                                  badge so modifier combos don't read as two
                                  disconnected keycaps (see .bb-kbd-combo). -->
@@ -2064,14 +2063,12 @@
       // blended pill (.bb-kbd-combo) instead of adjacent standalone kbds.
       function toTokens(keys) {
         if (!keys) return [];
-        // Chord: sequential keys joined by "then".
+        // Chord: sequential keys rendered as adjacent pills (gap-1 by CSS).
+        // No separator — the gap reads as "press in sequence".
         if (keys.chord && Array.isArray(keys.chord)) {
-          var out = [];
-          keys.chord.forEach(function(k, i) {
-            if (i > 0) out.push({ then: true });
-            out.push({ label: esc(bbKbdGlyph(k)) });
+          return keys.chord.map(function(k) {
+            return { label: esc(bbKbdGlyph(k)) };
           });
-          return out;
         }
         // Array form — treat as simultaneous chord rendered as a single
         // blended pill so the keys read as a unit rather than two
@@ -2097,7 +2094,6 @@
       function renderTokens(tokens) {
         if (!tokens || !tokens.length) return '';
         return tokens.map(function(t) {
-          if (t.then) return '<span class="bb-shortcuts-then">then</span>';
           if (t.combo) {
             return '<span class="bb-kbd-combo">' +
               t.combo.map(function(k) {

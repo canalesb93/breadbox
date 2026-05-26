@@ -1366,7 +1366,7 @@ templ SectionKbd() {
 				</div>
 			</div>
 		}
-		@designExample("Chord (KbdChord)", "Sequential keys separated by a faint \"then\" label — for vim-style g-prefixed navigation.") {
+		@designExample("Chord (KbdChord)", "Sequential keys rendered as adjacent pills (e.g. [G][D]) — the small gap reads as \"press in sequence\". Distinct from KbdCombo, which fuses keys into one pill for held-simultaneously modifier combos.") {
 			<div class="flex flex-col gap-3 text-sm max-w-sm">
 				<div class="flex items-center justify-between gap-3 py-1">
 					<span class="text-base-content/70">Go to dashboard</span>
@@ -1379,6 +1379,17 @@ templ SectionKbd() {
 				<div class="flex items-center justify-between gap-3 py-1">
 					<span class="text-base-content/70">Go to rules</span>
 					@components.KbdChord("g", "r")
+				</div>
+			</div>
+		}
+		@designExample("Command palette trigger (sidebar)", "Live shape: this is the `.bb-sidebar-search` div that lives at the top of the desktop sidebar — clicking it dispatches `open-cmdk`. Pattern is search-icon + label + trailing KbdCombo hint. The kbd uses the same currentColor-tint surface override as buttons, so it stays legible against the muted base-200/50 trigger surface in both themes.") {
+			<div class="max-w-xs">
+				<div class="bb-sidebar-search" role="button" tabindex="0">
+					@components.LucideIcon("search", "")
+					<span>Search...</span>
+					<span class="bb-sidebar-search-hint">
+						@components.KbdCombo("cmd", "k")
+					</span>
 				</div>
 			</div>
 		}
