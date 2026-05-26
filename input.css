@@ -2390,20 +2390,23 @@
     color: oklch(from var(--color-base-content) l c h / 0.7);
   }
 
-  /* When a kbd lives inside a daisy tooltip OR a solid-tone .btn, the
-     surrounding surface and the muted base-200/foreground/0.7 combo
-     wash out (the surface is already dark/colored and the muted ground
-     fights the surrounding text). Use a translucent tint of the current
-     foreground so the kbd pill reads as a subtle inset of whatever
-     parent text colour it sits in. `currentColor` adapts automatically
-     across solid-tone buttons, tooltips, and either theme. */
+  /* When a kbd lives inside ANY .btn or daisy tooltip, the default
+     base-200 ground can collide with the surface. `.btn-soft` (and
+     daisy 5's per-tone soft variants) sit in the base-200 luminance
+     range — a base-200 kbd on a base-200-tinted button is invisible.
+     ghost/outline buttons sit on the page base-100 with a base-200
+     kbd that reads as a faint smudge. Solid-tone surfaces clash too.
+
+     Replace the default ground with `color-mix(currentColor 22%)`
+     so the kbd always tints toward whatever foreground colour
+     surrounds it. `currentColor` adapts across every button variant
+     (primary / secondary / accent / neutral / ghost / outline / soft /
+     link / tone-specific) + tooltips + both themes from a single rule,
+     with no per-theme or per-variant override. */
+  .btn .bb-kbd,
   .tooltip .bb-kbd,
-  [role="tooltip"] .bb-kbd,
-  .btn-primary .bb-kbd,
-  .btn-secondary .bb-kbd,
-  .btn-accent .bb-kbd,
-  .btn-neutral .bb-kbd {
-    background: color-mix(in oklab, currentColor 18%, transparent);
+  [role="tooltip"] .bb-kbd {
+    background: color-mix(in oklab, currentColor 22%, transparent);
     color: inherit;
   }
 
@@ -2426,23 +2429,18 @@
     border-left: 1px solid oklch(from var(--color-base-content) l c h / 0.10);
   }
 
-  /* Same currentColor-tint treatment as .bb-kbd above. */
+  /* Same currentColor-tint treatment as .bb-kbd above — widened to any
+     .btn so .btn-soft / ghost / outline get the inversion too. */
+  .btn .bb-kbd-combo,
   .tooltip .bb-kbd-combo,
-  [role="tooltip"] .bb-kbd-combo,
-  .btn-primary .bb-kbd-combo,
-  .btn-secondary .bb-kbd-combo,
-  .btn-accent .bb-kbd-combo,
-  .btn-neutral .bb-kbd-combo {
-    background: color-mix(in oklab, currentColor 18%, transparent);
+  [role="tooltip"] .bb-kbd-combo {
+    background: color-mix(in oklab, currentColor 22%, transparent);
     color: inherit;
   }
+  .btn .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
   .tooltip .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
-  [role="tooltip"] .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
-  .btn-primary .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
-  .btn-secondary .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
-  .btn-accent .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key,
-  .btn-neutral .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key {
-    border-left-color: color-mix(in oklab, currentColor 30%, transparent);
+  [role="tooltip"] .bb-kbd-combo .bb-kbd-combo__key + .bb-kbd-combo__key {
+    border-left-color: color-mix(in oklab, currentColor 35%, transparent);
   }
 
   /* ── Triage mode: compact review rows ── */

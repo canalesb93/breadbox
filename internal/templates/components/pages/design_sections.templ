@@ -1382,11 +1382,15 @@ templ SectionKbd() {
 				</div>
 			</div>
 		}
-		@designExample("Inside a button (trailing hint)", "kbd inline at the trailing edge of a button. Surface-aware: on a solid-tone button (primary/secondary/accent/neutral) the kbd inverts to a translucent base-100 tint with white-ish glyph; on ghost / soft / outline it keeps the muted base-200 ground.") {
+		@designExample("Inside a button (trailing hint)", "kbd inline at the trailing edge of a button. Surface-aware: every .btn variant (primary / secondary / accent / neutral / ghost / outline / soft / soft-tone) gets a `currentColor 22%`-tinted pill that always reads as an inset of whatever foreground colour surrounds it. One rule, both themes.") {
 			<div class="flex flex-wrap items-center gap-3">
 				<button type="button" class="btn btn-primary btn-sm gap-2">
 					Submit
 					@components.KbdCombo("cmd", "enter")
+				</button>
+				<button type="button" class="btn btn-secondary btn-sm gap-2">
+					Approve
+					@components.KbdCombo("cmd", "a")
 				</button>
 				<button type="button" class="btn btn-neutral btn-sm gap-2">
 					Save draft
@@ -1403,6 +1407,10 @@ templ SectionKbd() {
 				<button type="button" class="btn btn-soft btn-sm gap-2">
 					Delete
 					@components.KbdCombo("cmd", "shift", "delete")
+				</button>
+				<button type="button" class="btn btn-soft btn-error btn-sm gap-2">
+					Discard
+					@components.Kbd("d")
 				</button>
 			</div>
 		}
