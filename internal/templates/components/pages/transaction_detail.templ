@@ -496,13 +496,23 @@ templ txdActorInline(e service.ActivityEntry) {
 }
 
 // txdActor adapts a system-event ActivityEntry into the shared
-// TimelineActor shape used by `TimelineActorInline`.
+// TimelineActor shape used by `TimelineActorInline`. UserID +
+// Version are passed straight through — UserAvatar builds the
+// URL on the render side via components.AvatarURLWith.
 func txdActor(e service.ActivityEntry) components.TimelineActor {
 	a := components.TimelineActor{Name: e.ActorName}
-	if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
-		a.AvatarURL = avatarURLStr(*e.ActorID, e.ActorAvatarVersion)
-	} else if e.ActorType == "agent" {
+	switch e.ActorType {
+	case "user":
+		if e.ActorID != nil {
+			a.UserID = *e.ActorID
+		}
+		a.Version = e.ActorAvatarVersion
+	case "agent":
 		a.IsAgent = true
+		if e.ActorID != nil {
+			a.UserID = *e.ActorID
+			a.Version = e.ActorAvatarVersion
+		}
 	}
 	return a
 }
@@ -626,14 +636,23 @@ templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
 
 // txdCommentActor adapts a comment ActivityEntry into the shared
 // TimelineActor shape so `TimelineActorInline` can render its 16px
-// avatar. Users get an image URL; agents get the bot fallback; system
-// actors render as just the bold name.
+// avatar. Users get an image URL; agents get an agent-styled
+// identicon when they carry an ID and the bot fallback otherwise;
+// system actors render as just the bold name.
 func txdCommentActor(e service.ActivityEntry) components.TimelineActor {
 	a := components.TimelineActor{Name: e.ActorName}
-	if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
-		a.AvatarURL = avatarURLStr(*e.ActorID, e.ActorAvatarVersion)
-	} else if e.ActorType == "agent" {
+	switch e.ActorType {
+	case "user":
+		if e.ActorID != nil {
+			a.UserID = *e.ActorID
+		}
+		a.Version = e.ActorAvatarVersion
+	case "agent":
 		a.IsAgent = true
+		if e.ActorID != nil {
+			a.UserID = *e.ActorID
+			a.Version = e.ActorAvatarVersion
+		}
 	}
 	return a
 }
@@ -990,19 +1009,6 @@ func relativeTimeStrAt(s string, now time.Time) string {
 	return timefmt.RelativeRFC3339At(s, now)
 }
 
-// avatarURLStr mirrors the admin "avatarURL" funcMap for the (user_id,
-// version) overload the activity timeline uses — second arg is a
-// stringified unix timestamp for cache-busting after avatar uploads.
-func avatarURLStr(id, version string) string {
-	if id == "" {
-		return "/avatars/unknown"
-	}
-	url := "/avatars/" + id
-	if version != "" {
-		url += "?v=" + version
-	}
-	return url
-}
 
 // txdCategoryInitial returns the current category UUID for the picker's
 // data-initial attribute, or an empty string when the transaction has no

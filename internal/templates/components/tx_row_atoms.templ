@@ -56,7 +56,7 @@ templ TxAvatar(p TxAvatarProps) {
 		}
 		if p.OwnerName != "" {
 			if p.OwnerID != nil {
-				<img src={ avatarURL(deref(p.OwnerID)) } alt="" class="bb-tx-owner-badge" title={ p.OwnerName }/>
+				<img src={ AvatarURL(deref(p.OwnerID), "") } alt="" class="bb-tx-owner-badge" title={ p.OwnerName } loading="lazy" decoding="async"/>
 			} else {
 				<span class="bb-tx-owner-badge bb-tx-owner-badge--letter" title={ p.OwnerName }>
 					<span>{ firstChar(p.OwnerName) }</span>

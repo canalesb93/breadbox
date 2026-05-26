@@ -265,6 +265,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionAmounts() },
 		},
 		{
+			Slug:        "user-avatar",
+			Title:       "User avatar",
+			Description: "components.UserAvatar — the shared identity badge used by the sidebar profile, transaction owner badge, activity-timeline rail tile + inline actor, and settings preview. Backed by the DiceBear /avatars/{id} endpoint with components.AvatarURL as the single source of truth for URL construction.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionUserAvatar() },
+		},
+		{
 			Slug:        "transaction-rows",
 			Title:       "Transaction rows",
 			Description: "TxRow / TxRowCompact / TxRowFeed and their building blocks (bb-tx-avatar, bb-tx-owner-badge, bb-tx-amount). The same avatar + amount shapes carry across every surface that lists transactions.",

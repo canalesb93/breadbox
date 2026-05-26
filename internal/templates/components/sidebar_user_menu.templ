@@ -45,7 +45,14 @@ templ SidebarUserMenu(p SidebarUserMenuProps) {
 		style={ "anchor-name:" + anchorName }
 	>
 		if p.HasLinkedUser {
-			<img src={ navAvatar(p.SessionUserID, p.SessionAvatarVersion) } alt="" class="bb-sidebar-profile-avatar shrink-0"/>
+			@UserAvatar(UserAvatarProps{
+				ID:         p.SessionUserID,
+				Name:       navDisplayName(p.UserName, p.AdminUsername),
+				Version:    p.SessionAvatarVersion,
+				Size:       UserAvatarLg,
+				Class:      "bb-sidebar-profile-avatar",
+				Decorative: true,
+			})
 		} else {
 			<i data-lucide="user-circle" class="w-6 h-6 text-base-content/40 shrink-0"></i>
 		}

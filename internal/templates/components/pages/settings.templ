@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"breadbox/internal/avatar"
 	"breadbox/internal/templates/components"
 )
 
@@ -252,28 +253,72 @@ templ settingsSystemCard(p SettingsProps) {
 	</div>
 }
 
-// settingsAvatarStyleCard renders the DiceBear style picker on the
-// General tab. The select submits via POST /settings/avatar-style;
-// the live preview is driven by Alpine and points at
-// api.dicebear.com so the user can compare styles without
-// reloading the server-rendered identicons.
+// settingsAvatarStyleCard renders the DiceBear style pickers on the
+// General tab — one for human users, one for AI agents. Each form
+// posts to /settings/avatar-style with its `actor` field set; the
+// live preview is driven by Alpine and routes through the
+// /avatars/preview proxy so both pickers warm the same in-memory
+// cache /avatars/{id} reads from.
 templ settingsAvatarStyleCard(p SettingsProps) {
-	<div class="bb-card p-5" x-data="{ style: $el.dataset.style }" data-style={ p.AvatarStyle }>
+	<div class="flex flex-col gap-5">
+		@settingsAvatarStylePicker(settingsAvatarPickerProps{
+			Actor:        "user",
+			Title:        "User Avatars",
+			Description:  "DiceBear style for human-member identicons — uploaded avatars are unaffected.",
+			Icon:         "user-circle",
+			CurrentStyle: p.AvatarUserStyle,
+			Seeds:        userPreviewSeeds(),
+			CSRFToken:    p.CSRFToken,
+			Styles:       p.AvatarStyles,
+		})
+		@settingsAvatarStylePicker(settingsAvatarPickerProps{
+			Actor:        "agent",
+			Title:        "Agent Avatars",
+			Description:  "DiceBear style for AI agents — distinct from the user style so agent-authored activity reads as obviously non-human.",
+			Icon:         "bot",
+			CurrentStyle: p.AvatarAgentStyle,
+			Seeds:        agentPreviewSeeds(),
+			CSRFToken:    p.CSRFToken,
+			Styles:       p.AvatarStyles,
+		})
+	</div>
+}
+
+// settingsAvatarPickerProps captures one picker card's render inputs.
+// Used by settingsAvatarStylePicker so the two cards (user + agent)
+// share markup but differ in actor key, copy, and preview seeds.
+type settingsAvatarPickerProps struct {
+	Actor        string // "user" or "agent" — flows into the form's hidden field
+	Title        string
+	Description  string
+	Icon         string // lucide icon name for the card header tile
+	CurrentStyle string
+	Seeds        []string // four sample seeds for the live preview row
+	CSRFToken    string
+	Styles       []avatar.StyleOption
+}
+
+// settingsAvatarStylePicker renders one picker card. Self-contained
+// x-data scope: the select drives the four preview tiles through the
+// /avatars/preview proxy on every change, no submit needed.
+templ settingsAvatarStylePicker(p settingsAvatarPickerProps) {
+	<div class="bb-card p-5" x-data="{ style: $el.dataset.style }" data-style={ p.CurrentStyle }>
 		<div class="bb-icon-header">
 			<div class="bb-icon-header__tile bg-base-200/60">
-				<i data-lucide="user-circle" class="w-4 h-4 text-base-content opacity-60"></i>
+				<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content opacity-60"></i>
 			</div>
 			<div class="bb-icon-header__text">
-				<h2 class="text-sm font-semibold">User Avatars</h2>
-				<p class="text-xs text-base-content/45">DiceBear style for auto-generated identicons — uploaded avatars are unaffected</p>
+				<h2 class="text-sm font-semibold">{ p.Title }</h2>
+				<p class="text-xs text-base-content/45">{ p.Description }</p>
 			</div>
 		</div>
 		<form method="POST" action="/settings/avatar-style">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="avatar_style">Style</label>
-			<select id="avatar_style" name="avatar_style" class="select select-sm w-full max-w-sm bg-base-200" x-model="style">
-				for _, opt := range p.AvatarStyles {
-					if opt.ID == p.AvatarStyle {
+			<input type="hidden" name="actor" value={ p.Actor }/>
+			<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for={ "avatar_style_" + p.Actor }>Style</label>
+			<select id={ "avatar_style_" + p.Actor } name="avatar_style" class="select select-sm w-full max-w-sm bg-base-200" x-model="style">
+				for _, opt := range p.Styles {
+					if opt.ID == p.CurrentStyle {
 						<option value={ opt.ID } selected>{ opt.Label }</option>
 					} else {
 						<option value={ opt.ID }>{ opt.Label }</option>
@@ -283,7 +328,7 @@ templ settingsAvatarStyleCard(p SettingsProps) {
 			<div class="mt-4 flex items-center gap-3">
 				<span class="text-xs text-base-content/40">Preview</span>
 				<div class="flex items-center gap-2">
-					for _, seed := range []string{"alice", "bob", "casey", "drew"} {
+					for _, seed := range p.Seeds {
 						<img
 							class="w-10 h-10 rounded-full bg-base-200"
 							alt={ "Preview " + seed }

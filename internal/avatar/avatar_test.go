@@ -22,7 +22,7 @@ func withDiceBearMock(t *testing.T, handler http.HandlerFunc) func() {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	prevBase, _ := baseURL.Load().(string)
-	prevStyle, _ := styleAtomic.Load().(string)
+	prevStyle, _ := userStyleAtomic.Load().(string)
 	SetAPIBaseURL(srv.URL)
 	ResetCache()
 	return func() {
@@ -217,7 +217,7 @@ func TestGenerateSVGStyled_OverridesGlobal(t *testing.T) {
 }
 
 func TestSetStyle_DefaultOnEmpty(t *testing.T) {
-	prev, _ := styleAtomic.Load().(string)
+	prev, _ := userStyleAtomic.Load().(string)
 	defer SetStyle(prev)
 
 	SetStyle("")
