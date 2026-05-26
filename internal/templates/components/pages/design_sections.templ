@@ -2203,3 +2203,169 @@ templ SectionAgentRunRows() {
 		}
 	</div>
 }
+
+// ─── Command palette ───────────────────────────────────────────────────
+
+// SectionCommandPalette renders the live cmdk shell (bb-cmdk-*) inline so
+// every row variant — generic command + tx — can be compared against the
+// same gutter. The dialog wrapper here drops the `.bb-cmdk-dialog` class
+// so it sits in the page flow instead of position:fixed; the inner pieces
+// keep their production classes verbatim.
+templ SectionCommandPalette() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">About this section</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li><code>.bb-cmdk-*</code> is today's shell (opened by <code>⌘K</code> from <code>base.html</code>). It's queued for replacement by a <code>&lt;dialog class="modal"&gt;</code> shell per the daisy anti-pattern list — the sandbox tracks the current row markup so the migration has a target.</li>
+				<li><code>.bb-cmdk-item.bb-cmdk-item--tx</code> wraps the same <code>TxRowCompact</code> the dashboard recents render. An unlayered override in <code>input.css</code> re-pads the inner anchor to <code>px-4</code> so the avatar and amount columns align with the generic <code>.bb-cmdk-generic px-4</code> gutter.</li>
+			</ul>
+		</div>
+		@designExample("Full dialog (inline)", "Same input wrap, group label, item types, and footer the live cmdk uses — rendered statically so every variant is visible. No fixed position, list max-height is unconstrained.") {
+			<div class="border border-base-300 rounded-xl bg-base-100 overflow-hidden max-w-[560px] mx-auto shadow-sm">
+				<div class="bb-cmdk-input-wrap">
+					<i data-lucide="search"></i>
+					<input class="bb-cmdk-input" placeholder="Type a command or search..." readonly/>
+					<div class="bb-kbd" style="font-size:0.6rem">esc</div>
+				</div>
+				<div class="bb-cmdk-list" style="max-height:none">
+					<div class="bb-cmdk-group">
+						<div class="bb-cmdk-group-label">Overview</div>
+						<div class="bb-cmdk-item">
+							<div class="bb-cmdk-generic">
+								<div class="bb-cmdk-item-icon"><i data-lucide="rss"></i></div>
+								<div class="bb-cmdk-item-label">
+									<div class="bb-cmdk-item-title">Feed</div>
+									<div class="bb-cmdk-item-desc">Activity feed across the household</div>
+								</div>
+								<div class="bb-cmdk-item-shortcut">
+									@components.KbdChord("g", "o")
+								</div>
+							</div>
+						</div>
+						<div class="bb-cmdk-item" data-active="true">
+							<div class="bb-cmdk-generic">
+								<div class="bb-cmdk-item-icon"><i data-lucide="receipt"></i></div>
+								<div class="bb-cmdk-item-label">
+									<div class="bb-cmdk-item-title">Transactions</div>
+									<div class="bb-cmdk-item-desc">View all transactions</div>
+								</div>
+								<div class="bb-cmdk-item-shortcut">
+									@components.KbdChord("g", "t")
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="bb-cmdk-group">
+						<div class="bb-cmdk-group-label">Transactions</div>
+						<div class="bb-cmdk-item bb-cmdk-item--tx">
+							@components.TxRowCompact(designTxRowsCategorized())
+						</div>
+						<div class="bb-cmdk-item bb-cmdk-item--tx">
+							@components.TxRowCompact(designTxRowsPending())
+						</div>
+					</div>
+				</div>
+				<div class="bb-cmdk-footer">
+					<div class="flex items-center gap-3">
+						<span class="inline-flex items-center gap-1">
+							@components.Kbd("up")
+							@components.Kbd("down")
+							<span>navigate</span>
+						</span>
+						<span class="inline-flex items-center gap-1">
+							@components.Kbd("enter")
+							<span>open</span>
+						</span>
+						<span class="inline-flex items-center gap-1">
+							@components.Kbd("esc")
+							<span>close</span>
+						</span>
+					</div>
+				</div>
+			</div>
+		}
+		@designExample("Generic item — default vs active", "Default sits on the .bb-cmdk-item neutral surface; [data-active='true'] applies the primary tint and recolors the .bb-cmdk-item-icon tile. Hover paints the same tint.") {
+			<div class="border border-base-300 rounded-xl bg-base-100 max-w-[560px] mx-auto py-2">
+				<div class="bb-cmdk-item">
+					<div class="bb-cmdk-generic">
+						<div class="bb-cmdk-item-icon"><i data-lucide="rss"></i></div>
+						<div class="bb-cmdk-item-label">
+							<div class="bb-cmdk-item-title">Feed</div>
+							<div class="bb-cmdk-item-desc">Default — neutral icon tile</div>
+						</div>
+						<div class="bb-cmdk-item-shortcut">
+							@components.KbdChord("g", "o")
+						</div>
+					</div>
+				</div>
+				<div class="bb-cmdk-item" data-active="true">
+					<div class="bb-cmdk-generic">
+						<div class="bb-cmdk-item-icon"><i data-lucide="receipt"></i></div>
+						<div class="bb-cmdk-item-label">
+							<div class="bb-cmdk-item-title">Transactions</div>
+							<div class="bb-cmdk-item-desc">Active — primary tint on tile + bg-primary/8 on row</div>
+						</div>
+						<div class="bb-cmdk-item-shortcut">
+							@components.KbdChord("g", "t")
+						</div>
+					</div>
+				</div>
+				<div class="bb-cmdk-item">
+					<div class="bb-cmdk-generic">
+						<div class="bb-cmdk-item-icon"><i data-lucide="plus-circle"></i></div>
+						<div class="bb-cmdk-item-label">
+							<div class="bb-cmdk-item-title">Connect a Bank</div>
+						</div>
+						<div class="bb-cmdk-item-shortcut">
+							@components.KbdChord("n", "c")
+						</div>
+					</div>
+				</div>
+			</div>
+		}
+		@designExample("Tx item — wraps TxRowCompact", "The .bb-cmdk-item--tx wrapper drops its padding so the inner anchor (re-padded to px-4 by an unlayered override) lines up with every generic row's gutter. Same TxRowCompact paints the dashboard recents — no fork in markup.") {
+			<div class="border border-base-300 rounded-xl bg-base-100 max-w-[560px] mx-auto py-2">
+				<div class="bb-cmdk-item bb-cmdk-item--tx">
+					@components.TxRowCompact(designTxRowsCategorized())
+				</div>
+				<div class="bb-cmdk-item bb-cmdk-item--tx" data-active="true">
+					@components.TxRowCompact(designTxRowsPending())
+				</div>
+				<div class="bb-cmdk-item bb-cmdk-item--tx">
+					@components.TxRowCompact(designTxRowsIncome())
+				</div>
+				<div class="bb-cmdk-item bb-cmdk-item--tx">
+					@components.TxRowCompact(designTxRowsUncategorized())
+				</div>
+			</div>
+		}
+		@designExample("Loading + empty states", "Loading swaps in three skeleton rows during the 300ms debounce + /-/search/transactions roundtrip. Empty renders when filteredItems is empty and the user has typed something.") {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				<div class="border border-base-300 rounded-xl bg-base-100 py-2">
+					<div class="bb-cmdk-group">
+						<div class="bb-cmdk-group-label">Transactions</div>
+						for i := 0; i < 3; i++ {
+							<div class="bb-cmdk-item" style="pointer-events:none">
+								<div class="bb-cmdk-generic">
+									<div class="bb-cmdk-item-icon">
+										<div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div>
+									</div>
+									<div class="bb-cmdk-item-label">
+										<div class="h-3.5 bg-base-300/40 rounded w-36 animate-pulse"></div>
+										<div class="h-2.5 bg-base-300/30 rounded w-48 mt-1.5 animate-pulse"></div>
+									</div>
+								</div>
+							</div>
+						}
+					</div>
+				</div>
+				<div class="border border-base-300 rounded-xl bg-base-100 overflow-hidden">
+					<div class="bb-cmdk-empty">
+						<i data-lucide="search-x"></i>
+						<span class="text-sm">No results found</span>
+					</div>
+				</div>
+			</div>
+		}
+	</div>
+}

@@ -2531,6 +2531,26 @@
   display: inline-flex;
 }
 
+/* ── Command palette: tx-row horizontal alignment ──
+ * TxRowCompact ships with `px-2 -mx-1` so its hover paint extends slightly
+ * beyond the parent edge on dashboard/recents (where the parent has no
+ * horizontal padding of its own). Inside the cmdk, the wrapper has `mx-2`
+ * and generic items render at `px-4` (.bb-cmdk-generic), so without an
+ * override the tx row's content starts ~12px from the dialog edge while
+ * every generic item sits at 24px — the avatar/amount columns visibly
+ * drift left of every other row. Pull the inner anchor flush with the
+ * wrapper edge and re-pad to `px-4` so all rows share one gutter.
+ *
+ * Has to live unlayered because `px-2` and `-mx-1` are Tailwind utility
+ * classes — @layer components rules lose to utilities regardless of
+ * specificity. */
+.bb-cmdk-item--tx .bb-tx-row-compact {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
 /* ── Activity timeline — prominent overrides ──
  * Has to live unlayered because every rule below targets Tailwind utility
  * classes (w-6, h-6, leading-6, ring-4, py-2.5, …). Inside @layer components
