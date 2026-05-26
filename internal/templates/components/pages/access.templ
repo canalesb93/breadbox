@@ -36,16 +36,7 @@ templ accessOAuthClientsSection(p AccessProps) {
 			Right:   accessCreateClientButton(),
 		}) {
 			if len(p.ActiveClients) == 0 && len(p.RevokedClients) == 0 {
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					@components.EmptyState(components.EmptyStateProps{
-						Icon:     "fingerprint",
-						Title:    "No OAuth clients yet",
-						Body:     "Create an OAuth client to connect external AI services to your Breadbox MCP server.",
-						CTAHref:  templ.SafeURL("/settings/oauth-clients/new"),
-						CTAIcon:  "plus",
-						CTALabel: "Create your first client",
-					})
-				}
+				@accessEmptyRow("Create one to connect external AI services to your MCP server.")
 			} else {
 				for _, c := range p.ActiveClients {
 					@accessActiveClientRow(c, p.IsAdmin, p.CSRFToken)
@@ -69,6 +60,19 @@ templ accessOAuthClientsSection(p AccessProps) {
 				</div>
 			</div>
 		}
+	</div>
+}
+
+// accessEmptyRow renders a quiet caption inside a section body when
+// no rows exist yet. The header already carries the section name, an
+// icon, and the Create button — repeating any of that as a separate
+// "empty state card" inside would just stack a card on a card. So
+// we keep it to one short hint line.
+templ accessEmptyRow(hint string) {
+	<div class="bb-settings-row">
+		<div class="bb-settings-row__main">
+			<p class="text-sm text-base-content/50">{ hint }</p>
+		</div>
 	</div>
 }
 
@@ -168,16 +172,7 @@ templ accessAPIKeysSection(p AccessProps) {
 			Right:   accessCreateKeyButton(),
 		}) {
 			if len(p.ActiveKeys) == 0 && len(p.RevokedKeys) == 0 {
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					@components.EmptyState(components.EmptyStateProps{
-						Icon:     "key",
-						Title:    "No API keys yet",
-						Body:     "Create an API key to connect MCP agents or integrate with external tools.",
-						CTAHref:  templ.SafeURL("/settings/api-keys/new"),
-						CTAIcon:  "plus",
-						CTALabel: "Create your first key",
-					})
-				}
+				@accessEmptyRow("Create one to connect MCP agents or integrate with external tools.")
 			} else {
 				for _, k := range p.ActiveKeys {
 					@accessActiveKeyRow(k, p.IsAdmin, p.CSRFToken)

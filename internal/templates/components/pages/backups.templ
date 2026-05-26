@@ -41,33 +41,31 @@ templ Backups(p BackupsProps) {
 					</div>
 				}
 				@backupsStats(p)
-				@backupsScheduleSection(p)
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+					@backupsScheduleSection(p)
+					@backupsRestoreSection(p)
+				</div>
 				@backupsFilesSection(p)
-				@backupsRestoreSection(p)
 			}
 		</div>
 	</div>
 }
 
+// backupsEncryptionAlert is intentionally subtle when things are fine
+// (info-tone reminder that the key matters) and escalates only when
+// the key is actually missing.
 templ backupsEncryptionAlert(p BackupsProps) {
-	<div class="alert alert-warning rounded-xl">
-		@components.LucideIcon("shield-alert", "w-5 h-5 flex-shrink-0")
-		<div>
-			<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
-			<p class="text-xs mt-1 leading-relaxed">
-				Database backups contain encrypted bank credentials that are useless without the matching
-				<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code>.
-				If you lose the key, all bank connections must be re-linked from scratch. Store it in a
-				password manager or secure vault — never commit it to version control.
-			</p>
-			if !p.HasEncryptionKey {
-				<p class="text-xs mt-2 text-error font-semibold">
-					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-0.5")
-					No encryption key is currently set. Bank credentials cannot be stored or restored.
-				</p>
-			}
+	if !p.HasEncryptionKey {
+		<div role="alert" class="alert alert-error alert-soft rounded-xl text-sm">
+			@components.LucideIcon("alert-triangle", "w-4 h-4 shrink-0")
+			<span>No <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> set. Bank credentials can't be stored or restored.</span>
 		</div>
-	</div>
+	} else {
+		<div role="status" class="alert alert-info alert-soft rounded-xl text-sm">
+			@components.LucideIcon("info", "w-4 h-4 shrink-0")
+			<span>Store <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> separately — without it, backups can't be restored.</span>
+		</div>
+	}
 }
 
 templ backupsStats(p BackupsProps) {
