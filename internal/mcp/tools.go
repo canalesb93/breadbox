@@ -550,7 +550,12 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 	// context. Reports created via submit_report still link back to the
 	// surrounding session row in the audit timeline.
 	sessionID := auditSessionFromContext(reqCtx)
-	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author, sessionID)
+	// When this call is running under a per-run agent API key,
+	// agentRunShortID resolves to the surrounding agent_runs.short_id
+	// — the service stamps the FK on the new report so the runs
+	// landing can render "this run produced these reports" chips.
+	agentRunShortID := service.AgentRunShortIDFromContext(reqCtx)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author, sessionID, agentRunShortID)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

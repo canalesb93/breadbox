@@ -1,0 +1,371 @@
+package components
+
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
+
+// AgentRunRowProps is the view-model for a single agent-run row across
+// the runs list, per-agent runs view, and the design sandbox. It lives
+// in the components package (rather than pages) so anything that lists
+// agent runs renders the same shape.
+//
+// Numeric pointer fields on service.AgentRunResponse are flattened to
+// plain values here — handlers convert nil → zero so the templ doesn't
+// nil-check on every cell. AgentName/AgentSlug are empty in per-agent
+// contexts where the surrounding page already names the agent.
+type AgentRunRowProps struct {
+	ShortID    string
+	AgentSlug  string
+	AgentName  string
+	Status     string // success | error | in_progress | skipped | timeout
+	Trigger    string // cron | manual | webhook | initial
+	StartedAt  time.Time
+	FinishedAt *time.Time
+	DurationMs int64
+	CostUSD    float64
+	TokensIn   int64
+	TokensOut  int64
+	HitCap     string
+	Turns      int
+	Note       string
+
+	// ErrorMessage is the raw error_message column. Empty for non-errored
+	// runs. ErrorMessageFriendly is the operator-friendly translation;
+	// empty when no special mapping applies, in which case the raw message
+	// should be rendered as-is.
+	ErrorMessage         string
+	ErrorMessageFriendly string
+
+	// ShowAgent controls whether the row prefixes the run with the agent
+	// name. False when the surrounding page already scopes to one agent.
+	ShowAgent bool
+
+	// Reports lists agent_reports submitted during this run, most recent
+	// first. Rendered as inline chips below the meta line — the operator
+	// can click straight into the report without opening the run.
+	Reports []AgentRunReportRef
+}
+
+// AgentRunReportRef is the lightweight reference rendered on a row when
+// the run produced one or more reports. Only the fields the chip needs;
+// the report-detail page owns the full body.
+type AgentRunReportRef struct {
+	ShortID  string
+	Title    string
+	Priority string // info | warning | critical (drives chip tone)
+}
+
+// AgentRunRow renders one run as a rich row inside a vertical list.
+// Clicking anywhere routes to /agents/runs/{shortId}. Replaces the
+// dense table rows previously rendered inline on the runs page; the
+// new shape pairs an icon tile with status/trigger metadata on the
+// left and a cost/duration block on the right.
+//
+// Standalone: meant to be wrapped in @AgentRunRowList, which paints
+// the rounded container + divider so siblings stack cleanly.
+templ AgentRunRow(p AgentRunRowProps) {
+	<a
+		href={ templ.SafeURL("/agents/runs/" + p.ShortID) }
+		class={ "block px-4 py-3 hover:bg-base-200/40 transition-colors no-underline", templ.KV("opacity-70", p.Status == "skipped") }
+		data-run-short-id={ p.ShortID }
+	>
+		<div class="flex items-start gap-3">
+			@agentRunRowAvatar(p.Status)
+			<div class="min-w-0 flex-1">
+				<div class="flex items-center gap-2 flex-wrap">
+					if p.ShowAgent && p.AgentName != "" {
+						<span class="text-sm font-medium text-base-content truncate">{ p.AgentName }</span>
+						<span class="text-base-content/20">·</span>
+					}
+					<span class="font-mono text-[0.7rem] text-base-content/50 tabular-nums">{ p.ShortID }</span>
+					@AgentRunStatusBadge(p.Status)
+					if p.Trigger != "" {
+						<span class="badge badge-ghost badge-xs gap-1">
+							<i data-lucide={ agentRunTriggerIcon(p.Trigger) } class="w-2.5 h-2.5"></i>
+							{ p.Trigger }
+						</span>
+					}
+					if p.HitCap != "" {
+						<span class="badge badge-soft badge-warning badge-xs">cap: { p.HitCap }</span>
+					}
+				</div>
+				<div class="flex items-center gap-2 mt-1 text-xs text-base-content/50 flex-wrap">
+					<span class="tabular-nums" title={ p.StartedAt.Format(time.RFC3339) }>
+						{ agentRunRelativeTime(p.StartedAt) }
+					</span>
+					if p.DurationMs > 0 {
+						<span class="text-base-content/20">·</span>
+						<span class="tabular-nums">{ agentRunFormatDuration(p.DurationMs) }</span>
+					}
+					if p.Turns > 0 {
+						<span class="text-base-content/20">·</span>
+						<span class="tabular-nums">{ strconv.Itoa(p.Turns) } turns</span>
+					}
+					if p.TokensIn > 0 || p.TokensOut > 0 {
+						<span class="text-base-content/20 hidden sm:inline">·</span>
+						<span class="tabular-nums hidden sm:inline">{ agentRunFormatTokens(p.TokensIn, p.TokensOut) } tok</span>
+					}
+				</div>
+				if p.Status == "error" && (p.ErrorMessageFriendly != "" || p.ErrorMessage != "") {
+					<div class="mt-1.5 inline-flex items-start gap-1.5 text-xs text-error/90">
+						<i data-lucide="triangle-alert" class="w-3 h-3 mt-0.5 shrink-0"></i>
+						<span class="line-clamp-1">
+							if p.ErrorMessageFriendly != "" {
+								{ p.ErrorMessageFriendly }
+							} else {
+								{ p.ErrorMessage }
+							}
+						</span>
+					</div>
+				}
+				if len(p.Reports) > 0 {
+					<div class="mt-1.5 flex flex-wrap gap-1.5">
+						for _, rep := range p.Reports {
+							@agentRunReportChip(rep)
+						}
+					</div>
+				}
+				if p.Note != "" {
+					<div class="mt-1.5 inline-flex items-start gap-1.5 text-xs text-base-content/60">
+						<i data-lucide="sticky-note" class="w-3 h-3 mt-0.5 shrink-0 opacity-60"></i>
+						<span class="line-clamp-1 italic" title={ p.Note }>{ p.Note }</span>
+					</div>
+				}
+			</div>
+			<div class="shrink-0 text-right flex flex-col items-end gap-0.5">
+				@agentRunRowCost(p.CostUSD)
+				if p.FinishedAt != nil && !p.FinishedAt.IsZero() {
+					<span class="text-[0.65rem] text-base-content/40 tabular-nums hidden sm:inline">
+						finished { agentRunFinishedShort(*p.FinishedAt) }
+					</span>
+				} else if p.Status == "in_progress" {
+					<span class="text-[0.65rem] text-info/70 tabular-nums inline-flex items-center gap-1">
+						<span class="loading loading-spinner loading-xs"></span>
+						running
+					</span>
+				}
+			</div>
+		</div>
+	</a>
+}
+
+// AgentRunRowList wraps a series of AgentRunRow elements in the
+// canonical rounded surface + dividers. Pass the rows as the children
+// block:
+//
+//	@components.AgentRunRowList() {
+//	  for _, r := range rows {
+//	    @components.AgentRunRow(r)
+//	  }
+//	}
+templ AgentRunRowList() {
+	<div class="rounded-xl bg-base-100 border border-base-300 divide-y divide-base-200 overflow-hidden">
+		{ children... }
+	</div>
+}
+
+// AgentRunStatusBadge renders the status pill shared between the runs
+// list, run detail header, and the design sandbox. In-progress rows
+// carry a spinner; everything else is a soft daisy badge.
+templ AgentRunStatusBadge(status string) {
+	switch status {
+		case "success":
+			<span class="badge badge-soft badge-success badge-xs">success</span>
+		case "error":
+			<span class="badge badge-soft badge-error badge-xs">error</span>
+		case "in_progress":
+			<span class="badge badge-soft badge-info badge-xs gap-1">
+				<span class="loading loading-spinner loading-xs"></span>
+				running
+			</span>
+		case "skipped":
+			<span class="badge badge-ghost badge-xs">skipped</span>
+		case "timeout":
+			<span class="badge badge-soft badge-error badge-xs">timeout</span>
+		default:
+			<span class="badge badge-ghost badge-xs">{ status }</span>
+	}
+}
+
+// agentRunRowAvatar renders the leading icon tile. The tone tracks the
+// run status so the row reads as a colored "stoplight" at a glance.
+templ agentRunRowAvatar(status string) {
+	<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", agentRunAvatarTone(status) }>
+		<i data-lucide={ agentRunAvatarIcon(status) } class={ "w-4 h-4", agentRunAvatarIconColor(status) }></i>
+	</div>
+}
+
+// agentRunReportChip renders a single report reference as a clickable
+// pill that stops propagation so it doesn't bubble up to the parent
+// row's link. Tone shifts with priority — critical/warning lift out of
+// the neutral palette so the operator can spot them without scanning.
+templ agentRunReportChip(r AgentRunReportRef) {
+	<a
+		href={ templ.SafeURL("/reports/" + r.ShortID) }
+		class={ "inline-flex items-center gap-1.5 max-w-full text-xs rounded-md border px-2 py-0.5 hover:bg-base-200/60 no-underline transition-colors", agentRunReportChipTone(r.Priority) }
+		@click.stop=""
+		title={ "Report: " + r.Title }
+	>
+		<i data-lucide={ agentRunReportChipIcon(r.Priority) } class="w-3 h-3 shrink-0"></i>
+		<span class="line-clamp-1">{ r.Title }</span>
+	</a>
+}
+
+func agentRunReportChipTone(priority string) string {
+	switch priority {
+	case "critical":
+		return "border-error/30 text-error bg-error/5"
+	case "warning":
+		return "border-warning/30 text-warning bg-warning/5"
+	default:
+		return "border-base-300 text-base-content/70 bg-base-100"
+	}
+}
+
+func agentRunReportChipIcon(priority string) string {
+	switch priority {
+	case "critical":
+		return "alert-octagon"
+	case "warning":
+		return "alert-triangle"
+	default:
+		return "file-text"
+	}
+}
+
+// agentRunRowCost renders the cost cell. Zero/negative costs collapse
+// to a thin em-dash so empty rows don't carry visual weight.
+templ agentRunRowCost(v float64) {
+	if v > 0 {
+		@Amount(AmountProps{
+			Value:     v,
+			Intent:    AmountCost,
+			Precision: 4,
+			Class:     "text-sm font-semibold",
+		})
+	} else {
+		<span class="text-sm text-base-content/30">—</span>
+	}
+}
+
+func agentRunAvatarTone(status string) string {
+	switch status {
+	case "success":
+		return "bg-success/10"
+	case "error", "timeout":
+		return "bg-error/10"
+	case "in_progress":
+		return "bg-info/10"
+	case "skipped":
+		return "bg-base-200/60"
+	default:
+		return "bg-base-200/60"
+	}
+}
+
+func agentRunAvatarIcon(status string) string {
+	switch status {
+	case "success":
+		return "check"
+	case "error":
+		return "x"
+	case "timeout":
+		return "clock-alert"
+	case "in_progress":
+		return "loader"
+	case "skipped":
+		return "circle-dashed"
+	default:
+		return "bot"
+	}
+}
+
+func agentRunAvatarIconColor(status string) string {
+	switch status {
+	case "success":
+		return "text-success"
+	case "error", "timeout":
+		return "text-error"
+	case "in_progress":
+		return "text-info"
+	default:
+		return "text-base-content/50"
+	}
+}
+
+func agentRunTriggerIcon(trigger string) string {
+	switch trigger {
+	case "cron":
+		return "clock"
+	case "manual":
+		return "hand"
+	case "webhook":
+		return "webhook"
+	case "initial":
+		return "play"
+	default:
+		return "circle"
+	}
+}
+
+// agentRunRelativeTime renders a compact "3m ago" / "2h ago" / "Jan 2"
+// label for a started-at instant. Same algorithm as
+// agentsListRelativeTime in pages; duplicated here so the components
+// package has no upward dependency on pages.
+func agentRunRelativeTime(t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2")
+	}
+}
+
+func agentRunFinishedShort(t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+	return t.Format("15:04")
+}
+
+func agentRunFormatDuration(ms int64) string {
+	if ms <= 0 {
+		return "—"
+	}
+	if ms < 1000 {
+		return fmt.Sprintf("%dms", ms)
+	}
+	secs := float64(ms) / 1000.0
+	if secs < 60 {
+		return fmt.Sprintf("%.1fs", secs)
+	}
+	mins := secs / 60.0
+	return fmt.Sprintf("%.1fm", mins)
+}
+
+func agentRunFormatTokens(in, out int64) string {
+	return fmt.Sprintf("%s / %s", agentRunAbbrev(in), agentRunAbbrev(out))
+}
+
+func agentRunAbbrev(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fk", float64(n)/1_000)
+	default:
+		return strconv.FormatInt(n, 10)
+	}
+}

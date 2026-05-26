@@ -194,3 +194,17 @@ WHERE started_at < $1
 
 -- name: CountInProgressAgentRuns :one
 SELECT COUNT(*) FROM agent_runs WHERE status = 'in_progress';
+
+-- name: GetAgentRunsExtraStats30d :one
+-- Cross-agent 30-day rollup of error count + average duration. Powers
+-- the StatTile row on the /agents landing. Skipped runs (quiet hours,
+-- concurrency lock) are excluded from the duration average — they
+-- aren't real workload and distort it — but are *not* excluded from
+-- the error count (which already filters on status = 'error').
+SELECT
+    COUNT(*) FILTER (WHERE status = 'error')::int        AS error_count,
+    (COALESCE(AVG(duration_ms) FILTER (
+        WHERE status != 'skipped' AND duration_ms IS NOT NULL
+    ), 0)::float8 / 1000.0)::float8                      AS avg_duration_seconds
+FROM agent_runs
+WHERE started_at >= NOW() - INTERVAL '30 days';

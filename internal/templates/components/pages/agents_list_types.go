@@ -12,8 +12,15 @@ import "time"
 // never reaches into service types directly. Pre-rendering relative-time
 // strings on the handler side keeps the templ free of time helpers.
 type AgentsListProps struct {
-	Agents    []AgentsListRowProps
-	Status    AgentSubsystemStatusProps
+	Agents []AgentsListRowProps
+	Status AgentSubsystemStatusProps
+
+	// LastPromptPrefixes is map[agent_slug] → most recent operator
+	// prefix; surfaces the "Use last prefix" affordance in the shared
+	// Run-an-agent modal. Empty map renders the modal without the
+	// "Last prefix" chips.
+	LastPromptPrefixes map[string]string
+
 	CSRFToken string
 }
 

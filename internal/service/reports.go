@@ -11,6 +11,7 @@ import (
 	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // AgentReportResponse is the API response type for agent reports.
@@ -69,8 +70,11 @@ var ValidReportPriorities = map[string]bool{
 	"critical": true,
 }
 
-// CreateAgentReport creates a new agent report, optionally linked to an MCP session.
-func (s *Service) CreateAgentReport(ctx context.Context, title, body string, actor Actor, priority string, tags []string, author string, sessionID string) (AgentReportResponse, error) {
+// CreateAgentReport creates a new agent report, optionally linked to
+// an MCP session and an agent run. agentRunShortID resolves to the
+// agent_runs.id FK on the new row; empty leaves it NULL (operator-
+// submitted reports, MCP sessions outside the agent SDK).
+func (s *Service) CreateAgentReport(ctx context.Context, title, body string, actor Actor, priority string, tags []string, author string, sessionID string, agentRunShortID string) (AgentReportResponse, error) {
 	if title == "" {
 		return AgentReportResponse{}, fmt.Errorf("%w: title is required", ErrInvalidParameter)
 	}
@@ -97,6 +101,13 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 
 	sessUUID, _ := s.ResolveSessionUUID(ctx, sessionID)
 
+	var runUUID pgtype.UUID
+	if agentRunShortID != "" {
+		if run, err := s.Queries.GetAgentRunByShortID(ctx, agentRunShortID); err == nil {
+			runUUID = run.ID
+		}
+	}
+
 	report, err := s.Queries.CreateAgentReport(ctx, db.CreateAgentReportParams{
 		Title:         title,
 		Body:          body,
@@ -107,12 +118,63 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		Tags:          tags,
 		Author:        pgconv.TextIfNotEmpty(author),
 		SessionID:     sessUUID,
+		AgentRunID:    runUUID,
 	})
 	if err != nil {
 		return AgentReportResponse{}, fmt.Errorf("create agent report: %w", err)
 	}
 
 	return agentReportFromRow(report), nil
+}
+
+// AgentRunReportSummary is the compact report-reference shape rendered
+// inside an AgentRunRow chip on the runs landing. We deliberately
+// don't carry the body — opening the report is one click away — so
+// the row stays light and the page-level query is small.
+type AgentRunReportSummary struct {
+	ShortID  string
+	Title    string
+	Priority string
+}
+
+// ListReportSummariesForRunIDs fetches the report-summary chip data
+// for a batch of agent_runs.id UUIDs in one query. Returns a map
+// keyed by run-id (canonical UUID string); runs with no reports are
+// absent from the map. Reports inside each slice are ordered oldest →
+// newest so the chip line reads chronologically when an agent
+// produces multiple reports per run.
+func (s *Service) ListReportSummariesForRunIDs(ctx context.Context, runIDs []string) (map[string][]AgentRunReportSummary, error) {
+	out := make(map[string][]AgentRunReportSummary, len(runIDs))
+	if len(runIDs) == 0 {
+		return out, nil
+	}
+	uuids := make([]pgtype.UUID, 0, len(runIDs))
+	for _, id := range runIDs {
+		u, err := pgconv.ParseUUID(id)
+		if err != nil {
+			continue
+		}
+		uuids = append(uuids, u)
+	}
+	if len(uuids) == 0 {
+		return out, nil
+	}
+	rows, err := s.Queries.ListReportSummariesForRunIDs(ctx, uuids)
+	if err != nil {
+		return nil, fmt.Errorf("list report summaries for runs: %w", err)
+	}
+	for _, r := range rows {
+		if !r.AgentRunID.Valid {
+			continue
+		}
+		runID := pgconv.FormatUUID(r.AgentRunID)
+		out[runID] = append(out[runID], AgentRunReportSummary{
+			ShortID:  r.ShortID,
+			Title:    r.Title,
+			Priority: r.Priority,
+		})
+	}
+	return out, nil
 }
 
 // ListAgentReports returns the most recent reports.
