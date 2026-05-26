@@ -809,6 +809,11 @@ templ SectionLoading() {
 				@components.AgentsListSkeleton()
 			</div>
 		}
+		@designExample("Agent runs list skeleton", "Placeholder mirroring the /agents runs landing — 4-up 30d stat row (Runs / Errors / Cost / Avg duration), collapsed filter bar (icon + label + chip slots), and the divided card of rich run rows (icon tile + agent name + short-ID + status badge + trigger pill + meta line + trailing cost). Rows vary widths and toggle the optional error/note slots so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents is full-SSR today.") {
+			<div class="max-w-5xl">
+				@components.AgentRunsListSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>
