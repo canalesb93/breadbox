@@ -3323,3 +3323,15 @@
   background: color-mix(in oklch, var(--color-base-200) 35%, transparent);
   border: 1px dashed color-mix(in oklch, var(--color-base-300) 60%, transparent);
 }
+
+/* "Jump to result" target flash — a brief primary-tinted halo when the
+ * sticky-header button scrolls the run summary into view, so the eye
+ * catches where the page jumped to. */
+.bb-run-summary--flash {
+  animation: bb-run-summary-flash 1.2s ease-out;
+}
+@keyframes bb-run-summary-flash {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 60%, transparent); }
+  20%  { box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-primary) 30%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}

@@ -211,6 +211,23 @@ document.addEventListener('alpine:init', function () {
           else d.removeAttribute('open');
         }, this);
       },
+
+      // jumpToResult scrolls the page so the run's "Final result"
+      // bubble lands at the top of the viewport (with a little
+      // breathing room for the sticky header). For long transcripts
+      // this is the single most-requested affordance — "skip to the
+      // bottom line." We pick the LAST .bb-run-summary because some
+      // transcripts have two result events and we already drop the
+      // zero-valued one, but defence-in-depth is cheap.
+      jumpToResult: function () {
+        var nodes = this.$el.querySelectorAll('.bb-run-summary');
+        if (!nodes.length) return;
+        var target = nodes[nodes.length - 1];
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        // Brief highlight pulse so the eye catches where we landed.
+        target.classList.add('bb-run-summary--flash');
+        setTimeout(function () { target.classList.remove('bb-run-summary--flash'); }, 1200);
+      },
     };
   });
 

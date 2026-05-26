@@ -56,6 +56,7 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 			</section>
 			<aside class="space-y-4">
 				@agentRunStatsCard(p)
+				@agentRunToolsCard(p)
 				@agentRunNoteCard(p)
 				if len(p.Run.Reports) > 0 {
 					@agentRunReportsCard(p)
@@ -119,6 +120,17 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 			</div>
 		</div>
 		<div class="bb-run-header__actions">
+			if TranscriptHasResultEvent(p.Transcript) {
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost gap-2"
+					title="Jump to the run's final result bubble"
+					@click="jumpToResult()"
+				>
+					<i data-lucide="flag-triangle-right" class="w-4 h-4"></i>
+					Jump to result
+				</button>
+			}
 			if p.Run.AgentSlug != "" {
 				<a
 					href={ templ.SafeURL("/agents?agent=" + p.Run.AgentSlug + "&run=1") }
@@ -540,6 +552,29 @@ templ agentRunNoteCard(p AgentRunDetailProps) {
 			</div>
 		</form>
 	</div>
+}
+
+// agentRunToolsCard surfaces the per-tool call counts for the run.
+// Helps the operator answer "which tools did this agent lean on?"
+// without scrolling the transcript. Hidden entirely when the run made
+// no tool calls (a pure-conversation agent).
+templ agentRunToolsCard(p AgentRunDetailProps) {
+	if usage := ComputeToolUsage(p.Transcript); len(usage) > 0 {
+		<div class="bb-card p-4">
+			<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
+				<i data-lucide="wrench" class="w-3 h-3"></i>
+				Tools used
+			</h3>
+			<ul class="space-y-1">
+				for _, t := range usage {
+					<li class="flex items-baseline justify-between gap-2 text-sm">
+						<span class="font-mono text-xs text-base-content/80 truncate">{ t.Name }</span>
+						<span class="badge badge-ghost badge-xs tabular-nums">{ strconv.Itoa(t.Count) }</span>
+					</li>
+				}
+			</ul>
+		</div>
+	}
 }
 
 templ agentRunReportsCard(p AgentRunDetailProps) {

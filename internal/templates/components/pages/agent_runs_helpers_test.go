@@ -67,6 +67,51 @@ func TestFilterTranscriptForDisplay_EnrichesToolResultWithName(t *testing.T) {
 	}
 }
 
+func TestComputeToolUsage(t *testing.T) {
+	in := []TranscriptEvent{
+		{Type: "tool_use", ToolName: "mcp__breadbox__query_transactions"},
+		{Type: "tool_use", ToolName: "mcp__breadbox__query_transactions"},
+		{Type: "tool_use", ToolName: "mcp__breadbox__list_categories"},
+		{Type: "tool_result", ToolName: "mcp__breadbox__query_transactions"}, // not counted
+		{Type: "assistant", Text: "hi"},
+		{Type: "tool_use", ToolName: "Bash"}, // non-mcp tool, kept as-is
+	}
+	got := ComputeToolUsage(in)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 unique tools, got %d: %+v", len(got), got)
+	}
+	// First entry: query_transactions, 2 calls.
+	if got[0].Name != "query_transactions" || got[0].Count != 2 {
+		t.Errorf("expected query_transactions=2 first, got %+v", got[0])
+	}
+	// Tie-break — name ASC among count=1 entries: Bash < list_categories.
+	if got[1].Name != "Bash" || got[1].Count != 1 {
+		t.Errorf("expected Bash=1 second, got %+v", got[1])
+	}
+	if got[2].Name != "list_categories" || got[2].Count != 1 {
+		t.Errorf("expected list_categories=1 third, got %+v", got[2])
+	}
+}
+
+func TestTranscriptHasResultEvent(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []TranscriptEvent
+		want bool
+	}{
+		{"empty", nil, false},
+		{"no result", []TranscriptEvent{{Type: "assistant"}, {Type: "tool_use"}}, false},
+		{"has result", []TranscriptEvent{{Type: "assistant"}, {Type: "result", CostUSD: 0.01}}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := TranscriptHasResultEvent(c.in); got != c.want {
+				t.Errorf("got %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
 func TestFilterTranscriptForDisplay_LeavesOrphanToolResultAlone(t *testing.T) {
 	// A tool_result whose ToolUseID has no matching tool_use should keep
 	// an empty ToolName. The renderer drops the name pill in that case.
