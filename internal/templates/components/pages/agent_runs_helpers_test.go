@@ -47,3 +47,37 @@ func TestFilterTranscriptForDisplay_KeepsResultWithJustCacheData(t *testing.T) {
 		t.Fatalf("expected result with cache_read preserved, got %+v", out)
 	}
 }
+
+func TestFilterTranscriptForDisplay_EnrichesToolResultWithName(t *testing.T) {
+	in := []TranscriptEvent{
+		{Type: "tool_use", ToolUseID: "toolu_a", ToolName: "query_transactions"},
+		{Type: "tool_use", ToolUseID: "toolu_b", ToolName: "list_categories"},
+		{Type: "tool_result", ToolUseID: "toolu_a", ToolResultJSON: `{"count": 47}`},
+		{Type: "tool_result", ToolUseID: "toolu_b", ToolResultJSON: `[]`},
+	}
+	out := FilterTranscriptForDisplay(in)
+	if len(out) != 4 {
+		t.Fatalf("expected 4 events, got %d", len(out))
+	}
+	if out[2].ToolName != "query_transactions" {
+		t.Errorf("expected first tool_result enriched with query_transactions, got %q", out[2].ToolName)
+	}
+	if out[3].ToolName != "list_categories" {
+		t.Errorf("expected second tool_result enriched with list_categories, got %q", out[3].ToolName)
+	}
+}
+
+func TestFilterTranscriptForDisplay_LeavesOrphanToolResultAlone(t *testing.T) {
+	// A tool_result whose ToolUseID has no matching tool_use should keep
+	// an empty ToolName. The renderer drops the name pill in that case.
+	in := []TranscriptEvent{
+		{Type: "tool_result", ToolUseID: "toolu_unknown"},
+	}
+	out := FilterTranscriptForDisplay(in)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(out))
+	}
+	if out[0].ToolName != "" {
+		t.Errorf("expected empty ToolName for orphan tool_result, got %q", out[0].ToolName)
+	}
+}

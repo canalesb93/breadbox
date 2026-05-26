@@ -35,23 +35,46 @@ var AgentRunFriendlyErrorMappings = []agentRunErrorMapping{
 }
 
 // FilterTranscriptForDisplay drops events that are present in the
-// NDJSON file but add no signal to the rendered transcript. Currently
-// just `result` events where every numeric field is zero: the SDK
-// sometimes emits an init-shaped result envelope before the actual
-// usage payload, and rendering both as "Final result" bubbles is
-// confusing (the operator sees a row of zeros followed by the real one).
+// NDJSON file but add no signal to the rendered transcript, AND
+// enriches tool_result events with the name of the tool_use they're
+// answering. Two responsibilities in one pass because both touch
+// every event and the live endpoint + the initial render must agree
+// on the result either way.
+//
+// Filtering: `result` events where every numeric field is zero. The
+// Claude Agent SDK sometimes emits an init-shaped result envelope
+// before the actual usage payload, and rendering both as "Final
+// result" bubbles is confusing.
+//
+// Enrichment: builds an id->name index from tool_use events and
+// writes the tool name onto every tool_result whose ToolUseID
+// matches. The chat-thread row then reads "tool result —
+// query_transactions" instead of an anonymous "tool result".
 //
 // Callers: the initial server render and the /-/agents/runs/{id}/live
-// poll endpoint — both feed events through here so the live patch
-// matches what the operator already saw on first paint.
+// poll endpoint.
 func FilterTranscriptForDisplay(events []TranscriptEvent) []TranscriptEvent {
 	if len(events) == 0 {
 		return events
 	}
+	// Pass 1: build the id->name index across the whole slice.
+	toolNames := make(map[string]string, 8)
+	for _, ev := range events {
+		if ev.Type == "tool_use" && ev.ToolUseID != "" && ev.ToolName != "" {
+			toolNames[ev.ToolUseID] = ev.ToolName
+		}
+	}
+
+	// Pass 2: filter + enrich.
 	out := make([]TranscriptEvent, 0, len(events))
 	for _, ev := range events {
 		if ev.Type == "result" && resultEventIsEmpty(ev) {
 			continue
+		}
+		if ev.Type == "tool_result" && ev.ToolName == "" && ev.ToolUseID != "" {
+			if name, ok := toolNames[ev.ToolUseID]; ok {
+				ev.ToolName = name
+			}
 		}
 		out = append(out, ev)
 	}
