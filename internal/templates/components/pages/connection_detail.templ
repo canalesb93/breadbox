@@ -112,25 +112,45 @@ func connDetailIconTone(provider string) components.IconTone {
 	}
 }
 
-// connDetailBadges renders the inline status chips next to the title:
-// the StatusBadge (or sync-error hover tooltip), plus a Paused badge.
+// connDetailBadges renders the inline status chips next to the title.
+//
+// Error-surfacing rule: when one of the page-level banners renders
+// above the header (reauth-required or consecutive-failures), suppress
+// the status / sync-error chip here — the banner is canonical. Neutral
+// metadata (Paused) is kept because it's orthogonal to the error.
 templ connDetailBadges(p ConnectionDetailProps) {
-	if p.LastSyncStatus == "error" && p.Status == "active" {
-		<span class="relative group/err">
-			<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
-			if p.LastSyncErrorMessageValid {
-				<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-					<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
-					<span class="text-base-content/70">{ p.LastSyncErrorMessageString }</span>
-				</span>
-			}
-		</span>
-	} else {
-		@templ.Raw(components.StatusBadge(p.Status))
+	if !connDetailHasErrorBanner(p) {
+		if p.LastSyncStatus == "error" && p.Status == "active" {
+			<span class="relative group/err">
+				<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
+				if p.LastSyncErrorMessageValid {
+					<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
+						<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
+						<span class="text-base-content/70">{ p.LastSyncErrorMessageString }</span>
+					</span>
+				}
+			</span>
+		} else {
+			@templ.Raw(components.StatusBadge(p.Status))
+		}
 	}
 	if p.Paused {
 		<span class="badge badge-ghost badge-sm">Paused</span>
 	}
+}
+
+// connDetailHasErrorBanner mirrors the two banner conditions above the
+// EntityHeader: needs-reauth (status error or pending_reauth) and the
+// 3+ consecutive failures warning. Used by connDetailBadges to avoid
+// duplicating the same signal as an inline chip.
+func connDetailHasErrorBanner(p ConnectionDetailProps) bool {
+	if p.Status == "error" || p.Status == "pending_reauth" {
+		return true
+	}
+	if p.ConsecutiveFailures >= 3 {
+		return true
+	}
+	return false
 }
 
 // connDetailMeta renders the bullet-separated meta line: provider,
