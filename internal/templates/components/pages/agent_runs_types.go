@@ -116,11 +116,6 @@ type AgentRunDetailProps struct {
 	Error string
 
 	CSRFToken string
-
-	// RefreshSeconds, when > 0, emits a <meta http-equiv="refresh"> tag
-	// that auto-reloads the page. Set this for in_progress runs so the
-	// transcript fills in as the SDK writes lines.
-	RefreshSeconds int
 }
 
 // TranscriptEvent is a unified representation of one NDJSON line in the

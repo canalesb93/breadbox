@@ -1,0 +1,264 @@
+package pages
+
+import (
+	"time"
+
+	"breadbox/internal/templates/components"
+)
+
+// design_agent_run_chat.templ holds the three sandbox sections shipped
+// with the agent-run-detail redesign. They live in their own file so
+// the agent-runs sprint can move the canonical examples around without
+// disturbing the older sections.
+//
+//   - SectionMarkdownProse — the .bb-prose body styled by components.Markdown.
+//   - SectionJSONViewer    — components.JSONViewer with copy + collapse.
+//   - SectionAgentRunChat  — the chat-thread variants the redesigned
+//                            /agents/runs/{id} page composes.
+
+// ─── Markdown prose ─────────────────────────────────────────────────
+
+templ SectionMarkdownProse() {
+	<div class="flex flex-col gap-6">
+		@designExample(
+			"Assistant text",
+			"components.Markdown takes a string of agent-emitted text and renders headers, lists, code blocks, links, and tables inside a `.bb-prose` wrapper. The chat-bubble in the run-detail page is the primary consumer; the reports body will adopt it next.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleAssistant())
+			</div>
+		}
+		@designExample(
+			"Code blocks + tables",
+			"Fenced blocks (` ``` `) preserve whitespace + escape every HTML metachar. GFM tables accept `---:` for right-align — used for the cost columns in agent post-mortem reports.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleCodeAndTable())
+			</div>
+		}
+		@designExample(
+			"Safety",
+			"Raw HTML in the source is escaped; only http/https/mailto links survive — `javascript:` is stripped down to the visible label.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleSafety())
+			</div>
+		}
+	</div>
+}
+
+// designMarkdownSampleAssistant returns a representative chunk of
+// agent-emitted text. Lives as a Go helper because templ's lexer fights
+// with multi-line string literals that contain backticks.
+func designMarkdownSampleAssistant() string {
+	return "## What I'm doing\n\n" +
+		"I'm going to look at your **last 30 days of transactions** and pick out the merchants that are new since your last review. Here's the plan:\n\n" +
+		"1. Pull every transaction from `2026-04-25` onward.\n" +
+		"2. Bucket by `merchant_name` (case-insensitive).\n" +
+		"3. Filter to merchants that don't appear in your prior 90 days.\n" +
+		"4. Surface the top 5 by total amount.\n\n" +
+		"You can intervene at any step with a quick note like *\"skip restaurants\"* and I'll re-scope.\n\n" +
+		"> Heads-up: I'll mark anything ambiguous for review rather than guessing."
+}
+
+func designMarkdownSampleCodeAndTable() string {
+	return "Here's the rule I'd suggest:\n\n" +
+		"```sql\nSELECT merchant_name, SUM(amount) AS total\nFROM transactions\nWHERE date >= NOW() - INTERVAL '30 days'\nGROUP BY merchant_name\nORDER BY total DESC\nLIMIT 5;\n```\n\n" +
+		"And the top 5 from the dry run:\n\n" +
+		"| Merchant      | Txns | Total       |\n" +
+		"|---------------|-----:|------------:|\n" +
+		"| Whole Foods   |   12 |   $384.12   |\n" +
+		"| Lyft          |   18 |   $192.40   |\n" +
+		"| Apple.com     |    3 |    $59.97   |"
+}
+
+func designMarkdownSampleSafety() string {
+	return "Links: a good [example.com](https://example.com) survives, a [bad one](javascript:alert(1)) renders as plain text.\n\n" +
+		"Inline HTML like <script>alert('hi')</script> is escaped, so `<script>` shows up literally."
+}
+
+// ─── JSON viewer ────────────────────────────────────────────────────
+
+templ SectionJSONViewer() {
+	<div class="flex flex-col gap-6">
+		@designExample(
+			"Default",
+			"Server-rendered, zero-dep. Objects + arrays collapse on click; every level is its own <details> so deep payloads stay manageable.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.JSONViewer(components.JSONViewerProps{
+					Source: designJSONSample(),
+				})
+			</div>
+		}
+		@designExample(
+			"With copy button",
+			"ShowCopy adds a clipboard affordance in the top-right corner. The copy payload is the original source string — preserving any non-pretty-print formatting your caller passed in.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.JSONViewer(components.JSONViewerProps{
+					Source:   designJSONSample(),
+					ShowCopy: true,
+				})
+			</div>
+		}
+		@designExample(
+			"Collapsed-by-default",
+			"MaxDepth=1 starts everything below the top-level keys collapsed. Useful for long tool-result payloads where the operator just wants to see the keys before diving in.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.JSONViewer(components.JSONViewerProps{
+					Source:   designJSONLargeSample(),
+					MaxDepth: 1,
+					ShowCopy: true,
+				})
+			</div>
+		}
+		@designExample(
+			"Empty + malformed",
+			"Empty source renders an em-dash placeholder. Unparseable JSON falls back to a plain `<pre>` so the operator sees the raw payload — never an error.",
+		) {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				<div class="bb-card p-4">
+					<div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 mb-2">Empty</div>
+					@components.JSONViewer(components.JSONViewerProps{Source: ""})
+				</div>
+				<div class="bb-card p-4">
+					<div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 mb-2">Malformed</div>
+					@components.JSONViewer(components.JSONViewerProps{Source: `{ "broken": true,`})
+				</div>
+			</div>
+		}
+	</div>
+}
+
+func designJSONSample() string {
+	return `{
+  "merchant": "Whole Foods Market",
+  "category": "groceries",
+  "items": ["produce", "deli", "snacks"],
+  "amount": 42.18,
+  "tax": 2.13,
+  "approved": true,
+  "notes": null
+}`
+}
+
+func designJSONLargeSample() string {
+	return `{
+  "run_id": "run_dGHbZfr6",
+  "tools_used": [
+    {"name": "query_transactions", "input": {"start": "2026-04-25", "limit": 100}, "result_size": 87},
+    {"name": "list_merchants", "input": {"order": "total_desc"}, "result_size": 14},
+    {"name": "create_review", "input": {"transaction_id": "tx_abc123", "reason": "uncategorized"}}
+  ],
+  "summary": {
+    "messages": 12,
+    "tool_calls": 3,
+    "duration_ms": 18420,
+    "cost_usd": 0.0427
+  },
+  "metadata": {
+    "model": "claude-sonnet-4-6",
+    "temperature": null
+  }
+}`
+}
+
+// ─── Agent run chat thread ──────────────────────────────────────────
+
+templ SectionAgentRunChat() {
+	<div class="flex flex-col gap-6">
+		@designExample(
+			"Assistant + user bubbles",
+			"Daisy `chat chat-start` for the agent (left-aligned, primary-tinted avatar); `chat chat-end` for the user / tool envelopes. Assistant text routes through components.Markdown so lists, code, and bold render exactly as the agent intended.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				<ul class="bb-chat-thread">
+					@agentRunTranscriptEvent(designChatAssistantEvent(), 0)
+					@agentRunTranscriptEvent(designChatUserEvent(), 1)
+				</ul>
+			</div>
+		}
+		@designExample(
+			"Tool call + result rows",
+			"Tool events render as compact rows that expand into the JSONViewer. We strip the `mcp__breadbox__` prefix from tool names so the row stays readable. Color tone: blue tile for `tool_use`, green for `tool_result`.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				<ul class="bb-chat-thread">
+					@agentRunTranscriptEvent(designChatToolUseEvent(), 0)
+					@agentRunTranscriptEvent(designChatToolResultEvent(), 1)
+				</ul>
+			</div>
+		}
+		@designExample(
+			"Final result + error",
+			"`result` events render as a pinned stats bubble at the bottom of the thread. `error` events use a soft alert so they don't dominate the thread.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				<ul class="bb-chat-thread">
+					@agentRunTranscriptEvent(designChatResultEvent(), 0)
+					@agentRunTranscriptEvent(designChatErrorEvent(), 1)
+				</ul>
+			</div>
+		}
+	</div>
+}
+
+// designChatAssistantEvent returns a representative assistant message
+// for the sandbox. We share a single helper across the three example
+// blocks so the sample stays consistent and only changes in one place.
+func designChatAssistantEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:      "assistant",
+		Role:      "assistant",
+		Text:      designMarkdownSampleAssistant(),
+		Timestamp: time.Now().Add(-3 * time.Minute),
+	}
+}
+
+func designChatUserEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:      "user",
+		Role:      "user",
+		Text:      "Skip restaurants. Focus on the grocery + subscription buckets.",
+		Timestamp: time.Now().Add(-2*time.Minute - 30*time.Second),
+	}
+}
+
+func designChatToolUseEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:          "tool_use",
+		ToolName:      "mcp__breadbox__query_transactions",
+		ToolInputJSON: `{"start": "2026-04-25", "limit": 100, "categories": ["groceries", "subscriptions"]}`,
+		Timestamp:     time.Now().Add(-2 * time.Minute),
+	}
+}
+
+func designChatToolResultEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:           "tool_result",
+		ToolResultJSON: `{"count": 47, "sample": [{"merchant": "Whole Foods", "amount": 42.18}, {"merchant": "Spotify", "amount": 9.99}], "has_more": true}`,
+		Timestamp:      time.Now().Add(-1*time.Minute - 50*time.Second),
+	}
+}
+
+func designChatResultEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:       "result",
+		CostUSD:    0.0427,
+		TokensIn:   18213,
+		TokensOut:  842,
+		CacheRead:  4096,
+		CacheWrite: 1284,
+		Timestamp:  time.Now().Add(-1 * time.Minute),
+	}
+}
+
+func designChatErrorEvent() TranscriptEvent {
+	return TranscriptEvent{
+		Type:      "error",
+		Text:      "anthropic.api_error: 529 — server overloaded, retrying",
+		Timestamp: time.Now().Add(-45 * time.Second),
+	}
+}

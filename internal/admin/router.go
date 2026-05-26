@@ -397,6 +397,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// flow on the detail page. Accessible to all roles (read-only).
 		r.Get("/transactions/{id}/timeline/rows", TimelineRowsHandler(a, sm, svc))
 
+		// Agent run live updates — JSON snapshot the run-detail page
+		// polls every 3 s while a run is in_progress. Read-only, all
+		// roles (an editor restriction would block dashboards that
+		// want to keep an eye on someone else's runs).
+		r.Get("/agents/runs/{shortId}/live", AgentRunLiveHandler(svc, sm, tr))
+
 		// Editor+ API routes (categorization, tagging, access management).
 		r.Group(func(r chi.Router) {
 			r.Use(RequireEditor(sm))
