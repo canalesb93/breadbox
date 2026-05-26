@@ -809,6 +809,11 @@ templ SectionLoading() {
 				@components.AgentsListSkeleton()
 			</div>
 		}
+		@designExample("Agent runs list skeleton", "Placeholder mirroring /agents/{slug}/runs (and the cross-agent /agents/runs view) — filter bar (Status / Trigger / Hit cap / Start / End + Apply/Clear) and the runs table (Run, Status, Trigger, Started, Duration, Turns, Cost, In/Out, Hit cap, Note). Rows vary the status-pill / hit-cap / note widths so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents/runs is full-SSR today.") {
+			<div class="max-w-5xl">
+				@components.AgentRunsListSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>

@@ -1,0 +1,137 @@
+package components
+
+// AgentRunsListSkeleton renders a placeholder mirroring the layout of the
+// /agents/{slug}/runs and /agents/runs pages — the multi-column filter
+// bar (Status / Trigger / Hit cap / Start / End plus an Apply + Clear
+// row) followed by the runs table (Run, Status, Trigger, Started,
+// Duration, Turns, Cost, In/Out, Hit cap, Note). Sized to match the
+// real component so a future swap-in doesn't shift layout.
+//
+// /agents/runs is a full-SSR page today; this primitive is exposed in
+// /design#loading so it's ready for the eventual filter-bar / AJAX swap
+// (e.g. re-filtering without a page reload) and discoverable to anyone
+// wiring loading states for adjacent run-history panels.
+//
+// Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
+// hand-rolled `bb-skeleton*` family is being retired).
+templ AgentRunsListSkeleton() {
+	<div aria-hidden="true">
+		<!-- Filter bar card -->
+		<div class="bb-card mb-6 p-4">
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-3">
+				for i := 0; i < 5; i++ {
+					<div class="space-y-1.5">
+						<div class="skeleton h-2.5 w-12"></div>
+						<div class="skeleton h-8 w-full rounded-md"></div>
+					</div>
+				}
+			</div>
+			<div class="flex items-center gap-2">
+				<div class="skeleton h-8 w-20 rounded-md"></div>
+				<div class="skeleton h-8 w-14 rounded-md"></div>
+			</div>
+		</div>
+		<!-- Runs table -->
+		<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
+			<table class="table table-sm">
+				<thead>
+					<tr class="text-xs text-base-content/50">
+						<th><div class="skeleton h-3 w-10"></div></th>
+						<th><div class="skeleton h-3 w-14"></div></th>
+						<th><div class="skeleton h-3 w-14"></div></th>
+						<th><div class="skeleton h-3 w-14"></div></th>
+						<th class="text-right"><div class="skeleton h-3 w-16 ml-auto"></div></th>
+						<th class="text-right"><div class="skeleton h-3 w-10 ml-auto"></div></th>
+						<th class="text-right"><div class="skeleton h-3 w-12 ml-auto"></div></th>
+						<th class="text-right"><div class="skeleton h-3 w-14 ml-auto"></div></th>
+						<th><div class="skeleton h-3 w-12"></div></th>
+						<th><div class="skeleton h-3 w-10"></div></th>
+					</tr>
+				</thead>
+				<tbody>
+					for i := 0; i < 6; i++ {
+						@agentRunsListSkeletonRow(i)
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+// agentRunsListSkeletonRow mirrors one agentRunsRow: short-ID monospace
+// link, status pill, trigger label, started timestamp, duration / turns
+// / cost / token counts (right-aligned tabular), hit-cap badge slot, and
+// the optional note line. Row index varies the placeholder shapes so the
+// skeleton doesn't look stamped — some rows show a hit-cap badge, others
+// an em-dash; one row shortens the duration cell to mimic an in-progress
+// run; the note cell alternates between a one-line note and an em-dash.
+templ agentRunsListSkeletonRow(i int) {
+	<tr>
+		<!-- Run short ID (mono link) -->
+		<td class="align-middle">
+			<div class="skeleton h-3 w-16"></div>
+		</td>
+		<!-- Status pill: vary width so success/error/running/skipped feel distinct -->
+		<td class="align-middle">
+			if i%4 == 0 {
+				<div class="skeleton h-4 w-20 rounded-full"></div>
+			} else if i%4 == 1 {
+				<div class="skeleton h-4 w-14 rounded-full"></div>
+			} else if i%4 == 2 {
+				<div class="skeleton h-4 w-16 rounded-full"></div>
+			} else {
+				<div class="skeleton h-4 w-12 rounded-full"></div>
+			}
+		</td>
+		<!-- Trigger label -->
+		<td class="align-middle">
+			if i%3 == 0 {
+				<div class="skeleton h-3 w-10"></div>
+			} else {
+				<div class="skeleton h-3 w-14"></div>
+			}
+		</td>
+		<!-- Started timestamp -->
+		<td class="align-middle">
+			<div class="skeleton h-3 w-20"></div>
+		</td>
+		<!-- Duration (right-aligned tabular) -->
+		<td class="align-middle text-right">
+			if i == 1 {
+				<div class="skeleton h-3 w-8 ml-auto"></div>
+			} else if i%2 == 0 {
+				<div class="skeleton h-3 w-12 ml-auto"></div>
+			} else {
+				<div class="skeleton h-3 w-14 ml-auto"></div>
+			}
+		</td>
+		<!-- Turns -->
+		<td class="align-middle text-right">
+			<div class="skeleton h-3 w-6 ml-auto"></div>
+		</td>
+		<!-- Cost -->
+		<td class="align-middle text-right">
+			<div class="skeleton h-3 w-12 ml-auto"></div>
+		</td>
+		<!-- Tokens in / out -->
+		<td class="align-middle text-right">
+			<div class="skeleton h-3 w-16 ml-auto"></div>
+		</td>
+		<!-- Hit-cap badge slot (only on some rows) -->
+		<td class="align-middle">
+			if i%3 == 0 {
+				<div class="skeleton h-3.5 w-16 rounded-full"></div>
+			} else {
+				<div class="skeleton h-3 w-3"></div>
+			}
+		</td>
+		<!-- Note (alternates between a one-line note and em-dash) -->
+		<td class="align-middle">
+			if i%2 == 0 {
+				<div class="skeleton h-2.5 w-32"></div>
+			} else {
+				<div class="skeleton h-3 w-3"></div>
+			}
+		</td>
+	</tr>
+}
