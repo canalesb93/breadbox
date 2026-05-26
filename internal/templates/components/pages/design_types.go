@@ -324,6 +324,13 @@ func DesignSections() []DesignSection {
 			Group:       "patterns",
 			Render:      func() templ.Component { return SectionTimeline() },
 		},
+		{
+			Slug:        "command-palette",
+			Title:       "Command palette",
+			Description: "The ⌘K cmdk shell (bb-cmdk-*) rendered inline — catalogues the dialog, generic command rows (default + active), the tx variant that wraps TxRowCompact, and the loading + empty states. Pins down the current row markup so the queued migration to a daisy <dialog class=\"modal\"> shell has a target.",
+			Group:       "patterns",
+			Render:      func() templ.Component { return SectionCommandPalette() },
+		},
 	}
 }
 
