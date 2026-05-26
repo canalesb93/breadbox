@@ -83,6 +83,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
+		r.Get("/accounts", AccountsListPageHandler(a, svc, sm, tr))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 
 		// The review queue is tag-backed — "needs-review" transactions. The

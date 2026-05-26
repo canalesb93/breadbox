@@ -4,14 +4,25 @@ import "cmp"
 
 // FilterSearchInput is the canonical client-side filter input — a daisy
 // `input` with a small leading search icon and an `x-model` binding
-// for Alpine-driven row filtering. Currently used by `/categories` and
-// `/tags`; future inline-filter list pages should reach for this
-// before re-rolling the markup.
+// for Alpine-driven row filtering. Currently used by `/accounts`,
+// `/categories`, and `/tags`; future inline-filter list pages should
+// reach for this before re-rolling the markup.
 //
 // The component is markup-only. Caller owns the Alpine factory that the
 // XModel string targets — typically a `filter` string on the page's
 // root `x-data` object that each row reads via
 // `x-show="!filter || ($el.dataset.search || '').includes(filter.toLowerCase())"`.
+//
+// Spec hooks:
+//
+//   - `type="search"` is the HTML standard for a free-text filter input
+//     — it carries the right ARIA semantics ("searchbox" role), gets the
+//     browser-native clear affordance, and is what assistive tech expects.
+//   - Pressing Escape on a `type="search"` input is a long-standing
+//     convention in WebKit/Chromium: clear the value, then blur. The
+//     inline handler below mirrors that on the Alpine model so x-model
+//     stays in sync and the behavior is consistent across browsers
+//     (including Firefox, which doesn't ship the native Escape clear).
 //
 // Usage:
 //
@@ -33,10 +44,16 @@ templ FilterSearchInput(p FilterSearchInputProps) {
 			class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content opacity-50 pointer-events-none z-10"
 		></i>
 		<input
-			type="text"
+			type="search"
+			role="searchbox"
 			placeholder={ p.Placeholder }
 			x-model={ p.XModel }
+			@keydown.escape.prevent.stop="$el.value = ''; $el.dispatchEvent(new Event('input', { bubbles: true })); $el.blur()"
 			class="input w-full pl-9 h-10 text-sm"
+			autocomplete="off"
+			autocorrect="off"
+			autocapitalize="none"
+			spellcheck="false"
 		/>
 	</div>
 }

@@ -14,8 +14,9 @@ type ConnectionsProps struct {
 	TotalLiabilities float64
 	HasAnyBalance    bool
 
-	// Family member filter buttons (only rendered when len(Users) > 1)
-	Users []ConnectionsUserFilter
+	// Provider filter strip (only rendered when len(Providers) > 1) —
+	// shows just the providers actually configured in this household.
+	Providers []ConnectionsProviderFilter
 
 	// Connection cards
 	Connections []ConnectionsRow
@@ -25,11 +26,14 @@ type ConnectionsProps struct {
 	LinkAccounts []ConnectionsLinkAccount
 }
 
-// ConnectionsUserFilter is one button in the family-member filter strip.
-type ConnectionsUserFilter struct {
-	ID    string // formatted UUID — used both as filter value and href
-	Name  string
-	First string // first letter for the avatar circle
+// ConnectionsProviderFilter is one chip in the provider filter strip.
+// Only providers actually present on the connections list get a chip — we
+// don't render chips for providers that aren't configured.
+type ConnectionsProviderFilter struct {
+	Slug  string // canonical provider name ("plaid" | "teller" | "csv") — filter value
+	Label string // human-readable name shown on the chip ("Plaid", "Teller", "CSV")
+	Icon  string // Lucide icon name (matches the per-card provider icon)
+	Count int    // # of connections under this provider — used only to sort chips by usage, not displayed
 }
 
 // ConnectionsRow is one bank-connection card on the page.
