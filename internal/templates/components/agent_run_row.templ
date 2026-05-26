@@ -66,37 +66,44 @@ type AgentRunReportRef struct {
 // tooltip-only accessory icons; raw shortID, tokens, turns, and the
 // finished-at clock time live on the run-detail page instead.
 templ AgentRunRow(p AgentRunRowProps) {
-	<a
-		href={ templ.SafeURL("/agents/runs/" + p.ShortID) }
-		class={ "list-row no-underline transition-colors hover:bg-base-200/40 items-center",
+	<li
+		class={ "list-row transition-colors hover:bg-base-200/40 items-center",
 			templ.KV("opacity-70", p.Status == "skipped") }
 		data-run-short-id={ p.ShortID }
 	>
-		@agentRunRowAvatar(p.Status)
-		<div class="min-w-0">
-			<div class="flex items-center gap-2 min-w-0">
-				if p.ShowAgent && p.AgentName != "" {
-					<span class="font-medium text-sm text-base-content truncate">{ p.AgentName }</span>
-				} else {
-					@AgentRunStatusBadge(p.Status)
-				}
-				@agentRunAccessoryIcons(p)
-				<span
-					class="ml-auto shrink-0 text-xs text-base-content/50 tabular-nums"
-					title={ p.StartedAt.Format(time.RFC3339) }
-				>
-					{ agentRunCompactTime(p.StartedAt, p.DurationMs, p.Status) }
-				</span>
+		<a
+			class="contents no-underline"
+			href={ templ.SafeURL("/agents/runs/" + p.ShortID) }
+		>
+			@agentRunRowAvatar(p.Status)
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					if p.ShowAgent && p.AgentName != "" {
+						<span class="font-medium text-sm text-base-content truncate">{ p.AgentName }</span>
+					} else {
+						@AgentRunStatusBadge(p.Status)
+					}
+					@agentRunAccessoryIcons(p)
+					<span
+						class="ml-auto shrink-0 text-xs text-base-content/50 tabular-nums"
+						title={ p.StartedAt.Format(time.RFC3339) }
+					>
+						{ agentRunCompactTime(p.StartedAt, p.DurationMs, p.Status) }
+					</span>
+				</div>
+				@agentRunRowBody(p)
 			</div>
-			@agentRunRowBody(p)
-		</div>
-		@agentRunRowCost(p)
-	</a>
+			@agentRunRowCost(p)
+		</a>
+	</li>
 }
 
 // AgentRunRowList wraps a series of AgentRunRow elements in the
-// canonical daisy `list` surface. The dividers come from the daisy
-// list primitive; no bespoke wrapper.
+// canonical daisy `list` surface. The dividers between rows come from
+// the daisy list primitive; no bespoke wrapper. The `<ul>` + `<li>`
+// shape matches the daisy docs syntax exactly; each row's inner `<a
+// class="contents">` carries navigation without disturbing the
+// `list-row` grid.
 //
 //	@components.AgentRunRowList() {
 //	  for _, r := range rows {
@@ -104,9 +111,9 @@ templ AgentRunRow(p AgentRunRowProps) {
 //	  }
 //	}
 templ AgentRunRowList() {
-	<div class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+	<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
 		{ children... }
-	</div>
+	</ul>
 }
 
 // AgentRunStatusBadge renders the status pill shared between the runs

@@ -43,11 +43,11 @@ templ AgentRunsListSkeleton() {
 			</div>
 		</div>
 		<!-- Run rows: daisy list card, mirroring AgentRunRowList -->
-		<div class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+		<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
 			for i := 0; i < 6; i++ {
 				@agentRunsListSkeletonRow(i)
 			}
-		</div>
+		</ul>
 		<!-- Pagination footer -->
 		<div class="flex items-center justify-end gap-3 mt-4">
 			<div class="skeleton h-3 w-28 hidden sm:block"></div>
@@ -66,7 +66,7 @@ templ AgentRunsListSkeleton() {
 // placeholder widths and toggles which rows show a body line so the
 // skeleton reads as motion rather than a stamped grid.
 templ agentRunsListSkeletonRow(i int) {
-	<div class="list-row items-center">
+	<li class="list-row items-center">
 		<!-- Status-tinted avatar tile -->
 		<div class="skeleton w-10 h-10 rounded-lg shrink-0"></div>
 		<div class="min-w-0">
@@ -97,5 +97,5 @@ templ agentRunsListSkeletonRow(i int) {
 		</div>
 		<!-- Trailing cost block -->
 		<div class="shrink-0 self-center skeleton h-4 w-14"></div>
-	</div>
+	</li>
 }
