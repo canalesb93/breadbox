@@ -22,7 +22,7 @@ templ SaveKey(p SaveKeyProps) {
 	}) {
 		<!-- Self-registering web component: <onepassword-save-button>. Vendored from @1password/save-button 1.3.0. -->
 		<script type="module" src="/static/js/vendor/onepassword-save-button.js"></script>
-		<!-- Page behavior: reveal toggle, clipboard copy, .env download. -->
+		<!-- Page behavior: reveal toggle, clipboard copy, 1Password proxy. -->
 		<script src="/static/js/admin/components/setup_save_key.js"></script>
 		<div class="text-center mb-7">
 			<div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -32,7 +32,10 @@ templ SaveKey(p SaveKeyProps) {
 			<p class="text-sm text-base-content/60 mt-1.5 leading-relaxed">Breadbox uses this key to encrypt bank credentials at rest. Save it to a password manager before connecting any banks.</p>
 		</div>
 		<div class="space-y-4" data-setup-save-key>
-			<!-- Encryption key display + reveal toggle -->
+			<!-- Encryption key display + reveal toggle. Single line; the
+			     64-char key h-scrolls inside the field rather than wrapping
+			     so the action buttons below stay anchored at a predictable
+			     vertical position. -->
 			<div>
 				<div class="flex items-center justify-between mb-1.5">
 					<span class="text-xs font-medium text-base-content/50 tracking-wide">ENCRYPTION_KEY</span>
@@ -55,44 +58,45 @@ templ SaveKey(p SaveKeyProps) {
 					aria-readonly="true"
 					aria-label="Encryption key"
 					tabindex="0"
-					class="bg-base-200/60 border border-base-300 rounded-lg px-3.5 py-3 font-mono text-xs break-all leading-relaxed text-base-content/85 min-h-[3.25rem]"
+					class="bb-key-display"
 				><span data-key-text>{ maskedDots(p.EncryptionKey) }</span></div>
 			</div>
-			<!-- Stacked action buttons. Copy is the primary path (most users
-			     will pick from clipboard into a password manager); Download
-			     is an alternative; the 1Password button is a bonus that
-			     only does anything if the browser extension is installed. -->
-			<div class="space-y-2">
+			<!-- The 1Password web component is functional but ugly; we
+			     park it off-screen and proxy clicks from our own daisy
+			     button below. Keeping it in the DOM is what gives the
+			     extension something to attach to. -->
+			<onepassword-save-button
+				data-onepassword-type="login"
+				value={ p.OnePasswordValue }
+				class="blue"
+				padding="normal"
+				aria-hidden="true"
+				tabindex="-1"
+				style="position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none"
+			></onepassword-save-button>
+			<!-- Two equal-weight save options. Copy goes to the clipboard;
+			     "Save in 1Password" forwards to the hidden web component.
+			     Both styled identically so neither reads as preferred — the
+			     user picks whichever workflow fits their password manager. -->
+			<div class="grid grid-cols-2 gap-2">
 				<button
 					type="button"
 					data-action="copy"
-					class="btn btn-primary btn-soft btn-sm w-full h-11 gap-2"
+					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
 				>
 					<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
 					<i data-lucide="check" class="w-4 h-4 hidden text-success" data-copy-done></i>
-					<span data-copy-label>Copy to clipboard</span>
+					<span data-copy-label>Copy</span>
 				</button>
 				<button
 					type="button"
-					data-action="download"
-					class="btn btn-sm h-11 gap-2 w-full"
+					data-action="save-1password"
+					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
+					title="Requires the 1Password browser extension"
 				>
-					<i data-lucide="download" class="w-4 h-4" data-download-icon></i>
-					<i data-lucide="check" class="w-4 h-4 hidden text-success" data-download-done></i>
-					<span data-download-label>Download .env</span>
+					<i data-lucide="key-round" class="w-4 h-4"></i>
+					<span>Save in 1Password</span>
 				</button>
-				<!-- The 1Password web component renders inert unless the
-				     visitor has the 1Password browser extension installed.
-				     Sits on its own row at its natural width so we don't
-				     fight its shadow-DOM sizing. -->
-				<div class="flex justify-center pt-0.5">
-					<onepassword-save-button
-						data-onepassword-type="login"
-						value={ p.OnePasswordValue }
-						class="blue"
-						padding="normal"
-					></onepassword-save-button>
-				</div>
 			</div>
 			<!-- Lost-it-later callout. Quieter visual weight than a daisy alert. -->
 			<div class="rounded-lg bg-base-200/40 border border-base-300/70 px-3.5 py-3 text-xs text-base-content/60 leading-relaxed">

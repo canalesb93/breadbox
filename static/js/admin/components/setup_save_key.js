@@ -1,11 +1,11 @@
 // Page behavior for /setup/save-key — reveal toggle, clipboard copy,
-// and ".env" download for the one-time encryption-key reveal screen.
+// and a daisy-styled proxy to the (off-screen) 1Password Save button.
 //
 // Plain vanilla JS (not Alpine): the wizard layout deliberately doesn't
 // load Alpine.js. The encryption key is read from a `data-key-value`
 // attribute on the display container rather than an <input>, so we can
-// render it as wrap-friendly mono text instead of a single-line field
-// that truncates a 64-char hex string.
+// keep the visible content masked at SSR and toggle it client-side
+// without ever flashing the plaintext.
 (function () {
   function onReady(fn) {
     if (document.readyState === 'loading') {
@@ -70,48 +70,31 @@
           var lbl = copyBtn.querySelector('[data-copy-label]');
           if (ic) ic.classList.add('hidden');
           if (ok) ok.classList.remove('hidden');
-          if (lbl) lbl.textContent = 'Copied to clipboard';
+          if (lbl) lbl.textContent = 'Copied';
           if (copyResetTimer) clearTimeout(copyResetTimer);
           copyResetTimer = setTimeout(function () {
             copyBtn.classList.remove('btn-success');
             copyBtn.classList.add('btn-primary', 'btn-soft');
             if (ic) ic.classList.remove('hidden');
             if (ok) ok.classList.add('hidden');
-            if (lbl) lbl.textContent = 'Copy to clipboard';
+            if (lbl) lbl.textContent = 'Copy';
           }, 2000);
         });
       });
     }
 
-    // Download .env.
-    var dlBtn = root.querySelector('[data-action="download"]');
-    var dlResetTimer = null;
-    if (dlBtn) {
-      dlBtn.addEventListener('click', function () {
-        var contents = '# Breadbox encryption key -- store this somewhere safe.\n'
-          + '# Without it, encrypted bank credentials cannot be decrypted.\n'
-          + 'ENCRYPTION_KEY=' + key + '\n';
-        var blob = new Blob([contents], { type: 'text/plain;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'breadbox.env';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-        var dlIcon = dlBtn.querySelector('[data-download-icon]');
-        var dlDone = dlBtn.querySelector('[data-download-done]');
-        var dlLabel = dlBtn.querySelector('[data-download-label]');
-        if (dlIcon) dlIcon.classList.add('hidden');
-        if (dlDone) dlDone.classList.remove('hidden');
-        if (dlLabel) dlLabel.textContent = 'Downloaded';
-        if (dlResetTimer) clearTimeout(dlResetTimer);
-        dlResetTimer = setTimeout(function () {
-          if (dlIcon) dlIcon.classList.remove('hidden');
-          if (dlDone) dlDone.classList.add('hidden');
-          if (dlLabel) dlLabel.textContent = 'Download .env';
-        }, 2000);
+    // Save in 1Password — forwards the click to the hidden web
+    // component's internal button, which is what the 1Password browser
+    // extension hooks into. The component lives off-screen so we get to
+    // render our own daisy-styled button instead of fighting its
+    // shadow-DOM styling. Without the extension, this is a no-op.
+    var op1pBtn = root.querySelector('[data-action="save-1password"]');
+    if (op1pBtn) {
+      op1pBtn.addEventListener('click', function () {
+        var opEl = document.querySelector('onepassword-save-button');
+        if (!opEl) return;
+        var inner = opEl.shadowRoot && opEl.shadowRoot.querySelector('button.onepasswordSaveBtn');
+        if (inner) inner.click();
       });
     }
   }

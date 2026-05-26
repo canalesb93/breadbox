@@ -83,13 +83,6 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		// Check if onboarding is dismissed (for the nav badge display).
 		dismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
 
-		// One-time hint pushing admins toward the key-reveal screen.
-		// Only shows when the env key is set and we haven't stamped the
-		// acknowledgment yet — gone forever once the admin clicks
-		// through /setup/save-key.
-		shouldSaveKey := len(a.Config.EncryptionKey) > 0 &&
-			appconfig.String(ctx, a.Queries, appconfig.KeyEncryptionKeyAcknowledgedAt, "") == ""
-
 		data := BaseTemplateData(r, sm, "getting-started", "Getting Started")
 		props := pages.GettingStartedProps{
 			HasMember:           hasMember,
@@ -104,7 +97,6 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 			TransactionCount:    txCount,
 			SuccessfulSyncs:     successfulSyncs,
 			OnboardingDismissed: dismissed,
-			ShouldSaveKey:       shouldSaveKey,
 			CSRFToken:           GetCSRFToken(r),
 		}
 		renderGettingStarted(w, r, tr, data, props)
