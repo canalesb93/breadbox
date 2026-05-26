@@ -784,6 +784,11 @@ templ SectionLoading() {
 				@components.TxResultsSkeleton()
 			</div>
 		}
+		@designExample("Accounts list skeleton", "Placeholder mirroring /accounts — summary stats (Net Worth / Assets / Liabilities), filter input, and the sortable table. Primitive is exposed here for future AJAX swaps and adjacent account panels; /accounts is full-SSR today.") {
+			<div class="max-w-4xl">
+				@components.AccountsListSkeleton()
+			</div>
+		}
 		@designExample("Progress", "Indeterminate + determinate.") {
 			<div class="space-y-3 max-w-md">
 				<progress class="progress progress-primary w-full"></progress>

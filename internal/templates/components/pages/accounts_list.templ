@@ -97,6 +97,12 @@ templ AccountsList(p AccountsListProps) {
 				})
 			}
 		</div>
+		<!-- Loading skeleton for the accounts list, available for any future
+		     client-side refresh / pagination swap. Mirrors the SSR layout
+		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+		<template id="bb-accounts-list-skeleton-template">
+			@components.AccountsListSkeleton()
+		</template>
 	</div>
 	<script>
 		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
