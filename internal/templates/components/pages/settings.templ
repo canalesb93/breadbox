@@ -22,7 +22,7 @@ templ SettingsGeneral(p SettingsProps) {
 			Title:    "General",
 			Subtitle: "Schedule, log retention, and avatars",
 		})
-		<div class="space-y-6">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 			@settingsSyncSection(p)
 			@settingsAvatarsSection(p)
 		</div>
@@ -38,7 +38,7 @@ templ SettingsSystem(p SettingsProps) {
 			Title:    "System",
 			Subtitle: "Security and runtime information",
 		})
-		<div class="space-y-6">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 			@settingsSecuritySection(p)
 			@settingsRuntimeSection(p)
 		</div>
@@ -54,7 +54,7 @@ templ SettingsHelp(p SettingsProps) {
 			Title:    "Help",
 			Subtitle: "Setup guide and resources",
 		})
-		<div class="space-y-6">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 			@settingsResourcesSection(p)
 			@settingsDeveloperSection()
 		</div>
