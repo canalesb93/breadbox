@@ -2885,7 +2885,8 @@
   .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1 {
     background: color-mix(in oklch, var(--color-base-100) 92%, white 8%);
   }
-  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after,
+  /* Composer card has no header — its tail points at the card body, so
+   * match the lifted card surface. */
   .bb-timeline-prominent .bb-timeline > li:has([data-composer-anchor]) > div.flex-1::after {
     border-right-color: color-mix(in oklch, var(--color-base-100) 92%, white 8%);
   }
@@ -2894,6 +2895,16 @@
    * it slightly so the header reads as a defined band rather than a hole. */
   .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1 > div:first-child {
     background: color-mix(in oklch, var(--color-base-100) 86%, white 14%);
+  }
+  /* Comment-card tail points at the header bar (top: 6px lands inside the
+   * 0.5rem padding + 1.55 line-height header), so match the header's
+   * lifted background — not the card body. In light mode both surfaces
+   * composite to nearly the same color so the body-matching value above
+   * looked right; in dark mode the header is visibly lighter than the
+   * card, and a body-coloured tail reads as a notch hanging below the
+   * header. */
+  .bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1::after {
+    border-right-color: color-mix(in oklch, var(--color-base-100) 86%, white 14%);
   }
 }
 
