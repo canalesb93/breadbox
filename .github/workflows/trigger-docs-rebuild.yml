@@ -1,0 +1,31 @@
+name: Trigger docs rebuild
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "openapi.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: trigger-docs-rebuild
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Mintlify deployment
+        env:
+          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
+          MINTLIFY_PROJECT_ID: ${{ secrets.MINTLIFY_PROJECT_ID }}
+        run: |
+          if [ -z "$MINTLIFY_API_KEY" ] || [ -z "$MINTLIFY_PROJECT_ID" ]; then
+            echo "::error::MINTLIFY_API_KEY and MINTLIFY_PROJECT_ID secrets are required."
+            exit 1
+          fi
+          curl -fsSL -X POST "https://api.mintlify.com/v1/project/update/$MINTLIFY_PROJECT_ID" \
+            -H "Authorization: Bearer $MINTLIFY_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger":"openapi-spec-changed"}'
+          echo "Mintlify rebuild queued."
