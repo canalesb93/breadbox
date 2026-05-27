@@ -65,7 +65,7 @@ func SaveKeyHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer) htt
 			PageTitle:        "Save encryption key",
 			CSRFToken:        GetCSRFToken(r),
 			EncryptionKey:    keyHex,
-			OnePasswordValue: encodeOnePasswordLogin(title, keyHex),
+			OnePasswordValue: encodeOnePasswordAPIKey(title, keyHex, installURL(r)),
 			ItemTitle:        title,
 		}
 		if f := GetFlash(ctx, sm); f != nil {
@@ -90,22 +90,34 @@ func saveKeyItemTitle(host string) string {
 	return fmt.Sprintf("Breadbox encryption key (%s)", host)
 }
 
-// encodeOnePasswordLogin builds the base64-encoded JSON payload the
+// encodeOnePasswordAPIKey builds the base64-encoded JSON payload the
 // <onepassword-save-button> consumes. The save-button package itself
 // ships an encodeOPSaveRequest() helper, but doing it server-side
 // keeps the page logic-free and saves a JS module roundtrip.
 //
+// We pair this with data-onepassword-type="api-key" on the web
+// component so 1Password files the entry as an API Credential rather
+// than a Login. An API Credential is the right shape for a standalone
+// secret: the `current-password` autocomplete maps to the Credential
+// field, and `url` to the website. No username field — its only
+// previous value was the literal string "ENCRYPTION_KEY", which
+// surfaced as the username column in 1Password and was the source of
+// confusion this function was renamed to fix.
+//
 // Format reference: https://www.1password.dev/web/add-1password-button-website
-func encodeOnePasswordLogin(title, key string) string {
+func encodeOnePasswordAPIKey(title, key, url string) string {
+	fields := []map[string]interface{}{
+		{"autocomplete": "current-password", "value": key},
+	}
+	if url != "" {
+		fields = append(fields, map[string]interface{}{"autocomplete": "url", "value": url})
+	}
 	payload := struct {
 		Title  string                   `json:"title"`
 		Fields []map[string]interface{} `json:"fields"`
 	}{
-		Title: title,
-		Fields: []map[string]interface{}{
-			{"autocomplete": "username", "value": "ENCRYPTION_KEY"},
-			{"autocomplete": "current-password", "value": key},
-		},
+		Title:  title,
+		Fields: fields,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -115,4 +127,27 @@ func encodeOnePasswordLogin(title, key string) string {
 		return ""
 	}
 	return base64.StdEncoding.EncodeToString(raw)
+}
+
+// installURL builds the public-facing URL of this Breadbox install,
+// honoring X-Forwarded-Proto / X-Forwarded-Host when set by a reverse
+// proxy. Used as the website value on the saved 1Password item so the
+// user can jump back to the right install from their vault. Returns
+// "" when host is unknown (which makes the encoder skip the field).
+func installURL(r *http.Request) string {
+	if r.Host == "" {
+		return ""
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	return scheme + "://" + host
 }

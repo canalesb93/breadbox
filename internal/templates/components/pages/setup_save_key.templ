@@ -67,11 +67,13 @@ templ SaveKey(p SaveKeyProps) {
 			<!-- The 1Password web component is functional but ugly; we
 			     park it off-screen and proxy clicks from our own daisy
 			     button below. Keeping it in the DOM is what gives the
-			     extension something to attach to. -->
+			     extension something to attach to.
+			     `api-key` files this in 1Password as an API Credential
+			     (not a Login) — the right shape for a standalone secret
+			     with no associated username. -->
 			<onepassword-save-button
-				data-onepassword-type="login"
+				data-onepassword-type="api-key"
 				value={ p.OnePasswordValue }
-				class="blue"
 				padding="normal"
 				aria-hidden="true"
 				tabindex="-1"
