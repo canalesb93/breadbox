@@ -22,9 +22,10 @@ Pick one entrypoint:
   railway init        # picks a name + creates the project
   railway link        # link this dir to that project
   ```
-- **Deploy button** (skips the GitHub-pick step; you still need to add
-  Postgres in step 2):
-  [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https%3A%2F%2Fgithub.com%2Fcanalesb93%2Fbreadbox)
+- **Deploy button** (one-click — provisions Breadbox + Postgres + a
+  `/var/lib/breadbox` volume, sets `DATABASE_URL` from Postgres,
+  auto-generates `ENCRYPTION_KEY`. Skip to step 5 after it finishes):
+  [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/fXUDm0)
 
 ### 2. Add Postgres to the project — **before** the first deploy
 
