@@ -2,7 +2,10 @@
 
 package agent
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 // TranscriptDirEnvVar is the env-var name that supplies the fallback
 // transcript_dir when app_config has no explicit value.
@@ -14,18 +17,24 @@ const TranscriptDirEnvVar = "BREADBOX_AGENT_TRANSCRIPT_DIR"
 // Precedence (highest first):
 //
 //  1. operator config in app_config — handled by the caller via
-//     appconfig.String(..., KeyAgentTranscriptDir, DefaultTranscriptDir())
+//     appconfig.String(..., KeyAgentTranscriptDir, DefaultTranscriptDir(dataDir))
 //  2. BREADBOX_AGENT_TRANSCRIPT_DIR env var — local-dev hook for sharing
 //     one transcript dir across multiple worktree servers
-//  3. "transcripts/agents" — cwd-relative, matches the Docker image's
-//     /app/transcripts/agents working directory
+//  3. <dataDir>/transcripts/agents when dataDir is non-empty — derived
+//     from BB_DATA_DIR (defaults to /var/lib/breadbox in ENVIRONMENT=docker)
+//  4. "transcripts/agents" — cwd-relative, used when no data root is
+//     configured (local dev outside Docker)
 //
-// The Docker image still resolves to /app/transcripts/agents because the
-// env var is unset and the working directory is /app. Local worktree
-// sessions get a stable home-shared dir via the session-start hook.
-func DefaultTranscriptDir() string {
+// In Docker images dataDir resolves to /var/lib/breadbox, so transcripts
+// land at /var/lib/breadbox/transcripts/agents alongside the backups
+// dir — one volume covers both. Local worktree sessions get a stable
+// home-shared dir via the session-start hook (env var path 2).
+func DefaultTranscriptDir(dataDir string) string {
 	if v := os.Getenv(TranscriptDirEnvVar); v != "" {
 		return v
+	}
+	if dataDir != "" {
+		return filepath.Join(dataDir, "transcripts", "agents")
 	}
 	return "transcripts/agents"
 }

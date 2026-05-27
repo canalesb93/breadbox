@@ -10,6 +10,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - **MCP tool `list_annotations`** now wraps its response in a `{ "annotations": [...] }` envelope. The previous bare-array shape failed client-side schema validation on clients that strictly enforce the MCP spec — `structuredContent` is required to be a JSON record, not an array. The new envelope matches every other list tool (`list_accounts`, `list_categories`, `list_tags`, …) and the REST `/transactions/{id}/annotations` endpoint.
 
+### Changed
+
+- **Persistent runtime data now lives under a single root.** Agent NDJSON transcripts and scheduled pg_dump backups both default to subdirectories of `BB_DATA_DIR` (resolves to `/var/lib/breadbox` when `ENVIRONMENT=docker`, empty for local dev so cwd-relative defaults still apply). One Docker / Fly / Railway volume mount at `/var/lib/breadbox` covers both; the per-subsystem env vars (`BACKUP_DIR`, `BREADBOX_AGENT_TRANSCRIPT_DIR`) still override.
+
+  This is a soft-breaking change for self-hosters running this repo's `docker-compose.prod.yml`. Old layout: two named volumes `breadbox_transcripts:/app/transcripts` + `breadbox_backups:/var/lib/breadbox/backups`. New layout: one volume `breadbox_data:/var/lib/breadbox`. Compose, `fly.toml`, and `deploy/install.sh` are all updated. **To migrate existing data on Docker installs** (steps run from the install dir):
+
+  ```bash
+  # 1. Stop the stack so files quiesce.
+  docker compose down
+
+  # 2. Copy transcripts from the old volume to the new layout. The
+  #    helper container has both volumes mounted side by side.
+  docker run --rm \
+    -v ${PWD##*/}_breadbox_transcripts:/old \
+    -v ${PWD##*/}_breadbox_data:/new \
+    alpine sh -c 'mkdir -p /new/transcripts && cp -a /old/. /new/transcripts/'
+
+  # 3. Copy backups likewise.
+  docker run --rm \
+    -v ${PWD##*/}_breadbox_backups:/old \
+    -v ${PWD##*/}_breadbox_data:/new \
+    alpine sh -c 'mkdir -p /new/backups && cp -a /old/. /new/backups/'
+
+  # 4. Bring the stack back up against the new compose.
+  docker compose up -d
+
+  # 5. After verifying Settings → Agents shows old transcripts and
+  #    Settings → Backups shows old backup files, drop the orphan volumes.
+  docker volume rm ${PWD##*/}_breadbox_transcripts ${PWD##*/}_breadbox_backups
+  ```
+
+  Skipping the migration leaves prior transcripts and backups stranded on the old volumes — Breadbox still works, but old data is invisible until copied over. Fresh installs are unaffected.
+
 ### Added
 
 - **`breadbox agent test` CLI** for diagnosing the agent subsystem end-to-end: verifies auth is configured, sidecar binary is discoverable, and a tiny "say OK" prompt round-trips through the SDK. Exit code 3 = no auth, 5 = no binary.

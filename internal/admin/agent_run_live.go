@@ -44,7 +44,7 @@ type AgentRunLivePayload struct {
 // group); same transcript parsing as the full page handler so the
 // in-place patch matches what the initial server-side render would
 // have produced.
-func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer, dataDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		shortID := chi.URLParam(r, "shortId")
@@ -90,7 +90,7 @@ func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 			path = *run.TranscriptPath
 		}
 		if path == "" && run.ID != "" {
-			dir := appconfig.String(ctx, svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
+			dir := appconfig.String(ctx, svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(dataDir))
 			if dir != "" {
 				path = filepath.Join(dir, run.ID+".ndjson")
 			}

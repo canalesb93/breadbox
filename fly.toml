@@ -8,7 +8,7 @@
 #   2. `primary_region` — your nearest Fly region (iad, sjc, lhr, syd…)
 #
 # Everything else is set up for a single-machine Breadbox install with
-# persistent volumes for transcripts + backups and HTTP health checks.
+# one persistent volume for transcripts + backups and HTTP health checks.
 
 app = "breadbox"
 primary_region = "iad"
@@ -48,23 +48,17 @@ primary_region = "iad"
   method = "GET"
   path = "/health/ready"
 
-# Persistent storage. The breadbox container writes:
-#   - NDJSON agent-run transcripts to /app/transcripts
-#   - Scheduled pg_dump backups to /var/lib/breadbox/backups
-# Both should survive deploys. Create the volumes once before the first
-# deploy:
-#   flyctl volumes create breadbox_transcripts --region <primary_region> --size 1
-#   flyctl volumes create breadbox_backups     --region <primary_region> --size 5
+# Persistent storage. The breadbox container writes everything under
+# /var/lib/breadbox (set automatically when ENVIRONMENT=docker):
+#   - /var/lib/breadbox/transcripts/agents — NDJSON agent-run transcripts
+#   - /var/lib/breadbox/backups            — scheduled pg_dump backups
+# One volume covers both. Create it once before the first deploy:
+#   flyctl volumes create breadbox_data --region <primary_region> --size 6
 
 [[mounts]]
-  source = "breadbox_transcripts"
-  destination = "/app/transcripts"
-  initial_size = "1gb"
-
-[[mounts]]
-  source = "breadbox_backups"
-  destination = "/var/lib/breadbox/backups"
-  initial_size = "5gb"
+  source = "breadbox_data"
+  destination = "/var/lib/breadbox"
+  initial_size = "6gb"
 
 [[vm]]
   size = "shared-cpu-1x"

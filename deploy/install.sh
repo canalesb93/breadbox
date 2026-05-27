@@ -146,7 +146,7 @@ do_uninstall() {
     printf "  ${INSTALL_DIR}/.env\n"
     printf "  ${INSTALL_DIR}/.breadbox-version\n"
     printf "\n"
-    printf "${YELLOW}Docker volumes (postgres, transcripts, backups, and caddy if used) are NOT removed.${NC}\n"
+    printf "${YELLOW}Docker volumes (postgres, breadbox data, and caddy if used) are NOT removed.${NC}\n"
     printf "To remove all breadbox volumes (DESTROYS data):\n"
     printf "  docker volume rm \$(docker volume ls -q | grep breadbox)\n"
     printf "\n"
@@ -485,7 +485,7 @@ for arg in "$@"; do
             printf "  --port=N               HTTP port to listen on (default: 8080)\n"
             printf "  --version=vX.Y.Z       Pin to a specific release tag (default: latest GitHub release)\n"
             printf "  --no-start             Write the install but don't 'docker compose up' it\n"
-            printf "  --purge-volumes        Drop existing postgres/transcripts/backups volumes before install\n"
+            printf "  --purge-volumes        Drop existing postgres/breadbox-data volumes before install\n"
             printf "                         (DESTRUCTIVE — wipes prior data; use when re-installing fresh)\n"
             printf "  --register-daemon      Register launchd (macOS) or systemd (Linux) unit\n"
             printf "  --no-register-daemon   Skip daemon registration (no boot-time autostart)\n"
@@ -792,7 +792,11 @@ if [ "$ENV_EXISTS" = "0" ] && [ -n "$EXISTING_PG_VOLUME" ]; then
     printf "\n"
     if [ "$PURGE_VOLUMES" = "1" ] || prompt_yn "Drop existing volumes and start fresh? (DESTROYS all prior data)" "n"; then
         info "Removing existing volumes..."
-        for vol in "${PROJECT_NAME}_postgres_data" "${PROJECT_NAME}_breadbox_transcripts" "${PROJECT_NAME}_breadbox_backups"; do
+        # breadbox_transcripts / breadbox_backups are the pre-BB_DATA_DIR
+        # volume names — list them too so --purge-volumes wipes old installs
+        # cleanly. Fresh installs only have breadbox_data; the docker
+        # volume rm calls for the legacy names will no-op via 2>/dev/null.
+        for vol in "${PROJECT_NAME}_postgres_data" "${PROJECT_NAME}_breadbox_data" "${PROJECT_NAME}_breadbox_transcripts" "${PROJECT_NAME}_breadbox_backups"; do
             docker volume rm "$vol" 2>/dev/null && success "Removed $vol" || true
         done
         printf "\n"
