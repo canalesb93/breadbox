@@ -37,6 +37,17 @@ account.
 Full install docs — binary download, Go source, manual Docker, daemon
 registration: **[docs.breadbox.sh/install](https://docs.breadbox.sh/install)**.
 
+### Or deploy to a managed platform
+
+- **[Fly.io](deploy/fly-deploy.md)** — `flyctl deploy` against the
+  [`fly.toml`](fly.toml) at the repo root. Managed Postgres + persistent
+  volumes. ~5 minutes.
+- **[Railway](deploy/railway-deploy.md)** — one-click "Deploy on
+  Railway" button; auto-attached Postgres add-on. ~3 minutes.
+
+Both work without extra config thanks to Breadbox's 12-factor `$PORT`
+handling — the platform-injected port flows through to the binary.
+
 ## CLI
 
 The same `breadbox` binary doubles as a `gh`-style CLI for driving any
