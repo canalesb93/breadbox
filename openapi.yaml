@@ -2295,6 +2295,17 @@ paths:
               properties:
                 name: { type: string }
                 scope: { type: string, enum: [full_access, read_only] }
+                actor_type:
+                  type: string
+                  enum: [user, agent, system]
+                  default: user
+                  description: |
+                    Attribution category. Defaults to `user` for human-driven
+                    integrations. `agent` keys are short-lived runtime
+                    credentials minted by the agent orchestrator and are
+                    auto-revoked after 1 hour by the startup cleanup sweep —
+                    do not request `agent` for long-lived integrations.
+                actor_name: { type: string, nullable: true }
       responses:
         "201":
           description: Created key (plaintext returned once).

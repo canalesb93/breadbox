@@ -51,8 +51,8 @@ func TestDeleteTransaction_SoftDeletes(t *testing.T) {
 	if len(annots) != 1 {
 		t.Fatalf("want 1 transaction_deleted annotation, got %d", len(annots))
 	}
-	if annots[0].ActorType != "agent" {
-		t.Fatalf("want actor_type=agent, got %q", annots[0].ActorType)
+	if annots[0].ActorType != "user" {
+		t.Fatalf("want actor_type=user, got %q", annots[0].ActorType)
 	}
 }
 
