@@ -2496,9 +2496,6 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs/{shortId}:
-    parameters:
-      - { name: shortId, in: path, required: true, schema: { type: string } }
     patch:
       tags: [Agents]
       summary: Set or clear the operator note on a run
