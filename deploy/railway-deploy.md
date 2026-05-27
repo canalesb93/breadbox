@@ -1,47 +1,52 @@
 # Deploy Breadbox to Railway
 
 [Railway](https://railway.com) builds Breadbox directly from this repo's
-Dockerfile, attaches a managed Postgres add-on, and gives you a public
-HTTPS URL. About 3 minutes end-to-end.
+Dockerfile. About 5 minutes end-to-end.
 
-## One-click deploy
+> ⚠️ **Postgres must be provisioned in the same Railway project before the
+> Breadbox service starts.** Breadbox crashes on boot if `DATABASE_URL` is
+> unset. The Deploy button does NOT auto-provision the database — you have
+> to add it manually first. See the order of operations below.
 
-Click the button — Railway forks the repo, builds, and prompts you for
-the required secrets (`ENCRYPTION_KEY`). Postgres attaches automatically
-and exposes `DATABASE_URL` to the service.
+## Deploy steps
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https%3A%2F%2Fgithub.com%2Fcanalesb93%2Fbreadbox)
+### 1. Create the Railway project
 
-After deploy:
-1. Open the service URL Railway prints (`*.up.railway.app`)
-2. Visit `/setup` to create your admin account
-3. Visit `/connections` to link your first bank
+Pick one entrypoint:
 
-## Manual deploy (full control)
+- **Dashboard**: Railway → **New Project** → **Deploy from GitHub repo** →
+  point it at `canalesb93/breadbox`.
+- **CLI**:
+  ```bash
+  railway login
+  railway init        # picks a name + creates the project
+  railway link        # link this dir to that project
+  ```
+- **Deploy button** (skips the GitHub-pick step; you still need to add
+  Postgres in step 2):
+  [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https%3A%2F%2Fgithub.com%2Fcanalesb93%2Fbreadbox)
 
-If you'd rather configure things yourself, or you want to use an
-existing project:
+### 2. Add Postgres to the project — **before** the first deploy
 
-### 1. Create a project from the repo
+In the Railway dashboard:
+1. Click **+ New** → **Database** → **Add PostgreSQL**.
+2. Open the Breadbox service → **Variables** tab.
+3. Reference the Postgres connection:
+   ```
+   DATABASE_URL = ${{ Postgres.DATABASE_URL }}
+   ```
+   (Use the **Add Variable Reference** UI rather than pasting a literal
+   string — Railway auto-updates the reference if the DB rotates creds.)
 
-```bash
-railway login
-railway init                # picks a name + creates the project
-railway link                # link this dir to that project
-```
-
-Or skip the CLI and click "New Project" → "Deploy from GitHub repo" in
-the Railway dashboard, then point it at `canalesb93/breadbox`.
-
-### 2. Add Postgres
-
-In the dashboard: **+ New** → **Database** → **Add PostgreSQL**.
-Railway sets `DATABASE_URL` automatically on the service.
+If you skip this step, the Breadbox container will crash on startup
+with `failed to connect to ... /tmp/.s.PGSQL.5432: no such file` — that's
+the runtime trying to find a local socket because nothing set
+`DATABASE_URL`.
 
 ### 3. Set the encryption key
 
 ```bash
-railway variables set ENCRYPTION_KEY=$(openssl rand -hex 32)
+railway variables --set ENCRYPTION_KEY=$(openssl rand -hex 32)
 ```
 
 > **Save this key.** It encrypts your bank-provider credentials at rest.
@@ -53,14 +58,19 @@ railway variables set ENCRYPTION_KEY=$(openssl rand -hex 32)
 railway up
 ```
 
-Railway reads `deploy/railway.json` to find the Dockerfile + start
-command, builds the image, and exposes a public URL.
+Railway reads `railway.json` from the repo root (Dockerfile builder +
+`migrate && serve` start command), builds the image, and starts the
+service.
 
-### 5. Generate a public domain (one click)
+### 5. Generate a public domain
 
-In the dashboard: **Settings** → **Networking** → **Generate Domain**.
-You get `*.up.railway.app`. Custom domains supported under the same
-panel.
+Dashboard → Breadbox service → **Settings** → **Networking** →
+**Generate Domain**. You get `*.up.railway.app`. Custom domains live
+under the same panel.
+
+### 6. Continue setup
+
+Open the public URL Railway printed → `/setup` → create your admin.
 
 ## Updating
 
