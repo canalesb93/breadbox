@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
 set -eu
 
 # Breadbox Install Script
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | bash
 #   bash install.sh [--uninstall] [--yes] [--domain=...] [--install-docker]
+#   bash install.sh [--version=vX.Y.Z] [--no-start]
 #
 # INSTALL_DIR convention:
 #   - System install  (running as root or EUID 0) → /opt/breadbox
@@ -373,7 +374,10 @@ AUTO_YES=0
 INSTALL_DOCKER=0
 REGISTER_DAEMON=0
 NO_REGISTER_DAEMON=0
+NO_START=0
+PURGE_VOLUMES=0
 DOMAIN_ARG=""
+VERSION_ARG=""
 
 for arg in "$@"; do
     case "$arg" in
@@ -382,7 +386,10 @@ for arg in "$@"; do
         --install-docker) INSTALL_DOCKER=1 ;;
         --register-daemon) REGISTER_DAEMON=1 ;;
         --no-register-daemon) NO_REGISTER_DAEMON=1 ;;
+        --no-start) NO_START=1 ;;
+        --purge-volumes) PURGE_VOLUMES=1 ;;
         --domain=*) DOMAIN_ARG="${arg#--domain=}" ;;
+        --version=*) VERSION_ARG="${arg#--version=}" ;;
         --help|-h)
             printf "Usage: install.sh [OPTIONS]\n\n"
             printf "Options:\n"
@@ -390,6 +397,10 @@ for arg in "$@"; do
             printf "  --yes, -y              Skip interactive prompts; accept defaults\n"
             printf "  --install-docker       Install Docker automatically (Linux only)\n"
             printf "  --domain=HOST          Configure the install for HTTPS at HOST (enables Caddy)\n"
+            printf "  --version=vX.Y.Z       Pin to a specific release tag (default: latest GitHub release)\n"
+            printf "  --no-start             Write the install but don't 'docker compose up' it\n"
+            printf "  --purge-volumes        Drop existing postgres/transcripts/backups volumes before install\n"
+            printf "                         (DESTRUCTIVE — wipes prior data; use when re-installing fresh)\n"
             printf "  --register-daemon      Register launchd (macOS) or systemd (Linux) unit\n"
             printf "  --no-register-daemon   Skip daemon registration (no boot-time autostart)\n"
             printf "  --help, -h             Show this help message\n"
@@ -471,14 +482,20 @@ printf "\n"
 
 # --- Resolve version ---
 
-info "Fetching latest release..."
-TAG=$(get_latest_tag)
-if [ "$TAG" = "latest" ]; then
-    warn "Could not determine latest release tag. Using :latest image."
-    IMAGE_TAG="latest"
+if [ -n "$VERSION_ARG" ]; then
+    info "Using pinned version: ${VERSION_ARG}"
+    TAG="$VERSION_ARG"
+    IMAGE_TAG="$VERSION_ARG"
 else
-    success "Latest release: ${TAG}"
-    IMAGE_TAG="$TAG"
+    info "Fetching latest release..."
+    TAG=$(get_latest_tag)
+    if [ "$TAG" = "latest" ]; then
+        warn "Could not determine latest release tag. Using :latest image."
+        IMAGE_TAG="latest"
+    else
+        success "Latest release: ${TAG}"
+        IMAGE_TAG="$TAG"
+    fi
 fi
 
 printf "\n"
@@ -550,8 +567,9 @@ if [ "$IMAGE_TAG" != "latest" ]; then
     info "Pinned image to ghcr.io/${REPO}:${IMAGE_TAG}"
 fi
 
-# Record the pinned tag so update.sh can preserve it across upgrades.
-# "latest" signals the user explicitly wants rolling updates.
+# Record the pinned tag for traceability and for any user-side scripting
+# that wants to know which release this dir was installed against.
+# "latest" signals the user picked rolling updates.
 printf "%s\n" "$IMAGE_TAG" > "${INSTALL_DIR}/.breadbox-version"
 
 # --- Generate .env ---
@@ -615,24 +633,84 @@ fi
 
 printf "\n"
 
+# --- Detect existing postgres volume (cross-install footgun) ---
+#
+# When a user uninstalls and reinstalls, --uninstall preserves the
+# postgres_data volume by design (protect user data). But this install
+# generates a fresh POSTGRES_PASSWORD that doesn't match what's baked into
+# the existing volume's pg_hba.conf, so breadbox can't authenticate and
+# every migration attempt fails with "password authentication failed".
+#
+# Detect the leftover volume and force the user to choose: drop it (lose
+# data, get a clean install) or abort and recover the old password from
+# their previous .env backup.
+PROJECT_NAME=$(basename "$INSTALL_DIR")
+EXISTING_PG_VOLUME=$(docker volume ls --format '{{.Name}}' 2>/dev/null \
+    | grep -E "^${PROJECT_NAME}_postgres_data$" | head -1 || true)
+
+if [ "$ENV_EXISTS" = "0" ] && [ -n "$EXISTING_PG_VOLUME" ]; then
+    warn "Existing postgres volume detected: ${EXISTING_PG_VOLUME}"
+    warn "It was preserved by a previous --uninstall. The new .env has a"
+    warn "fresh POSTGRES_PASSWORD that will NOT match the volume's stored"
+    warn "credentials — breadbox would fail to authenticate."
+    printf "\n"
+    if [ "$PURGE_VOLUMES" = "1" ] || prompt_yn "Drop existing volumes and start fresh? (DESTROYS all prior data)" "n"; then
+        info "Removing existing volumes..."
+        for vol in "${PROJECT_NAME}_postgres_data" "${PROJECT_NAME}_breadbox_transcripts" "${PROJECT_NAME}_breadbox_backups"; do
+            docker volume rm "$vol" 2>/dev/null && success "Removed $vol" || true
+        done
+        printf "\n"
+    else
+        # Remove the freshly-generated .env so the next install.sh run starts
+        # from ENV_EXISTS=0 and re-prompts (otherwise the stale fresh-secrets
+        # .env would silently keep failing auth).
+        rm -f "${INSTALL_DIR}/.env"
+        die "Aborted. To preserve the existing data, restore your previous .env (or its POSTGRES_PASSWORD) to ${INSTALL_DIR}/.env and re-run. To start fresh, re-run with --purge-volumes."
+    fi
+fi
+
+# --- Skip start if requested ---
+
+cd "$INSTALL_DIR"
+
+if [ "$NO_START" = "1" ]; then
+    success "Install written. Skipping 'docker compose up' (--no-start)."
+    info "Review and start manually:"
+    info "  cd ${INSTALL_DIR}"
+    if [ -n "$CADDY_PROFILE" ]; then
+        info "  docker compose --profile caddy -f ${COMPOSE_FILE} up -d"
+    else
+        info "  docker compose -f ${COMPOSE_FILE} up -d"
+    fi
+    exit 0
+fi
+
 # --- Start services ---
 
 info "Starting Breadbox..."
-cd "$INSTALL_DIR"
 # Intentionally unquoted: CADDY_PROFILE is either empty or "--profile caddy"
 # and we want the empty case to contribute no argument.
 # shellcheck disable=SC2086
-docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" up -d
+if ! docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" up -d; then
+    error "docker compose up failed. Last 20 lines of compose logs:"
+    # shellcheck disable=SC2086
+    docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 20 || true
+    exit 1
+fi
 
 printf "\n"
 
 # --- Wait for healthy ---
 
+# Pull SERVER_PORT from .env so a non-default port still gets probed correctly.
+PORT=$(grep -E '^SERVER_PORT=' "${INSTALL_DIR}/.env" 2>/dev/null | head -1 | cut -d= -f2)
+PORT="${PORT:-8080}"
+
 info "Waiting for Breadbox to start..."
 healthy=0
 i=0
 while [ "$i" -lt 60 ]; do
-    if curl -sf http://localhost:8080/health/ready >/dev/null 2>&1; then
+    if curl -sf "http://localhost:${PORT}/health/ready" >/dev/null 2>&1; then
         healthy=1
         break
     fi
@@ -662,16 +740,17 @@ if [ "$healthy" -eq 1 ]; then
         info "Public URL:    ${BOLD}https://${DOMAIN_VALUE}${NC}"
         info "Setup wizard:  ${BOLD}https://${DOMAIN_VALUE}/setup${NC}"
     else
-        info "Setup wizard:  ${BOLD}http://localhost:8080/setup${NC}"
+        info "Setup wizard:  ${BOLD}http://localhost:${PORT}/setup${NC}"
     fi
     info "Config file:   ${INSTALL_DIR}/.env"
     info "Version pin:   ${INSTALL_DIR}/.breadbox-version (${IMAGE_TAG})"
     if [ -n "$CADDY_PROFILE" ]; then
         info "View logs:     cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} logs -f"
+        info "Update:        cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} pull && docker compose --profile caddy -f ${COMPOSE_FILE} up -d"
     else
         info "View logs:     cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs -f"
+        info "Update:        cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} pull && docker compose -f ${COMPOSE_FILE} up -d"
     fi
-    info "Update:        cd ${INSTALL_DIR} && ./update.sh   (preserves your pinned version)"
     info "Uninstall:     ${0} --uninstall"
     printf "\n"
     if [ -z "$DOMAIN_VALUE" ]; then
@@ -681,16 +760,35 @@ if [ "$healthy" -eq 1 ]; then
     fi
 
     # --- Post-install: breadbox doctor handoff ---
-    # `breadbox doctor` is a planned pre-flight command (tracked in issue
-    # #687). When it lands, running it against the fresh install catches
-    # misconfiguration before the user hits runtime errors. If the binary
-    # inside the container doesn't support `doctor` yet, tolerate the
-    # failure quietly so the installer doesn't regress on older images.
-    if docker compose -f "$COMPOSE_FILE" exec -T breadbox /app/breadbox doctor 2>/dev/null; then
-        :  # doctor printed its own summary; nothing more to say.
-    else
-        printf "${DIM}Run 'docker compose -f %s exec breadbox /app/breadbox doctor' when available${NC}\n" "$COMPOSE_FILE"
-        printf "${DIM}to verify configuration (see issue #687).${NC}\n"
+    # Run `breadbox doctor --json` and surface only fails/warns. On a
+    # clean install every check passes — print a single-line summary
+    # so the success path stays quiet. The full report is one command
+    # away if the user wants it.
+    printf "\n"
+    doctor_out=$(docker compose -f "$COMPOSE_FILE" exec -T breadbox /app/breadbox doctor --json 2>/dev/null || true)
+    if [ -n "$doctor_out" ]; then
+        # Use python (preinstalled on macOS + most Linux distros) to filter
+        # the JSON. Fall back to printing the raw output if python is absent.
+        if check_command python3; then
+            python3 -c '
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(1)
+checks = d.get("checks", []) or []
+fails = [c for c in checks if c.get("status") not in ("pass", "skip")]
+if fails:
+    print("doctor: %d issue(s)" % len(fails))
+    for c in fails:
+        print("  - [%s] %s: %s" % (c.get("status",""), c.get("name",""), c.get("message","")))
+    print("  full report: docker compose exec breadbox /app/breadbox doctor")
+else:
+    print("doctor: ok (%d checks passed)" % len(checks))
+' <<< "$doctor_out" || printf "%s\n" "$doctor_out"
+        else
+            printf "%s\n" "$doctor_out"
+        fi
         printf "\n"
     fi
 else

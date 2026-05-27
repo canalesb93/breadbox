@@ -106,6 +106,19 @@ templ Nav(p NavProps) {
 			}
 		}
 	</nav>
+	if p.NavUpdateAvailable && p.IsAdmin {
+		<a
+			href={ templ.SafeURL(p.NavLatestURL) }
+			target="_blank"
+			rel="noopener noreferrer"
+			class="bb-sidebar-link text-warning"
+			title={ "Release notes for " + p.NavLatestVersion }
+		>
+			@LucideIcon("arrow-up-circle", "")
+			<span class="flex-1 truncate">Update available</span>
+			<span class="badge badge-soft badge-warning badge-xs">{ p.NavLatestVersion }</span>
+		</a>
+	}
 	<div class="mt-auto pt-3 border-t border-base-300 px-2">
 		@SidebarUserMenu(SidebarUserMenuProps{
 			CurrentPage:          p.CurrentPage,

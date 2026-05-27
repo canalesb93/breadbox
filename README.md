@@ -1,301 +1,64 @@
 # Breadbox
 
-Self-hosted financial data aggregation for households. Connect your banks, sync transactions automatically, and query your financial data through a REST API or AI agents via [MCP](https://modelcontextprotocol.io/).
+Self-hosted financial data store with an MCP server.
 
-<!-- TODO: Add screenshot of dashboard here -->
+<!-- Recommended: 1600x1000 PNG, embedded at width=840 -->
+<img src="docs/images/dashboard.png" alt="Breadbox dashboard" width="840">
 
-## Why Breadbox?
+## What it is
 
-Banks silo your financial data behind their own apps. AI agents can help with budgeting, spending analysis, and anomaly detection -- but they need structured access to your data without touching your bank credentials.
+- **MCP server** for AI agents — Streamable HTTP at `/mcp` and stdio via
+  `breadbox mcp`, with scoped API keys and per-tool read/write permissions
+- **Built-in agent runtime** — schedule [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview)
+  runs that call breadbox MCP to enrich, categorize, and review transactions;
+  cron / sync-complete / on-demand triggers, per-run cost + turn caps, full
+  NDJSON transcripts. Bring your own Anthropic API key or OAuth subscription
+  token.
+- **REST API** — every endpoint under `/api/v1/*` with cursor pagination,
+  field selection, and filtering. Specified in [`openapi.yaml`](openapi.yaml).
+- **Admin dashboard** — connection management, sync monitoring, transaction
+  review queue, rule engine with recursive AND/OR/NOT conditions
+- **Pluggable bank sync** — provider interface feeding a single normalized
+  transaction store; integrations and a CSV importer ship today, more on the
+  roadmap
+- **Multi-user household** — admin + family members, attribution-aware
+  filtering, account linking for cross-connection deduplication
+- **AES-256-GCM** encryption for provider credentials at rest
+- **Single binary** — Go server hosting API, MCP, dashboard, webhooks, and
+  cron in one process
 
-Breadbox syncs your bank data into a PostgreSQL database you control, then exposes it through a structured API that any tool or agent can query. Your data stays on your hardware, encrypted at rest, exportable and deletable at any time.
-
-## Features
-
-- **Bank sync** via [Plaid](https://plaid.com/), [Teller](https://teller.io/), and CSV import
-- **MCP server** for AI agent integration (Streamable HTTP + stdio)
-- **REST API** with cursor pagination, field selection, and filtering
-- **Admin dashboard** with connection management, sync monitoring, and transaction review
-- **Transaction rules engine** with recursive AND/OR/NOT conditions for auto-categorization
-- **Review queue** for triaging new or uncategorized transactions
-- **Account linking** for cross-connection transaction deduplication (e.g., authorized user cards)
-- **Multi-user** household support (admin + family members)
-- **Category system** with 2-level hierarchy
-- **Agent reports** for AI agents to submit summaries and flag transactions
-- **Built-in agent runtime** -- schedule recurring [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview) runs that call breadbox MCP to enrich, categorize, and review transactions; cron / sync-complete / on-demand triggers, per-run cost + turn caps, full NDJSON transcripts
-- **API key auth** with scoped access (full/read-only)
-- **AES-256-GCM encryption** for provider credentials at rest
-- **CLI** -- `gh`-style `breadbox <noun> <verb>` driving a local or remote instance; same binary, plus a 10 MB `breadbox-cli` lite build for remote agents
-- **Single binary** -- one Go binary serves everything (API, MCP, dashboard, webhooks, cron)
-
-## Installation
-
-### One-liner (recommended)
+## Quick start
 
 ```bash
 curl -fsSL https://breadbox.sh/install.sh | bash
 ```
 
-This is the primary install path. It detects your OS (Linux or macOS) and arch
-(amd64 or arm64), checks for Docker (and offers to install it on Linux via
-`get.docker.com`), prompts for an optional public domain (leave blank for a
-localhost-only install), writes a version-pinned `docker-compose.prod.yml`,
-generates an `ENCRYPTION_KEY` and database password, and starts the stack.
+Detects your OS, installs Docker if needed, prompts for a domain (or leaves it
+localhost-only), generates secrets, and brings up the stack. Visit `/setup`
+to create your admin account.
 
-On success it offers to register a launchd agent (macOS) or systemd unit
-(Linux) so Breadbox restarts on boot, and calls `breadbox doctor` to verify
-configuration.
+Full install docs (binary download, source, manual Docker, daemon
+registration): **[docs.breadbox.sh/install](https://docs.breadbox.sh/install)**.
 
-Common variations:
+## AI agents
 
-```bash
-# Non-interactive install with a public domain (enables Caddy + HTTPS)
-curl -fsSL https://breadbox.sh/install.sh | bash -s -- --yes --domain=breadbox.example.com
+<!-- Recommended: 1400x900 PNG -->
+<img src="docs/images/claude-desktop.png" alt="Claude Desktop querying Breadbox via MCP" width="840">
 
-# Installer without breadbox.sh (straight from GitHub)
-curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | bash
-```
+Point any MCP client at `https://your-host/mcp` with an API key. Read
+transactions, apply categories, write rules, surface anomalies — without the
+agent ever touching bank credentials.
 
-Install directory:
-
-- Root (`sudo bash ...`) → `/opt/breadbox`
-- Regular user → `$HOME/.breadbox`
-- Override: `INSTALL_DIR=/custom/path bash install.sh`
-
-Updates respect the installed version pin. `./update.sh` in the install
-directory pulls the same tag on every run; `./update.sh --bump=v0.4.0` (or
-`--bump=latest`) explicitly changes it. Full docs in [`deploy/`](deploy/).
-
-### Docker Compose (manual)
-
-No need to clone the repo. This pulls the pre-built image from GHCR and starts Breadbox with PostgreSQL directly — useful if you want full control over the compose file:
-
-```bash
-mkdir breadbox && cd breadbox
-curl -O https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/docker-compose.prod.yml
-mv docker-compose.prod.yml docker-compose.yml
-```
-
-Create a `.env` file with required configuration:
-
-```bash
-cat > .env <<EOF
-DATABASE_URL=postgres://breadbox:breadbox@db:5432/breadbox?sslmode=disable
-ENCRYPTION_KEY=$(openssl rand -hex 32)
-SERVER_PORT=8080
-ENVIRONMENT=docker
-POSTGRES_USER=breadbox
-POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '=/+')
-POSTGRES_DB=breadbox
-EOF
-```
-
-Start the services:
-
-```bash
-# Localhost-only (no HTTPS, no Caddy, no 80/443 bindings)
-docker compose up -d breadbox db
-
-# With public HTTPS via Caddy (requires DOMAIN= in .env)
-docker compose --profile caddy up -d
-```
-
-Caddy is gated behind the `caddy` compose profile, so localhost-only installs never bind ports 80/443.
-
-To pin a specific version instead of `latest`, edit `docker-compose.yml` and change the image tag:
-
-```yaml
-image: ghcr.io/canalesb93/breadbox:v0.1.0
-```
-
-### Binary download
-
-Pre-built binaries for Linux and macOS (amd64/arm64) are available on the [GitHub Releases](https://github.com/canalesb93/breadbox/releases) page.
-
-```bash
-# Download the binary for your platform (example: Linux amd64)
-curl -fsSL https://github.com/canalesb93/breadbox/releases/latest/download/breadbox-linux-amd64 -o breadbox
-chmod +x breadbox
-
-# Requires a running PostgreSQL instance
-export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
-export ENCRYPTION_KEY="$(openssl rand -hex 32)"
-
-# First-time setup: pick an admin email + password (password is typed, not echoed).
-# Skip if you already have an admin account.
-./breadbox init
-
-./breadbox serve
-# Visit http://localhost:8080
-```
-
-### Go install
-
-Build from source using Go:
-
-```bash
-git clone https://github.com/canalesb93/breadbox.git && cd breadbox
-go install ./cmd/breadbox
-
-# Requires a running PostgreSQL instance
-export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
-export ENCRYPTION_KEY="$(openssl rand -hex 32)"
-
-# First-time setup: pick an admin email + password (password is typed, not echoed).
-breadbox init
-
-breadbox serve
-# Visit http://localhost:8080
-```
-
-> **Note:** The module path is `breadbox`, so `go install github.com/...@latest` is not supported. Clone the repo and install locally.
-
-### From source (development)
-
-```bash
-git clone https://github.com/canalesb93/breadbox.git && cd breadbox
-
-# Requires Go 1.24+ and PostgreSQL 16+
-make dev
-
-# Visit http://localhost:8080
-```
-
-Alternate build targets:
-
-```bash
-make build           # default — server + CLI + dashboard (~50 MB)
-make build-headless  # server + CLI, no dashboard assets (~46 MB)
-make build-lite      # CLI-only, no server packages — ships as breadbox-cli (~10 MB)
-```
-
-For production deployment details (domain setup, Caddy, daemon registration, backups), see the [`deploy/README.md`](deploy/README.md).
-
-## MCP Integration
-
-Breadbox exposes financial data to AI agents via the [Model Context Protocol](https://modelcontextprotocol.io/). This is the primary way to connect your financial data to AI assistants.
-
-**Streamable HTTP** (remote): The MCP endpoint is at `/mcp`, authenticated with an API key.
-
-**Stdio** (local): Run `breadbox mcp` for direct stdin/stdout MCP transport. (The older `breadbox mcp-stdio` still works as a deprecated alias for back-compat with existing Claude Desktop configs.)
-
-### Claude Desktop / Claude Code
-
-```json
-{
-  "mcpServers": {
-    "breadbox": {
-      "command": "/path/to/breadbox",
-      "args": ["mcp"],
-      "env": {
-        "DATABASE_URL": "postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"
-      }
-    }
-  }
-}
-```
-
-### Remote MCP (any agent)
-
-Point your agent's MCP client at your Breadbox instance:
-
-```
-URL: https://your-host/mcp
-Header: X-API-Key: bb_your_api_key
-```
-
-## CLI
-
-The `breadbox` binary doubles as a `gh`-style CLI driving any breadbox over its REST API. Same binary, same auth, plus a 10 MB `breadbox-cli` lite build (`-tags=lite`) for remote agents that don't need the server packages.
-
-Per-host credentials live in `~/.config/breadbox/hosts.toml`. Switch hosts with `--host <name>` or `BREADBOX_HOST=<name>`. Full command catalog: [`docs/cli-commands.md`](docs/cli-commands.md); upkeep rule: [`.claude/rules/cli-commands.md`](.claude/rules/cli-commands.md).
-
-### Local (same machine as `breadbox serve`)
-
-```bash
-breadbox auth bootstrap           # mints a full_access key, saves to hosts.toml
-breadbox doctor                   # readiness report
-breadbox transactions list --limit 10
-breadbox connections link --provider=plaid --user=<short_id> --wait
-```
-
-### Remote (device-code login)
-
-```bash
-breadbox auth login --host=https://breadbox.example.com
-# prints a verification URL + short code; approve on the server's /auth/device page
-breadbox accounts list
-```
-
-Or paste a pre-issued key directly: `breadbox auth login --host=URL --token=bb_xxxxx`.
-
-### Output
-
-Default is a human table on TTY and JSON when piped (`breadbox transactions list | jq ...` just works). Exit codes are a contract: `0` success, `1` runtime, `2` usage, `3` auth, `4` upstream, `5` validation.
-
-## REST API
-
-Every endpoint under `/api/v1/*` is described in [`openapi.yaml`](./openapi.yaml) (OpenAPI 3.1) at the repo root. Point your favourite SDK generator (`openapi-generator`, `openapi-typescript`, etc.) at that file. The prose companion lives in [`docs/api-reference.md`](docs/api-reference.md); when the two disagree, the OpenAPI spec wins — CI enforces parity via `TestOpenAPIDrift`.
-
-## Configuration
-
-All configuration via environment variables. See `.env.example` for the full list.
-
-| Variable | Description | Required |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM (`openssl rand -hex 32`) | Yes (with Plaid/Teller) |
-| `SERVER_PORT` | HTTP listen port (default: 8080) | No |
-| `PLAID_CLIENT_ID` | Plaid API client ID | No |
-| `PLAID_SECRET` | Plaid API secret | No |
-| `TELLER_APP_ID` | Teller application ID | No |
-
-Provider credentials can also be configured through the setup wizard or admin dashboard.
-
-## CLI
-
-Common server-side commands (full catalog in [`docs/cli-commands.md`](docs/cli-commands.md)):
-
-```
-breadbox serve              Start the server (API, MCP, dashboard, webhooks, cron)
-breadbox init               First-time setup: create admin account interactively
-breadbox mcp                Start MCP server on stdin/stdout (alias: mcp-stdio, deprecated)
-breadbox migrate            Run pending database migrations
-breadbox doctor             Validate config and connectivity without booting the server
-breadbox agent test         Smoke-test the Claude Agent SDK integration (~5¢ bounded)
-breadbox agent run <slug>   Fire a configured agent immediately from the shell
-breadbox agent list         List configured agents (table or --json)
-breadbox version            Print version
-```
-
-Run `breadbox doctor` if the server fails to start or something feels off — it
-surfaces bad `DATABASE_URL`/`ENCRYPTION_KEY`, missing migrations, unreadable
-Teller certs, a missing admin account, and unreachable `PUBLIC_URL` in a single
-pass. See [Doctor](docs/doctor.md) for the full check list and `--json` /
-`--skip-external` flags.
+Or let Breadbox run the agents itself: the built-in runtime ships with five
+starter agents (Initial Setup, Bulk Review, Quick Review, Routine Review,
+Spending Report) and a prompt builder for your own. See the
+[multi-agent reviewer guide](https://docs.breadbox.sh/guides/multi-agent-reviewer).
 
 ## Documentation
 
-User-facing docs (install, quickstart, providers, agents, backup): [docs.breadbox.sh](https://docs.breadbox.sh).
-
-Engineering-internal canonical specs in this repo:
-
-- [Architecture](docs/architecture.md) -- system design, provider interface, deployment
-- [Data Model](docs/data-model.md) -- database schema, enums, relationships
-- [API Reference](docs/api-reference.md) -- prose companion to `openapi.yaml` (the canonical contract)
-- [API Endpoints](docs/api-endpoints.md) -- terse index of every REST endpoint
-- [MCP Server](docs/mcp-server.md) -- tools, resources, usage
-- [MCP Tools Reference](docs/mcp-tools-reference.md) -- per-tool contracts
-- [Rule DSL](docs/rule-dsl.md) -- transaction-rule grammar, actions, triggers
-- [Design System](docs/design-system.md) -- UI framework and component reference
-- [Activity Timeline](docs/activity-timeline.md) -- timeline component contract
-- [Doctor](docs/doctor.md) -- `breadbox doctor` pre-flight / readiness check
-- [CLI Commands](docs/cli-commands.md) -- terse index of every `breadbox <noun> <verb>` command
-- [Stacked PRs](docs/stacked-prs.md) -- when and how to split work into a `gt` stack
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and guidelines.
+- **[docs.breadbox.sh](https://docs.breadbox.sh)** — install, providers, agents, API
+- [`docs/`](docs/) in this repo — engineering specs (data model, architecture, MCP tools, rule DSL)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — development setup
 
 ## License
 
