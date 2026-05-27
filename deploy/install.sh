@@ -340,7 +340,10 @@ register_daemon_systemd() {
     unit_dest="/etc/systemd/system/breadbox.service"
 
     if [ "$(id -u)" != "0" ]; then
-        warn "Registering a systemd unit requires root. Re-run with sudo to enable this feature."
+        warn "Registering a systemd unit requires root. To enable it, re-run as:"
+        warn "  curl -fsSL https://breadbox.sh/install.sh | sudo bash -s -- --register-daemon"
+        warn "(Note: 'sudo curl … | bash' applies sudo to curl only, not bash —"
+        warn "the script then runs as your user. Put sudo in front of bash.)"
         return 1
     fi
 
