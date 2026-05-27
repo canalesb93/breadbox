@@ -869,7 +869,7 @@ paths:
           description: Provider exchange failed.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Error" }
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   /api/v1/connections/{id}:
     parameters: [{ $ref: "#/components/parameters/IDPath" }]
     get:
@@ -2823,6 +2823,11 @@ components:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     InternalError:
       description: Unexpected server error.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    BadGateway:
+      description: Upstream provider failed.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
