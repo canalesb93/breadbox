@@ -556,7 +556,10 @@ DOMAIN_VALUE="$DOMAIN_ARG"
 if [ -z "$DOMAIN_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
     printf "\n"
     info "Optional: configure a public domain for automatic HTTPS via Caddy."
-    info "Leave blank for a localhost-only install (ports 80/443 not bound)."
+    info "Leave blank for a localhost-only install — also leave blank if"
+    info "something else already terminates HTTPS in front of this host"
+    info "(reverse proxy, cloud platform, Tailscale Serve, etc.). Caddy"
+    info "stays off and ports 80/443 are not bound."
     DOMAIN_VALUE=$(prompt_value "Public domain (e.g. breadbox.example.com)" "")
 fi
 
