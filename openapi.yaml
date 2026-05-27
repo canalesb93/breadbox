@@ -65,20 +65,40 @@ tags:
     description: Liveness and readiness probes. No authentication.
   - name: Version
     description: Server version metadata.
+  - name: Auth
+    description: Device-code grant and the unauthenticated headless bootstrap probe.
   - name: Accounts
+    description: Household bank accounts synced from providers.
   - name: Transactions
+    description: Cursor-paginated transactions, counts, summaries, and merchant rollups.
   - name: Comments
+    description: Conversation comments attached to a transaction.
   - name: Annotations
+    description: Activity-timeline events for a transaction (category changes, comments, tags, system events).
   - name: Tags
+    description: Free-form labels applied to transactions.
   - name: Categories
+    description: Two-level category tree, import/export, and merges.
   - name: Connections
+    description: Bank-side links (Plaid items, Teller enrollments, CSV-import buckets) and the hosted-link page that mints them.
   - name: Sync
+    description: Manual sync triggers, sync history, and per-provider health.
   - name: Rules
+    description: Categorization rule engine with retroactive apply and preview.
   - name: Account Links
+    description: Dependent-to-primary reconciliation links and transaction match management.
   - name: Reports
+    description: Agent-submitted reports and the household read/unread state.
   - name: Users
+    description: Household members and the login accounts attached to them.
   - name: API Keys
+    description: Scoped credentials for REST and MCP clients.
   - name: Settings
+    description: Provider credentials and other app-config knobs.
+  - name: Agents
+    description: Scheduled Claude Agent SDK definitions, run history, transcripts, and prompt blocks.
+  - name: Webhooks
+    description: Stored webhook events and on-demand replay.
 
 paths:
   # -- Health & version (no auth) --
