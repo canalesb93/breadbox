@@ -44,6 +44,16 @@ Breadbox instance — locally or remote — over its REST API. Per-host
 credentials live in `~/.config/breadbox/hosts.toml`; switch hosts with
 `--host <name>` or `BREADBOX_HOST=<name>`.
 
+Already have a Breadbox server somewhere and just want the CLI on your
+laptop? Install only the 10 MB lite build — no Docker, no Postgres:
+
+```bash
+curl -fsSL https://breadbox.sh/cli.sh | bash
+```
+
+Detects your OS, drops `breadbox` into `~/.local/bin` (or `/usr/local/bin`
+under `sudo`), and prompts for the host URL to connect to.
+
 ### Local (same machine as the server)
 
 ```bash

@@ -67,6 +67,15 @@ jobs:
                 -o "dist/breadbox-${target}" \
                 ./cmd/breadbox
             echo "::endgroup::"
+            # CLI-only lite build (no server packages). Ships as
+            # breadbox-cli-{os}-{arch} for the `cli.sh` install path.
+            echo "::group::breadbox-cli-${target}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -trimpath -tags=lite \
+                -ldflags="-s -w -X main.version=${VERSION}" \
+                -o "dist/breadbox-cli-${target}" \
+                ./cmd/breadbox
+            echo "::endgroup::"
           done
           (cd dist && sha256sum breadbox-* > checksums.txt)
           ls -lh dist/
@@ -173,6 +182,10 @@ jobs:
             dist/breadbox-linux-arm64
             dist/breadbox-darwin-amd64
             dist/breadbox-darwin-arm64
+            dist/breadbox-cli-linux-amd64
+            dist/breadbox-cli-linux-arm64
+            dist/breadbox-cli-darwin-amd64
+            dist/breadbox-cli-darwin-arm64
             dist/checksums.txt
           fail_on_unmatched_files: true
           draft: false
