@@ -75,13 +75,19 @@ fi
 # Color helpers (disabled when not a terminal or NO_COLOR is set)
 # ---------------------------------------------------------------------------
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    BLUE='\033[0;34m'
-    BOLD='\033[1m'
-    DIM='\033[2m'
-    NC='\033[0m'
+    # Pre-interpret the escapes via $(printf ...) so each variable holds
+    # an actual ESC byte rather than the literal text "\033". Avoids a
+    # subtle bug where `printf "...\\_\\${NC}\n"` would consume the
+    # trailing `\\` as a backslash literal and leak `\033[0m` as visible
+    # text — exactly what happened on the bottom-right of the ASCII
+    # banner.
+    RED=$(printf '\033[0;31m')
+    GREEN=$(printf '\033[0;32m')
+    YELLOW=$(printf '\033[1;33m')
+    BLUE=$(printf '\033[0;34m')
+    BOLD=$(printf '\033[1m')
+    DIM=$(printf '\033[2m')
+    NC=$(printf '\033[0m')
 else
     RED='' GREEN='' YELLOW='' BLUE='' BOLD='' DIM='' NC=''
 fi
@@ -140,8 +146,9 @@ do_uninstall() {
     printf "  ${INSTALL_DIR}/.env\n"
     printf "  ${INSTALL_DIR}/.breadbox-version\n"
     printf "\n"
-    printf "${YELLOW}Docker volumes (postgres_data, caddy_data, caddy_config) are NOT removed.${NC}\n"
-    printf "To remove volumes: docker volume rm breadbox_postgres_data breadbox_caddy_data breadbox_caddy_config\n"
+    printf "${YELLOW}Docker volumes (postgres, transcripts, backups, and caddy if used) are NOT removed.${NC}\n"
+    printf "To remove all breadbox volumes (DESTROYS data):\n"
+    printf "  docker volume rm \$(docker volume ls -q | grep breadbox)\n"
     printf "\n"
 
     # When invoked via `curl | bash -s -- --uninstall`, stdin is the pipe.
