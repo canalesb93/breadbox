@@ -5,6 +5,7 @@ package components
 import (
 	"embed"
 	"fmt"
+	"html/template"
 	"strings"
 )
 
@@ -49,4 +50,20 @@ func renderBrandIcon(slug, class string) string {
 		merged += " " + class
 	}
 	return strings.Replace(raw, "<svg ", fmt.Sprintf(`<svg class=%q `, merged), 1)
+}
+
+// BrandFuncMap returns the html/template func registration that mirrors
+// the @BrandIcon templ component for legacy html/template pages.
+//
+// Usage:
+//
+//	{{ brand "breadbox" "w-5 h-5" }}
+//
+// Pass "" for class when no extra classes are needed.
+func BrandFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"brand": func(slug, class string) template.HTML {
+			return template.HTML(renderBrandIcon(slug, class))
+		},
+	}
 }
