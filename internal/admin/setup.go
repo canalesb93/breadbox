@@ -84,17 +84,20 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer)
 			return
 		}
 
-		// Auto-login the freshly created admin so we can land them
-		// directly on the Getting Started guide. Browsers still see the
-		// password field in the submitted form, so password-manager
-		// save prompts continue to work without a separate /login step.
+		// Auto-login the freshly created admin and land them on the
+		// one-time encryption-key reveal. SaveKeyHandler falls through
+		// to /getting-started when the key isn't in env or has already
+		// been acknowledged, so this is safe in all configurations.
+		// Browsers still see the password field in the submitted form,
+		// so password-manager save prompts continue to work without a
+		// separate /login step.
 		if err := sm.RenewToken(ctx); err != nil {
 			a.Logger.Error("setup: renew session token", "error", err)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		SetLoginSessionKeys(ctx, sm, account, a.Queries)
-		http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
+		http.Redirect(w, r, "/setup/save-key", http.StatusSeeOther)
 	}
 }
 
