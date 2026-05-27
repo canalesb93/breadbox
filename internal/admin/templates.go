@@ -305,6 +305,10 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			// remaining html/template pages don't fall back to the
 			// JS-driven `<i data-lucide>` placeholder.
 			components.LucideFuncMap(),
+			// `brand` renders a vendored brand SVG (breadbox mark,
+			// partner logos) inline — mirrors the @BrandIcon templ
+			// component for html/template pages.
+			components.BrandFuncMap(),
 		),
 	}
 	if err := tr.parseTemplates(); err != nil {
