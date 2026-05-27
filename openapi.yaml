@@ -358,7 +358,7 @@ paths:
         - $ref: "#/components/parameters/Fields"
         - { name: account_id, in: query, schema: { type: string }, description: Filter by account UUID or short_id (repeatable). }
         - { name: connection_id, in: query, schema: { type: string }, description: Filter by connection. }
-        - { name: user_id, in: query, schema: { type: string }, description: Filter by attributed user (uses `COALESCE(attributed_user_id, connection.user_id)`). }
+        - { name: user_id, in: query, schema: { type: string }, description: "Filter by attributed user (uses `COALESCE(attributed_user_id, connection.user_id)`)." }
         - { name: category_id, in: query, schema: { type: string }, description: Filter by category. }
         - { name: tag, in: query, schema: { type: string }, description: Filter by tag slug. }
         - { name: search, in: query, schema: { type: string }, description: Substring/word/fuzzy search on name + merchant_name. Comma-separated values are OR'd. }
