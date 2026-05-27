@@ -27,9 +27,6 @@ services:
       # even if you haven't enabled a schedule yet; the directory is
       # empty until a backup runs.
       - breadbox_backups:/var/lib/breadbox/backups
-      # Uncomment to enable one-click updates from the admin dashboard.
-      # This gives the container access to the Docker daemon.
-      # - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/ready"]
       interval: 30s

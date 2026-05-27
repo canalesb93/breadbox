@@ -1,0 +1,179 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to (re-)release, e.g. v0.1.0. Must already exist."
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  GO_VERSION: "1.25"
+  SQLC_VERSION: "1.30.0"
+
+jobs:
+  binaries:
+    name: build binaries
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install sqlc
+        run: |
+          curl -sL "https://github.com/sqlc-dev/sqlc/releases/download/v${SQLC_VERSION}/sqlc_${SQLC_VERSION}_linux_amd64.tar.gz" \
+            | sudo tar xz -C /usr/local/bin sqlc
+
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@latest
+
+      - name: Generate (sqlc + templ + css)
+        run: make generate
+
+      - name: Cross-compile
+        env:
+          VERSION: ${{ steps.ver.outputs.tag }}
+        run: |
+          mkdir -p dist
+          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            os=${target%-*}
+            arch=${target#*-}
+            echo "::group::breadbox-${target}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -trimpath \
+                -ldflags="-s -w -X main.version=${VERSION}" \
+                -o "dist/breadbox-${target}" \
+                ./cmd/breadbox
+            echo "::endgroup::"
+          done
+          (cd dist && sha256sum breadbox-* > checksums.txt)
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+          if-no-files-found: error
+
+  docker:
+    name: build + push docker image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ steps.ver.outputs.tag }}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.ver.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    name: create github release
+    needs: [binaries, docker]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: dist/
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          # Grab the section under the first '## ' heading (the release we're cutting).
+          # Stops at the next '## ' heading or EOF.
+          awk '
+            /^## / && seen { exit }
+            /^## / { seen=1; next }
+            seen { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "release-notes.md is empty — CHANGELOG.md has no leading '## ' section." >&2
+            exit 1
+          fi
+          echo "---" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "Docker image: \`ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.tag }}\`" >> release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body_path: release-notes.md
+          files: |
+            dist/breadbox-linux-amd64
+            dist/breadbox-linux-arm64
+            dist/breadbox-darwin-amd64
+            dist/breadbox-darwin-arm64
+            dist/checksums.txt
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false

@@ -43,7 +43,7 @@ The script will:
 1. Verify Docker / Docker Compose (offer to install Docker on Linux if missing)
 2. Fetch the latest release tag from GitHub
 3. Download `docker-compose.prod.yml` and `Caddyfile`, pinned to that release
-4. Write `.breadbox-version` so `update.sh` preserves the pin
+4. Write `.breadbox-version` recording the installed tag
 5. Prompt for an optional public domain (leave blank for localhost-only)
 6. Generate `ENCRYPTION_KEY` and database password
 7. Create a `.env` file (will not overwrite an existing one)
@@ -85,14 +85,11 @@ You can run `deploy/detect.sh` directly to print what the installer sees, and
 
 ### `INSTALL_DIR` default
 
-`INSTALL_DIR` follows a consistent convention across install and update:
+`INSTALL_DIR` follows a consistent convention:
 
 - **Root / `sudo bash install.sh`** → `/opt/breadbox`
 - **Regular user** → `$HOME/.breadbox`
 - Override: `INSTALL_DIR=/custom/path bash install.sh`
-
-`update.sh` resolves `INSTALL_DIR` with the same rules, so `sudo ./update.sh` and `./update.sh`
-target the same directory as their matching install.
 
 ## Manual Setup
 
@@ -178,60 +175,46 @@ For custom TLS configuration, edit the `Caddyfile` directly. See [Caddy document
 
 ## Updating
 
-### Dashboard Update Banner
-
-When a new version is published on GitHub, the admin dashboard shows an update banner with the latest version and a link to release notes.
-
-**With Docker socket mounted:** Click "Pull Update" to download the new image, then run `docker compose up -d` on the server to apply.
-
-**Without Docker socket:** Copy the update command from the banner and run it on your server.
-
-### CLI Update
+Updates are two `docker compose` commands. The admin dashboard surfaces a
+"new release available" banner with a link to the changelog when a newer
+tag is published on GitHub — when you see it, run:
 
 ```bash
-cd /opt/breadbox    # or $HOME/.breadbox for user installs
-sudo ./update.sh
-```
-
-`update.sh` respects the version pin recorded in `.breadbox-version`. If you installed
-`v0.3.1`, the script will pull `v0.3.1` on every run — it will **not** silently roll
-you forward to `main` / `latest`. To explicitly change the pin:
-
-```bash
-./update.sh --bump=v0.4.0    # pin to a specific release
-./update.sh --bump=latest    # opt in to rolling updates
-```
-
-If `.env` has `DOMAIN` set, the script passes `--profile caddy` to `docker compose`
-automatically so the reverse proxy restarts alongside the app.
-
-Manual update (not recommended — skips the pin check):
-
-```bash
-cd /opt/breadbox
+cd /opt/breadbox       # or $HOME/.breadbox for user installs
 docker compose pull
 docker compose up -d
 ```
 
-### Unattended Updates
-
-Use the `--yes` flag with the update script for cron-based updates:
+If you installed with a domain (Caddy enabled), include the profile:
 
 ```bash
-# Example cron entry (update daily at 3 AM)
-0 3 * * * cd /opt/breadbox && ./update.sh --yes >> /var/log/breadbox-update.log 2>&1
+docker compose --profile caddy pull
+docker compose --profile caddy up -d
 ```
 
-### Docker Socket (Optional)
+### Pinning a specific version
 
-To enable image pulling from the admin dashboard, uncomment the Docker socket volume mount in `docker-compose.yml`:
+By default `docker-compose.prod.yml` references `ghcr.io/canalesb93/breadbox:latest`
+(rolling). To pin a specific release, edit the `image:` line:
 
 ```yaml
-volumes:
-  - /var/run/docker.sock:/var/run/docker.sock
+image: ghcr.io/canalesb93/breadbox:v0.1.0
 ```
 
-This gives the container access to the Docker daemon. The actual container restart still requires running `docker compose up -d` on the host.
+Then `docker compose pull && docker compose up -d` will hold that version.
+
+### Unattended updates
+
+For background auto-update behavior, use [Watchtower](https://containrrr.dev/watchtower/)
+or [Diun](https://crazymax.dev/diun/) as a separate container. Breadbox itself
+does not include auto-update logic — keeping it out keeps you in control of
+when updates happen, which matters for a self-hosted financial app.
+
+Simple cron-driven equivalent:
+
+```bash
+0 3 * * * cd /opt/breadbox && docker compose pull && docker compose up -d >> /var/log/breadbox-update.log 2>&1
+```
 
 ## Environment Variables Reference
 
