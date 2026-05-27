@@ -183,7 +183,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// PageHeader. /agents?agent=<slug> filters the runs feed to one
 		// agent, which subsumes the old /agents/{slug}/runs route.
 		// Legacy /agents/runs and /agents/{slug}/runs 301-redirect.
-		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr))
+		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr, a.Config.DataDir))
 		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
 		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
 		// /agents/{slug} is the per-agent landing page (lifetime stats +
@@ -191,7 +191,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// from the detail page's Edit button.
 		r.Get("/agents/{slug}", AgentDetailPageHandler(svc, sm, tr))
 		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
-		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr))
+		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr, a.Config.DataDir))
 		r.Get("/agents/runs", func(w http.ResponseWriter, r *http.Request) {
 			// Preserve query params so bookmarked filter URLs still work.
 			target := "/agents"
@@ -401,7 +401,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// polls every 3 s while a run is in_progress. Read-only, all
 		// roles (an editor restriction would block dashboards that
 		// want to keep an eye on someone else's runs).
-		r.Get("/agents/runs/{shortId}/live", AgentRunLiveHandler(svc, sm, tr))
+		r.Get("/agents/runs/{shortId}/live", AgentRunLiveHandler(svc, sm, tr, a.Config.DataDir))
 
 		// Editor+ API routes (categorization, tagging, access management).
 		r.Group(func(r chi.Router) {

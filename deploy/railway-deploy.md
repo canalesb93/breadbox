@@ -91,16 +91,18 @@ available" badge in the sidebar when a newer GitHub release exists.
 Railway's default container filesystem is **ephemeral** — every deploy
 resets it. Breadbox writes two things to disk that you'll want to keep:
 
-- Agent NDJSON transcripts → `/app/transcripts`
+- Agent NDJSON transcripts → `/var/lib/breadbox/transcripts/agents`
 - Scheduled pg_dump backups → `/var/lib/breadbox/backups`
 
-Add a Railway Volume (dashboard: **Settings** → **Volumes** → **+ New
-Volume**) mounted at each path. Two volumes, ~1 GB and ~5 GB respectively
-are reasonable starting sizes for a household install.
+Both live under `/var/lib/breadbox`, so a **single** Railway Volume
+mounted at that path covers both. In the dashboard: **Settings** →
+**Volumes** → **+ New Volume**, mount path `/var/lib/breadbox`,
+~6 GB is a reasonable starting size for a household install (5 GB of
+backups + 1 GB of transcripts).
 
-If you don't add volumes, the transcripts page in `/agents` will reset
-on every deploy and Settings → Backups will appear empty. Functionality
-is otherwise intact.
+If you don't add the volume, the transcripts page in `/agents` will
+reset on every deploy and Settings → Backups will appear empty.
+Functionality is otherwise intact.
 
 ## Cost notes
 
@@ -141,6 +143,6 @@ image — no extra Railway config needed. If agents fail, check
 - **Single replica.** `numReplicas: 1` in `railway.json` — Breadbox's
   scheduler isn't designed for multi-instance coordination. Don't
   scale horizontally.
-- **Ephemeral filesystem by default.** Mount volumes (see above) for
-  transcripts and backups.
+- **Ephemeral filesystem by default.** Mount the `/var/lib/breadbox`
+  volume (see "Persistent storage" above) for transcripts and backups.
 - **No multi-region.** Same reason as the replica limit.

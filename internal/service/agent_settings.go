@@ -49,7 +49,7 @@ type UpdateAgentSettingsParams struct {
 
 // GetAgentSettings reads agent.* keys from app_config, decrypts tokens,
 // returns masked values.
-func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte) (*AgentSettingsResponse, error) {
+func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte, dataDir string) (*AgentSettingsResponse, error) {
 	authMode := appconfig.String(ctx, s.Queries, appconfig.KeyAgentAuthMode, appconfig.AuthModeSubscription)
 
 	subToken, _, err := appconfig.ReadEncrypted(ctx, s.Queries, appconfig.KeyAgentSubscriptionToken, encKey)
@@ -66,7 +66,7 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte) (*AgentSe
 	runtimePath := appconfig.String(ctx, s.Queries, appconfig.KeyAgentRuntimePath, "")
 	// Default matches serve.go fallback — keeps the Settings → Agents
 	// form showing the active path on a fresh install rather than blank.
-	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
+	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(dataDir))
 	globalBudget := readOptionalFloat(ctx, s.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD)
 
 	return &AgentSettingsResponse{
@@ -81,7 +81,7 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte) (*AgentSe
 }
 
 // UpdateAgentSettings writes the non-nil fields and returns the new masked state.
-func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettingsParams, encKey []byte) (*AgentSettingsResponse, error) {
+func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettingsParams, encKey []byte, dataDir string) (*AgentSettingsResponse, error) {
 	if p.AuthMode != nil {
 		if *p.AuthMode != appconfig.AuthModeSubscription && *p.AuthMode != appconfig.AuthModeAPIKey {
 			return nil, fmt.Errorf("%w: auth_mode must be subscription or api_key", ErrInvalidParameter)
@@ -127,7 +127,7 @@ func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettings
 			return nil, fmt.Errorf("set transcript_dir: %w", err)
 		}
 	}
-	return s.GetAgentSettings(ctx, encKey)
+	return s.GetAgentSettings(ctx, encKey, dataDir)
 }
 
 // AgentSubsystemStatus is a cheap, side-effect-free readiness report for

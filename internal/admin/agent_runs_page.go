@@ -41,7 +41,7 @@ const agentRunTranscriptMaxEvents = 500
 // the filter dropdown + the "Run an agent" modal picker), and the
 // 30-day stats rollup. Definitions + runs are fetched in parallel
 // since they're independent reads.
-func AgentRunsListPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+func AgentRunsListPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer, dataDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -169,7 +169,7 @@ func computeAgentRunsStats(ctx context.Context, svc *service.Service, defs []ser
 // AgentRunDetailPageHandler serves GET /agents/runs/{shortId}. Resolves the
 // run, parses the NDJSON transcript file (best-effort; missing file just
 // surfaces an Error message), and renders the detail templ.
-func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer, dataDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		shortID := chi.URLParam(r, "shortId")
@@ -250,7 +250,7 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 			path = *run.TranscriptPath
 		}
 		if path == "" && run.ID != "" {
-			dir := appconfig.String(ctx, svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
+			dir := appconfig.String(ctx, svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(dataDir))
 			if dir != "" {
 				path = filepath.Join(dir, run.ID+".ndjson")
 			}

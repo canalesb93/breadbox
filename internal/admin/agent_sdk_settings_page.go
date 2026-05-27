@@ -32,7 +32,7 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		settings, err := svc.GetAgentSettings(ctx, a.Config.EncryptionKey)
+		settings, err := svc.GetAgentSettings(ctx, a.Config.EncryptionKey, a.Config.DataDir)
 		if err != nil {
 			http.Error(w, "Failed to load agent settings: "+err.Error(), http.StatusInternalServerError)
 			return

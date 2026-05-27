@@ -33,11 +33,14 @@ Edit:
 flyctl launch --no-deploy --copy-config
 
 # Persistent storage for agent transcripts and pg_dump backups.
-flyctl volumes create breadbox_transcripts --size 1
-flyctl volumes create breadbox_backups     --size 5
+# Both live under /var/lib/breadbox (set automatically when
+# ENVIRONMENT=docker), so one volume covers both.
+flyctl volumes create breadbox_data --size 6
 ```
 
-(Sizes are starting points; extend later with `flyctl volumes extend`.)
+(Size is a starting point — ~5 GB of backups + ~1 GB of transcripts
+covers a typical household install. Extend later with
+`flyctl volumes extend`.)
 
 ## 3. Set up Postgres
 
@@ -138,8 +141,8 @@ flyctl certs create breadbox.yourdomain.com
   min_machines_running = 0
   ```
   Machines cold-start on the next HTTP request (~1–2 seconds).
-- Storage: transcripts + backups grow with usage. Defaults (1 GB + 5 GB)
-  cover modest household use; extend later if needed.
+- Storage: transcripts + backups share one 6 GB volume by default;
+  extend later with `flyctl volumes extend` if needed.
 
 ## Troubleshooting
 

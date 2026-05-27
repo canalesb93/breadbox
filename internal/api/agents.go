@@ -412,7 +412,7 @@ func GetAgentRunHandler(svc *service.Service) http.HandlerFunc {
 // 404s the whole way to completion. The SPA then sits on "Run starting…"
 // until the run finishes and shows the whole thing at once instead of
 // streaming. The fallback gives the polling loop something to read live.
-func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
+func GetAgentRunTranscriptHandler(svc *service.Service, a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "shortId")
 		run, err := svc.GetAgentRun(r.Context(), id)
@@ -425,7 +425,7 @@ func GetAgentRunTranscriptHandler(svc *service.Service) http.HandlerFunc {
 			path = *run.TranscriptPath
 		}
 		if path == "" && run.ID != "" {
-			dir := appconfig.String(r.Context(), svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
+			dir := appconfig.String(r.Context(), svc.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(a.Config.DataDir))
 			if dir != "" {
 				path = filepath.Join(dir, run.ID+".ndjson")
 			}
@@ -474,7 +474,7 @@ func AgentSubsystemStatusHandler(svc *service.Service) http.HandlerFunc {
 // GetAgentSettingsHandler returns the agent.* config with masked tokens.
 func GetAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		out, err := svc.GetAgentSettings(r.Context(), a.Config.EncryptionKey)
+		out, err := svc.GetAgentSettings(r.Context(), a.Config.EncryptionKey, a.Config.DataDir)
 		if err != nil {
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to read agent settings")
 			return
@@ -498,7 +498,7 @@ func UpdateAgentSettingsHandler(svc *service.Service, a *app.App) http.HandlerFu
 			GlobalMaxBudgetUSD: req.GlobalMaxBudgetUSD,
 			RuntimePath:        req.RuntimePath,
 			TranscriptDir:      req.TranscriptDir,
-		}, a.Config.EncryptionKey)
+		}, a.Config.EncryptionKey, a.Config.DataDir)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
 				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())

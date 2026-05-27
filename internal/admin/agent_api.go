@@ -276,7 +276,7 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 			params.GlobalMaxBudgetUSD = &zero
 		}
 
-		if _, err := svc.UpdateAgentSettings(r.Context(), params, a.Config.EncryptionKey); err != nil {
+		if _, err := svc.UpdateAgentSettings(r.Context(), params, a.Config.EncryptionKey, a.Config.DataDir); err != nil {
 			FlashRedirect(w, r, sm, "error", "Failed to save settings: "+err.Error(), "/settings/agents")
 			return
 		}

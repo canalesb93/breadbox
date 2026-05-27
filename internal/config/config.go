@@ -11,6 +11,14 @@ type Config struct {
 	Environment   string
 	LogLevel      string // LOG_LEVEL: debug, info, warn, error
 
+	// DataDir is the root directory for persistent runtime data (agent
+	// transcripts, scheduled pg_dump backups, future cached blobs).
+	// Sourced from BB_DATA_DIR; defaults to "/var/lib/breadbox" when
+	// ENVIRONMENT=docker, empty otherwise. When empty, per-subsystem
+	// defaults fall back to cwd-relative paths. Per-subsystem env vars
+	// (BREADBOX_AGENT_TRANSCRIPT_DIR, BACKUP_DIR) still override.
+	DataDir string
+
 	// May come from env (overrides app_config) or app_config table
 	PlaidClientID string
 	PlaidSecret   string

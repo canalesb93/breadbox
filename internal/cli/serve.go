@@ -165,7 +165,7 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	// via Settings → Agents → "breadbox-agent transcripts dir" if they
 	// want them elsewhere. Daily cleanup (iter-25) still prunes whatever
 	// path is in effect.
-	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir())
+	agentTranscriptDir := appconfig.String(ctx, a.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(cfg.DataDir))
 	agentSidecar := &agent.Sidecar{
 		BinaryPath:    agentRuntimePath,
 		TranscriptDir: agentTranscriptDir,
@@ -187,8 +187,8 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	if _, err := exec.LookPath("pg_dump"); err == nil {
 		backupDir := os.Getenv("BACKUP_DIR")
 		if backupDir == "" {
-			if cfg.Environment == "docker" {
-				backupDir = "/var/lib/breadbox/backups"
+			if cfg.DataDir != "" {
+				backupDir = filepath.Join(cfg.DataDir, "backups")
 			} else {
 				backupDir = filepath.Join(".", "backups")
 			}

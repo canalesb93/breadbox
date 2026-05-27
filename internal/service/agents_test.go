@@ -222,7 +222,7 @@ func TestMintRunAPIKey_ScopeFromToolScope(t *testing.T) {
 
 func TestGetAgentSettings_DefaultsWhenUnset(t *testing.T) {
 	svc, _, _ := newService(t)
-	s, err := svc.GetAgentSettings(context.Background(), devEncKey)
+	s, err := svc.GetAgentSettings(context.Background(), devEncKey, "")
 	if err != nil {
 		t.Fatalf("get settings: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestUpdateAgentSettings_TokenMaskedNeverReturnedPlaintext(t *testing.T) {
 	token := plain
 	s, err := svc.UpdateAgentSettings(context.Background(), service.UpdateAgentSettingsParams{
 		SubscriptionToken: &token,
-	}, devEncKey)
+	}, devEncKey, "")
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestUpdateAgentSettings_TokenMaskedNeverReturnedPlaintext(t *testing.T) {
 	}
 
 	// Confirm GET returns the same masked form (and not plaintext).
-	got, err := svc.GetAgentSettings(context.Background(), devEncKey)
+	got, err := svc.GetAgentSettings(context.Background(), devEncKey, "")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -273,13 +273,13 @@ func TestUpdateAgentSettings_ClearTokenWithEmptyString(t *testing.T) {
 	set := "sk-ant-oat01-some-value-12345"
 	if _, err := svc.UpdateAgentSettings(context.Background(), service.UpdateAgentSettingsParams{
 		SubscriptionToken: &set,
-	}, devEncKey); err != nil {
+	}, devEncKey, ""); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	empty := ""
 	cleared, err := svc.UpdateAgentSettings(context.Background(), service.UpdateAgentSettingsParams{
 		SubscriptionToken: &empty,
-	}, devEncKey)
+	}, devEncKey, "")
 	if err != nil {
 		t.Fatalf("clear: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestUpdateAgentSettings_RejectsInvalidAuthMode(t *testing.T) {
 	bad := "banana"
 	_, err := svc.UpdateAgentSettings(context.Background(), service.UpdateAgentSettingsParams{
 		AuthMode: &bad,
-	}, devEncKey)
+	}, devEncKey, "")
 	if !errors.Is(err, service.ErrInvalidParameter) {
 		t.Errorf("err = %v, want ErrInvalidParameter", err)
 	}
