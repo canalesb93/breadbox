@@ -144,12 +144,21 @@ do_uninstall() {
     printf "To remove volumes: docker volume rm breadbox_postgres_data breadbox_caddy_data breadbox_caddy_config\n"
     printf "\n"
 
-    printf "Continue? [y/N] "
-    read -r confirm
-    case "$confirm" in
-        [yY]|[yY][eE][sS]) ;;
-        *) info "Uninstall cancelled."; exit 0 ;;
-    esac
+    # When invoked via `curl | bash -s -- --uninstall`, stdin is the pipe.
+    # _bb_read_line falls back to /dev/tty so the prompt actually works.
+    # If neither is available (cron, etc.), require --yes to avoid silently
+    # destroying state.
+    if [ "${AUTO_YES:-0}" != "1" ]; then
+        printf "Continue? [y/N] "
+        if ! _bb_read_line; then
+            error "No terminal available for confirmation. Re-run with --yes to skip the prompt."
+            exit 1
+        fi
+        case "$ans" in
+            [yY]|[yY][eE][sS]) ;;
+            *) info "Uninstall cancelled."; exit 0 ;;
+        esac
+    fi
 
     rm -f "$INSTALL_DIR/$COMPOSE_FILE"
     rm -f "$INSTALL_DIR/Caddyfile"
@@ -172,8 +181,31 @@ check_command() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Helper: read one line into $ans. Tries the right source for each
+# invocation pattern; returns 1 only when nothing produces a line.
+#
+# Preference order:
+#   1. Stdin when it's a TTY — interactive `bash install.sh`
+#   2. /dev/tty — `curl | bash` case (stdin is the drained install pipe,
+#      but the controlling terminal is still available)
+#   3. Stdin as a last resort — heredoc / here-string testing patterns
+#      and headless ssh with piped input
+#
+# Per-read redirection avoids dash's quirk where `exec 3</dev/tty` exits
+# the shell on open failure even inside a conditional.
+_bb_read_line() {
+    if [ -t 0 ]; then
+        read -r ans
+        return $?
+    fi
+    if read -r ans </dev/tty 2>/dev/null; then
+        return 0
+    fi
+    read -r ans 2>/dev/null || return 1
+}
+
 # Prompt for a yes/no answer. Returns 0 for yes, 1 for no.
-# Respects AUTO_YES (treats "yes" as the default when non-interactive).
+# Respects AUTO_YES (treats default as the answer when --yes is set).
 prompt_yn() {
     question="$1"
     default="${2:-n}"
@@ -183,18 +215,15 @@ prompt_yn() {
         return 1
     fi
 
-    if [ ! -t 0 ]; then
-        # Non-interactive (piped). Use default.
-        [ "$default" = "y" ] && return 0
-        return 1
-    fi
-
     if [ "$default" = "y" ]; then
         printf "%s [Y/n] " "$question"
     else
         printf "%s [y/N] " "$question"
     fi
-    read -r ans
+    if ! _bb_read_line; then
+        # No readable source (headless cron / -T ssh). Fall back to default.
+        ans="$default"
+    fi
     ans=${ans:-$default}
     case "$ans" in
         [yY]|[yY][eE][sS]) return 0 ;;
@@ -207,7 +236,7 @@ prompt_value() {
     question="$1"
     default="${2:-}"
 
-    if [ "${AUTO_YES:-0}" = "1" ] || [ ! -t 0 ]; then
+    if [ "${AUTO_YES:-0}" = "1" ]; then
         printf "%s" "$default"
         return
     fi
@@ -217,7 +246,9 @@ prompt_value() {
     else
         printf "%s: " "$question" >&2
     fi
-    read -r ans
+    if ! _bb_read_line; then
+        ans="$default"
+    fi
     printf "%s" "${ans:-$default}"
 }
 
@@ -769,8 +800,11 @@ if [ "$healthy" -eq 1 ]; then
     if [ -n "$doctor_out" ]; then
         # Use python (preinstalled on macOS + most Linux distros) to filter
         # the JSON. Fall back to printing the raw output if python is absent.
+        # POSIX-portable: pipe data to python via stdin; -c passes the script
+        # so stdin stays available for the data. The earlier `<<<` here-string
+        # was a bashism that crashed under dash.
         if check_command python3; then
-            python3 -c '
+            printf "%s" "$doctor_out" | python3 -c '
 import json, sys
 try:
     d = json.loads(sys.stdin.read())
@@ -785,7 +819,7 @@ if fails:
     print("  full report: docker compose exec breadbox /app/breadbox doctor")
 else:
     print("doctor: ok (%d checks passed)" % len(checks))
-' <<< "$doctor_out" || printf "%s\n" "$doctor_out"
+' || printf "%s\n" "$doctor_out"
         else
             printf "%s\n" "$doctor_out"
         fi

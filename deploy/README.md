@@ -216,6 +216,32 @@ Simple cron-driven equivalent:
 0 3 * * * cd /opt/breadbox && docker compose pull && docker compose up -d >> /var/log/breadbox-update.log 2>&1
 ```
 
+## Uninstalling
+
+Same one-liner pattern, with `--uninstall`:
+
+```bash
+curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall
+```
+
+This stops + removes the containers and deletes the install directory's
+`docker-compose.prod.yml`, `Caddyfile`, `.env`, and `.breadbox-version`.
+
+**The postgres volume is preserved by default** so your transactions and
+connection data survive accidental uninstalls. To wipe it too:
+
+```bash
+docker volume rm $(docker volume ls -q | grep breadbox)
+```
+
+If you'd rather work from the install directory directly:
+
+```bash
+cd ~/.breadbox      # or /opt/breadbox for root installs
+docker compose -f docker-compose.prod.yml down -v   # -v drops volumes
+rm -rf ~/.breadbox
+```
+
 ## Environment Variables Reference
 
 | Variable | Required | Default | Description |
