@@ -261,22 +261,58 @@ prompt_value() {
 
 # Detect the host's external HTTPS URL when running on a known
 # platform. Prints the URL on stdout, or nothing if the platform
-# isn't recognized. Currently supports:
-#   - exe.dev — metadata service at 169.254.169.254 returns the VM name
-#               as JSON; the public URL is https://<name>.exe.xyz
-# Extending this for other platforms (Fly.io detects $FLY_APP_NAME,
-# Railway has $RAILWAY_PUBLIC_DOMAIN, etc.) is a small if-block per
-# platform — but install.sh only runs on plain VMs, not on the PaaS
-# build hosts, so detection here is bounded to VM-style platforms.
+# isn't recognized.
+#
+# Supported (zero-cost — each is one env-var check or one short
+# bounded HTTP probe):
+#   - Fly.io        — $FLY_APP_NAME              → https://<name>.fly.dev
+#   - Railway       — $RAILWAY_PUBLIC_DOMAIN     → https://<value>
+#   - Render        — $RENDER_EXTERNAL_URL       → <value> (already full URL)
+#   - Gitpod        — $GITPOD_WORKSPACE_URL      → <value>
+#   - GH Codespaces — $CODESPACE_NAME + domain   → https://<name>-<port>.<dom>
+#   - exe.dev       — HTTP 169.254.169.254 metadata → https://<name>.exe.xyz
+#
+# Env-var-based checks are tried first (no network cost). The exe.dev
+# probe runs last with a 2s timeout so non-platform hosts pay nearly
+# nothing for the check.
 detect_external_url() {
-    # exe.dev: <2s timeout so non-exe.dev hosts don't pay for the probe.
+    # Fly.io
+    if [ -n "${FLY_APP_NAME:-}" ]; then
+        printf "https://%s.fly.dev" "$FLY_APP_NAME"
+        return
+    fi
+    # Railway
+    if [ -n "${RAILWAY_PUBLIC_DOMAIN:-}" ]; then
+        printf "https://%s" "$RAILWAY_PUBLIC_DOMAIN"
+        return
+    fi
+    # Render
+    if [ -n "${RENDER_EXTERNAL_URL:-}" ]; then
+        printf "%s" "$RENDER_EXTERNAL_URL"
+        return
+    fi
+    # Gitpod
+    if [ -n "${GITPOD_WORKSPACE_URL:-}" ]; then
+        printf "%s" "$GITPOD_WORKSPACE_URL"
+        return
+    fi
+    # GitHub Codespaces
+    if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACE_PORT_FORWARDING_DOMAIN:-}" ]; then
+        # Codespaces uses <codespace-name>-<port>.<domain>; we don't
+        # know the port at this point (PORT_VALUE isn't resolved yet
+        # when detect_external_url runs early), so emit the
+        # codespace-host root URL — the success message will compose
+        # the /setup path correctly.
+        printf "https://%s-%s.%s" "$CODESPACE_NAME" "${PORT_ARG:-8080}" "$GITHUB_CODESPACE_PORT_FORWARDING_DOMAIN"
+        return
+    fi
+    # exe.dev: bounded HTTP probe to the link-local metadata service.
     if check_command curl; then
         meta=$(curl -fsS --max-time 2 http://169.254.169.254/ 2>/dev/null)
         if [ -n "$meta" ]; then
-            # The metadata service returns:
-            # {"name": "<vmname>", "source_ip": "..."}.
-            # Prefer python3 for robust JSON parsing; fall back to a grep+sed
-            # path so the function still works on hosts without python.
+            # Metadata: {"name": "<vmname>", "source_ip": "..."}.
+            # Prefer python3 for robust JSON parsing; fall back to a
+            # grep+sed path so the function works on python-less hosts.
             vmname=""
             if check_command python3; then
                 vmname=$(printf "%s" "$meta" | python3 -c \
@@ -621,11 +657,23 @@ fi
 DOMAIN_VALUE="$DOMAIN_ARG"
 if [ -z "$DOMAIN_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
     printf "\n"
-    info "Optional: configure a public domain for automatic HTTPS via Caddy."
-    info "Leave blank for a localhost-only install — also leave blank if"
-    info "something else already terminates HTTPS in front of this host"
-    info "(reverse proxy, cloud platform, Tailscale Serve, etc.). Caddy"
-    info "stays off and ports 80/443 are not bound."
+    if [ -n "$EXTERNAL_URL" ]; then
+        # Platform already handles HTTPS at the edge — guide the user
+        # toward leaving the prompt blank and explain why.
+        info "Optional: configure a public domain for automatic HTTPS via Caddy."
+        info "${BOLD}This host's public URL is already ${EXTERNAL_URL}${NC}"
+        info "${BOLD}(HTTPS handled by the platform).${NC}"
+        info "Leave blank to use that URL — Caddy stays off, ports 80/443 not bound."
+        info "${DIM}Only enter a custom domain if you want to override the platform's${NC}"
+        info "${DIM}URL with self-managed Caddy HTTPS (advanced — will conflict with${NC}"
+        info "${DIM}the platform's edge proxy unless you also disable it).${NC}"
+    else
+        info "Optional: configure a public domain for automatic HTTPS via Caddy."
+        info "Leave blank for a localhost-only install — also leave blank if"
+        info "something else already terminates HTTPS in front of this host"
+        info "(reverse proxy, cloud platform, Tailscale Serve, etc.). Caddy"
+        info "stays off and ports 80/443 are not bound."
+    fi
     DOMAIN_VALUE=$(prompt_value "Public domain (e.g. breadbox.example.com)" "")
 fi
 
@@ -656,8 +704,14 @@ fi
 if [ -z "$PORT_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
     printf "\n"
     info "Optional: HTTP port for Breadbox to listen on (default 8080)."
-    info "Change this only if 8080 is already taken on this host, OR if"
-    info "your reverse proxy / hosting platform expects a specific port."
+    if [ -n "$EXTERNAL_URL" ]; then
+        info "${DIM}Your platform's edge proxy will route to whichever port Breadbox${NC}"
+        info "${DIM}listens on. Keep the default 8080 unless the platform's proxy is${NC}"
+        info "${DIM}already configured for a non-default port.${NC}"
+    else
+        info "Change this only if 8080 is already taken on this host, OR if"
+        info "your reverse proxy / hosting platform expects a specific port."
+    fi
     PORT_VALUE=$(prompt_value "Port" "8080")
 fi
 PORT_VALUE="${PORT_VALUE:-8080}"
@@ -909,6 +963,18 @@ if [ "$healthy" -eq 1 ]; then
         register_daemon
     fi
 
+    # Platform-reachability check. Breadbox is healthy locally on
+    # ${PORT}. When a platform-supplied external URL exists, verify it
+    # actually routes to us — the most common cause of a "service
+    # unavailable" on a known-good install is the platform's edge proxy
+    # pointing at the wrong port.
+    PLATFORM_REACHABLE=1
+    if [ -n "$EXTERNAL_URL" ]; then
+        if ! curl -fsSL --max-time 5 "${EXTERNAL_URL}/health/ready" >/dev/null 2>&1; then
+            PLATFORM_REACHABLE=0
+        fi
+    fi
+
     # Compute the URL we'll headline. Priority: user-supplied --domain >
     # detected platform external URL > localhost. The middle case
     # closes the loop on VM platforms (exe.dev) where the script can
@@ -942,6 +1008,27 @@ if [ "$healthy" -eq 1 ]; then
     # know the public URL (no --domain and no platform detection).
     if [ -z "$DOMAIN_VALUE" ] && [ -z "$EXTERNAL_URL" ]; then
         printf "    ${DIM}(or your public URL if this host is behind a reverse proxy on port ${PORT})${NC}\n"
+    fi
+    # Platform-reachability warning. We've already confirmed Breadbox is
+    # healthy locally; if the platform-public URL doesn't reach us, the
+    # bug is on the platform side (proxy port mismatch is the canonical
+    # cause). Don't fail the install — just surface the remediation.
+    if [ "$PLATFORM_REACHABLE" -eq 0 ]; then
+        printf "\n"
+        warn "${EXTERNAL_URL} is not reaching Breadbox yet."
+        warn "Breadbox is healthy on port ${PORT}, but the platform's edge proxy"
+        warn "isn't routing to it. Most common cause: a port-mismatch."
+        case "$EXTERNAL_URL" in
+            *.exe.xyz)
+                vmname=$(printf "%s" "$EXTERNAL_URL" | sed 's|https://||;s|\.exe\.xyz||')
+                warn "Fix on exe.dev:"
+                warn "  ssh exe.dev share port ${vmname} ${PORT}"
+                ;;
+            *)
+                warn "Fix: configure your platform's edge proxy to point at port ${PORT}"
+                warn "(via the platform's CLI / dashboard)."
+                ;;
+        esac
     fi
     printf "\n"
 
