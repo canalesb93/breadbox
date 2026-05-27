@@ -5,7 +5,10 @@ services:
     env_file: .env
     command: ["sh", "-c", "/app/breadbox migrate && /app/breadbox serve"]
     ports:
-      - "8080:8080"
+      # Both sides of the mapping come from .env's SERVER_PORT so the host
+      # publishes the same port the binary listens on. The :-8080 default
+      # keeps existing installs working when SERVER_PORT is unset.
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
     depends_on:
       db:
         condition: service_healthy
@@ -28,7 +31,7 @@ services:
       # empty until a backup runs.
       - breadbox_backups:/var/lib/breadbox/backups
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/ready"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:${SERVER_PORT:-8080}/health/ready"]
       interval: 30s
       timeout: 5s
       retries: 3

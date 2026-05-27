@@ -418,6 +418,7 @@ NO_REGISTER_DAEMON=0
 NO_START=0
 PURGE_VOLUMES=0
 DOMAIN_ARG=""
+PORT_ARG=""
 VERSION_ARG=""
 
 for arg in "$@"; do
@@ -430,6 +431,7 @@ for arg in "$@"; do
         --no-start) NO_START=1 ;;
         --purge-volumes) PURGE_VOLUMES=1 ;;
         --domain=*) DOMAIN_ARG="${arg#--domain=}" ;;
+        --port=*) PORT_ARG="${arg#--port=}" ;;
         --version=*) VERSION_ARG="${arg#--version=}" ;;
         --help|-h)
             printf "Usage: install.sh [OPTIONS]\n\n"
@@ -438,6 +440,7 @@ for arg in "$@"; do
             printf "  --yes, -y              Skip interactive prompts; accept defaults\n"
             printf "  --install-docker       Install Docker automatically (Linux only)\n"
             printf "  --domain=HOST          Configure the install for HTTPS at HOST (enables Caddy)\n"
+            printf "  --port=N               HTTP port to listen on (default: 8080)\n"
             printf "  --version=vX.Y.Z       Pin to a specific release tag (default: latest GitHub release)\n"
             printf "  --no-start             Write the install but don't 'docker compose up' it\n"
             printf "  --purge-volumes        Drop existing postgres/transcripts/backups volumes before install\n"
@@ -546,7 +549,19 @@ printf "\n"
 if [ -f "${INSTALL_DIR}/.env" ]; then
     warn "Existing .env found at ${INSTALL_DIR}/.env"
     info "To avoid overwriting your configuration, the existing .env will be preserved."
-    info "To start fresh, run: $0 --uninstall"
+    info "To start fresh, run: curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall"
+    # --domain / --port can't take effect when reusing an existing .env —
+    # the env-generation block is skipped. Warn loudly so the user doesn't
+    # think their flag worked, then point at the in-place edit.
+    if [ -n "$DOMAIN_ARG" ] || [ -n "$PORT_ARG" ]; then
+        printf "\n"
+        warn "Note: --domain / --port have no effect when reusing an existing .env."
+        warn "To change settings on this install:"
+        warn "  1. Edit ${INSTALL_DIR}/.env (DOMAIN= and/or SERVER_PORT=)"
+        warn "  2. cd ${INSTALL_DIR} && docker compose -f docker-compose.prod.yml up -d"
+        warn "Or uninstall first to start fresh:"
+        warn "  curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall"
+    fi
     printf "\n"
     ENV_EXISTS=1
 else
@@ -572,6 +587,32 @@ if [ -n "$DOMAIN_VALUE" ]; then
 else
     info "Localhost-only install (no HTTPS, no Caddy)"
     CADDY_PROFILE=""
+fi
+
+# --- Port prompt ---
+#
+# Most users want 8080 — but some platforms (exe.dev, some cloud PaaS,
+# certain reverse proxies) route to a specific port number that isn't
+# 8080. Prompting up-front catches those cases before the install
+# completes and the user discovers "service unavailable" later.
+PORT_VALUE="$PORT_ARG"
+if [ -z "$PORT_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
+    printf "\n"
+    info "Optional: HTTP port for Breadbox to listen on (default 8080)."
+    info "Change this only if 8080 is already taken on this host, OR if"
+    info "your reverse proxy / hosting platform expects a specific port."
+    PORT_VALUE=$(prompt_value "Port" "8080")
+fi
+PORT_VALUE="${PORT_VALUE:-8080}"
+# Sanity-check: digits-only, 1-65535.
+case "$PORT_VALUE" in
+    ''|*[!0-9]*) die "--port must be a number, got: ${PORT_VALUE}" ;;
+esac
+if [ "$PORT_VALUE" -lt 1 ] || [ "$PORT_VALUE" -gt 65535 ]; then
+    die "--port must be 1-65535, got: ${PORT_VALUE}"
+fi
+if [ "$PORT_VALUE" != "8080" ]; then
+    info "Listening on port: ${PORT_VALUE}"
 fi
 
 printf "\n"
@@ -647,7 +688,7 @@ POSTGRES_DB=breadbox
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 # --- Server ---
-SERVER_PORT=8080
+SERVER_PORT=${PORT_VALUE}
 ENVIRONMENT=docker
 
 # --- Domain (for Caddy HTTPS) ---
@@ -729,6 +770,38 @@ if [ "$NO_START" = "1" ]; then
     exit 0
 fi
 
+# --- Pre-flight port check ---
+#
+# Catch "port already in use" up-front instead of letting the user wait 60s
+# for the health probe to time out. Uses `ss` (universally available on
+# systemd hosts via iproute2) — falls back to lsof if ss is missing.
+# Compose's port-mapping clash error is also clear, but we want to refuse
+# *before* generating volumes / pulling images / starting containers.
+check_port_in_use() {
+    port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltn "sport = :${port}" 2>/dev/null | tail -n +2 | grep -q .
+    elif command -v lsof >/dev/null 2>&1; then
+        lsof -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+    else
+        # No tool available — skip the check. Compose will surface the
+        # error if there's a real conflict.
+        return 1
+    fi
+}
+
+if check_port_in_use "$PORT_VALUE"; then
+    error "Port ${PORT_VALUE} is already in use on this host."
+    error "Pick a different port with: --port=N (or stop the conflicting service first)."
+    error "Check what's listening:"
+    if command -v ss >/dev/null 2>&1; then
+        error "  ss -ltnp 'sport = :${PORT_VALUE}'"
+    else
+        error "  lsof -iTCP:${PORT_VALUE} -sTCP:LISTEN"
+    fi
+    exit 1
+fi
+
 # --- Start services ---
 
 info "Starting Breadbox..."
@@ -737,8 +810,12 @@ info "Starting Breadbox..."
 # shellcheck disable=SC2086
 if ! docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" up -d; then
     error "docker compose up failed. Last 20 lines of compose logs:"
+    # Redact DSN-style credentials before dumping to the terminal — see the
+    # health-failure block below for the same precaution.
     # shellcheck disable=SC2086
-    docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 20 || true
+    docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 20 2>&1 \
+        | sed -E 's#(://[^:@/]+:)[^@]+@#\1REDACTED@#g' \
+        || true
     exit 1
 fi
 
@@ -785,6 +862,8 @@ if [ "$healthy" -eq 1 ]; then
         info "Setup wizard:  ${BOLD}https://${DOMAIN_VALUE}/setup${NC}"
     else
         info "Setup wizard:  ${BOLD}http://localhost:${PORT}/setup${NC}"
+        info "${DIM}  …or visit your public URL if this host is behind a reverse proxy${NC}"
+        info "${DIM}  pointing at port ${PORT}.${NC}"
     fi
     info "Config file:   ${INSTALL_DIR}/.env"
     info "Version pin:   ${INSTALL_DIR}/.breadbox-version (${IMAGE_TAG})"
@@ -795,7 +874,7 @@ if [ "$healthy" -eq 1 ]; then
         info "View logs:     cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs -f"
         info "Update:        cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} pull && docker compose -f ${COMPOSE_FILE} up -d"
     fi
-    info "Uninstall:     ${0} --uninstall"
+    info "Uninstall:     curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall"
     printf "\n"
     if [ -z "$DOMAIN_VALUE" ]; then
         printf "${DIM}To enable HTTPS later, edit .env to set DOMAIN=, then:${NC}\n"
@@ -840,6 +919,27 @@ else:
     fi
 else
     error "Breadbox did not become healthy within 60 seconds."
-    error "Check logs: cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs"
+    error ""
+    error "Common causes:"
+    error "  1. Port ${PORT} is already used by another process on this host."
+    error "     Re-run with --port=N to pick a different one, or stop the"
+    error "     conflicting service. Check with:"
+    error "       ss -ltnp 'sport = :${PORT}'    (or: lsof -iTCP:${PORT} -sTCP:LISTEN)"
+    error "  2. Postgres is still initializing (rare on first install — wait"
+    error "     a few seconds and retry from the install dir, or check the"
+    error "     db logs: docker compose -f ${COMPOSE_FILE} logs db)"
+    error "  3. The breadbox container hit a startup error (most likely the"
+    error "     migration failed). See the last 30 lines:"
+    error ""
+    # Redact credentials embedded in DSN-style URLs before dumping logs to
+    # the user's terminal. goose/pgx errors sometimes include the DSN, and
+    # POSTGRES_PASSWORD was generated for this install just a moment ago —
+    # we don't want it landing in scrollback / CI captures / shell history.
+    # shellcheck disable=SC2086
+    docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 30 breadbox 2>&1 \
+        | sed -E 's#(://[^:@/]+:)[^@]+@#\1REDACTED@#g' \
+        || true
+    error ""
+    error "Full logs: cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs"
     exit 1
 fi
