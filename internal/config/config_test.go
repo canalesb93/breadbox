@@ -143,6 +143,97 @@ func TestLoad_ServerPort_FromEnv(t *testing.T) {
 	}
 }
 
+// TestLoad_ServerPort_FallsBackToPortEnv exercises the PaaS port-injection
+// convention. Heroku, Fly.io, Railway, Render, Cloud Run, etc. inject
+// PORT (not SERVER_PORT). When SERVER_PORT is unset but PORT is set,
+// Breadbox must bind to PORT.
+func TestLoad_ServerPort_FallsBackToPortEnv(t *testing.T) {
+	savedServer := os.Getenv("SERVER_PORT")
+	savedPort := os.Getenv("PORT")
+	t.Cleanup(func() {
+		if savedServer != "" {
+			os.Setenv("SERVER_PORT", savedServer)
+		} else {
+			os.Unsetenv("SERVER_PORT")
+		}
+		if savedPort != "" {
+			os.Setenv("PORT", savedPort)
+		} else {
+			os.Unsetenv("PORT")
+		}
+	})
+
+	os.Unsetenv("SERVER_PORT")
+	os.Setenv("PORT", "3000")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.ServerPort != "3000" {
+		t.Errorf("expected PORT fallback to give '3000', got %q", cfg.ServerPort)
+	}
+}
+
+// TestLoad_ServerPort_PrefersServerPortOverPort verifies that when both
+// SERVER_PORT and PORT are set, SERVER_PORT wins. That way a user who
+// has set both (e.g. PORT leaked from another tool's env) gets the
+// value they explicitly chose for Breadbox.
+func TestLoad_ServerPort_PrefersServerPortOverPort(t *testing.T) {
+	savedServer := os.Getenv("SERVER_PORT")
+	savedPort := os.Getenv("PORT")
+	t.Cleanup(func() {
+		if savedServer != "" {
+			os.Setenv("SERVER_PORT", savedServer)
+		} else {
+			os.Unsetenv("SERVER_PORT")
+		}
+		if savedPort != "" {
+			os.Setenv("PORT", savedPort)
+		} else {
+			os.Unsetenv("PORT")
+		}
+	})
+
+	os.Setenv("SERVER_PORT", "7777")
+	os.Setenv("PORT", "3000")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.ServerPort != "7777" {
+		t.Errorf("expected SERVER_PORT to win over PORT, got %q", cfg.ServerPort)
+	}
+}
+
+// TestLoad_ServerPort_DefaultsTo8080 verifies the final fallback when
+// neither SERVER_PORT nor PORT is set.
+func TestLoad_ServerPort_DefaultsTo8080(t *testing.T) {
+	savedServer := os.Getenv("SERVER_PORT")
+	savedPort := os.Getenv("PORT")
+	t.Cleanup(func() {
+		if savedServer != "" {
+			os.Setenv("SERVER_PORT", savedServer)
+		} else {
+			os.Unsetenv("SERVER_PORT")
+		}
+		if savedPort != "" {
+			os.Setenv("PORT", savedPort)
+		} else {
+			os.Unsetenv("PORT")
+		}
+	})
+
+	os.Unsetenv("SERVER_PORT")
+	os.Unsetenv("PORT")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.ServerPort != "8080" {
+		t.Errorf("expected default '8080', got %q", cfg.ServerPort)
+	}
+}
+
 func TestLoad_PlaidEnvVars(t *testing.T) {
 	vars := map[string]string{
 		"PLAID_CLIENT_ID": "test-client",

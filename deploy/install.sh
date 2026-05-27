@@ -596,6 +596,15 @@ fi
 # 8080. Prompting up-front catches those cases before the install
 # completes and the user discovers "service unavailable" later.
 PORT_VALUE="$PORT_ARG"
+# 12-factor / PaaS convention: Heroku, Fly.io, Railway, Render, Cloud Run
+# all inject PORT into the runtime environment. When the user runs the
+# installer on a host where PORT is already exported, default to it
+# instead of forcing them to discover and translate it. --port=N still
+# wins; this only kicks in when --port wasn't given.
+if [ -z "$PORT_VALUE" ] && [ -n "${PORT:-}" ]; then
+    PORT_VALUE="$PORT"
+    info "Detected PORT=${PORT} in the environment (12-factor convention) — using as default."
+fi
 if [ -z "$PORT_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
     printf "\n"
     info "Optional: HTTP port for Breadbox to listen on (default 8080)."

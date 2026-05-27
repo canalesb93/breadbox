@@ -34,7 +34,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Environment:   env,
-		ServerPort:    getEnv("SERVER_PORT", "8080"),
+		ServerPort:    resolveServerPort(),
 		LogLevel:      os.Getenv("LOG_LEVEL"),
 		ConfigSources: make(map[string]string),
 	}
@@ -247,6 +247,22 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// resolveServerPort returns the HTTP listen port. Tries SERVER_PORT first
+// (the Breadbox-specific name), then PORT (the 12-factor convention used
+// by Heroku, Fly.io, Railway, Render, Cloud Run, and most PaaS hosts),
+// then defaults to 8080. The PORT fallback makes Breadbox deployable on
+// any PaaS that injects a runtime port without the user having to
+// translate it to SERVER_PORT.
+func resolveServerPort() string {
+	if v := os.Getenv("SERVER_PORT"); v != "" {
+		return v
+	}
+	if v := os.Getenv("PORT"); v != "" {
+		return v
+	}
+	return "8080"
 }
 
 func getEnvInt(key string, fallback int) int {
