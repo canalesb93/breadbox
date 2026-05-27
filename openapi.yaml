@@ -3134,7 +3134,7 @@ components:
         action: { type: string, enum: [link, relink] }
         connection_id:
           type: string
-          description: Present only for `action: "relink"` — the connection being re-authenticated.
+          description: 'Present only for `action: "relink"` — the connection being re-authenticated.'
         single_use: { type: boolean }
         redirect_url:
           type: string
@@ -3147,10 +3147,10 @@ components:
           enum: [pending, active, completed, failed, expired, consumed]
         error_code:
           type: string
-          description: Present only on `status: "failed"`.
+          description: 'Present only on `status: "failed"`.'
         error_message:
           type: string
-          description: Present only on `status: "failed"`.
+          description: 'Present only on `status: "failed"`.'
         result_connection_ids:
           type: array
           items: { type: string }
