@@ -259,6 +259,44 @@ prompt_value() {
     printf "%s" "${ans:-$default}"
 }
 
+# Detect the host's external HTTPS URL when running on a known
+# platform. Prints the URL on stdout, or nothing if the platform
+# isn't recognized. Currently supports:
+#   - exe.dev — metadata service at 169.254.169.254 returns the VM name
+#               as JSON; the public URL is https://<name>.exe.xyz
+# Extending this for other platforms (Fly.io detects $FLY_APP_NAME,
+# Railway has $RAILWAY_PUBLIC_DOMAIN, etc.) is a small if-block per
+# platform — but install.sh only runs on plain VMs, not on the PaaS
+# build hosts, so detection here is bounded to VM-style platforms.
+detect_external_url() {
+    # exe.dev: <2s timeout so non-exe.dev hosts don't pay for the probe.
+    if check_command curl; then
+        meta=$(curl -fsS --max-time 2 http://169.254.169.254/ 2>/dev/null)
+        if [ -n "$meta" ]; then
+            # The metadata service returns:
+            # {"name": "<vmname>", "source_ip": "..."}.
+            # Prefer python3 for robust JSON parsing; fall back to a grep+sed
+            # path so the function still works on hosts without python.
+            vmname=""
+            if check_command python3; then
+                vmname=$(printf "%s" "$meta" | python3 -c \
+                    'import json,sys; d=json.load(sys.stdin); print(d.get("name",""))' \
+                    2>/dev/null)
+            fi
+            if [ -z "$vmname" ]; then
+                vmname=$(printf "%s" "$meta" \
+                    | grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' \
+                    | head -1 \
+                    | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+            fi
+            if [ -n "$vmname" ]; then
+                printf "https://%s.exe.xyz" "$vmname"
+                return
+            fi
+        fi
+    fi
+}
+
 # Fetch the latest release tag from GitHub API.
 # Falls back to "latest" if the API call fails.
 get_latest_tag() {
@@ -522,6 +560,12 @@ if ! check_command openssl; then
 fi
 success "openssl found"
 
+# --- Detect external URL (when on a recognized VM platform) ---
+EXTERNAL_URL=$(detect_external_url)
+if [ -n "$EXTERNAL_URL" ]; then
+    success "Detected platform — public URL: ${EXTERNAL_URL}"
+fi
+
 printf "\n"
 
 # --- Resolve version ---
@@ -534,7 +578,11 @@ else
     info "Fetching latest release..."
     TAG=$(get_latest_tag)
     if [ "$TAG" = "latest" ]; then
-        warn "Could not determine latest release tag. Using :latest image."
+        # Pre-v0.1.0 there's no GitHub Release yet, so this fires for
+        # every install. Phrase as neutral info rather than a warning
+        # — the rolling :latest image is the right behavior in this
+        # state.
+        info "No release tagged yet — using :latest image (rolling)."
         IMAGE_TAG="latest"
     else
         success "Latest release: ${TAG}"
@@ -861,69 +909,70 @@ if [ "$healthy" -eq 1 ]; then
         register_daemon
     fi
 
+    # Compute the URL we'll headline. Priority: user-supplied --domain >
+    # detected platform external URL > localhost. The middle case
+    # closes the loop on VM platforms (exe.dev) where the script can
+    # derive the real public URL — no more "or visit your public URL"
+    # guessing.
+    if [ -n "$DOMAIN_VALUE" ]; then
+        SETUP_URL="https://${DOMAIN_VALUE}/setup"
+    elif [ -n "$EXTERNAL_URL" ]; then
+        SETUP_URL="${EXTERNAL_URL}/setup"
+    else
+        SETUP_URL="http://localhost:${PORT}/setup"
+    fi
+
+    # Compose-command shortcuts for the footer hints. Both variants are
+    # computed up front to avoid repeating long literal commands later.
+    COMPOSE_CMD="docker compose -f ${COMPOSE_FILE}"
+    CADDY_COMPOSE_CMD="docker compose --profile caddy -f ${COMPOSE_FILE}"
+    if [ -n "$CADDY_PROFILE" ]; then
+        COMPOSE_CMD="$CADDY_COMPOSE_CMD"
+    fi
+
     printf "${GREEN}${BOLD}"
     printf "  =========================================\n"
     printf "    Breadbox is running!\n"
     printf "  =========================================\n"
     printf "${NC}\n"
-    if [ -n "$DOMAIN_VALUE" ]; then
-        info "Public URL:    ${BOLD}https://${DOMAIN_VALUE}${NC}"
-        info "Setup wizard:  ${BOLD}https://${DOMAIN_VALUE}/setup${NC}"
-    else
-        info "Setup wizard:  ${BOLD}http://localhost:${PORT}/setup${NC}"
-        info "${DIM}  …or visit your public URL if this host is behind a reverse proxy${NC}"
-        info "${DIM}  pointing at port ${PORT}.${NC}"
-    fi
-    info "Config file:   ${INSTALL_DIR}/.env"
-    info "Version pin:   ${INSTALL_DIR}/.breadbox-version (${IMAGE_TAG})"
-    if [ -n "$CADDY_PROFILE" ]; then
-        info "View logs:     cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} logs -f"
-        info "Update:        cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} pull && docker compose --profile caddy -f ${COMPOSE_FILE} up -d"
-    else
-        info "View logs:     cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs -f"
-        info "Update:        cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} pull && docker compose -f ${COMPOSE_FILE} up -d"
-    fi
-    info "Uninstall:     curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall"
-    printf "\n"
-    if [ -z "$DOMAIN_VALUE" ]; then
-        printf "${DIM}To enable HTTPS later, edit .env to set DOMAIN=, then:${NC}\n"
-        printf "${DIM}  cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} up -d${NC}\n"
-        printf "\n"
-    fi
 
-    # --- Post-install: breadbox doctor handoff ---
-    # Run `breadbox doctor --json` and surface only fails/warns. On a
-    # clean install every check passes — print a single-line summary
-    # so the success path stays quiet. The full report is one command
-    # away if the user wants it.
+    # Headline: the one thing the user needs to do RIGHT NOW.
+    printf "  ${BOLD}→ Continue setup:${NC} ${BOLD}${SETUP_URL}${NC}\n"
+    # Only show the "or your public URL" hint when we genuinely don't
+    # know the public URL (no --domain and no platform detection).
+    if [ -z "$DOMAIN_VALUE" ] && [ -z "$EXTERNAL_URL" ]; then
+        printf "    ${DIM}(or your public URL if this host is behind a reverse proxy on port ${PORT})${NC}\n"
+    fi
     printf "\n"
-    doctor_out=$(docker compose -f "$COMPOSE_FILE" exec -T breadbox /app/breadbox doctor --json 2>/dev/null || true)
-    if [ -n "$doctor_out" ]; then
-        # Use python (preinstalled on macOS + most Linux distros) to filter
-        # the JSON. Fall back to printing the raw output if python is absent.
-        # POSIX-portable: pipe data to python via stdin; -c passes the script
-        # so stdin stays available for the data. The earlier `<<<` here-string
-        # was a bashism that crashed under dash.
-        if check_command python3; then
-            printf "%s" "$doctor_out" | python3 -c '
-import json, sys
-try:
-    d = json.loads(sys.stdin.read())
-except Exception:
-    sys.exit(1)
-checks = d.get("checks", []) or []
-fails = [c for c in checks if c.get("status") not in ("pass", "skip")]
-if fails:
-    print("doctor: %d issue(s)" % len(fails))
-    for c in fails:
-        print("  - [%s] %s: %s" % (c.get("status",""), c.get("name",""), c.get("message","")))
-    print("  full report: docker compose exec breadbox /app/breadbox doctor")
-else:
-    print("doctor: ok (%d checks passed)" % len(checks))
-' || printf "%s\n" "$doctor_out"
-        else
-            printf "%s\n" "$doctor_out"
-        fi
+
+    # Optional next steps. Phrased as "things you can do", not "things
+    # that are wrong" — the post-install state is correct, the user just
+    # hasn't done these yet. Replaces the doctor handoff that previously
+    # surfaced "no admin account" as a scary fail right after the user
+    # had no chance to create one.
+    printf "  ${BOLD}Optional next steps${NC} (after creating your admin):\n"
+    printf "    • Connect a bank — /connections (Plaid, Teller, or CSV import)\n"
+    printf "    • Enable the AI agent runtime — /agents (set an Anthropic API key)\n"
+    printf "    • Schedule database backups — /settings/backups\n"
+    printf "\n"
+
+    # Quiet operational footer. Less prominent than the call-to-action
+    # but still discoverable when the user needs it.
+    printf "  ${DIM}Config:    ${INSTALL_DIR}/.env${NC}\n"
+    printf "  ${DIM}Logs:      cd ${INSTALL_DIR} && ${COMPOSE_CMD} logs -f${NC}\n"
+    printf "  ${DIM}Update:    cd ${INSTALL_DIR} && ${COMPOSE_CMD} pull && ${COMPOSE_CMD} up -d${NC}\n"
+    printf "  ${DIM}Diagnose:  cd ${INSTALL_DIR} && ${COMPOSE_CMD} exec breadbox /app/breadbox doctor${NC}\n"
+    printf "  ${DIM}Uninstall: curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall${NC}\n"
+    printf "\n"
+
+    if [ -z "$DOMAIN_VALUE" ] && [ -z "$EXTERNAL_URL" ]; then
+        # The "enable Caddy later" hint only makes sense for users who
+        # might actually need a self-managed reverse proxy. On a
+        # detected-platform host (e.g. exe.dev) the platform's own edge
+        # already terminates HTTPS — bringing up Caddy on top would
+        # fight for ports 80/443.
+        printf "  ${DIM}HTTPS later: edit .env to set DOMAIN=, then:${NC}\n"
+        printf "  ${DIM}  cd ${INSTALL_DIR} && ${CADDY_COMPOSE_CMD} up -d${NC}\n"
         printf "\n"
     fi
 else
