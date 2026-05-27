@@ -50,11 +50,12 @@ func TestWhoami_ReturnsCallerIdentity(t *testing.T) {
 	if got.Scope != "full_access" {
 		t.Errorf("Scope = %q want full_access", got.Scope)
 	}
-	// The legacy CreateAPIKeyLegacy call used by setupTestEnv defaults
-	// actor_type to "agent" (per the new schema default), so this row
-	// should report the default.
-	if got.ActorType != "agent" {
-		t.Errorf("ActorType = %q want agent (default)", got.ActorType)
+	// CreateAPIKeyLegacy (used by setupTestEnv) defaults actor_type to
+	// "user" — the safe default for human-driven entry points. Agent
+	// runtime keys opt in explicitly so the startup
+	// CleanupOrphanedAgentApiKeys sweep doesn't reap dashboard keys.
+	if got.ActorType != "user" {
+		t.Errorf("ActorType = %q want user (default)", got.ActorType)
 	}
 	if got.ID == "" {
 		t.Error("ID is empty")

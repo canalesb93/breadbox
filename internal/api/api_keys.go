@@ -58,7 +58,7 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		if req.ActorType == "" {
-			req.ActorType = "agent"
+			req.ActorType = "user"
 		}
 		if req.ActorType != "user" && req.ActorType != "agent" && req.ActorType != "system" {
 			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "actor_type must be user, agent, or system")

@@ -25,7 +25,11 @@ func TestCreateAPIKey_StoresActorColumns(t *testing.T) {
 		actorType string
 		actorName string
 	}{
-		{"agent default", "", ""},
+		// Empty ActorType defaults to "user" — the safe default for
+		// human-facing entry points (dashboard, REST). Agent runtime keys
+		// must opt in explicitly so the startup CleanupOrphanedAgentApiKeys
+		// sweep doesn't reap user keys after the 1-hour grace.
+		{"user default", "", ""},
 		{"explicit agent", "agent", "bot-alpha"},
 		{"user actor", "user", "ricardo"},
 		{"system actor", "system", "stdio"},
@@ -43,7 +47,7 @@ func TestCreateAPIKey_StoresActorColumns(t *testing.T) {
 			}
 			wantType := tc.actorType
 			if wantType == "" {
-				wantType = "agent"
+				wantType = "user"
 			}
 			if got.ActorType != wantType {
 				t.Errorf("ActorType = %q want %q", got.ActorType, wantType)

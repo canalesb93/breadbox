@@ -20,13 +20,17 @@ import (
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 // CreateAPIKeyParams collects the inputs for minting a new API key. Actor
-// fields default to `agent` when omitted so existing callers keep their
-// behavior. CLI's `auth bootstrap` passes `user`, the stdio bootstrap passes
-// `system` (see ensureStdioSystemKey).
+// fields default to `user` when omitted — the safe default for any
+// human-driven entry point (admin dashboard form, REST `POST
+// /api/v1/api-keys`, OAuth client mint). Agent runtime keys are short-lived
+// and must opt in explicitly with `ActorType: "agent"` (see
+// `MintRunAPIKey`); otherwise the startup
+// `CleanupOrphanedAgentApiKeys` sweep silently revokes them after 1 hour.
+// The stdio bootstrap passes `system` (see ensureStdioSystemKey).
 type CreateAPIKeyParams struct {
 	Name      string
 	Scope     string
-	ActorType string // "user" | "agent" | "system"; defaults to "agent"
+	ActorType string // "user" | "agent" | "system"; defaults to "user"
 	ActorName string // optional display name, falls back to Name
 }
 
@@ -44,7 +48,7 @@ func (s *Service) CreateAPIKey(ctx context.Context, p CreateAPIKeyParams) (*Crea
 	}
 	actorType := p.ActorType
 	if actorType == "" {
-		actorType = "agent"
+		actorType = "user"
 	}
 	if actorType != "user" && actorType != "agent" && actorType != "system" {
 		return nil, fmt.Errorf("invalid actor_type: %s", actorType)

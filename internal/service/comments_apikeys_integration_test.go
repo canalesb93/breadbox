@@ -412,6 +412,97 @@ func TestCreateAPIKey_DefaultScope(t *testing.T) {
 	}
 }
 
+// TestCreateAPIKey_DefaultActorTypeIsUser locks in the post-fix default:
+// callers that don't set ActorType (admin dashboard form, OAuth client mint,
+// REST POST /api/v1/api-keys without an explicit body field) get
+// actor_type='user', not 'agent'. Regression for the bug where the silent
+// 'agent' default caused dashboard-created keys to be reaped by the startup
+// CleanupOrphanedAgentApiKeys sweep on every server restart.
+func TestCreateAPIKey_DefaultActorTypeIsUser(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// CreateAPIKeyLegacy — the entry point the admin dashboard uses.
+	legacy, err := svc.CreateAPIKeyLegacy(ctx, "dashboard-key", "full_access")
+	if err != nil {
+		t.Fatalf("CreateAPIKeyLegacy failed: %v", err)
+	}
+	if legacy.ActorType != "user" {
+		t.Errorf("CreateAPIKeyLegacy actor_type = %q, want %q", legacy.ActorType, "user")
+	}
+
+	// CreateAPIKey with an empty ActorType — the REST handler's path when the
+	// request body omits actor_type.
+	implicit, err := svc.CreateAPIKey(ctx, service.CreateAPIKeyParams{
+		Name:  "rest-key",
+		Scope: "full_access",
+	})
+	if err != nil {
+		t.Fatalf("CreateAPIKey failed: %v", err)
+	}
+	if implicit.ActorType != "user" {
+		t.Errorf("CreateAPIKey (empty ActorType) actor_type = %q, want %q", implicit.ActorType, "user")
+	}
+
+	// Explicit ActorType="agent" still works — orchestrator must keep minting
+	// short-lived agent keys.
+	explicit, err := svc.CreateAPIKey(ctx, service.CreateAPIKeyParams{
+		Name:      "agent-key",
+		Scope:     "full_access",
+		ActorType: "agent",
+	})
+	if err != nil {
+		t.Fatalf("CreateAPIKey(agent) failed: %v", err)
+	}
+	if explicit.ActorType != "agent" {
+		t.Errorf("CreateAPIKey(ActorType=agent) actor_type = %q, want %q", explicit.ActorType, "agent")
+	}
+}
+
+// TestCreateAPIKey_LegacyKeyNotReapedByOrphanCleanup is the end-to-end
+// regression for the dev-VM symptom: a key minted via the dashboard path,
+// aged past the 1-hour grace window, must survive a startup
+// CleanupOrphanedAgentApiKeys sweep.
+func TestCreateAPIKey_LegacyKeyNotReapedByOrphanCleanup(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	result, err := svc.CreateAPIKeyLegacy(ctx, "long-lived-dashboard-key", "full_access")
+	if err != nil {
+		t.Fatalf("CreateAPIKeyLegacy: %v", err)
+	}
+
+	// Age the key past the cleanup's 1-hour grace.
+	if _, err := pool.Exec(ctx,
+		"UPDATE api_keys SET created_at = NOW() - INTERVAL '2 hours' WHERE id = $1::uuid",
+		result.ID,
+	); err != nil {
+		t.Fatalf("age key: %v", err)
+	}
+
+	if _, err := queries.CleanupOrphanedAgentApiKeys(ctx); err != nil {
+		t.Fatalf("CleanupOrphanedAgentApiKeys: %v", err)
+	}
+
+	keys, err := svc.ListAPIKeys(ctx)
+	if err != nil {
+		t.Fatalf("ListAPIKeys: %v", err)
+	}
+	var found *service.APIKeyResponse
+	for i := range keys {
+		if keys[i].ID == result.ID {
+			found = &keys[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("dashboard key %q missing from ListAPIKeys", result.ID)
+	}
+	if found.RevokedAt != nil {
+		t.Fatalf("dashboard key was revoked by orphan cleanup; revoked_at = %q", *found.RevokedAt)
+	}
+}
+
 func TestCreateAPIKey_ReadOnlyScope(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
