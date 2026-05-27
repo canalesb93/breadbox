@@ -24,7 +24,7 @@ func seedSubscriptionAuth(t *testing.T, svc *service.Service) []byte {
 	tok := "sk-ant-oat01-FAKE-TEST-TOKEN-FOR-INTEGRATION"
 	if _, err := svc.UpdateAgentSettings(context.Background(), service.UpdateAgentSettingsParams{
 		SubscriptionToken: &tok,
-	}, devEncKey); err != nil {
+	}, devEncKey, ""); err != nil {
 		t.Fatalf("seed subscription auth: %v", err)
 	}
 	return devEncKey
