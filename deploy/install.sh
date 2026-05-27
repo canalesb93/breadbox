@@ -418,6 +418,7 @@ NO_REGISTER_DAEMON=0
 NO_START=0
 PURGE_VOLUMES=0
 DOMAIN_ARG=""
+PORT_ARG=""
 VERSION_ARG=""
 
 for arg in "$@"; do
@@ -430,6 +431,7 @@ for arg in "$@"; do
         --no-start) NO_START=1 ;;
         --purge-volumes) PURGE_VOLUMES=1 ;;
         --domain=*) DOMAIN_ARG="${arg#--domain=}" ;;
+        --port=*) PORT_ARG="${arg#--port=}" ;;
         --version=*) VERSION_ARG="${arg#--version=}" ;;
         --help|-h)
             printf "Usage: install.sh [OPTIONS]\n\n"
@@ -438,6 +440,7 @@ for arg in "$@"; do
             printf "  --yes, -y              Skip interactive prompts; accept defaults\n"
             printf "  --install-docker       Install Docker automatically (Linux only)\n"
             printf "  --domain=HOST          Configure the install for HTTPS at HOST (enables Caddy)\n"
+            printf "  --port=N               HTTP port to listen on (default: 8080)\n"
             printf "  --version=vX.Y.Z       Pin to a specific release tag (default: latest GitHub release)\n"
             printf "  --no-start             Write the install but don't 'docker compose up' it\n"
             printf "  --purge-volumes        Drop existing postgres/transcripts/backups volumes before install\n"
@@ -574,6 +577,32 @@ else
     CADDY_PROFILE=""
 fi
 
+# --- Port prompt ---
+#
+# Most users want 8080 — but some platforms (exe.dev, some cloud PaaS,
+# certain reverse proxies) route to a specific port number that isn't
+# 8080. Prompting up-front catches those cases before the install
+# completes and the user discovers "service unavailable" later.
+PORT_VALUE="$PORT_ARG"
+if [ -z "$PORT_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
+    printf "\n"
+    info "Optional: HTTP port for Breadbox to listen on (default 8080)."
+    info "Change this only if 8080 is already taken on this host, OR if"
+    info "your reverse proxy / hosting platform expects a specific port."
+    PORT_VALUE=$(prompt_value "Port" "8080")
+fi
+PORT_VALUE="${PORT_VALUE:-8080}"
+# Sanity-check: digits-only, 1-65535.
+case "$PORT_VALUE" in
+    ''|*[!0-9]*) die "--port must be a number, got: ${PORT_VALUE}" ;;
+esac
+if [ "$PORT_VALUE" -lt 1 ] || [ "$PORT_VALUE" -gt 65535 ]; then
+    die "--port must be 1-65535, got: ${PORT_VALUE}"
+fi
+if [ "$PORT_VALUE" != "8080" ]; then
+    info "Listening on port: ${PORT_VALUE}"
+fi
+
 printf "\n"
 
 # --- Create install directory ---
@@ -647,7 +676,7 @@ POSTGRES_DB=breadbox
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 # --- Server ---
-SERVER_PORT=8080
+SERVER_PORT=${PORT_VALUE}
 ENVIRONMENT=docker
 
 # --- Domain (for Caddy HTTPS) ---
@@ -785,6 +814,8 @@ if [ "$healthy" -eq 1 ]; then
         info "Setup wizard:  ${BOLD}https://${DOMAIN_VALUE}/setup${NC}"
     else
         info "Setup wizard:  ${BOLD}http://localhost:${PORT}/setup${NC}"
+        info "${DIM}  …or visit your public URL if this host is behind a reverse proxy${NC}"
+        info "${DIM}  pointing at port ${PORT}.${NC}"
     fi
     info "Config file:   ${INSTALL_DIR}/.env"
     info "Version pin:   ${INSTALL_DIR}/.breadbox-version (${IMAGE_TAG})"
@@ -840,6 +871,20 @@ else:
     fi
 else
     error "Breadbox did not become healthy within 60 seconds."
-    error "Check logs: cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs"
+    error ""
+    error "Common causes:"
+    error "  1. Port ${PORT} is already used by another process on this host."
+    error "     Re-run with --port=N to pick a different one, or stop the"
+    error "     conflicting service. Check with: lsof -iTCP:${PORT} -sTCP:LISTEN"
+    error "  2. Postgres is still initializing (rare on first install — wait"
+    error "     a few seconds and retry from the install dir, or check the"
+    error "     db logs: docker compose -f ${COMPOSE_FILE} logs db)"
+    error "  3. The breadbox container hit a startup error (most likely the"
+    error "     migration failed). See the last 30 lines:"
+    error ""
+    # shellcheck disable=SC2086
+    docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 30 breadbox || true
+    error ""
+    error "Full logs: cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs"
     exit 1
 fi
