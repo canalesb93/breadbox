@@ -259,53 +259,21 @@ prompt_value() {
     printf "%s" "${ans:-$default}"
 }
 
-# Detect the host's external HTTPS URL when running on a known
-# platform. Prints the URL on stdout, or nothing if the platform
-# isn't recognized.
+# Detect the host's external HTTPS URL when running on a known VM
+# platform. Prints the URL on stdout, or nothing if no platform was
+# recognized.
 #
-# Supported (zero-cost — each is one env-var check or one short
-# bounded HTTP probe):
-#   - Fly.io        — $FLY_APP_NAME              → https://<name>.fly.dev
-#   - Railway       — $RAILWAY_PUBLIC_DOMAIN     → https://<value>
-#   - Render        — $RENDER_EXTERNAL_URL       → <value> (already full URL)
-#   - Gitpod        — $GITPOD_WORKSPACE_URL      → <value>
-#   - GH Codespaces — $CODESPACE_NAME + domain   → https://<name>-<port>.<dom>
-#   - exe.dev       — HTTP 169.254.169.254 metadata → https://<name>.exe.xyz
+# Currently supports exe.dev only. PaaS hosts like Fly.io / Railway /
+# Render deploy via Dockerfile builds at the edge, not by running
+# install.sh interactively — env-var-based detection for those was
+# both unreachable in practice AND created a misdetection bug when
+# stale FLY_APP_NAME etc. lingered in a developer's shell. PaaS port
+# coupling is handled in the binary instead (12-factor $PORT
+# fallback in internal/config/load.go).
 #
-# Env-var-based checks are tried first (no network cost). The exe.dev
-# probe runs last with a 2s timeout so non-platform hosts pay nearly
-# nothing for the check.
+# Adding another VM platform here: one if-block — probe whatever
+# metadata service or env var it exposes, print the public URL.
 detect_external_url() {
-    # Fly.io
-    if [ -n "${FLY_APP_NAME:-}" ]; then
-        printf "https://%s.fly.dev" "$FLY_APP_NAME"
-        return
-    fi
-    # Railway
-    if [ -n "${RAILWAY_PUBLIC_DOMAIN:-}" ]; then
-        printf "https://%s" "$RAILWAY_PUBLIC_DOMAIN"
-        return
-    fi
-    # Render
-    if [ -n "${RENDER_EXTERNAL_URL:-}" ]; then
-        printf "%s" "$RENDER_EXTERNAL_URL"
-        return
-    fi
-    # Gitpod
-    if [ -n "${GITPOD_WORKSPACE_URL:-}" ]; then
-        printf "%s" "$GITPOD_WORKSPACE_URL"
-        return
-    fi
-    # GitHub Codespaces
-    if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACE_PORT_FORWARDING_DOMAIN:-}" ]; then
-        # Codespaces uses <codespace-name>-<port>.<domain>; we don't
-        # know the port at this point (PORT_VALUE isn't resolved yet
-        # when detect_external_url runs early), so emit the
-        # codespace-host root URL — the success message will compose
-        # the /setup path correctly.
-        printf "https://%s-%s.%s" "$CODESPACE_NAME" "${PORT_ARG:-8080}" "$GITHUB_CODESPACE_PORT_FORWARDING_DOMAIN"
-        return
-    fi
     # exe.dev: bounded HTTP probe to the link-local metadata service.
     if check_command curl; then
         meta=$(curl -fsS --max-time 2 http://169.254.169.254/ 2>/dev/null)
@@ -631,20 +599,10 @@ printf "\n"
 # --- Check for existing installation ---
 
 if [ -f "${INSTALL_DIR}/.env" ]; then
-    warn "Existing .env found at ${INSTALL_DIR}/.env"
-    info "To avoid overwriting your configuration, the existing .env will be preserved."
-    info "To start fresh, run: curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall"
-    # --domain / --port can't take effect when reusing an existing .env —
-    # the env-generation block is skipped. Warn loudly so the user doesn't
-    # think their flag worked, then point at the in-place edit.
+    warn "Existing .env at ${INSTALL_DIR}/.env — preserving it."
+    info "${DIM}To reset, run --uninstall first. To change values, edit .env directly.${NC}"
     if [ -n "$DOMAIN_ARG" ] || [ -n "$PORT_ARG" ]; then
-        printf "\n"
-        warn "Note: --domain / --port have no effect when reusing an existing .env."
-        warn "To change settings on this install:"
-        warn "  1. Edit ${INSTALL_DIR}/.env (DOMAIN= and/or SERVER_PORT=)"
-        warn "  2. cd ${INSTALL_DIR} && docker compose -f docker-compose.prod.yml up -d"
-        warn "Or uninstall first to start fresh:"
-        warn "  curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall"
+        warn "${DIM}--domain / --port ignored on reinstall; edit .env or --uninstall first.${NC}"
     fi
     printf "\n"
     ENV_EXISTS=1
@@ -658,23 +616,13 @@ DOMAIN_VALUE="$DOMAIN_ARG"
 if [ -z "$DOMAIN_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
     printf "\n"
     if [ -n "$EXTERNAL_URL" ]; then
-        # Platform already handles HTTPS at the edge — guide the user
-        # toward leaving the prompt blank and explain why.
-        info "Optional: configure a public domain for automatic HTTPS via Caddy."
-        info "${BOLD}This host's public URL is already ${EXTERNAL_URL}${NC}"
-        info "${BOLD}(HTTPS handled by the platform).${NC}"
-        info "Leave blank to use that URL — Caddy stays off, ports 80/443 not bound."
-        info "${DIM}Only enter a custom domain if you want to override the platform's${NC}"
-        info "${DIM}URL with self-managed Caddy HTTPS (advanced — will conflict with${NC}"
-        info "${DIM}the platform's edge proxy unless you also disable it).${NC}"
+        info "Public URL detected: ${EXTERNAL_URL} (HTTPS via the platform)."
+        info "${DIM}Leave the domain prompt blank to use it. More: https://docs.breadbox.sh/install${NC}"
     else
-        info "Optional: configure a public domain for automatic HTTPS via Caddy."
-        info "Leave blank for a localhost-only install — also leave blank if"
-        info "something else already terminates HTTPS in front of this host"
-        info "(reverse proxy, cloud platform, Tailscale Serve, etc.). Caddy"
-        info "stays off and ports 80/443 are not bound."
+        info "Public domain for HTTPS via Caddy (blank = localhost / behind external proxy)."
+        info "${DIM}More: https://docs.breadbox.sh/install${NC}"
     fi
-    DOMAIN_VALUE=$(prompt_value "Public domain (e.g. breadbox.example.com)" "")
+    DOMAIN_VALUE=$(prompt_value "Public domain" "")
 fi
 
 if [ -n "$DOMAIN_VALUE" ]; then
@@ -703,15 +651,7 @@ if [ -z "$PORT_VALUE" ] && [ -n "${PORT:-}" ]; then
 fi
 if [ -z "$PORT_VALUE" ] && [ "$ENV_EXISTS" = "0" ]; then
     printf "\n"
-    info "Optional: HTTP port for Breadbox to listen on (default 8080)."
-    if [ -n "$EXTERNAL_URL" ]; then
-        info "${DIM}Your platform's edge proxy will route to whichever port Breadbox${NC}"
-        info "${DIM}listens on. Keep the default 8080 unless the platform's proxy is${NC}"
-        info "${DIM}already configured for a non-default port.${NC}"
-    else
-        info "Change this only if 8080 is already taken on this host, OR if"
-        info "your reverse proxy / hosting platform expects a specific port."
-    fi
+    info "HTTP port (default 8080 — change if 8080 is taken or your proxy needs another)."
     PORT_VALUE=$(prompt_value "Port" "8080")
 fi
 PORT_VALUE="${PORT_VALUE:-8080}"
@@ -964,13 +904,19 @@ if [ "$healthy" -eq 1 ]; then
     fi
 
     # Platform-reachability check. Breadbox is healthy locally on
-    # ${PORT}. When a platform-supplied external URL exists, verify it
-    # actually routes to us — the most common cause of a "service
-    # unavailable" on a known-good install is the platform's edge proxy
-    # pointing at the wrong port.
+    # ${PORT}. When a platform-supplied external URL exists, verify
+    # the platform's edge proxy is routing to us.
+    #
+    # We use HTTP-status classification rather than curl's --fail
+    # because a private VM (auth gate, 4xx) IS routing — the bug we
+    # want to catch is "edge proxy points at the wrong port", which
+    # surfaces as connection failure (000) or upstream-error (5xx).
+    # Any 2xx/3xx/4xx means the platform is reaching Breadbox.
     PLATFORM_REACHABLE=1
     if [ -n "$EXTERNAL_URL" ]; then
-        if ! curl -fsSL --max-time 5 "${EXTERNAL_URL}/health/ready" >/dev/null 2>&1; then
+        status=$(curl -sL --max-time 5 -o /dev/null -w '%{http_code}' \
+            "${EXTERNAL_URL}/health/ready" 2>/dev/null)
+        if [ -z "$status" ] || [ "$status" = "000" ] || [ "$status" -ge 500 ] 2>/dev/null; then
             PLATFORM_REACHABLE=0
         fi
     fi
@@ -1009,59 +955,30 @@ if [ "$healthy" -eq 1 ]; then
     if [ -z "$DOMAIN_VALUE" ] && [ -z "$EXTERNAL_URL" ]; then
         printf "    ${DIM}(or your public URL if this host is behind a reverse proxy on port ${PORT})${NC}\n"
     fi
-    # Platform-reachability warning. We've already confirmed Breadbox is
-    # healthy locally; if the platform-public URL doesn't reach us, the
-    # bug is on the platform side (proxy port mismatch is the canonical
-    # cause). Don't fail the install — just surface the remediation.
+    # Platform-reachability warning. Breadbox is healthy locally; if
+    # the public URL doesn't reach us, the bug is on the platform side
+    # (proxy port mismatch is the canonical cause). Don't fail the
+    # install — just surface the remediation.
     if [ "$PLATFORM_REACHABLE" -eq 0 ]; then
         printf "\n"
-        warn "${EXTERNAL_URL} is not reaching Breadbox yet."
-        warn "Breadbox is healthy on port ${PORT}, but the platform's edge proxy"
-        warn "isn't routing to it. Most common cause: a port-mismatch."
+        warn "${EXTERNAL_URL} isn't routing to port ${PORT} yet — check your platform's proxy."
         case "$EXTERNAL_URL" in
             *.exe.xyz)
                 vmname=$(printf "%s" "$EXTERNAL_URL" | sed 's|https://||;s|\.exe\.xyz||')
-                warn "Fix on exe.dev:"
-                warn "  ssh exe.dev share port ${vmname} ${PORT}"
-                ;;
-            *)
-                warn "Fix: configure your platform's edge proxy to point at port ${PORT}"
-                warn "(via the platform's CLI / dashboard)."
+                warn "  Fix: ssh exe.dev share port ${vmname} ${PORT}"
                 ;;
         esac
     fi
     printf "\n"
 
-    # Optional next steps. Phrased as "things you can do", not "things
-    # that are wrong" — the post-install state is correct, the user just
-    # hasn't done these yet. Replaces the doctor handoff that previously
-    # surfaced "no admin account" as a scary fail right after the user
-    # had no chance to create one.
-    printf "  ${BOLD}Optional next steps${NC} (after creating your admin):\n"
-    printf "    • Connect a bank — /connections (Plaid, Teller, or CSV import)\n"
-    printf "    • Enable the AI agent runtime — /agents (set an Anthropic API key)\n"
-    printf "    • Schedule database backups — /settings/backups\n"
-    printf "\n"
-
-    # Quiet operational footer. Less prominent than the call-to-action
-    # but still discoverable when the user needs it.
+    # Quiet operational essentials — the rest lives in docs. Setup
+    # wizard guides the user from /setup; bank/agent/backups setup
+    # surfaces in the app itself (/getting-started).
     printf "  ${DIM}Config:    ${INSTALL_DIR}/.env${NC}\n"
     printf "  ${DIM}Logs:      cd ${INSTALL_DIR} && ${COMPOSE_CMD} logs -f${NC}\n"
-    printf "  ${DIM}Update:    cd ${INSTALL_DIR} && ${COMPOSE_CMD} pull && ${COMPOSE_CMD} up -d${NC}\n"
-    printf "  ${DIM}Diagnose:  cd ${INSTALL_DIR} && ${COMPOSE_CMD} exec breadbox /app/breadbox doctor${NC}\n"
     printf "  ${DIM}Uninstall: curl -fsSL https://breadbox.sh/install.sh | bash -s -- --uninstall${NC}\n"
+    printf "  ${DIM}Docs:      https://docs.breadbox.sh/install${NC}\n"
     printf "\n"
-
-    if [ -z "$DOMAIN_VALUE" ] && [ -z "$EXTERNAL_URL" ]; then
-        # The "enable Caddy later" hint only makes sense for users who
-        # might actually need a self-managed reverse proxy. On a
-        # detected-platform host (e.g. exe.dev) the platform's own edge
-        # already terminates HTTPS — bringing up Caddy on top would
-        # fight for ports 80/443.
-        printf "  ${DIM}HTTPS later: edit .env to set DOMAIN=, then:${NC}\n"
-        printf "  ${DIM}  cd ${INSTALL_DIR} && ${CADDY_COMPOSE_CMD} up -d${NC}\n"
-        printf "\n"
-    fi
 else
     error "Breadbox did not become healthy within 60 seconds."
     error ""
