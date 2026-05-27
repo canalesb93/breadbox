@@ -2,30 +2,26 @@
 
 Self-hosted financial data store with an MCP server.
 
-<!-- Recommended: 1600x1000 PNG, embedded at width=840 -->
 <img src="docs/images/dashboard.png" alt="Breadbox dashboard" width="840">
 
 ## What it is
 
-- **MCP server** for AI agents — Streamable HTTP at `/mcp` and stdio via
-  `breadbox mcp`, with scoped API keys and per-tool read/write permissions
+Breadbox aggregates bank transactions into a PostgreSQL database you
+control and exposes them over a REST API and an MCP server. The intent
+is infrastructure: one normalized data store that AI agents, dashboards,
+and scripts can all query without each tool needing your bank credentials.
+
+- **MCP server** at `/mcp` (Streamable HTTP) and `breadbox mcp` (stdio),
+  scoped API keys with per-tool read/write permissions
+- **REST API** under `/api/v1/*`, specified in [`openapi.yaml`](openapi.yaml)
 - **Built-in agent runtime** — schedule [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview)
-  runs that call breadbox MCP to enrich, categorize, and review transactions;
-  cron / sync-complete / on-demand triggers, per-run cost + turn caps, full
-  NDJSON transcripts. Bring your own Anthropic API key or OAuth subscription
-  token.
-- **REST API** — every endpoint under `/api/v1/*` with cursor pagination,
-  field selection, and filtering. Specified in [`openapi.yaml`](openapi.yaml).
-- **Admin dashboard** — connection management, sync monitoring, transaction
-  review queue, rule engine with recursive AND/OR/NOT conditions
-- **Pluggable bank sync** — provider interface feeding a single normalized
-  transaction store; integrations and a CSV importer ship today, more on the
-  roadmap
-- **Multi-user household** — admin + family members, attribution-aware
-  filtering, account linking for cross-connection deduplication
-- **AES-256-GCM** encryption for provider credentials at rest
-- **Single binary** — Go server hosting API, MCP, dashboard, webhooks, and
-  cron in one process
+  runs on cron / sync-complete / on-demand, with per-run cost + turn caps
+  and full NDJSON transcripts. Bring your own Anthropic API key or OAuth
+  subscription token.
+- **Pluggable bank sync** — a normalized provider interface; integrations
+  and CSV import ship today, more on the roadmap
+- **Admin dashboard** — transaction review queue, rule engine, sync
+  monitoring, multi-user household support
 
 ## Quick start
 
@@ -33,26 +29,79 @@ Self-hosted financial data store with an MCP server.
 curl -fsSL https://breadbox.sh/install.sh | bash
 ```
 
-Detects your OS, installs Docker if needed, prompts for a domain (or leaves it
-localhost-only), generates secrets, and brings up the stack. Visit `/setup`
-to create your admin account.
+Detects OS, installs Docker if needed, prompts for an optional public
+domain, generates secrets, and brings up the stack. Visit
+`http://localhost:8080/setup` (or your domain) to create the admin
+account.
 
-Full install docs (binary download, source, manual Docker, daemon
-registration): **[docs.breadbox.sh/install](https://docs.breadbox.sh/install)**.
+Full install docs — binary download, Go source, manual Docker, daemon
+registration: **[docs.breadbox.sh/install](https://docs.breadbox.sh/install)**.
+
+## CLI
+
+The same `breadbox` binary doubles as a `gh`-style CLI for driving any
+Breadbox instance — locally or remote — over its REST API. Per-host
+credentials live in `~/.config/breadbox/hosts.toml`; switch hosts with
+`--host <name>` or `BREADBOX_HOST=<name>`.
+
+### Local (same machine as the server)
+
+```bash
+breadbox auth bootstrap           # mint a full-access key, save to hosts.toml
+breadbox doctor                   # readiness report
+breadbox transactions list --limit 10
+breadbox connections link --provider=plaid --user=<short_id> --wait
+```
+
+### Remote (device-code login)
+
+```bash
+breadbox auth login --host=https://breadbox.example.com
+# prints a verification URL + short code; approve on the server's /auth/device page
+breadbox accounts list
+```
+
+Output is a human table on a TTY and JSON when piped, so
+`breadbox transactions list | jq '.[].amount'` just works. Full command
+catalog: [`docs/cli-commands.md`](docs/cli-commands.md).
+
+A 10 MB `breadbox-cli` lite build ships separately for remote agents and
+scripts that don't need the server packages.
 
 ## AI agents
 
-<!-- Recommended: 1400x900 PNG -->
-<img src="docs/images/claude-desktop.png" alt="Claude Desktop querying Breadbox via MCP" width="840">
+<img src="docs/images/claude-desktop.png" alt="Claude querying Breadbox via MCP" width="840">
 
 Point any MCP client at `https://your-host/mcp` with an API key. Read
-transactions, apply categories, write rules, surface anomalies — without the
-agent ever touching bank credentials.
+transactions, apply categories, write rules, surface anomalies — without
+the agent ever touching bank credentials.
 
-Or let Breadbox run the agents itself: the built-in runtime ships with five
-starter agents (Initial Setup, Bulk Review, Quick Review, Routine Review,
-Spending Report) and a prompt builder for your own. See the
+Claude Desktop / Claude Code config:
+
+```json
+{
+  "mcpServers": {
+    "breadbox": {
+      "command": "/path/to/breadbox",
+      "args": ["mcp"],
+      "env": {
+        "DATABASE_URL": "postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"
+      }
+    }
+  }
+}
+```
+
+Or let Breadbox run the agents itself: the built-in runtime ships with
+five starter agents (Initial Setup, Bulk Review, Quick Review, Routine
+Review, Spending Report) and a prompt builder for your own. See the
 [multi-agent reviewer guide](https://docs.breadbox.sh/guides/multi-agent-reviewer).
+
+## Status
+
+Pre-1.0. Breaking changes are documented in [`CHANGELOG.md`](CHANGELOG.md).
+Provider credentials are encrypted at rest with AES-256-GCM; the whole
+stack runs as a single Go binary alongside Postgres.
 
 ## Documentation
 
