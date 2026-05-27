@@ -15,9 +15,11 @@ Caddy handles automatic HTTPS via Let's Encrypt. Breadbox is a single Go binary 
 - Docker and Docker Compose
   - On Linux the installer can install Docker for you (`--install-docker`, uses `https://get.docker.com`).
   - On macOS install [Docker Desktop](https://docs.docker.com/desktop/install/mac-install/) manually first.
-- Optional: a domain name pointing to your VM's IP address (for HTTPS via Caddy). If you don't
-  configure a domain the installer performs a localhost-only install and does **not** bind
-  ports 80/443.
+- Optional: a domain name pointing to your VM's IP address (for HTTPS via Caddy). Skip the
+  domain — leave the prompt blank — for a localhost-only install, **or** when something else
+  already terminates HTTPS in front of this host (reverse proxy, cloud platform with TLS at
+  the edge, Tailscale Serve, etc.). In those cases Caddy stays off and ports 80/443 are not
+  bound.
 
 ## Quick Install (One-Liner)
 
