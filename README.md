@@ -39,17 +39,20 @@ registration: **[docs.breadbox.sh/install](https://docs.breadbox.sh/install)**.
 
 ### Or deploy to a managed platform
 
-- **[Railway](deploy/railway-deploy.md)** — true one-click template
-  (provisions Postgres + volume + encryption key). ~3 minutes.
-- **[Render](deploy/render-deploy.md)** — one-click Blueprint
-  ([`render.yaml`](render.yaml)) wiring Postgres + a persistent disk.
-  Paste a hex encryption key once during setup. ~5 minutes.
-- **[Fly.io](deploy/fly-deploy.md)** — `flyctl deploy` against the
-  [`fly.toml`](fly.toml) at the repo root. Managed Postgres + a
-  persistent volume. CLI-only; ~5 minutes.
+One-click templates provision Postgres + a persistent volume +
+an auto-generated encryption key:
 
-Both work without extra config thanks to Breadbox's 12-factor `$PORT`
-handling — the platform-injected port flows through to the binary.
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/fXUDm0)
+&nbsp;
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/canalesb93/breadbox)
+
+- **[Railway](deploy/railway-deploy.md)** — fully one-click. Provisions
+  everything, no prompts. ~2 minutes.
+- **[Render](deploy/render-deploy.md)** — one-click [Blueprint](render.yaml);
+  paste a hex encryption key once during setup. ~2 minutes.
+
+Both pull the prebuilt `ghcr.io/canalesb93/breadbox` image and inject
+`$PORT` automatically — no extra config.
 
 ## CLI
 
