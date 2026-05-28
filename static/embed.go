@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-//go:embed all:css all:js favicon.svg
+//go:embed all:css all:js all:fonts favicon.svg
 var embedded embed.FS
 
 // FS serves static assets. Defaults to the embedded FS baked into the binary.

@@ -29,10 +29,11 @@ templ Wizard(p WizardProps) {
 			<title>{ wizardTitle(p.PageTitle) }</title>
 			<link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/>
 			<link rel="stylesheet" href="/static/css/styles.css"/>
-			<link rel="preconnect" href="https://fonts.googleapis.com"/>
-			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-			<style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+			<!-- Self-hosted Inter Variable — matches base.html; eliminates the
+			     cross-origin font swap on hard-reload. @font-face declarations
+			     live in styles.css so this layout and base.html share them. -->
+			<link rel="preload" href="/static/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin/>
+			<style>body { font-family: 'Inter var', system-ui, -apple-system, sans-serif; }</style>
 			<!-- Lucide: self-hosted + deferred. See base.html for rationale. -->
 			<script defer src="/static/js/vendor/lucide.min.js"></script>
 		</head>
