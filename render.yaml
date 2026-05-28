@@ -1,0 +1,59 @@
+# Breadbox on Render — Blueprint
+#
+# Multi-service one-click deploy. Provisions:
+#   - breadbox (prebuilt image pulled from ghcr.io, healthcheck /health/ready)
+#   - breadbox-db (managed PostgreSQL)
+#   - one persistent disk at /var/lib/breadbox (transcripts + backups)
+#
+# Pulls the multi-arch image published by this repo's release CI — no
+# Dockerfile build at deploy time, no GitHub permissions required from
+# the user clicking the button. ~30 s deploys instead of ~4 min builds.
+# Trade-off: users don't get auto-redeploy on every `main` push;
+# Render redeploys on manual trigger or when a new image tag is pulled.
+#
+# Render's `generateValue` produces base64, not hex, and Breadbox's
+# ENCRYPTION_KEY parser is hex-only — so the key is marked sync:false,
+# which prompts the user to paste a value at blueprint setup. Generate
+# one locally with `openssl rand -hex 32` before clicking deploy.
+#
+# Deploy button:
+#   https://render.com/deploy?repo=https://github.com/canalesb93/breadbox
+#
+# Full walkthrough: deploy/render-deploy.md.
+
+databases:
+  - name: breadbox-db
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: breadbox
+    runtime: image
+    plan: starter
+    image:
+      url: ghcr.io/canalesb93/breadbox:latest
+    healthCheckPath: /health/ready
+    # Run migrations before booting the server. The published image's
+    # default CMD is `/app/breadbox serve`; override to chain migrate
+    # first. preDeployCommand isn't supported with runtime: image, so
+    # this is the canonical place for it.
+    dockerCommand: sh -c "/app/breadbox migrate && /app/breadbox serve"
+    envVars:
+      # ENVIRONMENT=docker flips BB_DATA_DIR to /var/lib/breadbox, which
+      # the volume below covers.
+      - key: ENVIRONMENT
+        value: docker
+      - key: DATABASE_URL
+        fromDatabase:
+          name: breadbox-db
+          property: connectionString
+      - key: ENCRYPTION_KEY
+        # Render's generateValue is base64-only; the binary expects
+        # 64-char hex. Operator pastes a value at blueprint setup.
+        # Generate with: openssl rand -hex 32
+        sync: false
+    disk:
+      name: breadbox-data
+      mountPath: /var/lib/breadbox
+      sizeGB: 6
