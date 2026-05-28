@@ -1,14 +1,17 @@
 # Deploy Breadbox to Render
 
-[Render](https://render.com) builds Breadbox from this repo's Dockerfile
-via [Blueprints](https://render.com/docs/blueprint-spec). About 5 minutes
-end-to-end.
+[Render](https://render.com) deploys Breadbox via
+[Blueprints](https://render.com/docs/blueprint-spec) — pulling the
+prebuilt image from `ghcr.io/canalesb93/breadbox:latest`. About
+2 minutes end-to-end.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/canalesb93/breadbox)
 
 The button reads `render.yaml` at the repo root and provisions:
 
-- **breadbox** — Docker web service on the `starter` plan (required for disks)
+- **breadbox** — pulled from `ghcr.io/canalesb93/breadbox:latest`
+  (prebuilt multi-arch image, **no Dockerfile build at deploy time**),
+  starter plan (required tier for persistent disks)
 - **breadbox-db** — managed PostgreSQL 16 on the `basic-256mb` plan
 - **6 GB persistent disk** mounted at `/var/lib/breadbox` (covers agent
   transcripts + scheduled pg_dump backups)
@@ -32,10 +35,13 @@ and losing it locks you out of stored Plaid / Teller tokens.
 
 Render walks you through:
 
-- Connecting your GitHub account if you haven't already.
-- Forking `canalesb93/breadbox` into your account (or using an existing
-  fork — Render needs read access to the repo).
+- Connecting your Render account (sign up if needed).
 - Naming the blueprint instance.
+
+Because the blueprint uses `runtime: image`, **Render does NOT fork
+the GitHub repo** into your account. It just pulls the prebuilt image
+from `ghcr.io/canalesb93/breadbox:latest` directly. Zero GitHub
+permissions required.
 
 ### 3. Paste `ENCRYPTION_KEY` when prompted
 
@@ -49,12 +55,12 @@ prompts for a value. Paste the hex string from step 1.
 ### 4. Apply the blueprint
 
 Click **Apply**. Render provisions both services, creates the disk,
-runs migrations, and starts Breadbox. The first build takes ~3–4 min
-because Render builds the Docker image from scratch (no prebuilt
-image is used).
+pulls the image, runs migrations, and starts Breadbox. **~30 s
+end-to-end** because there's no Docker build — the image is pulled
+prebuilt from ghcr.io.
 
-Watch the build logs from the Blueprint dashboard. The healthcheck at
-`/health/ready` flips green once the server is listening.
+Watch the deploy logs from the Blueprint dashboard. The healthcheck
+at `/health/ready` flips green once the server is listening.
 
 ### 5. Open the public URL
 
@@ -63,18 +69,19 @@ land on `/setup`, create your admin.
 
 ## Updating
 
-Render auto-deploys on every push to the configured branch (default
-`main`). Pull a new upstream release:
+Because the service pulls a fixed image tag (`:latest`), Render does
+**not** auto-redeploy when upstream `main` advances — by design, so
+self-hosters of a financial app control their own upgrade timing.
 
-```bash
-git fetch upstream
-git merge upstream/main
-git push
-```
+To pull a newer image, click **Manual Deploy** → **Deploy latest
+image** on the service in the Render dashboard. The breadbox admin
+dashboard also surfaces an "update available" badge in the sidebar
+when a newer GitHub release exists.
 
-Render rebuilds and redeploys. The admin dashboard surfaces an
-"update available" badge in the sidebar when a newer GitHub release
-exists.
+To pin to a specific release, edit the `image.url` in your
+`render.yaml` (or your own template copy) — e.g.
+`ghcr.io/canalesb93/breadbox:v0.1.0` — and Render redeploys to that
+tag on the next sync.
 
 ## Cost notes
 
@@ -108,10 +115,9 @@ automatically.
 
 ## Troubleshooting
 
-**Build fails partway through Docker build**
-The Dockerfile downloads sqlc + templ + tailwind binaries in the
-builder stage. If Render's network blips, hit **Manual Deploy** to
-retry — the build cache usually picks up where it left off.
+**Image pull fails**
+Hit **Manual Deploy** to retry. The `ghcr.io` image is public; the
+most common cause of a pull failure is a transient ghcr outage.
 
 **Service crashes on startup with `ENCRYPTION_KEY: invalid hex`**
 The value you pasted isn't 64 hex chars. Regenerate with
@@ -127,10 +133,6 @@ Deploy** once the database shows `Available`.
 
 - **Single instance only.** Disk attachment blocks horizontal scaling,
   and Breadbox's scheduler isn't multi-instance-safe anyway.
-- **Docker build is from scratch.** Render doesn't pull
-  `ghcr.io/canalesb93/breadbox:latest` — it rebuilds from the
-  Dockerfile every deploy. ~3–4 min builds; this is the trade-off
-  for Render's transparency model.
-- **No GitHub Container Registry shortcut.** Want a ~30 s deploy
-  instead? Open an issue and we can ship a `render-prebuilt.yaml`
-  variant that pulls the published image.
+- **No auto-redeploy on upstream commits.** The blueprint pulls a
+  fixed image tag (`:latest`); Render redeploys only on a manual
+  trigger or when you change the tag in `render.yaml`.
