@@ -1,0 +1,52 @@
+# Breadbox on Render — Blueprint
+#
+# Multi-service one-click deploy. Provisions:
+#   - breadbox (Docker web service, healthcheck /health/ready)
+#   - breadbox-db (managed PostgreSQL)
+#   - one persistent disk at /var/lib/breadbox (transcripts + backups)
+#
+# Render's `generateValue` produces base64, not hex, and Breadbox's
+# ENCRYPTION_KEY parser is hex-only — so the key is marked sync:false,
+# which prompts the user to paste a value at blueprint setup. Generate
+# one locally with `openssl rand -hex 32` before clicking deploy.
+#
+# Deploy button:
+#   https://render.com/deploy?repo=https://github.com/canalesb93/breadbox
+#
+# Full walkthrough: deploy/render-deploy.md.
+
+databases:
+  - name: breadbox-db
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: breadbox
+    runtime: docker
+    plan: starter
+    repo: https://github.com/canalesb93/breadbox
+    branch: main
+    healthCheckPath: /health/ready
+    # Run migrations before booting the server. Same shape as the
+    # docker-compose.prod.yml command — keeps a single source of
+    # truth for the start sequence.
+    dockerCommand: sh -c "/app/breadbox migrate && /app/breadbox serve"
+    envVars:
+      # ENVIRONMENT=docker flips BB_DATA_DIR to /var/lib/breadbox, which
+      # the volume below covers.
+      - key: ENVIRONMENT
+        value: docker
+      - key: DATABASE_URL
+        fromDatabase:
+          name: breadbox-db
+          property: connectionString
+      - key: ENCRYPTION_KEY
+        # Render's generateValue is base64-only; the binary expects
+        # 64-char hex. Operator pastes a value at blueprint setup.
+        # Generate with: openssl rand -hex 32
+        sync: false
+    disk:
+      name: breadbox-data
+      mountPath: /var/lib/breadbox
+      sizeGB: 6
