@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" stroke="#1a1a1a" stroke-linecap="round" stroke-linejoin="round" fill="#fff" paint-order="stroke">
-  <path stroke-width="2" d="M10.7424 2.0715c5 0 4.2576 2.3568 6.2576 5.7011C18.7122 10.6357 21.9304 10 21.9304 14c0 4.5-3.6771 3.5-5.6096 5-1.9749 1.5329-2.4655 3-5.9655 3-1.5796 0-1.9231-2.532-2.9407-3.5987C4.9943 15.8639 3.7945 17.6707 2.7515 16 1.1084 13.3681 2.9368 9.4932 4.4319 6.7224c1.8089-3.3526 4.0918-4.6509 6.3105-4.6509z"/>
-  <circle fill="#ffc300" paint-order="fill" cx="11.5" cy="12" r="3.5"/>
+<svg viewBox="0 0 24 24" stroke="#1a1a1a" stroke-linecap="round" stroke-linejoin="round" fill="#fff" paint-order="stroke" width="32" height="32" class="lucide lucide-egg-fried-icon lucide-egg-fried" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <path stroke-width="2" d="M10.7424 2.0715c5 0 4.2576 2.3568 6.2576 5.7011C18.7122 10.6357 21.9304 10 21.9304 14c0 4.5-3.6771 3.5-5.6096 5-1.9749 1.5329-2.4655 3-5.9655 3-1.5796 0-1.9231-2.532-2.9407-3.5987C4.9943 15.8639 3.7945 17.6707 2.7515 16 1.1084 13.3681 2.9368 9.4932 4.4319 6.7224c1.8089-3.3526 4.0918-4.6509 6.3105-4.6509z" />
+    <circle fill="#ffc300" paint-order="fill" cx="11.5" cy="12" r="3.5" />
+    <path fill="rgba(39, 39, 39, 0)" d="M12.1016 13.8797l0.0925-0.0582a2.592 2.592 0.5371 0 0 1.2069-2.3618" />
 </svg>
