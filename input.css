@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Inter Variable, self-hosted under /static/fonts/ to eliminate the
+   cross-origin font swap on hard-reload. base.html and the wizard layout
+   both load styles.css, so the @font-face lives here once. The roman file
+   is preloaded from each layout's <head>. */
+@font-face {
+  font-family: 'Inter var';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/static/fonts/InterVariable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter var';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/static/fonts/InterVariable-Italic.woff2') format('woff2');
+}
+
 /* ─── EXPERIMENT (theme-strip branch) ─────────────────────────────────
  * Drop the bespoke breadbox-light / breadbox-dark OKLCH palettes and
  * fall back to daisyUI's stock light + dark themes. Goal: see whether
