@@ -206,7 +206,7 @@ func (s *MCPServer) resolveTransportID(req *mcpsdk.CallToolRequest) string {
 // mcp_sessions row's api_key_id + api_key_name on first call, and
 // those columns never re-stamp. Rebinding after the session row is
 // created would permanently record the wrong key for every session.
-func (s *MCPServer) rebindActorFromClientInfo(ctx context.Context, req *mcpsdk.CallToolRequest, transportID string) context.Context {
+func (s *MCPServer) rebindActorFromClientInfo(ctx context.Context, req *mcpsdk.CallToolRequest) context.Context {
 	if req == nil || req.Session == nil {
 		return ctx
 	}
@@ -215,9 +215,10 @@ func (s *MCPServer) rebindActorFromClientInfo(ctx context.Context, req *mcpsdk.C
 		return ctx
 	}
 	transport := "stdio"
-	if id := req.Session.ID(); id != "" && id != transportID {
-		// HTTP sessions advertise their MCP-Session-Id; stdio falls
-		// back to the per-process transport id we stamped ourselves.
+	if req.Session.ID() != "" {
+		// HTTP sessions advertise their MCP-Session-Id; stdio has
+		// none and falls back to the per-process transport id we
+		// stamped ourselves.
 		transport = "http"
 	}
 	clientInfo := service.MCPClientInfo{
@@ -501,7 +502,7 @@ func makeToolDefLogged[T any](spec ToolSpec, handler func(context.Context, *mcps
 				// and mcp_sessions.api_key_name on first call, and those
 				// columns are write-once. Doing this swap after would
 				// permanently record the wrong key for every session.
-				ctx = s.rebindActorFromClientInfo(ctx, req, transportID)
+				ctx = s.rebindActorFromClientInfo(ctx, req)
 
 				auditSessionID := s.ensureAuditSession(ctx, req, transportID)
 
