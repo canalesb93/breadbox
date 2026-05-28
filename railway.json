@@ -5,7 +5,8 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "/app/breadbox migrate && /app/breadbox serve",
+    "preDeployCommand": ["/app/breadbox migrate"],
+    "startCommand": "/app/breadbox serve",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
