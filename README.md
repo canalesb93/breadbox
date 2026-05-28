@@ -39,11 +39,14 @@ registration: **[docs.breadbox.sh/install](https://docs.breadbox.sh/install)**.
 
 ### Or deploy to a managed platform
 
+- **[Railway](deploy/railway-deploy.md)** — true one-click template
+  (provisions Postgres + volume + encryption key). ~3 minutes.
+- **[Render](deploy/render-deploy.md)** — one-click Blueprint
+  ([`render.yaml`](render.yaml)) wiring Postgres + a persistent disk.
+  Paste a hex encryption key once during setup. ~5 minutes.
 - **[Fly.io](deploy/fly-deploy.md)** — `flyctl deploy` against the
-  [`fly.toml`](fly.toml) at the repo root. Managed Postgres + persistent
-  volumes. ~5 minutes.
-- **[Railway](deploy/railway-deploy.md)** — Dockerfile build, public
-  HTTPS, attach Postgres in two clicks. ~5 minutes.
+  [`fly.toml`](fly.toml) at the repo root. Managed Postgres + a
+  persistent volume. CLI-only; ~5 minutes.
 
 Both work without extra config thanks to Breadbox's 12-factor `$PORT`
 handling — the platform-injected port flows through to the binary.
