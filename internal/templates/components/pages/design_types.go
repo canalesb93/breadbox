@@ -221,6 +221,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionFilterSearchInput() },
 		},
 		{
+			Slug:        "server-filter-toolbar",
+			Title:       "Server filter toolbar",
+			Description: "GET-driven filter bar for server-rendered list pages — a daisy search `input` + N daisy `select`s on one row, auto-submitting on `change`. Used on /rules (search + category + status + creator). Inline `<input type=hidden>` carries unrelated query state (sort, per_page) across submits; an active-filters `Clear` link resets the URL.",
+			Group:       "forms",
+			Render:      func() templ.Component { return SectionServerFilterToolbar() },
+		},
+		{
 			Slug:        "category-picker",
 			Title:       "Category picker",
 			Description: "Shared `categoryPicker` Alpine factory + `bb-cat-picker` container paired with the four canonical button shells used across the admin (inline tx row, filter bar, assign panel, form select). Every variant routes through the same global overlay (base.html) via data-source-id so behaviour stays consistent.",

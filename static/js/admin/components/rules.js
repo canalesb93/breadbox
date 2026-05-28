@@ -112,6 +112,16 @@ document.addEventListener('alpine:init', function () {
     };
   });
 
+  // bbRulesFilter is the Alpine helper bound on the GET filter <form>.
+  // The toolbar fires `$el.form.requestSubmit()` on every <select> change
+  // and on Escape inside the search input; this factory exists so the
+  // x-data binding has something to attach to (Alpine requires an
+  // explicit data scope for @change to resolve $el / form context).
+  // No state is needed — the URL is the source of truth.
+  Alpine.data('bbRulesFilter', function () {
+    return {};
+  });
+
   var reg = Alpine.store('shortcuts');
   if (!reg) return;
 

@@ -29,15 +29,31 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			CategorySlug: optStrQuery(q, "category_slug"),
 		}
 
-		if v := q.Get("enabled"); v != "" {
-			if b, err := strconv.ParseBool(v); err == nil {
+		enabledFilter := q.Get("enabled")
+		if enabledFilter != "" {
+			if b, err := strconv.ParseBool(enabledFilter); err == nil {
 				params.Enabled = &b
+			} else {
+				// Unknown value: drop it so the toolbar's "All" doesn't get a
+				// stale checkmark.
+				enabledFilter = ""
 			}
+		}
+
+		// Whitelist creator_type to the three values the rule schema uses;
+		// anything else collapses to "all" so callers can't poke arbitrary
+		// strings into the WHERE clause.
+		creatorType := q.Get("creator_type")
+		switch creatorType {
+		case "user", "agent", "system":
+			params.CreatorType = &creatorType
+		default:
+			creatorType = ""
 		}
 
 		// Sort key — whitelisted in ruleOrderByClause so unknown values fall
 		// back to created_at DESC instead of injecting arbitrary SQL.
-		sortBy := r.URL.Query().Get("sort_by")
+		sortBy := q.Get("sort_by")
 		params.SortBy = sortBy
 
 		result, err := svc.ListTransactionRules(ctx, params)
@@ -46,15 +62,36 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			return
 		}
 
-		renderRules(w, r, sm, tr, result, sortBy, version)
+		// Categories drive the filter <select> — best-effort, an empty list
+		// just collapses the option set to "All categories".
+		categories, _ := svc.ListCategoryTree(ctx)
+
+		renderRules(w, r, sm, tr, result, rulesFilterState{
+			Search:       q.Get("search"),
+			CategorySlug: q.Get("category_slug"),
+			Enabled:      enabledFilter,
+			CreatorType:  creatorType,
+			SortBy:       sortBy,
+		}, flattenRuleCategoryFilter(categories), version)
 	}
+}
+
+// rulesFilterState bundles the query-string filter values so the
+// renderRules signature doesn't grow unbounded. Each field is the
+// echoed-back string the toolbar's <input>/<select> needs.
+type rulesFilterState struct {
+	Search       string
+	CategorySlug string
+	Enabled      string
+	CreatorType  string
+	SortBy       string
 }
 
 // renderRules builds the typed templ props for the rules list page and
 // hosts them inside the base layout via TemplateRenderer.RenderWithTempl.
 // Replaces the old html/template render — the page is now defined in
 // internal/templates/components/pages/rules.templ.
-func renderRules(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, result *service.TransactionRuleListResult, sortBy, version string) {
+func renderRules(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, result *service.TransactionRuleListResult, fs rulesFilterState, categories []pages.RulesCategoryOption, version string) {
 	rows := make([]pages.RulesRow, 0, len(result.Rules))
 	for _, rule := range result.Rules {
 		row := pages.BuildRulesRow(rule)
@@ -72,15 +109,21 @@ func renderRules(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager,
 	}
 
 	props := pages.RulesProps{
-		Rules:          rows,
-		Total:          result.Total,
-		Page:           result.Page,
-		PageSize:       result.PageSize,
-		TotalPages:     result.TotalPages,
-		ShowingStart:   (result.Page-1)*result.PageSize + 1,
-		ShowingEnd:     min(int64(result.Page*result.PageSize), result.Total),
-		PaginationBase: buildRulesPaginationBase(r),
-		SortBy:         sortBy,
+		Rules:            rows,
+		Total:            result.Total,
+		Page:             result.Page,
+		PageSize:         result.PageSize,
+		TotalPages:       result.TotalPages,
+		ShowingStart:     (result.Page-1)*result.PageSize + 1,
+		ShowingEnd:       min(int64(result.Page*result.PageSize), result.Total),
+		PaginationBase:   buildRulesPaginationBase(r),
+		SortBy:           fs.SortBy,
+		Search:           fs.Search,
+		CategorySlug:     fs.CategorySlug,
+		EnabledFilter:    fs.Enabled,
+		CreatorType:      fs.CreatorType,
+		FiltersActive:    fs.Search != "" || fs.CategorySlug != "" || fs.Enabled != "" || fs.CreatorType != "",
+		FilterCategories: categories,
 	}
 
 	data := BaseTemplateData(r, sm, "rules", "Rules")
@@ -88,10 +131,31 @@ func renderRules(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager,
 	tr.RenderWithTempl(w, r, data, pages.Rules(props))
 }
 
+// flattenRuleCategoryFilter turns the parent/child category tree into
+// the flat list the rules filter <select> needs. Children are prefixed
+// with an em-space so the dropdown reads as a single grouped list
+// without needing <optgroup> styling (which daisy doesn't theme).
+func flattenRuleCategoryFilter(tree []service.CategoryResponse) []pages.RulesCategoryOption {
+	out := make([]pages.RulesCategoryOption, 0, len(tree)*2)
+	for _, parent := range tree {
+		out = append(out, pages.RulesCategoryOption{
+			Slug:  parent.Slug,
+			Label: parent.DisplayName,
+		})
+		for _, child := range parent.Children {
+			out = append(out, pages.RulesCategoryOption{
+				Slug:  child.Slug,
+				Label: " " + child.DisplayName,
+			})
+		}
+	}
+	return out
+}
+
 // buildRulesPaginationBase returns the pagination base URL for the rules page.
 func buildRulesPaginationBase(r *http.Request) string {
 	return paginationBase("/rules", pickValues(r, []string{
-		"search", "category_slug", "enabled", "per_page", "sort_by",
+		"search", "category_slug", "enabled", "creator_type", "per_page", "sort_by",
 	}), "page")
 }
 

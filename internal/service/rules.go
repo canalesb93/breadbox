@@ -835,6 +835,12 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		argN++
 	}
 
+	if params.CreatorType != nil && *params.CreatorType != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("tr.created_by_type = $%d", argN))
+		args = append(args, *params.CreatorType)
+		argN++
+	}
+
 	if params.Search != nil && *params.Search != "" {
 		mode := ""
 		if params.SearchMode != nil {
