@@ -253,9 +253,9 @@ func getEnv(key, fallback string) string {
 // resolveDataDir returns the persistent-data root used by transcripts,
 // backups, and any other runtime-writable state. BB_DATA_DIR wins when
 // set. Otherwise we default to /var/lib/breadbox in Docker (matches the
-// FHS convention and what docker-compose.prod.yml + fly.toml mount as a
-// volume) and leave empty in local / CLI contexts so cwd-relative
-// fallbacks apply.
+// FHS convention and what docker-compose.prod.yml + the Railway/Render
+// one-click templates mount as a volume) and leave empty in local /
+// CLI contexts so cwd-relative fallbacks apply.
 func resolveDataDir(env string) string {
 	if v := os.Getenv("BB_DATA_DIR"); v != "" {
 		return v
