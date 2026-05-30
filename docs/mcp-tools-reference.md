@@ -248,6 +248,10 @@ List detected recurring series. Optional `status` filter (`active` | `candidate`
 
 Get one series by short ID or UUID, including its full `detection_signals` (`occurrence_count`, `interval_cv`, `cadence_snap_error`, `amount_branch`, `merchant_key_is_fallback`). Inspect before reviewing a candidate.
 
+### explain_series_candidates (Read)
+
+Answer "why isn't *merchant* a subscription?". Returns `near_misses` — every recurring-looking merchant group that is **not** already a series, each annotated with the detector's verdict: `qualifies:true` (passes every gate but isn't tracked yet — confirm it with `assign_series`) or a specific `reason` it fell short (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Each row carries a human `explanation` plus the raw numbers (`occurrence_count`, `nearest_cadence`, `median_gap_days`, `interval_cv`, `amount_min`/`amount_max`, `first_seen`/`last_seen`). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this surfaces what it skipped (ordered most-charges-first, capped at 50).
+
 ### review_series (Write)
 
 Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a subscription → sticky at that amount band, never re-proposed), `pause`, or `cancel`. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates candidates from `list_series(status=candidate)`.

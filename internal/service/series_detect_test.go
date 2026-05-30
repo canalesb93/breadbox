@@ -159,3 +159,69 @@ func TestSeriesRenewalHealth(t *testing.T) {
 }
 
 func intp(i int) *int { return &i }
+
+// --- evaluateGroup rejection reasons (the explain-feed verdicts) ---
+
+func TestEvaluateGroup_Reasons(t *testing.T) {
+	cases := []struct {
+		name       string
+		charges    []chargePoint
+		wantReason string
+	}{
+		{
+			name:       "single charge",
+			charges:    []chargePoint{cp("2026-01-15", 999)},
+			wantReason: seriesRejectTooFewCharges,
+		},
+		{
+			name:       "all same day",
+			charges:    []chargePoint{cp("2026-01-15", 999), cp("2026-01-15", 999), cp("2026-01-15", 999)},
+			wantReason: seriesRejectSameDayDuplicates,
+		},
+		{
+			name:       "irregular gaps dont snap",
+			charges:    []chargePoint{cp("2026-01-01", 999), cp("2026-02-15", 999), cp("2026-04-01", 999)},
+			wantReason: seriesRejectIrregularCadence,
+		},
+		{
+			name:       "only two monthly charges",
+			charges:    []chargePoint{cp("2026-01-15", 999), cp("2026-02-15", 999)},
+			wantReason: seriesRejectTooFewOccurrences,
+		},
+		{
+			name:       "monthly-ish but intervals too variable",
+			charges:    []chargePoint{cp("2026-01-01", 999), cp("2026-01-26", 999), cp("2026-02-25", 999), cp("2026-04-05", 999)},
+			wantReason: seriesRejectIntervalVariable,
+		},
+		{
+			name:       "clean monthly cadence but scattered amounts",
+			charges:    []chargePoint{cp("2026-01-15", 999), cp("2026-02-15", 2999), cp("2026-03-15", 500), cp("2026-04-15", 1500)},
+			wantReason: seriesRejectAmountUnstable,
+		},
+		{
+			name:       "clean monthly subscription qualifies",
+			charges:    []chargePoint{cp("2026-01-15", 999), cp("2026-02-15", 999), cp("2026-03-15", 999)},
+			wantReason: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diag := evaluateGroup(tc.charges, "merchant", "USD")
+			if diag.Reason != tc.wantReason {
+				t.Errorf("reason = %q, want %q (occ=%d, medGap=%.1f, cv=%.3f, nearest=%s)",
+					diag.Reason, tc.wantReason, diag.OccurrenceCount, diag.MedianGapDays, diag.IntervalCV, diag.NearestCadence)
+			}
+		})
+	}
+}
+
+func TestEvaluateGroup_AnalyzeGroupAgreesWithReason(t *testing.T) {
+	// analyzeGroup's ok must equal "reason is empty" for the same input.
+	charges := []chargePoint{cp("2026-01-15", 999), cp("2026-02-15", 999), cp("2026-03-15", 999)}
+	_, ok := analyzeGroup(charges, "m", "USD")
+	_, diag := evaluateGroup(charges, "m", "USD")
+	if ok != (diag.Reason == "") {
+		t.Errorf("analyzeGroup ok=%v but evaluateGroup reason=%q — wrappers disagree", ok, diag.Reason)
+	}
+}

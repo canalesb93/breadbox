@@ -173,6 +173,160 @@ func (s *Service) detectForUser(ctx context.Context, effUser pgtype.UUID, opts d
 	return emitted, nil
 }
 
+// seriesExplainMaxRows caps the explain feed so a noisy account doesn't return
+// hundreds of one-off merchants.
+const seriesExplainMaxRows = 50
+
+// SeriesNearMiss is one merchant group that is NOT currently a recurring series,
+// annotated with the detector's verdict: either it qualifies (eligible but not
+// yet tracked) or it fell short of a specific precision-first gate. This is the
+// read-side "why isn't this a subscription?" feed — pure analysis over existing
+// transactions, no writes.
+type SeriesNearMiss struct {
+	MerchantKey       string   `json:"merchant_key"`
+	Name              string   `json:"name"`
+	Currency          *string  `json:"iso_currency_code,omitempty"`
+	OccurrenceCount   int      `json:"occurrence_count"`
+	Qualifies         bool     `json:"qualifies"`        // true = passes every gate but isn't tracked yet
+	Reason            string   `json:"reason,omitempty"` // gate it failed (empty when Qualifies)
+	Explanation       string   `json:"explanation"`      // human one-liner
+	NearestCadence    string   `json:"nearest_cadence,omitempty"`
+	MedianGapDays     float64  `json:"median_gap_days,omitempty"`
+	IntervalCV        float64  `json:"interval_cv,omitempty"`
+	AmountMin         *float64 `json:"amount_min,omitempty"`
+	AmountMax         *float64 `json:"amount_max,omitempty"`
+	AmountSpreadRatio float64  `json:"amount_spread_ratio,omitempty"`
+	FirstSeen         *string  `json:"first_seen,omitempty"`
+	LastSeen          *string  `json:"last_seen,omitempty"`
+}
+
+// ExplainSeriesCandidates reports, per merchant group that is not already a
+// recurring series, the detector's verdict over the trailing detection window —
+// the same gates the live detector runs, but surfacing the *reason* a group did
+// (or didn't) qualify. Read-only: no merchant_key backfill, no upserts.
+//
+// Groups already represented by a recurring_series row (any status) are
+// excluded — they're hits, not near-misses. Single-charge groups are dropped as
+// noise. Results are ordered most-charges-first (closest to qualifying) and
+// capped at seriesExplainMaxRows.
+func (s *Service) ExplainSeriesCandidates(ctx context.Context) ([]SeriesNearMiss, error) {
+	users, err := s.distinctEffectiveUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.existingSeriesMerchantKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	since := time.Now().AddDate(0, 0, -seriesDetectWindowDays)
+
+	var out []SeriesNearMiss
+	for _, u := range users {
+		rows, err := s.loadCandidateCharges(ctx, u, &since)
+		if err != nil {
+			return nil, err
+		}
+		i := 0
+		for i < len(rows) {
+			j := i
+			for j < len(rows) && rows[j].merchantKey == rows[i].merchantKey && rows[j].currency == rows[i].currency {
+				j++
+			}
+			group := rows[i:j]
+			i = j
+
+			key := group[0].merchantKey
+			if existing[key] {
+				continue // already a series — not a near-miss
+			}
+			if len(group) < 2 {
+				continue // single charge: nothing to explain
+			}
+
+			charges := make([]chargePoint, len(group))
+			for k, r := range group {
+				charges[k] = chargePoint{date: r.date, amountCents: r.amountCents}
+			}
+			_, diag := evaluateGroup(charges, key, group[0].currency)
+
+			nm := SeriesNearMiss{
+				MerchantKey:       key,
+				Name:              slugs.TitleCase(key),
+				OccurrenceCount:   diag.OccurrenceCount,
+				Qualifies:         diag.Reason == "",
+				Reason:            diag.Reason,
+				Explanation:       nearMissExplanation(diag),
+				NearestCadence:    diag.NearestCadence,
+				MedianGapDays:     diag.MedianGapDays,
+				IntervalCV:        diag.IntervalCV,
+				AmountSpreadRatio: diag.AmountSpreadRatio,
+			}
+			if group[0].currency != "" {
+				c := group[0].currency
+				nm.Currency = &c
+			}
+			if diag.AmountMaxCents > 0 {
+				mn := float64(diag.AmountMinCents) / 100
+				mx := float64(diag.AmountMaxCents) / 100
+				nm.AmountMin, nm.AmountMax = &mn, &mx
+			}
+			// Rows are ordered by date asc within a group.
+			fs := group[0].date.Format("2006-01-02")
+			ls := group[len(group)-1].date.Format("2006-01-02")
+			nm.FirstSeen, nm.LastSeen = &fs, &ls
+			out = append(out, nm)
+		}
+	}
+
+	sort.SliceStable(out, func(a, b int) bool { return out[a].OccurrenceCount > out[b].OccurrenceCount })
+	if len(out) > seriesExplainMaxRows {
+		out = out[:seriesExplainMaxRows]
+	}
+	return out, nil
+}
+
+// existingSeriesMerchantKeys returns the set of merchant_keys that already have
+// a recurring_series row (any status), so the explain feed can skip them.
+func (s *Service) existingSeriesMerchantKeys(ctx context.Context) (map[string]bool, error) {
+	rows, err := s.Pool.Query(ctx, `SELECT DISTINCT merchant_key FROM recurring_series`)
+	if err != nil {
+		return nil, fmt.Errorf("load existing series keys: %w", err)
+	}
+	defer rows.Close()
+	set := map[string]bool{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, fmt.Errorf("scan series key: %w", err)
+		}
+		set[k] = true
+	}
+	return set, rows.Err()
+}
+
+// nearMissExplanation renders a one-line human explanation for a group's verdict,
+// folding in the actual numbers so the message is concrete.
+func nearMissExplanation(diag groupDiagnostics) string {
+	switch diag.Reason {
+	case "":
+		return fmt.Sprintf("Looks like a %s subscription (%d charges) — eligible but not tracked yet.", diag.NearestCadence, diag.OccurrenceCount)
+	case seriesRejectTooFewOccurrences:
+		return fmt.Sprintf("Only %d charges seen; a %s series needs more before it's trustworthy.", diag.OccurrenceCount, diag.NearestCadence)
+	case seriesRejectIrregularCadence:
+		return fmt.Sprintf("Charge timing is irregular (~%.0f-day gaps); doesn't match a known cadence.", diag.MedianGapDays)
+	case seriesRejectIntervalVariable:
+		return fmt.Sprintf("Charge intervals vary too much (interval_cv %.2f) for a reliable %s cadence.", diag.IntervalCV, diag.NearestCadence)
+	case seriesRejectAmountUnstable:
+		return fmt.Sprintf("Amounts swing too much ($%.2f–$%.2f) to be a steady subscription.", float64(diag.AmountMinCents)/100, float64(diag.AmountMaxCents)/100)
+	case seriesRejectSameDayDuplicates:
+		return "All charges fall on one day — looks like duplicates, not a recurring cycle."
+	case seriesRejectTooFewCharges:
+		return "Only one charge so far — nothing to compare yet."
+	default:
+		return "Did not qualify as a recurring series."
+	}
+}
+
 // populateMerchantKeys derives transactions.merchant_key for the user's rows
 // that don't have one yet, using the same Go normalizer the sync path uses. The
 // backfill's "UPDATE merchant_key first" step; a no-op once rows are populated.

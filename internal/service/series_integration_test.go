@@ -538,6 +538,90 @@ func TestRuleConditions_InSeriesAndSeries(t *testing.T) {
 	}
 }
 
+// TestExplainSeriesCandidates verifies the near-miss / explain feed: a 2-charge
+// group is reported as too_few_occurrences, a clean 3-charge group qualifies but
+// is untracked, and a merchant already represented by a series is excluded.
+func TestExplainSeriesCandidates(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Near-miss: only 2 monthly charges → too_few_occurrences.
+	testutil.MustCreateTransaction(t, queries, acctID, "HULU_1", "Hulu", 1799, "2026-03-10")
+	testutil.MustCreateTransaction(t, queries, acctID, "HULU_2", "Hulu", 1799, "2026-04-10")
+	// Qualifying but untracked: 3 clean monthly charges, steady amount.
+	testutil.MustCreateTransaction(t, queries, acctID, "DISNEY_1", "Disney Plus", 1399, "2026-02-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "DISNEY_2", "Disney Plus", 1399, "2026-03-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "DISNEY_3", "Disney Plus", 1399, "2026-04-12")
+	// Already a series: linked netflix charges must be excluded from the feed.
+	n1 := testutil.MustCreateTransaction(t, queries, acctID, "NFLX_1", "Netflix", 1599, "2026-02-15")
+	n2 := testutil.MustCreateTransaction(t, queries, acctID, "NFLX_2", "Netflix", 1599, "2026-03-15")
+	n3 := testutil.MustCreateTransaction(t, queries, acctID, "NFLX_3", "Netflix", 1599, "2026-04-15")
+
+	// Populate merchant_key the way sync would — explain is read-only and assumes
+	// the key is already set (the engine sets it at upsert; backfill fills history).
+	for key, name := range map[string]string{"hulu": "Hulu", "disneyplus": "Disney Plus", "netflix": "Netflix"} {
+		if _, err := pool.Exec(ctx, `UPDATE transactions SET merchant_key=$1 WHERE provider_name=$2`, key, name); err != nil {
+			t.Fatalf("set merchant_key: %v", err)
+		}
+	}
+
+	if _, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Netflix", MerchantKey: "netflix", Cadence: service.SeriesCadenceMonthly,
+		ExpectedAmount: seriesF64Ptr(15.99), Currency: seriesStrPtr("USD"),
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: []string{n1.ShortID, n2.ShortID, n3.ShortID},
+	}, service.SystemActor()); err != nil {
+		t.Fatalf("seed netflix series: %v", err)
+	}
+
+	nm, err := svc.ExplainSeriesCandidates(ctx)
+	if err != nil {
+		t.Fatalf("ExplainSeriesCandidates: %v", err)
+	}
+
+	byKey := map[string]service.SeriesNearMiss{}
+	for _, m := range nm {
+		byKey[m.MerchantKey] = m
+	}
+
+	if _, ok := byKey["netflix"]; ok {
+		t.Error("netflix is already a series; it must not appear in the near-miss feed")
+	}
+
+	hulu, ok := byKey["hulu"]
+	if !ok {
+		t.Fatalf("hulu near-miss missing from feed (got keys %v)", keysOf(byKey))
+	}
+	if hulu.Reason != "too_few_occurrences" {
+		t.Errorf("hulu reason = %q, want too_few_occurrences", hulu.Reason)
+	}
+	if hulu.Qualifies {
+		t.Error("hulu should not qualify with only 2 charges")
+	}
+	if hulu.OccurrenceCount != 2 {
+		t.Errorf("hulu occurrence_count = %d, want 2", hulu.OccurrenceCount)
+	}
+	if hulu.Explanation == "" {
+		t.Error("hulu near-miss should carry a human explanation")
+	}
+
+	disney, ok := byKey["disneyplus"]
+	if !ok {
+		t.Fatalf("disneyplus near-miss missing from feed (got keys %v)", keysOf(byKey))
+	}
+	if !disney.Qualifies {
+		t.Errorf("disneyplus should qualify (3 clean monthly charges); reason=%q", disney.Reason)
+	}
+}
+
+func keysOf(m map[string]service.SeriesNearMiss) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 func txnHasTag(t *testing.T, pool *pgxpool.Pool, txnID pgtype.UUID, slug string) bool {
 	t.Helper()
 	var n int

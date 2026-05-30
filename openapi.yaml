@@ -1889,6 +1889,22 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/explain:
+    get:
+      tags: [Series]
+      summary: Explain near-miss subscriptions
+      description: "Answer \"why isn't <merchant> a subscription?\". Reports every recurring-looking merchant group that is not already a series, with the detector's verdict — `qualifies:true` (eligible but untracked) or a specific gate it failed (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Read-only analysis over the trailing detection window."
+      responses:
+        "200":
+          description: Near-miss merchant groups with detector verdicts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  near_misses:
+                    type: array
+                    items: { $ref: "#/components/schemas/SeriesNearMiss" }
   /api/v1/series/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }
@@ -3223,6 +3239,26 @@ components:
         detection_signals: { type: object, nullable: true, additionalProperties: true }
         tags: { type: array, items: { type: string } }
         created_at: { type: string, format: date-time }
+      additionalProperties: true
+    SeriesNearMiss:
+      type: object
+      description: A recurring-looking merchant group that is not (yet) a series, with the detector's verdict.
+      properties:
+        merchant_key: { type: string }
+        name: { type: string }
+        iso_currency_code: { type: string, nullable: true }
+        occurrence_count: { type: integer }
+        qualifies: { type: boolean, description: "True when the group passes every gate but isn't tracked yet." }
+        reason: { type: string, description: "Gate it failed; empty when qualifies. `too_few_occurrences`|`irregular_cadence`|`interval_too_variable`|`amount_unstable`|`same_day_duplicates`|`too_few_charges`." }
+        explanation: { type: string, description: "Human one-line explanation with the numbers folded in." }
+        nearest_cadence: { type: string }
+        median_gap_days: { type: number }
+        interval_cv: { type: number }
+        amount_min: { type: number, nullable: true }
+        amount_max: { type: number, nullable: true }
+        amount_spread_ratio: { type: number }
+        first_seen: { type: string, format: date, nullable: true }
+        last_seen: { type: string, format: date, nullable: true }
       additionalProperties: true
     Category:
       type: object

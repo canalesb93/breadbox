@@ -379,6 +379,10 @@ func (s *MCPServer) buildToolRegistry() {
 			Description: "Get one recurring series by short ID or UUID, including its full detection_signals. Use before reviewing a candidate to inspect the evidence (occurrence_count, interval_cv, cadence_snap_error, amount_branch, monotonic drift).",
 		}, s.handleGetSeries, s),
 		makeToolDefLogged(ToolSpec{
+			Name: "explain_series_candidates", Title: "Explain Near-Miss Subscriptions", Classification: ToolRead,
+			Description: "Answer \"why isn't <merchant> a subscription?\". Reports every recurring-looking merchant group that is NOT already a series, with the detector's verdict: qualifies=true (eligible but not tracked yet — confirm it with assign_series) or a specific reason it fell short (too_few_occurrences, irregular_cadence, interval_too_variable, amount_unstable, same_day_duplicates). Each row carries a human explanation plus the numbers (occurrence_count, nearest_cadence, median_gap_days, interval_cv, amount min/max). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this is how you surface what it skipped.",
+		}, s.handleExplainSeriesCandidates, s),
+		makeToolDefLogged(ToolSpec{
 			Name: "review_series", Title: "Review Subscription", Classification: ToolWrite,
 			Description: "Apply a verdict to a recurring series: confirm (it is a subscription → active), reject (NOT a subscription → sticky, never re-proposed at that amount band), pause, or cancel. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates the candidates surfaced by list_series(status=candidate).",
 		}, s.handleReviewSeries, s),

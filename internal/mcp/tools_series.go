@@ -52,6 +52,16 @@ func (s *MCPServer) handleListSeries(_ context.Context, _ *mcpsdk.CallToolReques
 	return jsonResult(map[string]any{"series": series})
 }
 
+type explainSeriesInput struct{}
+
+func (s *MCPServer) handleExplainSeriesCandidates(_ context.Context, _ *mcpsdk.CallToolRequest, _ explainSeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	nearMisses, err := s.svc.ExplainSeriesCandidates(context.Background())
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(map[string]any{"near_misses": nearMisses})
+}
+
 func (s *MCPServer) handleGetSeries(_ context.Context, _ *mcpsdk.CallToolRequest, input getSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	if input.ID == "" {
 		return errorResult(fmt.Errorf("id is required")), nil, nil
