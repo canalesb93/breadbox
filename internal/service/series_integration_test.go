@@ -614,6 +614,117 @@ func TestExplainSeriesCandidates(t *testing.T) {
 	}
 }
 
+func TestRekeySeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SQ *PAYMENT", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	// Mint under a fallback/over-merged key.
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Payment", MerchantKey: "payment", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: members,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+
+	rekeyed, err := svc.RekeySeries(ctx, series.ShortID, "spotify", service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("RekeySeries: %v", err)
+	}
+	if rekeyed.MerchantKey != "spotify" {
+		t.Errorf("series merchant_key = %q, want spotify", rekeyed.MerchantKey)
+	}
+
+	// All members' merchant_key repointed to the new key.
+	var n int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions WHERE series_id = $1 AND merchant_key = $2`,
+		series.ID, "spotify").Scan(&n); err != nil {
+		t.Fatalf("count repointed members: %v", err)
+	}
+	if n != 3 {
+		t.Errorf("repointed members = %d, want 3", n)
+	}
+
+	// Collision: re-keying into a key that already has a series is refused.
+	if _, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Netflix", MerchantKey: "netflix", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic,
+	}, service.SystemActor()); err != nil {
+		t.Fatalf("mint netflix: %v", err)
+	}
+	if _, err := svc.RekeySeries(ctx, series.ShortID, "netflix", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected re-key into an existing key to error (no silent merge)")
+	}
+}
+
+func TestSplitSeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	a := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_1", "Amazon Prime", 13900, "2024-05-01")
+	b := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_2", "Amazon Prime", 13900, "2025-05-01")
+	c := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_3", "Amazon Prime", 13900, "2026-05-01")
+	stray := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_VID", "Amazon Prime Video", 499, "2026-04-10")
+
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Amazon Prime", MerchantKey: "amazonprime", Cadence: service.SeriesCadenceAnnual,
+		Source:       service.SeriesSourceDeterministic,
+		MemberTxnIDs: []string{a.ShortID, b.ShortID, c.ShortID, stray.ShortID},
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if series.OccurrenceCount != 4 {
+		t.Fatalf("source occurrence_count = %d, want 4", series.OccurrenceCount)
+	}
+
+	newS, err := svc.SplitSeries(ctx, series.ShortID, []string{stray.ShortID}, "primevideo", "Prime Video",
+		service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("SplitSeries: %v", err)
+	}
+	if newS.MerchantKey != "primevideo" {
+		t.Errorf("new series merchant_key = %q, want primevideo", newS.MerchantKey)
+	}
+	if newS.OccurrenceCount != 1 {
+		t.Errorf("new series occurrence_count = %d, want 1", newS.OccurrenceCount)
+	}
+
+	// The stray charge moved into the new series and was repointed.
+	var sid pgtype.UUID
+	var mkey string
+	if err := pool.QueryRow(ctx, `SELECT series_id, merchant_key FROM transactions WHERE id = $1`, stray.ID).Scan(&sid, &mkey); err != nil {
+		t.Fatalf("query stray: %v", err)
+	}
+	if pgconv.FormatUUID(sid) != newS.ID {
+		t.Errorf("stray series_id = %q, want %q", pgconv.FormatUUID(sid), newS.ID)
+	}
+	if mkey != "primevideo" {
+		t.Errorf("stray merchant_key = %q, want primevideo", mkey)
+	}
+
+	// Source series dropped to 3 members.
+	src, err := svc.GetSeries(ctx, series.ShortID)
+	if err != nil {
+		t.Fatalf("get source: %v", err)
+	}
+	if src.OccurrenceCount != 3 {
+		t.Errorf("source occurrence_count after split = %d, want 3", src.OccurrenceCount)
+	}
+
+	// Splitting out a transaction that isn't a member of the source errors.
+	other := testutil.MustCreateTransaction(t, queries, acctID, "OTHER", "Other Co", 100, "2026-01-01")
+	if _, err := svc.SplitSeries(ctx, series.ShortID, []string{other.ShortID}, "otherkey", "", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected splitting a non-member to error")
+	}
+	// Splitting into a key that already has a series errors.
+	if _, err := svc.SplitSeries(ctx, series.ShortID, []string{a.ShortID}, "primevideo", "", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected splitting into an existing key to error")
+	}
+}
+
 func keysOf(m map[string]service.SeriesNearMiss) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

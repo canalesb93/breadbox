@@ -146,6 +146,54 @@ func (s *MCPServer) handleRemoveSeriesTag(ctx context.Context, _ *mcpsdk.CallToo
 	return jsonResult(series)
 }
 
+type rekeySeriesInput struct {
+	ID     string `json:"id" jsonschema:"required,Series short ID or UUID to re-key."`
+	NewKey string `json:"new_merchant_key" jsonschema:"required,The corrected normalized merchant key (e.g. 'spotify' rather than a fallback like 'payment'). Members' merchant_key is repointed to match."`
+}
+
+func (s *MCPServer) handleRekeySeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input rekeySeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" || input.NewKey == "" {
+		return errorResult(fmt.Errorf("id and new_merchant_key are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.RekeySeries(context.Background(), input.ID, input.NewKey, actor)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
+type splitSeriesInput struct {
+	ID             string   `json:"id" jsonschema:"required,Source series short ID or UUID to split."`
+	NewKey         string   `json:"new_merchant_key" jsonschema:"required,Merchant key for the new series the split-out charges move into. Must not already have a series and must differ from the source key."`
+	Name           string   `json:"name,omitempty" jsonschema:"Optional display name for the new series; defaults to a title-cased new_merchant_key."`
+	TransactionIDs []string `json:"transaction_ids" jsonschema:"required,Transactions (short ID or UUID) to move out of the source series into the new one. Each must currently belong to the source series. Max 50."`
+}
+
+func (s *MCPServer) handleSplitSeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input splitSeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" || input.NewKey == "" || len(input.TransactionIDs) == 0 {
+		return errorResult(fmt.Errorf("id, new_merchant_key, and transaction_ids are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.SplitSeries(context.Background(), input.ID, input.TransactionIDs, input.NewKey, input.Name, actor)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
 func (s *MCPServer) handleAssignSeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input assignSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil

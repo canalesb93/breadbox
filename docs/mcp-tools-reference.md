@@ -260,6 +260,14 @@ Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a 
 
 Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide `series_id` to assign to an existing series, **or** `merchant_key` + `create_if_missing:true` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). `confirm:true` flips it straight to `active`; omit to leave a reviewable `candidate`. Use after `list_series(status=candidate)` shows nothing for a subscription the user says exists.
 
+### rekey_series (Write)
+
+Correct a series' `merchant_key` when detection grouped it under a wrong or fallback key (e.g. `payment` → `spotify`). Repoints the series and its linked transactions to `new_merchant_key`. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects *historical* grouping — incoming charges still key off the provider name at sync time (a merchant-key alias table is future work).
+
+### split_series (Write)
+
+Break an over-grouped series in two: move `transaction_ids` (≤50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency / user / category; rollups recompute on both sides. Errors if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series.
+
 ### add_series_tag (Write)
 
 Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it with `create_tag` first). Returns the updated series (including its `tags`).

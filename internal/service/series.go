@@ -13,6 +13,7 @@ import (
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -596,6 +597,195 @@ func (s *Service) ReviewSeries(ctx context.Context, idOrShort string, verdict Se
 	return &resp, nil
 }
 
+// RekeySeries changes a series' merchant_key (correcting a wrong or over-merged
+// detection key) and repoints its members' transactions.merchant_key to match,
+// so the series and its history stay consistent under the new key. It refuses
+// to silently merge: if a live series already exists at the new signature
+// (merchant_key + currency + user), or that signature is sticky-rejected, it
+// errors and tells the caller to move members instead.
+//
+// Scope note: incoming charges still derive their key from the provider name at
+// sync time, so a future charge of this merchant lands under the
+// provider-derived key, not the re-keyed one — re-key corrects the *historical*
+// grouping, not the normalizer. A merchant-key alias table is future work.
+func (s *Service) RekeySeries(ctx context.Context, idOrShort, newKey string, actor Actor) (*SeriesResponse, error) {
+	newKey = strings.TrimSpace(newKey)
+	if newKey == "" {
+		return nil, fmt.Errorf("%w: new merchant_key is required", ErrInvalidParameter)
+	}
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin rekey: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	row, err := qtx.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+	if strings.TrimSpace(row.MerchantKey) == newKey {
+		resp := seriesFromRow(row)
+		return &resp, nil // no-op: already at this key
+	}
+
+	// Collision / sticky-reject guard on the target signature.
+	match, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
+		MerchantKey:     newKey,
+		IsoCurrencyCode: row.IsoCurrencyCode,
+		UserID:          row.UserID,
+	})
+	if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("match target key: %w", mErr)
+	}
+	if mErr == nil && match.ID != row.ID {
+		if match.Confidence == SeriesConfidenceRejected {
+			return nil, fmt.Errorf("%w: %q is a sticky-rejected signature; re-key would resurrect it", ErrInvalidParameter, newKey)
+		}
+		return nil, fmt.Errorf("%w: a series already exists at %q — re-key won't merge; move members there instead", ErrInvalidParameter, newKey)
+	}
+
+	// Repoint members' merchant_key so detection stays consistent, then the series'.
+	if _, err := tx.Exec(ctx,
+		`UPDATE transactions SET merchant_key = $2, updated_at = NOW() WHERE series_id = $1 AND deleted_at IS NULL`,
+		row.ID, newKey); err != nil {
+		return nil, fmt.Errorf("repoint member keys: %w", err)
+	}
+	upd := updateParamsFromRow(row)
+	upd.MerchantKey = newKey
+	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
+	if err != nil {
+		return nil, fmt.Errorf("update series key: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit rekey: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// SplitSeries moves a subset of a series' members into a brand-new series under
+// newKey — the fix for an over-grouped series (e.g. a variable $4.99 charge
+// swept in with a $139/yr renewal). The new series inherits the source's
+// currency / user / category / cadence as a starting point; rollups recompute
+// on both sides. It errors if newKey equals the source key, if a live series
+// already exists at newKey, or if any listed transaction isn't a current member
+// of the source — so a split never steals from a third series or no-ops silently.
+func (s *Service) SplitSeries(ctx context.Context, idOrShort string, memberIDsOrShorts []string, newKey, newName string, actor Actor) (*SeriesResponse, error) {
+	newKey = strings.TrimSpace(newKey)
+	if newKey == "" {
+		return nil, fmt.Errorf("%w: new merchant_key is required", ErrInvalidParameter)
+	}
+	if len(memberIDsOrShorts) == 0 {
+		return nil, fmt.Errorf("%w: at least one transaction to split out is required", ErrInvalidParameter)
+	}
+	if len(memberIDsOrShorts) > seriesAssignMaxMembers {
+		return nil, fmt.Errorf("%w: at most %d transactions per split", ErrInvalidParameter, seriesAssignMaxMembers)
+	}
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	memberIDs, err := s.resolveTransactionIDs(ctx, memberIDsOrShorts)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin split: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	src, err := qtx.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+	if strings.TrimSpace(src.MerchantKey) == newKey {
+		return nil, fmt.Errorf("%w: split key must differ from the source key %q", ErrInvalidParameter, newKey)
+	}
+
+	// The target signature must be free — split creates a fresh series.
+	_, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
+		MerchantKey:     newKey,
+		IsoCurrencyCode: src.IsoCurrencyCode,
+		UserID:          src.UserID,
+	})
+	if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("match target key: %w", mErr)
+	}
+	if mErr == nil {
+		return nil, fmt.Errorf("%w: a series already exists at %q — assign the members to it instead of splitting", ErrInvalidParameter, newKey)
+	}
+
+	name := strings.TrimSpace(newName)
+	if name == "" {
+		name = slugs.TitleCase(newKey)
+	}
+	nw, err := qtx.InsertRecurringSeries(ctx, db.InsertRecurringSeriesParams{
+		UserID:           src.UserID,
+		Name:             name,
+		MerchantKey:      newKey,
+		Cadence:          src.Cadence,
+		ExpectedDay:      src.ExpectedDay,
+		ExpectedAmount:   pgtype.Numeric{}, // recomputed from the split-out members
+		AmountTolerance:  src.AmountTolerance,
+		IsoCurrencyCode:  src.IsoCurrencyCode,
+		CategoryID:       src.CategoryID,
+		Status:           SeriesStatusCandidate,
+		DetectionSource:  seriesSourceForActor(actor),
+		Confidence:       SeriesConfidenceAuto,
+		ConfirmedByType:  pgtype.Text{},
+		LastAmount:       pgtype.Numeric{},
+		LastSeenDate:     pgtype.Date{},
+		NextExpectedDate: pgtype.Date{},
+		OccurrenceCount:  0,
+		DetectionSignals: nil,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("insert split series: %w", err)
+	}
+
+	// Move the listed members from source → new (and repoint their merchant_key).
+	// Guarded on series_id = source so it never steals a charge from a third series.
+	ct, err := tx.Exec(ctx,
+		`UPDATE transactions SET series_id = $2, merchant_key = $3, updated_at = NOW()
+		 WHERE id = ANY($4::uuid[]) AND series_id = $1 AND deleted_at IS NULL`,
+		src.ID, nw.ID, newKey, memberIDs)
+	if err != nil {
+		return nil, fmt.Errorf("move members: %w", err)
+	}
+	if moved := ct.RowsAffected(); int(moved) != len(memberIDs) {
+		return nil, fmt.Errorf("%w: %d of %d transactions are not current members of the source series",
+			ErrInvalidParameter, len(memberIDs)-int(moved), len(memberIDs))
+	}
+
+	newRow, err := s.applyRollup(ctx, qtx, nw.ID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.applyRollup(ctx, qtx, src.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit split: %w", err)
+	}
+	resp := seriesFromRow(newRow)
+	return &resp, nil
+}
+
 // GetSeries returns a single series by short_id or uuid.
 func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
@@ -754,6 +944,27 @@ func (s *Service) seriesRollup(ctx context.Context, q *db.Queries, seriesID pgty
 		return 0, pgtype.Numeric{}, pgtype.Date{}, fmt.Errorf("series rollup: %w", err)
 	}
 	return int32(roll.OccurrenceCount), roll.LastAmount, roll.LastSeenDate, nil
+}
+
+// applyRollup recomputes a series' occurrence/last-amount/last-seen from its
+// live members and persists them (plus the projected next_expected_date),
+// returning the refreshed row. Used after membership changes (re-key keeps
+// membership but is harmless; split changes it on both sides).
+func (s *Service) applyRollup(ctx context.Context, qtx *db.Queries, id pgtype.UUID) (db.RecurringSeries, error) {
+	row, err := qtx.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		return db.RecurringSeries{}, fmt.Errorf("get series for rollup: %w", err)
+	}
+	occ, lastAmt, lastSeen, err := s.seriesRollup(ctx, qtx, id)
+	if err != nil {
+		return db.RecurringSeries{}, err
+	}
+	upd := updateParamsFromRow(row)
+	upd.OccurrenceCount = occ
+	upd.LastAmount = lastAmt
+	upd.LastSeenDate = lastSeen
+	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, lastSeen)
+	return qtx.UpdateRecurringSeries(ctx, upd)
 }
 
 func (s *Service) resolveOptionalUserID(ctx context.Context, idOrShort *string) (pgtype.UUID, error) {

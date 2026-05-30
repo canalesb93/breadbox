@@ -187,6 +187,64 @@ func RemoveSeriesTagHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// rekeySeriesRequest is the body for POST /api/v1/series/{id}/rekey.
+type rekeySeriesRequest struct {
+	NewMerchantKey string `json:"new_merchant_key"`
+}
+
+// RekeySeriesHandler corrects a series' merchant_key (and repoints its members).
+// POST /api/v1/series/{id}/rekey — mirrors the rekey_series MCP tool (write).
+func RekeySeriesHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body rekeySeriesRequest
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		if strings.TrimSpace(body.NewMerchantKey) == "" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "new_merchant_key is required")
+			return
+		}
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.RekeySeries(r.Context(), id, body.NewMerchantKey, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to re-key series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
+// splitSeriesRequest is the body for POST /api/v1/series/{id}/split.
+type splitSeriesRequest struct {
+	NewMerchantKey string   `json:"new_merchant_key"`
+	Name           string   `json:"name,omitempty"`
+	TransactionIDs []string `json:"transaction_ids"`
+}
+
+// SplitSeriesHandler moves a subset of a series' members into a new series.
+// POST /api/v1/series/{id}/split — mirrors the split_series MCP tool (write).
+func SplitSeriesHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body splitSeriesRequest
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		if strings.TrimSpace(body.NewMerchantKey) == "" || len(body.TransactionIDs) == 0 {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "new_merchant_key and transaction_ids are required")
+			return
+		}
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.SplitSeries(r.Context(), id, body.TransactionIDs, body.NewMerchantKey, body.Name, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to split series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
 // reviewSeriesRequest is the body for PATCH /api/v1/series/{id}.
 type reviewSeriesRequest struct {
 	Verdict string `json:"verdict"` // confirm | reject | pause | cancel

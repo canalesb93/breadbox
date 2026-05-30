@@ -1962,6 +1962,54 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/rekey:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Series]
+      summary: Re-key a recurring series
+      description: "**Requires `full_access` scope.** Corrects a series' `merchant_key` and repoints its members' `merchant_key` to match. Errors (400) if a live series already exists at the new key or it is sticky-rejected — re-key never silently merges. Corrects historical grouping; future charges still key off the provider name."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_merchant_key]
+              properties:
+                new_merchant_key: { type: string }
+      responses:
+        "200":
+          description: Re-keyed series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/split:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Series]
+      summary: Split a recurring series
+      description: "**Requires `full_access` scope.** Moves the given `transaction_ids` (max 50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for an over-grouped series. Errors (400) if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_merchant_key, transaction_ids]
+              properties:
+                new_merchant_key: { type: string }
+                name: { type: string }
+                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
+      responses:
+        "200":
+          description: The new series the members were split into.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/series/{id}/tags:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }

@@ -190,6 +190,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
 			r.Post("/series", AssignSeriesHandler(svc))
 			r.Post("/series/{id}/transactions", LinkSeriesTransactionsHandler(svc))
+			r.Post("/series/{id}/rekey", RekeySeriesHandler(svc))
+			r.Post("/series/{id}/split", SplitSeriesHandler(svc))
 			r.Post("/series/{id}/tags", AddSeriesTagHandler(svc))
 			r.Delete("/series/{id}/tags/{slug}", RemoveSeriesTagHandler(svc))
 			r.Patch("/series/{id}", ReviewSeriesHandler(svc))
