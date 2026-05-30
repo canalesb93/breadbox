@@ -26,6 +26,15 @@ type SettingsSectionProps struct {
 	Caption   string
 	Right     templ.Component
 	Variant   string
+	// FullWidth drops the left gutter so the content spans the whole
+	// width (overview cards, stats grids, page-level alerts). When set,
+	// the content is NOT auto-carded — the caller supplies its own
+	// container.
+	FullWidth bool
+	// Bare renders the children directly in the content column without
+	// the default card wrapper — for action lists or sections that manage
+	// their own cards (e.g. the API-keys list + reveal).
+	Bare bool
 	// Form wraps the children in a <form> so a single in-section Save
 	// button (use the Footer slot) submits all of its rows at once.
 	// Omit for sections that hold auto-save rows only — those wrap
@@ -50,9 +59,11 @@ type SettingsSectionFormProps struct {
 	Extra templ.Attributes
 }
 
-// SettingsSection is the canonical wrapper. The body slot is rendered
-// inside `.bb-settings-section__body` — populate it with one or more
-// SettingsRow calls.
+// SettingsSection is the canonical wrapper — a borderless two-column
+// group. The section identity (icon + title + caption) renders in the
+// left gutter; the body slot (one or more SettingsRow calls) + the
+// optional Right action + Footer render in the right content column.
+// See .claude/rules/settings.md.
 templ SettingsSection(p SettingsSectionProps) {
 	if p.Form != nil {
 		<form
@@ -61,87 +72,153 @@ templ SettingsSection(p SettingsSectionProps) {
 			if p.Form.Enctype != "" {
 				enctype={ p.Form.Enctype }
 			}
-			class={ settingsSectionClasses(p.Variant) }
+			class={ settingsSectionClasses(p.Variant, p.FullWidth) }
 			{ p.Form.Extra... }
 		>
 			if p.Form.CSRFToken != "" {
 				<input type="hidden" name="_csrf" value={ p.Form.CSRFToken }/>
 			}
-			@settingsSectionHeader(p)
-			<div class="bb-settings-section__body">
+			@settingsSectionGrid(p) {
 				{ children... }
-			</div>
-			if p.Footer != nil {
-				<div class="bb-settings-section__footer">
-					@p.Footer
-				</div>
 			}
 		</form>
 	} else {
-		<section class={ settingsSectionClasses(p.Variant) }>
-			@settingsSectionHeader(p)
-			<div class="bb-settings-section__body">
+		<section class={ settingsSectionClasses(p.Variant, p.FullWidth) }>
+			@settingsSectionGrid(p) {
 				{ children... }
-			</div>
-			if p.Footer != nil {
-				<div class="bb-settings-section__footer">
-					@p.Footer
-				</div>
 			}
 		</section>
 	}
 }
 
-templ settingsSectionHeader(p SettingsSectionProps) {
-	if p.Title != "" || p.Right != nil {
-		<header class="bb-settings-section__header">
+// settingsSectionGrid lays out the gutter + content. The content is
+// wrapped in a card by default; Bare/FullWidth render children directly so
+// the caller controls the container. The Right action sits above the card;
+// the Footer (Save bar) sits inside it.
+templ settingsSectionGrid(p SettingsSectionProps) {
+	<div class="bb-settings-section__grid">
+		if !p.FullWidth {
+			@settingsSectionMeta(p)
+		}
+		<div class="bb-settings-section__content">
+			if p.Right != nil {
+				<div class="bb-settings-section__action">
+					@p.Right
+				</div>
+			}
+			if p.Bare || p.FullWidth {
+				{ children... }
+				if p.Footer != nil {
+					<div class="bb-settings-section__footer">
+						@p.Footer
+					</div>
+				}
+			} else {
+				<div class={ settingsCardClasses(p.Variant) }>
+					{ children... }
+					if p.Footer != nil {
+						<div class="bb-settings-card__footer">
+							@p.Footer
+						</div>
+					}
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// settingsSectionMeta renders the left gutter. The heading block is only
+// emitted when a Title exists; the gutter element itself is always
+// present so the content column keeps a consistent left edge across
+// every section — the editorial alignment that makes the borderless
+// layout read as one surface rather than a stack of cards.
+templ settingsSectionMeta(p SettingsSectionProps) {
+	<div class="bb-settings-section__meta">
+		if p.Title != "" {
 			<div class="bb-settings-section__heading">
 				if p.BrandIcon != "" {
 					@BrandIcon(p.BrandIcon, settingsSectionIconClasses(p.Variant))
 				} else if p.Icon != "" {
-					<i data-lucide={ p.Icon } class={ settingsSectionIconClasses(p.Variant) }></i>
+					@LucideIcon(p.Icon, settingsSectionIconClasses(p.Variant))
 				}
-				<div class="min-w-0">
-					if p.Title != "" {
-						<h2 class={ settingsSectionTitleClasses(p.Variant) }>{ p.Title }</h2>
-					}
-					if p.Caption != "" {
-						<p class="bb-settings-section__caption">{ p.Caption }</p>
-					}
-				</div>
+				<h2 class="bb-settings-section__title">{ p.Title }</h2>
 			</div>
-			if p.Right != nil {
-				<div class="bb-settings-section__right">
-					@p.Right
-				</div>
+			if p.Caption != "" {
+				<p class="bb-settings-section__caption">{ p.Caption }</p>
 			}
-		</header>
-	}
+		}
+	</div>
 }
 
-func settingsSectionClasses(variant string) string {
-	switch variant {
-	case "danger":
-		return "bb-settings-section bb-settings-section--danger"
-	default:
-		return "bb-settings-section"
+func settingsSectionClasses(variant string, fullWidth bool) string {
+	out := "bb-settings-section"
+	if variant == "danger" {
+		out += " bb-settings-section--danger"
 	}
+	if fullWidth {
+		out += " bb-settings-section--full"
+	}
+	return out
 }
 
+func settingsCardClasses(variant string) string {
+	if variant == "danger" {
+		return "bb-settings-card bb-settings-card--danger"
+	}
+	return "bb-settings-card"
+}
+
+// SettingsCardProps configures a standalone content card — the same subtle
+// container SettingsSection wraps its content in, exposed for Bare sections
+// that hold several cards or a card with its own header (Title + Caption +
+// optional Right slot) and Footer.
+type SettingsCardProps struct {
+	Title   string
+	Caption string
+	Variant string
+	Right   templ.Component
+	Footer  templ.Component
+}
+
+templ SettingsCard(p SettingsCardProps) {
+	<div class={ settingsCardClasses(p.Variant) }>
+		if p.Title != "" {
+			<div class="bb-settings-card__header flex items-start justify-between gap-3">
+				<div class="min-w-0">
+					<div class="bb-settings-card__title">{ p.Title }</div>
+					if p.Caption != "" {
+						<p class="bb-settings-card__caption">{ p.Caption }</p>
+					}
+				</div>
+				if p.Right != nil {
+					<div class="shrink-0">
+						@p.Right
+					</div>
+				}
+			</div>
+		}
+		{ children... }
+		if p.Footer != nil {
+			<div class="bb-settings-card__footer">
+				@p.Footer
+			</div>
+		}
+	</div>
+}
+
+// settingsSectionIconClasses dims the quiet section-header icon via
+// `opacity-*`, never `text-base-content/NN`. A Lucide icon is several
+// overlapping <path>s sharing stroke="currentColor"; putting alpha on the
+// icon's *color* makes each stroke semi-transparent and the overlaps stack
+// into darker pixels (the `svg.lucide` alpha-strip rule in input.css can't
+// rescue an alpha set directly on the icon — a utility-layer color beats
+// the base-layer strip). `opacity-*` composites the whole icon as one
+// layer first, so it dims cleanly. See input.css ~L247.
 func settingsSectionIconClasses(variant string) string {
 	switch variant {
 	case "danger":
 		return "w-4 h-4 text-error shrink-0"
 	default:
-		return "w-4 h-4 text-base-content/45 shrink-0"
-	}
-}
-
-func settingsSectionTitleClasses(variant string) string {
-	switch variant {
-	case "danger":
-		return "text-sm font-semibold text-error leading-tight"
-	default:
-		return "text-sm font-semibold leading-tight"
+		return "w-4 h-4 text-base-content opacity-60 shrink-0"
 	}
 }

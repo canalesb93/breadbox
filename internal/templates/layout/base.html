@@ -497,13 +497,19 @@
   </div>
   {{end}}
 
-  {{- /* Global Settings modal — rendered on every authenticated page so the
-        sidebar gear (and any other entry point that dispatches
-        `open-settings`) can open it without a navigation. The same component
-        also serves cold deep-loads of /settings/* URLs: when SettingsInitialTab
-        is set, the modal opens on boot with the requested tab. Hidden for
-        unauthenticated visitors (no editor role => no settings to show). */ -}}
-  {{if .IsEditor}}{{renderComponent "SettingsModal" .}}{{end}}
+  {{- /* Settings is a full page now (/settings/*), not a modal overlay.
+        Any legacy `open-settings` dispatch — the sidebar user menu, the
+        cmdk palette, keyboard shortcuts — navigates to the corresponding
+        /settings/<tab> page instead of opening a dialog. One global
+        listener keeps every existing dispatcher working untouched. */ -}}
+  {{if .IsEditor}}
+  <script>
+    window.addEventListener('open-settings', function (e) {
+      var tab = (e && e.detail && e.detail.tab) || 'account';
+      window.location.href = '/settings/' + tab;
+    });
+  </script>
+  {{end}}
 
   <!-- Global Confirmation Modal -->
   <div x-data="bbConfirmModal()" x-cloak
@@ -1807,7 +1813,7 @@
         // Quick Actions
         { id: 'act-connect', shortcutId: 'global.new.c', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
         { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
-        { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/settings/api-keys/new', keywords: 'new token' },
+        { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/settings/api-keys', keywords: 'new token' },
         { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/household/new', keywords: 'new person family' },
         // Action item (no href) — cycles $store.theme system → light → dark.
         // shortcutId links to the '*' binding seeded in seedRegistry() so the
@@ -2456,7 +2462,7 @@
       var newRoutes = {
         c: { path: '/connections/new',         label: 'New Connection' },
         i: { path: '/connections/import-csv',  label: 'Import CSV' },
-        k: { path: '/settings/api-keys/new',   label: 'New API Key' },
+        k: { path: '/settings/api-keys',       label: 'API Keys' },
         u: { path: '/household/new',  label: 'New Household Member' }
       };
 

@@ -11,7 +11,6 @@ import (
 
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -361,80 +360,62 @@ func (rw *oauthRedirectInterceptor) WriteHeader(code int) {
 // --- Admin handlers for OAuth client management ---
 
 
-// OAuthClientNewPageHandler serves GET /admin/oauth-clients/new.
-func OAuthClientNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		data := BaseTemplateData(r, sm, "api-keys", "Create OAuth Client")
-		renderOAuthClientNew(w, r, tr, data, pages.OAuthClientNewProps{
-			CSRFToken: GetCSRFToken(r),
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "API Keys", Href: "/settings/api-keys"},
-				{Label: "Create OAuth Client"},
-			},
-		})
-	}
-}
-
-// renderOAuthClientNew mirrors renderAPIKeyNew: hands the typed
-// OAuthClientNewProps to the templ component and uses RenderWithTempl
-// to host it inside base.html.
-func renderOAuthClientNew(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.OAuthClientNewProps) {
-	tr.RenderWithTempl(w, r, data, pages.OAuthClientNew(props))
-}
-
-// OAuthClientCreatePageHandler serves POST /admin/oauth-clients/new.
+// OAuthClientCreatePageHandler serves POST /settings/oauth-clients/new.
+//
+// One-click create, mirroring the API-key flow: the name is optional
+// (defaults to "OAuth client") and the scope defaults to full access. The
+// client_id + one-time secret are stashed in a session flash and we 303
+// back to the Access tab, where popOAuthClientReveal renders them inline —
+// no /created subpage.
 func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
-			FlashRedirect(w, r, sm, "error", "Name is required", "/settings/oauth-clients/new")
-			return
+			name = "OAuth client"
 		}
 		scope := r.FormValue("scope")
-		if scope == "" {
+		if scope != "read_only" {
 			scope = "full_access"
 		}
 		result, err := svc.CreateOAuthClient(r.Context(), name, scope)
 		if err != nil {
-			FlashRedirect(w, r, sm, "error", "Failed to create OAuth client", "/settings/oauth-clients/new")
+			FlashRedirect(w, r, sm, "error", "Failed to create OAuth client", "/settings/api-keys")
 			return
 		}
+		reveal := &pages.AccessReveal{
+			Name:     result.Name,
+			ClientID: result.ClientID,
+			Secret:   result.PlaintextClientSecret,
+			Scope:    scope,
+		}
+		// JS path: render the Access tab fragment directly with the reveal.
+		if r.Header.Get(settingsFragmentHeader) == "1" {
+			renderAccessTab(svc, sm, tr, w, r, nil, reveal)
+			return
+		}
+		// No-JS fallback: flash + 303 back to the tab.
 		sm.Put(r.Context(), "created_oauth_client_id", result.ClientID)
 		sm.Put(r.Context(), "created_oauth_client_secret", result.PlaintextClientSecret)
 		sm.Put(r.Context(), "created_oauth_client_name", result.Name)
-		http.Redirect(w, r, "/settings/oauth-clients/"+result.ID+"/created", http.StatusSeeOther)
+		sm.Put(r.Context(), "created_oauth_client_scope", scope)
+		http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 	}
 }
 
-// OAuthClientCreatedPageHandler serves GET /admin/oauth-clients/{id}/created.
-func OAuthClientCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		clientID := sm.PopString(r.Context(), "created_oauth_client_id")
-		clientSecret := sm.PopString(r.Context(), "created_oauth_client_secret")
-		name := sm.PopString(r.Context(), "created_oauth_client_name")
-		if clientID == "" {
-			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
-			return
-		}
-		data := BaseTemplateData(r, sm, "api-keys", "OAuth Client Created")
-		renderOAuthClientCreated(w, r, tr, data, pages.OAuthClientCreatedProps{
-			ClientName:   name,
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			MCPServerURL: mcpServerURL(r),
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "API Keys", Href: "/settings/api-keys"},
-				{Label: "Client Created"},
-			},
-		})
+// popOAuthClientReveal consumes the one-time flash an OAuth-client create
+// left behind so the Access tab can show the client_id + secret inline on
+// the redirect-back render. Returns nil when no client was just created.
+func popOAuthClientReveal(r *http.Request, sm *scs.SessionManager) *pages.AccessReveal {
+	clientID := sm.PopString(r.Context(), "created_oauth_client_id")
+	if clientID == "" {
+		return nil
 	}
-}
-
-// renderOAuthClientCreated mirrors renderAPIKeyCreated: hands the typed
-// OAuthClientCreatedProps to the templ component and uses RenderWithTempl
-// to host it inside base.html.
-func renderOAuthClientCreated(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.OAuthClientCreatedProps) {
-	tr.RenderWithTempl(w, r, data, pages.OAuthClientCreated(props))
+	return &pages.AccessReveal{
+		Name:     sm.PopString(r.Context(), "created_oauth_client_name"),
+		ClientID: clientID,
+		Secret:   sm.PopString(r.Context(), "created_oauth_client_secret"),
+		Scope:    sm.PopString(r.Context(), "created_oauth_client_scope"),
+	}
 }
 
 // OAuthClientRevokePageHandler serves POST /admin/oauth-clients/{id}/revoke.
