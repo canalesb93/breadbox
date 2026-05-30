@@ -1328,6 +1328,25 @@ func kbdGlyphRefs() []kbdGlyphRef {
 
 // ─── Keyboard shortcut badges ──────────────────────────────────────────
 
+templ SectionThemeControls() {
+	<div class="flex flex-col gap-6">
+		@designExample("ThemeToggle (compact)", "Cycling icon button used in the sidebar + design navbar. One click steps system → light → dark → system; the glyph (monitor / sun / moon) reflects the current preference, so \"system\" stays distinguishable. Backed by $store.theme — try it and watch the navbar toggle above stay in sync.") {
+			<div class="flex items-center gap-3">
+				@components.ThemeToggle()
+				<span class="text-sm text-base-content/60" x-data x-text="$store.theme.title"></span>
+			</div>
+		}
+		@designExample("ThemeControl (segmented)", "Explicit System / Light / Dark control for Settings → General. A daisy join surfaces all three states at once and makes \"System\" reselectable — the way back to OS-following after a manual override. Binds to the same $store.theme as the icon toggle.") {
+			<div class="flex flex-col gap-3">
+				@components.ThemeControl()
+				<p class="text-xs text-base-content/45 leading-snug max-w-md">
+					Theme is a per-browser preference (localStorage <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">bb-theme</code>), never server-stored. "System" removes <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">data-theme</code> so daisyUI's prefers-color-scheme drives it.
+				</p>
+			</div>
+		}
+	</div>
+}
+
 templ SectionKbd() {
 	<div class="flex flex-col gap-6">
 		@designExample("Single key (Kbd)", "Use for one-key shortcuts. Hides on touch devices via $store.device.isTouch + sm: breakpoint.") {

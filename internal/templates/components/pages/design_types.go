@@ -123,6 +123,13 @@ func DesignSections() []DesignSection {
 			Group:       "foundations",
 			Render:      func() templ.Component { return SectionKbd() },
 		},
+		{
+			Slug:        "theme-controls",
+			Title:       "Theme controls",
+			Description: "ThemeToggle (compact cycling icon button — system → light → dark) and ThemeControl (explicit System/Light/Dark segmented control). Both bind to the shared $store.theme; \"system\" follows the OS via prefers-color-scheme.",
+			Group:       "foundations",
+			Render:      func() templ.Component { return SectionThemeControls() },
+		},
 
 		// ── Layout ──────────────────────────────────────────────────
 		{
