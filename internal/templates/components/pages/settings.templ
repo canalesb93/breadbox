@@ -20,13 +20,39 @@ templ SettingsGeneral(p SettingsProps) {
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "General",
-			Subtitle: "Schedule, log retention, and avatars",
+			Subtitle: "Appearance, schedule, log retention, and avatars",
 		})
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 			@settingsSyncSection(p)
+			@settingsAppearanceSection()
 			@settingsAvatarsSection(p)
 		</div>
 	</div>
+}
+
+// ---------------------------------------------------------------------
+// General — Appearance
+// ---------------------------------------------------------------------
+
+// settingsAppearanceSection holds the explicit theme control. It's the
+// settings-screen counterpart to the sidebar ThemeToggle — both bind to
+// the same client-side $store.theme, so changing one updates the other.
+// No form / CSRF: theme is a per-browser localStorage preference, never
+// server-stored (a member's dark-mode choice shouldn't follow them across
+// devices or leak to other household members).
+templ settingsAppearanceSection() {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "palette",
+		Title:   "Appearance",
+		Caption: "Saved in this browser only",
+	}) {
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Theme",
+			Caption: "System follows your OS light/dark setting",
+		}) {
+			@components.ThemeControl()
+		}
+	}
 }
 
 // SettingsSystem renders the System tab — encryption key status and

@@ -1,0 +1,69 @@
+package components
+
+// Theme controls — two shapes over the same client-side `$store.theme`
+// (registered in base.html). Theme is a per-browser preference held in
+// localStorage (`bb-theme`), never server-stored: a household member's
+// dark-mode choice shouldn't leak across devices or to other users.
+//
+// The store has three states:
+//   - "system" — no data-theme; daisyUI's prefers-color-scheme drives it
+//   - "light"  — forces data-theme="light"
+//   - "dark"   — forces data-theme="dark"
+//
+// "system" is the default and the only way to follow the OS again after a
+// manual override, which the old two-state sun/moon swap could never do.
+
+// ThemeToggle is the compact icon button used in the sidebar and the
+// design-system navbar. One click cycles system → light → dark → system;
+// the glyph reflects the *preference* (monitor / sun / moon), not the
+// resolved theme, so "system" stays legible as its own state.
+//
+// All three glyphs render server-side and are gated by x-show once Alpine
+// hydrates. x-cloak hides them until then so a reload doesn't flash all
+// three; btn-square reserves the box so there's no layout shift.
+templ ThemeToggle() {
+	<button
+		type="button"
+		class="btn btn-sm btn-square btn-ghost text-base-content/60"
+		x-data
+		@click="$store.theme.cycle()"
+		:title="$store.theme.title"
+		:aria-label="$store.theme.title"
+	>
+		<span x-cloak x-show="$store.theme.preference === 'system'" class="contents">
+			@LucideIcon("monitor", "w-4 h-4")
+		</span>
+		<span x-cloak x-show="$store.theme.preference === 'light'" class="contents">
+			@LucideIcon("sun", "w-4 h-4")
+		</span>
+		<span x-cloak x-show="$store.theme.preference === 'dark'" class="contents">
+			@LucideIcon("moon", "w-4 h-4")
+		</span>
+	</button>
+}
+
+// ThemeControl is the explicit segmented control for the Settings →
+// General → Appearance section. A daisy `join` of three buttons makes all
+// states visible at once (unlike the cycling icon) and surfaces "System"
+// as a first-class, reselectable option. The active button binds to
+// `$store.theme.preference` so it stays in sync with the sidebar toggle.
+templ ThemeControl() {
+	<div class="join" x-data role="group" aria-label="Theme preference">
+		@themeControlButton("system", "monitor", "System")
+		@themeControlButton("light", "sun", "Light")
+		@themeControlButton("dark", "moon", "Dark")
+	</div>
+}
+
+templ themeControlButton(value, icon, label string) {
+	<button
+		type="button"
+		class="join-item btn btn-sm gap-1.5"
+		:class={ "$store.theme.preference === '" + value + "' ? 'btn-primary' : 'btn-ghost'" }
+		:aria-pressed={ "$store.theme.preference === '" + value + "'" }
+		@click={ "$store.theme.set('" + value + "')" }
+	>
+		@LucideIcon(icon, "w-4 h-4")
+		{ label }
+	</button>
+}

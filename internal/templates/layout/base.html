@@ -18,16 +18,22 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <script>
-    // Apply persisted theme override before paint so we don't flash the
-    // wrong theme on reload. Absent value falls through to daisyUI's
-    // prefers-color-scheme default ("light --default, dark --prefersdark"
-    // in input.css). Wrapped in try/catch because localStorage throws in
-    // private-mode Safari and the toggle should degrade gracefully.
+    // Apply the persisted theme preference before paint so we don't flash
+    // the wrong theme on reload. Three states (mirrors $store.theme below):
+    //   'light' / 'dark' — force data-theme to that override
+    //   'system' / absent / anything else — remove data-theme and let
+    //     daisyUI's prefers-color-scheme default drive it ("light --default,
+    //     dark --prefersdark" in input.css). Selecting "system" is the only
+    //     way back to OS-following after a manual override.
+    // Wrapped in try/catch because localStorage throws in private-mode
+    // Safari and the toggle should degrade gracefully.
     (function () {
       try {
         var t = localStorage.getItem('bb-theme');
         if (t === 'light' || t === 'dark') {
           document.documentElement.dataset.theme = t;
+        } else {
+          delete document.documentElement.dataset.theme;
         }
       } catch (_) { /* best-effort */ }
     })();
@@ -149,6 +155,66 @@
       Alpine.store('device', {
         isTouch: mqTouch.matches,
         isMobile: mqMobile.matches,
+      });
+    });
+  </script>
+
+  <script>
+    // Alpine store: $store.theme
+    //
+    // Single source of truth for the theme preference, shared by every
+    // ThemeToggle / ThemeControl instance (sidebar, design navbar,
+    // Settings → General). Three states:
+    //   'system' — no data-theme; daisyUI's prefers-color-scheme drives it
+    //   'light'  — forces data-theme="light"
+    //   'dark'   — forces data-theme="dark"
+    //
+    // Persisted to localStorage('bb-theme'); the pre-paint <head> script
+    // reapplies it on the next load so reloads never flash the other theme.
+    // Theme is intentionally per-browser, not server-stored — a member's
+    // dark-mode choice shouldn't follow them across devices or leak to
+    // other household members. `systemDark` is tracked reactively so the
+    // toggle glyph updates live when the OS flips while in 'system'.
+    document.addEventListener('alpine:init', function() {
+      var KEY = 'bb-theme';
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      function read() {
+        try {
+          var v = localStorage.getItem(KEY);
+          if (v === 'light' || v === 'dark' || v === 'system') return v;
+        } catch (_) { /* private-mode Safari */ }
+        return 'system';
+      }
+      function apply(pref) {
+        var root = document.documentElement;
+        if (pref === 'light' || pref === 'dark') root.dataset.theme = pref;
+        else delete root.dataset.theme;
+      }
+      Alpine.store('theme', {
+        preference: read(),
+        systemDark: mq.matches,
+        get resolved() {
+          return this.preference === 'system'
+            ? (this.systemDark ? 'dark' : 'light')
+            : this.preference;
+        },
+        get title() {
+          return 'Theme: ' + this.preference + ' (click to change)';
+        },
+        set: function(pref) {
+          if (pref !== 'light' && pref !== 'dark' && pref !== 'system') return;
+          this.preference = pref;
+          try { localStorage.setItem(KEY, pref); } catch (_) {}
+          apply(pref);
+        },
+        cycle: function() {
+          var next = { system: 'light', light: 'dark', dark: 'system' };
+          this.set(next[this.preference] || 'system');
+        },
+        init: function() {
+          var self = this;
+          mq.addEventListener('change', function(e) { self.systemDark = e.matches; });
+        },
       });
     });
   </script>
@@ -300,9 +366,9 @@
          the native daisy `navbar` component. Sticky so it stays in view
          while the gallery scrolls; the design gallery's anchor links
          and sticky outline both offset for this bar's height.
-         The theme toggle is short-lived: it writes data-theme to <html>
-         per click but never persists. Page reload drops the attribute
-         and the sandbox returns to system theme via prefers-color-scheme. -->
+         The theme toggle is the shared ThemeToggle component, backed by
+         $store.theme — selecting light/dark/system persists to
+         localStorage just like the sidebar toggle. -->
     <div class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-30 px-4 sm:px-6">
       <div class="navbar-start">
         <a
@@ -314,21 +380,7 @@
         </a>
       </div>
       <div class="navbar-end gap-1">
-        <label
-          class="swap swap-rotate btn btn-ghost btn-sm btn-square text-base-content/60"
-          title="Toggle theme (resets on reload)"
-        >
-          <input
-            type="checkbox"
-            class="sr-only"
-            x-data="{ dark: matchMedia('(prefers-color-scheme: dark)').matches }"
-            x-model="dark"
-            @change="document.documentElement.dataset.theme = dark ? 'dark' : 'light'"
-            aria-label="Toggle theme"
-          />
-          {{ lucide "sun" "swap-off w-4 h-4" }}
-          {{ lucide "moon" "swap-on w-4 h-4" }}
-        </label>
+        {{renderComponent "ThemeToggle" nil}}
         <a href="/" class="btn btn-ghost btn-sm gap-1.5 text-base-content/60">
           {{ lucide "arrow-left" "w-3.5 h-3.5" }}
           Back to app
@@ -418,31 +470,11 @@
             Breadbox
           </a>
           <div class="flex items-center gap-1 shrink-0">
-            <!-- Theme toggle (sun/moon). Persists override to
-                 localStorage; the inline <head> script reapplies on
-                 next load so reloads don't flash the other theme. -->
-            <label
-              class="swap swap-rotate btn btn-sm btn-square btn-ghost text-base-content/60"
-              title="Toggle theme"
-              x-data="{
-                dark: (document.documentElement.dataset.theme
-                  ? document.documentElement.dataset.theme === 'dark'
-                  : matchMedia('(prefers-color-scheme: dark)').matches),
-              }"
-              @change="
-                document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-                try { localStorage.setItem('bb-theme', dark ? 'dark' : 'light'); } catch (_) {}
-              "
-            >
-              <input
-                type="checkbox"
-                class="sr-only"
-                x-model="dark"
-                aria-label="Toggle theme"
-              />
-              {{ lucide "sun" "swap-off w-4 h-4" }}
-              {{ lucide "moon" "swap-on w-4 h-4" }}
-            </label>
+            <!-- Theme toggle — shared ThemeToggle component. Cycles
+                 system → light → dark via $store.theme, persisting the
+                 choice to localStorage; the inline <head> script reapplies
+                 it on next load so reloads don't flash the other theme. -->
+            {{renderComponent "ThemeToggle" nil}}
             <!-- Close button — only visible on mobile/tablet (< lg) -->
             <label for="bb-drawer"
                    class="btn btn-sm btn-square btn-ghost lg:hidden"

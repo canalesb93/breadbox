@@ -93,6 +93,9 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.UserAvatar(p), nil
 	},
+	"ThemeToggle": func(_ any) (templ.Component, error) {
+		return components.ThemeToggle(), nil
+	},
 	"SettingsModal": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
