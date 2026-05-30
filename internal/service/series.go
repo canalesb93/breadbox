@@ -772,6 +772,18 @@ func (s *Service) SplitSeries(ctx context.Context, idOrShort string, memberIDsOr
 			ErrInvalidParameter, len(memberIDs)-int(moved), len(memberIDs))
 	}
 
+	// Strip the SOURCE series' inherited tags from the moved members — they no
+	// longer belong to it, so its system-provenance tags are stale. Scoped by
+	// provenance (added_by_type='system' + added_by_id=source short_id) so a tag
+	// the user added directly to the transaction survives. The new series has no
+	// tags yet; a later add_series_tag will re-materialize via ApplySeriesTagToAllMembers.
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM transaction_tags
+		 WHERE transaction_id = ANY($1::uuid[]) AND added_by_type = 'system' AND added_by_id = $2`,
+		memberIDs, src.ShortID); err != nil {
+		return nil, fmt.Errorf("strip source-inherited tags from moved members: %w", err)
+	}
+
 	newRow, err := s.applyRollup(ctx, qtx, nw.ID)
 	if err != nil {
 		return nil, err

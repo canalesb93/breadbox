@@ -725,6 +725,56 @@ func TestSplitSeries(t *testing.T) {
 	}
 }
 
+func TestSplitSeries_StripsSourceInheritedTags(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	testutil.MustCreateTag(t, queries, "on-prime", "On Prime")
+	testutil.MustCreateTag(t, queries, "user-pin", "User Pin")
+	acctID := seedTxnFixture(t, queries)
+	a := testutil.MustCreateTransaction(t, queries, acctID, "AP_1", "Amazon Prime", 13900, "2025-05-01")
+	keep := testutil.MustCreateTransaction(t, queries, acctID, "AP_2", "Amazon Prime", 13900, "2026-05-01")
+	stray := testutil.MustCreateTransaction(t, queries, acctID, "AP_VID", "Amazon Prime Video", 499, "2026-04-10")
+	actor := service.Actor{Type: "user", Name: "Tester"}
+
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Amazon Prime", MerchantKey: "amazonprime", Cadence: service.SeriesCadenceAnnual,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: []string{a.ShortID, keep.ShortID, stray.ShortID},
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+
+	// Inherit the series tag onto all members (provenance system + series short_id).
+	if err := svc.AddSeriesTag(ctx, series.ShortID, "on-prime", actor); err != nil {
+		t.Fatalf("add series tag: %v", err)
+	}
+	// A tag the user added directly to the stray charge (non-system provenance).
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)
+		 SELECT $1, id, 'user', 'Tester' FROM tags WHERE slug = 'user-pin'`, stray.ID); err != nil {
+		t.Fatalf("insert user tag: %v", err)
+	}
+	if !txnHasTag(t, pool, stray.ID, "on-prime") || !txnHasTag(t, pool, stray.ID, "user-pin") {
+		t.Fatal("precondition: stray should carry both tags before the split")
+	}
+
+	if _, err := svc.SplitSeries(ctx, series.ShortID, []string{stray.ShortID}, "primevideo", "Prime Video", actor); err != nil {
+		t.Fatalf("SplitSeries: %v", err)
+	}
+
+	// The moved member loses the SOURCE series' inherited tag but keeps the user tag.
+	if txnHasTag(t, pool, stray.ID, "on-prime") {
+		t.Error("moved member should no longer carry the source series' inherited tag")
+	}
+	if !txnHasTag(t, pool, stray.ID, "user-pin") {
+		t.Error("a user-added tag must survive the split (provenance-scoped strip)")
+	}
+	// A member that stayed keeps the source tag.
+	if !txnHasTag(t, pool, keep.ID, "on-prime") {
+		t.Error("a member that stayed should keep the source series' inherited tag")
+	}
+}
+
 func keysOf(m map[string]service.SeriesNearMiss) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
