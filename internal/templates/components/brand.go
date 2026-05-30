@@ -37,9 +37,14 @@ func loadBrandIcons() map[string]string {
 // renderBrandIcon mirrors renderLucideIcon: stamps the resolved class
 // list into the embedded <svg> at render time. The `brand` class is
 // load-bearing — input.css scopes `svg.brand` for the same
-// pointer-events neutralisation as `svg.lucide`. Multi-color brand
-// marks (Teller) ignore currentColor by design; monochrome marks
-// (Plaid, GitHub, Anthropic, Claude mono, MCP) inherit it.
+// pointer-events neutralisation as `svg.lucide`.
+//
+// Fill behavior splits two ways (see the brand block in input.css):
+//   - Plaid and MCP use fill="currentColor", so they inherit the
+//     container's text color and track light/dark like a Lucide icon.
+//   - GitHub, Anthropic, Claude, and Teller keep their baked-in brand
+//     fills (the fill IS the brand); the black-on-light marks get a
+//     dark-mode flip in input.css.
 func renderBrandIcon(slug, class string) string {
 	raw, ok := brandIcons[slug]
 	if !ok {
