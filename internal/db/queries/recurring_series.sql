@@ -86,3 +86,9 @@ ORDER BY (status = 'candidate') DESC, occurrence_count DESC, created_at DESC;
 
 -- name: CountRecurringSeries :one
 SELECT COUNT(*) FROM recurring_series WHERE deleted_at IS NULL;
+
+-- name: ListSeriesMembers :many
+SELECT short_id, date, provider_name, provider_merchant_name, amount, iso_currency_code
+FROM transactions
+WHERE series_id = $1 AND deleted_at IS NULL
+ORDER BY date DESC, created_at DESC;

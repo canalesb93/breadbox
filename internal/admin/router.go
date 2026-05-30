@@ -141,6 +141,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/tags", TagsPageHandler(svc, sm, tr))
 
+		// Subscriptions — recurring-series list + detail. Editor scope: the
+		// candidate-confirmation surface is the single human-adjudication point
+		// for detected series.
+		r.Get("/subscriptions", SubscriptionsListPageHandler(a, svc, sm, tr))
+		r.Get("/subscriptions/{id}", SubscriptionDetailHandler(a, sm, tr, svc))
+
 		// Design-system sandbox. /design is the full gallery; /design/c/{slug}
 		// renders a single component family in isolation for focused screenshots.
 		// Editor scope: developer tooling, not user-facing.

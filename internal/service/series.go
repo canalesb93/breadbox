@@ -371,6 +371,40 @@ func (s *Service) ListSeriesByStatus(ctx context.Context, status string) ([]Seri
 	return out, nil
 }
 
+// SeriesMember is one linked transaction (charge) of a recurring series.
+type SeriesMember struct {
+	ShortID      string   `json:"short_id"`
+	Date         *string  `json:"date,omitempty"`
+	Name         string   `json:"name"`
+	MerchantName *string  `json:"merchant_name,omitempty"`
+	Amount       *float64 `json:"amount,omitempty"`
+	Currency     *string  `json:"iso_currency_code,omitempty"`
+}
+
+// SeriesMembers returns the transactions linked to a series, newest first.
+func (s *Service) SeriesMembers(ctx context.Context, idOrShort string) ([]SeriesMember, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.Queries.ListSeriesMembers(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list series members: %w", err)
+	}
+	out := make([]SeriesMember, len(rows))
+	for i, r := range rows {
+		out[i] = SeriesMember{
+			ShortID:      r.ShortID,
+			Date:         dateStr(r.Date),
+			Name:         r.ProviderName,
+			MerchantName: textPtr(r.ProviderMerchantName),
+			Amount:       numericFloat(r.Amount),
+			Currency:     textPtr(r.IsoCurrencyCode),
+		}
+	}
+	return out, nil
+}
+
 // seriesRollup recomputes (occurrence_count, last_amount, last_seen_date) from
 // the live members of a series. Zero members → zeros/NULLs (idempotent).
 func (s *Service) seriesRollup(ctx context.Context, q *db.Queries, seriesID pgtype.UUID) (int32, pgtype.Numeric, pgtype.Date, error) {

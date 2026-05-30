@@ -58,6 +58,11 @@ templ Nav(p NavProps) {
 		<a href="/accounts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "accounts") }>
 			@LucideIcon("wallet", "") Accounts
 		</a>
+		if p.IsEditor {
+			<a href="/subscriptions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "subscriptions") }>
+				@LucideIcon("repeat", "") Subscriptions
+			</a>
+		}
 		if p.IsAdmin {
 			<a href="/reports" class={ "bb-sidebar-link", navActive(p.CurrentPage, "reports") }>
 				@LucideIcon("file-text", "")
