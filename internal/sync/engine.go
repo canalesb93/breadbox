@@ -694,6 +694,14 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 			tctx.Category = slug
 		}
 	}
+	// Seed recurring-series membership so rules can condition on it via
+	// field="series" / field="in_series". series_id is NULL on freshly-synced
+	// rows (the detector links them post-sync), so this is populated mainly on
+	// changed / re-synced rows that already belong to a series.
+	if dbTxn.SeriesID.Valid {
+		tctx.InSeries = true
+		tctx.SeriesShortID = resolver.SeriesShortID(dbTxn.SeriesID)
+	}
 
 	// For changed transactions, load the current tag slugs so tag-based
 	// conditions can match. New transactions start with empty tags (any tags

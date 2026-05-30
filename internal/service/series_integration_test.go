@@ -463,6 +463,81 @@ func TestApplyRuleRetroactively_AssignSeries(t *testing.T) {
 	}
 }
 
+// TestRuleConditions_InSeriesAndSeries exercises the read-half of the
+// rules-engine composition: a rule conditioned on series membership
+// (in_series) or a specific series (series eq short_id) matches only the
+// linked transactions when applied retroactively. This validates the
+// recurring_series JOIN + scan added to the retroactive context query.
+func TestRuleConditions_InSeriesAndSeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	testutil.MustCreateTag(t, queries, "subscription-charge", "Subscription charge")
+	testutil.MustCreateTag(t, queries, "is-netflix", "Is Netflix")
+	acctID := seedTxnFixture(t, queries)
+	n1 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_1", "Netflix", 1599, "2026-03-15")
+	n2 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_2", "Netflix", 1599, "2026-04-15")
+	loose := testutil.MustCreateTransaction(t, queries, acctID, "STARBUCKS", "Starbucks", 599, "2026-04-16")
+	actor := service.Actor{Type: "user", Name: "Tester"}
+
+	// Link the two Netflix charges to a series; Starbucks stays unlinked.
+	series, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, TransactionIDs: []string{n1.ShortID, n2.ShortID},
+	}, actor)
+	if err != nil {
+		t.Fatalf("assign series: %v", err)
+	}
+
+	// Rule 1: in_series eq true → add_tag subscription-charge. Should hit the
+	// two members, skip Starbucks.
+	inSeriesRule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Members get a tag",
+		Conditions: service.Condition{Field: "in_series", Op: "eq", Value: true},
+		Actions:    []service.RuleAction{{Type: "add_tag", TagSlug: "subscription-charge"}},
+		Actor:      actor,
+	})
+	if err != nil {
+		t.Fatalf("create in_series rule: %v", err)
+	}
+	matched, err := svc.ApplyRuleRetroactively(ctx, inSeriesRule.ID)
+	if err != nil {
+		t.Fatalf("apply in_series rule: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("in_series matched = %d, want 2 (the two linked charges)", matched)
+	}
+	if !txnHasTag(t, pool, n1.ID, "subscription-charge") || !txnHasTag(t, pool, n2.ID, "subscription-charge") {
+		t.Error("expected both series members to receive the subscription-charge tag")
+	}
+	if txnHasTag(t, pool, loose.ID, "subscription-charge") {
+		t.Error("unlinked transaction was wrongly tagged by an in_series rule")
+	}
+
+	// Rule 2: series eq <short_id> → add_tag is-netflix. Targets the specific
+	// series by its short_id, exercising the recurring_series JOIN.
+	seriesRule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Netflix series tag",
+		Conditions: service.Condition{Field: "series", Op: "eq", Value: series.ShortID},
+		Actions:    []service.RuleAction{{Type: "add_tag", TagSlug: "is-netflix"}},
+		Actor:      actor,
+	})
+	if err != nil {
+		t.Fatalf("create series rule: %v", err)
+	}
+	matched, err = svc.ApplyRuleRetroactively(ctx, seriesRule.ID)
+	if err != nil {
+		t.Fatalf("apply series rule: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("series eq matched = %d, want 2", matched)
+	}
+	if !txnHasTag(t, pool, n1.ID, "is-netflix") {
+		t.Error("expected the matched series member to receive the is-netflix tag")
+	}
+	if txnHasTag(t, pool, loose.ID, "is-netflix") {
+		t.Error("unlinked transaction was wrongly tagged by a series eq rule")
+	}
+}
+
 func txnHasTag(t *testing.T, pool *pgxpool.Pool, txnID pgtype.UUID, slug string) bool {
 	t.Helper()
 	var n int

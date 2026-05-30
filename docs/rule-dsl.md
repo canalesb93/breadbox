@@ -71,8 +71,12 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 | `user_id`           | string  | Family member UUID                                              |
 | `user_name`         | string  | Family member display name                                      |
 | `tags`              | tags    | List of current transaction tag slugs (special, see below)      |
+| `series`            | string  | `short_id` of the recurring series the transaction belongs to (empty when unassigned) |
+| `in_series`         | bool    | Whether the transaction is linked to any recurring series       |
 
 > **Raw vs assigned category.** `provider_category_primary` / `provider_category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
+
+> **Series membership timing.** `series` / `in_series` reflect a transaction's *current* `series_id`. A brand-new transaction has no series until the post-sync detector links it, so these fields are `""` / `false` on the create pass — they're most useful for re-synced/changed rows and for **retroactive apply** over historical data (e.g. tag everything already in a series, or exclude series members from a catch-all rule). They are the read-half companion to the `assign_series` action (the write-half). A rule **matches** on series membership but cannot **discover** a series — detection is an aggregate decision the detector owns; see `docs/data-model.md` and the recurring-series design notes.
 
 ### Operators per field type
 

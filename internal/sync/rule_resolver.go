@@ -49,6 +49,15 @@ type TransactionContext struct {
 	// (field: "tags") can match against the transaction's current tags.
 	// Updated mid-resolver as earlier-stage add_tag actions apply.
 	Tags []string
+	// SeriesShortID is the short_id of the recurring series this transaction
+	// belongs to (field: "series"), empty when unassigned. Resolved from the
+	// resolver's series cache at sync time. For newly-synced rows it is empty
+	// until the post-sync detector links them — series conditions therefore
+	// matter mostly for changed / re-synced rows and retroactive apply.
+	SeriesShortID string
+	// InSeries reports whether the transaction is linked to any recurring
+	// series (field: "in_series"). Same timing caveat as SeriesShortID.
+	InSeries bool
 }
 
 // RuleActionSource tracks which rule contributed which action for audit.
@@ -130,6 +139,7 @@ type RuleResolver struct {
 	rules           []compiledRule
 	slugCache       map[[16]byte]string      // category UUID bytes -> slug
 	slugToID        map[string]pgtype.UUID   // category slug -> UUID (reverse cache)
+	seriesShortID   map[[16]byte]string      // recurring_series UUID bytes -> short_id
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
@@ -167,9 +177,10 @@ type ruleRow struct {
 // If the transaction_rules table does not exist, it logs a warning and proceeds with no rules.
 func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, logger *slog.Logger) (*RuleResolver, error) {
 	r := &RuleResolver{
-		slugCache: make(map[[16]byte]string),
-		slugToID:  make(map[string]pgtype.UUID),
-		hitCounts: make(map[[16]byte]int),
+		slugCache:     make(map[[16]byte]string),
+		slugToID:      make(map[string]pgtype.UUID),
+		seriesShortID: make(map[[16]byte]string),
+		hitCounts:     make(map[[16]byte]int),
 	}
 
 	// Load transaction rules. Gracefully handle missing table.
@@ -201,6 +212,25 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 		}
 		r.slugCache[id.Bytes] = slug
 		r.slugToID[slug] = id
+	}
+
+	// Load the recurring-series id→short_id cache so the `series` condition
+	// field can resolve a transaction's series_id to its short_id without a
+	// per-row query. Tolerate a missing table (older deployments / lite) the
+	// same way loadRules does — series conditions simply won't match.
+	seriesRows, err := pool.Query(ctx, "SELECT id, short_id FROM recurring_series")
+	if err != nil {
+		logger.Warn("failed to load recurring series cache; series conditions will not match", "error", err)
+	} else {
+		defer seriesRows.Close()
+		for seriesRows.Next() {
+			var id pgtype.UUID
+			var shortID string
+			if err := seriesRows.Scan(&id, &shortID); err != nil {
+				return nil, fmt.Errorf("scan recurring series short_id: %w", err)
+			}
+			r.seriesShortID[id.Bytes] = shortID
+		}
 	}
 
 	return r, nil
@@ -415,6 +445,16 @@ func (r *RuleResolver) CategoryIDForSlug(slug string) pgtype.UUID {
 		return pgtype.UUID{}
 	}
 	return r.slugToID[slug]
+}
+
+// SeriesShortID returns the short_id for a recurring-series UUID, or empty
+// string if the series is unknown to the resolver's cache (e.g. minted after
+// resolver construction, or the table was unavailable at load time).
+func (r *RuleResolver) SeriesShortID(id pgtype.UUID) string {
+	if !id.Valid {
+		return ""
+	}
+	return r.seriesShortID[id.Bytes]
 }
 
 // ResolveWithContext evaluates all transaction rules in pipeline-stage order
@@ -759,6 +799,10 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.UserName)
 	case "tags":
 		return evaluateTags(c, tctx.Tags)
+	case "series":
+		return evaluateString(c, tctx.SeriesShortID)
+	case "in_series":
+		return evaluateBool(c, tctx.InSeries)
 	default:
 		return false // unknown field
 	}
