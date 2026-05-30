@@ -147,9 +147,9 @@ templ rulesFilterBar(p RulesProps) {
 				aria-label="Filter by category"
 				@change="$el.form.requestSubmit()"
 			>
-				@rulesFilterCategoryOption("", "All categories", p.CategorySlug == "")
+				@rulesFilterOption("", "All categories", p.CategorySlug == "")
 				for _, c := range p.FilterCategories {
-					@rulesFilterCategoryOption(c.Slug, c.Label, p.CategorySlug == c.Slug)
+					@rulesFilterOption(c.Slug, c.Label, p.CategorySlug == c.Slug)
 				}
 			</select>
 			<select
@@ -193,6 +193,9 @@ templ rulesFilterBar(p RulesProps) {
 	</form>
 }
 
+// Category labels arrive from the handler with a leading space so child
+// rows read as indented in the dropdown — browsers preserve leading
+// whitespace inside <option> content, so we don't need <optgroup>.
 templ rulesFilterOption(value, label string, selected bool) {
 	if selected {
 		<option value={ value } selected>{ label }</option>
@@ -200,19 +203,6 @@ templ rulesFilterOption(value, label string, selected bool) {
 		<option value={ value }>{ label }</option>
 	}
 }
-
-// rulesFilterCategoryOption renders one <option>. Child categories
-// arrive from the handler with a leading space so the nesting reads
-// at a glance — browsers preserve leading whitespace inside
-// <option> content, so we don't need <optgroup>.
-templ rulesFilterCategoryOption(value, label string, selected bool) {
-	if selected {
-		<option value={ value } selected>{ label }</option>
-	} else {
-		<option value={ value }>{ label }</option>
-	}
-}
-
 
 templ rulesNewRuleAction() {
 	<a href="/rules/new" class="btn btn-primary btn-sm gap-2" data-new-rule>
@@ -347,13 +337,11 @@ templ rulesRow(r RulesRow) {
 			}
 		</td>
 		<td class="align-middle text-right" @click.stop>
-			<div class="contents">
-				@components.OverflowMenu(components.OverflowMenuProps{
-					AriaLabel: "Rule " + r.Name + " actions",
-					Size:      "xs",
-					Items:     rulesOverflowItems(r),
-				})
-			</div>
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: "Rule " + r.Name + " actions",
+				Size:      "xs",
+				Items:     rulesOverflowItems(r),
+			})
 		</td>
 	</tr>
 }
