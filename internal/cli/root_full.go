@@ -22,4 +22,5 @@ func registerServerCommands(root *cobra.Command) {
 	AddBackupCmd(root)
 	AddAgentCmd(root)
 	AddRevealKeyCmd(root)
+	AddSeriesCmd(root)
 }

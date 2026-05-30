@@ -113,6 +113,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/reports/{id}", GetReportHandler(svc))
 		r.Get("/tags", ListTagsHandler(svc))
 		r.Get("/tags/{slug}", GetTagHandler(svc))
+		r.Get("/series", ListSeriesHandler(svc))
+		r.Get("/series/{id}", GetSeriesHandler(svc))
 		r.Get("/settings/providers", GetProviderConfigHandler(a))
 		// Agents — read endpoints. Specific paths before /agents/{slug} param.
 		r.Get("/agents", ListAgentDefinitionsHandler(svc))
@@ -185,6 +187,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Delete("/transactions/{id}/tags/{slug}", RemoveTransactionTagHandler(svc))
 			r.Post("/tags", CreateTagHandler(svc))
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
+			r.Post("/series", AssignSeriesHandler(svc))
+			r.Post("/series/{id}/transactions", LinkSeriesTransactionsHandler(svc))
+			r.Patch("/series/{id}", ReviewSeriesHandler(svc))
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 			r.Put("/settings/providers/plaid", UpdatePlaidConfigHandler(a))
 			r.Put("/settings/providers/teller", UpdateTellerConfigHandler(a))

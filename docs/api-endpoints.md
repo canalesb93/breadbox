@@ -79,6 +79,16 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | PATCH | `/tags/{slug}` | W | Partial update of display_name/description/color/icon/lifecycle |
 | DELETE | `/tags/{slug}` | W | Delete a tag |
 
+## Subscriptions (recurring series)
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/series` | R | List recurring series; optional `?status=active\|candidate\|paused\|cancelled` |
+| GET | `/series/{id}` | R | Single series (accepts UUID or short_id) |
+| POST | `/series` | W | Create a missed series (`merchant_key`+`create_if_missing`) or assign by `series_id`; links `transaction_ids` (≤50), optional `confirm` |
+| POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series; optional `confirm` |
+| PATCH | `/series/{id}` | W | Apply a verdict: `confirm`/`reject`/`pause`/`cancel` (user confirmation outranks agent) |
+
 ## Rules
 
 | Method | Path | Scope | Description |

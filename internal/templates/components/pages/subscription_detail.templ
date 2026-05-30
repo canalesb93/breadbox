@@ -1,0 +1,188 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// SubscriptionDetail renders /subscriptions/{short_id} — one recurring series
+// with its config grid, derived price-change history, and the timeline of
+// linked charges. Verdict actions (confirm / reject / pause / cancel) reuse the
+// `subscriptionsList` Alpine factory's window-level 'series-verdict' handler.
+templ SubscriptionDetail(p SubscriptionDetailProps) {
+	<script src="/static/js/admin/components/subscriptions.js"></script>
+	<div x-data="subscriptionsList">
+		@components.BreadcrumbNav([]components.Breadcrumb{
+			{Label: "Subscriptions", Href: "/subscriptions"},
+			{Label: p.Series.Name},
+		})
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                p.Series.Name,
+			Subtitle:             subscriptionDetailSubtitle(p.Series),
+			SubtitleHideOnMobile: true,
+			Action:               subscriptionsBetaBadge(),
+		})
+		<!-- Status + verdict toolbar -->
+		<div class="flex items-center flex-wrap gap-2 mb-6">
+			<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.StatusTone }>{ p.Series.StatusLabel }</span>
+			if p.Series.Status == "candidate" {
+				<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.BandTone }>{ p.Series.ConfidenceBand } confidence</span>
+			}
+			<div class="flex-1"></div>
+			switch p.Series.Status {
+				case "candidate":
+					@subscriptionVerdictBtn(p.Series, "reject", "Not a subscription", "x", "btn-ghost")
+					@subscriptionVerdictBtn(p.Series, "confirm", "Confirm", "check", "btn-primary")
+				case "active":
+					@subscriptionVerdictBtn(p.Series, "pause", "Pause", "pause", "btn-ghost")
+					@subscriptionVerdictBtn(p.Series, "cancel", "Cancel", "x-circle", "btn-ghost")
+				case "paused":
+					@subscriptionVerdictBtn(p.Series, "confirm", "Resume", "play", "btn-primary")
+					@subscriptionVerdictBtn(p.Series, "cancel", "Cancel", "x-circle", "btn-ghost")
+				case "cancelled":
+					@subscriptionVerdictBtn(p.Series, "confirm", "Reactivate", "rotate-ccw", "btn-primary")
+			}
+		</div>
+		<!-- Config grid -->
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:  "repeat",
+			Title: "Details",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence"}) {
+				<span class="text-sm">{ p.Series.CadenceLabel }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Last charge"}) {
+				if p.Series.HasAmount {
+					@components.Amount(components.AmountProps{Value: p.Series.Amount, Intent: components.AmountCost, Class: "text-sm font-medium"})
+				} else {
+					<span class="text-base-content/40 text-sm">—</span>
+				}
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Expected amount", Caption: "± tolerance band"}) {
+				<span class="text-sm">{ subscriptionDetailField(p.ExpectedAmount) } <span class="text-base-content/40">{ subscriptionToleranceSuffix(p.AmountTolerance) }</span></span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Suggested category"}) {
+				<span class="text-sm">{ subscriptionDetailField(p.Series.CategoryName) }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day"}) {
+				<span class="text-sm">{ subscriptionDetailField(p.ExpectedDay) }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Next renewal"}) {
+				<span class="text-sm">{ subscriptionDetailField(p.NextExpected) }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Last seen"}) {
+				<span class="text-sm">{ subscriptionDetailField(p.LastSeen) }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Detected by"}) {
+				<span class="text-sm">{ p.Series.SourceLabel }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Merchant key", Caption: "Normalized detection anchor"}) {
+				<code class="font-mono text-xs break-all">{ subscriptionDetailField(p.Series.MerchantKey) }</code>
+			}
+		}
+		<!-- Price-change history -->
+		if len(p.PriceChanges) > 0 {
+			<div class="mt-6">
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:  "trending-up",
+					Title: "Price changes",
+				}) {
+					for _, c := range p.PriceChanges {
+						@components.SettingsRow(components.SettingsRowProps{Label: c.Date}) {
+							<span class="text-sm inline-flex items-center gap-2">
+								@components.Amount(components.AmountProps{Value: c.From, Intent: components.AmountCost, Class: "text-sm text-base-content/50 line-through"})
+								@components.LucideIcon("arrow-right", "w-3.5 h-3.5 text-base-content/30")
+								@components.Amount(components.AmountProps{Value: c.To, Intent: components.AmountCost, Class: "text-sm font-medium"})
+							</span>
+						}
+					}
+				}
+			</div>
+		}
+		<!-- Linked charges -->
+		<div class="mt-6">
+			<div class="flex items-center gap-2 mb-3">
+				<h2 class="text-sm font-semibold text-base-content">Linked charges</h2>
+				<span class="badge badge-ghost badge-sm">{ fmt.Sprintf("%d", len(p.Members)) }</span>
+			</div>
+			if len(p.Members) == 0 {
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:    "receipt",
+					Title:   "No linked charges",
+					Body:    "Transactions get linked to this series as they sync or when you assign them.",
+					Compact: true,
+					InCard:  true,
+				})
+			} else {
+				<div class="bb-card overflow-hidden">
+					<div class="overflow-x-auto">
+						<table class="table table-sm">
+							<thead class="text-xs text-base-content/60">
+								<tr>
+									<th>Date</th>
+									<th>Description</th>
+									<th class="text-right">Amount</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, m := range p.Members {
+									<tr class="hover:bg-base-200/30 transition-colors">
+										<td class="text-sm text-base-content/70 whitespace-nowrap">{ m.Date }</td>
+										<td>
+											<a href={ templ.SafeURL("/transactions/" + m.ShortID) } class="text-sm text-base-content hover:underline">{ m.Name }</a>
+										</td>
+										<td class="text-right">
+											if m.HasAmount {
+												@components.Amount(components.AmountProps{Value: m.Amount, Intent: components.AmountCost, Class: "text-sm font-medium"})
+											} else {
+												<span class="text-xs text-base-content/30">—</span>
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			}
+		</div>
+	</div>
+	<script>
+		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
+	</script>
+}
+
+// subscriptionVerdictBtn renders one verdict action that dispatches to the
+// shared 'series-verdict' window handler in subscriptions.js.
+templ subscriptionVerdictBtn(s SubscriptionRow, verdict, label, icon, variant string) {
+	<button
+		type="button"
+		@click={ fmt.Sprintf("$dispatch('series-verdict', {id: %q, name: %q, verdict: %q})", s.ShortID, s.Name, verdict) }
+		class={ "btn btn-sm gap-1.5", variant }
+	>
+		@components.LucideIcon(icon, "w-4 h-4")
+		{ label }
+	</button>
+}
+
+func subscriptionDetailSubtitle(s SubscriptionRow) string {
+	if s.MerchantKey != "" {
+		return s.CadenceLabel + " · " + s.MerchantKey
+	}
+	return s.CadenceLabel
+}
+
+func subscriptionDetailField(v string) string {
+	if v == "" {
+		return "—"
+	}
+	return v
+}
+
+func subscriptionToleranceSuffix(tol string) string {
+	if tol == "" {
+		return ""
+	}
+	return "± " + tol
+}

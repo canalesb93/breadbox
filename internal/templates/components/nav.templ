@@ -20,6 +20,7 @@ type NavProps struct {
 	UnreadReports        int64
 	ConnectionsAttention int64
 	PendingReviews       int64
+	SeriesCandidates     int64
 
 	// Profile footer
 	HasLinkedUser        bool
@@ -58,6 +59,15 @@ templ Nav(p NavProps) {
 		<a href="/accounts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "accounts") }>
 			@LucideIcon("wallet", "") Accounts
 		</a>
+		if p.IsEditor {
+			<a href="/subscriptions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "subscriptions") }>
+				@LucideIcon("repeat", "")
+				<span class="flex-1">Subscriptions</span>
+				if p.SeriesCandidates > 0 {
+					<span class="bb-nav-badge" title={ fmt.Sprintf("%d subscription candidates need review", p.SeriesCandidates) }>{ badgeCount(p.SeriesCandidates) }</span>
+				}
+			</a>
+		}
 		if p.IsAdmin {
 			<a href="/reports" class={ "bb-sidebar-link", navActive(p.CurrentPage, "reports") }>
 				@LucideIcon("file-text", "")

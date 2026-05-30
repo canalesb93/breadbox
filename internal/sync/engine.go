@@ -471,9 +471,9 @@ type processTransactionOpts struct {
 
 // processTransactionResult captures the outcome of processing a single transaction.
 type processTransactionResult struct {
-	added            int // 1 if newly inserted, 0 otherwise
-	modified         int // 1 if existing row changed, 0 otherwise
-	unchanged        int // 1 if existing row was identical, 0 otherwise
+	added            int  // 1 if newly inserted, 0 otherwise
+	modified         int  // 1 if existing row changed, 0 otherwise
+	unchanged        int  // 1 if existing row was identical, 0 otherwise
 	skipped          bool // true if account is excluded
 	errored          bool // true if resolve or upsert failed (already logged)
 	ruleApplications []pendingApplication
@@ -612,6 +612,11 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
 	}
 
+	merchantName := ""
+	if txn.MerchantName != nil {
+		merchantName = *txn.MerchantName
+	}
+
 	params := db.UpsertTransactionParams{
 		AccountID:                    accountID,
 		ProviderTransactionID:        txn.ExternalID,
@@ -630,6 +635,10 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
 		ProviderRaw:                  txn.Raw,
+		// merchant_key: the normalized recurring-series detection anchor, set at
+		// sync time so going-forward rows are immediately groupable. NULL when no
+		// usable merchant signal (excluded from auto-detection). See merchantkey.go.
+		MerchantKey: pgconv.TextIfNotEmpty(MerchantKey(merchantName, txn.Name)),
 	}
 
 	return q.UpsertTransaction(ctx, params)
@@ -1309,4 +1318,3 @@ func optionalDecimalToNumeric(d *decimal.Decimal) pgtype.Numeric {
 	}
 	return decimalToNumeric(*d)
 }
-

@@ -23,7 +23,10 @@ type NavBadges struct {
 	PendingReviews       int64
 	ConnectionsAttention int64
 	UnreadReports        int64
-	ShowGettingStarted   bool
+	// SeriesCandidates is the count of recurring-series candidates awaiting a
+	// confirm/reject verdict. Displayed next to the Subscriptions nav link.
+	SeriesCandidates   int64
+	ShowGettingStarted bool
 }
 
 // NavBadgesMiddleware fetches sidebar notification badge counts and stores them
@@ -52,6 +55,12 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 				badges.UnreadReports = unread
 			} else {
 				logger.Debug("nav badges: count unread agent reports", "error", err)
+			}
+
+			if cand, err := queries.CountCandidateSeriesForReview(ctx); err == nil {
+				badges.SeriesCandidates = cand
+			} else {
+				logger.Debug("nav badges: count candidate series", "error", err)
 			}
 
 			// Check if getting started guide should show in nav.
