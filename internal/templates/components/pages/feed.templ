@@ -550,7 +550,13 @@ templ feedReportBody(it FeedItem, r *FeedReport, now time.Time) {
 // author this stays correct as long as DisplayAuthor is set.
 func feedReportActor(r *FeedReport) components.TimelineActor {
 	return components.TimelineActor{
-		Name:    r.DisplayAuthor,
+		Name: r.DisplayAuthor,
+		// UserID seeds the avatar: when the report resolves to its
+		// agent_definition, this is the slug, so the row renders the
+		// agent's robot via /avatars/<slug>?type=agent (UserAvatar routes
+		// IsAgent through ?type=agent). Empty seed falls back to the
+		// bot tile — same as before for operator/historical reports.
+		UserID:  r.AvatarSeed,
 		IsAgent: true,
 	}
 }

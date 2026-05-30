@@ -3,7 +3,7 @@
 //
 // The package tracks two DiceBear styles — one for human users
 // (avatar.dicebear_style_user, default "shapes") and one for AI
-// agents (avatar.dicebear_style_agent, default "bottts") — so a
+// agents (avatar.dicebear_style_agent, default "bottts-neutral") — so a
 // human-authored activity row reads unambiguously against an
 // agent-authored one. Both values live in app_config and are pushed
 // into the package via SetUserStyle / SetAgentStyle at server
@@ -41,10 +41,12 @@ const (
 	// symmetrical with DefaultAgentStyle.
 	DefaultUserStyle = "shapes"
 
-	// DefaultAgentStyle is the fallback for agent identicons. "bottts"
-	// is DiceBear's canonical robot style — agents read as obviously
-	// non-human against the user fallback aesthetic.
-	DefaultAgentStyle = "bottts"
+	// DefaultAgentStyle is the fallback for agent identicons.
+	// "bottts-neutral" is DiceBear's robot style on a flat, transparent
+	// background (no per-avatar colored tile) — agents read as obviously
+	// non-human while sitting cleanly on our own surfaces/rings instead
+	// of carrying their own background swatch.
+	DefaultAgentStyle = "bottts-neutral"
 
 	// DefaultAPIBaseURL is the DiceBear v9 HTTP API root. Tests
 	// override this via SetAPIBaseURL.

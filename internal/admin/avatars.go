@@ -10,13 +10,13 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/avatar"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -36,7 +36,7 @@ const maxAvatarUploadSize = 5 << 20 // 5 MB
 //
 //	?type=user|agent — picks which configured DiceBear style to use.
 //	                   Default "user". Agent identicons use a separate
-//	                   style (default "bottts") so agent activity reads
+//	                   style (default "bottts-neutral") so agent activity reads
 //	                   as obviously non-human. When the id resolves to
 //	                   an api_keys row with actor_type='agent', the
 //	                   handler upgrades the style to "agent" regardless
@@ -87,7 +87,7 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 			seed := idStr
 			if key.ActorType == "agent" {
 				actor = avatar.ActorAgent
-				if slug, ok := agentSlugFromKeyName(key.Name); ok {
+				if slug, ok := service.ParseAgentKeySlug(key.Name); ok {
 					seed = slug
 				}
 			}
@@ -98,19 +98,6 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		// Unknown id — generate a stable pattern from the raw string.
 		serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 	}
-}
-
-// agentSlugFromKeyName recovers an agent's slug from a minted run-key
-// name of the form "agent:<slug>:<runID>" (see
-// service.Orchestrator key minting). Returns ok=false for any other
-// shape — operator-created agent keys, HTTP MCP keys, the stdio
-// singleton — so the caller keeps seeding on the key UUID for those.
-func agentSlugFromKeyName(name string) (string, bool) {
-	parts := strings.Split(name, ":")
-	if len(parts) != 3 || parts[0] != "agent" || parts[1] == "" {
-		return "", false
-	}
-	return parts[1], true
 }
 
 // parseActorType reads the `?type=` query param and normalises it

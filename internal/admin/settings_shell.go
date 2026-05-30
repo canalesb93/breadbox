@@ -3,8 +3,6 @@
 package admin
 
 import (
-	"bytes"
-	"html/template"
 	"net/http"
 	"net/url"
 
@@ -40,12 +38,12 @@ const (
 //     already open and the user switches tabs or opens the modal via the
 //     sidebar gear.
 //
-//  2. Full page GET (cold deep-link to /settings/:tab) — pre-renders the
-//     tab body, stuffs it into the SettingsModal via the data map, and
-//     renders an empty host main. The modal opens on first paint.
+//  2. Full page GET (direct /settings/:tab navigation) — renders the
+//     full Settings page (rail + the active tab body) inside the normal
+//     app chrome via base.html.
 //
 // `tab` is one of the components.SettingsModalTab* identifiers — used to
-// tell the modal which row to highlight and where to push history.
+// highlight the active rail item and seed the in-page swapper.
 func renderSettingsTab(
 	tr *TemplateRenderer,
 	w http.ResponseWriter,
@@ -63,16 +61,35 @@ func renderSettingsTab(
 		return
 	}
 
-	// Cold load — pre-render the body, then host an empty page that opens
-	// the modal on top.
-	var buf bytes.Buffer
-	if err := body.Render(r.Context(), &buf); err != nil {
-		http.Error(w, "templ render error: "+err.Error(), http.StatusInternalServerError)
-		return
+	// Role flags drive the rail's per-tab gating. Handlers that build
+	// their data via BaseTemplateData already set them; the
+	// buildSettingsProps tabs (General/System/Help) don't — so resolve
+	// them here from the session, mirroring the base-layout enrichment in
+	// TemplateRenderer.Render (same single-admin default), BEFORE we build
+	// the rail. The matching SessionRole key also makes Render's own role
+	// block a no-op so the two stay consistent.
+	if _, ok := data["SessionRole"]; !ok && tr.sm != nil {
+		role := tr.sm.GetString(r.Context(), sessionKeyAccountRole)
+		if role == "" {
+			role = RoleAdmin
+		}
+		data["SessionRole"] = role
+		data["IsAdmin"] = role == RoleAdmin
+		data["IsEditor"] = role == RoleAdmin || role == RoleEditor
+		data["RoleDisplay"] = RoleDisplayName(role)
 	}
-	data["SettingsInitialTab"] = tab
-	data["SettingsInitialBody"] = template.HTML(buf.String())
-	tr.RenderWithTempl(w, r, data, pages.SettingsHost())
+
+	// Full navigation — render the Settings page (rail + active tab body)
+	// inside base.html. The in-page swapper (settings_page.js) takes over
+	// subsequent tab switches and in-tab saves.
+	isAdmin, _ := data["IsAdmin"].(bool)
+	isEditor, _ := data["IsEditor"].(bool)
+	tr.RenderWithTempl(w, r, data, pages.SettingsPage(pages.SettingsPageProps{
+		ActiveTab: tab,
+		IsAdmin:   isAdmin,
+		IsEditor:  isEditor,
+		Body:      body,
+	}))
 }
 
 // truncateFlash bounds flash messages we ship via response headers.

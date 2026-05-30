@@ -1079,11 +1079,18 @@ func (s *Service) MintRunAPIKey(ctx context.Context, def *AgentDefinitionRespons
 	if def.ToolScope == "read_only" {
 		scope = "read_only"
 	}
+	// ActorName is the agent's DISPLAY name (def.Name) — every write the
+	// run makes stamps this, so the feed reads "Routine Review" rather
+	// than the slug or the SDK's generic "claude-code" clientInfo.
+	// AgentDefinitionID is the durable link that lets any of the run's
+	// activity resolve back to this one definition (name + slug avatar).
+	// The slug still lives in the key Name for the avatar seed.
 	return s.CreateAPIKey(ctx, CreateAPIKeyParams{
-		Name:      fmt.Sprintf("agent:%s:%s", def.Slug, runShortID),
-		Scope:     scope,
-		ActorType: "agent",
-		ActorName: def.Slug,
+		Name:              fmt.Sprintf("agent:%s:%s", def.Slug, runShortID),
+		Scope:             scope,
+		ActorType:         "agent",
+		ActorName:         def.Name,
+		AgentDefinitionID: def.ID,
 	})
 }
 

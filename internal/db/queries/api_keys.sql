@@ -1,10 +1,22 @@
 -- name: CreateApiKey :one
-INSERT INTO api_keys (name, key_hash, key_prefix, scope, actor_type, actor_name)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO api_keys (name, key_hash, key_prefix, scope, actor_type, actor_name, agent_definition_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetApiKeyByHash :one
 SELECT * FROM api_keys WHERE key_hash = $1;
+
+-- name: GetAgentIdentityByApiKeyID :one
+-- Canonical agent identity for an actor: the agent_definition linked to
+-- the api_keys row at mint (per-run keys). Lets every surface render an
+-- agent's activity under one name + slug-seeded avatar instead of the
+-- MCP clientInfo the SDK presents. Returns no rows for non-agent keys
+-- or run keys minted before agent_definition_id existed (callers fall
+-- back to parsing the slug from the key name).
+SELECT ad.id, ad.short_id, ad.name, ad.slug
+FROM api_keys ak
+JOIN agent_definitions ad ON ad.id = ak.agent_definition_id
+WHERE ak.id = $1;
 
 -- name: GetApiKeyByPrefix :one
 SELECT * FROM api_keys WHERE key_prefix = $1 LIMIT 1;

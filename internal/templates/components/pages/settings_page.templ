@@ -1,0 +1,97 @@
+package pages
+
+import (
+	"strings"
+
+	"breadbox/internal/templates/components"
+)
+
+// SettingsPage is the full-page Settings shell: a persistent left rail
+// beside the active tab body. It renders inside the normal app chrome
+// (base.html provides the sidebar + topbar); this lays out the
+// rail + content and wires the in-page swapper that keeps tab switches
+// and in-tab saves snappy without a full reload.
+//
+// Progressive enhancement: each rail item is a real anchor pointing at
+// its /settings/<tab> route. With JS they're intercepted into an AJAX
+// body swap; without it they fall back to ordinary navigations that
+// re-render the page.
+templ SettingsPage(p SettingsPageProps) {
+	<script src="/static/js/admin/components/settings_page.js"></script>
+	<div
+		x-data="settingsPage"
+		data-active-tab={ p.ActiveTab }
+		@popstate.window="onPopState()"
+	>
+		<div class="bb-settings-layout">
+			@settingsPageRail(p)
+			<div class="bb-settings-content" id="bb-settings-body" x-ref="body">
+				@p.Body
+			</div>
+		</div>
+		<!--
+			Page-level toast slot. The swapper injects save/error alerts
+			here (driven by X-BB-Flash-* response headers) so feedback
+			surfaces without a full navigation.
+		-->
+		<div
+			class="toast toast-center toast-bottom z-50 pointer-events-none"
+			x-ref="toast"
+			aria-live="polite"
+			aria-atomic="true"
+		></div>
+	</div>
+}
+
+// settingsPageRail renders the vertical tab rail (lg+) / horizontal scroll
+// strip (mobile). Group labels are hidden on the mobile strip. Role gating
+// mirrors the legacy modal rail: Account is always shown; API Keys needs
+// editor; everything else is admin-only.
+templ settingsPageRail(p SettingsPageProps) {
+	<nav class="bb-settings-rail" aria-label="Settings sections">
+		<div class="bb-settings-rail__list">
+			@settingsRailItem(p, "account", "user-cog", "Account")
+			if p.IsAdmin {
+				<div class="bb-settings-rail__group-label">Workspace</div>
+				@settingsRailItem(p, "general", "sliders-horizontal", "General")
+				@settingsRailItem(p, "system", "cpu", "System")
+				<div class="bb-settings-rail__group-label">Integrations</div>
+				@settingsRailItem(p, "providers", "plug", "Providers")
+				@settingsRailItem(p, "agents", "sparkles", "Agents")
+				@settingsRailItem(p, "mcp", "brand:model-context-protocol", "MCP")
+			}
+			if p.IsEditor {
+				if p.IsAdmin {
+					<div class="bb-settings-rail__group-label">Access</div>
+				}
+				@settingsRailItem(p, "api-keys", "key-round", "API Keys")
+			}
+			if p.IsAdmin {
+				<div class="bb-settings-rail__group-label">Maintenance</div>
+				@settingsRailItem(p, "backups", "hard-drive", "Backups")
+				@settingsRailItem(p, "help", "life-buoy", "Help")
+			}
+		</div>
+	</nav>
+}
+
+// settingsRailItem renders one rail link. The tab id rides in data-tab so
+// the swapper's click handler reads it off $el without per-row string
+// interpolation; data-active drives the highlight.
+templ settingsRailItem(p SettingsPageProps, tab, icon, label string) {
+	<a
+		href={ settingsPageTabHref(tab) }
+		data-tab={ tab }
+		data-active={ settingsRailActiveAttr(p.ActiveTab, tab) }
+		x-bind:data-active={ railActiveBindExpr(tab) }
+		class="bb-settings-rail__item"
+		@click.prevent="switchTo($el.dataset.tab)"
+	>
+		if strings.HasPrefix(icon, "brand:") {
+			@components.BrandIcon(strings.TrimPrefix(icon, "brand:"), "shrink-0")
+		} else {
+			@components.LucideIcon(icon, "shrink-0")
+		}
+		<span>{ label }</span>
+	</a>
+}

@@ -210,6 +210,21 @@ func (s *MCPServer) rebindActorFromClientInfo(ctx context.Context, req *mcpsdk.C
 	if req == nil || req.Session == nil {
 		return ctx
 	}
+	// Never clobber a scheduled agent's run key. A run is already
+	// authenticated as its per-run key (agent:<slug>:<runID>, bound from
+	// BREADBOX_API_KEY in runMCPStdio), which carries the agent's real
+	// identity + agent_definition link. The clientInfo the Claude Agent
+	// SDK sends is the generic shared "claude-code" host identity —
+	// rebinding to it collapses every agent onto one client key and
+	// erases per-agent attribution (the bug that made one session show
+	// three different actor names + avatars). Leave the run key in place.
+	//
+	// IsAgentRunContext also checks actor_type='agent', so a non-agent key
+	// merely *named* "agent:..." can't suppress the rebind and spoof an
+	// agent identity.
+	if service.IsAgentRunContext(ctx) {
+		return ctx
+	}
 	ip := req.Session.InitializeParams()
 	if ip == nil || ip.ClientInfo == nil {
 		return ctx
