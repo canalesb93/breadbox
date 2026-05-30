@@ -5,6 +5,7 @@ package admin
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -83,10 +84,13 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		// Render absolute creation dates in the viewer's timezone (bb_tz
+		// cookie) rather than the server's — see UserLocation.
+		loc := UserLocation(r)
 		// Split keys into active and revoked for cleaner display.
 		var activeKeys, revokedKeys []pages.AccessKeyRow
 		for _, k := range keys {
-			row := buildAccessKeyRow(k)
+			row := buildAccessKeyRow(k, loc)
 			if k.RevokedAt != nil {
 				revokedKeys = append(revokedKeys, row)
 			} else {
@@ -95,14 +99,14 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 		}
 		var activeClients, revokedClients []pages.AccessClientRow
 		for _, c := range clients {
-			row := buildAccessClientRow(c)
+			row := buildAccessClientRow(c, loc)
 			if c.RevokedAt != nil {
 				revokedClients = append(revokedClients, row)
 			} else {
 				activeClients = append(activeClients, row)
 			}
 		}
-		data := BaseTemplateData(r, sm, "api-keys","Access")
+		data := BaseTemplateData(r, sm, "api-keys", "Access")
 		props := pages.AccessProps{
 			IsAdmin:        IsAdmin(sm, r),
 			CSRFToken:      GetCSRFToken(r),
@@ -124,34 +128,37 @@ func renderAccess(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager
 
 // buildAccessKeyRow flattens a service.APIKeyResponse into the templ-side
 // view-model, pre-rendering the date helpers (`formatDateShort`,
-// `relativeTime`) the old html/template called via funcMap.
-func buildAccessKeyRow(k service.APIKeyResponse) pages.AccessKeyRow {
+// `relativeTime`) the old html/template called via funcMap. loc is the
+// viewer's timezone (admin.UserLocation) so the absolute creation date
+// renders in their wall clock, not the server's.
+func buildAccessKeyRow(k service.APIKeyResponse, loc *time.Location) pages.AccessKeyRow {
 	return pages.AccessKeyRow{
 		ID:               k.ID,
 		Name:             k.Name,
 		KeyPrefix:        k.KeyPrefix,
 		Scope:            k.Scope,
-		CreatedAtShort:   timefmt.FormatRFC3339(k.CreatedAt, timefmt.LayoutDateShort),
+		CreatedAtShort:   timefmt.FormatRFC3339In(k.CreatedAt, loc, timefmt.LayoutDateShort),
 		LastUsedRelative: timefmt.RelativeRFC3339Ptr(k.LastUsedAt),
 	}
 }
 
 // buildAccessClientRow flattens a service.OAuthClientResponse into the
-// templ-side view-model, pre-rendering the creation date.
-func buildAccessClientRow(c service.OAuthClientResponse) pages.AccessClientRow {
+// templ-side view-model, pre-rendering the creation date. loc is the viewer's
+// timezone (admin.UserLocation).
+func buildAccessClientRow(c service.OAuthClientResponse, loc *time.Location) pages.AccessClientRow {
 	return pages.AccessClientRow{
 		ID:             c.ID,
 		Name:           c.Name,
 		ClientIDPrefix: c.ClientIDPrefix,
 		Scope:          c.Scope,
-		CreatedAtShort: timefmt.FormatRFC3339(c.CreatedAt, timefmt.LayoutDateShort),
+		CreatedAtShort: timefmt.FormatRFC3339In(c.CreatedAt, loc, timefmt.LayoutDateShort),
 	}
 }
 
 // APIKeyNewPageHandler serves GET /admin/api-keys/new.
 func APIKeyNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := BaseTemplateData(r, sm, "api-keys","Create API Key")
+		data := BaseTemplateData(r, sm, "api-keys", "Create API Key")
 		renderAPIKeyNew(w, r, tr, data, pages.APIKeyNewProps{
 			CSRFToken: GetCSRFToken(r),
 			Breadcrumbs: []components.Breadcrumb{
@@ -204,7 +211,7 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 			return
 		}
-		data := BaseTemplateData(r, sm, "api-keys","API Key Created")
+		data := BaseTemplateData(r, sm, "api-keys", "API Key Created")
 		renderAPIKeyCreated(w, r, tr, data, pages.APIKeyCreatedProps{
 			KeyName:      name,
 			PlaintextKey: key,

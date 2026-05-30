@@ -99,6 +99,9 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 		}
 
 		t, _ := time.Parse(time.RFC3339, report.CreatedAt)
+		// Render the absolute created-at clock in the viewer's timezone
+		// (bb_tz cookie) rather than the server's — see UserLocation.
+		loc := UserLocation(r)
 
 		detail := pages.ReportDetailReport{
 			ID:            report.ID,
@@ -107,7 +110,7 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			Priority:      report.Priority,
 			Tags:          report.Tags,
 			DisplayAuthor: reportDisplayAuthor(report.CreatedByName, report.Author),
-			CreatedAt:     t.Format("Jan 2, 2006 at 3:04 PM"),
+			CreatedAt:     t.In(loc).Format("Jan 2, 2006 at 3:04 PM"),
 			CreatedAtRel:  relativeTime(t),
 			IsRead:        report.ReadAt != nil,
 		}

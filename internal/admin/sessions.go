@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -26,7 +27,7 @@ func SessionDetailHandler(svc *service.Service, sm *scs.SessionManager, tr *Temp
 		}
 
 		data := BaseTemplateData(r, sm, "logs", "Session Detail")
-		props := buildSessionDetailProps(detail)
+		props := buildSessionDetailProps(detail, UserLocation(r))
 		renderSessionDetail(w, r, tr, data, props)
 	}
 }
@@ -41,8 +42,10 @@ func renderSessionDetail(w http.ResponseWriter, r *http.Request, tr *TemplateRen
 // buildSessionDetailProps projects service.MCPSessionDetailResponse
 // into the flat view-model the templ renders. Pre-renders relative
 // time and pretty-prints request/response JSON so the templ stays
-// free of admin funcMap helpers.
-func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.SessionDetailProps {
+// free of admin funcMap helpers. loc is the viewer's timezone
+// (admin.UserLocation) so per-tool-call absolute timestamps render in
+// their wall clock, not the server's.
+func buildSessionDetailProps(detail service.MCPSessionDetailResponse, loc *time.Location) pages.SessionDetailProps {
 	out := pages.SessionDetailProps{
 		Session: pages.SessionDetailHeader{
 			Purpose:       detail.Purpose,
@@ -66,7 +69,7 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 				Sequence:       c.Sequence,
 				OffsetLabel:    c.OffsetLabel,
 				CreatedAt:      c.CreatedAt,
-				CreatedAtAbs:   timefmt.FormatRFC3339(c.CreatedAt, timefmt.LayoutDateTime),
+				CreatedAtAbs:   timefmt.FormatRFC3339In(c.CreatedAt, loc, timefmt.LayoutDateTime),
 				CreatedAtRel:   timefmt.RelativeRFC3339(c.CreatedAt),
 			}
 			if c.DurationMs != nil {

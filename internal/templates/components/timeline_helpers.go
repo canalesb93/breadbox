@@ -82,22 +82,11 @@ func timelineIconColor(tone string) string {
 // the supplied now (typically derived from the viewer's browser TZ via
 // `admin.UserLocation`). Falls back to time.Local when now is the zero
 // value so callers without an anchor still get a sensible render.
-// Unparseable input is returned unchanged.
+// Unparseable input is returned unchanged. Thin wrapper over the canonical
+// timefmt.FormatRFC3339At so this and the home feed's tooltip render
+// identically.
 func formatTimelineTimestamp(s string, now time.Time) string {
-	if s == "" {
-		return ""
-	}
-	loc := time.Local
-	if !now.IsZero() {
-		loc = now.Location()
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.In(loc).Format("Jan 2, 2006 3:04 PM")
-	}
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.In(loc).Format("Jan 2, 2006 3:04 PM")
-	}
-	return s
+	return timefmt.FormatRFC3339At(s, now, timefmt.LayoutDateTime)
 }
 
 // relativeTimelineTimestamp renders an RFC3339 timestamp as a short relative
