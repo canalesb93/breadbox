@@ -55,11 +55,16 @@ templ ThemeControl() {
 	</div>
 }
 
+// Inactive segments are a plain (neutral) btn, not btn-ghost — ghost
+// renders borderless/transparent, so the unselected states vanish and the
+// control stops reading as a segmented group. Plain btn gives each segment
+// a defined surface + the join's hairline seams; the active one is
+// btn-primary. Matches the canonical join segmented control in /design.
 templ themeControlButton(value, icon, label string) {
 	<button
 		type="button"
 		class="join-item btn btn-sm gap-1.5"
-		:class={ "$store.theme.preference === '" + value + "' ? 'btn-primary' : 'btn-ghost'" }
+		:class={ "$store.theme.preference === '" + value + "' ? 'btn-primary' : ''" }
 		:aria-pressed={ "$store.theme.preference === '" + value + "'" }
 		@click={ "$store.theme.set('" + value + "')" }
 	>
