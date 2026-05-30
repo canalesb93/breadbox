@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -411,6 +412,96 @@ func findSeriesByKey(t *testing.T, svc *service.Service, key string) *service.Se
 		}
 	}
 	return nil
+}
+
+func txnHasTag(t *testing.T, pool *pgxpool.Pool, txnID pgtype.UUID, slug string) bool {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM transaction_tags tt JOIN tags t ON t.id = tt.tag_id WHERE tt.transaction_id = $1 AND t.slug = $2`,
+		txnID, slug).Scan(&n); err != nil {
+		t.Fatalf("txnHasTag: %v", err)
+	}
+	return n > 0
+}
+
+func TestSeriesTags_MembersInherit(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	testutil.MustCreateTag(t, queries, "subscriptions", "Subscriptions")
+	acctID := seedTxnFixture(t, queries)
+	t1 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_1", "Netflix", 1599, "2026-03-15")
+	t2 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_2", "Netflix", 1599, "2026-04-15")
+	actor := service.Actor{Type: "user", Name: "Tester"}
+
+	series, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, TransactionIDs: []string{t1.ShortID, t2.ShortID},
+	}, actor)
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+
+	// Attach a tag to the series → existing members are backfilled.
+	if err := svc.AddSeriesTag(ctx, series.ShortID, "subscriptions", actor); err != nil {
+		t.Fatalf("AddSeriesTag: %v", err)
+	}
+	if !txnHasTag(t, pool, t1.ID, "subscriptions") || !txnHasTag(t, pool, t2.ID, "subscriptions") {
+		t.Error("existing members did not inherit the series tag on add (backfill)")
+	}
+
+	// A member linked AFTER the tag exists inherits it at link time.
+	t3 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_3", "Netflix", 1599, "2026-05-15")
+	if _, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		SeriesID: &series.ShortID, TransactionIDs: []string{t3.ShortID},
+	}, actor); err != nil {
+		t.Fatalf("link new member: %v", err)
+	}
+	if !txnHasTag(t, pool, t3.ID, "subscriptions") {
+		t.Error("newly-linked member did not inherit the series tag")
+	}
+
+	// GetSeries reflects the series' tags.
+	got, _ := svc.GetSeries(ctx, series.ShortID)
+	if len(got.Tags) != 1 || got.Tags[0] != "subscriptions" {
+		t.Errorf("GetSeries.Tags = %v, want [subscriptions]", got.Tags)
+	}
+}
+
+func TestSeriesTags_RemoveStripsInheritedKeepsUserTags(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	testutil.MustCreateTag(t, queries, "subscriptions", "Subscriptions")
+	userTag := testutil.MustCreateTag(t, queries, "important", "Important")
+	acctID := seedTxnFixture(t, queries)
+	tx1 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_1", "Netflix", 1599, "2026-04-15")
+	actor := service.Actor{Type: "user", Name: "Tester"}
+
+	series, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, TransactionIDs: []string{tx1.ShortID},
+	}, actor)
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+	if err := svc.AddSeriesTag(ctx, series.ShortID, "subscriptions", actor); err != nil {
+		t.Fatalf("AddSeriesTag: %v", err)
+	}
+	// User manually adds a different tag to the member.
+	if _, err := queries.AddTransactionTag(ctx, db.AddTransactionTagParams{
+		TransactionID: tx1.ID, TagID: userTag.ID,
+		AddedByType: "user", AddedByID: pgconv.Text("u1"), AddedByName: "Tester",
+	}); err != nil {
+		t.Fatalf("user add tag: %v", err)
+	}
+
+	if err := svc.RemoveSeriesTag(ctx, series.ShortID, "subscriptions"); err != nil {
+		t.Fatalf("RemoveSeriesTag: %v", err)
+	}
+	if txnHasTag(t, pool, tx1.ID, "subscriptions") {
+		t.Error("series-inherited tag was not stripped from member on remove")
+	}
+	if !txnHasTag(t, pool, tx1.ID, "important") {
+		t.Error("user-added tag was wrongly stripped by RemoveSeriesTag")
+	}
 }
 
 func TestAssignSeriesFromRuleTx_MintAndLink(t *testing.T) {

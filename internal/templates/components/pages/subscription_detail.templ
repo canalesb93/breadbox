@@ -65,6 +65,17 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			@components.SettingsRow(components.SettingsRowProps{Label: "Suggested category"}) {
 				<span class="text-sm">{ subscriptionDetailField(p.Series.CategoryName) }</span>
 			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Tags", Caption: "Linked charges inherit these"}) {
+				if len(p.Series.Tags) > 0 {
+					<span class="inline-flex flex-wrap gap-1.5">
+						for _, tag := range p.Series.Tags {
+							<span class="badge badge-soft badge-neutral badge-sm">{ tag }</span>
+						}
+					</span>
+				} else {
+					<span class="text-base-content/40 text-sm">—</span>
+				}
+			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day"}) {
 				<span class="text-sm">{ subscriptionDetailField(p.ExpectedDay) }</span>
 			}

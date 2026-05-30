@@ -181,6 +181,7 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 	if s.CategoryID != nil {
 		row.CategoryName = catName[*s.CategoryID]
 	}
+	row.Tags = s.Tags
 	if s.UserID != nil {
 		row.UserID = *s.UserID
 		row.OwnerName = userName[*s.UserID]

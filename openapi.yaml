@@ -1946,6 +1946,44 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/tags:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Series]
+      summary: Attach a tag to a recurring series
+      description: "**Requires `full_access` scope.** Attaches an existing tag to the series and materializes it onto the series' linked transactions (they inherit the tag). Returns the updated series."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag_slug]
+              properties:
+                tag_slug: { type: string }
+      responses:
+        "200":
+          description: Updated series (includes its tags).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/tags/{slug}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Series]
+      summary: Detach a tag from a recurring series
+      description: "**Requires `full_access` scope.** Detaches the tag and strips the series-inherited copies from its members (provenance-scoped, so user-added tags survive)."
+      responses:
+        "200":
+          description: Updated series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # -- Users --
   /api/v1/users:
@@ -3181,6 +3219,7 @@ components:
         next_expected_date: { type: string, format: date, nullable: true }
         occurrence_count: { type: integer }
         detection_signals: { type: object, nullable: true, additionalProperties: true }
+        tags: { type: array, items: { type: string } }
         created_at: { type: string, format: date-time }
       additionalProperties: true
     Category:
