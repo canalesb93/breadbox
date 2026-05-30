@@ -61,20 +61,6 @@ func FormatRFC3339At(s string, now time.Time, layout string) string {
 	return FormatRFC3339In(s, loc, layout)
 }
 
-// FormatTimeIn renders an already-parsed time.Time via layout anchored to
-// loc — the time.Time twin of FormatRFC3339In for callers that hold a
-// timestamptz value rather than an RFC3339 string. A zero t yields ""; a nil
-// loc falls back to time.Local.
-func FormatTimeIn(t time.Time, loc *time.Location, layout string) string {
-	if t.IsZero() {
-		return ""
-	}
-	if loc == nil {
-		loc = time.Local
-	}
-	return t.In(loc).Format(layout)
-}
-
 // FormatRFC3339 parses an RFC3339 (or RFC3339Nano) timestamp string and
 // renders it via layout in the SERVER's timezone. Deprecated for anything
 // shown to a viewer: a UTC-running server renders every absolute time in UTC.

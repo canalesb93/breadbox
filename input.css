@@ -273,6 +273,15 @@
    * header) and shouldn't intercept clicks. */
   svg.brand, svg.brand * { pointer-events: none; }
 
+  /* Brand marks that fill with currentColor (Plaid, MCP) must mirror the
+   * svg.lucide alpha-strip above. Without it, a muted container color —
+   * text-base-content/45 (settings section headers) or /65 (settings-rail
+   * tabs) — bleeds its alpha into the fill, so the mark renders a softer
+   * gray than the Lucide icons sitting right next to it. The baked-fill
+   * marks (GitHub, Anthropic, Claude, Teller) use explicit fills and
+   * ignore `color`, so this is a no-op for them. */
+  svg.brand { color: rgb(from currentColor r g b / 1); }
+
   /* Two kinds of brand mark live here:
    *
    *   1. Monochrome marks meant to read as UI icons (Plaid, MCP). Their
@@ -431,36 +440,88 @@
      "group" the way macOS / Linear settings do — not as another card.
      The header is intentionally quiet (small icon, sm/font-semibold
      title) — the row labels carry the visual hierarchy. */
+  /* === Settings: borderless gutter header + carded right content ===
+     Modeled on Mintlify settings. A section is a two-column block: the
+     left gutter is the section's identity (icon + title + caption), the
+     right column is the working surface — usually a subtle CARD that
+     groups the controls. The section itself is borderless; sections are
+     separated by a full-width hairline + even vertical rhythm.
+
+     `--full` drops the gutter so the content spans the whole width
+     (overview cards, stats grids, page-level alerts). Separator + rhythm
+     are applied UNCONDITIONALLY (top border + symmetric padding) rather
+     than via :first-child, because sections are frequently wrapped in a
+     `<div id="anchor">` for hash deep-links, which defeats sibling rules.
+     The page header carries no bottom border, so the first section's top
+     border reads as the line under the title. */
   .bb-settings-section {
-    @apply rounded-2xl border border-base-300 bg-base-100 overflow-hidden;
+    @apply border-t border-base-200 py-7;
   }
-  .bb-settings-section--danger {
-    @apply border-error/30;
+  .bb-settings-section__grid {
+    @apply grid grid-cols-1 gap-x-10 gap-y-3 lg:grid-cols-[14rem_minmax(0,1fr)];
   }
-  .bb-settings-section__header {
-    @apply px-4 sm:px-5 py-3 sm:py-3.5 flex items-center gap-3 border-b border-base-300/80 min-w-0;
+  .bb-settings-section--full .bb-settings-section__grid {
+    @apply lg:grid-cols-1;
+  }
+  /* Left gutter — section identity. Quiet by design; the card on the
+     right carries the working hierarchy. Top-aligned with the content. */
+  .bb-settings-section__meta {
+    @apply min-w-0;
   }
   .bb-settings-section__heading {
-    @apply flex items-center gap-2.5 min-w-0 flex-1;
+    @apply flex items-center gap-2 min-w-0;
+  }
+  .bb-settings-section__title {
+    @apply text-sm font-semibold leading-tight;
   }
   .bb-settings-section__caption {
-    @apply text-xs text-base-content/45 mt-0.5 leading-snug;
+    @apply text-xs text-base-content/50 mt-1 leading-relaxed;
   }
-  .bb-settings-section__right {
-    @apply shrink-0 flex items-center gap-2;
+  .bb-settings-section__content {
+    @apply min-w-0;
+  }
+  /* Section primary action (e.g. "Create key") — sits above the card,
+     flush-right, its top edge aligned with the gutter title. */
+  .bb-settings-section__action {
+    @apply flex justify-start lg:justify-end gap-2 mb-3 empty:hidden;
+  }
+  .bb-settings-section--danger .bb-settings-section__title {
+    @apply text-error;
   }
 
-  /* Body is just a stack of rows; dividers between adjacent rows. */
-  .bb-settings-section__body > .bb-settings-row + .bb-settings-row {
-    @apply border-t border-base-300/70;
+  /* The content card — subtle elevation over the base-200 page surface.
+     Rows live inside it, divided by hairlines; an optional header/footer
+     brackets them. Flatter than .bb-card (no shadow) so it reads as a
+     quiet container, not a raised panel. */
+  .bb-settings-card {
+    @apply rounded-xl border border-base-300 bg-base-100 overflow-hidden;
+  }
+  .bb-settings-card--danger {
+    @apply border-error/25 bg-error/[0.025];
+  }
+  .bb-settings-card__header {
+    @apply px-4 sm:px-5 py-3.5 border-b border-base-200;
+  }
+  .bb-settings-card__title {
+    @apply text-sm font-semibold leading-tight flex items-center gap-2 flex-wrap;
+  }
+  .bb-settings-card__caption {
+    @apply text-xs text-base-content/50 mt-1 leading-snug;
+  }
+  .bb-settings-card__footer {
+    @apply px-4 sm:px-5 py-3 border-t border-base-200 bg-base-200/30 flex items-center justify-end gap-2;
   }
 
-  /* The row primitive. Defaults to inline (label left, control right);
+  /* Rows. Inside a card they carry horizontal padding + hairline dividers;
      `--stack` flips to full-width-below for textareas / file inputs /
-     credential editors. Min-height keeps tall controls from making
-     short rows feel cramped next to them. */
+     reveals. */
   .bb-settings-row {
-    @apply px-4 sm:px-5 py-3.5 flex items-center gap-4 min-h-[3.25rem];
+    @apply flex items-center justify-between gap-4 px-4 sm:px-5 py-3.5 min-h-[3rem];
+  }
+  .bb-settings-card > .bb-settings-row + .bb-settings-row,
+  .bb-settings-card__body > .bb-settings-row + .bb-settings-row,
+  .bb-settings-section__body > .bb-settings-row + .bb-settings-row {
+    @apply border-t border-base-200;
   }
   .bb-settings-row--stack {
     @apply flex-col items-stretch gap-2;
@@ -482,14 +543,67 @@
   }
   /* When a row IS a link (action list rows), the whole row hovers. */
   .bb-settings-row--link {
-    @apply hover:bg-base-200/40 transition-colors no-underline cursor-pointer;
+    @apply hover:bg-base-200/50 transition-colors no-underline cursor-pointer;
+  }
+  /* Footer used inside Bare/full-width content (no card wrapper). */
+  .bb-settings-section__footer {
+    @apply flex items-center justify-end gap-2 mt-4 pt-3 border-t border-base-200;
   }
 
-  /* Pinned footer below the section body — typically a bb-action-row
-     carrying the Save button. Border-top keeps it reading as the same
-     surface as the section even when the body has its own dividers. */
-  .bb-settings-section__footer {
-    @apply border-t border-base-300/80 px-4 sm:px-5 py-3 flex items-center justify-end gap-2 bg-base-200/20;
+  /* === Settings shell: a rail that extends the app sidebar + content ===
+     On lg+ the rail is a base-100 panel flush against the app sidebar
+     (its negative margins cancel <main>'s padding so it reaches the
+     sidebar edge and runs full height), with the same link language as
+     .bb-sidebar-link — so it reads as the sidebar's navigation continuing
+     into Settings. Below lg it collapses to a horizontal scroll strip. */
+  /* The layout fills at least the viewport (minus <main>'s p-6) so the
+     rail's self-stretch reaches the bottom even on short tabs (Account,
+     API Keys) — otherwise the base-100 panel stops mid-page and the
+     sidebar-extension illusion breaks. */
+  .bb-settings-layout {
+    @apply flex flex-col lg:flex-row lg:min-h-[calc(100vh-3rem)];
+  }
+  /* Negative margins cancel <main>'s p-6 so the rail bleeds to the
+     sidebar edge + the viewport top/bottom; self-stretch + the layout's
+     min-height make the base-100 panel span the full height. The list
+     inside is sticky (below) so it stays put while a long tab scrolls. */
+  .bb-settings-rail {
+    @apply shrink-0 mb-5 lg:mb-0 lg:w-56 lg:self-stretch
+           lg:-my-6 lg:-ml-6 lg:py-6 lg:pl-6 lg:pr-4
+           lg:bg-base-100 lg:border-r lg:border-base-300;
+  }
+  /* Mobile: horizontal scroll strip. lg+: a sticky vertical column that
+     scrolls on its own if the items ever exceed the viewport height
+     (small screens, many sections) instead of clipping. */
+  .bb-settings-rail__list {
+    @apply flex flex-row gap-1 overflow-x-auto pb-1
+           lg:flex-col lg:gap-0.5 lg:pb-0 lg:sticky lg:top-6
+           lg:overflow-x-visible lg:overflow-y-auto lg:max-h-[calc(100vh-3rem)];
+  }
+  .bb-settings-rail__group-label {
+    @apply hidden lg:block text-[0.65rem] font-medium uppercase tracking-wide text-base-content/40 px-3 pt-5 pb-1.5;
+  }
+  .bb-settings-rail__item {
+    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-8 shrink-0
+           rounded-lg text-sm font-medium whitespace-nowrap no-underline
+           text-base-content/60 hover:bg-base-200 hover:text-base-content;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .bb-settings-rail__item[data-active="true"] {
+    @apply bg-base-200 text-base-content font-semibold;
+  }
+  .bb-settings-rail__item i, .bb-settings-rail__item svg {
+    @apply w-4 h-4 opacity-50;
+    transition: opacity 0.15s ease;
+  }
+  .bb-settings-rail__item:hover i, .bb-settings-rail__item:hover svg {
+    @apply opacity-70;
+  }
+  .bb-settings-rail__item[data-active="true"] i, .bb-settings-rail__item[data-active="true"] svg {
+    @apply opacity-100;
+  }
+  .bb-settings-content {
+    @apply flex-1 min-w-0 lg:pl-10 lg:max-w-5xl;
   }
 
   /* Form inputs/selects with subtle base-200 bg that clears on focus. */

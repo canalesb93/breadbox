@@ -14,6 +14,24 @@ type AccessProps struct {
 	ActiveClients  []AccessClientRow
 	RevokedClients []AccessClientRow
 	HasAnyClients  bool
+	// JustCreatedKey / JustCreatedClient carry a one-time plaintext
+	// reveal, populated by the handler from a session flash right after a
+	// create. When set, the section renders a prominent copy-now block at
+	// the top of its content. nil on every other load.
+	JustCreatedKey    *AccessReveal
+	JustCreatedClient *AccessReveal
+}
+
+// AccessReveal is the one-time secret shown immediately after minting an
+// API key or OAuth client. The plaintext never leaves the server again —
+// it's popped from the session flash on the redirect-back render and shown
+// once. ClientID is set only for OAuth clients (the public half, shown
+// alongside the secret); empty for API keys.
+type AccessReveal struct {
+	Name     string
+	ClientID string
+	Secret   string
+	Scope    string
 }
 
 // AccessKeyRow is the per-row shape for the API keys section. CreatedAtShort

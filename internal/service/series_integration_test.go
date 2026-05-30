@@ -1,0 +1,399 @@
+//go:build integration && !lite
+
+package service_test
+
+import (
+	"context"
+	"math"
+	"testing"
+
+	"breadbox/internal/db"
+	"breadbox/internal/service"
+	"breadbox/internal/testutil"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// seedRecurring creates a user→connection→account and N monthly $9.99 charges
+// with a shared provider_name, returning the account ID and the member short_ids.
+func seedRecurring(t *testing.T, queries *db.Queries, name string, dates []string) (pgtype.UUID, []string) {
+	t.Helper()
+	acctID := seedTxnFixture(t, queries)
+	ids := make([]string, 0, len(dates))
+	for _, d := range dates {
+		txn := testutil.MustCreateTransaction(t, queries, acctID, name+"_"+d, name, 999, d)
+		ids = append(ids, txn.ShortID)
+	}
+	return acctID, ids
+}
+
+func countLinkedMembers(t *testing.T, pool *pgxpool.Pool, seriesID string) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM transactions WHERE series_id = $1`, seriesID).Scan(&n); err != nil {
+		t.Fatalf("count linked members: %v", err)
+	}
+	return n
+}
+
+func seriesF64Ptr(f float64) *float64 { return &f }
+func seriesI32Ptr(i int32) *int32     { return &i }
+func seriesStrPtr(s string) *string   { return &s }
+
+func spotifyUpsert(members []string) service.SeriesUpsert {
+	return service.SeriesUpsert{
+		Name:           "Spotify",
+		MerchantKey:    "spotify",
+		Cadence:        service.SeriesCadenceMonthly,
+		ExpectedAmount: seriesF64Ptr(9.99),
+		ExpectedDay:    seriesI32Ptr(15),
+		Currency:       seriesStrPtr("USD"),
+		Source:         service.SeriesSourceDeterministic,
+		MemberTxnIDs:   members,
+	}
+}
+
+func TestUpsertSeriesCandidate_InsertAndBacklink(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	resp, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("UpsertSeriesCandidate: %v", err)
+	}
+
+	if resp.Status != service.SeriesStatusCandidate {
+		t.Errorf("status = %q, want candidate", resp.Status)
+	}
+	if resp.Confidence != service.SeriesConfidenceAuto {
+		t.Errorf("confidence = %q, want auto", resp.Confidence)
+	}
+	if resp.OccurrenceCount != 3 {
+		t.Errorf("occurrence_count = %d, want 3", resp.OccurrenceCount)
+	}
+	if resp.LastSeenDate == nil || *resp.LastSeenDate != "2026-04-15" {
+		t.Errorf("last_seen_date = %v, want 2026-04-15", resp.LastSeenDate)
+	}
+	if resp.NextExpectedDate == nil || *resp.NextExpectedDate != "2026-05-15" {
+		t.Errorf("next_expected_date = %v, want 2026-05-15", resp.NextExpectedDate)
+	}
+	if resp.LastAmount == nil || math.Abs(*resp.LastAmount-9.99) > 0.001 {
+		t.Errorf("last_amount = %v, want 9.99", resp.LastAmount)
+	}
+	if n := countLinkedMembers(t, pool, resp.ID); n != 3 {
+		t.Errorf("linked members = %d, want 3", n)
+	}
+}
+
+func TestUpsertSeriesCandidate_Idempotent(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	first, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("first upsert: %v", err)
+	}
+	second, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+	if first.ShortID != second.ShortID {
+		t.Errorf("re-upsert forked: %s != %s", first.ShortID, second.ShortID)
+	}
+	if second.OccurrenceCount != 3 {
+		t.Errorf("occurrence_count after re-upsert = %d, want 3", second.OccurrenceCount)
+	}
+	if total, _ := queries.CountRecurringSeries(ctx); total != 1 {
+		t.Errorf("series count = %d, want 1", total)
+	}
+}
+
+func TestUpsertSeriesCandidate_RejectedIsSticky(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if _, err := svc.ReviewSeries(ctx, created.ShortID, service.VerdictReject, service.Actor{Type: "agent", Name: "Agent"}); err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+
+	// Re-detection must not resurrect a rejected series.
+	again, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("re-upsert after reject: %v", err)
+	}
+	if again.Confidence != service.SeriesConfidenceRejected {
+		t.Errorf("confidence = %q, want rejected (sticky)", again.Confidence)
+	}
+	if again.ShortID != created.ShortID {
+		t.Errorf("re-upsert forked past a rejected series")
+	}
+	if total, _ := queries.CountRecurringSeries(ctx); total != 1 {
+		t.Errorf("series count = %d, want 1", total)
+	}
+}
+
+func TestReviewSeries_ConfirmPromotes(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	confirmed, err := svc.ReviewSeries(ctx, created.ShortID, service.VerdictConfirm, service.Actor{Type: "user", ID: "u1", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	if confirmed.Confidence != service.SeriesConfidenceConfirmed {
+		t.Errorf("confidence = %q, want confirmed", confirmed.Confidence)
+	}
+	if confirmed.Status != service.SeriesStatusActive {
+		t.Errorf("status = %q, want active", confirmed.Status)
+	}
+	if confirmed.ConfirmedByType == nil || *confirmed.ConfirmedByType != "user" {
+		t.Errorf("confirmed_by_type = %v, want user", confirmed.ConfirmedByType)
+	}
+	_ = queries
+}
+
+func TestReviewSeries_UserOutranksAgent(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	created, _ := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if _, err := svc.ReviewSeries(ctx, created.ShortID, service.VerdictConfirm, service.Actor{Type: "user", ID: "u1", Name: "Tester"}); err != nil {
+		t.Fatalf("user confirm: %v", err)
+	}
+	// An agent cannot overturn a user's confirmation.
+	after, err := svc.ReviewSeries(ctx, created.ShortID, service.VerdictReject, service.Actor{Type: "agent", Name: "Agent"})
+	if err != nil {
+		t.Fatalf("agent reject: %v", err)
+	}
+	if after.Confidence != service.SeriesConfidenceConfirmed {
+		t.Errorf("confidence = %q, want confirmed (user outranks agent)", after.Confidence)
+	}
+	_ = queries
+}
+
+func TestUpsertSeriesCandidate_ConfirmedKeepsAdjudicatedFields(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	created, _ := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if _, err := svc.ReviewSeries(ctx, created.ShortID, service.VerdictConfirm, service.Actor{Type: "user", ID: "u1", Name: "Tester"}); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+
+	// A later detection pass adds a 4th charge but proposes a wrong cadence.
+	fourth := testutil.MustCreateTransaction(t, queries, acctID, "SPOTIFY_2026-05-15", "SPOTIFY", 999, "2026-05-15")
+	bad := spotifyUpsert(append(append([]string{}, members...), fourth.ShortID))
+	bad.Cadence = service.SeriesCadenceWeekly // adjudicated field must NOT change
+
+	refreshed, err := svc.UpsertSeriesCandidate(ctx, bad, service.SystemActor())
+	if err != nil {
+		t.Fatalf("re-upsert confirmed: %v", err)
+	}
+	if refreshed.Cadence != service.SeriesCadenceMonthly {
+		t.Errorf("cadence = %q, want monthly (confirmed fields are sacred)", refreshed.Cadence)
+	}
+	if refreshed.OccurrenceCount != 4 {
+		t.Errorf("occurrence_count = %d, want 4 (rollups always refresh)", refreshed.OccurrenceCount)
+	}
+	if refreshed.Confidence != service.SeriesConfidenceConfirmed {
+		t.Errorf("confidence = %q, want confirmed (never downgraded)", refreshed.Confidence)
+	}
+}
+
+func TestUpsertSeriesCandidate_HouseholdNullUser(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	in := spotifyUpsert(members) // UserID nil = household
+	first, err := svc.UpsertSeriesCandidate(ctx, in, service.SystemActor())
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if first.UserID != nil {
+		t.Errorf("user_id = %v, want nil (household)", first.UserID)
+	}
+	second, err := svc.UpsertSeriesCandidate(ctx, in, service.SystemActor())
+	if err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if first.ShortID != second.ShortID {
+		t.Error("NULL-user signature did not match on re-upsert (IS NOT DISTINCT FROM)")
+	}
+	if total, _ := queries.CountRecurringSeries(ctx); total != 1 {
+		t.Errorf("series count = %d, want 1", total)
+	}
+}
+
+func TestUpsertSeriesCandidate_RequiresMerchantKey(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+	_, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{MerchantKey: "  "}, service.SystemActor())
+	if err == nil {
+		t.Fatal("expected error for empty merchant_key, got nil")
+	}
+}
+
+// TestUpsertSeriesCandidate_SourcePrecedenceGuard pins PATCH A: a thin
+// lower-or-equal-precedence write must not clobber a higher-precedence actor's
+// proposed fields, and a write that passes no cadence must never downgrade a
+// snapped cadence to "unknown" nor null detection_signals.
+func TestUpsertSeriesCandidate_SourcePrecedenceGuard(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	// Detector lands a monthly candidate with real signals.
+	det := spotifyUpsert(members)
+	det.DetectionSignals = []byte(`{"cadence":"monthly","interval_cv":0.02}`)
+	created, err := svc.UpsertSeriesCandidate(ctx, det, service.SystemActor())
+	if err != nil {
+		t.Fatalf("detector upsert: %v", err)
+	}
+
+	// A thin rule-source write (no cadence, no signals) links only — it must
+	// NOT downgrade the snapped monthly cadence to "unknown" or null signals.
+	ruleWrite := service.SeriesUpsert{
+		MerchantKey:  "spotify",
+		Currency:     seriesStrPtr("USD"),
+		Source:       service.SeriesSourceRule,
+		MemberTxnIDs: members,
+	}
+	afterRule, err := svc.UpsertSeriesCandidate(ctx, ruleWrite, service.Actor{Type: "agent", Name: "Rule"})
+	if err != nil {
+		t.Fatalf("rule-source upsert: %v", err)
+	}
+	if afterRule.ShortID != created.ShortID {
+		t.Fatalf("rule write forked the series")
+	}
+	if afterRule.Cadence != service.SeriesCadenceMonthly {
+		t.Errorf("cadence = %q, want monthly (a thin rule write must not downgrade to unknown)", afterRule.Cadence)
+	}
+	if len(afterRule.DetectionSignals) == 0 {
+		t.Errorf("detection_signals nulled by a rule write; want preserved")
+	}
+
+	// An agent sharpens cadence to annual (higher precedence than deterministic).
+	agentWrite := spotifyUpsert(members)
+	agentWrite.Cadence = service.SeriesCadenceAnnual
+	agentWrite.Source = service.SeriesSourceAgent
+	if _, err := svc.UpsertSeriesCandidate(ctx, agentWrite, service.Actor{Type: "agent", Name: "Agent"}); err != nil {
+		t.Fatalf("agent upsert: %v", err)
+	}
+	// A later deterministic re-detect proposing monthly must NOT overwrite the
+	// agent's annual (lower rank than agent).
+	redetect := spotifyUpsert(members) // source=deterministic, cadence=monthly
+	afterRedetect, err := svc.UpsertSeriesCandidate(ctx, redetect, service.SystemActor())
+	if err != nil {
+		t.Fatalf("re-detect upsert: %v", err)
+	}
+	if afterRedetect.Cadence != service.SeriesCadenceAnnual {
+		t.Errorf("cadence = %q, want annual (deterministic must not overwrite an agent's value)", afterRedetect.Cadence)
+	}
+}
+
+func TestAssignSeries_CreateLinkConfirm(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "NETFLIX", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	_ = acctID
+
+	resp, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey:     "netflix",
+		CreateIfMissing: true,
+		Name:            "Netflix",
+		Cadence:         service.SeriesCadenceMonthly,
+		ExpectedAmount:  seriesF64Ptr(9.99),
+		Currency:        seriesStrPtr("USD"),
+		TransactionIDs:  members,
+		Confirm:         true,
+	}, service.Actor{Type: "user", ID: "u1", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("AssignSeries create+confirm: %v", err)
+	}
+	if resp.Status != service.SeriesStatusActive {
+		t.Errorf("status = %q, want active (confirm:true)", resp.Status)
+	}
+	if resp.Confidence != service.SeriesConfidenceConfirmed {
+		t.Errorf("confidence = %q, want confirmed", resp.Confidence)
+	}
+	if resp.OccurrenceCount != 3 {
+		t.Errorf("occurrence_count = %d, want 3", resp.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, resp.ID); n != 3 {
+		t.Errorf("linked members = %d, want 3", n)
+	}
+}
+
+func TestAssignSeries_LinkExisting(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("seed series: %v", err)
+	}
+
+	// A 4th charge the detector didn't group — link it by series_id.
+	extra := testutil.MustCreateTransaction(t, queries, acctID, "SPOTIFY_2026-05-15", "SPOTIFY", 999, "2026-05-15")
+	resp, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		SeriesID:       &created.ShortID,
+		TransactionIDs: []string{extra.ShortID},
+	}, service.Actor{Type: "user", ID: "u1", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("AssignSeries link existing: %v", err)
+	}
+	if resp.ShortID != created.ShortID {
+		t.Errorf("linked to wrong series: %s != %s", resp.ShortID, created.ShortID)
+	}
+	if resp.OccurrenceCount != 4 {
+		t.Errorf("occurrence_count = %d, want 4", resp.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, resp.ID); n != 4 {
+		t.Errorf("linked members = %d, want 4", n)
+	}
+}
+
+func TestAssignSeries_RejectsTooManyMembers(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+	ids := make([]string, 51)
+	for i := range ids {
+		ids[i] = "deadbeef"
+	}
+	_, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey:     "netflix",
+		CreateIfMissing: true,
+		TransactionIDs:  ids,
+	}, service.Actor{Type: "user", Name: "Tester"})
+	if err == nil {
+		t.Fatal("expected error for >50 transaction_ids, got nil")
+	}
+}
+
+func TestAssignSeries_RequiresSeriesOrCreate(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+	// Neither series_id nor (merchant_key + create_if_missing).
+	_, err := svc.AssignSeries(ctx, service.AssignSeriesInput{MerchantKey: "netflix"}, service.Actor{Type: "user", Name: "Tester"})
+	if err == nil {
+		t.Fatal("expected error when create_if_missing is false and no series_id, got nil")
+	}
+}

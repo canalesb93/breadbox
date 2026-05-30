@@ -14,20 +14,22 @@ type settingsTabHeaderProps struct {
 	Right    templ.Component
 }
 
-// settingsTabHeader is the shared title row for every settings tab.
-// Tighter than the page-level `bb-page-header` because the modal itself
-// already provides the outer "Settings" chrome — the tab header is a
-// section header, not a page header.
+// settingsTabHeader is the shared title row for every settings tab — the
+// page header of the active settings surface. It opens each tab with the
+// same rhythm so switching tabs reads as moving through one consistent
+// page rather than landing on differently-shaped surfaces.
 templ settingsTabHeader(p settingsTabHeaderProps) {
-	<div class="flex items-start justify-between gap-4 mb-6">
+	<div class="flex items-start justify-between gap-4 pb-5">
 		<div class="min-w-0">
-			<h1 class="text-lg font-semibold leading-tight">{ p.Title }</h1>
+			<h1 class="text-xl font-semibold leading-tight">{ p.Title }</h1>
 			if p.Subtitle != "" {
-				<p class="text-sm text-base-content/50 mt-1 truncate">{ p.Subtitle }</p>
+				<p class="text-sm text-base-content/50 mt-1.5">{ p.Subtitle }</p>
 			}
 		</div>
 		if p.Right != nil {
-			@p.Right
+			<div class="shrink-0">
+				@p.Right
+			</div>
 		}
 	</div>
 }

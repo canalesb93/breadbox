@@ -96,22 +96,6 @@ var componentRegistry = map[string]componentAdapter{
 	"ThemeToggle": func(_ any) (templ.Component, error) {
 		return components.ThemeToggle(), nil
 	},
-	"SettingsModal": func(data any) (templ.Component, error) {
-		m, ok := data.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("SettingsModal: want map[string]any, got %T", data)
-		}
-		isAdmin, _ := m["IsAdmin"].(bool)
-		isEditor, _ := m["IsEditor"].(bool)
-		initialTab, _ := m["SettingsInitialTab"].(string)
-		initialBody, _ := m["SettingsInitialBody"].(template.HTML)
-		return components.SettingsModal(components.SettingsModalProps{
-			IsAdmin:     isAdmin,
-			IsEditor:    isEditor,
-			InitialTab:  initialTab,
-			InitialBody: initialBody,
-		}), nil
-	},
 	"TopbarUserMenu": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
@@ -144,12 +128,12 @@ func topbarUserMenuPropsFromData(m map[string]any) components.SidebarUserMenuPro
 // under, for the topbar breadcrumb (e.g. "Overview / Feed"). Returns ""
 // for pages with no section (login, settings sub-pages) so the breadcrumb
 // renders the page title alone. Keep in sync with the section groupings
-// in components.Nav.
+// in components.Nav (TestPageSectionCoversNav guards this).
 func pageSectionLabel(currentPage string) string {
 	switch currentPage {
 	case "getting-started":
 		return "Setup"
-	case "feed", "transactions", "accounts", "reports":
+	case "feed", "transactions", "accounts", "subscriptions", "reports":
 		return "Overview"
 	case "agents", "rules", "categories", "tags":
 		return "Manage"
@@ -272,6 +256,7 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		p.UnreadReports = badges.UnreadReports
 		p.ConnectionsAttention = badges.ConnectionsAttention
 		p.PendingReviews = badges.PendingReviews
+		p.SeriesCandidates = badges.SeriesCandidates
 	}
 	return p
 }

@@ -143,6 +143,12 @@ A **connection** is a bank-side OAuth link (Plaid item, Teller enrollment, or CS
 | `breadbox sync status` | R | Last sync per connection + scheduler state |
 | `breadbox sync logs [--connection] [--limit] [--follow]` | R | Sync history; `--follow` tails new entries |
 
+## Subscriptions (recurring series)
+
+| Command | Scope | Description |
+|---------|-------|-------------|
+| `breadbox series backfill` | L | One-time all-history recurring-series detection (populates merchant keys, surfaces subscription candidates) |
+
 ## CSV
 
 | Command | Scope | Description |

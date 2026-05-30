@@ -40,9 +40,8 @@ templ providersPlaidSection(p ProvidersProps, h *service.ProviderHealthSummary) 
 			BrandIcon: "plaid",
 			Title:     "Plaid",
 			Caption:   "Thousands of financial institutions",
-			Right:     providersStatusBadge(h, p.PlaidConfigured),
 		}) {
-			@providersStatsRow(h)
+			@providersStatsRow(h, p.PlaidConfigured)
 			if p.PlaidFromEnv {
 				@providersPlaidEnvRows(p)
 			} else {
@@ -157,9 +156,8 @@ templ providersTellerSection(p ProvidersProps, h *service.ProviderHealthSummary)
 			BrandIcon: "teller",
 			Title:     "Teller",
 			Caption:   "mTLS certificate authentication",
-			Right:     providersStatusBadge(h, p.TellerConfigured),
 		}) {
-			@providersStatsRow(h)
+			@providersStatsRow(h, p.TellerConfigured)
 			if p.TellerFromEnv {
 				@providersTellerEnvRows(p)
 			} else {
@@ -274,9 +272,8 @@ templ providersCSVSection(h *service.ProviderHealthSummary) {
 		Icon:    "file-spreadsheet",
 		Title:   "CSV Import",
 		Caption: "Import transactions from bank-exported files — no API credentials required",
-		Right:   providersCSVBadge(),
 	}) {
-		@providersStatsRow(h)
+		@providersStatsRow(h, true)
 		@components.SettingsRowLink(components.SettingsRowLinkProps{
 			Href:    "/connections/import-csv",
 			Icon:    "upload",
@@ -286,22 +283,23 @@ templ providersCSVSection(h *service.ProviderHealthSummary) {
 	}
 }
 
-templ providersCSVBadge() {
-	<span class="badge badge-soft badge-success badge-sm">Always available</span>
-}
-
 // ---------------------------------------------------------------------
 // Shared rows
 // ---------------------------------------------------------------------
 
-// providersStatsRow renders the connections / accounts / last-sync
-// inline summary as a single row's right slot.
-templ providersStatsRow(h *service.ProviderHealthSummary) {
-	if h != nil {
-		@components.SettingsRow(components.SettingsRowProps{
-			Label: "Status",
-		}) {
-			<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs items-center">
+// providersStatsRow renders the single "Status" row: a plain
+// connections / accounts / last-sync summary. No status badge — the
+// last-sync line already carries health (green "Last sync …" vs red
+// "Last sync failed …"), so a "Healthy"/"Sync Error" chip would just
+// duplicate it. A short text status covers the cases with no sync line
+// (configured-but-no-data, not configured). Always rendered so every
+// provider shows a Status line.
+templ providersStatsRow(h *service.ProviderHealthSummary, configured bool) {
+	@components.SettingsRow(components.SettingsRowProps{
+		Label: "Status",
+	}) {
+		<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs items-center">
+			if h != nil {
 				<span class="text-base-content/60 tabular-nums">{ fmt.Sprintf("%d connections", h.ConnectionCount) }</span>
 				<span class="text-base-content/30">·</span>
 				<span class="text-base-content/60 tabular-nums">{ fmt.Sprintf("%d accounts", h.AccountCount) }</span>
@@ -321,8 +319,12 @@ templ providersStatsRow(h *service.ProviderHealthSummary) {
 					<span class="text-base-content/30">·</span>
 					<span class="text-base-content/40">Never synced</span>
 				}
-			</div>
-		}
+			} else if configured {
+				<span class="text-base-content/50">Configured</span>
+			} else {
+				<span class="text-base-content/40">Not configured</span>
+			}
+		</div>
 	}
 }
 
@@ -365,19 +367,6 @@ templ providersTellerWebhookRow(p ProvidersProps) {
 				Without webhooks, Breadbox polls every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) } via cron to detect changes.
 			</p>
 		</div>
-	}
-}
-
-// providersStatusBadge mirrors the original 4-way status badge.
-templ providersStatusBadge(h *service.ProviderHealthSummary, configured bool) {
-	if h != nil && h.LastSyncTime != nil && h.LastSyncStatus == "error" {
-		<span class="badge badge-soft badge-error badge-sm">Sync Error</span>
-	} else if h != nil && h.LastSyncTime != nil && h.LastSyncStatus == "success" {
-		<span class="badge badge-soft badge-success badge-sm">Healthy</span>
-	} else if configured {
-		<span class="badge badge-soft badge-success badge-sm">Configured</span>
-	} else {
-		<span class="badge badge-ghost badge-sm">Not Configured</span>
 	}
 }
 

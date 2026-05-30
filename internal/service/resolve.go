@@ -80,3 +80,8 @@ func (s *Service) resolveMatchID(ctx context.Context, idOrShort string) (pgtype.
 func (s *Service) resolveAnnotationID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
 	return s.resolveID(ctx, idOrShort, s.Queries.GetAnnotationUUIDByShortID, ErrNotFound)
 }
+
+// resolveSeriesID accepts either a UUID string or a short ID for a recurring series.
+func (s *Service) resolveSeriesID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
+	return s.resolveID(ctx, idOrShort, s.Queries.GetRecurringSeriesUUIDByShortID, ErrNotFound)
+}

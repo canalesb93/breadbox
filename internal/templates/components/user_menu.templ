@@ -12,27 +12,15 @@ package components
 // userMenuItems renders the shared action <li>s: Settings / Documentation /
 // GitHub / (Design system, editors only) / Sign out.
 //
-// Settings routing is role-aware: editors open the in-app settings modal
-// (the `open-settings` event, whose listener — SettingsModal — is only
-// rendered for editors in base.html); viewers have no modal, so they get a
-// direct link to their full-page account settings instead of a dead no-op.
+// Settings is a full page now (/settings/*, since #1601 retired the modal),
+// so it's a plain link to the account settings — works for every role
+// (RequireAuth), no Alpine/listener dependency, right-clickable.
 templ userMenuItems(p SidebarUserMenuProps, logoutFormID string) {
 	<li>
-		if p.IsEditor {
-			<button
-				type="button"
-				x-data
-				@click="$dispatch('open-settings', { tab: 'account' }); $el.closest('[popover]')?.hidePopover()"
-			>
-				@LucideIcon("settings", "w-3.5 h-3.5")
-				<span class="flex-1">Settings</span>
-			</button>
-		} else {
-			<a href="/settings/account" @click="$el.closest('[popover]')?.hidePopover()">
-				@LucideIcon("settings", "w-3.5 h-3.5")
-				<span class="flex-1">Settings</span>
-			</a>
-		}
+		<a href="/settings/account" @click="$el.closest('[popover]')?.hidePopover()">
+			@LucideIcon("settings", "w-3.5 h-3.5")
+			<span class="flex-1">Settings</span>
+		</a>
 	</li>
 	<hr class="border-base-300 my-1 mx-2"/>
 	<li>
