@@ -36,7 +36,7 @@ const maxAvatarUploadSize = 5 << 20 // 5 MB
 //
 //	?type=user|agent — picks which configured DiceBear style to use.
 //	                   Default "user". Agent identicons use a separate
-//	                   style (default "bottts") so agent activity reads
+//	                   style (default "bottts-neutral") so agent activity reads
 //	                   as obviously non-human. When the id resolves to
 //	                   an api_keys row with actor_type='agent', the
 //	                   handler upgrades the style to "agent" regardless
