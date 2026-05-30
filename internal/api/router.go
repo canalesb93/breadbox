@@ -187,6 +187,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Delete("/transactions/{id}/tags/{slug}", RemoveTransactionTagHandler(svc))
 			r.Post("/tags", CreateTagHandler(svc))
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
+			r.Post("/series", AssignSeriesHandler(svc))
+			r.Post("/series/{id}/transactions", LinkSeriesTransactionsHandler(svc))
 			r.Patch("/series/{id}", ReviewSeriesHandler(svc))
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 			r.Put("/settings/providers/plaid", UpdatePlaidConfigHandler(a))

@@ -111,6 +111,138 @@ type SeriesResponse struct {
 	UpdatedAt        string          `json:"updated_at"`
 }
 
+// AssignSeriesInput is the input to AssignSeries — the imperative create/link
+// path an agent or user drives (the MCP/REST `assign_series` tool). Either
+// assign to an existing series (SeriesID) or mint one by signature
+// (MerchantKey + CreateIfMissing); then back-link members and optionally
+// confirm in the same call.
+type AssignSeriesInput struct {
+	SeriesID        *string  // short_id or uuid — assign to an existing series
+	MerchantKey     string   // required when minting (CreateIfMissing)
+	CreateIfMissing bool     // mint a series if no SeriesID
+	Name            string   // optional display label for a minted series
+	Cadence         string   // optional proposed cadence for a minted series
+	ExpectedAmount  *float64 // optional, paired with Currency
+	Currency        *string
+	CategoryID      *string  // short_id or uuid, advisory
+	UserID          *string  // short_id or uuid; nil = shared/household
+	TransactionIDs  []string // members to back-link (short_id or uuid), ≤50
+	Confirm         bool     // flip straight to confirmed/active in the same call
+}
+
+// seriesAssignMaxMembers caps the per-call back-link batch (mirrors the
+// update_transactions 50-op ceiling).
+const seriesAssignMaxMembers = 50
+
+// AssignSeries is the imperative create/link entry point shared by the
+// `assign_series` MCP tool and REST endpoints. It funnels through
+// UpsertSeriesCandidate (mint path) or a direct link (existing-series path),
+// so the precedence ladder + sticky-reject arbitrate uniformly, then applies
+// an optional confirm verdict. Source is derived from the actor (user|agent).
+func (s *Service) AssignSeries(ctx context.Context, in AssignSeriesInput, actor Actor) (*SeriesResponse, error) {
+	if len(in.TransactionIDs) > seriesAssignMaxMembers {
+		return nil, fmt.Errorf("%w: at most %d transactions per call", ErrInvalidParameter, seriesAssignMaxMembers)
+	}
+
+	var resp *SeriesResponse
+	switch {
+	case in.SeriesID != nil && strings.TrimSpace(*in.SeriesID) != "":
+		linked, err := s.linkSeriesMembers(ctx, *in.SeriesID, in.TransactionIDs)
+		if err != nil {
+			return nil, err
+		}
+		resp = linked
+	case in.CreateIfMissing && strings.TrimSpace(in.MerchantKey) != "":
+		minted, err := s.UpsertSeriesCandidate(ctx, SeriesUpsert{
+			UserID:         in.UserID,
+			Name:           in.Name,
+			MerchantKey:    in.MerchantKey,
+			Cadence:        in.Cadence,
+			ExpectedAmount: in.ExpectedAmount,
+			Currency:       in.Currency,
+			CategoryID:     in.CategoryID,
+			Source:         seriesSourceForActor(actor),
+			MemberTxnIDs:   in.TransactionIDs,
+		}, actor)
+		if err != nil {
+			return nil, err
+		}
+		resp = minted
+	default:
+		return nil, fmt.Errorf("%w: provide series_id, or merchant_key with create_if_missing", ErrInvalidParameter)
+	}
+
+	if in.Confirm {
+		return s.ReviewSeries(ctx, resp.ShortID, VerdictConfirm, actor)
+	}
+	return resp, nil
+}
+
+// linkSeriesMembers back-links transactions to an existing series (NULL-fill
+// only) and recomputes its rollups, in one transaction. Used by the
+// existing-series branch of AssignSeries.
+func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, memberIDsOrShorts []string) (*SeriesResponse, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	memberIDs, err := s.resolveTransactionIDs(ctx, memberIDsOrShorts)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin link members: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	row, err := qtx.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+	if len(memberIDs) > 0 {
+		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
+			SeriesID:       row.ID,
+			TransactionIds: memberIDs,
+		}); err != nil {
+			return nil, fmt.Errorf("back-link members: %w", err)
+		}
+	}
+	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	upd := updateParamsFromRow(row)
+	upd.OccurrenceCount = occCount
+	upd.LastAmount = lastAmount
+	upd.LastSeenDate = lastSeen
+	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, lastSeen)
+	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
+	if err != nil {
+		return nil, fmt.Errorf("update series: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit link members: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// seriesSourceForActor maps an actor to the detection_source vocabulary for an
+// imperative write: a real user → "user", everything else (agents, system) →
+// "agent". Rule-authored writes set Source explicitly and don't use this.
+func seriesSourceForActor(actor Actor) string {
+	if actor.Type == "user" {
+		return SeriesSourceUser
+	}
+	return SeriesSourceAgent
+}
+
 // UpsertSeriesCandidate is the single writer of recurring_series from detection.
 // It matches the dedup signature under a row lock, inserts a fresh candidate or
 // refreshes an existing one per the precedence ladder, back-links member
@@ -235,11 +367,24 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 	upd.LastSeenDate = lastSeen
 
 	// An unadjudicated (auto) candidate may have its proposed fields sharpened
-	// by a fresh detection pass; a confirmed series gets rollups only (its
-	// adjudicated fields are sacred). Confidence/status are never downgraded by
-	// the proposal path — verdicts flow through ReviewSeries.
-	if base.Confidence == SeriesConfidenceAuto {
-		upd.Cadence = cadence
+	// by a fresh write; a confirmed series gets rollups only (its adjudicated
+	// fields are sacred). Confidence/status are never downgraded by the proposal
+	// path — verdicts flow through ReviewSeries.
+	//
+	// PATCH A — source-precedence guard. A write may sharpen the proposed fields
+	// only when its source ranks >= the row's current detection_source on the
+	// ladder deterministic < rule < agent < user. This stops a lower-precedence
+	// writer (e.g. the next deterministic re-detect, or a thin rule-authored
+	// link) from clobbering values a higher-precedence actor deliberately set.
+	// Two extra carve-outs make a thin write safe regardless of rank:
+	//   - never downgrade a known cadence to "unknown" (a link-only write that
+	//     passes no cadence must not erase the detector's snapped value);
+	//   - never null detection_signals (already guarded by the len>0 check).
+	if base.Confidence == SeriesConfidenceAuto &&
+		seriesSourceRank(source) >= seriesSourceRank(base.DetectionSource) {
+		if cadence != SeriesCadenceUnknown || base.Cadence == SeriesCadenceUnknown {
+			upd.Cadence = cadence
+		}
 		if in.ExpectedAmount != nil {
 			upd.ExpectedAmount = numericDollars(*in.ExpectedAmount)
 		}
@@ -258,6 +403,8 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 		if len(in.DetectionSignals) > 0 {
 			upd.DetectionSignals = in.DetectionSignals
 		}
+		// Record who last shaped the row so precedence reflects it on the next write.
+		upd.DetectionSource = source
 	}
 	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, upd.LastSeenDate)
 
@@ -502,6 +649,25 @@ func seriesFromRow(r db.RecurringSeries) SeriesResponse {
 		resp.DetectionSignals = json.RawMessage(r.DetectionSignals)
 	}
 	return resp
+}
+
+// seriesSourceRank orders detection sources for the precedence guard in
+// UpsertSeriesCandidate (PATCH A): a write may sharpen an auto candidate's
+// proposed fields only when its source ranks >= the row's current source.
+// deterministic (1) < rule (2) < agent (3) < user (4). Unknown sources rank 0.
+func seriesSourceRank(source string) int {
+	switch source {
+	case SeriesSourceDeterministic:
+		return 1
+	case SeriesSourceRule:
+		return 2
+	case SeriesSourceAgent:
+		return 3
+	case SeriesSourceUser:
+		return 4
+	default:
+		return 0
+	}
 }
 
 // confirmerType maps an actor to the confirmed_by_type vocabulary (user|agent);

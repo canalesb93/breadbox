@@ -1860,6 +1860,35 @@ paths:
                   series:
                     type: array
                     items: { $ref: "#/components/schemas/RecurringSeries" }
+    post:
+      tags: [Series]
+      summary: Create or assign a recurring series
+      description: "**Requires `full_access` scope.** Create a series detection missed, or assign transactions to one. Provide `series_id` to assign to an existing series, or `merchant_key` + `create_if_missing` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector). `transaction_ids` (max 50) are back-linked NULL-fill only. `confirm:true` activates the series in the same call."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                series_id: { type: string, description: "Existing series short ID or UUID to assign to." }
+                merchant_key: { type: string, description: "Key to mint a new series under (requires create_if_missing)." }
+                create_if_missing: { type: boolean }
+                name: { type: string }
+                cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual] }
+                expected_amount: { type: number }
+                currency: { type: string }
+                category_id: { type: string }
+                user_id: { type: string }
+                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
+                confirm: { type: boolean }
+      responses:
+        "200":
+          description: Created or updated series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/series/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }
@@ -1886,6 +1915,30 @@ paths:
               required: [verdict]
               properties:
                 verdict: { type: string, enum: [confirm, reject, pause, cancel] }
+      responses:
+        "200":
+          description: Updated series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/transactions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Series]
+      summary: Link transactions to a recurring series
+      description: "**Requires `full_access` scope.** Back-links transactions (max 50, NULL-fill only — never steals a charge already in another series) to the series and recomputes its rollups. `confirm:true` activates the series."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transaction_ids]
+              properties:
+                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
+                confirm: { type: boolean }
       responses:
         "200":
           description: Updated series.

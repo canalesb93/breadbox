@@ -249,3 +249,151 @@ func TestUpsertSeriesCandidate_RequiresMerchantKey(t *testing.T) {
 		t.Fatal("expected error for empty merchant_key, got nil")
 	}
 }
+
+// TestUpsertSeriesCandidate_SourcePrecedenceGuard pins PATCH A: a thin
+// lower-or-equal-precedence write must not clobber a higher-precedence actor's
+// proposed fields, and a write that passes no cadence must never downgrade a
+// snapped cadence to "unknown" nor null detection_signals.
+func TestUpsertSeriesCandidate_SourcePrecedenceGuard(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	// Detector lands a monthly candidate with real signals.
+	det := spotifyUpsert(members)
+	det.DetectionSignals = []byte(`{"cadence":"monthly","interval_cv":0.02}`)
+	created, err := svc.UpsertSeriesCandidate(ctx, det, service.SystemActor())
+	if err != nil {
+		t.Fatalf("detector upsert: %v", err)
+	}
+
+	// A thin rule-source write (no cadence, no signals) links only — it must
+	// NOT downgrade the snapped monthly cadence to "unknown" or null signals.
+	ruleWrite := service.SeriesUpsert{
+		MerchantKey:  "spotify",
+		Currency:     seriesStrPtr("USD"),
+		Source:       service.SeriesSourceRule,
+		MemberTxnIDs: members,
+	}
+	afterRule, err := svc.UpsertSeriesCandidate(ctx, ruleWrite, service.Actor{Type: "agent", Name: "Rule"})
+	if err != nil {
+		t.Fatalf("rule-source upsert: %v", err)
+	}
+	if afterRule.ShortID != created.ShortID {
+		t.Fatalf("rule write forked the series")
+	}
+	if afterRule.Cadence != service.SeriesCadenceMonthly {
+		t.Errorf("cadence = %q, want monthly (a thin rule write must not downgrade to unknown)", afterRule.Cadence)
+	}
+	if len(afterRule.DetectionSignals) == 0 {
+		t.Errorf("detection_signals nulled by a rule write; want preserved")
+	}
+
+	// An agent sharpens cadence to annual (higher precedence than deterministic).
+	agentWrite := spotifyUpsert(members)
+	agentWrite.Cadence = service.SeriesCadenceAnnual
+	agentWrite.Source = service.SeriesSourceAgent
+	if _, err := svc.UpsertSeriesCandidate(ctx, agentWrite, service.Actor{Type: "agent", Name: "Agent"}); err != nil {
+		t.Fatalf("agent upsert: %v", err)
+	}
+	// A later deterministic re-detect proposing monthly must NOT overwrite the
+	// agent's annual (lower rank than agent).
+	redetect := spotifyUpsert(members) // source=deterministic, cadence=monthly
+	afterRedetect, err := svc.UpsertSeriesCandidate(ctx, redetect, service.SystemActor())
+	if err != nil {
+		t.Fatalf("re-detect upsert: %v", err)
+	}
+	if afterRedetect.Cadence != service.SeriesCadenceAnnual {
+		t.Errorf("cadence = %q, want annual (deterministic must not overwrite an agent's value)", afterRedetect.Cadence)
+	}
+}
+
+func TestAssignSeries_CreateLinkConfirm(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "NETFLIX", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	_ = acctID
+
+	resp, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey:     "netflix",
+		CreateIfMissing: true,
+		Name:            "Netflix",
+		Cadence:         service.SeriesCadenceMonthly,
+		ExpectedAmount:  seriesF64Ptr(9.99),
+		Currency:        seriesStrPtr("USD"),
+		TransactionIDs:  members,
+		Confirm:         true,
+	}, service.Actor{Type: "user", ID: "u1", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("AssignSeries create+confirm: %v", err)
+	}
+	if resp.Status != service.SeriesStatusActive {
+		t.Errorf("status = %q, want active (confirm:true)", resp.Status)
+	}
+	if resp.Confidence != service.SeriesConfidenceConfirmed {
+		t.Errorf("confidence = %q, want confirmed", resp.Confidence)
+	}
+	if resp.OccurrenceCount != 3 {
+		t.Errorf("occurrence_count = %d, want 3", resp.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, resp.ID); n != 3 {
+		t.Errorf("linked members = %d, want 3", n)
+	}
+}
+
+func TestAssignSeries_LinkExisting(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("seed series: %v", err)
+	}
+
+	// A 4th charge the detector didn't group — link it by series_id.
+	extra := testutil.MustCreateTransaction(t, queries, acctID, "SPOTIFY_2026-05-15", "SPOTIFY", 999, "2026-05-15")
+	resp, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		SeriesID:       &created.ShortID,
+		TransactionIDs: []string{extra.ShortID},
+	}, service.Actor{Type: "user", ID: "u1", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("AssignSeries link existing: %v", err)
+	}
+	if resp.ShortID != created.ShortID {
+		t.Errorf("linked to wrong series: %s != %s", resp.ShortID, created.ShortID)
+	}
+	if resp.OccurrenceCount != 4 {
+		t.Errorf("occurrence_count = %d, want 4", resp.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, resp.ID); n != 4 {
+		t.Errorf("linked members = %d, want 4", n)
+	}
+}
+
+func TestAssignSeries_RejectsTooManyMembers(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+	ids := make([]string, 51)
+	for i := range ids {
+		ids[i] = "deadbeef"
+	}
+	_, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey:     "netflix",
+		CreateIfMissing: true,
+		TransactionIDs:  ids,
+	}, service.Actor{Type: "user", Name: "Tester"})
+	if err == nil {
+		t.Fatal("expected error for >50 transaction_ids, got nil")
+	}
+}
+
+func TestAssignSeries_RequiresSeriesOrCreate(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+	// Neither series_id nor (merchant_key + create_if_missing).
+	_, err := svc.AssignSeries(ctx, service.AssignSeriesInput{MerchantKey: "netflix"}, service.Actor{Type: "user", Name: "Tester"})
+	if err == nil {
+		t.Fatal("expected error when create_if_missing is false and no series_id, got nil")
+	}
+}
