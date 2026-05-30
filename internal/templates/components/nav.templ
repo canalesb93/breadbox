@@ -94,9 +94,13 @@ templ Nav(p NavProps) {
 	// only; on mobile the drawer is a transient overlay with no collapsed
 	// state. bbToggleSidebar() flips <html data-sidebar> and persists it.
 	<div class="bb-sidebar-footer mt-auto pt-2 border-t border-base-300/60 hidden lg:block">
+		// Ghost-style toggle: transparent until hovered. Reuses bb-sidebar-link
+		// (same hover:bg-base-200 as the nav items) so the rail reads as one
+		// surface. Note: do NOT add a `bg-transparent` utility here — utilities
+		// beat @layer components, so it would clobber the link's hover state.
 		<button
 			type="button"
-			class="bb-sidebar-link bb-sidebar-collapse w-full border-0 bg-transparent cursor-pointer text-left"
+			class="bb-sidebar-link bb-sidebar-collapse w-full cursor-pointer text-left"
 			onclick="bbToggleSidebar()"
 			aria-label="Toggle sidebar"
 			title="Collapse sidebar"
