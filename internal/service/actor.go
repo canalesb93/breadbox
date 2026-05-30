@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -103,6 +104,36 @@ func AgentRunShortIDFromContext(ctx context.Context) string {
 		return ""
 	}
 	return rest[lastColon+1:]
+}
+
+// ParseAgentKeySlug extracts the agent slug from a per-run key name of
+// the form "agent:<slug>:<runID>" (minted by Orchestrator.MintRunAPIKey).
+// Returns ok=false for any other shape. This is the single canonical Go
+// parser for that contract — the avatar handler and the actor resolver
+// both call it so the format lives in one place. Keep it in lock-step
+// with the key name built in MintRunAPIKey and the SPLIT_PART backfill.
+func ParseAgentKeySlug(name string) (string, bool) {
+	parts := strings.Split(name, ":")
+	if len(parts) != 3 || parts[0] != "agent" || parts[1] == "" {
+		return "", false
+	}
+	return parts[1], true
+}
+
+// IsAgentRunContext reports whether ctx is authenticated as a scheduled
+// agent's per-run key: actor_type='agent' AND a parseable
+// "agent:<slug>:<runID>" name. It gates behavior that must apply ONLY to
+// real agent runs — notably never letting the MCP clientInfo rebind
+// clobber the run key. The actor_type check is load-bearing: a non-agent
+// key that merely happens to be named "agent:..." must NOT be treated as
+// a run (otherwise an operator could spoof an agent identity).
+func IsAgentRunContext(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxKeyAPIKey).(apiKeyCtxValue)
+	if !ok || v.actorType != "agent" {
+		return false
+	}
+	_, parsed := ParseAgentKeySlug(v.name)
+	return parsed
 }
 
 // ActorFromContext builds an Actor from the request context.

@@ -10,13 +10,13 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/avatar"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -106,11 +106,7 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 // shape — operator-created agent keys, HTTP MCP keys, the stdio
 // singleton — so the caller keeps seeding on the key UUID for those.
 func agentSlugFromKeyName(name string) (string, bool) {
-	parts := strings.Split(name, ":")
-	if len(parts) != 3 || parts[0] != "agent" || parts[1] == "" {
-		return "", false
-	}
-	return parts[1], true
+	return service.ParseAgentKeySlug(name)
 }
 
 // parseActorType reads the `?type=` query param and normalises it
