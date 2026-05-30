@@ -98,9 +98,11 @@ templ Nav(p NavProps) {
 		// (same hover:bg-base-200 as the nav items) so the rail reads as one
 		// surface. Note: do NOT add a `bg-transparent` utility here — utilities
 		// beat @layer components, so it would clobber the link's hover state.
+		// `.bb-sidebar-collapse` is the JS hook bbSyncSidebarToggleLabel() uses
+		// to keep the tooltip ("Collapse"/"Expand sidebar") in sync with state.
 		<button
 			type="button"
-			class="bb-sidebar-link bb-sidebar-collapse w-full cursor-pointer text-left"
+			class="bb-sidebar-link bb-sidebar-collapse w-full cursor-pointer"
 			onclick="bbToggleSidebar()"
 			aria-label="Toggle sidebar"
 			title="Collapse sidebar"
