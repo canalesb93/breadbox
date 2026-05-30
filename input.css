@@ -2802,49 +2802,72 @@
 
 /* ── Collapsible sidebar — desktop icon-rail ──
  * Unlayered (not @layer components) on purpose: the collapsed width must
- * beat the `lg:w-64` @apply'd onto .bb-sidebar, and the header centering
- * must beat the `justify-between` utility on .bb-sidebar-header. Utilities
- * and @apply'd declarations win over @layer components regardless of
- * specificity (see the section note above), so these overrides only land
- * if they sit outside every layer.
+ * beat the `lg:w-64` @apply'd onto .bb-sidebar, and the inner overrides must
+ * beat assorted utilities. Utilities/@apply'd declarations win over @layer
+ * components regardless of specificity (see the section note above), so
+ * these only land if they sit outside every layer.
  *
  * Toggled by bbToggleSidebar() setting <html data-sidebar="collapsed">
- * (pre-applied before paint by the inline <head> script, so no flash).
- * Only active at lg+, where the sidebar is a persistent rail; below lg the
- * drawer is a transient overlay and keeps its full width. The drawer's
- * `max-content` grid track reflows the content as the rail width animates. */
+ * (pre-applied before paint by the inline <head> script, so no flash). Only
+ * active at lg+, where the sidebar is a persistent rail.
+ *
+ * Smoothness strategy — the inner pieces animate INTO the collapsed state
+ * rather than popping:
+ *   • The icons never move. The collapsed width is tuned to 4rem so a nav
+ *     icon's UNCHANGED offset (rail px-3 12px + link px-3 12px + half the
+ *     16px icon = 32px) lands exactly on the 64px rail's centre line. We
+ *     therefore do NOT toggle justify-content/padding on the links, which
+ *     can't transition and would snap.
+ *   • Labels fade (opacity) and the narrowing rail clips the rest
+ *     (overflow-x: clip). They stay in layout so the icons don't reflow;
+ *     flex-shrink:0 keeps the icons from being squeezed in the cramped rail.
+ *   • The brand mark is a bigger glyph (w-5) sitting flush left, so it slides
+ *     onto the icon centre line via an animated margin, in step with width. */
 @media (min-width: 1024px) {
-  .bb-sidebar { transition: width 0.2s ease; }
+  .bb-sidebar { transition: width 0.22s ease; overflow-x: clip; }
+  .bb-sidebar-brand { transition: margin-left 0.22s ease; }
+  .bb-sidebar-link__label,
+  .bb-sidebar-brand-text,
+  .bb-sidebar-section { transition: opacity 0.16s ease; }
+  /* Icons hold their size + position while the rail squeezes around them. */
+  .bb-sidebar-link svg, .bb-sidebar-link i,
+  .bb-sidebar-brand svg, .bb-sidebar-brand i { flex-shrink: 0; }
 
-  html[data-sidebar="collapsed"] .bb-sidebar {
-    width: 4.5rem;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-  }
+  html[data-sidebar="collapsed"] .bb-sidebar { width: 4rem; }
 
-  /* Drop every text affordance inside the rail; the icons remain. */
+  /* Text fades out; the clipped rail hides whatever's mid-fade. Kept in
+     layout so the icons stay put. */
   html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link__label,
   html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-brand-text,
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
+    opacity: 0;
+  }
+  /* Section labels also collapse their height to a slim group spacer. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
+    font-size: 0;
+    line-height: 0;
+  }
+
+  /* Slide the larger brand mark onto the nav icons' centre line. */
+  html[data-sidebar="collapsed"] .bb-sidebar-brand {
+    margin-left: 0.625rem;
+  }
+
+  /* Badges have nowhere to sit in the rail. */
   html[data-sidebar="collapsed"] .bb-sidebar .bb-nav-badge,
   html[data-sidebar="collapsed"] .bb-sidebar .badge {
     display: none;
   }
+}
 
-  /* Centre the icons in the narrowed rail (links + the brand row). */
-  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link {
-    justify-content: center;
-    padding-left: 0;
-    padding-right: 0;
-  }
-  html[data-sidebar="collapsed"] .bb-sidebar-header {
-    justify-content: center;
-  }
-
-  /* Section labels collapse to a slim spacer so groups stay separated. */
-  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
-    font-size: 0;
-    line-height: 0;
-    padding: 0.75rem 0 0.25rem;
+/* Honour reduced-motion: collapse snaps instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  .bb-sidebar,
+  .bb-sidebar-brand,
+  .bb-sidebar-link__label,
+  .bb-sidebar-brand-text,
+  .bb-sidebar-section {
+    transition: none;
   }
 }
 
