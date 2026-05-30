@@ -657,6 +657,52 @@
     }
   }
 
+  /* ── Desktop topbar ── static across pages; the lg+ counterpart of
+     .bb-mobile-navbar. Sticky, hairline-bordered, lightly blurred. Holds
+     the breadcrumb (left) + search / theme / profile (right). */
+  .bb-topbar {
+    @apply hidden lg:flex items-center justify-between gap-3 h-14 px-4 sm:px-6 bg-base-100;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    border-bottom: 1px solid oklch(from var(--color-base-content) l c h / 0.06);
+    -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+    background-color: color-mix(in oklch, var(--color-base-100) 92%, transparent);
+    view-transition-name: app-topbar;
+  }
+
+  .bb-topbar-breadcrumb {
+    @apply flex items-center gap-1.5 min-w-0 text-sm;
+  }
+
+  /* ⌘K search trigger — shared chrome for the topbar trigger and the
+     sidebar trigger (the latter now only in the /design sandbox). The
+     surface + hover + transition live here once so re-theming the trigger
+     can't make the two drift; each variant's sizing/spacing/icon-size are
+     deltas (.bb-topbar-search below, .bb-sidebar-search further down). */
+  .bb-topbar-search,
+  .bb-sidebar-search {
+    @apply flex items-center rounded-lg text-sm
+           bg-base-200/50 border border-base-300/50 cursor-pointer select-none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .bb-topbar-search:hover,
+  .bb-sidebar-search:hover {
+    @apply bg-base-200 border-base-300;
+  }
+
+  /* Topbar variant: navbar-row sizing; hidden < md so the breadcrumb keeps
+     its width (⌘K + the palette still work there). */
+  .bb-topbar-search {
+    @apply hidden md:flex h-9 w-56 px-3 gap-2 text-base-content/40;
+  }
+
+  .bb-topbar-search svg, .bb-topbar-search i {
+    @apply w-4 h-4;
+  }
+
   /* ── Sidebar ── */
   .bb-sidebar {
     @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
@@ -745,6 +791,13 @@
 
   .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
     @apply opacity-100;
+  }
+
+  /* Label span inside every sidebar link — the hook the collapsed
+     icon-rail uses to hide the text while keeping the icon. flex-1 lets it
+     fill the row so any trailing badge sits at the far edge. */
+  .bb-sidebar-link__label {
+    @apply flex-1 truncate;
   }
 
   /* ── Trailing loading spinner on mobile sidebar tap ──
@@ -1878,16 +1931,11 @@
     @apply w-8 h-8 mb-2 opacity-40;
   }
 
-  /* ── Sidebar Cmd+K trigger ── */
+  /* ── Sidebar Cmd+K trigger — chrome + hover shared with .bb-topbar-search
+     (see "⌘K search trigger" near the top); only the sidebar-row sizing,
+     spacing, muted-text tint and smaller icon are deltas here. ── */
   .bb-sidebar-search {
-    @apply flex items-center gap-2.5 px-3 py-2.5 lg:py-2 mx-0 mb-3 rounded-lg
-           text-sm text-base-content/35 bg-base-200/50 border border-base-300/50
-           cursor-pointer select-none;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-  }
-
-  .bb-sidebar-search:hover {
-    @apply bg-base-200 border-base-300;
+    @apply gap-2.5 px-3 py-2.5 lg:py-2 mx-0 mb-3 text-base-content/35;
   }
 
   .bb-sidebar-search svg,
@@ -1968,6 +2016,11 @@
     font-size: 0.55rem;
     line-height: 1;
   }
+
+  /* NOTE: the collapsed icon-rail rules live UNLAYERED (search
+     "Collapsible sidebar — desktop icon-rail" below the @layer
+     components close) — they must beat the `lg:w-64` @apply and the
+     `justify-between` utility, which @layer components can't. */
 
   /* ── Landscape mobile: scroll entire sidebar, keep full touch targets ── */
   @media (orientation: landscape) and (max-height: 500px) {
@@ -2863,6 +2916,102 @@
  * the slug-tooltip class made the chip render two-line). */
 .bb-tag.tooltip {
   display: inline-flex;
+}
+
+/* ── Collapsible sidebar — desktop icon-rail ──
+ * Unlayered (not @layer components) on purpose: the collapsed width must
+ * beat the `lg:w-64` @apply'd onto .bb-sidebar, and the inner overrides must
+ * beat assorted utilities. Utilities/@apply'd declarations win over @layer
+ * components regardless of specificity (see the section note above), so
+ * these only land if they sit outside every layer.
+ *
+ * Toggled by bbToggleSidebar() setting <html data-sidebar="collapsed">
+ * (pre-applied before paint by the inline <head> script, so no flash). Only
+ * active at lg+, where the sidebar is a persistent rail.
+ *
+ * Smoothness strategy — the inner pieces animate INTO the collapsed state
+ * rather than popping:
+ *   • The icons never move. The collapsed width is tuned to 4rem so a nav
+ *     icon's UNCHANGED offset (rail px-3 12px + link px-3 12px + half the
+ *     16px icon = 32px) lands exactly on the 64px rail's centre line. We
+ *     therefore do NOT toggle justify-content/padding on the links, which
+ *     can't transition and would snap.
+ *   • Labels fade (opacity) and the narrowing rail clips the rest
+ *     (overflow-x: clip). They stay in layout so the icons don't reflow;
+ *     flex-shrink:0 keeps the icons from being squeezed in the cramped rail.
+ *   • The brand mark is a bigger glyph (w-5) sitting flush left, so it slides
+ *     onto the icon centre line via an animated margin, in step with width. */
+@media (min-width: 1024px) {
+  /* --bb-rail-collapsed-w is the single tunable for the collapsed rail. It is
+     NOT arbitrary: it must equal 2 × (rail px-3 + link px-3 + half a nav icon)
+     = 2 × (0.75rem + 0.75rem + 0.5rem) = 4rem, so a nav icon's unchanged left
+     offset lands exactly on the rail's centre line. If you change the sidebar
+     padding (.bb-sidebar px-3), the link padding (.bb-sidebar-link px-3), or
+     the nav icon size (lg:w-4), recompute this — the brand offset below is
+     derived from it, but the nav-icon centring is geometric and breaks
+     silently otherwise. */
+  .bb-sidebar { --bb-rail-collapsed-w: 4rem; transition: width 0.22s ease; overflow-x: clip; }
+  .bb-sidebar-brand { transition: margin-left 0.22s ease; }
+  .bb-sidebar-link__label,
+  .bb-sidebar-brand-text,
+  .bb-sidebar-section { transition: opacity 0.16s ease; }
+  /* Icons hold their size + position while the rail squeezes around them. */
+  .bb-sidebar-link svg, .bb-sidebar-link i,
+  .bb-sidebar-brand svg, .bb-sidebar-brand i { flex-shrink: 0; }
+
+  html[data-sidebar="collapsed"] .bb-sidebar { width: var(--bb-rail-collapsed-w); }
+
+  /* Text fades out; the clipped rail hides whatever's mid-fade. Kept in
+     layout so the icons stay put. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link__label,
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-brand-text,
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
+    opacity: 0;
+  }
+  /* Section labels also collapse their height to a slim group spacer. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
+    font-size: 0;
+    line-height: 0;
+  }
+
+  /* Slide the larger brand mark (w-5, flush-left via !px-0) onto the rail
+     centre line. Derived from the rail width so it tracks any retune:
+     rail-centre (w/2) − rail's left padding (px-3 = 0.75rem) − half the brand
+     glyph (w-5 → 0.625rem) = the left margin that centres the glyph. */
+  html[data-sidebar="collapsed"] .bb-sidebar-brand {
+    margin-left: calc(var(--bb-rail-collapsed-w) / 2 - 0.75rem - 0.625rem);
+  }
+
+  /* Badges have nowhere to sit in the rail. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-nav-badge,
+  html[data-sidebar="collapsed"] .bb-sidebar .badge {
+    display: none;
+  }
+}
+
+/* Honour reduced-motion: collapse snaps instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  .bb-sidebar,
+  .bb-sidebar-brand,
+  .bb-sidebar-link__label,
+  .bb-sidebar-brand-text,
+  .bb-sidebar-section {
+    transition: none;
+  }
+}
+
+/* ── daisy popover dropdowns: instant close ──
+ * A daisy `.dropdown[popover]` anchors next to its trigger while open (via
+ * position-area), but on close the anchor reverts and the base `inset:0`
+ * snaps it to the viewport top for the duration of the fade — a visible
+ * "jump". This affects every popover dropdown (the topbar profile menu, the
+ * OverflowMenu kebab on row lists, SidebarUserMenu), so the fix is applied to
+ * the mechanism, not one caller: kill the transition while not :popover-open
+ * so the menu closes instantly instead of animating from the wrong spot. The
+ * open animation (matched by :popover-open) is unaffected. Unlayered to beat
+ * daisy's own transition rule. */
+.dropdown[popover]:not(:popover-open) {
+  transition: none;
 }
 
 /* ── Command palette: tx-row horizontal alignment ──

@@ -340,6 +340,39 @@
       });
     });
   </script>
+  <script>
+    // Sidebar collapse — applied before paint (like the theme above) so a
+    // reload never flashes the expanded rail then snaps to collapsed.
+    // bbToggleSidebar flips <html data-sidebar="collapsed"> and persists the
+    // choice; the desktop icon-rail CSS keys off that attribute (only active
+    // at lg+ — the mobile drawer overlay has no collapsed state). localStorage
+    // throws in private-mode Safari, so every access is best-effort.
+    (function () {
+      try {
+        if (localStorage.getItem('bb-sidebar') === 'collapsed') {
+          document.documentElement.dataset.sidebar = 'collapsed';
+        }
+      } catch (_) { /* best-effort */ }
+    })();
+    // Keep the toggle's tooltip honest: "Expand sidebar" while collapsed,
+    // "Collapse sidebar" while expanded — so the icon-only rail (where the
+    // visible "Collapse" label is hidden) never advertises the wrong action.
+    function bbSyncSidebarToggleLabel() {
+      var btn = document.querySelector('.bb-sidebar-collapse');
+      if (!btn) return;
+      btn.title = document.documentElement.dataset.sidebar === 'collapsed'
+        ? 'Expand sidebar' : 'Collapse sidebar';
+    }
+    window.bbToggleSidebar = function () {
+      var el = document.documentElement;
+      var willCollapse = el.dataset.sidebar !== 'collapsed';
+      if (willCollapse) { el.dataset.sidebar = 'collapsed'; }
+      else { delete el.dataset.sidebar; }
+      try { localStorage.setItem('bb-sidebar', willCollapse ? 'collapsed' : 'expanded'); } catch (_) {}
+      bbSyncSidebarToggleLabel();
+    };
+    document.addEventListener('DOMContentLoaded', bbSyncSidebarToggleLabel);
+  </script>
 </head>
 <body>
   <!-- Navigation progress bar -->
@@ -405,6 +438,32 @@
 
     <!-- Main content -->
     <div class="drawer-content bg-base-200">
+      <!-- Desktop topbar — static across every page (hidden < lg, where the
+           mobile navbar below takes over). Left: breadcrumb of the current
+           section/page. Right: ⌘K search, theme toggle, profile menu. -->
+      <header class="bb-topbar">
+        <div class="bb-topbar-breadcrumb">
+          {{$section := pageSection .CurrentPage}}
+          {{if $section}}
+          <span class="text-base-content/40">{{$section}}</span>
+          <span class="text-base-content/25">/</span>
+          {{end}}
+          <span class="font-medium text-base-content truncate">{{.PageTitle}}</span>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button"
+                  class="bb-topbar-search"
+                  x-data @click="$dispatch('open-cmdk')"
+                  aria-label="Search"
+                  title="Search">
+            {{ lucide "search" "" }}
+            <span>Search…</span>
+            <span class="ml-auto">{{renderComponent "KbdCombo" (strs "cmd" "k")}}</span>
+          </button>
+          {{renderComponent "ThemeToggle" nil}}
+          {{if .AdminUsername}}{{renderComponent "TopbarUserMenu" .}}{{end}}
+        </div>
+      </header>
       <!-- Mobile navbar — sticky so it stays at top while scrolling -->
       <div class="bb-mobile-navbar lg:hidden"
            x-data="{ open: false }"
@@ -463,13 +522,17 @@
     <div class="drawer-side" id="bb-drawer-sidebar">
       <label for="bb-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
       <aside class="bb-sidebar" id="bb-sidebar" aria-label="Main navigation">
-        <!-- Brand + theme toggle + close button row -->
+        <!-- Brand row. The brand text + the theme/close cluster collapse on
+             desktop: the icon-rail hides the text (.bb-sidebar-brand-text)
+             and the theme toggle + close button are mobile-only (the desktop
+             theme toggle lives in the topbar; close only matters for the
+             mobile drawer overlay). -->
         <div class="flex items-center justify-between mb-5">
           <a href="/" class="bb-sidebar-brand !mb-0 !px-0 !py-0">
             {{ brand "breadbox" "w-5 h-5" }}
-            Breadbox
+            <span class="bb-sidebar-brand-text">Breadbox</span>
           </a>
-          <div class="flex items-center gap-1 shrink-0">
+          <div class="flex items-center gap-1 shrink-0 lg:hidden">
             <!-- Theme toggle — shared ThemeToggle component. Cycles
                  system → light → dark via $store.theme, persisting the
                  choice to localStorage; the inline <head> script reapplies
@@ -477,19 +540,11 @@
             {{renderComponent "ThemeToggle" nil}}
             <!-- Close button — only visible on mobile/tablet (< lg) -->
             <label for="bb-drawer"
-                   class="btn btn-sm btn-square btn-ghost lg:hidden"
+                   class="btn btn-sm btn-square btn-ghost"
                    aria-label="Close navigation menu">
               {{ lucide "x" "w-4 h-4" }}
             </label>
           </div>
-        </div>
-        <!-- Search trigger -->
-        <div class="bb-sidebar-search" x-data @click="$dispatch('open-cmdk')" role="button" tabindex="0" @keydown.enter="$dispatch('open-cmdk')">
-          {{ lucide "search" "" }}
-          <span>Search...</span>
-          <span class="bb-sidebar-search-hint">
-            {{renderComponent "KbdCombo" (strs "cmd" "k")}}
-          </span>
         </div>
         {{template "nav" .}}
       </aside>
