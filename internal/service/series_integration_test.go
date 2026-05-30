@@ -414,6 +414,55 @@ func findSeriesByKey(t *testing.T, svc *service.Service, key string) *service.Se
 	return nil
 }
 
+func TestApplyRuleRetroactively_AssignSeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX.COM 1", "Netflix", 1599, "2026-03-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX.COM 2", "Netflix", 1599, "2026-04-15")
+	other := testutil.MustCreateTransaction(t, queries, acctID, "STARBUCKS", "Starbucks", 599, "2026-04-16")
+
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Netflix → series",
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "Netflix"},
+		Actions:    []service.RuleAction{{Type: "assign_series", MerchantKey: "netflix", CreateIfMissing: true}},
+		Actor:      service.Actor{Type: "user", ID: "u1", Name: "Tester"},
+	})
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	n, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("matched = %d, want 2 (only the two Netflix charges)", n)
+	}
+
+	row := findSeriesByKey(t, svc, "netflix")
+	if row == nil {
+		t.Fatal("retroactive assign_series did not mint a netflix series")
+	}
+	if row.DetectionSource != service.SeriesSourceRule {
+		t.Errorf("detection_source = %q, want rule", row.DetectionSource)
+	}
+	if row.OccurrenceCount != 2 {
+		t.Errorf("occurrence_count = %d, want 2", row.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, row.ID); n != 2 {
+		t.Errorf("linked members = %d, want 2", n)
+	}
+	// The non-matching charge stays unlinked.
+	var seriesID pgtype.UUID
+	if err := pool.QueryRow(ctx, `SELECT series_id FROM transactions WHERE id=$1`, other.ID).Scan(&seriesID); err != nil {
+		t.Fatalf("query other txn: %v", err)
+	}
+	if seriesID.Valid {
+		t.Error("non-matching transaction was wrongly linked to a series")
+	}
+}
+
 func txnHasTag(t *testing.T, pool *pgxpool.Pool, txnID pgtype.UUID, slug string) bool {
 	t.Helper()
 	var n int

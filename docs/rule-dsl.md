@@ -175,7 +175,7 @@ Behavior:
 - **Link-and-rollup only** — it never overwrites a detector-snapped cadence or `detection_signals`, and it back-links NULL-fill only (never steals a charge already in another series).
 - Honors **sticky-reject**: minting at a `rejected` signature is a no-op (a rule can't resurrect a series the user dismissed).
 - Last-writer-wins across a pipeline: a higher-priority rule's `assign_series` overrides a lower one (a transaction joins at most one series).
-- **Sync-time only in v1.** Retroactive apply (`apply_rules`) does not yet materialize `assign_series` — existing transactions join when they next sync, or via the imperative `assign_series` MCP/REST tool.
+- **Retroactive apply** is supported via single-rule apply (`POST /rules/{id}/apply` / `apply_rules` with a `rule_id`): every matching existing transaction is linked using the same resolve-or-mint materialization as the sync path. (The bulk *apply-all* path does not yet materialize `assign_series` — apply the rule individually.)
 
 This is the declarative counterpart to the `assign_series` MCP tool: author the rule once and every future matching charge auto-joins the series with zero agent runs.
 

@@ -1264,6 +1264,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 	var categorySetSlug string
 	var tagAdds []string
 	var tagRemoves []string
+	var seriesAssign *RuleAction
 	for _, a := range rule.Actions {
 		switch a.Type {
 		case "set_category":
@@ -1281,11 +1282,11 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		case "add_comment":
 			// sync-only; skip retroactively.
 		case "assign_series":
-			// Sync-time only in v1; retroactive apply of assign_series is a
-			// follow-up (it needs per-transaction resolve-or-mint + rollup).
+			aCopy := a
+			seriesAssign = &aCopy
 		}
 	}
-	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0
+	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0 || seriesAssign != nil
 	if !hasWriteAction {
 		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
@@ -1381,6 +1382,18 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 				if _, err := s.materializeRuleTagRemove(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
 					tx.Rollback(ctx)
 					return totalMatched, err
+				}
+			}
+		}
+
+		// assign_series: resolve-or-mint the series and link each matched txn
+		// (NULL-fill) within the batch tx — same materialization the sync path
+		// uses, so retroactive and sync-time behave identically.
+		if seriesAssign != nil {
+			for _, txnID := range matchIDs {
+				if err := s.AssignSeriesFromRuleTx(ctx, tx, txnID, seriesAssign.SeriesShortID, seriesAssign.MerchantKey, seriesAssign.CreateIfMissing); err != nil {
+					tx.Rollback(ctx)
+					return totalMatched, fmt.Errorf("apply assign_series retroactively: %w", err)
 				}
 			}
 		}
