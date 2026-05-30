@@ -158,6 +158,27 @@ Appends a comment authored by the rule. Accumulates — multiple rules can each 
 
 - Sync-only. Retroactive apply does **not** materialize `add_comment` actions (they're meant to narrate a specific sync event, not back-fill chatter).
 
+### `assign_series`
+
+```json
+{ "type": "assign_series", "merchant_key": "spotify", "create_if_missing": true }
+```
+
+Links the matching transaction to a recurring series (subscription). Provide **exactly one** of:
+
+- `series_short_id` — assign to an existing series by its short ID. Validated at rule-create time (must resolve).
+- `merchant_key` + `create_if_missing: true` — mint a household series keyed on `merchant_key` if one doesn't already exist at that signature, then assign.
+
+Behavior:
+
+- Materializes **inside the sync transaction** (resolve-or-mint → back-link → recompute rollups), so the link commits atomically with the rest of the sync.
+- **Link-and-rollup only** — it never overwrites a detector-snapped cadence or `detection_signals`, and it back-links NULL-fill only (never steals a charge already in another series).
+- Honors **sticky-reject**: minting at a `rejected` signature is a no-op (a rule can't resurrect a series the user dismissed).
+- Last-writer-wins across a pipeline: a higher-priority rule's `assign_series` overrides a lower one (a transaction joins at most one series).
+- **Sync-time only in v1.** Retroactive apply (`apply_rules`) does not yet materialize `assign_series` — existing transactions join when they next sync, or via the imperative `assign_series` MCP/REST tool.
+
+This is the declarative counterpart to the `assign_series` MCP tool: author the rule once and every future matching charge auto-joins the series with zero agent runs.
+
 ### Combining actions
 
 A rule can carry multiple actions of different types. Override (`category_override=true`) suppresses only the `set_category` part — `add_tag` and `add_comment` still fire.

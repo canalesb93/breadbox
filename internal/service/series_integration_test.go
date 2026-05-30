@@ -397,3 +397,123 @@ func TestAssignSeries_RequiresSeriesOrCreate(t *testing.T) {
 		t.Fatal("expected error when create_if_missing is false and no series_id, got nil")
 	}
 }
+
+// netflixSeriesRow finds a candidate/active series by merchant_key in the list.
+func findSeriesByKey(t *testing.T, svc *service.Service, key string) *service.SeriesResponse {
+	t.Helper()
+	all, err := svc.ListSeries(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("list series: %v", err)
+	}
+	for i := range all {
+		if all[i].MerchantKey == key {
+			return &all[i]
+		}
+	}
+	return nil
+}
+
+func TestAssignSeriesFromRuleTx_MintAndLink(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	txn := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX.COM", "Netflix", 1599, "2026-05-15")
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	if err := svc.AssignSeriesFromRuleTx(ctx, tx, txn.ID, "", "netflix", true); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("AssignSeriesFromRuleTx mint: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	row := findSeriesByKey(t, svc, "netflix")
+	if row == nil {
+		t.Fatal("rule did not mint a netflix series")
+	}
+	if row.DetectionSource != service.SeriesSourceRule {
+		t.Errorf("detection_source = %q, want rule", row.DetectionSource)
+	}
+	if row.OccurrenceCount != 1 {
+		t.Errorf("occurrence_count = %d, want 1", row.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, row.ID); n != 1 {
+		t.Errorf("linked members = %d, want 1", n)
+	}
+}
+
+func TestAssignSeriesFromRuleTx_ExistingByShortID(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("seed series: %v", err)
+	}
+	extra := testutil.MustCreateTransaction(t, queries, acctID, "SPOTIFY_X", "SPOTIFY", 999, "2026-05-15")
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	if err := svc.AssignSeriesFromRuleTx(ctx, tx, extra.ID, created.ShortID, "", false); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("AssignSeriesFromRuleTx by short_id: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	refreshed, _ := svc.GetSeries(ctx, created.ShortID)
+	if refreshed.OccurrenceCount != 4 {
+		t.Errorf("occurrence_count = %d, want 4", refreshed.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, created.ID); n != 4 {
+		t.Errorf("linked members = %d, want 4", n)
+	}
+}
+
+func TestAssignSeriesFromRuleTx_StickyRejectSkips(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	// Create at the SAME signature the rule mints under (NULL currency + user)
+	// so the rule's match finds the rejected row and skips.
+	householdUpsert := service.SeriesUpsert{
+		Name:         "Spotify",
+		MerchantKey:  "spotify",
+		Cadence:      service.SeriesCadenceMonthly,
+		Source:       service.SeriesSourceDeterministic,
+		MemberTxnIDs: members,
+	}
+	created, _ := svc.UpsertSeriesCandidate(ctx, householdUpsert, service.SystemActor())
+	if _, err := svc.ReviewSeries(ctx, created.ShortID, service.VerdictReject, service.Actor{Type: "user", Name: "Tester"}); err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+
+	extra := testutil.MustCreateTransaction(t, queries, acctID, "SPOTIFY_X", "SPOTIFY", 999, "2026-05-15")
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	// Rule tries to mint at the rejected signature — must be a no-op.
+	if err := svc.AssignSeriesFromRuleTx(ctx, tx, extra.ID, "", "spotify", true); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("AssignSeriesFromRuleTx sticky: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	// No new series, and the rejected one was not touched (still 3 members).
+	if total, _ := queries.CountRecurringSeries(ctx); total != 1 {
+		t.Errorf("series count = %d, want 1 (sticky reject must not mint)", total)
+	}
+	if n := countLinkedMembers(t, pool, created.ID); n != 3 {
+		t.Errorf("rejected series members = %d, want 3 (extra txn must not link)", n)
+	}
+}

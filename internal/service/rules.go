@@ -491,10 +491,11 @@ func toStringSlice(v interface{}) ([]string, bool) {
 // Unknown types are rejected by ValidateActions. Read-time tolerates unknown
 // types by skipping them with a logged warning (see sync/rule_resolver).
 var validActionTypes = map[string]bool{
-	"set_category": true,
-	"add_tag":      true,
-	"remove_tag":   true,
-	"add_comment":  true,
+	"set_category":  true,
+	"add_tag":       true,
+	"remove_tag":    true,
+	"add_comment":   true,
+	"assign_series": true,
 }
 
 // tagSlugPattern enforces the tag slug format: lowercase alphanumerics with
@@ -513,7 +514,7 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 	seenCategory := false
 	for _, a := range actions {
 		if !validActionTypes[a.Type] {
-			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment)", ErrInvalidParameter, a.Type)
+			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series)", ErrInvalidParameter, a.Type)
 		}
 		switch a.Type {
 		case "set_category":
@@ -537,6 +538,20 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 		case "add_comment":
 			if a.Content == "" {
 				return fmt.Errorf("%w: add_comment action requires content", ErrInvalidParameter)
+			}
+		case "assign_series":
+			hasSeries := strings.TrimSpace(a.SeriesShortID) != ""
+			hasKey := strings.TrimSpace(a.MerchantKey) != ""
+			if hasSeries == hasKey {
+				return fmt.Errorf("%w: assign_series requires exactly one of series_short_id or merchant_key", ErrInvalidParameter)
+			}
+			if hasKey && !a.CreateIfMissing {
+				return fmt.Errorf("%w: assign_series with merchant_key requires create_if_missing=true", ErrInvalidParameter)
+			}
+			if hasSeries {
+				if _, err := s.resolveSeriesID(ctx, a.SeriesShortID); err != nil {
+					return fmt.Errorf("%w: assign_series series_short_id %q not found", ErrInvalidParameter, a.SeriesShortID)
+				}
 			}
 		}
 	}
@@ -1265,6 +1280,9 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 			tagRemoves = append(tagRemoves, a.TagSlug)
 		case "add_comment":
 			// sync-only; skip retroactively.
+		case "assign_series":
+			// Sync-time only in v1; retroactive apply of assign_series is a
+			// follow-up (it needs per-transaction resolve-or-mint + rollup).
 		}
 	}
 	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0
@@ -1418,6 +1436,11 @@ func actionAuditFields(a RuleAction) (string, string) {
 		return "tag", a.TagSlug
 	case "add_comment":
 		return "comment", a.Content
+	case "assign_series":
+		if a.SeriesShortID != "" {
+			return "series", a.SeriesShortID
+		}
+		return "series", a.MerchantKey
 	}
 	return "", ""
 }
