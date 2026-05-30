@@ -213,6 +213,9 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 
 			// Project webhook events into the templ view-model with
 			// pre-rendered relative + full timestamps.
+			// Full timestamps render in the viewer's timezone (bb_tz cookie,
+			// see UserLocation) so a UTC server doesn't show UTC clocks.
+			loc := UserLocation(r)
 			whRows := make([]pages.LogsWebhookRow, 0, len(result.Events))
 			for _, e := range result.Events {
 				whRows = append(whRows, pages.LogsWebhookRow{
@@ -225,7 +228,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 					PayloadHash:       e.PayloadHash,
 					ErrorMessage:      e.ErrorMessage,
 					CreatedAtRelative: timefmt.RelativeRFC3339Ptr(e.CreatedAt),
-					CreatedAtFull:     timefmt.FormatRFC3339Ptr(e.CreatedAt, timefmt.LayoutDateTime),
+					CreatedAtFull:     timefmt.FormatRFC3339PtrIn(e.CreatedAt, loc, timefmt.LayoutDateTime),
 				})
 			}
 
@@ -309,4 +312,3 @@ func encodeSyncStatusQuery(status, connID, trigger, dateFrom, dateTo string) str
 	}
 	return v.Encode()
 }
-

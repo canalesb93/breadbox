@@ -18,6 +18,15 @@ import (
 	// pgx stdlib driver registration is needed for goose's database/sql
 	// migrations regardless of which subcommand runs.
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	// Embed the IANA tzdata into the binary so time.LoadLocation always
+	// resolves named zones (e.g. "America/Los_Angeles") regardless of
+	// whether the host ships /usr/share/zoneinfo. Without this, a deploy on
+	// a minimal image (scratch/distroless, or a bare static binary) silently
+	// falls back to time.Local for the viewer's bb_tz cookie zone, rendering
+	// every absolute timestamp in the server's timezone. Cron schedule
+	// timezones depend on the same lookup. ~450KB; correctness over size.
+	_ "time/tzdata"
 )
 
 // version is set at build time via -ldflags "-X main.version=...".
