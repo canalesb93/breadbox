@@ -7,12 +7,13 @@ INSERT INTO transactions (
   amount, iso_currency_code, date, authorized_date,
   datetime, authorized_datetime, provider_name, provider_merchant_name,
   provider_category_primary, provider_category_detailed, provider_category_confidence,
-  provider_payment_channel, pending, category_id, provider_raw
+  provider_payment_channel, pending, category_id, provider_raw, merchant_key
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 )
 ON CONFLICT (provider_transaction_id) DO UPDATE SET
   account_id = EXCLUDED.account_id,
+  merchant_key = EXCLUDED.merchant_key,
   provider_pending_transaction_id = EXCLUDED.provider_pending_transaction_id,
   amount = EXCLUDED.amount,
   iso_currency_code = EXCLUDED.iso_currency_code,
