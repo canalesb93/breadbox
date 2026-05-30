@@ -218,7 +218,11 @@ func (s *MCPServer) rebindActorFromClientInfo(ctx context.Context, req *mcpsdk.C
 	// rebinding to it collapses every agent onto one client key and
 	// erases per-agent attribution (the bug that made one session show
 	// three different actor names + avatars). Leave the run key in place.
-	if service.AgentRunShortIDFromContext(ctx) != "" {
+	//
+	// IsAgentRunContext also checks actor_type='agent', so a non-agent key
+	// merely *named* "agent:..." can't suppress the rebind and spoof an
+	// agent identity.
+	if service.IsAgentRunContext(ctx) {
 		return ctx
 	}
 	ip := req.Session.InitializeParams()

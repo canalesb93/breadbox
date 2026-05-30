@@ -91,7 +91,8 @@ func (s *Service) CreateAPIKey(ctx context.Context, p CreateAPIKeyParams) (*Crea
 	}
 	var agentDefID pgtype.UUID
 	if p.AgentDefinitionID != "" {
-		if err := agentDefID.Scan(p.AgentDefinitionID); err != nil {
+		var err error
+		if agentDefID, err = pgconv.ParseUUID(p.AgentDefinitionID); err != nil {
 			return nil, fmt.Errorf("invalid agent_definition_id: %w", err)
 		}
 	}
@@ -187,15 +188,23 @@ func (s *Service) ResolveAgentSlugForActor(ctx context.Context, actorID string) 
 	if actorID == "" {
 		return "", false
 	}
-	var uid pgtype.UUID
-	if err := uid.Scan(actorID); err != nil {
-		return "", false
-	}
-	row, err := s.Queries.GetAgentIdentityByApiKeyID(ctx, uid)
+	uid, err := pgconv.ParseUUID(actorID)
 	if err != nil {
 		return "", false
 	}
-	return row.Slug, true
+	if row, rerr := s.Queries.GetAgentIdentityByApiKeyID(ctx, uid); rerr == nil {
+		return row.Slug, true
+	}
+	// No live definition link — the key's agent_definition_id is NULL
+	// because the definition was deleted (ON DELETE SET NULL) or the run
+	// key predates the column. Recover the slug from the immutable key
+	// name ("agent:<slug>:<runID>") so the agent's avatar still renders.
+	if key, kerr := s.Queries.GetApiKey(ctx, uid); kerr == nil && key.ActorType == "agent" {
+		if slug, ok := ParseAgentKeySlug(key.Name); ok {
+			return slug, true
+		}
+	}
+	return "", false
 }
 
 func apiKeyFromRow(r db.ApiKey) APIKeyResponse {

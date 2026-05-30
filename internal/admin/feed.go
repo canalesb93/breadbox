@@ -223,6 +223,11 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 		// Reports that the service folded into a bulk_action / agent_session
 		// card are NOT in `leftoverReports` — they render as part of that
 		// card's headline.
+		//
+		// agentSeedCache memoizes the report-author → avatar-seed resolution
+		// across the loop so repeat agents don't re-query; "" is cached too
+		// (a miss is a decision, not a retry).
+		agentSeedCache := map[string]string{}
 		for _, rep := range leftoverReports {
 			if rep.CreatedAt == "" {
 				continue
@@ -236,14 +241,20 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 			// Seed the report's avatar from the agent it ran under so the
 			// row shows the same robot as the agent's other activity,
-			// instead of the generic bot tile. Resolves only for run keys
-			// linked to a definition (new reports); operator/historical
-			// reports leave it empty and keep the bot fallback.
+			// instead of the generic bot tile. Only agent-authored reports
+			// can resolve — the actor_type guard skips a DB query for
+			// operator/system reports, and the cache dedups repeat agents.
 			reportAvatarSeed := ""
-			if rep.CreatedByID != nil {
-				if slug, ok := svc.ResolveAgentSlugForActor(ctx, *rep.CreatedByID); ok {
-					reportAvatarSeed = slug
+			if rep.CreatedByType == "agent" && rep.CreatedByID != nil {
+				id := *rep.CreatedByID
+				seed, cached := agentSeedCache[id]
+				if !cached {
+					if slug, ok := svc.ResolveAgentSlugForActor(ctx, id); ok {
+						seed = slug
+					}
+					agentSeedCache[id] = seed
 				}
+				reportAvatarSeed = seed
 			}
 			items = append(items, pages.FeedItem{
 				Type:         "report",

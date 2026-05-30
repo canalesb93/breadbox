@@ -71,3 +71,27 @@ func TestResolveAgentSlugForActor_NonAgentKey(t *testing.T) {
 		t.Errorf("expected ok=false for an empty actor id")
 	}
 }
+
+// TestResolveAgentSlugForActor_FallbackFromKeyName covers the
+// slug-from-name fallback: an agent key with NO agent_definition_id link
+// (definition deleted via ON DELETE SET NULL, or a run key minted before
+// the FK existed) still resolves to its slug from the immutable key name,
+// so the agent's avatar keeps rendering instead of falling to the bot tile.
+func TestResolveAgentSlugForActor_FallbackFromKeyName(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	res, err := svc.CreateAPIKey(ctx, service.CreateAPIKeyParams{
+		Name:      "agent:orphan-slug:Run99",
+		Scope:     "full_access",
+		ActorType: "agent",
+		// deliberately no AgentDefinitionID — simulates a deleted/pre-FK link
+	})
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	slug, ok := svc.ResolveAgentSlugForActor(ctx, res.ID)
+	if !ok || slug != "orphan-slug" {
+		t.Fatalf("fallback resolve = (%q,%v), want (orphan-slug,true)", slug, ok)
+	}
+}
