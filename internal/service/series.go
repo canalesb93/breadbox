@@ -107,6 +107,7 @@ type SeriesResponse struct {
 	NextExpectedDate *string         `json:"next_expected_date,omitempty"`
 	OccurrenceCount  int             `json:"occurrence_count"`
 	DetectionSignals json.RawMessage `json:"detection_signals,omitempty"`
+	Tags             []string        `json:"tags,omitempty"`
 	CreatedAt        string          `json:"created_at"`
 	UpdatedAt        string          `json:"updated_at"`
 }
@@ -243,6 +244,12 @@ func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID p
 	}); err != nil {
 		return fmt.Errorf("back-link series member: %w", err)
 	}
+	if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
+		SeriesID: seriesID,
+		Column2:  []pgtype.UUID{txnID},
+	}); err != nil {
+		return fmt.Errorf("apply series tags to member: %w", err)
+	}
 
 	row, err := qtx.GetRecurringSeriesByID(ctx, seriesID)
 	if err != nil {
@@ -296,6 +303,12 @@ func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, membe
 			TransactionIds: memberIDs,
 		}); err != nil {
 			return nil, fmt.Errorf("back-link members: %w", err)
+		}
+		if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
+			SeriesID: row.ID,
+			Column2:  memberIDs,
+		}); err != nil {
+			return nil, fmt.Errorf("apply series tags to members: %w", err)
 		}
 	}
 	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, row.ID)
@@ -429,13 +442,20 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 		}
 	}
 
-	// 4. Back-link member transactions (NULL-fill only).
+	// 4. Back-link member transactions (NULL-fill only) and materialize the
+	// series' tags onto the freshly-linked members (NULL-fill via ON CONFLICT).
 	if len(memberIDs) > 0 {
 		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
 			SeriesID:       base.ID,
 			TransactionIds: memberIDs,
 		}); err != nil {
 			return nil, fmt.Errorf("back-link members: %w", err)
+		}
+		if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
+			SeriesID: base.ID,
+			Column2:  memberIDs,
+		}); err != nil {
+			return nil, fmt.Errorf("apply series tags to members: %w", err)
 		}
 	}
 
@@ -570,7 +590,73 @@ func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesRespo
 		return nil, fmt.Errorf("get series: %w", err)
 	}
 	resp := seriesFromRow(row)
+	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, id); err == nil {
+		resp.Tags = slugs
+	}
 	return &resp, nil
+}
+
+// AddSeriesTag attaches an existing tag (by slug) to a series and materializes
+// it onto the series' current members (NULL-fill, provenance=system+series).
+func (s *Service) AddSeriesTag(ctx context.Context, idOrShort, tagSlug string, actor Actor) error {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return err
+	}
+	tag, err := s.Queries.GetTagBySlug(ctx, tagSlug)
+	if err != nil {
+		return fmt.Errorf("%w: tag %q not found", ErrInvalidParameter, tagSlug)
+	}
+	if _, err := s.Queries.AddSeriesTag(ctx, db.AddSeriesTagParams{SeriesID: id, TagID: tag.ID}); err != nil {
+		return fmt.Errorf("add series tag: %w", err)
+	}
+	if err := s.Queries.ApplySeriesTagToAllMembers(ctx, db.ApplySeriesTagToAllMembersParams{ID: id, TagID: tag.ID}); err != nil {
+		return fmt.Errorf("apply series tag to members: %w", err)
+	}
+	return nil
+}
+
+// RemoveSeriesTag detaches a tag from a series and strips the series-inherited
+// copies from its members (provenance-scoped, so user-added tags survive).
+func (s *Service) RemoveSeriesTag(ctx context.Context, idOrShort, tagSlug string) error {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return err
+	}
+	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("get series: %w", err)
+	}
+	tag, err := s.Queries.GetTagBySlug(ctx, tagSlug)
+	if err != nil {
+		return fmt.Errorf("%w: tag %q not found", ErrInvalidParameter, tagSlug)
+	}
+	if _, err := s.Queries.RemoveSeriesTag(ctx, db.RemoveSeriesTagParams{SeriesID: id, TagID: tag.ID}); err != nil {
+		return fmt.Errorf("remove series tag: %w", err)
+	}
+	if err := s.Queries.RemoveSeriesTagFromMembers(ctx, db.RemoveSeriesTagFromMembersParams{
+		TagID:     tag.ID,
+		AddedByID: pgconv.Text(row.ShortID),
+	}); err != nil {
+		return fmt.Errorf("remove series tag from members: %w", err)
+	}
+	return nil
+}
+
+// ListSeriesTags returns the tag slugs attached to a series.
+func (s *Service) ListSeriesTags(ctx context.Context, idOrShort string) ([]string, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	slugs, err := s.Queries.ListSeriesTagSlugs(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list series tags: %w", err)
+	}
+	return slugs, nil
 }
 
 // ListSeries returns series, optionally filtered by status. With no status it

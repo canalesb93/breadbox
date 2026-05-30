@@ -67,6 +67,7 @@ type SubscriptionRow struct {
 	Source       string // deterministic | agent | user | rule
 	SourceLabel  string
 	CategoryName string
+	Tags         []string // tag slugs attached to the series (inherited by members)
 
 	// Monthly-equivalent contribution (active rows) — used nowhere in the row
 	// itself but kept for parity / future per-row display.

@@ -256,6 +256,14 @@ Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a 
 
 Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide `series_id` to assign to an existing series, **or** `merchant_key` + `create_if_missing:true` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). `confirm:true` flips it straight to `active`; omit to leave a reviewable `candidate`. Use after `list_series(status=candidate)` shows nothing for a subscription the user says exists.
 
+### add_series_tag (Write)
+
+Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it with `create_tag` first). Returns the updated series (including its `tags`).
+
+### remove_series_tag (Write)
+
+Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.
+
 ---
 
 ## Transaction Rules Tools
