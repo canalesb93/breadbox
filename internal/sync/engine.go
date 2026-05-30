@@ -67,6 +67,13 @@ type Engine struct {
 	// so the hook can correlate; runs in the same goroutine as Sync so the
 	// hook should hand off async if it might block.
 	OnSyncComplete func(ctx context.Context, connectionID pgtype.UUID)
+
+	// AssignSeriesInTx materializes an `assign_series` rule action INSIDE the
+	// sync transaction — resolving/minting a recurring series and back-linking
+	// the transaction. Wired by the app layer in serve.go (function pointer, no
+	// import cycle — the same pattern as OnSyncComplete). Nil-safe: when unset
+	// (series subsystem not wired) the action is a no-op.
+	AssignSeriesInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, merchantKey string, createIfMissing bool) error
 }
 
 // NewEngine creates a new sync engine.
@@ -788,6 +795,16 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		src := sourceByKey["comment|"+content]
 		if err := e.applyCommentFromRule(ctx, tx, dbTxn.ID, content, src.ruleID, src.ruleShortID, src.ruleName); err != nil {
 			return result.Sources, err
+		}
+	}
+
+	// assign_series: link the transaction to a recurring series within the sync
+	// tx (resolve-or-mint + rollup), via the app-wired hook so the sync package
+	// stays decoupled from the series service. No-op when the hook is unset.
+	if result.SeriesAssign != nil && e.AssignSeriesInTx != nil {
+		if err := e.AssignSeriesInTx(ctx, tx, dbTxn.ID,
+			result.SeriesAssign.SeriesShortID, result.SeriesAssign.MerchantKey, result.SeriesAssign.CreateIfMissing); err != nil {
+			return result.Sources, fmt.Errorf("apply assign_series: %w", err)
 		}
 	}
 

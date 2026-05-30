@@ -441,6 +441,11 @@ type RuleAction struct {
 	CategorySlug string `json:"category_slug,omitempty"`
 	TagSlug      string `json:"tag_slug,omitempty"`
 	Content      string `json:"content,omitempty"`
+	// assign_series fields: assign matching transactions to an existing series
+	// (SeriesShortID) or mint one keyed on MerchantKey (CreateIfMissing).
+	SeriesShortID   string `json:"series_short_id,omitempty"`
+	MerchantKey     string `json:"merchant_key,omitempty"`
+	CreateIfMissing bool   `json:"create_if_missing,omitempty"`
 }
 
 // ActivityEntry represents a single event in a transaction's activity timeline.

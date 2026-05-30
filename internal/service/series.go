@@ -178,6 +178,91 @@ func (s *Service) AssignSeries(ctx context.Context, in AssignSeriesInput, actor 
 	return resp, nil
 }
 
+// AssignSeriesFromRuleTx materializes an `assign_series` rule action INSIDE the
+// sync transaction (the engine calls this via the Engine.AssignSeriesInTx hook,
+// so the sync package never imports service). It resolves the target series by
+// short_id, or matches/mints one by merchant_key signature, then back-links the
+// single transaction (NULL-fill only) and recomputes rollups — all on the
+// provided tx so it commits atomically with the sync.
+//
+// It is deliberately link-and-rollup only: it never sharpens cadence/signals,
+// so it can't downgrade a detector's snapped values (PATCH A is moot here).
+// Sticky-reject is honored (a rejected signature is skipped). Failures to
+// resolve are returned as nil (the rule no-ops) rather than failing the sync.
+func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, merchantKey string, createIfMissing bool) error {
+	qtx := s.Queries.WithTx(tx)
+
+	var seriesID pgtype.UUID
+	switch {
+	case strings.TrimSpace(seriesShortID) != "":
+		id, err := qtx.GetRecurringSeriesUUIDByShortID(ctx, seriesShortID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil // rule references a missing series — no-op, don't break sync
+			}
+			return fmt.Errorf("resolve series %q: %w", seriesShortID, err)
+		}
+		seriesID = id
+	case createIfMissing && strings.TrimSpace(merchantKey) != "":
+		key := strings.TrimSpace(merchantKey)
+		existing, matchErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
+			MerchantKey:     key,
+			IsoCurrencyCode: pgtype.Text{}, // rule mints a household-level series
+			UserID:          pgtype.UUID{},
+		})
+		switch {
+		case matchErr == nil:
+			if existing.Confidence == SeriesConfidenceRejected {
+				return nil // sticky reject — never re-mint at this signature
+			}
+			seriesID = existing.ID
+		case errors.Is(matchErr, pgx.ErrNoRows):
+			inserted, err := qtx.InsertRecurringSeries(ctx, db.InsertRecurringSeriesParams{
+				Name:            key,
+				MerchantKey:     key,
+				Cadence:         SeriesCadenceUnknown,
+				AmountTolerance: pgconv.NumericCents(100),
+				Status:          SeriesStatusCandidate,
+				DetectionSource: SeriesSourceRule,
+				Confidence:      SeriesConfidenceAuto,
+			})
+			if err != nil {
+				return fmt.Errorf("insert rule series: %w", err)
+			}
+			seriesID = inserted.ID
+		default:
+			return fmt.Errorf("match series: %w", matchErr)
+		}
+	default:
+		return nil // nothing actionable
+	}
+
+	if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
+		SeriesID:       seriesID,
+		TransactionIds: []pgtype.UUID{txnID},
+	}); err != nil {
+		return fmt.Errorf("back-link series member: %w", err)
+	}
+
+	row, err := qtx.GetRecurringSeriesByID(ctx, seriesID)
+	if err != nil {
+		return fmt.Errorf("reload series: %w", err)
+	}
+	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, seriesID)
+	if err != nil {
+		return err
+	}
+	upd := updateParamsFromRow(row)
+	upd.OccurrenceCount = occCount
+	upd.LastAmount = lastAmount
+	upd.LastSeenDate = lastSeen
+	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, lastSeen)
+	if _, err := qtx.UpdateRecurringSeries(ctx, upd); err != nil {
+		return fmt.Errorf("update series rollup: %w", err)
+	}
+	return nil
+}
+
 // linkSeriesMembers back-links transactions to an existing series (NULL-fill
 // only) and recomputes its rollups, in one transaction. Used by the
 // existing-series branch of AssignSeries.

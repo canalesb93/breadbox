@@ -186,6 +186,10 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 		}
 		agentOrch.FireSyncCompleteAgents(ctx)
 	}
+	// Materialize assign_series rule actions inside the sync transaction
+	// (resolve-or-mint + link). Function-pointer hook keeps the sync engine
+	// decoupled from the series service — same pattern as OnSyncComplete.
+	a.SyncEngine.AssignSeriesInTx = a.Service.AssignSeriesFromRuleTx
 	agentSched.Start(ctx)
 	a.AgentOrchestrator = agentOrch
 	a.AgentScheduler = agentSched

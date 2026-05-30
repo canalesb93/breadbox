@@ -91,6 +91,10 @@ type RuleActions struct {
 	// Comments is the accumulated list of comment content strings from
 	// add_comment actions.
 	Comments []string
+	// SeriesAssign, when non-nil, links the transaction to a recurring series.
+	// Last-writer-wins: the highest-priority matching rule owns the assignment
+	// (a transaction belongs to at most one series).
+	SeriesAssign *SeriesAssignIntent
 	// Sources records per-action provenance for the audit trail. For
 	// set_category, only the winning (last) rule's source is retained.
 	// For tag actions, only net-surviving adds/removes have sources.
@@ -101,10 +105,23 @@ type RuleActions struct {
 // Kept local so the sync package doesn't import service (preserves the
 // one-way service → sync dependency direction).
 type typedAction struct {
-	Type         string
-	CategorySlug string
-	TagSlug      string
-	Content      string
+	Type            string
+	CategorySlug    string
+	TagSlug         string
+	Content         string
+	SeriesShortID   string
+	MerchantKey     string
+	CreateIfMissing bool
+}
+
+// SeriesAssignIntent is the resolved assign_series action: link the
+// transaction to an existing series (SeriesShortID) or mint one keyed on
+// MerchantKey (CreateIfMissing). A transaction joins at most one series, so
+// this is last-writer-wins across matching rules.
+type SeriesAssignIntent struct {
+	SeriesShortID   string
+	MerchantKey     string
+	CreateIfMissing bool
 }
 
 // RuleResolver loads transaction rules and evaluates them during sync.
@@ -296,6 +313,11 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 		case "add_comment":
 			content, _ := m["content"].(string)
 			out = append(out, typedAction{Type: t, Content: content})
+		case "assign_series":
+			seriesShortID, _ := m["series_short_id"].(string)
+			merchantKey, _ := m["merchant_key"].(string)
+			createIfMissing, _ := m["create_if_missing"].(bool)
+			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, MerchantKey: merchantKey, CreateIfMissing: createIfMissing})
 		default:
 			logger.Warn("skipping unknown rule action type",
 				"rule_id", pgconv.FormatUUID(ruleID), "type", t)
@@ -529,6 +551,26 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					ActionField: "comment",
 					ActionValue: a.Content,
 				})
+			case "assign_series":
+				if a.SeriesShortID == "" && a.MerchantKey == "" {
+					continue
+				}
+				// Last-writer-wins: a transaction joins at most one series, so a
+				// later-stage rule overrides an earlier assignment and supersedes
+				// its audit source.
+				result.SeriesAssign = &SeriesAssignIntent{
+					SeriesShortID:   a.SeriesShortID,
+					MerchantKey:     a.MerchantKey,
+					CreateIfMissing: a.CreateIfMissing,
+				}
+				result.Sources = dropSeriesSource(result.Sources)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: "series",
+					ActionValue: seriesActionValue(a),
+				})
 			}
 		}
 	}
@@ -545,6 +587,32 @@ func dropCategorySource(src []RuleActionSource) []RuleActionSource {
 	kept := src[:0]
 	for _, s := range src {
 		if s.ActionField == "category" {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
+}
+
+// seriesActionValue is the audit value for an assign_series action: the
+// series short_id when assigning to an existing series, else the merchant_key
+// the series is minted under.
+func seriesActionValue(a typedAction) string {
+	if a.SeriesShortID != "" {
+		return a.SeriesShortID
+	}
+	return a.MerchantKey
+}
+
+// dropSeriesSource removes any prior series source so the final source slice
+// records only the winning (last) rule's provenance for the assignment.
+func dropSeriesSource(src []RuleActionSource) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == "series" {
 			continue
 		}
 		kept = append(kept, s)
