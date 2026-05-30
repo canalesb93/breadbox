@@ -83,6 +83,7 @@ templ settingsRailItem(p SettingsPageProps, tab, icon, label string) {
 		href={ settingsPageTabHref(tab) }
 		data-tab={ tab }
 		data-active={ settingsRailActiveAttr(p.ActiveTab, tab) }
+		x-bind:data-active={ railActiveBindExpr(tab) }
 		class="bb-settings-rail__item"
 		@click.prevent="switchTo($el.dataset.tab)"
 	>

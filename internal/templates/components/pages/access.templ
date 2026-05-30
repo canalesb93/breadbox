@@ -8,9 +8,10 @@ import (
 
 // Access renders the combined API Keys + OAuth Clients tab. Each is a
 // borderless SettingsSection (.claude/rules/settings.md). Creating a key
-// or client is a one-click action that mints with sensible defaults and
-// reveals the plaintext inline — an optional "Custom…" path lets the user
-// set a name + scope first. No subpages.
+// or client is a one-click action: an inline bar carries an optional
+// label + a permission toggle (defaults to full access), so the bare
+// button still mints in one click. The plaintext is revealed inline. No
+// subpages.
 templ Access(p AccessProps) {
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
@@ -206,65 +207,61 @@ templ accessRevokedClientRow(c AccessClientRow) {
 // ---------------------------------------------------------------------
 
 type accessCreateBarProps struct {
-	Action     string // POST endpoint that mints + flashes the secret
+	Action     string // POST endpoint that mints + reveals the secret
 	CSRFToken  string
 	CreateText string // "Create key" / "Create client"
-	NameHint   string // placeholder for the custom-name input
-	ScopeNote  string // one-line note under the scope select
+	NameHint   string // placeholder for the optional label input
+	ScopeNote  string // one-line note shown when "Read only" is picked
 }
 
-// accessCreateBar is the one-click create affordance: a primary button
-// that mints immediately with defaults (full access, auto name), plus a
-// "Custom…" toggle that reveals an inline name + scope form. Both submit
-// to the same endpoint; the in-page swapper intercepts the POST so the
-// reveal lands inline without a navigation.
+// accessCreateBar is the one-click create affordance: one inline bar with
+// an optional label, a full-access/read-only permission toggle (daisy
+// join segmented control, defaults to full access), and the create
+// button. Leaving the label blank and hitting create still mints in one
+// click. The in-page swapper intercepts the POST so the reveal lands
+// inline without a navigation.
 templ accessCreateBar(p accessCreateBarProps) {
-	<div class="flex flex-col gap-3 mb-5" x-data="{ custom: false }">
-		<div class="flex justify-end items-center gap-2" x-show="!custom">
-			<button type="button" class="btn btn-ghost btn-sm gap-1.5" @click="custom = true">
-				@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
-				Custom…
+	<form
+		method="POST"
+		action={ templ.SafeURL(p.Action) }
+		x-data="{ scope: 'full_access' }"
+		class="flex flex-col gap-2 mb-5"
+	>
+		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+		<input type="hidden" name="scope" :value="scope"/>
+		<div class="flex flex-col sm:flex-row sm:items-end gap-3">
+			<label class="flex flex-col gap-1.5 flex-1 min-w-0">
+				<span class="text-xs font-medium text-base-content/60">
+					Label <span class="font-normal text-base-content/40">optional</span>
+				</span>
+				<input type="text" name="name" class="input input-sm w-full" placeholder={ p.NameHint } autocomplete="off"/>
+			</label>
+			<div class="flex flex-col gap-1.5">
+				<span class="text-xs font-medium text-base-content/60">Permission</span>
+				<div class="join w-full sm:w-auto" role="group" aria-label="Permission scope">
+					<button
+						type="button"
+						class="join-item btn btn-sm flex-1 sm:flex-none"
+						:class="{ 'btn-active': scope === 'full_access' }"
+						:aria-pressed="scope === 'full_access'"
+						@click="scope = 'full_access'"
+					>Full access</button>
+					<button
+						type="button"
+						class="join-item btn btn-sm flex-1 sm:flex-none"
+						:class="{ 'btn-active': scope === 'read_only' }"
+						:aria-pressed="scope === 'read_only'"
+						@click="scope = 'read_only'"
+					>Read only</button>
+				</div>
+			</div>
+			<button type="submit" class="btn btn-primary btn-sm gap-2 w-full sm:w-auto">
+				@components.LucideIcon("plus", "w-4 h-4")
+				{ p.CreateText }
 			</button>
-			<form method="POST" action={ templ.SafeURL(p.Action) }>
-				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				<input type="hidden" name="scope" value="full_access"/>
-				<button type="submit" class="btn btn-primary btn-sm btn-soft gap-2">
-					@components.LucideIcon("plus", "w-4 h-4")
-					{ p.CreateText }
-				</button>
-			</form>
 		</div>
-		<form
-			method="POST"
-			action={ templ.SafeURL(p.Action) }
-			x-show="custom"
-			x-cloak
-			class="rounded-xl border border-base-200 bg-base-200/30 p-4 flex flex-col gap-3"
-		>
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<div class="flex flex-col sm:flex-row gap-3">
-				<label class="flex-1 flex flex-col gap-1.5">
-					<span class="text-xs font-medium text-base-content/60">Name</span>
-					<input type="text" name="name" class="input input-sm w-full" placeholder={ p.NameHint }/>
-				</label>
-				<label class="flex flex-col gap-1.5">
-					<span class="text-xs font-medium text-base-content/60">Scope</span>
-					<select name="scope" class="select select-sm bg-base-200">
-						<option value="full_access">Full access</option>
-						<option value="read_only">Read only</option>
-					</select>
-				</label>
-			</div>
-			<p class="text-xs text-base-content/45 leading-snug">{ p.ScopeNote }</p>
-			<div class="flex items-center justify-end gap-2">
-				<button type="button" class="btn btn-ghost btn-sm" @click="custom = false">Cancel</button>
-				<button type="submit" class="btn btn-primary btn-sm gap-2">
-					@components.LucideIcon("plus", "w-4 h-4")
-					{ p.CreateText }
-				</button>
-			</div>
-		</form>
-	</div>
+		<p class="text-xs text-base-content/45 leading-snug" x-show="scope === 'read_only'" x-cloak>{ p.ScopeNote }</p>
+	</form>
 }
 
 // accessReveal renders the one-time plaintext block shown right after a

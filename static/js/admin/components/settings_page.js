@@ -38,7 +38,6 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         this._loadTab(tab).then(function () {
           self._pushPath('/settings/' + tab);
-          self._setActiveRail(tab);
         });
       },
 
@@ -49,8 +48,8 @@ document.addEventListener('alpine:init', function () {
         if (!dest.settings) return; // left the settings space entirely
         var tab = dest.tab || this.currentTab;
         if (tab === this.currentTab) return;
-        var self = this;
-        this._loadTab(tab).then(function () { self._setActiveRail(tab); });
+        // currentTab (set in _loadTab) drives the rail highlight reactively.
+        this._loadTab(tab);
       },
 
       // -------- helpers --------
@@ -161,7 +160,6 @@ document.addEventListener('alpine:init', function () {
               if (window.location.pathname !== tabPath) {
                 self._pushPath(tabPath);
               }
-              self._setActiveRail(targetTab);
             });
           });
         }).catch(function (err) {
@@ -204,13 +202,6 @@ document.addEventListener('alpine:init', function () {
           self._refreshIcons();
           if (preserveScroll) scroller.scrollTop = savedScroll;
           else scroller.scrollTop = 0;
-        });
-      },
-
-      _setActiveRail: function (tab) {
-        var items = this.$el.querySelectorAll('.bb-settings-rail__item[data-tab]');
-        items.forEach(function (a) {
-          a.setAttribute('data-active', a.dataset.tab === tab ? 'true' : 'false');
         });
       },
 

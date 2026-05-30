@@ -547,17 +547,29 @@
      sidebar edge and runs full height), with the same link language as
      .bb-sidebar-link — so it reads as the sidebar's navigation continuing
      into Settings. Below lg it collapses to a horizontal scroll strip. */
+  /* The layout fills at least the viewport (minus <main>'s p-6) so the
+     rail's self-stretch reaches the bottom even on short tabs (Account,
+     API Keys) — otherwise the base-100 panel stops mid-page and the
+     sidebar-extension illusion breaks. */
   .bb-settings-layout {
-    @apply flex flex-col lg:flex-row;
+    @apply flex flex-col lg:flex-row lg:min-h-[calc(100vh-3rem)];
   }
+  /* Negative margins cancel <main>'s p-6 so the rail bleeds to the
+     sidebar edge + the viewport top/bottom; self-stretch + the layout's
+     min-height make the base-100 panel span the full height. The list
+     inside is sticky (below) so it stays put while a long tab scrolls. */
   .bb-settings-rail {
     @apply shrink-0 mb-5 lg:mb-0 lg:w-56 lg:self-stretch
-           lg:-my-4 sm:lg:-my-6 lg:-ml-4 sm:lg:-ml-6 lg:py-6 lg:pl-6 lg:pr-4
+           lg:-my-6 lg:-ml-6 lg:py-6 lg:pl-6 lg:pr-4
            lg:bg-base-100 lg:border-r lg:border-base-300;
   }
+  /* Mobile: horizontal scroll strip. lg+: a sticky vertical column that
+     scrolls on its own if the items ever exceed the viewport height
+     (small screens, many sections) instead of clipping. */
   .bb-settings-rail__list {
     @apply flex flex-row gap-1 overflow-x-auto pb-1
-           lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0 lg:sticky lg:top-6;
+           lg:flex-col lg:gap-0.5 lg:pb-0 lg:sticky lg:top-6
+           lg:overflow-x-visible lg:overflow-y-auto lg:max-h-[calc(100vh-3rem)];
   }
   .bb-settings-rail__group-label {
     @apply hidden lg:block text-[0.65rem] font-medium uppercase tracking-wide text-base-content/40 px-3 pt-5 pb-1.5;

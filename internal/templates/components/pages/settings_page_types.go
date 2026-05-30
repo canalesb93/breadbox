@@ -31,12 +31,23 @@ func settingsPageTabHref(tab string) templ.SafeURL {
 	return templ.SafeURL("/settings/" + tab)
 }
 
-// settingsRailActiveAttr returns the data-active value for a rail item so
-// the active highlight (and the in-page swapper's re-highlight on tab
-// switch) reads off a single attribute.
+// settingsRailActiveAttr returns the server-rendered data-active value for
+// a rail item — the first-paint / no-JS highlight. Once Alpine hydrates,
+// the reactive x-bind from railActiveBindExpr takes over so the highlight
+// tracks the live currentTab without any imperative DOM mutation.
 func settingsRailActiveAttr(active, tab string) string {
 	if active == tab {
 		return "true"
 	}
 	return "false"
+}
+
+// railActiveBindExpr is the Alpine expression bound to each rail item's
+// data-active. The highlight is a pure function of the component's
+// currentTab (set synchronously in the swapper's _loadTab), so it can
+// never drift from the visible tab — no race with the body-swap's
+// alpine:init re-dispatch the way an imperative _setActiveRail could.
+// tab is a fixed internal constant, so the single-quoted literal is safe.
+func railActiveBindExpr(tab string) string {
+	return "currentTab === '" + tab + "'"
 }

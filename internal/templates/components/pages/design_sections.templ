@@ -2821,7 +2821,7 @@ func designSampleColor() *string {
 templ SectionSettings() {
 	<div class="flex flex-col gap-6">
 		@designExample("Section + rows (inline controls)", "The default shape — label/caption left, control right. Used by General > Sync and Backups > Schedule.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "refresh-cw",
 					Title:   "Sync",
@@ -2851,7 +2851,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Section with right slot (action button)", "Right is for the primary section action — Create, Save, Create Backup Now. Not for status badges (surface those inline within a row).") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "key",
 					Title:   "API Keys",
@@ -2868,7 +2868,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Section with status badge in row", "Section header stays quiet; status reads cleaner inline within a row.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "shield",
 					Title:   "Security",
@@ -2890,7 +2890,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Stacked row (Stack: true)", "Use when the control is too wide for inline — textareas, file inputs, code blocks, credential editors.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "plug",
 					Title:   "Connection",
@@ -2912,7 +2912,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Multi-input form (Form + Footer)", "Section.Form wraps children in a <form>; Section.Footer pins the Save button at the bottom. One Save per section, never per row.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "lock",
 					Title:   "Change password",
@@ -2935,7 +2935,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Danger variant", "Variant: \"danger\" tints the border + icon error. Reserve for actions that delete or replace user data — not warnings.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "alert-triangle",
 					Title:   "Danger zone",
@@ -2955,7 +2955,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Link-style row (SettingsRowLink)", "The whole row is a link/button. Use for action lists — Help > Resources, Backups > Restore From Upload. Icon on the LEFT because the row IS the affordance.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "life-buoy",
 					Title:   "Resources",
@@ -2977,7 +2977,7 @@ templ SectionSettings() {
 			</div>
 		}
 		@designExample("Auto-save form (SettingsAutoSaveForm)", "Wraps a single <select> or checkbox; submits on change. The settings modal picks up the POST and surfaces an in-modal toast. Live example — change the select, watch the network tab.") {
-			<div class="max-w-xl">
+			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
 					Icon:    "user-circle",
 					Title:   "User avatars",

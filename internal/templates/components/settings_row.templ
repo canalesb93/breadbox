@@ -84,7 +84,7 @@ templ SettingsRowLink(p SettingsRowLinkProps) {
 		class="bb-settings-row bb-settings-row--link"
 	>
 		if p.Icon != "" {
-			<i data-lucide={ p.Icon } class="w-4 h-4 text-base-content/50 shrink-0"></i>
+			@LucideIcon(p.Icon, "w-4 h-4 text-base-content opacity-50 shrink-0")
 		}
 		<div class="bb-settings-row__main">
 			<div class="bb-settings-row__label">{ p.Label }</div>
@@ -96,9 +96,9 @@ templ SettingsRowLink(p SettingsRowLinkProps) {
 			if p.Trailing != nil {
 				@p.Trailing
 			} else if p.External {
-				@LucideIcon("square-arrow-out-up-right", "w-4 h-4 text-base-content/40")
+				@LucideIcon("square-arrow-out-up-right", "w-4 h-4 text-base-content opacity-40")
 			} else {
-				@LucideIcon("chevron-right", "w-4 h-4 text-base-content/40")
+				@LucideIcon("chevron-right", "w-4 h-4 text-base-content opacity-40")
 			}
 		</div>
 	</a>

@@ -139,7 +139,7 @@ templ settingsSectionMeta(p SettingsSectionProps) {
 				if p.BrandIcon != "" {
 					@BrandIcon(p.BrandIcon, settingsSectionIconClasses(p.Variant))
 				} else if p.Icon != "" {
-					<i data-lucide={ p.Icon } class={ settingsSectionIconClasses(p.Variant) }></i>
+					@LucideIcon(p.Icon, settingsSectionIconClasses(p.Variant))
 				}
 				<h2 class="bb-settings-section__title">{ p.Title }</h2>
 			</div>
@@ -206,11 +206,19 @@ templ SettingsCard(p SettingsCardProps) {
 	</div>
 }
 
+// settingsSectionIconClasses dims the quiet section-header icon via
+// `opacity-*`, never `text-base-content/NN`. A Lucide icon is several
+// overlapping <path>s sharing stroke="currentColor"; putting alpha on the
+// icon's *color* makes each stroke semi-transparent and the overlaps stack
+// into darker pixels (the `svg.lucide` alpha-strip rule in input.css can't
+// rescue an alpha set directly on the icon — a utility-layer color beats
+// the base-layer strip). `opacity-*` composites the whole icon as one
+// layer first, so it dims cleanly. See input.css ~L247.
 func settingsSectionIconClasses(variant string) string {
 	switch variant {
 	case "danger":
 		return "w-4 h-4 text-error shrink-0"
 	default:
-		return "w-4 h-4 text-base-content/45 shrink-0"
+		return "w-4 h-4 text-base-content opacity-60 shrink-0"
 	}
 }
