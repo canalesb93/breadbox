@@ -254,17 +254,23 @@
    * header) and shouldn't intercept clicks. */
   svg.brand, svg.brand * { pointer-events: none; }
 
-  /* Brand marks ship with their official brand fills baked into the
-   * <path> rather than inheriting currentColor — the marks ARE the
-   * brand, recolouring them defeats the point. Black-on-light marks
-   * (GitHub, Anthropic, MCP) need a flip in dark mode so they don't
-   * disappear on a base-100 surface. Plaid blue and Claude orange
-   * already contrast in both modes. Teller is multi-color and stays. */
+  /* Two kinds of brand mark live here:
+   *
+   *   1. Monochrome marks meant to read as UI icons (Plaid, MCP). Their
+   *      <path>s use fill="currentColor", so they inherit whatever color
+   *      the container sets (muted section-header text, the warning tile,
+   *      the active settings-rail tab) and track light/dark automatically
+   *      — exactly like the Lucide icons sitting next to them. Nothing to
+   *      flip here; currentColor already follows the theme.
+   *
+   *   2. Marks that keep their official baked-in fill because the fill IS
+   *      the brand. The black-on-light ones (GitHub, Anthropic) need a
+   *      flip in dark mode so they don't disappear on a base-100 surface.
+   *      Claude orange already contrasts in both modes; Teller is
+   *      multi-color and stays. */
   @media (prefers-color-scheme: dark) {
     svg.brand-github path,
-    svg.brand-anthropic path,
-    svg.brand-model-context-protocol path,
-    svg.brand-plaid path { fill: #fff; }
+    svg.brand-anthropic path { fill: #fff; }
   }
 
   /*
