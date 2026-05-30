@@ -300,6 +300,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},
 		{
+			Slug:        "report-inbox",
+			Title:       "Report inbox",
+			Description: "components.ReportInboxRow + ReportInboxList + ReportPriorityBadge — the agent-reports inbox (/reports). Daisy list-row with a priority-toned leading tile as the single status signal, a headline, a one-line plain-text body preview, and a quiet meta line. Unread = primary left border + headline weight (no dot, no tint). The priority chip is reused on the report detail header; the priority→tone map is shared with the agent-run report chip.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionReportInbox() },
+		},
+		{
 			Slug:        "agent-run-chat",
 			Title:       "Agent run chat thread",
 			Description: "The chat-thread variants the /agents/runs/{id} detail page composes — assistant + user bubbles (daisy chat), tool_use + tool_result rows (expand to JSON viewer), final result bubble, and the soft-alert error row. Pairs with the markdown-prose + json-viewer sections.",

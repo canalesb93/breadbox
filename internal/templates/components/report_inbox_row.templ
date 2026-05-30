@@ -1,0 +1,219 @@
+package components
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// ReportRowProps is the view-model for a single agent-report inbox row.
+// It lives in the components package (not pages) so anything that lists
+// reports — the /reports inbox, the /design sandbox, and a future
+// dashboard "recent reports" widget — renders the exact same shape.
+//
+// The handler (admin/reports.go) flattens service.AgentReportResponse
+// into this: ID is the short_id the row links to, Time is a pre-rendered
+// relative label, and Preview is a server-side plain-text strip of the
+// markdown body (the row never sees raw markdown).
+type ReportRowProps struct {
+	ID       string   // short_id; the row links to /reports/{ID}
+	Title    string   // report headline — often a full sentence
+	Preview  string   // pre-stripped one-line plain-text body snippet
+	Priority string   // "" | "warning" | "critical"
+	Tags     []string // metadata chips; first two shown, rest collapse to +N
+	Author   string   // DisplayAuthor (agent name)
+	Time     string   // pre-rendered relative time, e.g. "2h ago"
+	IsRead   bool
+}
+
+// ReportInboxRow renders one report as a daisy `list-row` inside an
+// @ReportInboxList. The shape converges on the vocabulary agent_run_row
+// already proved: one priority-toned leading icon tile as the status
+// stoplight (critical → error octagon, warning → triangle, default →
+// primary bot), a headline line, a one-line plain-text body preview,
+// and one quiet meta line (author · time · tags).
+//
+// Unread state is carried by exactly two restrained channels — a 2px
+// primary left border and a heavier headline weight. The whole row is a
+// click target via a stretched link; the only nested control is the
+// hover-revealed mark-read button, lifted above the link with z-10.
+templ ReportInboxRow(r ReportRowProps) {
+	<li
+		id={ "report-" + r.ID }
+		class={ "group list-row relative items-center border-l-2 transition-all duration-300 hover:bg-base-200/40",
+			templ.KV("border-primary", !r.IsRead),
+			templ.KV("border-transparent", r.IsRead) }
+		:class={ fmt.Sprintf("dismissed['%s'] ? 'opacity-0 h-0 overflow-hidden !p-0 !border-0' : ''", r.ID) }
+	>
+		<!-- Leading priority-toned tile — the row's single status signal. -->
+		<div class={ "w-10 h-10 rounded-lg flex items-center justify-center shrink-0", reportPriorityTileBg(r.Priority) }>
+			@LucideIcon(ReportPriorityIcon(r.Priority), "w-4 h-4 "+reportPriorityTileIconColor(r.Priority))
+		</div>
+		<!-- Main content: headline, preview, meta. -->
+		<div class="min-w-0">
+			<div class={ "text-sm leading-snug line-clamp-2", reportRowTitleClass(r.IsRead) }>{ r.Title }</div>
+			if r.Preview != "" {
+				<div class="text-xs text-base-content/50 line-clamp-1 mt-0.5">{ r.Preview }</div>
+			}
+			@reportRowMeta(r)
+		</div>
+		<!-- Trailing actions, lifted above the stretched link. -->
+		<div class="relative z-10 flex items-center self-center shrink-0">
+			if !r.IsRead {
+				<button
+					type="button"
+					@click.prevent.stop={ fmt.Sprintf("markRead('%s')", r.ID) }
+					class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-success hover:bg-success/10 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity"
+					aria-label="Mark as read"
+					title="Mark as read"
+				>
+					@LucideIcon("check", "w-4 h-4")
+				</button>
+			}
+		</div>
+		<!-- Stretched click target covering the whole row. -->
+		<a
+			href={ templ.SafeURL("/reports/" + r.ID) }
+			class="absolute inset-0 z-0"
+			aria-label={ reportRowLinkLabel(r) }
+		></a>
+	</li>
+}
+
+// reportRowMeta renders the single quiet meta line: author · time, then
+// up to two tag chips with a +N overflow. Author truncates first so the
+// time and chips stay legible on narrow rows.
+templ reportRowMeta(r ReportRowProps) {
+	<div class="flex items-center gap-1.5 mt-1 text-xs text-base-content/40 min-w-0">
+		if r.Author != "" {
+			<span class="truncate min-w-0">{ r.Author }</span>
+			<span class="text-base-content/20 shrink-0">·</span>
+		}
+		<span class="shrink-0 tabular-nums">{ r.Time }</span>
+		<!-- Tags are hidden below sm: so they never squeeze the author off a
+		     narrow row; they stay on the desktop row and the detail page. -->
+		for i, tag := range r.Tags {
+			if i < 2 {
+				<span class="badge badge-ghost badge-xs shrink-0 hidden sm:inline-flex">{ tag }</span>
+			}
+		}
+		if len(r.Tags) > 2 {
+			<span class="badge badge-ghost badge-xs shrink-0 hidden sm:inline-flex">+{ strconv.Itoa(len(r.Tags) - 2) }</span>
+		}
+	</div>
+}
+
+// ReportInboxList wraps a series of ReportInboxRow elements in the
+// canonical daisy `list` surface — the same shell AgentRunRowList uses,
+// so the two inbox-like surfaces share container chrome and dividers.
+//
+//	@components.ReportInboxList() {
+//	  for _, r := range rows {
+//	    @components.ReportInboxRow(r)
+//	  }
+//	}
+templ ReportInboxList() {
+	<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+		{ children... }
+	</ul>
+}
+
+// ReportPriorityIcon maps a report priority to its lucide glyph. Shared
+// by the inbox row's leading tile and the detail page's EntityHeader so
+// the two surfaces never drift. Empty and "info" fall through to the
+// neutral "bot" default — the reports analog of agent_run_row's
+// report-chip icon map.
+func ReportPriorityIcon(priority string) string {
+	switch priority {
+	case "critical":
+		return "alert-octagon"
+	case "warning":
+		return "alert-triangle"
+	default:
+		return "bot"
+	}
+}
+
+// ReportPriorityIconTone maps a report priority to the EntityHeader
+// IconTone used on the detail page. The inbox row uses the inline-bg
+// tile variant (reportPriorityTileBg) instead, but both derive from the
+// same priority → semantic-tone intent so the colour never drifts.
+func ReportPriorityIconTone(priority string) IconTone {
+	switch priority {
+	case "critical":
+		return IconToneError
+	case "warning":
+		return IconToneWarning
+	default:
+		return IconTonePrimary
+	}
+}
+
+// reportPriorityTileBg / reportPriorityTileIconColor render the inline
+// tinted tile used on the inbox row (matching agentRunAvatarTone). Empty
+// and "info" normalise to the primary default so a routine report keeps
+// a visible tile instead of going colourless.
+func reportPriorityTileBg(priority string) string {
+	switch priority {
+	case "critical":
+		return "bg-error/10"
+	case "warning":
+		return "bg-warning/10"
+	default:
+		return "bg-primary/10"
+	}
+}
+
+func reportPriorityTileIconColor(priority string) string {
+	switch priority {
+	case "critical":
+		return "text-error"
+	case "warning":
+		return "text-warning"
+	default:
+		return "text-primary"
+	}
+}
+
+// reportRowTitleClass splits the headline weight by read state: unread
+// reports stay full-strength so they pop in the list; read ones fade to
+// a lighter weight + muted colour. This weight split is one of the two
+// restrained unread channels (the other is the primary left border).
+func reportRowTitleClass(isRead bool) string {
+	if isRead {
+		return "font-normal text-base-content/60"
+	}
+	return "font-medium text-base-content"
+}
+
+// reportRowLinkLabel builds the stretched link's accessible name. The
+// row's visual state signals are all non-textual — the priority-toned
+// tile (aria-hidden icon + colour), the 2px primary left border, and the
+// headline weight — so a screen-reader / links-list user would otherwise
+// lose read-state, priority, author, and time entirely. This folds them
+// into one spoken label, e.g. "Unread. Critical. Open report: <title> —
+// <author>, <time>". Routine ("" / "info") reports carry no priority
+// word, matching ReportPriorityBadge.
+func reportRowLinkLabel(r ReportRowProps) string {
+	var b strings.Builder
+	if !r.IsRead {
+		b.WriteString("Unread. ")
+	}
+	switch r.Priority {
+	case "critical":
+		b.WriteString("Critical. ")
+	case "warning":
+		b.WriteString("Warning. ")
+	}
+	b.WriteString("Open report: ")
+	b.WriteString(r.Title)
+	if r.Author != "" {
+		b.WriteString(" — ")
+		b.WriteString(r.Author)
+	}
+	if r.Time != "" {
+		b.WriteString(", ")
+		b.WriteString(r.Time)
+	}
+	return b.String()
+}

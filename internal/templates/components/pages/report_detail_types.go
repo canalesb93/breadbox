@@ -18,8 +18,9 @@ type ReportDetailProps struct {
 }
 
 // ReportDetailReport flattens the agent-report fields the detail page
-// renders. Body is rendered client-side as Markdown via marked +
-// DOMPurify, so it's interpolated as a `data-markdown` attribute.
+// renders. Body is rendered server-side as Markdown via
+// components.Markdown (→ .bb-prose) — there is no client-side
+// marked/DOMPurify pipeline on this page.
 type ReportDetailReport struct {
 	ID            string
 	Title         string

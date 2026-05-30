@@ -1,0 +1,46 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionReportInbox showcases the agent-reports inbox primitives —
+// ReportPriorityBadge, ReportInboxRow, and ReportInboxList — that the
+// /reports page composes. Mirrors how design_agent_run_chat.templ was
+// split into its own sibling so design_sections.templ stays focused.
+//
+// The row matrix is wrapped in a tiny literal x-data so the
+// hover-revealed mark-read button actually fades a row on click here,
+// demonstrating the optimistic-dismiss the live reportsPage factory
+// drives.
+templ SectionReportInbox() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Renders the agent-reports inbox (canonical: <code>/reports</code>) via <code>ReportInboxRow</code> + <code>ReportInboxList</code>. The scaffold is daisy <code>list</code> / <code>list-row</code>, identical to <code>AgentRunRowList</code> — no bespoke wrapper.</li>
+				<li>The leading priority-toned tile is the row's single status signal (critical → error octagon, warning → triangle, default → primary bot). Unread is carried by exactly two restrained channels: a 2px primary left border and a heavier headline weight — no dot, no row tint.</li>
+				<li>The one-line <code>Preview</code> is stripped to plain text server-side (<code>admin/reports.go</code>); the row never sees raw markdown. The whole row is one stretched link; the only nested control is the hover-revealed mark-read button.</li>
+				<li><code>ReportPriorityBadge</code> is the shared priority chip reused on the detail-page <code>EntityHeader</code>. Row tile and detail header both derive from one map (<code>ReportPriorityIcon</code> / <code>ReportPriorityIconTone</code>), kept in lock-step with the agent-run report chip.</li>
+			</ul>
+		</div>
+		@designExample("Priority badge — ReportPriorityBadge", "Pure daisy soft badge, no layout. Default / info / empty renders nothing (the tile + meta already carry neutral state); warning and critical map to soft warning/error badges with a leading glyph.") {
+			<div class="flex flex-wrap items-center gap-2">
+				@components.ReportPriorityBadge("")
+				<span class="text-xs text-base-content/40">← empty renders nothing</span>
+				@components.ReportPriorityBadge("warning")
+				@components.ReportPriorityBadge("critical")
+			</div>
+		}
+		@designExample("Inbox rows — ReportInboxList + ReportInboxRow", "Full variant matrix: unread+critical, unread+warning, unread+plain, read+plain (dimmed, no left bar), a long headline that clamps to two lines, and a multi-tag row that collapses extras into a +N badge. Hover a row to reveal its mark-read button.") {
+			<div x-data="{ dismissed: {}, markRead(id) { this.dismissed[id] = true } }">
+				@components.ReportInboxList() {
+					@components.ReportInboxRow(designReportRowUnreadCritical())
+					@components.ReportInboxRow(designReportRowUnreadWarning())
+					@components.ReportInboxRow(designReportRowUnreadPlain())
+					@components.ReportInboxRow(designReportRowReadPlain())
+					@components.ReportInboxRow(designReportRowLongHeadline())
+					@components.ReportInboxRow(designReportRowMultiTag())
+				}
+			</div>
+		}
+	</div>
+}

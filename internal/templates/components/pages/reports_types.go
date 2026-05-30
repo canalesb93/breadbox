@@ -2,57 +2,39 @@
 
 package pages
 
-import "fmt"
+import "breadbox/internal/templates/components"
 
-// ReportsProps mirrors the field set the old reports.html read off the
-// layout data map. The handler (admin/reports.go) builds these and the
-// templ renders the agent-reports inbox without going through funcMap
-// helpers.
+// ReportsProps mirrors the field set the handler (admin/reports.go)
+// builds for the agent-reports inbox. The row view-model lives in the
+// components package (components.ReportRowProps) so the inbox row is
+// shared with the /design sandbox and any future recent-reports widget.
 type ReportsProps struct {
-	Reports      []ReportsItem
+	Reports      []components.ReportRowProps
 	FilterStatus string // "", "unread", "read"
-	TotalCount   int
+	// Per-tab counts shown as TabBar badges. Derived from the same
+	// most-recent-100 unfiltered fetch the list is built from, so every
+	// tab carries a consistent total regardless of the active filter.
+	// (Accurate for the realistic bounded inbox; a household with >100
+	// reports would see counts capped at the fetch window.)
+	AllCount    int
+	UnreadCount int
+	ReadCount   int
 }
 
-// ReportsItem is a view-model wrapper around service.AgentReportResponse
-// with the read-state and display author flattened so the templ does not
-// have to call any admin helpers.
-type ReportsItem struct {
-	ID            string
-	Title         string
-	Body          string
-	Priority      string // "", "warning", "critical"
-	Tags          []string
-	DisplayAuthor string
-	CreatedAt     string // pre-rendered relative time
-	IsRead        bool
-}
-
-// reportsTabClass returns the active/inactive class string for one of the
-// All / Unread / Read filter tabs at the top of the inbox. Mirrors the
-// `{{if eq .FilterStatus "x"}}…{{else}}…{{end}}` ternary in the source
-// HTML.
-func reportsTabClass(active bool) string {
-	base := "px-2.5 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors no-underline"
-	if active {
-		return base + " text-base-content border-primary"
+// reportsCountPtr adapts an int count to the *int TabBarItem.Count slot,
+// collapsing a zero count to nil so empty tabs render no badge instead
+// of a noisy "0".
+func reportsCountPtr(n int) *int {
+	if n == 0 {
+		return nil
 	}
-	return base + " text-base-content/40 border-transparent hover:text-base-content/60"
-}
-
-// reportsCountLabel renders "N report" / "N reports" — pluralized inline
-// so the templ side stays declarative. Mirrors the
-// `{{.TotalCount}} report{{if ne .TotalCount 1}}s{{end}}` pattern.
-func reportsCountLabel(n int) string {
-	if n == 1 {
-		return fmt.Sprintf("%d report", n)
-	}
-	return fmt.Sprintf("%d reports", n)
+	v := n
+	return &v
 }
 
 // reportsEmptyTitle renders the "No reports" / "No unread reports" /
 // "No read reports" header for the empty-state card, depending on the
-// active status filter. Mirrors the inline ternary in the source HTML.
+// active status filter.
 func reportsEmptyTitle(filterStatus string) string {
 	switch filterStatus {
 	case "unread":
@@ -72,24 +54,4 @@ func reportsEmptyMessage(filterStatus string) string {
 		return "You're all caught up. New agent messages will appear here."
 	}
 	return "Reports submitted by AI agents will appear here as messages."
-}
-
-// reportsTagHidden hides every meta tag past the first one on mobile.
-// Mirrors the `{{if gt $i 0}}hidden sm:inline{{end}}` guard in the
-// source HTML.
-func reportsTagHidden(i int) string {
-	if i > 0 {
-		return "hidden sm:inline"
-	}
-	return ""
-}
-
-// reportsTitleClass picks the message-bubble paragraph color based on
-// the report's read state. Read messages fade to /70; unread stay full
-// brightness so they pop in the inbox.
-func reportsTitleClass(isRead bool) string {
-	if isRead {
-		return "text-base-content/70"
-	}
-	return "text-base-content"
 }

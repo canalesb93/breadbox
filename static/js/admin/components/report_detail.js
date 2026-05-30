@@ -4,12 +4,11 @@
 // Initial scalar state (report ID + is-read flag) flows in via data-*
 // attributes on the x-data root and is read in init().
 //
-// Markdown rendering for the body lives in the shared
-// static/js/admin/markdown.js scanner (loaded as a sibling script in
-// report_detail.templ). It picks up the `.bb-report-body[data-markdown]`
-// element on DOMContentLoaded and runs marked + DOMPurify with the
-// shared link/table/last-child enhancements. This file is now purely
-// the Alpine factory for the toolbar (mark-read, copy-link, toast).
+// The report body is rendered server-side via components.Markdown
+// (→ .bb-prose), the same renderer the agent-run transcript uses — so
+// there is no client-side marked/DOMPurify/markdown.js pass on this page.
+// This factory owns only the detail toolbar: the mark-read/unread toggle,
+// copy-link, and the success toast.
 document.addEventListener('alpine:init', function () {
   Alpine.data('reportDetail', function () {
     return {

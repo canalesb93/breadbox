@@ -1,7 +1,6 @@
 // Shared markdown rendering for any element carrying `data-markdown="..."`.
 //
 // Used by:
-//   - /reports/{id}              -> .bb-report-body (full-page markdown)
 //   - /transactions/{id}         -> .bb-comment-bubble (annotation comments)
 //
 // Loaded as a sibling of marked + DOMPurify CDN scripts. Auto-runs on
