@@ -242,7 +242,7 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Read `status=candidate` to find series awaiting a verdict.
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. Read `status=candidate` to find series awaiting a verdict.
 
 ### get_series (Read)
 

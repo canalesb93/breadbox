@@ -3217,6 +3217,8 @@ components:
         last_amount: { type: number, nullable: true }
         last_seen_date: { type: string, format: date, nullable: true }
         next_expected_date: { type: string, format: date, nullable: true }
+        renewal_health: { type: string, description: "Derived (active series only): `active`|`due_soon`|`overdue`|`stale`|`unknown`, from next_expected_date vs today." }
+        days_until_renewal: { type: integer, nullable: true, description: "Signed days to next_expected_date (negative = overdue). Omitted when no projection." }
         occurrence_count: { type: integer }
         detection_signals: { type: object, nullable: true, additionalProperties: true }
         tags: { type: array, items: { type: string } }

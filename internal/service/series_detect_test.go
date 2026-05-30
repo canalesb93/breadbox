@@ -5,6 +5,8 @@ package service
 import (
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func cp(date string, cents int64) chargePoint {
@@ -104,3 +106,56 @@ func TestSnapCadence(t *testing.T) {
 		}
 	}
 }
+
+// --- renewal-health derivation (seriesRenewalHealth) ---
+
+func mkDate(s string) pgtype.Date {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		panic(err)
+	}
+	return pgtype.Date{Time: t, Valid: true}
+}
+
+func TestSeriesRenewalHealth(t *testing.T) {
+	now := time.Date(2026, 5, 30, 12, 0, 0, 0, time.UTC)
+
+	cases := []struct {
+		name         string
+		status       string
+		cadence      string
+		nextExpected pgtype.Date
+		wantHealth   string
+		wantDays     *int // nil means "expect nil pointer"
+	}{
+		{"non-active is empty", SeriesStatusCandidate, SeriesCadenceMonthly, mkDate("2026-06-15"), "", nil},
+		{"paused is empty", SeriesStatusPaused, SeriesCadenceMonthly, mkDate("2026-06-15"), "", nil},
+		{"no projection → unknown", SeriesStatusActive, SeriesCadenceIrregular, pgtype.Date{}, SeriesHealthUnknown, nil},
+		{"future beyond window → active", SeriesStatusActive, SeriesCadenceMonthly, mkDate("2026-06-29"), SeriesHealthActive, intp(30)},
+		{"within a week → due_soon", SeriesStatusActive, SeriesCadenceMonthly, mkDate("2026-06-05"), SeriesHealthDueSoon, intp(6)},
+		{"today → due_soon", SeriesStatusActive, SeriesCadenceMonthly, mkDate("2026-05-30"), SeriesHealthDueSoon, intp(0)},
+		{"a few days late, within cycle → overdue", SeriesStatusActive, SeriesCadenceMonthly, mkDate("2026-05-20"), SeriesHealthOverdue, intp(-10)},
+		{"missed a full monthly cycle → stale", SeriesStatusActive, SeriesCadenceMonthly, mkDate("2026-04-01"), SeriesHealthStale, intp(-59)},
+		{"weekly 10 days late → stale", SeriesStatusActive, SeriesCadenceWeekly, mkDate("2026-05-20"), SeriesHealthStale, intp(-10)},
+		{"weekly 5 days late → overdue", SeriesStatusActive, SeriesCadenceWeekly, mkDate("2026-05-25"), SeriesHealthOverdue, intp(-5)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotHealth, gotDays := seriesRenewalHealth(tc.status, tc.cadence, tc.nextExpected, now)
+			if gotHealth != tc.wantHealth {
+				t.Errorf("health = %q, want %q", gotHealth, tc.wantHealth)
+			}
+			switch {
+			case tc.wantDays == nil && gotDays != nil:
+				t.Errorf("days = %d, want nil", *gotDays)
+			case tc.wantDays != nil && gotDays == nil:
+				t.Errorf("days = nil, want %d", *tc.wantDays)
+			case tc.wantDays != nil && gotDays != nil && *gotDays != *tc.wantDays:
+				t.Errorf("days = %d, want %d", *gotDays, *tc.wantDays)
+			}
+		})
+	}
+}
+
+func intp(i int) *int { return &i }
