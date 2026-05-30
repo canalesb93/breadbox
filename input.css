@@ -1899,47 +1899,10 @@
     line-height: 1;
   }
 
-  /* ── Collapsible sidebar — desktop icon-rail ──────────────────────
-     Toggled by bbToggleSidebar() setting <html data-sidebar="collapsed">
-     (pre-applied before paint by the inline <head> script, so no flash).
-     Only active at lg+, where the sidebar is a persistent rail; below lg
-     the drawer is a transient overlay and keeps its full width. The grid
-     `max-content` track on .drawer reflows the content as the rail's width
-     animates. */
-  @media (min-width: 1024px) {
-    .bb-sidebar { transition: width 0.2s ease; }
-
-    html[data-sidebar="collapsed"] .bb-sidebar {
-      width: 4.5rem;
-      padding-left: 0.5rem;
-      padding-right: 0.5rem;
-    }
-
-    /* Drop every text affordance inside the rail; the icons remain. */
-    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link__label,
-    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-brand-text,
-    html[data-sidebar="collapsed"] .bb-sidebar .bb-nav-badge,
-    html[data-sidebar="collapsed"] .bb-sidebar .badge {
-      display: none;
-    }
-
-    /* Centre the icons in the narrowed rail. */
-    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link {
-      @apply justify-center;
-      padding-left: 0;
-      padding-right: 0;
-    }
-    html[data-sidebar="collapsed"] .bb-sidebar-header {
-      @apply justify-center;
-    }
-
-    /* Section labels collapse to a slim spacer so groups stay separated. */
-    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
-      font-size: 0;
-      line-height: 0;
-      padding: 0.75rem 0 0.25rem;
-    }
-  }
+  /* NOTE: the collapsed icon-rail rules live UNLAYERED (search
+     "Collapsible sidebar — desktop icon-rail" below the @layer
+     components close) — they must beat the `lg:w-64` @apply and the
+     `justify-between` utility, which @layer components can't. */
 
   /* ── Landscape mobile: scroll entire sidebar, keep full touch targets ── */
   @media (orientation: landscape) and (max-height: 500px) {
@@ -2835,6 +2798,65 @@
  * the slug-tooltip class made the chip render two-line). */
 .bb-tag.tooltip {
   display: inline-flex;
+}
+
+/* ── Collapsible sidebar — desktop icon-rail ──
+ * Unlayered (not @layer components) on purpose: the collapsed width must
+ * beat the `lg:w-64` @apply'd onto .bb-sidebar, and the header centering
+ * must beat the `justify-between` utility on .bb-sidebar-header. Utilities
+ * and @apply'd declarations win over @layer components regardless of
+ * specificity (see the section note above), so these overrides only land
+ * if they sit outside every layer.
+ *
+ * Toggled by bbToggleSidebar() setting <html data-sidebar="collapsed">
+ * (pre-applied before paint by the inline <head> script, so no flash).
+ * Only active at lg+, where the sidebar is a persistent rail; below lg the
+ * drawer is a transient overlay and keeps its full width. The drawer's
+ * `max-content` grid track reflows the content as the rail width animates. */
+@media (min-width: 1024px) {
+  .bb-sidebar { transition: width 0.2s ease; }
+
+  html[data-sidebar="collapsed"] .bb-sidebar {
+    width: 4.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  /* Drop every text affordance inside the rail; the icons remain. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link__label,
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-brand-text,
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-nav-badge,
+  html[data-sidebar="collapsed"] .bb-sidebar .badge {
+    display: none;
+  }
+
+  /* Centre the icons in the narrowed rail (links + the brand row). */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  html[data-sidebar="collapsed"] .bb-sidebar-header {
+    justify-content: center;
+  }
+
+  /* Section labels collapse to a slim spacer so groups stay separated. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
+    font-size: 0;
+    line-height: 0;
+    padding: 0.75rem 0 0.25rem;
+  }
+}
+
+/* ── Topbar profile dropdown: instant close ──
+ * The popover anchors below the avatar while open (via position-area), but
+ * on close the anchor reverts and the base `inset:0` snaps it to the
+ * viewport top for the duration of the fade — a visible "jump". Killing the
+ * transition while not :popover-open removes it instantly instead of
+ * animating from the wrong spot. Scoped to the topbar so other dropdowns
+ * keep their fade; unlayered to beat daisy's own transition rule. */
+.bb-topbar .dropdown[popover]:not(:popover-open) {
+  transition: none;
 }
 
 /* ── Command palette: tx-row horizontal alignment ──
