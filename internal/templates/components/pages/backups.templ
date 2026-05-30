@@ -41,10 +41,8 @@ templ Backups(p BackupsProps) {
 					</div>
 				}
 				@backupsStats(p)
-				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-					@backupsScheduleSection(p)
-					@backupsRestoreSection(p)
-				</div>
+				@backupsScheduleSection(p)
+				@backupsRestoreSection(p)
 				@backupsFilesSection(p)
 			}
 		</div>
@@ -303,11 +301,13 @@ templ backupsRestoreSection(p BackupsProps) {
 			Caption: "Upload a previously downloaded .sql.gz backup to replace current data",
 		}) {
 			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-				<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3">
-					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 inline mr-1")
-					<strong>Warning:</strong> Restoring a backup will replace all current data. Make sure you have the correct
-					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> that matches the backup,
-					or bank connections will need to be re-linked.
+				<div class="alert alert-error alert-soft rounded-lg text-xs items-start" role="alert">
+					@components.LucideIcon("alert-triangle", "w-4 h-4 shrink-0")
+					<span>
+						<strong>Warning:</strong> Restoring a backup will replace all current data. Make sure you have the correct
+						<code class="bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> that matches the backup,
+						or bank connections will need to be re-linked.
+					</span>
 				</div>
 			}
 			@components.SettingsRow(components.SettingsRowProps{

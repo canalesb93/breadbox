@@ -96,22 +96,6 @@ var componentRegistry = map[string]componentAdapter{
 	"ThemeToggle": func(_ any) (templ.Component, error) {
 		return components.ThemeToggle(), nil
 	},
-	"SettingsModal": func(data any) (templ.Component, error) {
-		m, ok := data.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("SettingsModal: want map[string]any, got %T", data)
-		}
-		isAdmin, _ := m["IsAdmin"].(bool)
-		isEditor, _ := m["IsEditor"].(bool)
-		initialTab, _ := m["SettingsInitialTab"].(string)
-		initialBody, _ := m["SettingsInitialBody"].(template.HTML)
-		return components.SettingsModal(components.SettingsModalProps{
-			IsAdmin:     isAdmin,
-			IsEditor:    isEditor,
-			InitialTab:  initialTab,
-			InitialBody: initialBody,
-		}), nil
-	},
 }
 
 // toStringSlice coerces the value passed via renderComponent into a

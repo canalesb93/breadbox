@@ -148,31 +148,31 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/design/c/{slug}", DesignComponentHandler(sm, tr))
 
 		// API Keys + OAuth Clients page (Settings → API Keys tab).
-		// Editors can view and create.
+		// Editors can view and create. Creation is one-click: a POST mints
+		// the secret and 303-redirects back to the tab, which reveals the
+		// plaintext inline (no /new form or /created subpage).
 		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
-		r.Get("/settings/api-keys/new", APIKeyNewPageHandler(sm, tr))
 		r.Post("/settings/api-keys/new", APIKeyCreatePageHandler(svc, sm, tr))
-		r.Get("/settings/api-keys/{id}/created", APIKeyCreatedPageHandler(sm, tr))
 
 		r.Get("/settings/oauth-clients", redirectGET("/settings/api-keys"))
-		r.Get("/settings/oauth-clients/new", OAuthClientNewPageHandler(sm, tr))
 		r.Post("/settings/oauth-clients/new", OAuthClientCreatePageHandler(svc, sm, tr))
-		r.Get("/settings/oauth-clients/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
 
-		// Legacy /access, /api-keys, /oauth-clients redirects.
+		// Legacy /access, /api-keys, /oauth-clients redirects. The old GET
+		// /new + /{id}/created subpages are gone — those URLs now 301 to the
+		// list, where create + reveal happen inline.
 		r.Get("/access", redirectGET("/settings/api-keys"))
 		r.Get("/api-keys", redirectGET("/settings/api-keys"))
-		r.Get("/api-keys/new", redirectGET("/settings/api-keys/new"))
+		r.Get("/api-keys/new", redirectGET("/settings/api-keys"))
 		r.Post("/api-keys/new", redirectPreserveMethod("/settings/api-keys/new"))
-		r.Get("/api-keys/{id}/created", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/settings/api-keys/"+chi.URLParam(r, "id")+"/created", http.StatusMovedPermanently)
-		})
+		r.Get("/api-keys/{id}/created", redirectGET("/settings/api-keys"))
+		r.Get("/settings/api-keys/new", redirectGET("/settings/api-keys"))
+		r.Get("/settings/api-keys/{id}/created", redirectGET("/settings/api-keys"))
 		r.Get("/oauth-clients", redirectGET("/settings/api-keys"))
-		r.Get("/oauth-clients/new", redirectGET("/settings/oauth-clients/new"))
+		r.Get("/oauth-clients/new", redirectGET("/settings/api-keys"))
 		r.Post("/oauth-clients/new", redirectPreserveMethod("/settings/oauth-clients/new"))
-		r.Get("/oauth-clients/{id}/created", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/settings/oauth-clients/"+chi.URLParam(r, "id")+"/created", http.StatusMovedPermanently)
-		})
+		r.Get("/oauth-clients/{id}/created", redirectGET("/settings/api-keys"))
+		r.Get("/settings/oauth-clients/new", redirectGET("/settings/api-keys"))
+		r.Get("/settings/oauth-clients/{id}/created", redirectGET("/settings/api-keys"))
 
 		// Agents — Claude Agent SDK admin pages.
 		//
