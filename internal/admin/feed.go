@@ -234,6 +234,17 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			if ts.Before(windowStart) || ts.After(windowEnd) {
 				continue
 			}
+			// Seed the report's avatar from the agent it ran under so the
+			// row shows the same robot as the agent's other activity,
+			// instead of the generic bot tile. Resolves only for run keys
+			// linked to a definition (new reports); operator/historical
+			// reports leave it empty and keep the bot fallback.
+			reportAvatarSeed := ""
+			if rep.CreatedByID != nil {
+				if slug, ok := svc.ResolveAgentSlugForActor(ctx, *rep.CreatedByID); ok {
+					reportAvatarSeed = slug
+				}
+			}
 			items = append(items, pages.FeedItem{
 				Type:         "report",
 				Timestamp:    ts,
@@ -247,6 +258,7 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 					Tags:          rep.Tags,
 					DisplayAuthor: reportDisplayAuthor(rep.CreatedByName, rep.Author),
 					IsUnread:      rep.ReadAt == nil,
+					AvatarSeed:    reportAvatarSeed,
 				},
 			})
 		}

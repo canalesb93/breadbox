@@ -32,6 +32,11 @@ type CreateAPIKeyParams struct {
 	Scope     string
 	ActorType string // "user" | "agent" | "system"; defaults to "user"
 	ActorName string // optional display name, falls back to Name
+	// AgentDefinitionID links a per-run agent key back to the
+	// agent_definition it runs for (UUID string; empty for non-agent
+	// keys). Set by MintRunAPIKey so all of an agent's activity resolves
+	// to one canonical identity. See GetAgentIdentityByApiKeyID.
+	AgentDefinitionID string
 }
 
 // CreateAPIKey mints a new API key and returns the full record plus the
@@ -84,13 +89,20 @@ func (s *Service) CreateAPIKey(ctx context.Context, p CreateAPIKeyParams) (*Crea
 	if p.ActorName != "" {
 		actorName = pgtype.Text{String: p.ActorName, Valid: true}
 	}
+	var agentDefID pgtype.UUID
+	if p.AgentDefinitionID != "" {
+		if err := agentDefID.Scan(p.AgentDefinitionID); err != nil {
+			return nil, fmt.Errorf("invalid agent_definition_id: %w", err)
+		}
+	}
 	apiKey, err := s.Queries.CreateApiKey(ctx, db.CreateApiKeyParams{
-		Name:      p.Name,
-		KeyHash:   keyHash,
-		KeyPrefix: keyPrefix,
-		Scope:     scope,
-		ActorType: actorType,
-		ActorName: actorName,
+		Name:              p.Name,
+		KeyHash:           keyHash,
+		KeyPrefix:         keyPrefix,
+		Scope:             scope,
+		ActorType:         actorType,
+		ActorName:         actorName,
+		AgentDefinitionID: agentDefID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
@@ -163,6 +175,27 @@ func (s *Service) ValidateAPIKey(ctx context.Context, key string) (*db.ApiKey, e
 	}()
 
 	return &apiKey, nil
+}
+
+// ResolveAgentSlugForActor returns the agent_definition slug an actor
+// (an api_keys UUID) runs for, when that key is a per-run agent key
+// linked to a definition (set at mint via agent_definition_id). The slug
+// is the avatar seed, so an agent's robot is identical everywhere its
+// activity surfaces. ok=false for non-agent actors, external mcp-client
+// identities, and keys with no definition link.
+func (s *Service) ResolveAgentSlugForActor(ctx context.Context, actorID string) (string, bool) {
+	if actorID == "" {
+		return "", false
+	}
+	var uid pgtype.UUID
+	if err := uid.Scan(actorID); err != nil {
+		return "", false
+	}
+	row, err := s.Queries.GetAgentIdentityByApiKeyID(ctx, uid)
+	if err != nil {
+		return "", false
+	}
+	return row.Slug, true
 }
 
 func apiKeyFromRow(r db.ApiKey) APIKeyResponse {
