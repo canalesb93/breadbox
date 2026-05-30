@@ -1,0 +1,516 @@
+//go:build !lite
+
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math"
+	"strings"
+	"time"
+
+	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+// Recurring-series enum vocabularies (mirrors the CHECK constraints in the
+// recurring_series migration). Kept here so the service validates before the DB.
+const (
+	SeriesCadenceWeekly     = "weekly"
+	SeriesCadenceBiweekly   = "biweekly"
+	SeriesCadenceMonthly    = "monthly"
+	SeriesCadenceQuarterly  = "quarterly"
+	SeriesCadenceSemiannual = "semiannual"
+	SeriesCadenceAnnual     = "annual"
+	SeriesCadenceIrregular  = "irregular"
+	SeriesCadenceUnknown    = "unknown"
+
+	SeriesStatusActive    = "active"
+	SeriesStatusPaused    = "paused"
+	SeriesStatusCancelled = "cancelled"
+	SeriesStatusCandidate = "candidate"
+
+	SeriesSourceDeterministic = "deterministic"
+	SeriesSourceAgent         = "agent"
+	SeriesSourceUser          = "user"
+	SeriesSourceRule          = "rule"
+
+	SeriesConfidenceAuto      = "auto"
+	SeriesConfidenceConfirmed = "confirmed"
+	SeriesConfidenceRejected  = "rejected"
+)
+
+var validSeriesCadence = map[string]bool{
+	SeriesCadenceWeekly: true, SeriesCadenceBiweekly: true, SeriesCadenceMonthly: true,
+	SeriesCadenceQuarterly: true, SeriesCadenceSemiannual: true, SeriesCadenceAnnual: true,
+	SeriesCadenceIrregular: true, SeriesCadenceUnknown: true,
+}
+
+var validSeriesSource = map[string]bool{
+	SeriesSourceDeterministic: true, SeriesSourceAgent: true,
+	SeriesSourceUser: true, SeriesSourceRule: true,
+}
+
+// SeriesVerdict is a human/agent adjudication applied via ReviewSeries.
+type SeriesVerdict string
+
+const (
+	VerdictConfirm SeriesVerdict = "confirm"
+	VerdictReject  SeriesVerdict = "reject"
+	VerdictPause   SeriesVerdict = "pause"
+	VerdictCancel  SeriesVerdict = "cancel"
+)
+
+// SeriesUpsert is the input to the detection funnel. The deterministic detector,
+// rule actions, and agents all funnel proposals through it. MerchantKey is
+// required — a NULL-merchant charge never produces a series this way (it joins a
+// series only via an explicit manual/agent/rule link).
+type SeriesUpsert struct {
+	UserID           *string  // short_id or uuid; nil = shared/household
+	Name             string   // display label; defaults to MerchantKey when empty
+	MerchantKey      string   // required, the dedup anchor
+	Cadence          string   // defaults to "unknown"
+	ExpectedDay      *int32   // day-of-month / day-of-week, when known
+	ExpectedAmount   *float64 // dollars, paired with Currency
+	AmountTolerance  *float64 // dollars; defaults to 1.00 on insert
+	Currency         *string
+	CategoryID       *string  // short_id or uuid; advisory
+	Source           string   // deterministic|agent|user|rule (defaults deterministic)
+	MemberTxnIDs     []string // transactions to back-link (short_id or uuid)
+	DetectionSignals []byte   // raw JSON signals (§6.6)
+}
+
+// SeriesResponse is the API/MCP shape of a recurring_series row.
+type SeriesResponse struct {
+	ID               string          `json:"id"`
+	ShortID          string          `json:"short_id"`
+	UserID           *string         `json:"user_id,omitempty"`
+	Name             string          `json:"name"`
+	MerchantKey      string          `json:"merchant_key"`
+	Cadence          string          `json:"cadence"`
+	ExpectedDay      *int            `json:"expected_day,omitempty"`
+	ExpectedAmount   *float64        `json:"expected_amount,omitempty"`
+	AmountTolerance  *float64        `json:"amount_tolerance,omitempty"`
+	IsoCurrencyCode  *string         `json:"iso_currency_code,omitempty"`
+	CategoryID       *string         `json:"category_id,omitempty"`
+	Status           string          `json:"status"`
+	DetectionSource  string          `json:"detection_source"`
+	Confidence       string          `json:"confidence"`
+	ConfirmedByType  *string         `json:"confirmed_by_type,omitempty"`
+	LastAmount       *float64        `json:"last_amount,omitempty"`
+	LastSeenDate     *string         `json:"last_seen_date,omitempty"`
+	NextExpectedDate *string         `json:"next_expected_date,omitempty"`
+	OccurrenceCount  int             `json:"occurrence_count"`
+	DetectionSignals json.RawMessage `json:"detection_signals,omitempty"`
+	CreatedAt        string          `json:"created_at"`
+	UpdatedAt        string          `json:"updated_at"`
+}
+
+// UpsertSeriesCandidate is the single writer of recurring_series from detection.
+// It matches the dedup signature under a row lock, inserts a fresh candidate or
+// refreshes an existing one per the precedence ladder, back-links member
+// transactions (NULL-fill only), and recomputes rollups — all in one
+// transaction so concurrent detector/agent writers converge instead of forking.
+func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, actor Actor) (*SeriesResponse, error) {
+	merchantKey := strings.TrimSpace(in.MerchantKey)
+	if merchantKey == "" {
+		return nil, fmt.Errorf("%w: merchant_key is required", ErrInvalidParameter)
+	}
+	cadence := in.Cadence
+	if cadence == "" {
+		cadence = SeriesCadenceUnknown
+	}
+	if !validSeriesCadence[cadence] {
+		return nil, fmt.Errorf("%w: invalid cadence %q", ErrInvalidParameter, cadence)
+	}
+	source := in.Source
+	if source == "" {
+		source = SeriesSourceDeterministic
+	}
+	if !validSeriesSource[source] {
+		return nil, fmt.Errorf("%w: invalid source %q", ErrInvalidParameter, source)
+	}
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		name = merchantKey
+	}
+
+	userID, err := s.resolveOptionalUserID(ctx, in.UserID)
+	if err != nil {
+		return nil, err
+	}
+	categoryID, err := s.resolveOptionalCategoryID(ctx, in.CategoryID)
+	if err != nil {
+		return nil, err
+	}
+	memberIDs, err := s.resolveTransactionIDs(ctx, in.MemberTxnIDs)
+	if err != nil {
+		return nil, err
+	}
+	currency := pgconv.TextPtrIfNotEmpty(in.Currency)
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin series upsert: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	// 1. Match the signature under a row lock.
+	existing, matchErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
+		MerchantKey:     merchantKey,
+		IsoCurrencyCode: currency,
+		UserID:          userID,
+	})
+	haveExisting := matchErr == nil
+	if matchErr != nil && !errors.Is(matchErr, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("match series: %w", matchErr)
+	}
+
+	// 2. A rejected verdict is sticky — never re-propose. Return it untouched.
+	if haveExisting && existing.Confidence == SeriesConfidenceRejected {
+		resp := seriesFromRow(existing)
+		return &resp, nil
+	}
+
+	// 3. Establish the target row (insert a fresh candidate, or reuse the match).
+	var base db.RecurringSeries
+	if haveExisting {
+		base = existing
+	} else {
+		tolerance := pgconv.NumericCents(100) // $1.00 default
+		if in.AmountTolerance != nil {
+			tolerance = numericDollars(*in.AmountTolerance)
+		}
+		base, err = qtx.InsertRecurringSeries(ctx, db.InsertRecurringSeriesParams{
+			UserID:           userID,
+			Name:             name,
+			MerchantKey:      merchantKey,
+			Cadence:          cadence,
+			ExpectedDay:      int4Ptr(in.ExpectedDay),
+			ExpectedAmount:   numericDollarsPtr(in.ExpectedAmount),
+			AmountTolerance:  tolerance,
+			IsoCurrencyCode:  currency,
+			CategoryID:       categoryID,
+			Status:           SeriesStatusCandidate,
+			DetectionSource:  source,
+			Confidence:       SeriesConfidenceAuto,
+			ConfirmedByType:  pgtype.Text{},
+			LastAmount:       pgtype.Numeric{},
+			LastSeenDate:     pgtype.Date{},
+			NextExpectedDate: pgtype.Date{},
+			OccurrenceCount:  0,
+			DetectionSignals: in.DetectionSignals,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("insert series: %w", err)
+		}
+	}
+
+	// 4. Back-link member transactions (NULL-fill only).
+	if len(memberIDs) > 0 {
+		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
+			SeriesID:       base.ID,
+			TransactionIds: memberIDs,
+		}); err != nil {
+			return nil, fmt.Errorf("back-link members: %w", err)
+		}
+	}
+
+	// 5. Recompute rollups from the live members.
+	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, base.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. Build the merged update per the precedence ladder.
+	upd := updateParamsFromRow(base)
+	upd.OccurrenceCount = occCount
+	upd.LastAmount = lastAmount
+	upd.LastSeenDate = lastSeen
+
+	// An unadjudicated (auto) candidate may have its proposed fields sharpened
+	// by a fresh detection pass; a confirmed series gets rollups only (its
+	// adjudicated fields are sacred). Confidence/status are never downgraded by
+	// the proposal path — verdicts flow through ReviewSeries.
+	if base.Confidence == SeriesConfidenceAuto {
+		upd.Cadence = cadence
+		if in.ExpectedAmount != nil {
+			upd.ExpectedAmount = numericDollars(*in.ExpectedAmount)
+		}
+		if in.ExpectedDay != nil {
+			upd.ExpectedDay = pgconv.Int4(*in.ExpectedDay)
+		}
+		if in.AmountTolerance != nil {
+			upd.AmountTolerance = numericDollars(*in.AmountTolerance)
+		}
+		if categoryID.Valid && !base.CategoryID.Valid {
+			upd.CategoryID = categoryID
+		}
+		if strings.TrimSpace(base.Name) == "" || base.Name == base.MerchantKey {
+			upd.Name = name
+		}
+		if len(in.DetectionSignals) > 0 {
+			upd.DetectionSignals = in.DetectionSignals
+		}
+	}
+	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, upd.LastSeenDate)
+
+	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
+	if err != nil {
+		return nil, fmt.Errorf("update series: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit series upsert: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// ReviewSeries applies a human/agent verdict to a series. Confirm/reject are
+// the durable verdict on the confidence axis; pause/cancel move the lifecycle
+// status. A user's prior confirmation outranks a later agent write.
+func (s *Service) ReviewSeries(ctx context.Context, idOrShort string, verdict SeriesVerdict, actor Actor) (*SeriesResponse, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+
+	// User outranks agent on adjudicated rows: an agent cannot overturn a
+	// user's confirm/reject verdict.
+	if (verdict == VerdictConfirm || verdict == VerdictReject) &&
+		row.Confidence == SeriesConfidenceConfirmed &&
+		row.ConfirmedByType.Valid && row.ConfirmedByType.String == "user" &&
+		actor.Type == "agent" {
+		resp := seriesFromRow(row)
+		return &resp, nil
+	}
+
+	upd := updateParamsFromRow(row)
+	switch verdict {
+	case VerdictConfirm:
+		upd.Confidence = SeriesConfidenceConfirmed
+		upd.Status = SeriesStatusActive
+		upd.ConfirmedByType = pgconv.Text(confirmerType(actor))
+		upd.DetectionSource = confirmerType(actor)
+	case VerdictReject:
+		upd.Confidence = SeriesConfidenceRejected
+		upd.ConfirmedByType = pgconv.Text(confirmerType(actor))
+	case VerdictPause:
+		upd.Status = SeriesStatusPaused
+	case VerdictCancel:
+		upd.Status = SeriesStatusCancelled
+	default:
+		return nil, fmt.Errorf("%w: unknown verdict %q", ErrInvalidParameter, verdict)
+	}
+
+	updated, err := s.Queries.UpdateRecurringSeries(ctx, upd)
+	if err != nil {
+		return nil, fmt.Errorf("review series: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// GetSeries returns a single series by short_id or uuid.
+func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+	resp := seriesFromRow(row)
+	return &resp, nil
+}
+
+// ListSeriesByStatus returns series in a given lifecycle status, newest first.
+func (s *Service) ListSeriesByStatus(ctx context.Context, status string) ([]SeriesResponse, error) {
+	rows, err := s.Queries.ListRecurringSeriesByStatus(ctx, status)
+	if err != nil {
+		return nil, fmt.Errorf("list series: %w", err)
+	}
+	out := make([]SeriesResponse, len(rows))
+	for i, r := range rows {
+		out[i] = seriesFromRow(r)
+	}
+	return out, nil
+}
+
+// seriesRollup recomputes (occurrence_count, last_amount, last_seen_date) from
+// the live members of a series. Zero members → zeros/NULLs (idempotent).
+func (s *Service) seriesRollup(ctx context.Context, q *db.Queries, seriesID pgtype.UUID) (int32, pgtype.Numeric, pgtype.Date, error) {
+	roll, err := q.SeriesMemberRollup(ctx, seriesID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, pgtype.Numeric{}, pgtype.Date{}, nil
+		}
+		return 0, pgtype.Numeric{}, pgtype.Date{}, fmt.Errorf("series rollup: %w", err)
+	}
+	return int32(roll.OccurrenceCount), roll.LastAmount, roll.LastSeenDate, nil
+}
+
+func (s *Service) resolveOptionalUserID(ctx context.Context, idOrShort *string) (pgtype.UUID, error) {
+	if idOrShort == nil || strings.TrimSpace(*idOrShort) == "" {
+		return pgtype.UUID{}, nil
+	}
+	return s.resolveUserID(ctx, *idOrShort)
+}
+
+func (s *Service) resolveOptionalCategoryID(ctx context.Context, idOrShort *string) (pgtype.UUID, error) {
+	if idOrShort == nil || strings.TrimSpace(*idOrShort) == "" {
+		return pgtype.UUID{}, nil
+	}
+	return s.resolveCategoryID(ctx, *idOrShort)
+}
+
+func (s *Service) resolveTransactionIDs(ctx context.Context, idsOrShorts []string) ([]pgtype.UUID, error) {
+	out := make([]pgtype.UUID, 0, len(idsOrShorts))
+	for _, raw := range idsOrShorts {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		id, err := s.resolveTransactionID(ctx, raw)
+		if err != nil {
+			return nil, fmt.Errorf("resolve member transaction %q: %w", raw, err)
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+// updateParamsFromRow seeds an UpdateRecurringSeriesParams from an existing row
+// so callers override only the fields they intend to change.
+func updateParamsFromRow(r db.RecurringSeries) db.UpdateRecurringSeriesParams {
+	return db.UpdateRecurringSeriesParams{
+		ID:               r.ID,
+		UserID:           r.UserID,
+		Name:             r.Name,
+		MerchantKey:      r.MerchantKey,
+		Cadence:          r.Cadence,
+		ExpectedDay:      r.ExpectedDay,
+		ExpectedAmount:   r.ExpectedAmount,
+		AmountTolerance:  r.AmountTolerance,
+		IsoCurrencyCode:  r.IsoCurrencyCode,
+		CategoryID:       r.CategoryID,
+		Status:           r.Status,
+		DetectionSource:  r.DetectionSource,
+		Confidence:       r.Confidence,
+		ConfirmedByType:  r.ConfirmedByType,
+		LastAmount:       r.LastAmount,
+		LastSeenDate:     r.LastSeenDate,
+		NextExpectedDate: r.NextExpectedDate,
+		OccurrenceCount:  r.OccurrenceCount,
+		DetectionSignals: r.DetectionSignals,
+	}
+}
+
+// seriesFromRow converts a db.RecurringSeries to a SeriesResponse.
+func seriesFromRow(r db.RecurringSeries) SeriesResponse {
+	resp := SeriesResponse{
+		ID:               formatUUID(r.ID),
+		ShortID:          r.ShortID,
+		UserID:           uuidPtr(r.UserID),
+		Name:             r.Name,
+		MerchantKey:      r.MerchantKey,
+		Cadence:          r.Cadence,
+		ExpectedDay:      int4ToIntPtr(r.ExpectedDay),
+		ExpectedAmount:   numericFloat(r.ExpectedAmount),
+		AmountTolerance:  numericFloat(r.AmountTolerance),
+		IsoCurrencyCode:  textPtr(r.IsoCurrencyCode),
+		CategoryID:       uuidPtr(r.CategoryID),
+		Status:           r.Status,
+		DetectionSource:  r.DetectionSource,
+		Confidence:       r.Confidence,
+		ConfirmedByType:  textPtr(r.ConfirmedByType),
+		LastAmount:       numericFloat(r.LastAmount),
+		LastSeenDate:     dateStr(r.LastSeenDate),
+		NextExpectedDate: dateStr(r.NextExpectedDate),
+		OccurrenceCount:  int(r.OccurrenceCount),
+		CreatedAt:        pgconv.TimestampStr(r.CreatedAt),
+		UpdatedAt:        pgconv.TimestampStr(r.UpdatedAt),
+	}
+	if len(r.DetectionSignals) > 0 {
+		resp.DetectionSignals = json.RawMessage(r.DetectionSignals)
+	}
+	return resp
+}
+
+// confirmerType maps an actor to the confirmed_by_type vocabulary (user|agent);
+// system/rule actors attribute as agent.
+func confirmerType(actor Actor) string {
+	if actor.Type == "user" {
+		return "user"
+	}
+	return "agent"
+}
+
+// nextExpectedDate projects the next charge date from the cadence and the last
+// seen date. Returns NULL for irregular/unknown cadences (no prediction).
+func nextExpectedDate(cadence string, lastSeen pgtype.Date) pgtype.Date {
+	if !lastSeen.Valid {
+		return pgtype.Date{}
+	}
+	d := lastSeen.Time
+	var next time.Time
+	switch cadence {
+	case SeriesCadenceWeekly:
+		next = d.AddDate(0, 0, 7)
+	case SeriesCadenceBiweekly:
+		next = d.AddDate(0, 0, 14)
+	case SeriesCadenceMonthly:
+		next = d.AddDate(0, 1, 0)
+	case SeriesCadenceQuarterly:
+		next = d.AddDate(0, 3, 0)
+	case SeriesCadenceSemiannual:
+		next = d.AddDate(0, 6, 0)
+	case SeriesCadenceAnnual:
+		next = d.AddDate(1, 0, 0)
+	default:
+		return pgtype.Date{}
+	}
+	return pgconv.Date(next)
+}
+
+func numericDollars(f float64) pgtype.Numeric {
+	return pgconv.NumericCents(int64(math.Round(f * 100)))
+}
+
+func numericDollarsPtr(f *float64) pgtype.Numeric {
+	if f == nil {
+		return pgtype.Numeric{}
+	}
+	return numericDollars(*f)
+}
+
+func int4Ptr(i *int32) pgtype.Int4 {
+	if i == nil {
+		return pgtype.Int4{}
+	}
+	return pgconv.Int4(*i)
+}
+
+func int4ToIntPtr(i pgtype.Int4) *int {
+	if !i.Valid {
+		return nil
+	}
+	v := int(i.Int32)
+	return &v
+}
