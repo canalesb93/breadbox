@@ -2668,7 +2668,7 @@ templ SectionUserAvatar() {
 				@components.UserAvatar(components.UserAvatarProps{ID: "drew-uuid", Name: "Drew Dawson", Size: components.UserAvatarLg, Version: "1735776000"})
 			</div>
 		}
-		@designExample("Agents — dual style + bot fallback", "IsAgent has two render paths. With an ID set, the URL routes through ?type=agent and the server picks the configured agent DiceBear style (default \"bottts\") — distinct from the user style so agent activity reads as obviously non-human. With no ID, the bot-tile fallback fires.") {
+		@designExample("Agents — dual style + bot fallback", "IsAgent has two render paths. With an ID set, the URL routes through ?type=agent and the server picks the configured agent DiceBear style (default \"bottts-neutral\") — distinct from the user style so agent activity reads as obviously non-human. With no ID, the bot-tile fallback fires.") {
 			<div class="flex flex-col gap-4">
 				<div class="flex flex-wrap items-center gap-4">
 					<span class="text-xs text-base-content/40 w-32">Agent identicon (ID + IsAgent)</span>
@@ -2858,7 +2858,7 @@ templ SectionUserAvatar() {
 				<div class="flex items-center gap-2">
 					<span class="text-xs text-base-content/40 w-24">Agent seeds</span>
 					for _, seed := range []string{"categorizer", "auditor", "reviewer", "scout"} {
-						<img class="w-10 h-10 rounded-full bg-base-200" alt={ "Preview " + seed } src={ "/avatars/preview/" + seed + "?style=bottts" }/>
+						<img class="w-10 h-10 rounded-full bg-base-200" alt={ "Preview " + seed } src={ "/avatars/preview/" + seed + "?style=bottts-neutral" }/>
 					}
 				</div>
 			</div>
