@@ -29,6 +29,7 @@ templ AgentDetail(p AgentDetailProps) {
 	@components.PageHeader(components.PageHeaderProps{
 		Title:    p.Name,
 		Subtitle: agentDetailSubtitle(p),
+		Leading:  agentDetailAvatar(p),
 		Action:   agentDetailHeaderActions(p),
 	})
 	if !p.Enabled {
@@ -37,6 +38,19 @@ templ AgentDetail(p AgentDetailProps) {
 	@agentDetailStats(p.Stats)
 	@agentDetailConfig(p)
 	@agentDetailRecentRuns(p)
+}
+
+// agentDetailAvatar is the identity avatar in the page header's leading
+// slot — the agent's DiceBear robot, seeded by its stable slug so it
+// matches the same agent everywhere it appears (list, run rows, feed).
+templ agentDetailAvatar(p AgentDetailProps) {
+	@components.UserAvatar(components.UserAvatarProps{
+		ID:      p.Slug,
+		Name:    p.Name,
+		IsAgent: true,
+		Size:    components.UserAvatarXL,
+		Class:   "shrink-0",
+	})
 }
 
 // agentDetailHeaderActions renders the primary "Run" + secondary

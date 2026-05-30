@@ -11,10 +11,19 @@ import (
 // admin/rules.go and the bridge drops the rendered HTML into base.html's
 // TemplContent slot.
 //
-// Direct port of the old html/template version. The Alpine factory
-// (`rulesPage`), keyboard-navigation module (`bbRuleNav`), and URL helpers
-// live in static/js/admin/components/rules.js — see #827 / docs/design-system.md
-// → "Alpine page components".
+// Table-based layout (see #1576 design refresh):
+//   - DaisyUI `table table-sm table-zebra-soft`, mirroring /agents.
+//   - Server-rendered GET filter toolbar above the table (search +
+//     category + status + type). Selects auto-submit on change via the
+//     `bbRulesFilter` Alpine helper; the search input submits on
+//     Enter/blur.
+//   - Less-important columns collapse below `md` so the row never spills
+//     past the viewport on mobile. Critical signal — status, name,
+//     condition/action summary — is always visible.
+//
+// The kebab actions, keyboard nav (j/k/Enter/n/Space/d), and toggle/
+// delete handlers in static/js/admin/components/rules.js are unchanged;
+// `data-rule-row` still anchors them.
 templ Rules(p RulesProps) {
 	<!-- Synchronous (NOT deferred) — Alpine's bundle in <head> is already
 	     deferred and dispatches alpine:init at parse-end, so a deferred
@@ -31,13 +40,19 @@ templ Rules(p RulesProps) {
 		Action:               rulesNewRuleAction(),
 	})
 	<div x-data="rulesPage">
-		<!-- Rules count + sort -->
-		<div class="flex items-center justify-between flex-wrap gap-3 mb-4 px-1">
+		@rulesFilterBar(p)
+		<!-- Result count + sort. Sits between the filter toolbar and the
+		     table so it doubles as a "this many match your filter" summary
+		     once any filter is active. -->
+		<div class="flex items-center justify-between flex-wrap gap-3 mb-3 px-1">
 			<div class="text-sm text-base-content/40">
 				if p.TotalPages > 1 {
 					@templ.Raw(fmt.Sprintf("Showing %d&ndash;%d of ", p.ShowingStart, p.ShowingEnd))
 				}
-				{ fmt.Sprintf("%d rule%s found", p.Total, components.PluralS(p.Total)) }
+				{ fmt.Sprintf("%d rule%s", p.Total, components.PluralS(p.Total)) }
+				if p.FiltersActive {
+					<span class="text-base-content/30"> match your filters</span>
+				}
 			</div>
 			if len(p.Rules) > 0 {
 				<label class="flex items-center gap-2 text-xs text-base-content/40 whitespace-nowrap">
@@ -52,20 +67,152 @@ templ Rules(p RulesProps) {
 				</label>
 			}
 		</div>
-		<!-- Rules as cards instead of table for Mercury feel -->
 		if len(p.Rules) == 0 {
-			@rulesEmpty()
+			@rulesEmpty(p.FiltersActive)
+		} else {
+			<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
+				<table class="table table-sm table-zebra-soft">
+					<thead>
+						<tr class="text-xs text-base-content/50">
+							<th class="font-medium text-center w-14">Enabled</th>
+							<th class="font-medium">Rule</th>
+							<th class="font-medium hidden md:table-cell">Category</th>
+							<th class="font-medium hidden lg:table-cell text-center w-16">Stage</th>
+							<th class="font-medium hidden sm:table-cell text-right w-20">Hits</th>
+							<th class="font-medium hidden md:table-cell w-28">Last hit</th>
+							<th class="w-10"></th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, r := range p.Rules {
+							@rulesRow(r)
+						}
+					</tbody>
+				</table>
+			</div>
 		}
-		<div class="space-y-3">
-			for _, r := range p.Rules {
-				@rulesRow(r)
-			}
-		</div>
 		if p.TotalPages > 1 {
 			@rulesPaginator(p)
 		}
 	</div>
 }
+
+// rulesFilterBar renders the GET-driven filter toolbar above the table.
+// The <form> targets /rules; the Alpine helper `bbRulesFilter` submits
+// on every <select> change so the user gets immediate feedback without
+// hunting for a Filter button. The search <input> submits on Enter or
+// blur (built-in <form> behavior) — autosubmit-on-keystroke would fire
+// too many requests for what is a server round-trip.
+//
+// Mobile: the bar wraps; the search input takes the full row, and the
+// three selects share the second row. The kbd hint hides on touch via
+// the shared Kbd component contract.
+templ rulesFilterBar(p RulesProps) {
+	<form
+		method="get"
+		action="/rules"
+		class="mb-4 px-1"
+		x-data="bbRulesFilter"
+	>
+		<!-- Preserve sort + per-page across filter submits so the toolbar
+		     doesn't blow away the user's column preferences. -->
+		if p.SortBy != "" {
+			<input type="hidden" name="sort_by" value={ p.SortBy }/>
+		}
+		if p.PageSize != 0 && p.PageSize != 50 {
+			<input type="hidden" name="per_page" value={ fmt.Sprintf("%d", p.PageSize) }/>
+		}
+		<div class="flex flex-wrap gap-2 items-stretch">
+			<div class="relative flex-1 min-w-[200px]">
+				<i
+					data-lucide="search"
+					class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content opacity-50 pointer-events-none z-10"
+				></i>
+				<input
+					type="search"
+					role="searchbox"
+					name="search"
+					value={ p.Search }
+					placeholder="Search rules by name…"
+					class="input input-sm w-full pl-9"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					@keydown.escape.prevent.stop="$el.value = ''; $el.form.requestSubmit()"
+				/>
+			</div>
+			<select
+				name="category_slug"
+				class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-44"
+				aria-label="Filter by category"
+				@change="$el.form.requestSubmit()"
+			>
+				@rulesFilterCategoryOption("", "All categories", p.CategorySlug == "")
+				for _, c := range p.FilterCategories {
+					@rulesFilterCategoryOption(c.Slug, c.Label, p.CategorySlug == c.Slug)
+				}
+			</select>
+			<select
+				name="enabled"
+				class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-32"
+				aria-label="Filter by status"
+				@change="$el.form.requestSubmit()"
+			>
+				@rulesFilterOption("", "Any status", p.EnabledFilter == "")
+				@rulesFilterOption("true", "Enabled", p.EnabledFilter == "true")
+				@rulesFilterOption("false", "Disabled", p.EnabledFilter == "false")
+			</select>
+			<select
+				name="creator_type"
+				class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-32"
+				aria-label="Filter by creator"
+				@change="$el.form.requestSubmit()"
+			>
+				@rulesFilterOption("", "Any type", p.CreatorType == "")
+				@rulesFilterOption("user", "User-created", p.CreatorType == "user")
+				@rulesFilterOption("agent", "Agent-created", p.CreatorType == "agent")
+				@rulesFilterOption("system", "System", p.CreatorType == "system")
+			</select>
+			if p.FiltersActive {
+				<a
+					href="/rules"
+					class="btn btn-ghost btn-sm gap-1.5 self-stretch"
+					title="Clear all filters"
+				>
+					@components.LucideIcon("x", "w-3.5 h-3.5")
+					<span class="hidden sm:inline">Clear</span>
+				</a>
+			}
+			<!-- No-JS fallback: the form still submits via a button press.
+			     Hidden by default since selects auto-submit via Alpine; the
+			     `noscript` block surfaces it when Alpine isn't available. -->
+			<noscript>
+				<button type="submit" class="btn btn-primary btn-sm">Filter</button>
+			</noscript>
+		</div>
+	</form>
+}
+
+templ rulesFilterOption(value, label string, selected bool) {
+	if selected {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+// rulesFilterCategoryOption renders one <option>. Child categories
+// arrive from the handler with a leading space so the nesting reads
+// at a glance — browsers preserve leading whitespace inside
+// <option> content, so we don't need <optgroup>.
+templ rulesFilterCategoryOption(value, label string, selected bool) {
+	if selected {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
 
 templ rulesNewRuleAction() {
 	<a href="/rules/new" class="btn btn-primary btn-sm gap-2" data-new-rule>
@@ -82,20 +229,41 @@ templ rulesSortOption(value, label string, selected bool) {
 	}
 }
 
-templ rulesEmpty() {
-	@components.EmptyState(components.EmptyStateProps{
-		Icon:     "list-filter",
-		Title:    "No rules yet",
-		Body:     "Create a rule to automatically categorize, tag, or comment on transactions during sync.",
-		CTAHref:  templ.SafeURL("/rules/new"),
-		CTAIcon:  "plus",
-		CTALabel: "Create Rule",
-	})
+// rulesEmpty picks between a first-run empty state ("create your first
+// rule") and a filtered-empty state ("nothing matches your filter").
+// The CTA differs — for a filtered list the most useful action is to
+// clear the filter, not to create yet another rule.
+templ rulesEmpty(filtered bool) {
+	if filtered {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:     "search-x",
+			Title:    "No rules match your filters",
+			Body:     "Try clearing the filters or searching for a different rule name.",
+			CTAHref:  templ.SafeURL("/rules"),
+			CTAIcon:  "x",
+			CTALabel: "Clear filters",
+		})
+	} else {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:     "list-filter",
+			Title:    "No rules yet",
+			Body:     "Create a rule to automatically categorize, tag, or comment on transactions during sync.",
+			CTAHref:  templ.SafeURL("/rules/new"),
+			CTAIcon:  "plus",
+			CTALabel: "Create Rule",
+		})
+	}
 }
 
+// rulesRow renders one rule as a <tr> in the table. Critical signal
+// (toggle, name, condition/action summary, kebab) is always present;
+// secondary columns (category, stage, hits, last hit) collapse on
+// smaller viewports via `hidden md:table-cell` etc. Anything we hide on
+// mobile is folded into the second line under the name so no signal is
+// lost — only the column density changes.
 templ rulesRow(r RulesRow) {
-	<div
-		class={ "bb-card p-0 cursor-pointer hover:bg-base-200/30 transition-colors relative focus-within:z-30 has-[:focus-within]:z-30", templ.KV("opacity-60", !r.Enabled) }
+	<tr
+		class={ "hover:bg-base-200/40 cursor-pointer", templ.KV("opacity-60", !r.Enabled) }
 		data-rule-row
 		data-rule-id={ r.ID }
 		data-open-url={ "/rules/" + r.ID }
@@ -103,120 +271,108 @@ templ rulesRow(r RulesRow) {
 		if !r.IsSystem {
 			data-can-delete="true"
 		}
-		x-data="{deleting: false}"
 		@click={ "window.location.href='/rules/" + r.ID + "'" }
 	>
-		<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 sm:py-5">
-			<!-- Avatar (category icon when set, else action-type icon) -->
-			<div class="flex-shrink-0">
-				@rulesAvatar(r)
-			</div>
-			<!-- Main info -->
-			<div class="flex-1 min-w-0">
-				<div class="flex items-center gap-2 flex-wrap">
-					<span class="font-semibold text-sm line-clamp-2 sm:truncate sm:line-clamp-none">{ r.Name }</span>
-					if r.IsSystem {
-						<span class="hidden sm:inline-flex badge badge-soft badge-info badge-xs gap-1" title="Built-in system rule">
-							@components.LucideIcon("shield", "w-2.5 h-2.5")
-							System
-						</span>
-					}
-					if r.Enabled {
-						if r.ExpiresAt != nil && r.Expired {
-							<span class="hidden sm:inline-flex badge badge-warning badge-xs">Expired</span>
-						}
-					} else {
-						<span class="hidden sm:inline-flex badge badge-ghost badge-xs">Disabled</span>
-					}
-				</div>
-				<!-- Compact counts subtitle. The full summary text lives on the
-				     detail page; the list view just communicates scale. -->
-				<div class="flex items-center gap-2 mt-0.5 text-xs text-base-content/40 whitespace-nowrap overflow-hidden">
-					<span class="inline-flex items-center gap-1 shrink-0" title={ r.ConditionSummary }>
-						if r.IsMatchAll {
-							@components.LucideIcon("infinity", "w-3 h-3")
-							<span class="italic">All</span>
-						} else {
-							@components.LucideIcon("list-filter", "w-3 h-3")
-							<span class="tabular-nums">{ fmt.Sprintf("%d cond.", r.ConditionCount) }</span>
-						}
-					</span>
-					<span class="text-base-content/30 shrink-0">&middot;</span>
-					<span class="inline-flex items-center gap-1 shrink-0 tabular-nums" title={ r.ActionsSummary }>
-						@components.LucideIcon("zap", "w-3 h-3")
-						{ fmt.Sprintf("%d action%s", r.ActionsCount, components.PluralS(r.ActionsCount)) }
-					</span>
-					<span class="text-base-content/30 shrink-0">&middot;</span>
-					<span class="tabular-nums shrink-0">{ fmt.Sprintf("%d hits", r.HitCount) }</span>
-				</div>
-			</div>
-			<!-- Right-side stats (desktop+). Adds pipeline stage + last-active
-			     recency that the subtitle doesn't carry. -->
-			<div class="hidden lg:flex items-center gap-4 text-xs text-base-content/40 flex-shrink-0">
-				<div class="w-12 text-center">
-					<div class="font-semibold text-sm text-base-content/50 tabular-nums">{ fmt.Sprintf("%d", r.Priority) }</div>
-					<div>stage</div>
-				</div>
-				<div class="w-20 text-center">
-					if r.LastHitAt != nil {
-						<div class="font-medium text-xs text-base-content/50">{ r.LastHitAtRelative }</div>
-						<div>last active</div>
-					} else {
-						<div class="font-medium text-xs text-base-content/30">—</div>
-						<div>last active</div>
-					}
-				</div>
-			</div>
-			<!-- Actions — Edit stays as the always-visible primary action;
-			     Enable/Disable + Delete go in the kebab to free up width on
-			     mobile. Matches /tags pattern (#728). -->
-			<div class="flex items-center justify-end gap-0.5 flex-shrink-0">
+		<!-- Toggle column. Click is scoped to the cell so the row's
+		     navigate-on-click doesn't fire. -->
+		<td class="align-middle text-center" @click.stop>
+			<input
+				type="checkbox"
+				class="toggle toggle-sm"
+				if r.Enabled {
+					checked
+				}
+				aria-label={ rulesToggleLabel(r) }
+				data-toggle-enabled
+				@change={ "toggleRule('" + r.ID + "')" }
+			/>
+		</td>
+		<!-- Name + condition/action summary line. On mobile this cell
+		     carries the chips for category, stage, hits, and last hit
+		     too (the dedicated columns are hidden < md). -->
+		<td class="align-middle">
+			<div class="flex items-center gap-2 flex-wrap">
 				<a
-					href={ templ.SafeURL("/rules/" + r.ID + "/edit") }
-					class="btn btn-ghost btn-xs btn-square"
-					title="Edit"
-					aria-label={ "Edit rule " + r.Name }
+					href={ templ.SafeURL("/rules/" + r.ID) }
+					class="font-medium text-sm hover:underline truncate max-w-[40ch]"
 					@click.stop
-				>
-					@components.LucideIcon("pencil", "w-3.5 h-3.5")
-				</a>
-				<div @click.stop class="contents">
-					@components.OverflowMenu(components.OverflowMenuProps{
-						AriaLabel: "Rule " + r.Name + " actions",
-						Size:      "xs",
-						Items:     rulesOverflowItems(r),
-					})
-				</div>
+				>{ r.Name }</a>
+				if r.IsSystem {
+					<span class="badge badge-soft badge-info badge-xs gap-1" title="Built-in system rule">
+						@components.LucideIcon("shield", "w-2.5 h-2.5")
+						System
+					</span>
+				}
+				if r.Enabled && r.ExpiresAt != nil && r.Expired {
+					<span class="badge badge-warning badge-xs">Expired</span>
+				}
 			</div>
-		</div>
-	</div>
+			<div class="flex items-center gap-2 mt-0.5 text-xs text-base-content/50 whitespace-nowrap overflow-hidden">
+				<span class="inline-flex items-center gap-1 shrink-0" title={ r.ConditionSummary }>
+					if r.IsMatchAll {
+						@components.LucideIcon("infinity", "w-3 h-3")
+						<span class="italic">All transactions</span>
+					} else {
+						@components.LucideIcon("list-filter", "w-3 h-3")
+						<span class="tabular-nums">{ fmt.Sprintf("%d cond.", r.ConditionCount) }</span>
+					}
+				</span>
+				<span class="text-base-content/30 shrink-0">&middot;</span>
+				<span class="inline-flex items-center gap-1 shrink-0 tabular-nums" title={ r.ActionsSummary }>
+					@components.LucideIcon("zap", "w-3 h-3")
+					{ fmt.Sprintf("%d action%s", r.ActionsCount, components.PluralS(r.ActionsCount)) }
+				</span>
+				<!-- Mobile-only stage + hits chips. Hidden once the
+				     dedicated columns appear so we don't double-render. -->
+				<span class="sm:hidden text-base-content/30 shrink-0">&middot;</span>
+				<span class="sm:hidden inline-flex items-center gap-1 shrink-0 tabular-nums" title="Hits">
+					{ fmt.Sprintf("%d hits", r.HitCount) }
+				</span>
+			</div>
+		</td>
+		<td class="align-middle text-xs hidden md:table-cell">
+			@rulesCategoryChip(r)
+		</td>
+		<td class="align-middle text-xs text-center hidden lg:table-cell tabular-nums text-base-content/60">
+			{ fmt.Sprintf("%d", r.Priority) }
+		</td>
+		<td class="align-middle text-xs text-right hidden sm:table-cell tabular-nums text-base-content/60">
+			{ fmt.Sprintf("%d", r.HitCount) }
+		</td>
+		<td class="align-middle text-xs hidden md:table-cell text-base-content/60 tabular-nums">
+			if r.LastHitAt != nil {
+				{ r.LastHitAtRelative }
+			} else {
+				<span class="text-base-content/30">—</span>
+			}
+		</td>
+		<td class="align-middle text-right" @click.stop>
+			<div class="contents">
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Rule " + r.Name + " actions",
+					Size:      "xs",
+					Items:     rulesOverflowItems(r),
+				})
+			</div>
+		</td>
+	</tr>
 }
 
-// rulesAvatar renders the leading avatar on the rule row. Mirrors the
-// branchy {{if … else if … else}} chain in the source HTML: category
-// icon (when set + enabled + not expired) → expired clock → disabled
-// pause → system shield → default zap.
-templ rulesAvatar(r RulesRow) {
-	if r.CategoryIcon != nil && *r.CategoryIcon != "" && r.Enabled && !(r.ExpiresAt != nil && r.Expired) {
-		<div class="bb-tx-avatar" style={ rulesAvatarStyle(r.CategoryColor) }>
-			@components.LucideIcon(*r.CategoryIcon, "w-5 h-5")
-		</div>
-	} else if r.ExpiresAt != nil && r.Expired {
-		<div class="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center">
-			@components.LucideIcon("clock", "w-5 h-5 text-warning")
-		</div>
-	} else if !r.Enabled {
-		<div class="w-9 h-9 rounded-xl bg-base-200 flex items-center justify-center">
-			@components.LucideIcon("pause", "w-5 h-5 text-base-content opacity-30")
-		</div>
-	} else if r.IsSystem {
-		<div class="w-9 h-9 rounded-xl bg-info/10 flex items-center justify-center" title="System rule">
-			@components.LucideIcon("shield", "w-5 h-5 text-info")
-		</div>
+// rulesCategoryChip renders the "what this rule sets" column. If the
+// rule has a target category we show its colored avatar; otherwise we
+// fall back to a soft action-type label so the column is never blank.
+templ rulesCategoryChip(r RulesRow) {
+	if r.CategoryIcon != nil && *r.CategoryIcon != "" {
+		<span class="inline-flex items-center gap-2">
+			<span class="bb-tx-avatar bb-tx-avatar-sm" style={ rulesAvatarStyle(r.CategoryColor) }>
+				@components.LucideIcon(*r.CategoryIcon, "w-3.5 h-3.5")
+			</span>
+			<span class="truncate max-w-[18ch]">{ r.ActionsSummary }</span>
+		</span>
 	} else {
-		<div class="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center">
-			@components.LucideIcon("zap", "w-5 h-5 text-success")
-		</div>
+		<span class="text-base-content/50 truncate inline-block max-w-[20ch]" title={ r.ActionsSummary }>
+			{ r.ActionsSummary }
+		</span>
 	}
 }
 
@@ -305,7 +461,14 @@ func rulesOverflowItems(r RulesRow) []components.OverflowMenuItem {
 		toggle.Label = "Enable"
 		toggle.Icon = "play"
 	}
-	items := []components.OverflowMenuItem{toggle}
+	items := []components.OverflowMenuItem{
+		{
+			Label: "Edit",
+			Icon:  "pencil",
+			Href:  templ.SafeURL("/rules/" + r.ID + "/edit"),
+		},
+		toggle,
+	}
 	if r.IsSystem {
 		items = append(items, components.OverflowMenuItem{
 			Label:     "System (no delete)",

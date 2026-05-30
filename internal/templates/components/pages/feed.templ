@@ -398,7 +398,7 @@ templ feedRow(it FeedItem, now time.Time) {
 // feedSyncTile is the icon tile for a sync row. Tinted by status.
 templ feedSyncTile(status string) {
 	<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-200", feedSyncTileBg(status) } aria-hidden="true">
-		@components.LucideIcon(feedSyncIcon(status), "w-3 h-3 " + feedSyncTileText(status))
+		@components.LucideIcon(feedSyncIcon(status), "w-3 h-3 "+feedSyncTileText(status))
 	</span>
 }
 
@@ -406,7 +406,7 @@ templ feedSyncTile(status string) {
 // priority (critical/warning/info → error/warning/primary palette).
 templ feedReportTile(priority string) {
 	<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-200", feedReportTileBg(priority) } aria-hidden="true">
-		@components.LucideIcon(feedReportIcon(priority), "w-3 h-3 " + feedReportTileText(priority))
+		@components.LucideIcon(feedReportIcon(priority), "w-3 h-3 "+feedReportTileText(priority))
 	</span>
 }
 
@@ -550,7 +550,13 @@ templ feedReportBody(it FeedItem, r *FeedReport, now time.Time) {
 // author this stays correct as long as DisplayAuthor is set.
 func feedReportActor(r *FeedReport) components.TimelineActor {
 	return components.TimelineActor{
-		Name:    r.DisplayAuthor,
+		Name: r.DisplayAuthor,
+		// UserID seeds the avatar: when the report resolves to its
+		// agent_definition, this is the slug, so the row renders the
+		// agent's robot via /avatars/<slug>?type=agent (UserAvatar routes
+		// IsAgent through ?type=agent). Empty seed falls back to the
+		// bot tile — same as before for operator/historical reports.
+		UserID:  r.AvatarSeed,
 		IsAgent: true,
 	}
 }
@@ -897,7 +903,6 @@ templ feedTxRefList(samples []FeedTransactionRef, additional int) {
 }
 
 // ── String helpers ────────────────────────────────────────────────────────
-
 
 func feedActorDisplay(name, actorType string) string {
 	if name != "" {
@@ -1317,15 +1322,5 @@ func feedRelativeTimestamp(s string, now time.Time) string {
 }
 
 func feedFormatTimestamp(s string, now time.Time) string {
-	if s == "" {
-		return ""
-	}
-	loc := time.Local
-	if !now.IsZero() {
-		loc = now.Location()
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.In(loc).Format("Jan 2, 2006 3:04 PM")
-	}
-	return s
+	return timefmt.FormatRFC3339At(s, now, timefmt.LayoutDateTime)
 }

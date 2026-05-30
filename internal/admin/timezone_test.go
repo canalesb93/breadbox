@@ -21,6 +21,14 @@ func TestUserLocation(t *testing.T) {
 		{name: "valid IANA name resolves", setCookie: true, cookieVal: "America/Los_Angeles", want: "America/Los_Angeles"},
 		{name: "valid UTC resolves", setCookie: true, cookieVal: "UTC", want: "UTC"},
 		{name: "garbage zone falls back to local", setCookie: true, cookieVal: "Not/A/Real/Zone", want: time.Local.String()},
+		// The JS shim writes encodeURIComponent(tz), so a slash-bearing zone
+		// arrives percent-encoded. Without server-side PathUnescape this fails
+		// LoadLocation and silently falls back to the server TZ — the bug.
+		{name: "percent-encoded slash zone resolves", setCookie: true, cookieVal: "America%2FLos_Angeles", want: "America/Los_Angeles"},
+		{name: "percent-encoded Europe zone resolves", setCookie: true, cookieVal: "Europe%2FLondon", want: "Europe/London"},
+		// PathUnescape (not QueryUnescape) so a '+' in the decoded zone name
+		// survives rather than being turned into a space.
+		{name: "percent-encoded plus zone resolves", setCookie: true, cookieVal: "Etc%2FGMT%2B5", want: "Etc/GMT+5"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

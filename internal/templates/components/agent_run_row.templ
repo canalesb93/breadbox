@@ -80,6 +80,15 @@ templ AgentRunRow(p AgentRunRowProps) {
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 min-w-0">
 					if p.ShowAgent && p.AgentName != "" {
+						@UserAvatar(UserAvatarProps{
+							ID:         p.AgentSlug,
+							Name:       p.AgentName,
+							IsAgent:    true,
+							Size:       UserAvatarXS,
+							Decorative: true,
+							Lazy:       true,
+							Class:      "shrink-0",
+						})
 						<span class="font-medium text-sm text-base-content truncate">{ p.AgentName }</span>
 					}
 					@agentRunAccessoryIcons(p)

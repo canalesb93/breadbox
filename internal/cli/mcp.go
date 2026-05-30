@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"breadbox/internal/app"
@@ -83,14 +84,36 @@ func runMCPStdio(parent context.Context, version string) error {
 	}
 	defer a.DB.Close()
 
-	// Attach the Local MCP fallback identity. The dispatcher swaps in
-	// per-client keys once clientInfo arrives; this is just the safe
-	// floor for anything that runs before then.
-	fallbackKey, err := ensureLocalMCPFallbackKey(ctx, a.Queries)
-	if err != nil {
-		return fmt.Errorf("ensure local mcp fallback key: %w", err)
+	// Bind the actor floor for this stdio session.
+	//
+	// A scheduled agent run spawns this process with its minted per-run
+	// key in BREADBOX_API_KEY (see service.AssembleJobSpec). Binding that
+	// key makes every write the agent performs attributable to the agent
+	// itself — agent:<slug>:<runID>, which carries the agent_definition
+	// link — instead of the SDK's generic "claude-code" clientInfo. The
+	// dispatcher's clientInfo rebind is gated to never overwrite a real
+	// run key (see MCPServer.rebindActorFromClientInfo).
+	//
+	// Interactive stdio (Claude Desktop, etc.) and any run without a
+	// valid key fall back to the relabelled "Local MCP" singleton — the
+	// same safe floor as before; the dispatcher then swaps in a
+	// per-client identity once clientInfo arrives.
+	var floorKey *db.ApiKey
+	if rawKey := strings.TrimSpace(os.Getenv("BREADBOX_API_KEY")); rawKey != "" {
+		if runKey, kerr := a.Service.ValidateAPIKey(ctx, rawKey); kerr == nil {
+			floorKey = runKey
+		} else {
+			logger.Warn("BREADBOX_API_KEY set but not a valid key; using Local MCP identity", "error", kerr)
+		}
 	}
-	ctx = service.ContextWithAPIKey(ctx, fallbackKey)
+	if floorKey == nil {
+		fallbackKey, err := ensureLocalMCPFallbackKey(ctx, a.Queries)
+		if err != nil {
+			return fmt.Errorf("ensure local mcp fallback key: %w", err)
+		}
+		floorKey = fallbackKey
+	}
+	ctx = service.ContextWithAPIKey(ctx, floorKey)
 
 	mcpServer := breadboxmcp.NewMCPServer(a.Service, version)
 

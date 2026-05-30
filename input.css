@@ -273,6 +273,15 @@
    * header) and shouldn't intercept clicks. */
   svg.brand, svg.brand * { pointer-events: none; }
 
+  /* Brand marks that fill with currentColor (Plaid, MCP) must mirror the
+   * svg.lucide alpha-strip above. Without it, a muted container color —
+   * text-base-content/45 (settings section headers) or /65 (settings-rail
+   * tabs) — bleeds its alpha into the fill, so the mark renders a softer
+   * gray than the Lucide icons sitting right next to it. The baked-fill
+   * marks (GitHub, Anthropic, Claude, Teller) use explicit fills and
+   * ignore `color`, so this is a no-op for them. */
+  svg.brand { color: rgb(from currentColor r g b / 1); }
+
   /* Two kinds of brand mark live here:
    *
    *   1. Monochrome marks meant to read as UI icons (Plaid, MCP). Their

@@ -25,30 +25,84 @@ const (
 	LayoutDateShort = "Jan 2, 3:04 PM"
 )
 
-// FormatRFC3339 parses an RFC3339 (or RFC3339Nano) timestamp string and
-// renders it via layout in the local timezone. Empty input yields ""; an
-// unparseable string is returned unchanged so callers don't display
-// "0001-01-01..." on bad data.
-func FormatRFC3339(s, layout string) string {
+// FormatRFC3339In parses an RFC3339 (or RFC3339Nano) timestamp string and
+// renders it via layout anchored to loc. This is the canonical
+// timezone-aware absolute-time formatter — pair it with admin.UserLocation(r)
+// so a UTC-running server renders the viewer's wall clock, not its own. A nil
+// loc falls back to time.Local. Empty input yields ""; an unparseable string
+// is returned unchanged so callers don't display "0001-01-01..." on bad data.
+func FormatRFC3339In(s string, loc *time.Location, layout string) string {
 	if s == "" {
 		return ""
 	}
+	if loc == nil {
+		loc = time.Local
+	}
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format(layout)
+		return t.In(loc).Format(layout)
 	}
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.Local().Format(layout)
+		return t.In(loc).Format(layout)
 	}
 	return s
 }
 
+// FormatRFC3339At is FormatRFC3339In with the location taken from a `now`
+// anchor (now.Location()). It's the shape used by page assemblers that already
+// thread a single `now` built from admin.UserLocation(r) — the home feed and
+// the per-tx activity timeline both render their absolute-time tooltips
+// through this so the two surfaces can never disagree. A zero now falls back
+// to time.Local.
+func FormatRFC3339At(s string, now time.Time, layout string) string {
+	loc := time.Local
+	if !now.IsZero() {
+		loc = now.Location()
+	}
+	return FormatRFC3339In(s, loc, layout)
+}
+
+// FormatTimeIn renders an already-parsed time.Time via layout anchored to
+// loc — the time.Time twin of FormatRFC3339In for callers that hold a
+// timestamptz value rather than an RFC3339 string. A zero t yields ""; a nil
+// loc falls back to time.Local.
+func FormatTimeIn(t time.Time, loc *time.Location, layout string) string {
+	if t.IsZero() {
+		return ""
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	return t.In(loc).Format(layout)
+}
+
+// FormatRFC3339 parses an RFC3339 (or RFC3339Nano) timestamp string and
+// renders it via layout in the SERVER's timezone. Deprecated for anything
+// shown to a viewer: a UTC-running server renders every absolute time in UTC.
+// Prefer FormatRFC3339In with a viewer location from admin.UserLocation(r).
+// This server-local form remains only for contexts with no request/viewer
+// (CLI output, server logs). Empty input yields ""; an unparseable string is
+// returned unchanged.
+func FormatRFC3339(s, layout string) string {
+	return FormatRFC3339In(s, time.Local, layout)
+}
+
 // FormatRFC3339Ptr is FormatRFC3339 for nullable *string inputs. nil and
-// empty both render as "".
+// empty both render as "". Server-local — see FormatRFC3339's caveat and
+// prefer FormatRFC3339In for viewer-facing output.
 func FormatRFC3339Ptr(s *string, layout string) string {
 	if s == nil {
 		return ""
 	}
 	return FormatRFC3339(*s, layout)
+}
+
+// FormatRFC3339PtrIn is FormatRFC3339In for nullable *string inputs — the
+// viewer-timezone twin of FormatRFC3339Ptr. nil and empty both render as "".
+func FormatRFC3339PtrIn(s *string, loc *time.Location, layout string) string {
+	if s == nil {
+		return ""
+	}
+	return FormatRFC3339In(*s, loc, layout)
 }
 
 // RelativeRFC3339 parses an RFC3339 (or RFC3339Nano) timestamp string and

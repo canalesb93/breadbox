@@ -211,6 +211,13 @@ type FeedReport struct {
 	Tags          []string
 	DisplayAuthor string
 	IsUnread      bool
+	// AvatarSeed is the agent_definition slug the report's author runs
+	// for, resolved from the minted run key. When set, the report row
+	// renders the agent's DiceBear robot (the same one on the agent's
+	// list/detail pages) instead of the generic bot tile. Empty for
+	// operator-authored reports and historical reports whose run key no
+	// longer links to a definition.
+	AvatarSeed string
 }
 
 // FeedComment carries one standalone comment row.

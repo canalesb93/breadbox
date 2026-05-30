@@ -157,23 +157,36 @@ templ agentsListRow(a AgentsListRowProps) {
 		data-agent-slug={ a.Slug }
 	>
 		<td class="align-middle">
-			<div class="flex items-center gap-2">
-				<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s", a.Slug)) } class="font-medium text-sm hover:underline">
-					{ a.Name }
-				</a>
-				if a.TriggerOnSyncComplete {
-					<span class="badge badge-soft badge-info badge-xs gap-1" title="Fires after every successful sync">
-						@components.LucideIcon("refresh-cw", "w-2.5 h-2.5")
-						sync
-					</span>
-				}
-				if !a.Enabled {
-					<span class="badge badge-ghost badge-xs">Disabled</span>
-				}
+			<div class="flex items-center gap-2.5">
+				@components.UserAvatar(components.UserAvatarProps{
+					ID:         a.Slug,
+					Name:       a.Name,
+					IsAgent:    true,
+					Size:       components.UserAvatarMd,
+					Decorative: true,
+					Lazy:       true,
+					Class:      "shrink-0",
+				})
+				<div class="min-w-0">
+					<div class="flex items-center gap-2">
+						<a href={ templ.SafeURL(fmt.Sprintf("/agents/%s", a.Slug)) } class="font-medium text-sm hover:underline">
+							{ a.Name }
+						</a>
+						if a.TriggerOnSyncComplete {
+							<span class="badge badge-soft badge-info badge-xs gap-1" title="Fires after every successful sync">
+								@components.LucideIcon("refresh-cw", "w-2.5 h-2.5")
+								sync
+							</span>
+						}
+						if !a.Enabled {
+							<span class="badge badge-ghost badge-xs">Disabled</span>
+						}
+					</div>
+					if a.Description != "" {
+						<div class="text-xs text-base-content/50 mt-0.5 line-clamp-1 max-w-md">{ a.Description }</div>
+					}
+				</div>
 			</div>
-			if a.Description != "" {
-				<div class="text-xs text-base-content/50 mt-0.5 line-clamp-1 max-w-md">{ a.Description }</div>
-			}
 		</td>
 		<td class="align-middle text-xs">
 			if a.ScheduleCron != "" {

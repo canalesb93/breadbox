@@ -5,6 +5,7 @@ package admin
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -94,9 +95,11 @@ func renderAccessTab(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	// Absolute creation dates render in the viewer's timezone (bb_tz cookie).
+	loc := UserLocation(r)
 	var activeKeys, revokedKeys []pages.AccessKeyRow
 	for _, k := range keys {
-		row := buildAccessKeyRow(k)
+		row := buildAccessKeyRow(k, loc)
 		if k.RevokedAt != nil {
 			revokedKeys = append(revokedKeys, row)
 		} else {
@@ -105,7 +108,7 @@ func renderAccessTab(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 	}
 	var activeClients, revokedClients []pages.AccessClientRow
 	for _, c := range clients {
-		row := buildAccessClientRow(c)
+		row := buildAccessClientRow(c, loc)
 		if c.RevokedAt != nil {
 			revokedClients = append(revokedClients, row)
 		} else {
@@ -146,27 +149,30 @@ func popAPIKeyReveal(r *http.Request, sm *scs.SessionManager) *pages.AccessRevea
 
 // buildAccessKeyRow flattens a service.APIKeyResponse into the templ-side
 // view-model, pre-rendering the date helpers (`formatDateShort`,
-// `relativeTime`) the old html/template called via funcMap.
-func buildAccessKeyRow(k service.APIKeyResponse) pages.AccessKeyRow {
+// `relativeTime`) the old html/template called via funcMap. loc is the
+// viewer's timezone (admin.UserLocation) so the absolute creation date
+// renders in their wall clock, not the server's.
+func buildAccessKeyRow(k service.APIKeyResponse, loc *time.Location) pages.AccessKeyRow {
 	return pages.AccessKeyRow{
 		ID:               k.ID,
 		Name:             k.Name,
 		KeyPrefix:        k.KeyPrefix,
 		Scope:            k.Scope,
-		CreatedAtShort:   timefmt.FormatRFC3339(k.CreatedAt, timefmt.LayoutDateShort),
+		CreatedAtShort:   timefmt.FormatRFC3339In(k.CreatedAt, loc, timefmt.LayoutDateShort),
 		LastUsedRelative: timefmt.RelativeRFC3339Ptr(k.LastUsedAt),
 	}
 }
 
 // buildAccessClientRow flattens a service.OAuthClientResponse into the
-// templ-side view-model, pre-rendering the creation date.
-func buildAccessClientRow(c service.OAuthClientResponse) pages.AccessClientRow {
+// templ-side view-model, pre-rendering the creation date. loc is the viewer's
+// timezone (admin.UserLocation).
+func buildAccessClientRow(c service.OAuthClientResponse, loc *time.Location) pages.AccessClientRow {
 	return pages.AccessClientRow{
 		ID:             c.ID,
 		Name:           c.Name,
 		ClientIDPrefix: c.ClientIDPrefix,
 		Scope:          c.Scope,
-		CreatedAtShort: timefmt.FormatRFC3339(c.CreatedAt, timefmt.LayoutDateShort),
+		CreatedAtShort: timefmt.FormatRFC3339In(c.CreatedAt, loc, timefmt.LayoutDateShort),
 	}
 }
 

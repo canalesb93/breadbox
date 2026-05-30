@@ -8,11 +8,14 @@ package components
 //
 // Three render paths:
 //
-//   - <img> when ID (or SrcOverride) is set and the actor is a user.
-//     URL is built via AvatarURL(id, version); version is the
-//     session avatar_v cache-buster.
-//   - Bot tile when IsAgent is true — `bg-primary/10` ring with a
-//     lucide "bot" glyph sized to the variant.
+//   - <img> when ID (or SrcOverride) is set. For users the URL is built
+//     via AvatarURL(id, version); for agents (IsAgent) it routes through
+//     AgentAvatarURL → ?type=agent so the server picks the configured
+//     agent DiceBear style (default "bottts-neutral"). Seed an agent with its
+//     stable slug and each one renders as a distinct robot.
+//   - Bot tile when IsAgent is true but no ID/SrcOverride is set —
+//     `bg-primary/10` with a lucide "bot" glyph sized to the variant
+//     (the generic "some agent" fallback).
 //   - Letter fallback when neither ID nor IsAgent is set — first
 //     A–Z / 0–9 char of Name, or "?" if Name is empty too.
 //

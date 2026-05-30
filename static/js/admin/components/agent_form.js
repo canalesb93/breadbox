@@ -279,6 +279,18 @@ document.addEventListener('alpine:init', function () {
         if (window.bbWireSlugInput) window.bbWireSlugInput('agent-name', 'agent-slug');
       },
 
+      // ---- avatar preview ------------------------------------------------
+      //
+      // Mirrors the server-side agentFormAvatarSrc helper: the agent's
+      // DiceBear robot is seeded by its slug, so the preview tile updates
+      // live as the operator types (or as the slug auto-derives from the
+      // name — slug.js dispatches an `input` event we listen to). Empty
+      // slug falls back to the "new-agent" placeholder seed.
+      agentAvatarPreviewSrc: function (slug) {
+        var seed = (slug || '').trim() || 'new-agent';
+        return '/avatars/' + encodeURIComponent(seed) + '?type=agent&size=80';
+      },
+
       // ---- cron picker ---------------------------------------------------
       presets: PRESETS,
 
