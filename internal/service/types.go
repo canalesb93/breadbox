@@ -579,6 +579,11 @@ type TransactionRuleListParams struct {
 	Enabled      *bool
 	Search       *string
 	SearchMode   *string
+	// CreatorType filters by the rule's creator. Accepted values:
+	// "user", "agent", "system". Other values (or nil) leave the
+	// dimension unfiltered. Used by the admin list page's "Type"
+	// filter; the public REST API does not expose this knob.
+	CreatorType *string
 	// SortBy drives the ORDER BY clause for the offset-paginated path (admin UI).
 	// Accepted values: "created_at" (default), "hit_count", "last_hit_at", "priority", "name".
 	// Ignored by the cursor-paginated path (API), which must stay stable on (date, id).

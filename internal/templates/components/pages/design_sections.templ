@@ -1704,6 +1704,77 @@ templ SectionFilterSearchInput() {
 	</div>
 }
 
+// SectionServerFilterToolbar showcases the GET-driven filter toolbar
+// pattern used on /rules and recommended for any other server-rendered
+// list page that needs more than a single search field. The toolbar
+// auto-submits on every <select> change so the user gets immediate
+// feedback without hunting for a Filter button. The search input
+// submits on Enter or blur — keystroke auto-submit would fire too many
+// round-trips. Hidden inputs carry unrelated query state (sort,
+// per_page) across the submit so the toolbar never wipes the user's
+// other preferences.
+//
+// The form is rendered inert in the sandbox (action="#" prevents the
+// page from navigating away on interaction) so reviewers can click
+// through the variants safely.
+templ SectionServerFilterToolbar() {
+	<div class="flex flex-col gap-6">
+		@designExample("Default (4 controls + clear)", "Search + category + status + creator selects, with a Clear link when any filter is active. Mobile: controls wrap; each select fills the row at sm-.") {
+			<form method="get" action="#" class="px-1" onsubmit="return false">
+				<div class="flex flex-wrap gap-2 items-stretch">
+					<div class="relative flex-1 min-w-[200px]">
+						<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content opacity-50 pointer-events-none z-10"></i>
+						<input type="search" placeholder="Search rules by name…" class="input input-sm w-full pl-9"/>
+					</div>
+					<select class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-44">
+						<option>All categories</option>
+						<option>Groceries</option>
+						<option>Coffee &amp; Cafés</option>
+					</select>
+					<select class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-32">
+						<option>Any status</option>
+						<option>Enabled</option>
+						<option>Disabled</option>
+					</select>
+					<select class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-32">
+						<option>Any type</option>
+						<option>User-created</option>
+						<option>Agent-created</option>
+						<option>System</option>
+					</select>
+					<a href="#" class="btn btn-ghost btn-sm gap-1.5">
+						@components.LucideIcon("x", "w-3.5 h-3.5")
+						<span class="hidden sm:inline">Clear</span>
+					</a>
+				</div>
+			</form>
+		}
+		@designExample("Compact (2 controls, no clear)", "Same scaffolding with only two filters — drop the Clear affordance when no filter is active. Inline `<noscript>` Filter button kicks in if Alpine doesn't load.") {
+			<form method="get" action="#" class="px-1" onsubmit="return false">
+				<div class="flex flex-wrap gap-2 items-stretch">
+					<div class="relative flex-1 min-w-[200px]">
+						<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content opacity-50 pointer-events-none z-10"></i>
+						<input type="search" placeholder="Search merchants…" class="input input-sm w-full pl-9"/>
+					</div>
+					<select class="select select-sm bg-base-100 w-full sm:w-auto sm:min-w-44">
+						<option>All accounts</option>
+						<option>Chase Checking</option>
+						<option>Capital One Savings</option>
+					</select>
+					<noscript>
+						<button type="submit" class="btn btn-primary btn-sm">Filter</button>
+					</noscript>
+				</div>
+			</form>
+		}
+		<div class="text-xs text-base-content/60 px-1 max-w-prose">
+			@templ.Raw(`<p class="mb-2"><strong>Auto-submit pattern.</strong> Pair each <code>&lt;select&gt;</code> with <code>&#64;change="$el.form.requestSubmit()"</code> and register an Alpine factory (even empty <code>{}</code>) on the parent form via <code>x-data</code> so the change handler has a scope. Search inputs rely on the native form submit-on-Enter; add <code>&#64;keydown.escape</code> to clear and submit.</p>
+<p class="mb-2"><strong>State preservation.</strong> Sort, per_page, and any other query params the toolbar doesn&#39;t expose go in <code>&lt;input type=&quot;hidden&quot;&gt;</code> tags so the submit doesn&#39;t blow them away.</p>
+<p><strong>Empty values.</strong> Empty-string <code>&lt;option&gt;</code>s render the form value as <code>&quot;&quot;</code>, which the handler should treat as &ldquo;no filter for that dim&rdquo;. Whitelist accepted values server-side before pushing them into the SQL <code>WHERE</code> clause.</p>`)
+		</div>
+	</div>
+}
+
 // ─── Category picker ───────────────────────────────────────────────────
 
 // SectionCategoryPicker showcases the four canonical button shells used

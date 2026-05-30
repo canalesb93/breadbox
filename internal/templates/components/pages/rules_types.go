@@ -26,6 +26,30 @@ type RulesProps struct {
 	// Sort key drives the <select> in the toolbar. Empty == default
 	// (priority).
 	SortBy string
+
+	// Filter state — driven by query params, echoed back so the toolbar
+	// shows the active filter. Empty string == no filter for that dim.
+	Search       string
+	CategorySlug string
+	EnabledFilter string // "", "true", "false"
+	CreatorType   string // "", "user", "agent", "system"
+
+	// FiltersActive is true when any non-default filter is set; the
+	// toolbar uses it to show a "Clear" link.
+	FiltersActive bool
+
+	// FilterCategories is the flat list of categories used to populate
+	// the category-filter <select>. Built by the handler from
+	// ListCategoryTree to avoid a service call inside the templ.
+	FilterCategories []RulesCategoryOption
+}
+
+// RulesCategoryOption is a flattened, display-ready entry for the
+// category filter <select>. Indented children are pre-formatted in the
+// handler so the templ stays free of tree traversal.
+type RulesCategoryOption struct {
+	Slug  string
+	Label string
 }
 
 // RulesRow is a flat view-model for one rule card. Pre-renders the bits
