@@ -87,7 +87,7 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 			seed := idStr
 			if key.ActorType == "agent" {
 				actor = avatar.ActorAgent
-				if slug, ok := agentSlugFromKeyName(key.Name); ok {
+				if slug, ok := service.ParseAgentKeySlug(key.Name); ok {
 					seed = slug
 				}
 			}
@@ -98,15 +98,6 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		// Unknown id — generate a stable pattern from the raw string.
 		serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 	}
-}
-
-// agentSlugFromKeyName recovers an agent's slug from a minted run-key
-// name of the form "agent:<slug>:<runID>" (see
-// service.Orchestrator key minting). Returns ok=false for any other
-// shape — operator-created agent keys, HTTP MCP keys, the stdio
-// singleton — so the caller keeps seeding on the key UUID for those.
-func agentSlugFromKeyName(name string) (string, bool) {
-	return service.ParseAgentKeySlug(name)
 }
 
 // parseActorType reads the `?type=` query param and normalises it
