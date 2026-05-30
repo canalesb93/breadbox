@@ -38,71 +38,42 @@ type NavProps struct {
 }
 
 // Nav renders the sidebar drawer used inside layout/base.html.
+//
+// Every link label lives in a `.bb-sidebar-link__label` span so the
+// collapsed icon-rail (toggled via <html data-sidebar="collapsed">, see
+// bbToggleSidebar in base.html) can hide the text while keeping the icon
+// centred. Each link also carries a `title` so the label surfaces as a
+// native tooltip when the rail is collapsed.
 templ Nav(p NavProps) {
 	<nav class="bb-sidebar-nav">
 		if p.ShowGettingStarted {
 			<div class="bb-sidebar-section">Setup</div>
-			<a href="/getting-started" class={ "bb-sidebar-link", navActive(p.CurrentPage, "getting-started") }>
-				@LucideIcon("compass", "")
-				<span class="flex-1">Getting Started</span>
-			</a>
+			@navLink("/getting-started", "compass", "Getting Started", navActive(p.CurrentPage, "getting-started"))
 		}
 		<div class="bb-sidebar-section">Overview</div>
-		<a href="/" class={ "bb-sidebar-link", navActive(p.CurrentPage, "feed") }>
-			@LucideIcon("rss", "")
-			<span class="flex-1">Feed</span>
-		</a>
-		<a href="/transactions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "transactions") }>
-			@LucideIcon("receipt", "") Transactions
-		</a>
-		<a href="/accounts" class={ "bb-sidebar-link", navActive(p.CurrentPage, "accounts") }>
-			@LucideIcon("wallet", "") Accounts
-		</a>
+		@navLink("/", "rss", "Feed", navActive(p.CurrentPage, "feed"))
+		@navLink("/transactions", "receipt", "Transactions", navActive(p.CurrentPage, "transactions"))
+		@navLink("/accounts", "wallet", "Accounts", navActive(p.CurrentPage, "accounts"))
 		if p.IsAdmin {
-			<a href="/reports" class={ "bb-sidebar-link", navActive(p.CurrentPage, "reports") }>
-				@LucideIcon("file-text", "")
-				<span class="flex-1">Reports</span>
-				if p.UnreadReports > 0 {
-					<span class="bb-nav-badge" title={ fmt.Sprintf("%d unread reports", p.UnreadReports) }>{ badgeCount(p.UnreadReports) }</span>
-				}
-			</a>
+			@navLinkBadge("/reports", "file-text", "Reports", navActive(p.CurrentPage, "reports"), p.UnreadReports, "", fmt.Sprintf("%d unread reports", p.UnreadReports))
 		}
 		<div class="bb-sidebar-section">Manage</div>
 		if p.IsEditor {
-			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
-				@LucideIcon("bot-message-square", "")
-				<span>Agents</span>
-			</a>
+			@navLink("/agents", "bot-message-square", "Agents", navActive(p.CurrentPage, "agents"))
 		}
 		if p.IsAdmin {
-			<a href="/rules" class={ "bb-sidebar-link", navActive(p.CurrentPage, "rules") }>
-				@LucideIcon("zap", "") Rules
-			</a>
-			<a href="/categories" class={ "bb-sidebar-link", navActive(p.CurrentPage, "categories") }>
-				@LucideIcon("folder", "") Categories
-			</a>
+			@navLink("/rules", "zap", "Rules", navActive(p.CurrentPage, "rules"))
+			@navLink("/categories", "folder", "Categories", navActive(p.CurrentPage, "categories"))
 		}
 		if p.IsEditor {
-			<a href="/tags" class={ "bb-sidebar-link", navActive(p.CurrentPage, "tags") }>
-				@LucideIcon("tags", "") Tags
-			</a>
+			@navLink("/tags", "tags", "Tags", navActive(p.CurrentPage, "tags"))
 		}
 		if p.IsEditor {
 			<div class="bb-sidebar-section">System</div>
-			<a href="/connections" class={ "bb-sidebar-link", navActive(p.CurrentPage, "connections") }>
-				@LucideIcon("link", "")
-				<span class="flex-1">Connections</span>
-				if p.ConnectionsAttention > 0 {
-					<span class="bb-nav-badge bb-nav-badge--warn" title={ fmt.Sprintf("%d connections need attention", p.ConnectionsAttention) }>{ badgeCount(p.ConnectionsAttention) }</span>
-				}
-			</a>
+			@navLinkBadge("/connections", "link", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
 			if p.IsAdmin {
-				<a href="/household" class={ "bb-sidebar-link", navActive(p.CurrentPage, "household") }>
-					@LucideIcon("users", "") Household
-				</a>
-				<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
-					@LucideIcon("scroll-text", "") Logs
-				</a>
+				@navLink("/household", "users", "Household", navActive(p.CurrentPage, "household"))
+				@navLink("/logs", "scroll-text", "Logs", navActive(p.CurrentPage, "logs"))
 			}
 		}
 	</nav>
@@ -115,23 +86,46 @@ templ Nav(p NavProps) {
 			title={ "Release notes for " + p.NavLatestVersion }
 		>
 			@LucideIcon("arrow-up-circle", "")
-			<span class="flex-1 truncate">Update available</span>
+			<span class="bb-sidebar-link__label">Update available</span>
 			<span class="badge badge-soft badge-warning badge-xs">{ p.NavLatestVersion }</span>
 		</a>
 	}
-	<div class="mt-auto pt-3 border-t border-base-300 px-2">
-		@SidebarUserMenu(SidebarUserMenuProps{
-			CurrentPage:          p.CurrentPage,
-			IsEditor:             p.IsEditor,
-			HasLinkedUser:        p.HasLinkedUser,
-			SessionUserID:        p.SessionUserID,
-			SessionAvatarVersion: p.SessionAvatarVersion,
-			AdminUsername:        p.AdminUsername,
-			UserName:             p.UserName,
-			RoleDisplay:          p.RoleDisplay,
-			CSRFToken:            p.CSRFToken,
-		})
+	// Collapse toggle — pinned to the rail's foot (Mintlify-style). Desktop
+	// only; on mobile the drawer is a transient overlay with no collapsed
+	// state. bbToggleSidebar() flips <html data-sidebar> and persists it.
+	<div class="bb-sidebar-footer mt-auto pt-2 border-t border-base-300/60 hidden lg:block">
+		<button
+			type="button"
+			class="bb-sidebar-link bb-sidebar-collapse w-full border-0 bg-transparent cursor-pointer text-left"
+			onclick="bbToggleSidebar()"
+			aria-label="Toggle sidebar"
+			title="Collapse sidebar"
+		>
+			@LucideIcon("panel-left", "")
+			<span class="bb-sidebar-link__label">Collapse</span>
+		</button>
 	</div>
+}
+
+// navLink renders a single sidebar destination. The label is wrapped so
+// the collapsed rail can hide it; title doubles as the collapsed tooltip.
+templ navLink(href, icon, label, active string) {
+	<a href={ templ.SafeURL(href) } class={ "bb-sidebar-link", active } title={ label }>
+		@LucideIcon(icon, "")
+		<span class="bb-sidebar-link__label">{ label }</span>
+	</a>
+}
+
+// navLinkBadge is navLink plus a trailing notification count. The badge is
+// dropped in the collapsed rail (the CSS rule hides .bb-nav-badge there).
+templ navLinkBadge(href, icon, label, active string, count int64, badgeClass, badgeTitle string) {
+	<a href={ templ.SafeURL(href) } class={ "bb-sidebar-link", active } title={ label }>
+		@LucideIcon(icon, "")
+		<span class="bb-sidebar-link__label">{ label }</span>
+		if count > 0 {
+			<span class={ "bb-nav-badge", badgeClass } title={ badgeTitle }>{ badgeCount(count) }</span>
+		}
+	</a>
 }
 
 // navExternalLink renders a sidebar-styled button that opens an external

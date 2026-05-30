@@ -543,6 +543,43 @@
     }
   }
 
+  /* ── Desktop topbar ── static across pages; the lg+ counterpart of
+     .bb-mobile-navbar. Sticky, hairline-bordered, lightly blurred. Holds
+     the breadcrumb (left) + search / theme / profile (right). */
+  .bb-topbar {
+    @apply hidden lg:flex items-center justify-between gap-3 h-14 px-4 sm:px-6 bg-base-100;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    border-bottom: 1px solid oklch(from var(--color-base-content) l c h / 0.06);
+    -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+    background-color: color-mix(in oklch, var(--color-base-100) 92%, transparent);
+    view-transition-name: app-topbar;
+  }
+
+  .bb-topbar-breadcrumb {
+    @apply flex items-center gap-1.5 min-w-0 text-sm;
+  }
+
+  /* ⌘K search trigger in the topbar — mirrors the retired sidebar trigger
+     but sized for a navbar row. Hidden on the narrowest desktops (< md)
+     where the breadcrumb wants the width; ⌘K + the palette still work. */
+  .bb-topbar-search {
+    @apply hidden md:flex items-center gap-2 h-9 w-56 px-3 rounded-lg
+           text-sm text-base-content/40 bg-base-200/50 border border-base-300/50
+           cursor-pointer select-none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .bb-topbar-search:hover {
+    @apply bg-base-200 border-base-300;
+  }
+
+  .bb-topbar-search svg, .bb-topbar-search i {
+    @apply w-4 h-4;
+  }
+
   /* ── Sidebar ── */
   .bb-sidebar {
     @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
@@ -631,6 +668,13 @@
 
   .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
     @apply opacity-100;
+  }
+
+  /* Label span inside every sidebar link — the hook the collapsed
+     icon-rail uses to hide the text while keeping the icon. flex-1 lets it
+     fill the row so any trailing badge sits at the far edge. */
+  .bb-sidebar-link__label {
+    @apply flex-1 truncate;
   }
 
   /* ── Trailing loading spinner on mobile sidebar tap ──
@@ -1853,6 +1897,48 @@
     @apply no-underline;
     font-size: 0.55rem;
     line-height: 1;
+  }
+
+  /* ── Collapsible sidebar — desktop icon-rail ──────────────────────
+     Toggled by bbToggleSidebar() setting <html data-sidebar="collapsed">
+     (pre-applied before paint by the inline <head> script, so no flash).
+     Only active at lg+, where the sidebar is a persistent rail; below lg
+     the drawer is a transient overlay and keeps its full width. The grid
+     `max-content` track on .drawer reflows the content as the rail's width
+     animates. */
+  @media (min-width: 1024px) {
+    .bb-sidebar { transition: width 0.2s ease; }
+
+    html[data-sidebar="collapsed"] .bb-sidebar {
+      width: 4.5rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+
+    /* Drop every text affordance inside the rail; the icons remain. */
+    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link__label,
+    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-brand-text,
+    html[data-sidebar="collapsed"] .bb-sidebar .bb-nav-badge,
+    html[data-sidebar="collapsed"] .bb-sidebar .badge {
+      display: none;
+    }
+
+    /* Centre the icons in the narrowed rail. */
+    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-link {
+      @apply justify-center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    html[data-sidebar="collapsed"] .bb-sidebar-header {
+      @apply justify-center;
+    }
+
+    /* Section labels collapse to a slim spacer so groups stay separated. */
+    html[data-sidebar="collapsed"] .bb-sidebar .bb-sidebar-section {
+      font-size: 0;
+      line-height: 0;
+      padding: 0.75rem 0 0.25rem;
+    }
   }
 
   /* ── Landscape mobile: scroll entire sidebar, keep full touch targets ── */

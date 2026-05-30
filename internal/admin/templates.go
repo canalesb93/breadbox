@@ -112,6 +112,52 @@ var componentRegistry = map[string]componentAdapter{
 			InitialBody: initialBody,
 		}), nil
 	},
+	"TopbarUserMenu": func(data any) (templ.Component, error) {
+		m, ok := data.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("TopbarUserMenu: want map[string]any, got %T", data)
+		}
+		return components.TopbarUserMenu(topbarUserMenuPropsFromData(m)), nil
+	},
+}
+
+// topbarUserMenuPropsFromData builds the identity props the topbar
+// profile menu needs from the layout data map. It reuses the same fields
+// navPropsFromData already extracts (and caches as _NavProps) so there is
+// a single source of truth for the session identity shape.
+func topbarUserMenuPropsFromData(m map[string]any) components.SidebarUserMenuProps {
+	np := navPropsFromData(m)
+	return components.SidebarUserMenuProps{
+		CurrentPage:          np.CurrentPage,
+		IsEditor:             np.IsEditor,
+		HasLinkedUser:        np.HasLinkedUser,
+		SessionUserID:        np.SessionUserID,
+		SessionAvatarVersion: np.SessionAvatarVersion,
+		AdminUsername:        np.AdminUsername,
+		UserName:             np.UserName,
+		RoleDisplay:          np.RoleDisplay,
+		CSRFToken:            np.CSRFToken,
+	}
+}
+
+// pageSectionLabel maps a nav page id to the sidebar section it lives
+// under, for the topbar breadcrumb (e.g. "Overview / Feed"). Returns ""
+// for pages with no section (login, settings sub-pages) so the breadcrumb
+// renders the page title alone. Keep in sync with the section groupings
+// in components.Nav.
+func pageSectionLabel(currentPage string) string {
+	switch currentPage {
+	case "getting-started":
+		return "Setup"
+	case "feed", "transactions", "accounts", "reports":
+		return "Overview"
+	case "agents", "rules", "categories", "tags":
+		return "Manage"
+	case "connections", "household", "logs":
+		return "System"
+	default:
+		return ""
+	}
 }
 
 // toStringSlice coerces the value passed via renderComponent into a
@@ -287,6 +333,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
 				"strs":            func(vals ...string) []string { return vals },
 				"renderComponent": renderTemplComponent,
+				// pageSection maps the current nav page id to its sidebar
+				// section, for the desktop topbar breadcrumb in base.html.
+				"pageSection": pageSectionLabel,
 				// userAvatarProps constructs a UserAvatarProps from the
 				// BaseTemplateData fields html/template partials carry,
 				// for use through renderComponent. Kept inline so the
