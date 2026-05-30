@@ -238,6 +238,22 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ---
 
+## Subscriptions (Recurring Series) Tools
+
+### list_series (Read)
+
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Read `status=candidate` to find series awaiting a verdict.
+
+### get_series (Read)
+
+Get one series by short ID or UUID, including its full `detection_signals` (`occurrence_count`, `interval_cv`, `cadence_snap_error`, `amount_branch`, `merchant_key_is_fallback`). Inspect before reviewing a candidate.
+
+### review_series (Write)
+
+Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a subscription → sticky at that amount band, never re-proposed), `pause`, or `cancel`. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates candidates from `list_series(status=candidate)`.
+
+---
+
 ## Transaction Rules Tools
 
 > **Full DSL specification**: see **[`docs/rule-dsl.md`](rule-dsl.md)** for the complete condition grammar, action semantics, trigger matrix, pipeline-stage (priority) ordering, sync-vs-retroactive differences, and the chaining model that lets later-stage rules observe earlier-stage rules' tag/category mutations.
