@@ -1809,6 +1809,10 @@
         { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
         { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/settings/api-keys/new', keywords: 'new token' },
         { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/household/new', keywords: 'new person family' },
+        // Action item (no href) — cycles $store.theme system → light → dark.
+        // shortcutId links to the '*' binding seeded in seedRegistry() so the
+        // palette row shows the same keycap hint as the help modal.
+        { id: 'act-theme', shortcutId: 'global.theme.cycle', group: 'Quick Actions', title: 'Toggle theme', desc: 'Cycle theme: system → light → dark', icon: 'sun-moon', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').cycle(); }, keywords: 'theme dark light mode appearance toggle system color scheme night day' },
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
@@ -2031,6 +2035,13 @@
         },
 
         go(item) {
+          // Action items run a callback instead of navigating (e.g. the
+          // theme toggle). Run it, then close — no href, no page transition.
+          if (typeof item.action === 'function') {
+            item.action();
+            this.closePalette();
+            return;
+          }
           if (item.href) {
             // Settings URLs open the modal in-place instead of full-page
             // navigating to the empty host shell — keeps the user on
@@ -2553,6 +2564,20 @@
           group: 'Actions',
           scope: 'global',
           visible: true
+        });
+
+        // Cycle theme: system → light → dark. Bound to '*' (Shift+8 on a
+        // US layout) — the dispatcher rejects Cmd/Ctrl/Alt but allows Shift,
+        // and the browser folds Shift+8 into e.key='*', so we match the
+        // resulting character directly (layout-independent). Mirrors the
+        // command palette's "Toggle theme" action.
+        reg.register({
+          id: 'global.theme.cycle',
+          keys: '*',
+          description: 'Toggle theme (system → light → dark)',
+          group: 'Actions',
+          scope: 'global',
+          action: function() { if (Alpine.store('theme')) Alpine.store('theme').cycle(); }
         });
 
         Object.keys(goRoutes).forEach(function(k) {
