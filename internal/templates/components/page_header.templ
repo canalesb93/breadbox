@@ -7,6 +7,11 @@ package components
 //   - Subtitle: optional muted paragraph below the title (also used to
 //               carry small dynamic counts, e.g. "237 transactions").
 //   - Icon:     optional Lucide icon name; rendered inline-left of the title.
+//   - Leading:  optional templ.Component rendered left of the whole title
+//               block (avatar / identicon). Use for identity headers — e.g.
+//               an agent's DiceBear avatar on /agents/<slug>. Takes
+//               precedence over the inline Icon visually; pass one or the
+//               other, not both.
 //   - Action:   optional templ.Component for the page's PRIMARY action
 //               (typically a btn-primary). Right-aligned.
 //   - SecondaryAction: optional templ.Component for one secondary action
@@ -40,6 +45,10 @@ type PageHeaderProps struct {
 	Subtitle             string
 	Icon                 string // optional Lucide icon name
 	SubtitleHideOnMobile bool
+	// Leading is an optional visual rendered immediately left of the
+	// title block (e.g. an identity avatar). Nil keeps the classic
+	// title-only layout.
+	Leading templ.Component
 	// SecondaryAction is rendered before Action in the trailing slot.
 	// Convention: secondary-styled button (use PageHeaderSecondaryAction).
 	SecondaryAction templ.Component
@@ -51,23 +60,14 @@ type PageHeaderProps struct {
 
 templ PageHeader(p PageHeaderProps) {
 	<div class="bb-page-header">
-		<div class="min-w-0">
-			if p.Icon != "" {
-				<h1 class="bb-page-title flex items-center gap-2">
-					@LucideIcon(p.Icon, "w-6 h-6 text-primary shrink-0")
-					<span>{ p.Title }</span>
-				</h1>
-			} else {
-				<h1 class="bb-page-title">{ p.Title }</h1>
-			}
-			if p.Subtitle != "" {
-				if p.SubtitleHideOnMobile {
-					<p class="text-sm text-base-content/50 mt-1 hidden sm:block">{ p.Subtitle }</p>
-				} else {
-					<p class="text-sm text-base-content/50 mt-1">{ p.Subtitle }</p>
-				}
-			}
-		</div>
+		if p.Leading != nil {
+			<div class="flex items-center gap-3 min-w-0">
+				@p.Leading
+				@pageHeaderTitleBlock(p)
+			</div>
+		} else {
+			@pageHeaderTitleBlock(p)
+		}
 		if p.SecondaryAction != nil || p.Action != nil {
 			<div class="flex items-center gap-2 shrink-0">
 				if p.SecondaryAction != nil {
@@ -77,6 +77,29 @@ templ PageHeader(p PageHeaderProps) {
 					@p.Action
 				}
 			</div>
+		}
+	</div>
+}
+
+// pageHeaderTitleBlock is the title + subtitle column shared by the
+// leading-avatar and title-only layouts, so the two branches can't
+// drift apart.
+templ pageHeaderTitleBlock(p PageHeaderProps) {
+	<div class="min-w-0">
+		if p.Icon != "" {
+			<h1 class="bb-page-title flex items-center gap-2">
+				@LucideIcon(p.Icon, "w-6 h-6 text-primary shrink-0")
+				<span>{ p.Title }</span>
+			</h1>
+		} else {
+			<h1 class="bb-page-title">{ p.Title }</h1>
+		}
+		if p.Subtitle != "" {
+			if p.SubtitleHideOnMobile {
+				<p class="text-sm text-base-content/50 mt-1 hidden sm:block">{ p.Subtitle }</p>
+			} else {
+				<p class="text-sm text-base-content/50 mt-1">{ p.Subtitle }</p>
+			}
 		}
 	</div>
 }

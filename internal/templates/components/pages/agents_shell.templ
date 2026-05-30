@@ -129,9 +129,15 @@ templ agentRunModal(p agentRunModalProps) {
 				<div class="rounded-xl bg-base-100 border border-base-300 divide-y divide-base-200 max-h-72 overflow-y-auto">
 					<template x-for="opt in filtered" :key="opt.Slug">
 						<div class="flex items-center gap-3 px-3 py-2.5 hover:bg-base-200/50">
-							<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-								@components.LucideIcon("bot", "w-4 h-4 text-primary")
-							</div>
+							<span class="w-8 h-8 rounded-full overflow-hidden bg-base-200 shrink-0 inline-flex items-center justify-center">
+								<img
+									:src="'/avatars/' + encodeURIComponent(opt.Slug) + '?type=agent&size=48'"
+									:alt="opt.Name + ' avatar'"
+									class="w-full h-full object-cover"
+									loading="lazy"
+									decoding="async"
+								/>
+							</span>
 							<div class="min-w-0 flex-1">
 								<div class="text-sm font-medium truncate" x-text="opt.Name"></div>
 								<div class="text-xs text-base-content/50 line-clamp-1" x-text="opt.Description" x-show="opt.Description"></div>

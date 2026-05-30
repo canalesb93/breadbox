@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -74,17 +75,42 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		// URLs are built from it. When the row is an agent key,
 		// upgrade the actor type so the agent DiceBear style wins
 		// regardless of the URL's ?type= param.
+		//
+		// Every run mints a fresh per-run key (name "agent:<slug>:<runID>"),
+		// so seeding on the key UUID would give the same agent a different
+		// robot on every run. Instead we recover the agent's stable slug
+		// from the key name and seed on that — so an agent's activity rows
+		// share one avatar that matches its /agents/<slug> profile. Keys
+		// whose name isn't in that shape (HTTP MCP keys, the stdio
+		// singleton) fall back to the key UUID seed.
 		if key, kerr := a.Queries.GetApiKey(r.Context(), uid); kerr == nil {
+			seed := idStr
 			if key.ActorType == "agent" {
 				actor = avatar.ActorAgent
+				if slug, ok := agentSlugFromKeyName(key.Name); ok {
+					seed = slug
+				}
 			}
-			serveGeneratedAvatarForActor(w, r, idStr, actor, size)
+			serveGeneratedAvatarForActor(w, r, seed, actor, size)
 			return
 		}
 
 		// Unknown id — generate a stable pattern from the raw string.
 		serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 	}
+}
+
+// agentSlugFromKeyName recovers an agent's slug from a minted run-key
+// name of the form "agent:<slug>:<runID>" (see
+// service.Orchestrator key minting). Returns ok=false for any other
+// shape — operator-created agent keys, HTTP MCP keys, the stdio
+// singleton — so the caller keeps seeding on the key UUID for those.
+func agentSlugFromKeyName(name string) (string, bool) {
+	parts := strings.Split(name, ":")
+	if len(parts) != 3 || parts[0] != "agent" || parts[1] == "" {
+		return "", false
+	}
+	return parts[1], true
 }
 
 // parseActorType reads the `?type=` query param and normalises it

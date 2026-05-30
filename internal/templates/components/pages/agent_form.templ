@@ -54,9 +54,17 @@ templ AgentForm(p AgentFormProps) {
 			<!-- Identity: icon header + name + slug -->
 			<div class="p-5 sm:p-6">
 				<div class="bb-icon-header">
-					<div class="bb-icon-header__tile bb-icon-tile--primary">
-						@components.LucideIcon("bot", "w-5 h-5")
-					</div>
+					<span class="w-10 h-10 rounded-full overflow-hidden bg-base-200 shrink-0 inline-flex items-center justify-center" title="Avatar is generated from the slug">
+						<img
+							x-ref="agentAvatar"
+							src={ agentFormAvatarSrc(p.Form.Slug) }
+							alt="Agent avatar preview"
+							class="w-full h-full object-cover"
+							width="40"
+							height="40"
+							decoding="async"
+						/>
+					</span>
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold">
 							if p.Mode == "edit" {
@@ -91,6 +99,7 @@ templ AgentForm(p AgentFormProps) {
 							minlength="2"
 							maxlength="64"
 							required
+							@input="$refs.agentAvatar && ($refs.agentAvatar.src = agentAvatarPreviewSrc($event.target.value))"
 						/>
 						<p class="text-xs text-base-content/40 mt-1.5">Lowercase letters, digits, dashes. 2–64 chars. Used in URLs and the audit trail.</p>
 						@agentFormFieldError(p.FieldErr("slug"))
