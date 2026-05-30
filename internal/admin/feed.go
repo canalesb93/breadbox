@@ -266,7 +266,6 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 					Title:         rep.Title,
 					BodyExcerpt:   excerpt(rep.Body, 220),
 					Priority:      rep.Priority,
-					Tags:          rep.Tags,
 					DisplayAuthor: reportDisplayAuthor(rep.CreatedByName, rep.Author),
 					IsUnread:      rep.ReadAt == nil,
 					AvatarSeed:    reportAvatarSeed,
@@ -531,7 +530,6 @@ func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentS
 		out.ReportShortID = s.Report.ShortID
 		out.ReportTitle = s.Report.Title
 		out.ReportPriority = s.Report.Priority
-		out.ReportTags = s.Report.Tags
 		out.ReportIsUnread = s.Report.IsUnread
 	}
 	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(s.SampleTransactions))
@@ -562,7 +560,6 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 		out.ReportShortID = b.Report.ShortID
 		out.ReportTitle = b.Report.Title
 		out.ReportPriority = b.Report.Priority
-		out.ReportTags = b.Report.Tags
 		out.ReportIsUnread = b.Report.IsUnread
 	}
 	for _, sub := range b.Subjects {

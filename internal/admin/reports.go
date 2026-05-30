@@ -4,8 +4,6 @@ package admin
 
 import (
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -24,63 +22,6 @@ func reportDisplayAuthor(createdByName string, author *string) string {
 		return *author
 	}
 	return createdByName
-}
-
-// Markdown-stripping regexes for the inbox-row preview. Compiled once at
-// package scope. Order matters: fenced code and images come out first,
-// then link URLs (keeping the visible text), then line-leading markers.
-var (
-	reportPreviewFence    = regexp.MustCompile("(?s)```.*?```")
-	reportPreviewRuleLine = regexp.MustCompile(`(?m)^[ \t]*[:\-|=_*\s]{3,}[ \t]*$`)
-	reportPreviewImg      = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
-	reportPreviewLink     = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
-	reportPreviewInline   = regexp.MustCompile("`([^`]*)`")
-	reportPreviewHeading  = regexp.MustCompile(`(?m)^\s{0,3}#{1,6}\s+`)
-	reportPreviewQuote    = regexp.MustCompile(`(?m)^\s{0,3}>\s?`)
-	reportPreviewListItem = regexp.MustCompile(`(?m)^\s*([-*+]|\d+\.)\s+`)
-	// Emphasis is unwrapped by paired delimiters (keeping the inner text),
-	// not by a blanket [*_~] strip — so snake_case identifiers and bare
-	// arithmetic (file_name, 5*4) survive into the preview unscathed.
-	reportPreviewBold   = regexp.MustCompile(`(\*\*|__)(.+?)(\*\*|__)`)
-	reportPreviewItalic = regexp.MustCompile(`(^|[\s(])[*_]([^*_\n]+?)[*_]($|[\s).,!?;:])`)
-	reportPreviewStrike = regexp.MustCompile(`~~(.+?)~~`)
-	reportPreviewSpace  = regexp.MustCompile(`\s+`)
-)
-
-// reportPreview strips a markdown body down to a single line of plain
-// text for the inbox-row preview. Stripping markup (rather than
-// substringing raw markdown) keeps syntax characters and mid-token cuts
-// out of the snippet. The result is whitespace-collapsed and truncated
-// to ~140 chars on a word boundary.
-func reportPreview(body string) string {
-	s := body
-	s = reportPreviewFence.ReplaceAllString(s, " ")
-	s = reportPreviewRuleLine.ReplaceAllString(s, " ")
-	s = reportPreviewImg.ReplaceAllString(s, " ")
-	s = reportPreviewLink.ReplaceAllString(s, "$1")
-	s = reportPreviewInline.ReplaceAllString(s, "$1")
-	s = reportPreviewHeading.ReplaceAllString(s, "")
-	s = reportPreviewQuote.ReplaceAllString(s, "")
-	s = reportPreviewListItem.ReplaceAllString(s, "")
-	s = strings.ReplaceAll(s, "|", " ")
-	s = reportPreviewBold.ReplaceAllString(s, "$2")
-	s = reportPreviewItalic.ReplaceAllString(s, "$1$2$3")
-	s = reportPreviewStrike.ReplaceAllString(s, "$1")
-	s = reportPreviewSpace.ReplaceAllString(s, " ")
-	return truncateWords(strings.TrimSpace(s), 140)
-}
-
-// truncateWords clips s to at most max runes, backing up to the last
-// space so the snippet never ends mid-word, and appends an ellipsis.
-func truncateWords(s string, max int) string {
-	if len([]rune(s)) <= max {
-		return s
-	}
-	cut := string([]rune(s)[:max])
-	if i := strings.LastIndex(cut, " "); i > 0 {
-		cut = cut[:i]
-	}
-	return strings.TrimRight(cut, " ,.;:—-") + "…"
 }
 
 // ReportsPageHandler handles GET /reports.
@@ -124,9 +65,7 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			reports = append(reports, components.ReportRowProps{
 				ID:       rep.ID,
 				Title:    rep.Title,
-				Preview:  reportPreview(rep.Body),
 				Priority: rep.Priority,
-				Tags:     rep.Tags,
 				Author:   reportDisplayAuthor(rep.CreatedByName, rep.Author),
 				Time:     relativeTime(t),
 				IsRead:   isRead,
@@ -172,7 +111,6 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			Title:         report.Title,
 			Body:          report.Body,
 			Priority:      report.Priority,
-			Tags:          report.Tags,
 			DisplayAuthor: reportDisplayAuthor(report.CreatedByName, report.Author),
 			CreatedAt:     t.In(loc).Format("Jan 2, 2006 at 3:04 PM"),
 			CreatedAtRel:  relativeTime(t),

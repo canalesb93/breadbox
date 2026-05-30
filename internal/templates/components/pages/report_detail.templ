@@ -7,18 +7,22 @@ import "breadbox/internal/templates/components"
 // handler builds typed props in admin/reports.go and the bridge drops
 // the rendered HTML into base.html's TemplContent slot.
 //
-// The page reads like a document, not a chat turn: a standard
-// components.EntityHeader (priority-toned icon tile + title + meta +
-// actions) over a single comfortable-measure prose column. The body is
-// rendered server-side via components.Markdown (→ .bb-prose), the same
-// renderer the agent-run transcript uses — so there's no client-side
-// marked/DOMPurify pipeline or render flash on this page.
+// The header is a purpose-built report header: a priority/unread badge
+// row, the report title as the page H1, and an `agent · time` meta line,
+// with the mark-read/unread toggle + an overflow menu (copy link, manage
+// format) trailing. The body is rendered client-side as Markdown by the
+// shared static/js/admin/markdown.js scanner (marked + DOMPurify) into
+// .bb-report-body — the two CDN deps load synchronously (no defer) so
+// Alpine.data() registration runs before alpine:init.
 //
-// The only page-local Alpine is the reportDetail factory
-// (static/js/admin/components/report_detail.js): the mark-read/unread
-// toggle, copy-link, and the success toast. Scalar state (report ID +
-// is-read flag) flows in via data-* attributes on the x-data root.
+// The reportDetail Alpine factory (static/js/admin/components/report_detail.js)
+// owns the toolbar: mark-read/unread, copy-link, and the success toast.
+// Scalar state (report id + is-read flag) flows in via data-* attributes
+// on the x-data root.
 templ ReportDetail(p ReportDetailProps) {
+	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/markdown.js"></script>
 	<script src="/static/js/admin/components/report_detail.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div
@@ -34,66 +38,41 @@ templ ReportDetail(p ReportDetailProps) {
 				<span x-text="toast"></span>
 			</div>
 		</div>
-		@components.EntityHeader(components.EntityHeaderProps{
-			Title:      p.Report.Title,
-			TitleClass: "break-words",
-			Icon:       components.ReportPriorityIcon(p.Report.Priority),
-			IconTone:   components.ReportPriorityIconTone(p.Report.Priority),
-			Badges:     reportDetailTags(p),
-			Meta:       reportDetailMeta(p),
-			Action:     reportDetailActions(p),
-		})
-		<!-- Body card — server-rendered markdown as .bb-prose -->
-		<div class="bb-card mt-5">
-			<div class="px-5 sm:px-7 py-5 sm:py-6">
-				@components.Markdown(p.Report.Body)
+		<!-- Report header -->
+		<div class="flex items-start justify-between gap-4 mb-5">
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 mb-2 flex-wrap">
+					@components.ReportPriorityBadge(p.Report.Priority)
+					<span x-show="!isRead" x-cloak class="badge badge-soft badge-primary badge-sm">Unread</span>
+				</div>
+				<h1 class="text-xl sm:text-2xl font-semibold leading-snug break-words text-base-content">{ p.Report.Title }</h1>
+				<div class="mt-2.5 flex items-center gap-1.5 text-xs text-base-content/50">
+					@components.LucideIcon("bot", "w-3.5 h-3.5 text-base-content/40")
+					<span class="font-medium text-base-content/70">{ p.Report.DisplayAuthor }</span>
+					<span class="text-base-content/25">·</span>
+					<span title={ p.Report.CreatedAt }>{ p.Report.CreatedAtRel }</span>
+				</div>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<button type="button" @click="toggleRead()" class="btn btn-ghost btn-sm gap-2">
+					<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-4 h-4"></i>
+					<span class="hidden sm:inline" x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
+				</button>
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Report actions",
+					Items: []components.OverflowMenuItem{
+						{Label: "Copy link", Icon: "link", OnClick: "copyLink()"},
+						{Label: "Manage report format", Icon: "sliders-horizontal", Href: "/settings/mcp#report-format"},
+					},
+				})
 			</div>
 		</div>
-	</div>
-}
-
-// reportDetailTags renders the report's tag chips in the EntityHeader
-// Badges slot (hidden below sm:). Priority is deliberately NOT carried
-// here — it rides the always-visible IconTone tile plus the Meta line —
-// so a critical/warning chip is never hidden on mobile exactly when it
-// matters most.
-templ reportDetailTags(p ReportDetailProps) {
-	for _, tag := range p.Report.Tags {
-		<span class="badge badge-ghost badge-xs">{ tag }</span>
-	}
-}
-
-// reportDetailMeta is the always-visible subtitle line: author · sent
-// time · priority chip · an unread badge the reportDetail Alpine factory
-// clears on mark-read. Read-state is the one inbox signal worth keeping
-// on the detail page so the operator knows whether opening it counts as
-// triage.
-templ reportDetailMeta(p ReportDetailProps) {
-	<span class="truncate">{ p.Report.DisplayAuthor }</span>
-	<span class="text-base-content/20">·</span>
-	<span title={ p.Report.CreatedAt }>Sent { p.Report.CreatedAtRel }</span>
-	@components.ReportPriorityBadge(p.Report.Priority)
-	<span x-show="!isRead" x-cloak class="badge badge-soft badge-primary badge-sm">Unread</span>
-}
-
-// reportDetailActions renders the header's trailing controls: the
-// primary mark-read/unread toggle (always visible) plus an overflow menu
-// for copy-link + manage-format. Both ride the EntityHeader Action slot
-// (always visible) rather than SecondaryAction (hidden on mobile), since
-// the toggle is the page's main affordance.
-templ reportDetailActions(p ReportDetailProps) {
-	<div class="flex items-center gap-2">
-		<button type="button" @click="toggleRead()" class="btn btn-ghost btn-sm gap-2">
-			<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-4 h-4"></i>
-			<span x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
-		</button>
-		@components.OverflowMenu(components.OverflowMenuProps{
-			AriaLabel: "Report actions",
-			Items: []components.OverflowMenuItem{
-				{Label: "Copy link", Icon: "link", OnClick: "copyLink()"},
-				{Label: "Manage report format", Icon: "sliders-horizontal", Href: "/settings/mcp#report-format"},
-			},
-		})
+		<!-- Body card — Markdown rendered client-side into .bb-report-body -->
+		<div class="bb-card">
+			<div class="px-5 sm:px-7 py-5 sm:py-6">
+				<div class="bb-report-body" data-markdown={ p.Report.Body }></div>
+			</div>
+		</div>
 	</div>
 }
 

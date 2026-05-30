@@ -9,11 +9,11 @@ import "breadbox/internal/templates/components"
 //
 // The page composes shared primitives: components.PageHeader for the
 // title row, components.TabBar (with per-tab Count badges) for the
-// status filter, components.ReportInboxList/ReportInboxRow for the
-// inbox, and components.EmptyState for the no-reports state. The only
-// page-local Alpine is the reportsPage factory
-// (static/js/admin/components/reports.js) that powers the optimistic
-// mark-read fade.
+// status filter, components.ReportsList for the index (a clean runs-style
+// table on desktop, a stacked list on mobile: agent · time, status,
+// summary, action), and components.EmptyState for the no-reports state.
+// The reportsPage factory (static/js/admin/components/reports.js) powers
+// full-row navigation and the optimistic mark-read dismiss.
 templ Reports(p ReportsProps) {
 	<script src="/static/js/admin/components/reports.js"></script>
 	<!--
@@ -52,13 +52,9 @@ templ Reports(p ReportsProps) {
 				</button>
 			}
 		</div>
-		<!-- Reports inbox -->
+		<!-- Reports index: table on desktop, stacked list on mobile -->
 		if len(p.Reports) > 0 {
-			@components.ReportInboxList() {
-				for _, r := range p.Reports {
-					@components.ReportInboxRow(r)
-				}
-			}
+			@components.ReportsList(p.Reports)
 		} else {
 			@components.EmptyState(components.EmptyStateProps{
 				Icon:    "inbox",

@@ -11,6 +11,14 @@ document.addEventListener('alpine:init', function () {
 
       init: function () {},
 
+      // Full-row navigation: a click anywhere on a table row opens the
+      // report, except on the mark-read button or the summary link (which
+      // navigate on their own).
+      rowNav: function (event, url) {
+        if (event.target.closest('button') || event.target.closest('a')) return;
+        window.location.href = url;
+      },
+
       flash: function (message, type) {
         window.dispatchEvent(new CustomEvent('bb-toast', {
           detail: { message: message, type: type || 'error' }

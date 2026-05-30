@@ -7,9 +7,10 @@ package components
 // .claude/rules/daisyui.md).
 //
 // Renders nothing for the default/"info"/empty priority — a routine
-// report carries no chip; the surrounding tile + meta already convey
-// neutral state. "warning" and "critical" map to soft warning/error
-// badges with a leading glyph that matches ReportPriorityIcon.
+// report carries no chip; the Status column shows an em-dash instead.
+// "warning" and "critical" map to soft warning/error badges with a
+// leading glyph. Reused by the reports table's Status column and the
+// report detail header.
 templ ReportPriorityBadge(priority string) {
 	switch priority {
 		case "critical":
