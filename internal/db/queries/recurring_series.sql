@@ -79,5 +79,10 @@ SELECT * FROM recurring_series
 WHERE deleted_at IS NULL AND status = $1
 ORDER BY created_at DESC;
 
+-- name: ListRecurringSeries :many
+SELECT * FROM recurring_series
+WHERE deleted_at IS NULL
+ORDER BY (status = 'candidate') DESC, occurrence_count DESC, created_at DESC;
+
 -- name: CountRecurringSeries :one
 SELECT COUNT(*) FROM recurring_series WHERE deleted_at IS NULL;

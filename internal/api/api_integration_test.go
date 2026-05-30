@@ -139,6 +139,8 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		r.Get("/reports/{id}", GetReportHandler(svc))
 		r.Get("/tags", ListTagsHandler(svc))
 		r.Get("/tags/{slug}", GetTagHandler(svc))
+		r.Get("/series", ListSeriesHandler(svc))
+		r.Get("/series/{id}", GetSeriesHandler(svc))
 		r.Get("/keys/me", WhoamiHandler())
 
 		// Write endpoints — require full_access scope
@@ -187,6 +189,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/tags", CreateTagHandler(svc))
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
+			r.Patch("/series/{id}", ReviewSeriesHandler(svc))
 			r.Post("/sync", TriggerSyncHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))

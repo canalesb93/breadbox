@@ -341,6 +341,23 @@ func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesRespo
 	return &resp, nil
 }
 
+// ListSeries returns series, optionally filtered by status. With no status it
+// returns all live series, candidates first then by occurrence count.
+func (s *Service) ListSeries(ctx context.Context, status *string) ([]SeriesResponse, error) {
+	if status != nil && *status != "" {
+		return s.ListSeriesByStatus(ctx, *status)
+	}
+	rows, err := s.Queries.ListRecurringSeries(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list series: %w", err)
+	}
+	out := make([]SeriesResponse, len(rows))
+	for i, r := range rows {
+		out[i] = seriesFromRow(r)
+	}
+	return out, nil
+}
+
 // ListSeriesByStatus returns series in a given lifecycle status, newest first.
 func (s *Service) ListSeriesByStatus(ctx context.Context, status string) ([]SeriesResponse, error) {
 	rows, err := s.Queries.ListRecurringSeriesByStatus(ctx, status)

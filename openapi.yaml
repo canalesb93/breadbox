@@ -1839,6 +1839,61 @@ paths:
       responses:
         "204": { description: Deleted. }
 
+  # -- Recurring series (subscriptions) --
+  /api/v1/series:
+    get:
+      tags: [Series]
+      summary: List recurring series (subscriptions)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [active, candidate, paused, cancelled] }
+      responses:
+        "200":
+          description: Recurring series.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  series:
+                    type: array
+                    items: { $ref: "#/components/schemas/RecurringSeries" }
+  /api/v1/series/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Series]
+      summary: Get recurring series
+      responses:
+        "200":
+          description: Recurring series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Series]
+      summary: Review recurring series (confirm/reject/pause/cancel)
+      description: "**Requires `full_access` scope.** Applies a verdict; a user's confirmation outranks a later agent write."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verdict]
+              properties:
+                verdict: { type: string, enum: [confirm, reject, pause, cancel] }
+      responses:
+        "200":
+          description: Updated series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # -- Users --
   /api/v1/users:
     get:
@@ -3054,6 +3109,27 @@ components:
         slug: { type: string }
         name: { type: string }
         color: { type: string }
+    RecurringSeries:
+      type: object
+      description: A detected recurring series (subscription).
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        name: { type: string }
+        merchant_key: { type: string }
+        cadence: { type: string, description: "`weekly`|`biweekly`|`monthly`|`quarterly`|`semiannual`|`annual`|`irregular`|`unknown`." }
+        expected_amount: { type: number, nullable: true }
+        iso_currency_code: { type: string, nullable: true }
+        status: { type: string, description: "`active`|`paused`|`cancelled`|`candidate`." }
+        confidence: { type: string, description: "`auto`|`confirmed`|`rejected` — the verdict axis." }
+        detection_source: { type: string, description: "`deterministic`|`agent`|`user`|`rule`." }
+        last_amount: { type: number, nullable: true }
+        last_seen_date: { type: string, format: date, nullable: true }
+        next_expected_date: { type: string, format: date, nullable: true }
+        occurrence_count: { type: integer }
+        detection_signals: { type: object, nullable: true, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+      additionalProperties: true
     Category:
       type: object
       properties:
