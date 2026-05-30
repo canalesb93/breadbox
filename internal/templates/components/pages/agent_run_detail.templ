@@ -87,9 +87,14 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 			<a href={ templ.SafeURL(agentRunHeaderBackHref(p)) } class="btn btn-ghost btn-sm btn-square" title="Back to runs">
 				@components.LucideIcon("arrow-left", "w-4 h-4")
 			</a>
-			<div class="bb-run-header__icon">
-				@components.LucideIcon("bot", "w-4 h-4")
-			</div>
+			@components.UserAvatar(components.UserAvatarProps{
+				ID:         p.Run.AgentSlug,
+				Name:       p.Run.AgentName,
+				IsAgent:    true,
+				Size:       components.UserAvatarLg,
+				Decorative: true,
+				Class:      "shrink-0",
+			})
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 flex-wrap">
 					if p.Run.AgentName != "" {

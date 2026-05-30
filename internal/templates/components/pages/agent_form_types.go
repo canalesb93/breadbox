@@ -2,6 +2,26 @@
 
 package pages
 
+import (
+	"strings"
+
+	"breadbox/internal/templates/components"
+)
+
+// agentFormAvatarSrc builds the initial src for the form's live avatar
+// preview tile. Edit mode seeds on the agent's slug so you see the same
+// robot that appears in the list / detail / run rows; new mode (empty
+// slug) uses a stable "new-agent" placeholder so the tile shows a robot
+// rather than a broken image before a slug is typed. The Alpine factory
+// (agentAvatarPreviewSrc) swaps this on every slug keystroke.
+func agentFormAvatarSrc(slug string) string {
+	seed := strings.TrimSpace(slug)
+	if seed == "" {
+		seed = "new-agent"
+	}
+	return components.AvatarURLWith(seed, "", "agent", 80)
+}
+
 // AgentFormProps is the view-model the AgentForm templ reads. Built in
 // admin/agent_form_page.go from the service.AgentDefinitionResponse (edit
 // mode) or empty defaults (new mode).

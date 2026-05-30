@@ -230,12 +230,13 @@ func userAvatarPixelSize(s UserAvatarSize) int {
 }
 
 // userAvatarHasImage reports whether the component should render an
-// <img> path versus a fallback (letter or bot tile). When SrcOverride
-// is set we always render an image; otherwise only when ID is set.
+// <img> path versus a fallback (letter or bot tile). An image renders
+// whenever SrcOverride or ID is set — agents included: an agent WITH an
+// ID resolves to its own DiceBear identicon via ?type=agent
+// (userAvatarSrc routes the actor type), so distinct agents read as
+// distinct robots rather than the one generic bot tile. Only an agent
+// with NO ID falls through to the bot-tile branch in the templ.
 func userAvatarHasImage(p UserAvatarProps) bool {
-	if p.IsAgent {
-		return false
-	}
 	return p.SrcOverride != "" || p.ID != ""
 }
 
