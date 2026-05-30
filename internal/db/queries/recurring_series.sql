@@ -87,6 +87,13 @@ ORDER BY (status = 'candidate') DESC, occurrence_count DESC, created_at DESC;
 -- name: CountRecurringSeries :one
 SELECT COUNT(*) FROM recurring_series WHERE deleted_at IS NULL;
 
+-- name: CountCandidateSeriesForReview :one
+-- Candidates awaiting a human verdict, matching the /subscriptions "Needs
+-- review" section: status='candidate' but NOT sticky-rejected (a rejected row
+-- keeps status='candidate' with confidence='rejected' and is hidden).
+SELECT COUNT(*) FROM recurring_series
+WHERE deleted_at IS NULL AND status = 'candidate' AND confidence <> 'rejected';
+
 -- name: ListSeriesMembers :many
 SELECT short_id, date, provider_name, provider_merchant_name, amount, iso_currency_code
 FROM transactions

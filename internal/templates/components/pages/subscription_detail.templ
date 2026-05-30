@@ -21,6 +21,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			Title:                p.Series.Name,
 			Subtitle:             subscriptionDetailSubtitle(p.Series),
 			SubtitleHideOnMobile: true,
+			Action:               subscriptionsBetaBadge(),
 		})
 		<!-- Status + verdict toolbar -->
 		<div class="flex items-center flex-wrap gap-2 mb-6">

@@ -23,6 +23,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			Title:                "Subscriptions",
 			Subtitle:             "Recurring charges Breadbox has detected, and the candidates waiting on your call.",
 			SubtitleHideOnMobile: true,
+			Action:               subscriptionsBetaBadge(),
 		})
 		if len(p.Users) > 1 {
 			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto overflow-y-hidden">
@@ -258,6 +259,12 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 			}
 		</td>
 	</tr>
+}
+
+// subscriptionsBetaBadge marks Subscriptions as a v1/beta feature. Rendered in
+// the page header's trailing action slot on both list and detail.
+templ subscriptionsBetaBadge() {
+	<span class="badge badge-soft badge-info badge-sm" title="Subscriptions is a new feature — detection is still being tuned">Beta</span>
 }
 
 // amountTileClass sizes the first monthly-total prominently and any
