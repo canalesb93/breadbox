@@ -6,6 +6,9 @@ document.addEventListener('alpine:init', function () {
   Alpine.data('workflowsGallery', function () {
     return {
       csrfToken: '',
+      // open holds the slug of the preset whose configure drawer is showing
+      // (empty string = no drawer).
+      open: '',
 
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
@@ -33,18 +36,24 @@ document.addEventListener('alpine:init', function () {
         });
       },
 
-      // Enable a preset: instantiate the workflow, then reload so the row swaps
-      // its "Enable" button for a run toggle.
-      enablePreset: function (slug, btn) {
+      // Submit the configure drawer: instantiate the workflow with the chosen
+      // schedule / instructions / run-now, then reload so the row swaps its
+      // "Set up" button for a run toggle.
+      submitDrawer: function (slug, form) {
         var self = this;
+        var fd = new FormData(form);
+        // An unchecked checkbox is omitted by FormData — make the intent explicit.
+        var box = form.querySelector('input[name="enabled"]');
+        if (box && !box.checked) fd.set('enabled', 'false');
+        var btn = form.querySelector('button[type="submit"]');
         if (btn) btn.disabled = true;
-        self._post('/-/workflow-presets/' + encodeURIComponent(slug) + '/enable')
+        self._post('/-/workflow-presets/' + encodeURIComponent(slug) + '/enable', new URLSearchParams(fd).toString())
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             window.location.reload();
           })
           .catch(function (e) {
-            console.error('enablePreset failed', e);
+            console.error('submitDrawer failed', e);
             if (btn) btn.disabled = false;
             self.restorePageState();
           });

@@ -5,6 +5,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"breadbox/internal/service"
@@ -78,5 +79,45 @@ func TestEnableWorkflowFromPreset(t *testing.T) {
 	// Unknown preset -> not found.
 	if _, err := svc.EnableWorkflowFromPreset(ctx, "no-such-preset", service.EnableWorkflowFromPresetParams{}); !errors.Is(err, service.ErrNotFound) {
 		t.Fatalf("unknown preset err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestEnableWorkflowFromPreset_WithConfig(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	cron := "0 8 * * *"
+	wf, err := svc.EnableWorkflowFromPreset(ctx, "weekly-money-digest", service.EnableWorkflowFromPresetParams{
+		Enabled:                false,
+		ScheduleCron:           &cron,
+		AdditionalInstructions: "Focus on dining-out spend and call out anything unusual.",
+	})
+	if err != nil {
+		t.Fatalf("EnableWorkflowFromPreset: %v", err)
+	}
+	// Schedule override applied.
+	if wf.ScheduleCron == nil || *wf.ScheduleCron != cron {
+		t.Fatalf("schedule_cron = %v, want %q", wf.ScheduleCron, cron)
+	}
+	// Additional instructions appended to the composed base prompt.
+	if !strings.Contains(wf.Prompt, "Additional instructions") || !strings.Contains(wf.Prompt, "dining-out spend") {
+		t.Fatalf("prompt missing appended instructions; got %d chars", len(wf.Prompt))
+	}
+}
+
+func TestEnableWorkflowFromPreset_PostSyncIgnoresSchedule(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+	cron := "0 8 * * *"
+	// routine-reviewer is post-sync; a schedule override must be ignored.
+	wf, err := svc.EnableWorkflowFromPreset(ctx, "routine-reviewer", service.EnableWorkflowFromPresetParams{ScheduleCron: &cron})
+	if err != nil {
+		t.Fatalf("EnableWorkflowFromPreset: %v", err)
+	}
+	if wf.ScheduleCron != nil {
+		t.Fatalf("post-sync preset got a schedule_cron = %v, want nil", *wf.ScheduleCron)
+	}
+	if !wf.TriggerOnSyncComplete {
+		t.Fatalf("routine-reviewer should trigger on sync")
 	}
 }

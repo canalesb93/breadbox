@@ -157,7 +157,17 @@ type EnableWorkflowFromPresetParams struct {
 	// Enabled controls whether the instantiated workflow runs immediately.
 	// Defaults to false (instantiated but paused) so a household can review it.
 	Enabled bool
+	// ScheduleCron overrides the preset's default cron for scheduled presets
+	// (ignored for post-sync presets). nil = use the preset default.
+	ScheduleCron *string
+	// AdditionalInstructions, when non-empty, is appended to the composed base
+	// prompt every run — the household's per-workflow tuning, mirroring
+	// Mintlify's "additional prompt over the base prompt".
+	AdditionalInstructions string
 }
+
+// maxAdditionalInstructions caps the per-workflow instruction tuning.
+const maxAdditionalInstructions = 4000
 
 // EnableWorkflowFromPreset instantiates a workflow from a preset: it composes
 // the base prompt, applies the preset defaults, stamps source_template, and
@@ -185,6 +195,14 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 	if err != nil {
 		return nil, err
 	}
+	// Append the household's per-workflow tuning to the base prompt.
+	instr := strings.TrimSpace(params.AdditionalInstructions)
+	if len(instr) > maxAdditionalInstructions {
+		return nil, fmt.Errorf("%w: additional instructions exceed %d chars", ErrInvalidParameter, maxAdditionalInstructions)
+	}
+	if instr != "" {
+		prompt = prompt + "\n\n## Additional instructions\n\n" + instr
+	}
 
 	create := CreateAgentDefinitionParams{
 		Name:                  preset.Name,
@@ -197,9 +215,16 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 		TriggerOnSyncComplete: preset.TriggerOnSyncComplete,
 		SourceTemplate:        &preset.Slug,
 	}
-	if preset.ScheduleCron != "" {
+	// Scheduled presets accept a cron override; post-sync presets keep their
+	// event trigger (no cron).
+	if !preset.TriggerOnSyncComplete {
 		cron := preset.ScheduleCron
-		create.ScheduleCron = &cron
+		if params.ScheduleCron != nil && strings.TrimSpace(*params.ScheduleCron) != "" {
+			cron = strings.TrimSpace(*params.ScheduleCron)
+		}
+		if cron != "" {
+			create.ScheduleCron = &cron
+		}
 	}
 	return s.CreateAgentDefinition(ctx, create)
 }

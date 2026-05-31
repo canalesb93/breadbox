@@ -25,6 +25,8 @@ type WorkflowPresetCardProps struct {
 	Icon         string // lucide icon for the preset
 	TriggerLabel string // human-readable trigger summary ("After each sync", "Weekly")
 	ToolScope    string // "read_only" | "read_write" — drives a small "applies changes" hint
+	ScheduleCron string // default cron for scheduled presets (empty for post-sync)
+	TriggerOnSync bool  // true = post-sync event trigger (no schedule editing)
 
 	// Enablement state.
 	Enabled         bool   // the preset has been instantiated as a workflow
