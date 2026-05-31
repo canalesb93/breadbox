@@ -71,12 +71,12 @@ document.addEventListener('alpine:init', function () {
           });
       },
 
-      // Toggle an instantiated workflow's run state. Reuses the agent
+      // Toggle an instantiated workflow's run state via the Workflows
       // enable/disable endpoints (a workflow IS an agent_definition).
       toggleWorkflow: function (workflowSlug, el) {
         var self = this;
         var enabled = el.checked;
-        var url = '/-/agents/' + encodeURIComponent(workflowSlug) + (enabled ? '/enable' : '/disable');
+        var url = '/-/workflows/' + encodeURIComponent(workflowSlug) + (enabled ? '/enable' : '/disable');
         self._post(url)
           .then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);

@@ -413,6 +413,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// roles (an editor restriction would block dashboards that
 		// want to keep an eye on someone else's runs).
 		r.Get("/agents/runs/{shortId}/live", AgentRunLiveHandler(svc, sm, tr, a.Config.DataDir))
+		// Workflows-surface alias: the run-detail page (served at
+		// /workflows/runs/{shortId}) polls this. Same handler; the legacy
+		// /agents path above stays for the deferred hand-authored agent pages.
+		r.Get("/workflows/runs/{shortId}/live", AgentRunLiveHandler(svc, sm, tr, a.Config.DataDir))
 
 		// Editor+ API routes (categorization, tagging, access management).
 		r.Group(func(r chi.Router) {
@@ -457,6 +461,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/agents/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/agents/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/agents/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
+
+			// Workflows-surface action aliases (canonical). The Workflows
+			// gallery (run toggle), runs tab (re-run), and run-detail page
+			// POST to these; the legacy /-/agents/* routes above resolve the
+			// same handlers and stay for the deferred hand-authored agent
+			// pages. Both sets collapse to one when that surface is removed.
+			r.Post("/workflows/{slug}/enable", EnableAgentAdminHandler(svc))
+			r.Post("/workflows/{slug}/disable", DisableAgentAdminHandler(svc))
+			r.Post("/workflows/{slug}/run", RunAgentNowAdminHandler(a, svc))
+			r.Post("/workflows/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
 		})
 
 		// Admin-only API routes.
@@ -554,6 +568,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/agents/test", SmokeTestAgentAdminHandler(a, svc))
 			r.Post("/agents/notify-test", NotifyTestAdminHandler(svc))
 			r.Post("/agents/cleanup", AgentCleanupAdminHandler(a, svc))
+
+			// Workflows-surface aliases for the SDK settings + diagnostics
+			// (admin-only). The Workflows settings page posts here; the
+			// legacy /-/agents/* routes above remain for back-compat.
+			r.Post("/workflows/settings", UpdateAgentSDKSettingsAdminHandler(a, svc, sm))
+			r.Post("/workflows/test", SmokeTestAgentAdminHandler(a, svc))
+			r.Post("/workflows/notify-test", NotifyTestAdminHandler(svc))
+			r.Post("/workflows/cleanup", AgentCleanupAdminHandler(a, svc))
 		})
 	})
 

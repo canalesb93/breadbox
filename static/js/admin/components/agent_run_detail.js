@@ -1,4 +1,5 @@
-// Agent run detail Alpine component for /agents/runs/{shortId}.
+// Run detail Alpine component for /workflows/runs/{shortId}
+// (legacy alias: /agents/runs/{shortId}).
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 //
@@ -6,7 +7,7 @@
 //   - Live transcript polling for in_progress runs. Replaces the legacy
 //     `<meta http-equiv="refresh">` that lost scroll position and any
 //     open <details> nodes on every reload.
-//   - Inline-edit operator note (PATCH /api/v1/agents/runs/{id}, JSON
+//   - Inline-edit operator note (PATCH /api/v1/workflows/runs/{id}, JSON
 //     body). The session cookie + Origin check on the API side is what
 //     authorises the request — no separate CSRF token needed for the
 //     PATCH because /api/v1/* uses the same-host check.
@@ -102,7 +103,7 @@ document.addEventListener('alpine:init', function () {
 
       poll: function () {
         var self = this;
-        fetch('/-/agents/runs/' + encodeURIComponent(this.shortId) + '/live', {
+        fetch('/-/workflows/runs/' + encodeURIComponent(this.shortId) + '/live', {
           headers: { 'Accept': 'application/json' },
           credentials: 'same-origin',
         })
@@ -299,7 +300,7 @@ document.addEventListener('alpine:init', function () {
         this.error = '';
         var self = this;
         var trimmed = (this.draft || '').slice(0, 2000);
-        fetch('/api/v1/agents/runs/' + encodeURIComponent(this.shortId), {
+        fetch('/api/v1/workflows/runs/' + encodeURIComponent(this.shortId), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           credentials: 'same-origin',

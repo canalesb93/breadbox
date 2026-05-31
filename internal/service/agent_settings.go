@@ -24,7 +24,7 @@ func appconfigParam(key, value string) db.SetAppConfigParams {
 	}
 }
 
-// AgentSettingsResponse is what GET /api/v1/agents/settings returns.
+// AgentSettingsResponse is what GET /api/v1/workflows/settings returns.
 // Token fields are masked when present; full plaintext never leaves the server.
 type AgentSettingsResponse struct {
 	AuthMode           string   `json:"auth_mode"`
