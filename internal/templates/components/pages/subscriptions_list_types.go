@@ -16,6 +16,9 @@ type SubscriptionsListProps struct {
 
 	// Household-member filter strip. Only rendered when len > 1.
 	Users []SubscriptionUserFilter
+	// Type filter strip (subscription/bill/loan/other present in the data).
+	// Only rendered when len > 1 — no point offering a filter for one type.
+	Types []SubscriptionTypeFilter
 
 	// status == 'candidate' — get the Confirm / Not-a-subscription actions.
 	Candidates []SubscriptionRow
@@ -36,6 +39,12 @@ type SubscriptionUserFilter struct {
 	First string // first letter for the avatar circle
 }
 
+// SubscriptionTypeFilter — one option in the "filter by type" segmented control.
+type SubscriptionTypeFilter struct {
+	Value string // subscription | bill | loan | other — matches row data-type
+	Label string // "Subscriptions" | "Bills" | "Loans" | "Other"
+}
+
 // SubscriptionRow is one series card. Fields are pre-formatted in the handler.
 type SubscriptionRow struct {
 	ShortID     string // short_id — drives detail link + verdict PATCH
@@ -48,6 +57,9 @@ type SubscriptionRow struct {
 	Status      string // active | paused | cancelled | candidate
 	StatusLabel string
 	StatusTone  string // success | warning | neutral | info
+
+	Type      string // subscription | bill | loan | other (raw, drives the filter)
+	TypeLabel string // "Subscription" | "Bill" | "Loan" | "Other"
 
 	// Renewal-health attention chip (active series only). Empty when the
 	// subscription renews comfortably or has no projection — only the states a
