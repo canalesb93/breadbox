@@ -248,7 +248,7 @@ templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
 			<button
 				type="button"
 				class="btn btn-soft btn-sm gap-1.5"
-				@click={ "open='" + preset.Slug + "'" }
+				@click={ "$store.drawers.open('wf-config-" + preset.Slug + "')" }
 			>
 				@components.LucideIcon("settings-2", "w-4 h-4")
 				Set up
