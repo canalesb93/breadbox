@@ -36,6 +36,18 @@ document.addEventListener('alpine:init', function () {
         });
       },
 
+      // projectedCost returns the drawer's reactive cost hint for a scheduled
+      // preset: estPerRun × the chosen cadence's runs/month. Cadences map to a
+      // rough monthly run count (daily≈30, weekly≈4.3, monthly=1). Approximate
+      // by design — it's an order-of-magnitude transparency cue, not a quote.
+      projectedCost: function (cron, estPerRun, postSync) {
+        var est = Number(estPerRun) || 0;
+        if (postSync) return '≈ $' + est.toFixed(2) + ' per run';
+        var perMonth = { '0 8 * * *': 30, '0 7 * * 1': 4.3, '0 8 1 * *': 1 }[cron] || 4.3;
+        var runs = Math.round(perMonth);
+        return '≈ $' + (est * perMonth).toFixed(2) + '/mo · ' + runs + (runs === 1 ? ' run' : ' runs');
+      },
+
       // Submit the configure drawer: instantiate the workflow with the chosen
       // schedule / instructions / run-now, then reload so the row swaps its
       // "Set up" button for a run toggle.

@@ -62,7 +62,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 		for _, cat := range p.Categories {
 			for _, preset := range cat.Presets {
 				if !preset.Enabled {
-					@workflowConfigDrawer(preset)
+					@workflowConfigDrawer(preset, p.ConsentAcknowledged)
 				}
 			}
 		}
@@ -101,8 +101,10 @@ templ workflowPresetControl(preset WorkflowPresetCardProps) {
 }
 
 // workflowConfigDrawer is the right-side slide-over for configuring + enabling
-// one preset: trigger/schedule, additional instructions, and run-now.
-templ workflowConfigDrawer(preset WorkflowPresetCardProps) {
+// one preset: trigger/schedule, projected cost, additional instructions,
+// run-now, and (on first enable) a consent acknowledgement. consentAck=true
+// hides the consent gate once the household has already acknowledged.
+templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 	<div
 		x-show={ "open === '" + preset.Slug + "'" }
 		x-cloak
@@ -116,6 +118,7 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps) {
 		@keydown.escape.window="open=''"
 	>
 		<form
+			x-data={ "{ cron: '" + preset.ScheduleCron + "', consent: false }" }
 			class="flex flex-col h-full"
 			@submit.prevent={ "submitDrawer('" + preset.Slug + "', $event.target)" }
 		>
@@ -139,12 +142,20 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps) {
 							@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/50")
 							After each successful sync
 						</div>
+						<div class="text-xs text-base-content/45 mt-1.5 flex items-center gap-1">
+							@components.LucideIcon("circle-dollar-sign", "w-3.5 h-3.5")
+							{ "≈ $" + workflowCostStr(preset.EstCostPerRunUSD) + " per run" }
+						</div>
 					} else {
-						<select name="schedule_cron" class="select select-sm w-full">
+						<select name="schedule_cron" x-model="cron" class="select select-sm w-full">
 							@workflowScheduleOption("0 8 * * *", "Daily — 8:00 AM", preset.ScheduleCron)
 							@workflowScheduleOption("0 7 * * 1", "Weekly — Monday 7:00 AM", preset.ScheduleCron)
 							@workflowScheduleOption("0 8 1 * *", "Monthly — 1st, 8:00 AM", preset.ScheduleCron)
 						</select>
+						<div
+							class="text-xs text-base-content/45 mt-1.5 flex items-center gap-1"
+							x-text={ "projectedCost(cron, " + workflowCostStr(preset.EstCostPerRunUSD) + ", false)" }
+						></div>
 					}
 				</div>
 				<div>
@@ -164,13 +175,26 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps) {
 					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm"/>
 					Start running now
 				</label>
+				if !consentAck {
+					<label class="flex items-start gap-2 text-xs cursor-pointer rounded-lg bg-base-200/60 p-3 border border-base-300">
+						<input type="checkbox" name="consent" value="true" x-model="consent" class="checkbox checkbox-xs mt-0.5"/>
+						<span class="text-base-content/70">I understand this runs Claude over my household's financial data via the Anthropic API, which incurs usage cost.</span>
+					</label>
+				}
 			</div>
 			<div class="flex items-center justify-end gap-2 p-4 border-t border-base-300">
 				<button type="button" class="btn btn-ghost btn-sm" @click="open=''">Cancel</button>
-				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-					@components.LucideIcon("zap", "w-4 h-4")
-					Enable workflow
-				</button>
+				if consentAck {
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+						@components.LucideIcon("zap", "w-4 h-4")
+						Enable workflow
+					</button>
+				} else {
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="!consent">
+						@components.LucideIcon("zap", "w-4 h-4")
+						Enable workflow
+					</button>
+				}
 			</div>
 		</form>
 	</div>

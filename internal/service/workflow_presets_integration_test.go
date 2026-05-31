@@ -164,3 +164,31 @@ func TestListAllAgentRuns_WorkflowsOnly(t *testing.T) {
 		t.Fatalf("WorkflowsOnly run slug = %q, want %q", only.Runs[0].AgentSlug, wf.Slug)
 	}
 }
+
+func TestWorkflowsConsent(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	if svc.WorkflowsConsentAcknowledged(ctx) {
+		t.Fatal("fresh household should not have acknowledged consent")
+	}
+	if err := svc.AcknowledgeWorkflowsConsent(ctx); err != nil {
+		t.Fatalf("AcknowledgeWorkflowsConsent: %v", err)
+	}
+	if !svc.WorkflowsConsentAcknowledged(ctx) {
+		t.Fatal("consent should be acknowledged after AcknowledgeWorkflowsConsent")
+	}
+}
+
+func TestWorkflowPresetsHaveCostEstimates(t *testing.T) {
+	svc, _, _ := newService(t)
+	views, err := svc.ListWorkflowPresets(context.Background())
+	if err != nil {
+		t.Fatalf("ListWorkflowPresets: %v", err)
+	}
+	for _, v := range views {
+		if v.EstCostPerRunUSD <= 0 {
+			t.Errorf("preset %q has non-positive EstCostPerRunUSD %v", v.Slug, v.EstCostPerRunUSD)
+		}
+	}
+}

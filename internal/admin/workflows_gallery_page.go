@@ -24,11 +24,13 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			presets    []service.WorkflowPresetView
 			presetsErr error
 			status     *service.AgentSubsystemStatus
+			consented  bool
 			wg         sync.WaitGroup
 		)
-		wg.Add(2)
+		wg.Add(3)
 		go func() { defer wg.Done(); presets, presetsErr = svc.ListWorkflowPresets(ctx) }()
 		go func() { defer wg.Done(); status = svc.GetAgentSubsystemStatus(ctx) }()
+		go func() { defer wg.Done(); consented = svc.WorkflowsConsentAcknowledged(ctx) }()
 		wg.Wait()
 
 		if presetsErr != nil {
@@ -37,9 +39,10 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 		}
 
 		props := pages.WorkflowsGalleryProps{
-			Categories: groupWorkflowPresets(presets),
-			Status:     buildAgentsListStatus(status),
-			CSRFToken:  GetCSRFToken(r),
+			Categories:          groupWorkflowPresets(presets),
+			Status:              buildAgentsListStatus(status),
+			CSRFToken:           GetCSRFToken(r),
+			ConsentAcknowledged: consented,
 		}
 
 		data := BaseTemplateData(r, sm, "workflows", "Workflows")
@@ -57,15 +60,16 @@ func groupWorkflowPresets(views []service.WorkflowPresetView) []pages.WorkflowCa
 			order = append(order, v.Category)
 		}
 		card := pages.WorkflowPresetCardProps{
-			Slug:          v.Slug,
-			Name:          v.Name,
-			Description:   v.Description,
-			Icon:          v.Icon,
-			TriggerLabel:  presetTriggerLabel(v),
-			ToolScope:     v.ToolScope,
-			ScheduleCron:  v.ScheduleCron,
-			TriggerOnSync: v.TriggerOnSyncComplete,
-			Enabled:       v.Enabled,
+			Slug:             v.Slug,
+			Name:             v.Name,
+			Description:      v.Description,
+			Icon:             v.Icon,
+			TriggerLabel:     presetTriggerLabel(v),
+			ToolScope:        v.ToolScope,
+			ScheduleCron:     v.ScheduleCron,
+			TriggerOnSync:    v.TriggerOnSyncComplete,
+			EstCostPerRunUSD: v.EstCostPerRunUSD,
+			Enabled:          v.Enabled,
 		}
 		if v.WorkflowSlug != nil {
 			card.WorkflowSlug = *v.WorkflowSlug
