@@ -45,7 +45,7 @@
         submitVerdict: function (seriesId, seriesName, verdict) {
           var label = {
             confirm: 'Confirmed',
-            reject: 'Marked not a subscription',
+            reject: 'Marked not recurring',
             pause: 'Paused',
             cancel: 'Cancelled',
           }[verdict] || 'Updated';
@@ -63,9 +63,9 @@
               }
               restorePageState();
               return res.json().then(function (data) {
-                toast((data.error && data.error.message) || 'Failed to update subscription.');
+                toast((data.error && data.error.message) || 'Failed to update recurring charge.');
               }).catch(function () {
-                toast('Failed to update subscription.');
+                toast('Failed to update recurring charge.');
               });
             })
             .catch(function () {

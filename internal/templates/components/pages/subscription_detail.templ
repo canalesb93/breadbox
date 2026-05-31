@@ -14,7 +14,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 	<script src="/static/js/admin/components/subscriptions.js"></script>
 	<div x-data="subscriptionsList">
 		@components.BreadcrumbNav([]components.Breadcrumb{
-			{Label: "Subscriptions", Href: "/subscriptions"},
+			{Label: "Recurring", Href: "/recurring"},
 			{Label: p.Series.Name},
 		})
 		@components.PageHeader(components.PageHeaderProps{
@@ -32,7 +32,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			<div class="flex-1"></div>
 			switch p.Series.Status {
 				case "candidate":
-					@subscriptionVerdictBtn(p.Series, "reject", "Not a subscription", "x", "btn-ghost")
+					@subscriptionVerdictBtn(p.Series, "reject", "Not recurring", "x", "btn-ghost")
 					@subscriptionVerdictBtn(p.Series, "confirm", "Confirm", "check", "btn-primary")
 				case "active":
 					@subscriptionVerdictBtn(p.Series, "pause", "Pause", "pause", "btn-ghost")
