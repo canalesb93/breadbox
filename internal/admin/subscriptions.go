@@ -174,6 +174,7 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		Source:          s.DetectionSource,
 		SourceLabel:     sourceLabel(s.DetectionSource),
 	}
+	row.RenewalLabel, row.RenewalTone = subscriptionRenewal(s)
 	if s.LastAmount != nil {
 		row.HasAmount = true
 		row.Amount = math.Abs(*s.LastAmount)
@@ -188,6 +189,35 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 	}
 	row.Search = strings.ToLower(strings.Join([]string{s.Name, s.MerchantKey, row.CadenceLabel, row.CategoryName, row.OwnerName}, " "))
 	return row
+}
+
+// subscriptionRenewal derives an attention chip (label + daisy tone) from a
+// series' renewal health (shipped on SeriesResponse). Returns empty for
+// comfortably-renewing / no-projection series — only due_soon / overdue /
+// stale earn a chip, so the ledger highlights what needs a look. Health is
+// only populated for active series, so candidates/paused/cancelled get nothing.
+func subscriptionRenewal(s service.SeriesResponse) (string, string) {
+	days := 0
+	if s.DaysUntilRenewal != nil {
+		days = *s.DaysUntilRenewal
+	}
+	switch s.RenewalHealth {
+	case service.SeriesHealthDueSoon:
+		switch {
+		case days <= 0:
+			return "Due today", "info"
+		case days == 1:
+			return "Due tomorrow", "info"
+		default:
+			return fmt.Sprintf("Renews in %dd", days), "info"
+		}
+	case service.SeriesHealthOverdue:
+		return fmt.Sprintf("%dd overdue", -days), "warning"
+	case service.SeriesHealthStale:
+		return "Likely cancelled", "error"
+	default:
+		return "", ""
+	}
 }
 
 // subscriptionSignalsShape is the subset of detection_signals (§6.6) the UI

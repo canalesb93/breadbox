@@ -245,7 +245,12 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 			}
 		</td>
 		<td>
-			<span class={ "badge badge-soft badge-sm", "badge-" + s.StatusTone }>{ s.StatusLabel }</span>
+			<span class="inline-flex items-center gap-1.5 flex-wrap">
+				<span class={ "badge badge-soft badge-sm", "badge-" + s.StatusTone }>{ s.StatusLabel }</span>
+				if s.RenewalLabel != "" {
+					<span class={ "badge badge-soft badge-xs", "badge-" + s.RenewalTone }>{ s.RenewalLabel }</span>
+				}
+			</span>
 		</td>
 		<td class="text-right">
 			if s.HasAmount {
