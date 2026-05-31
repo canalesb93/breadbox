@@ -239,3 +239,14 @@ SELECT COALESCE(SUM(total_cost_usd), 0)::numeric(12,4) AS total_cost_usd
 FROM agent_runs
 WHERE started_at >= sqlc.arg(since)
   AND status != 'skipped';
+
+-- ExistsRecentRunForDefinition reports whether a non-skipped run for the
+-- given definition started at/after `since`. Powers the post-sync
+-- debounce: N rapid syncs within the window coalesce to one run.
+-- name: ExistsRecentRunForDefinition :one
+SELECT EXISTS(
+    SELECT 1 FROM agent_runs
+    WHERE agent_definition_id = sqlc.arg(definition_id)
+      AND started_at >= sqlc.arg(since)
+      AND status <> 'skipped'
+) AS run_exists;

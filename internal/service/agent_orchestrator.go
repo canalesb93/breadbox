@@ -171,6 +171,12 @@ func (o *Orchestrator) RunNowWith(ctx context.Context, def *AgentDefinitionRespo
 // Runs each agent in its own goroutine so the sync engine returns
 // immediately. Concurrency is bounded by the orchestrator's existing
 // semaphore (iter-29 default: 3) — excess fires roll into skipped rows.
+//
+// Post-sync debounce: a definition that already ran (non-skipped) within
+// PostSyncDebounceWindow is skipped silently here, so N rapid syncs
+// coalesce to one run instead of fanning out (the design-doc §4
+// cost-amplification trap). The debounce is intentionally row-less — a
+// coalesced trigger isn't a "missed" run worth a skipped row.
 func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
 	// Use a fresh context for the lookup — the incoming ctx is the sync
 	// engine's, and a cancelled webhook request or timed-out sync would
@@ -190,8 +196,16 @@ func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
 	}
 	o.logger.Info("orchestrator: dispatching sync-webhook agents",
 		"agent_count", len(defs))
+	debounceSince := time.Now().Add(-PostSyncDebounceWindow)
 	for i := range defs {
 		def := defs[i] // capture range value before goroutine
+		// Debounce: skip a definition that already ran recently. Fail open
+		// — an EXISTS query error must not suppress the run.
+		if recent, derr := o.svc.RecentRunExistsForDefinition(lookupCtx, def.ID, debounceSince); derr == nil && recent {
+			o.logger.Info("orchestrator: debouncing sync-webhook agent (ran within window)",
+				"agent", def.Slug, "window", PostSyncDebounceWindow.String())
+			continue
+		}
 		go func() {
 			// New ctx with timeout so a stuck run doesn't outlive shutdown.
 			runCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
