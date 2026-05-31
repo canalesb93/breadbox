@@ -192,6 +192,23 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 						></div>
 					}
 				</div>
+				for _, opt := range preset.Options {
+					<div>
+						<div class="text-sm font-medium mb-1.5">{ opt.Label }</div>
+						<select name={ opt.Key } class="select select-sm w-full">
+							for _, ch := range opt.Choices {
+								if ch.Value == opt.Default {
+									<option value={ ch.Value } selected>{ ch.Label }</option>
+								} else {
+									<option value={ ch.Value }>{ ch.Label }</option>
+								}
+							}
+						</select>
+						if opt.Help != "" {
+							<div class="text-xs text-base-content/40 mt-1">{ opt.Help }</div>
+						}
+					</div>
+				}
 				<div>
 					<div class="text-sm font-medium mb-1.5">
 						Additional instructions

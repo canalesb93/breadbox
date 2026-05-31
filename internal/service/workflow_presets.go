@@ -36,6 +36,79 @@ type WorkflowPreset struct {
 	// paying their own bill sees the order of magnitude before enabling.
 	// Deliberately approximate — actual cost is recorded per run.
 	EstCostPerRunUSD float64
+
+	// Options are this preset's specialized configuration choices, rendered
+	// as selects in the configure drawer (Mintlify "per-preset options").
+	// The chosen choice's Directive is appended to the composed prompt.
+	Options []WorkflowPresetOption
+}
+
+// WorkflowPresetOption is one preset-specific configuration choice (a
+// single-select). The chosen choice's Directive (if any) is appended to
+// the workflow's prompt under a heading named after the option's Label.
+type WorkflowPresetOption struct {
+	Key     string // form field name, e.g. "apply_mode"
+	Label   string // drawer label + prompt heading
+	Help    string // optional caption under the select
+	Default string // default choice Value
+	Choices []WorkflowPresetChoice
+}
+
+// WorkflowPresetChoice is one option value. Directive is the prompt text
+// appended when this choice is selected (empty = the default behavior,
+// no extra prompt).
+type WorkflowPresetChoice struct {
+	Value     string
+	Label     string
+	Directive string
+}
+
+// applyModeOption is the shared "auto-apply vs flag-only" choice for the
+// categorization presets. Auto is the default (no extra directive); flag-only
+// overrides the base prompt to suppress all category writes.
+var applyModeOption = WorkflowPresetOption{
+	Key:     "apply_mode",
+	Label:   "Apply mode",
+	Help:    "How it handles categories it's confident about.",
+	Default: "auto",
+	Choices: []WorkflowPresetChoice{
+		{Value: "auto", Label: "Auto-apply categories", Directive: ""},
+		{
+			Value:     "flag_only",
+			Label:     "Flag only — don't categorize",
+			Directive: "APPLY MODE — FLAG ONLY: Do NOT set, change, or clear any transaction category, and do NOT call update_transactions to write a category. Your job in this mode is review-and-flag only: flag transactions that need a human's attention (and leave a brief comment explaining why), but leave all categorization decisions to the user.",
+		},
+	},
+}
+
+// resolveOptionDirectives returns the prompt text to append for a preset's
+// chosen options. Each option resolves to a choice — the submitted value if
+// valid, otherwise the option's Default — and any non-empty Directive is
+// appended under a heading named for the option's Label.
+func resolveOptionDirectives(preset WorkflowPreset, chosen map[string]string) string {
+	var b strings.Builder
+	for _, opt := range preset.Options {
+		val := strings.TrimSpace(chosen[opt.Key])
+		valid := false
+		for _, ch := range opt.Choices {
+			if ch.Value == val {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			val = opt.Default
+		}
+		for _, ch := range opt.Choices {
+			if ch.Value == val && strings.TrimSpace(ch.Directive) != "" {
+				b.WriteString("\n\n## ")
+				b.WriteString(opt.Label)
+				b.WriteString("\n\n")
+				b.WriteString(ch.Directive)
+			}
+		}
+	}
+	return b.String()
 }
 
 // workflowPresets is the starter catalog. Order is the gallery display order.
@@ -57,6 +130,7 @@ var workflowPresets = []WorkflowPreset{
 		ToolScope:             "read_write",
 		TriggerOnSyncComplete: true,
 		EstCostPerRunUSD:      0.02, // short, efficient per-sync review
+		Options:               []WorkflowPresetOption{applyModeOption},
 	},
 	{
 		Slug:        "weekly-money-digest",
@@ -99,6 +173,7 @@ var workflowPresets = []WorkflowPreset{
 		ToolScope:        "read_write",
 		ScheduleCron:     "0 7 * * 1", // Mondays at 07:00 (canonical "Weekly" — drawer-selectable)
 		EstCostPerRunUSD: 0.08,        // thorough pass over an accumulated backlog
+		Options:          []WorkflowPresetOption{applyModeOption},
 	},
 	{
 		Slug:        "monthly-close",
@@ -202,6 +277,11 @@ type EnableWorkflowFromPresetParams struct {
 	// prompt every run — the household's per-workflow tuning, mirroring
 	// Mintlify's "additional prompt over the base prompt".
 	AdditionalInstructions string
+	// Options carries the chosen value for each of the preset's specialized
+	// options (keyed by WorkflowPresetOption.Key). Unknown/missing keys fall
+	// back to the option's Default. Chosen choices' Directives are appended
+	// to the composed prompt.
+	Options map[string]string
 }
 
 // maxAdditionalInstructions caps the per-workflow instruction tuning.
@@ -233,6 +313,9 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 	if err != nil {
 		return nil, err
 	}
+	// Apply the preset's specialized options: each chosen choice's directive
+	// is appended to the base prompt (auto/default choices have no directive).
+	prompt += resolveOptionDirectives(preset, params.Options)
 	// Append the household's per-workflow tuning to the base prompt.
 	instr := strings.TrimSpace(params.AdditionalInstructions)
 	if len(instr) > maxAdditionalInstructions {

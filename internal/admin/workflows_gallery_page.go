@@ -101,6 +101,18 @@ func groupWorkflowPresets(views []service.WorkflowPresetView) []pages.WorkflowCa
 		if v.WorkflowEnabled != nil {
 			card.WorkflowEnabled = *v.WorkflowEnabled
 		}
+		for _, opt := range v.Options {
+			cardOpt := pages.WorkflowPresetOptionProps{
+				Key:     opt.Key,
+				Label:   opt.Label,
+				Help:    opt.Help,
+				Default: opt.Default,
+			}
+			for _, ch := range opt.Choices {
+				cardOpt.Choices = append(cardOpt.Choices, pages.WorkflowPresetChoiceProps{Value: ch.Value, Label: ch.Label})
+			}
+			card.Options = append(card.Options, cardOpt)
+		}
 		byCat[v.Category] = append(byCat[v.Category], card)
 	}
 	out := make([]pages.WorkflowCategoryProps, 0, len(order))

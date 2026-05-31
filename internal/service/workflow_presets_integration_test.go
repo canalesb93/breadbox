@@ -233,3 +233,28 @@ func TestWorkflowRunStatusCounts(t *testing.T) {
 		t.Fatalf("scoped success = %d, want 2", scoped["success"])
 	}
 }
+
+func TestEnableWorkflowFromPreset_ApplyModeOption(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// flag_only → the suppress-categorization directive lands in the prompt.
+	flag, err := svc.EnableWorkflowFromPreset(ctx, "routine-reviewer", service.EnableWorkflowFromPresetParams{
+		Options: map[string]string{"apply_mode": "flag_only"},
+	})
+	if err != nil {
+		t.Fatalf("enable flag_only: %v", err)
+	}
+	if !strings.Contains(flag.Prompt, "FLAG ONLY") || !strings.Contains(flag.Prompt, "Apply mode") {
+		t.Fatalf("flag_only prompt missing the apply-mode directive (%d chars)", len(flag.Prompt))
+	}
+
+	// Default (auto) on a different preset → no directive appended.
+	auto, err := svc.EnableWorkflowFromPreset(ctx, "backlog-closer", service.EnableWorkflowFromPresetParams{})
+	if err != nil {
+		t.Fatalf("enable default: %v", err)
+	}
+	if strings.Contains(auto.Prompt, "FLAG ONLY") {
+		t.Fatalf("auto (default) prompt should NOT contain the flag-only directive")
+	}
+}
