@@ -4,12 +4,53 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 )
+
+// HouseholdCeilingWindow is the rolling window over which the household
+// spend ceiling (KeyAgentGlobalMaxBudgetUSD) is measured. A rolling
+// window (vs a calendar month) avoids a reset-day spend spike.
+const HouseholdCeilingWindow = 30 * 24 * time.Hour
+
+// HouseholdCostSince sums total_cost_usd across every workflow/agent run
+// started at/after `since` (skipped rows excluded). Powers the spend
+// ceiling gate and the settings spend display.
+func (s *Service) HouseholdCostSince(ctx context.Context, since time.Time) (float64, error) {
+	raw, err := s.Queries.GetHouseholdCostSince(ctx, pgconv.Timestamptz(since))
+	if err != nil {
+		return 0, fmt.Errorf("household cost since %s: %w", since.Format(time.RFC3339), err)
+	}
+	v, _ := pgconv.NumericToFloat(raw)
+	return v, nil
+}
+
+// HouseholdSpendStatus is the rolling-window spend snapshot for the
+// settings display: how much has been spent in the window and the active
+// ceiling (nil = no cap).
+type HouseholdSpendStatus struct {
+	WindowDays int
+	SpentUSD   float64
+	CeilingUSD *float64
+}
+
+// HouseholdSpendStatus returns the current rolling-window spend + the
+// configured ceiling for display in agent/workflow settings.
+func (s *Service) HouseholdSpendStatus(ctx context.Context) (HouseholdSpendStatus, error) {
+	spent, err := s.HouseholdCostSince(ctx, time.Now().Add(-HouseholdCeilingWindow))
+	if err != nil {
+		return HouseholdSpendStatus{WindowDays: 30}, err
+	}
+	return HouseholdSpendStatus{
+		WindowDays: 30,
+		SpentUSD:   spent,
+		CeilingUSD: readOptionalFloat(ctx, s.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD),
+	}, nil
+}
 
 // WorkflowsConsentAcknowledged reports whether the household has already
 // acknowledged that enabling a workflow runs Claude over their financial

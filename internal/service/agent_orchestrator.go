@@ -43,6 +43,28 @@ func capFromRunErr(err error) string {
 	}
 }
 
+// checkHouseholdCeiling enforces the household's aggregate spend ceiling
+// before a run starts. When KeyAgentGlobalMaxBudgetUSD is set and the
+// rolling 30-day spend has reached it, returns ErrBudgetCeilingReached
+// (wrapped with the spent/ceiling figures). No ceiling (unset or <= 0)
+// returns nil. A cost-sum query error fails OPEN — a transient DB hiccup
+// must not wedge every workflow run — and is logged.
+func (o *Orchestrator) checkHouseholdCeiling(ctx context.Context) error {
+	ceiling := readOptionalFloat(ctx, o.svc.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD)
+	if ceiling == nil || *ceiling <= 0 {
+		return nil
+	}
+	spent, err := o.svc.HouseholdCostSince(ctx, time.Now().Add(-HouseholdCeilingWindow))
+	if err != nil {
+		o.logger.Warn("orchestrator: household ceiling check failed; allowing run", "error", err)
+		return nil
+	}
+	if spent >= *ceiling {
+		return fmt.Errorf("%w ($%.2f of $%.2f in 30 days)", ErrBudgetCeilingReached, spent, *ceiling)
+	}
+	return nil
+}
+
 // Orchestrator drives one agent run end-to-end: acquires concurrency,
 // mints a scoped API key, assembles the JobSpec, runs the sidecar, persists
 // the resulting agent_runs row, and revokes the key.
@@ -130,6 +152,9 @@ func (o *Orchestrator) RunNow(ctx context.Context, def *AgentDefinitionResponse,
 // the agent edit page to dry-fire an unsaved prompt without mutating the
 // stored definition.
 func (o *Orchestrator) RunNowWith(ctx context.Context, def *AgentDefinitionResponse, ov RunOverrides) (*AgentRunResponse, error) {
+	if err := o.checkHouseholdCeiling(ctx); err != nil {
+		return nil, err
+	}
 	if err := o.sem.Acquire(ctx); err != nil {
 		return nil, err
 	}
@@ -184,6 +209,22 @@ func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
 // semaphore was full. Returns ErrConcurrencyLocked alongside the skipped
 // row so the scheduler can log appropriately.
 func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionResponse, trigger string) (*AgentRunResponse, error) {
+	// Household ceiling first — a cron fire that's over budget leaves a
+	// 'skipped' row (reason = the ceiling message) so the miss is visible.
+	if cerr := o.checkHouseholdCeiling(ctx); cerr != nil {
+		defUUID, perr := pgconv.ParseUUID(def.ID)
+		if perr != nil {
+			return nil, fmt.Errorf("orchestrator: parse def id: %w", perr)
+		}
+		runRow, crerr := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
+		if crerr != nil {
+			return nil, fmt.Errorf("orchestrator: create ceiling-skipped run row: %w (ceiling: %v)", crerr, cerr)
+		}
+		_ = o.svc.MarkAgentRunSkippedDB(ctx, runRow.ID, cerr.Error())
+		resp := AgentRunFromRow(runRow)
+		resp.Status = "skipped"
+		return &resp, cerr
+	}
 	if err := o.sem.Acquire(ctx); err != nil {
 		// Leave a 'skipped' row so the run history shows the missed fire.
 		defUUID, perr := pgconv.ParseUUID(def.ID)
@@ -220,6 +261,9 @@ func (o *Orchestrator) RunNowAsyncWith(ctx context.Context, def *AgentDefinition
 	// instead of returning an in_progress row that's destined to fail.
 	binaryPath := appconfig.String(ctx, o.svc.Queries, appconfig.KeyAgentRuntimePath, "")
 	if _, err := agent.LocateBinary(binaryPath); err != nil {
+		return nil, err
+	}
+	if err := o.checkHouseholdCeiling(ctx); err != nil {
 		return nil, err
 	}
 

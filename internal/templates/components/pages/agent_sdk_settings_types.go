@@ -19,6 +19,10 @@ type AgentSDKSettingsProps struct {
 	FormSuccess string
 	Status      AgentSDKStatusProps
 	CSRFToken   string
+	// HouseholdSpend30dStr is the read-only rolling 30-day spend across all
+	// workflow runs, formatted for the spend-ceiling section (e.g. "$2.13
+	// of $20.00" when a ceiling is set, or "$2.13" with no cap).
+	HouseholdSpend30dStr string
 }
 
 // AgentSDKSettingsFormFields mirrors the writable settings exposed by

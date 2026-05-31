@@ -218,8 +218,8 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 				/>
 			}
 			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Global max budget",
-				Caption: "Optional USD ceiling per run. Leave empty for no global cap.",
+				Label:   "Household spend ceiling",
+				Caption: "Pause all workflow runs once 30-day spend reaches this (USD). Empty = no cap.",
 				For:     "global_max_budget_usd",
 			}) {
 				<div class="flex items-center gap-2">
@@ -236,6 +236,12 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 						class="input input-sm w-28"
 					/>
 				</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Spent (last 30 days)",
+				Caption: "Rolling total across every workflow run; skipped runs excluded.",
+			}) {
+				<span class="text-sm tabular-nums text-base-content/80">{ p.HouseholdSpend30dStr }</span>
 			}
 			if p.FieldErrors["max_concurrent"] != "" || p.FieldErrors["global_max_budget_usd"] != "" {
 				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {

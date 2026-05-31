@@ -24,4 +24,10 @@ var (
 	// hosted-link session) has passed its expiration. Distinct from
 	// ErrNotFound because the row still exists, just unusable.
 	ErrExpired = errors.New("expired")
+	// ErrBudgetCeilingReached signals the household's aggregate spend
+	// ceiling (KeyAgentGlobalMaxBudgetUSD, over a rolling 30-day window)
+	// has been hit, so further workflow runs are paused until spend ages
+	// out of the window or the ceiling is raised. Manual triggers map it
+	// to 429; cron triggers leave a 'skipped' row with the reason.
+	ErrBudgetCeilingReached = errors.New("household spend ceiling reached")
 )
