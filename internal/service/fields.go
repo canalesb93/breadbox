@@ -32,6 +32,8 @@ var validFields = map[string]bool{
 	"pending":                      true,
 	"created_at":                   true,
 	"updated_at":                   true,
+	"metadata":                     true,
+	"flagged_at":                   true,
 }
 
 // fieldAliases expand shorthand names to groups of fields.
@@ -160,6 +162,10 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 			m["created_at"] = t.CreatedAt
 		case "updated_at":
 			m["updated_at"] = t.UpdatedAt
+		case "metadata":
+			m["metadata"] = t.Metadata
+		case "flagged_at":
+			m["flagged_at"] = t.FlaggedAt
 		}
 		// Keys outside the switch are silently ignored. ParseFields already
 		// rejects unknown names; review delegation strips "transaction." before

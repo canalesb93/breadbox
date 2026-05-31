@@ -45,7 +45,7 @@ func TestListRecentErroredAgentRuns_OnlyRecentErrors(t *testing.T) {
 			}
 		}
 		if _, err := pool.Exec(ctx,
-			`UPDATE agent_runs SET started_at = $1 WHERE id = $2`,
+			`UPDATE workflow_runs SET started_at = $1 WHERE id = $2`,
 			startedAt, row.ID); err != nil {
 			t.Fatalf("backdate: %v", err)
 		}

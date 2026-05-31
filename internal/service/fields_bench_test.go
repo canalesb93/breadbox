@@ -56,7 +56,7 @@ func benchTransactionResponse() TransactionResponse {
 			Icon:               &icon,
 			Color:              &color,
 		},
-		CategoryOverride:           false,
+		CategoryOverride: "none",
 		ProviderCategoryPrimary:    &categoryPrimaryRaw,
 		ProviderCategoryDetailed:   &categoryDetailedRaw,
 		ProviderCategoryConfidence: &categoryConfidence,

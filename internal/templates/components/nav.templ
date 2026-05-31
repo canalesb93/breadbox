@@ -63,7 +63,7 @@ templ Nav(p NavProps) {
 		}
 		<div class="bb-sidebar-section">Manage</div>
 		if p.IsEditor {
-			@navLink("/agents", "bot-message-square", "Agents", navActive(p.CurrentPage, "agents"))
+			@navLink("/workflows", "workflow", "Workflows", navActive(p.CurrentPage, "workflows"))
 		}
 		if p.IsAdmin {
 			@navLink("/rules", "zap", "Rules", navActive(p.CurrentPage, "rules"))

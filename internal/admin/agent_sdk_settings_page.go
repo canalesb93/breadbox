@@ -38,6 +38,7 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			return
 		}
 		status := svc.GetAgentSubsystemStatus(ctx)
+		spend, _ := svc.HouseholdSpendStatus(ctx) // best-effort; display only
 
 		form := pages.AgentSDKSettingsFormFields{
 			AuthMode:              settings.AuthMode,
@@ -45,6 +46,7 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			RuntimePath:           settings.RuntimePath,
 			TranscriptDir:         settings.TranscriptDir,
 			GlobalMaxBudgetUSDStr: formatOptionalBudget(settings.GlobalMaxBudgetUSD),
+			NotifyWebhookURL:      settings.NotifyWebhookURL,
 		}
 		if settings.SubscriptionToken != nil {
 			form.SubscriptionTokenDisplay = *settings.SubscriptionToken
@@ -75,10 +77,11 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 				BinaryPresent:  status.BinaryPresent,
 				BinaryPath:     status.BinaryPath,
 			},
-			CSRFToken: GetCSRFToken(r),
+			CSRFToken:            GetCSRFToken(r),
+			HouseholdSpend30dStr: formatHouseholdSpend(spend),
 		}
 
-		data := BaseTemplateData(r, sm, "agents-settings", "Agents settings")
+		data := BaseTemplateData(r, sm, "agents-settings", "Workflows settings")
 		data["CSRFToken"] = props.CSRFToken
 		data["Flash"] = nil
 		renderSettingsTab(tr, w, r, data, pages.SettingsTabAgents, pages.AgentSDKSettings(props))
@@ -93,4 +96,14 @@ func formatOptionalBudget(v *float64) string {
 		return ""
 	}
 	return strconv.FormatFloat(*v, 'f', 2, 64)
+}
+
+// formatHouseholdSpend renders the rolling-window spend as "$X.XX" or,
+// when a ceiling is set, "$X.XX of $Y.YY".
+func formatHouseholdSpend(s service.HouseholdSpendStatus) string {
+	spent := "$" + strconv.FormatFloat(s.SpentUSD, 'f', 2, 64)
+	if s.CeilingUSD != nil && *s.CeilingUSD > 0 {
+		return spent + " of $" + strconv.FormatFloat(*s.CeilingUSD, 'f', 2, 64)
+	}
+	return spent
 }

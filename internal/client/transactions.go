@@ -37,7 +37,7 @@ type Transaction struct {
 	ProviderName               string                   `json:"provider_name"`
 	ProviderMerchantName       *string                  `json:"provider_merchant_name,omitempty"`
 	Category                   *TransactionCategoryInfo `json:"category,omitempty"`
-	CategoryOverride           bool                     `json:"category_override"`
+	CategoryOverride           string                     `json:"category_override"`
 	ProviderCategoryPrimary    *string                  `json:"provider_category_primary,omitempty"`
 	ProviderCategoryDetailed   *string                  `json:"provider_category_detailed,omitempty"`
 	ProviderCategoryConfidence *string                  `json:"provider_category_confidence,omitempty"`

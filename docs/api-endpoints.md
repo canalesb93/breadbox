@@ -46,12 +46,18 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/transactions/update` | W | Atomic multi-field batch (category + tags + comment per row, max 50) |
 | POST | `/transactions/batch-categorize` | W | Set category on many transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | W | Server-side recategorize by filter |
-| PATCH | `/transactions/{id}/category` | W | Set category (`category_override=true`) |
+| PATCH | `/transactions/{id}/category` | W | Set category (`category_override='user'`) |
 | DELETE | `/transactions/{id}/category` | W | Reset category to provider default |
 | DELETE | `/transactions/{id}` | W | Soft-delete (sets `deleted_at`) |
 | POST | `/transactions/{id}/restore` | W | Restore a soft-deleted transaction |
 | POST | `/transactions/{id}/tags` | W | Attach a tag to a transaction |
 | DELETE | `/transactions/{id}/tags/{slug}` | W | Detach a tag from a transaction |
+| PATCH | `/transactions/{id}/metadata/{key}` | W | Upsert one free-form metadata key |
+| DELETE | `/transactions/{id}/metadata/{key}` | W | Remove one metadata key |
+| PUT | `/transactions/{id}/metadata` | W | Replace the entire metadata object |
+| DELETE | `/transactions/{id}/metadata` | W | Clear metadata to `{}` |
+| POST | `/transactions/{id}/flag` | W | Flag for attention (optional `reason` → comment) |
+| DELETE | `/transactions/{id}/flag` | W | Clear the flag |
 | POST | `/transactions/{transaction_id}/comments` | W | Add a comment |
 | PUT | `/transactions/{transaction_id}/comments/{id}` | W | Edit a comment |
 | DELETE | `/transactions/{transaction_id}/comments/{id}` | W | Delete a comment |
@@ -267,32 +273,34 @@ Secret-flagged keys are masked on read. A denylist of keys (`ENCRYPTION_KEY`, `t
 | GET | `/webhook-events` | W | Paginated list of recent webhook events; filters `provider`, `status`, `page`, `limit` |
 | POST | `/webhook-events/{id}/replay` | W | Re-trigger the manual sync the event would have caused; events without a connection are reported as `triggered: false` |
 
-## Agents
+## Workflows
 
-Agent definitions are scheduled Claude Agent SDK runs that call breadbox MCP to enrich, categorize, or report on data. Runs are append-only (no delete). Settings carry Anthropic credentials (encrypted at rest) and global caps.
+Workflows are scheduled Claude Agent SDK runs that call breadbox MCP to enrich, categorize, or report on data (the REST surface for the Workflows product; renamed from `/agents/*`). Runs are append-only (no delete). Settings carry Anthropic credentials (encrypted at rest) and global caps.
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| GET | `/agents` | R | List all agent definitions with last_run inlined (bare JSON array) |
-| GET | `/agents/{slug}` | R | One definition; accepts slug, short_id, or UUID |
-| POST | `/agents` | W | Create an agent definition |
-| PATCH | `/agents/{slug}` | W | PATCH-merge update; omitted fields are unchanged |
-| DELETE | `/agents/{slug}` | W | Delete the definition; historical runs preserved (FK SET NULL) |
-| POST | `/agents/{slug}/enable` | W | Flip enabled=true |
-| POST | `/agents/{slug}/disable` | W | Flip enabled=false |
-| POST | `/agents/{slug}/run` | W | Trigger an immediate synchronous run; optional body fields `{prompt_prefix}` (prepend, ≤2000) and `{prompt}` (full override, ≤40000) — `prompt` wins when both set; 503 `CONCURRENCY_LOCKED` when another run is in progress |
-| POST | `/agents/test` | W | Run the diagnostic smoke test (tiny "say OK" prompt, no MCP servers, ~5¢ cap); 422 `AUTH_NOT_CONFIGURED` / `AGENT_BINARY_NOT_FOUND` |
-| POST | `/agents/cleanup` | W | Run the agent cleanup pass on demand; returns `{runs_deleted, transcripts_deleted, transcripts_scanned, retention_days, transcript_dir}` |
-| GET | `/agents/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200); filters: `status`, `trigger`, `hit_cap` (`max_turns`/`max_budget`/`any`), `start`, `end` |
-| GET | `/agents/runs` | R | Cross-agent run history with `agent_slug`+`agent_name` per row; same filters as `/agents/{slug}/runs` plus optional `agent=<slug>` to narrow to one definition |
-| GET | `/agents/prompt-blocks` | R | Parsed view of the embedded `prompts/agents/*.md` library — id, title, description, group (`strategy`/`depth`/`integration`/`knowledge`), and full markdown content |
-| GET | `/agents/runs/recent-errors` | R | Errored runs across all agents in the last `hours` (default 24, max 168); `?limit=5` (max 50); joined with `agent_slug`+`agent_name` for deep-link |
-| GET | `/agents/runs/{shortId}` | R | One run detail (by short_id or UUID) |
-| PATCH | `/agents/runs/{shortId}` | W | Set/clear the operator note on a run. Body `{ "note": "..." }`; empty string clears. Capped at 2000 chars |
-| GET | `/agents/runs/{shortId}/transcript` | R | Streams the NDJSON transcript; 404 when not yet written |
-| GET | `/agents/settings` | R | Agent subsystem config; token fields returned masked, never plaintext |
-| GET | `/agents/status` | R | Cheap readiness probe — `{auth_configured, binary_present, ready}` for onboarding hints (no API call) |
-| PUT | `/agents/settings` | W | Update settings; nil fields are unchanged, empty string for token fields clears them |
+| GET | `/workflows` | R | List all agent definitions with last_run inlined (bare JSON array) |
+| GET | `/workflows/{slug}` | R | One definition; accepts slug, short_id, or UUID |
+| POST | `/workflows` | W | Create an agent definition |
+| PATCH | `/workflows/{slug}` | W | PATCH-merge update; omitted fields are unchanged |
+| DELETE | `/workflows/{slug}` | W | Delete the definition; historical runs preserved (FK SET NULL) |
+| POST | `/workflows/{slug}/enable` | W | Flip enabled=true |
+| POST | `/workflows/{slug}/disable` | W | Flip enabled=false |
+| POST | `/workflows/{slug}/run` | W | Trigger an immediate synchronous run; optional body fields `{prompt_prefix}` (prepend, ≤2000) and `{prompt}` (full override, ≤40000) — `prompt` wins when both set; 503 `CONCURRENCY_LOCKED` when another run is in progress |
+| POST | `/workflows/test` | W | Run the diagnostic smoke test (tiny "say OK" prompt, no MCP servers, ~5¢ cap); 422 `AUTH_NOT_CONFIGURED` / `AGENT_BINARY_NOT_FOUND` |
+| POST | `/workflows/cleanup` | W | Run the agent cleanup pass on demand; returns `{runs_deleted, transcripts_deleted, transcripts_scanned, retention_days, transcript_dir}` |
+| GET | `/workflows/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200); filters: `status`, `trigger`, `hit_cap` (`max_turns`/`max_budget`/`any`), `start`, `end` |
+| GET | `/workflows/runs` | R | Cross-agent run history with `agent_slug`+`agent_name` per row; same filters as `/workflows/{slug}/runs` plus optional `agent=<slug>` to narrow to one definition |
+| GET | `/workflows/prompt-blocks` | R | Parsed view of the embedded `prompts/agents/*.md` library — id, title, description, group (`strategy`/`depth`/`integration`/`knowledge`), and full markdown content |
+| GET | `/workflow-presets` | R | List the code-defined Workflow preset gallery, annotated with enabled-state |
+| POST | `/workflow-presets/{slug}/enable` | W | Instantiate a workflow from a preset (409 if already enabled) |
+| GET | `/workflows/runs/recent-errors` | R | Errored runs across all agents in the last `hours` (default 24, max 168); `?limit=5` (max 50); joined with `agent_slug`+`agent_name` for deep-link |
+| GET | `/workflows/runs/{shortId}` | R | One run detail (by short_id or UUID) |
+| PATCH | `/workflows/runs/{shortId}` | W | Set/clear the operator note on a run. Body `{ "note": "..." }`; empty string clears. Capped at 2000 chars |
+| GET | `/workflows/runs/{shortId}/transcript` | R | Streams the NDJSON transcript; 404 when not yet written |
+| GET | `/workflows/settings` | R | Agent subsystem config; token fields returned masked, never plaintext |
+| GET | `/workflows/status` | R | Cheap readiness probe — `{auth_configured, binary_present, ready}` for onboarding hints (no API call) |
+| PUT | `/workflows/settings` | W | Update settings; nil fields are unchanged, empty string for token fields clears them |
 
 `subscription_token` and `anthropic_api_key` are AES-256-GCM encrypted at rest. GET returns a masked display string (`"sk-ant-oat01-XXXXXXXXX••••wxyz"`); the full value never leaves the server. A per-run scoped API key (`actor_type='agent'`) is minted at run start by the orchestrator and revoked at completion — it is not exposed via this surface.
 

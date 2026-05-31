@@ -369,7 +369,7 @@ Both endpoints accept **two transports** with identical configuration fields. Pi
 }
 ```
 
-Re-importing the same CSV is a safe no-op — every row hashes to the same `provider_transaction_id` and the upsert detects the dedup. **Manual category overrides (`category_override = true`) are preserved** across re-imports.
+Re-importing the same CSV is a safe no-op — every row hashes to the same `provider_transaction_id` and the upsert detects the dedup. **Manual category overrides (`category_override = 'user'`) are preserved** across re-imports.
 
 Errors:
 
@@ -829,7 +829,7 @@ Each operation:
 | Field | Type | Description |
 |-------|------|-------------|
 | `transaction_id` | string | Required. UUID or short_id. |
-| `category_slug` | string | Optional. Sets `category_override=true`. Mutually exclusive with `reset_category`. |
+| `category_slug` | string | Optional. Sets `category_override='user'`. Mutually exclusive with `reset_category`. |
 | `reset_category` | bool | Optional. Clears the override and drops the transaction back to `uncategorized` so rules can re-categorize. |
 | `tags_to_add` | array | `[{"slug":"..."}]`. Auto-creates the tag if the slug is not yet registered. |
 | `tags_to_remove` | array | `[{"slug":"..."}]`. Unknown slugs are a no-op. |
@@ -943,11 +943,11 @@ Rules auto-categorize transactions during sync by matching conditions on transac
 | POST | `/rules/batch` | Write | Bulk-create rules (mirrors MCP `batch_create_rules`, max 50 per call) |
 | PUT | `/rules/{id}` | Write | Update a rule |
 | DELETE | `/rules/{id}` | Write | Delete a rule |
-| POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively (skips `category_override=true` rows) |
+| POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively (skips `category_override='user'` rows) |
 | POST | `/rules/apply-all` | Write | Apply all active rules retroactively (pipeline-stage order, skips overrides) |
 | POST | `/rules/preview` | Write | Dry-run a condition against existing transactions |
 
-`POST /rules/batch` and the apply endpoints both have integration coverage in `internal/api/rules_batch_integration_test.go` and `internal/api/rules_apply_integration_test.go`. The apply tests assert the `category_override=true` sacred-cow contract: a manually-overridden transaction is never recategorized by retroactive apply, even when its conditions match.
+`POST /rules/batch` and the apply endpoints both have integration coverage in `internal/api/rules_batch_integration_test.go` and `internal/api/rules_apply_integration_test.go`. The apply tests assert the `category_override='user'` sacred-cow contract: a manually-overridden transaction is never recategorized by retroactive apply, even when its conditions match.
 
 `POST /rules/batch` request body mirrors the MCP `batch_create_rules` shape:
 

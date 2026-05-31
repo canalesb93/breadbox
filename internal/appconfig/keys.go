@@ -66,6 +66,21 @@ const (
 	// one. Default: "bottts-neutral" (robot identicons on a flat
 	// transparent background).
 	KeyAvatarAgentStyle = "avatar.dicebear_style_agent"
+
+	// KeyWorkflowsConsentAckAt records when the household first
+	// acknowledged that enabling a workflow runs Claude over their
+	// financial ledger (incurring Anthropic API cost). Stored as an
+	// RFC3339 timestamp; non-empty = acknowledged. Gates the consent
+	// checkbox in the workflow configure drawer — shown on first enable,
+	// hidden thereafter.
+	KeyWorkflowsConsentAckAt = "workflows.consent_acknowledged_at"
+
+	// KeyNotifyWebhookURL is an optional outbound webhook URL. When set,
+	// Breadbox POSTs a JSON payload to it for workflow notifications (e.g.
+	// a report a workflow flagged). Empty = notifications disabled. The
+	// self-hoster controls the URL (point it at ntfy / Slack / Discord /
+	// an email bridge). http(s) only.
+	KeyNotifyWebhookURL = "notify.webhook_url"
 )
 
 // AuthMode values for KeyAgentAuthMode.

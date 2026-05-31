@@ -1,6 +1,6 @@
 //go:build integration && !lite
 
-// Pins the agent_definitions / agent_runs schema shipped in the Claude
+// Pins the workflows / workflow_runs schema shipped in the Claude
 // Agent SDK sprint. These tables back the admin /agents UI and the
 // scheduled-runner; the integration check fails loudly if someone reverts
 // the migrations.
@@ -29,12 +29,12 @@ func TestAgentDefinitionsTable_Exists(t *testing.T) {
 		var exists bool
 		if err := pool.QueryRow(ctx, `
 			SELECT EXISTS (SELECT 1 FROM information_schema.columns
-				WHERE table_name='agent_definitions' AND column_name=$1)
+				WHERE table_name='workflows' AND column_name=$1)
 		`, col).Scan(&exists); err != nil {
 			t.Fatalf("information_schema scan for %s: %v", col, err)
 		}
 		if !exists {
-			t.Errorf("agent_definitions.%s column is missing", col)
+			t.Errorf("workflows.%s column is missing", col)
 		}
 	}
 }
@@ -44,7 +44,7 @@ func TestAgentDefinitionsToolScopeCheck_RejectsInvalid(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := pool.Exec(ctx, `
-		INSERT INTO agent_definitions (name, slug, prompt, tool_scope, allowed_tools)
+		INSERT INTO workflows (name, slug, prompt, tool_scope, allowed_tools)
 		VALUES ('bogus tool scope', 'bogus-tool-scope-`+uniqueSuffix(t)+`',
 		        'p', 'totally-invalid', '[]')
 	`)
@@ -63,7 +63,7 @@ func TestAgentDefinitionsToolScopeCheck_AcceptsValid(t *testing.T) {
 	for _, scope := range []string{"read_only", "read_write"} {
 		slug := "valid-" + scope + "-" + uniqueSuffix(t)
 		if _, err := pool.Exec(ctx, `
-			INSERT INTO agent_definitions (name, slug, prompt, tool_scope, allowed_tools)
+			INSERT INTO workflows (name, slug, prompt, tool_scope, allowed_tools)
 			VALUES ('valid scope', $1, 'p', $2, '[]')
 		`, slug, scope); err != nil {
 			t.Errorf("expected scope %q to be accepted: %v", scope, err)
@@ -87,12 +87,12 @@ func TestAgentRunsTable_Exists(t *testing.T) {
 		var exists bool
 		if err := pool.QueryRow(ctx, `
 			SELECT EXISTS (SELECT 1 FROM information_schema.columns
-				WHERE table_name='agent_runs' AND column_name=$1)
+				WHERE table_name='workflow_runs' AND column_name=$1)
 		`, col).Scan(&exists); err != nil {
 			t.Fatalf("information_schema scan for %s: %v", col, err)
 		}
 		if !exists {
-			t.Errorf("agent_runs.%s column is missing", col)
+			t.Errorf("workflow_runs.%s column is missing", col)
 		}
 	}
 }
@@ -102,7 +102,7 @@ func TestAgentRunsStatusCheck_RejectsInvalid(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := pool.Exec(ctx, `
-		INSERT INTO agent_runs ("trigger", status) VALUES ('manual', 'bogus')
+		INSERT INTO workflow_runs ("trigger", status) VALUES ('manual', 'bogus')
 	`)
 	if err == nil {
 		t.Fatal("expected CHECK violation for status='bogus', got nil")
@@ -119,7 +119,7 @@ func TestAgentRunsFK_SetNullOnDefinitionDelete(t *testing.T) {
 	slug := "fk-test-" + uniqueSuffix(t)
 	var defID pgtype.UUID
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO agent_definitions (name, slug, prompt, allowed_tools)
+		INSERT INTO workflows (name, slug, prompt, allowed_tools)
 		VALUES ('fk test', $1, 'p', '[]')
 		RETURNING id
 	`, slug).Scan(&defID); err != nil {
@@ -128,20 +128,20 @@ func TestAgentRunsFK_SetNullOnDefinitionDelete(t *testing.T) {
 
 	var runID pgtype.UUID
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO agent_runs (agent_definition_id, "trigger", status)
+		INSERT INTO workflow_runs (agent_definition_id, "trigger", status)
 		VALUES ($1, 'manual', 'success')
 		RETURNING id
 	`, defID).Scan(&runID); err != nil {
 		t.Fatalf("insert run: %v", err)
 	}
 
-	if _, err := pool.Exec(ctx, `DELETE FROM agent_definitions WHERE id = $1`, defID); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM workflows WHERE id = $1`, defID); err != nil {
 		t.Fatalf("delete definition: %v", err)
 	}
 
 	var orphanedDefID pgtype.UUID
 	if err := pool.QueryRow(ctx, `
-		SELECT agent_definition_id FROM agent_runs WHERE id = $1
+		SELECT agent_definition_id FROM workflow_runs WHERE id = $1
 	`, runID).Scan(&orphanedDefID); err != nil {
 		t.Fatalf("re-fetch run: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestAgentDefinitionsShortIDTrigger_Fires(t *testing.T) {
 	slug := "shortid-test-" + uniqueSuffix(t)
 	var shortID string
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO agent_definitions (name, slug, prompt, allowed_tools)
+		INSERT INTO workflows (name, slug, prompt, allowed_tools)
 		VALUES ('shortid', $1, 'p', '[]')
 		RETURNING short_id
 	`, slug).Scan(&shortID); err != nil {

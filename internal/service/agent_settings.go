@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -23,7 +24,7 @@ func appconfigParam(key, value string) db.SetAppConfigParams {
 	}
 }
 
-// AgentSettingsResponse is what GET /api/v1/agents/settings returns.
+// AgentSettingsResponse is what GET /api/v1/workflows/settings returns.
 // Token fields are masked when present; full plaintext never leaves the server.
 type AgentSettingsResponse struct {
 	AuthMode           string   `json:"auth_mode"`
@@ -33,6 +34,7 @@ type AgentSettingsResponse struct {
 	GlobalMaxBudgetUSD *float64 `json:"global_max_budget_usd,omitempty"`
 	RuntimePath        string   `json:"runtime_path"`
 	TranscriptDir      string   `json:"transcript_dir"`
+	NotifyWebhookURL   string   `json:"notify_webhook_url"`
 }
 
 // UpdateAgentSettingsParams holds writable settings. Nil = don't touch;
@@ -45,6 +47,7 @@ type UpdateAgentSettingsParams struct {
 	GlobalMaxBudgetUSD *float64
 	RuntimePath        *string
 	TranscriptDir      *string
+	NotifyWebhookURL   *string
 }
 
 // GetAgentSettings reads agent.* keys from app_config, decrypts tokens,
@@ -68,6 +71,7 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte, dataDir s
 	// form showing the active path on a fresh install rather than blank.
 	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(dataDir))
 	globalBudget := readOptionalFloat(ctx, s.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD)
+	notifyURL := appconfig.String(ctx, s.Queries, appconfig.KeyNotifyWebhookURL, "")
 
 	return &AgentSettingsResponse{
 		AuthMode:           authMode,
@@ -77,6 +81,7 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte, dataDir s
 		GlobalMaxBudgetUSD: globalBudget,
 		RuntimePath:        runtimePath,
 		TranscriptDir:      transcriptDir,
+		NotifyWebhookURL:   notifyURL,
 	}, nil
 }
 
@@ -127,6 +132,19 @@ func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettings
 			return nil, fmt.Errorf("set transcript_dir: %w", err)
 		}
 	}
+	if p.NotifyWebhookURL != nil {
+		// Empty clears the webhook (notifications off); a non-empty value
+		// must be a valid http(s) URL.
+		trimmed := strings.TrimSpace(*p.NotifyWebhookURL)
+		if trimmed != "" {
+			if err := validateNotifyURL(trimmed); err != nil {
+				return nil, err
+			}
+		}
+		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyNotifyWebhookURL, trimmed)); err != nil {
+			return nil, fmt.Errorf("set notify_webhook_url: %w", err)
+		}
+	}
 	return s.GetAgentSettings(ctx, encKey, dataDir)
 }
 
@@ -135,11 +153,11 @@ func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettings
 // onboarding hints, and (later) by the smoke-test endpoints to short-
 // circuit before charging a real API call.
 type AgentSubsystemStatus struct {
-	AuthMode        string `json:"auth_mode"`
-	AuthConfigured  bool   `json:"auth_configured"`
-	BinaryPresent   bool   `json:"binary_present"`
-	BinaryPath      string `json:"binary_path,omitempty"`
-	Ready           bool   `json:"ready"` // AuthConfigured && BinaryPresent
+	AuthMode       string `json:"auth_mode"`
+	AuthConfigured bool   `json:"auth_configured"`
+	BinaryPresent  bool   `json:"binary_present"`
+	BinaryPath     string `json:"binary_path,omitempty"`
+	Ready          bool   `json:"ready"` // AuthConfigured && BinaryPresent
 }
 
 // GetAgentSubsystemStatus inspects app_config + the filesystem to report

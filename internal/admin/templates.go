@@ -135,7 +135,7 @@ func pageSectionLabel(currentPage string) string {
 		return "Setup"
 	case "feed", "transactions", "accounts", "recurring", "reports":
 		return "Overview"
-	case "agents", "rules", "categories", "tags":
+	case "workflows", "agents", "rules", "categories", "tags":
 		return "Manage"
 	case "connections", "household", "logs":
 		return "System"

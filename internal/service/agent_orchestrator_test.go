@@ -613,3 +613,65 @@ func TestOrchestratorRunNowAsyncWith_PanicInGoroutineIsRecovered(t *testing.T) {
 		t.Errorf("post-panic RunNow failed (semaphore leaked?): %v", err)
 	}
 }
+
+func TestHouseholdCostSince(t *testing.T) {
+	svc, _, pool := newService(t)
+	ctx := context.Background()
+	def := mustCreateAgentDefinition(t, svc, "cost-since", true)
+
+	ins := func(status string, cost string, age string) {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,total_cost_usd,started_at)
+			 VALUES ($1,'cron',$2,$3, NOW() - $4::interval)`,
+			def.ID, status, cost, age)
+		if err != nil {
+			t.Fatalf("insert run: %v", err)
+		}
+	}
+	ins("success", "0.06", "1 hour")   // in window
+	ins("success", "0.04", "2 hours")  // in window
+	ins("skipped", "0.50", "1 hour")   // excluded: skipped
+	ins("success", "1.00", "60 days")  // excluded: outside window
+
+	spent, err := svc.HouseholdCostSince(ctx, time.Now().Add(-24*time.Hour))
+	if err != nil {
+		t.Fatalf("HouseholdCostSince: %v", err)
+	}
+	if spent < 0.099 || spent > 0.101 {
+		t.Fatalf("spent = %v, want ~0.10 (skipped + out-of-window excluded)", spent)
+	}
+}
+
+func TestRunOrSkip_HouseholdCeiling(t *testing.T) {
+	svc, _, pool := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	ctx := context.Background()
+	def := mustCreateAgentDefinition(t, svc, "ceiling", true)
+
+	// Set a $0.10 household ceiling and push 30-day spend over it.
+	ceiling := 0.10
+	if _, err := svc.UpdateAgentSettings(ctx, service.UpdateAgentSettingsParams{GlobalMaxBudgetUSD: &ceiling}, encKey, ""); err != nil {
+		t.Fatalf("set ceiling: %v", err)
+	}
+	for _, c := range []string{"0.07", "0.06"} {
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,total_cost_usd,started_at)
+			 VALUES ($1,'cron','success',$2, NOW())`, def.ID, c); err != nil {
+			t.Fatalf("insert run: %v", err)
+		}
+	}
+
+	noop := agent.RunnerFunc(func(ctx context.Context, _ agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		t.Error("runner should NOT fire when over the household ceiling")
+		return agent.RunResult{Status: agent.StatusSuccess}, nil
+	})
+	orch := service.NewOrchestrator(svc, noop, 1, encKey, slog.Default())
+
+	resp, err := orch.RunOrSkip(ctx, def, "cron")
+	if !errors.Is(err, service.ErrBudgetCeilingReached) {
+		t.Fatalf("RunOrSkip err = %v, want ErrBudgetCeilingReached", err)
+	}
+	if resp == nil || resp.Status != "skipped" {
+		t.Fatalf("want a skipped row, got %+v", resp)
+	}
+}

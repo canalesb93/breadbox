@@ -636,7 +636,7 @@ func TestSetTransactionCategory_Success(t *testing.T) {
 
 	// Verify category changed and override is set
 	var gotCatID pgtype.UUID
-	var override bool
+	var override string
 	err = pool.QueryRow(ctx,
 		"SELECT category_id, category_override FROM transactions WHERE id = $1", txn.ID,
 	).Scan(&gotCatID, &override)
@@ -647,7 +647,7 @@ func TestSetTransactionCategory_Success(t *testing.T) {
 	if gotCatID != tgtUID {
 		t.Errorf("category not set correctly")
 	}
-	if !override {
+	if override == "none" {
 		t.Errorf("category_override should be true")
 	}
 }
@@ -709,12 +709,12 @@ func TestBatchSetTransactionCategory_SetsOverrideFlag(t *testing.T) {
 	}
 
 	// Verify category_override is set to TRUE
-	var override bool
+	var override string
 	err = pool.QueryRow(ctx, "SELECT category_override FROM transactions WHERE id = $1", txn1.ID).Scan(&override)
 	if err != nil {
 		t.Fatalf("query override: %v", err)
 	}
-	if !override {
+	if override == "none" {
 		t.Errorf("category_override should be true after batch categorize")
 	}
 }

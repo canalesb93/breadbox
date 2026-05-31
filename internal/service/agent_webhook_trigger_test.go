@@ -107,3 +107,35 @@ func mustCreateWebhookAgent(t *testing.T, svc *service.Service, slug string, ena
 	}
 	return def
 }
+
+// TestFireSyncCompleteAgents_DebouncesRecentRun confirms the post-sync
+// hook coalesces: an eligible agent that already ran (non-skipped) within
+// PostSyncDebounceWindow is NOT dispatched again on a fresh sync-complete.
+func TestFireSyncCompleteAgents_DebouncesRecentRun(t *testing.T) {
+	svc, _, pool := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+	def := mustCreateWebhookAgent(t, svc, "wh-debounce", true, true)
+
+	// A recent non-skipped run anchors the debounce window.
+	if _, err := pool.Exec(context.Background(),
+		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,started_at)
+		 VALUES ($1,'webhook','success', NOW())`, def.ID); err != nil {
+		t.Fatalf("seed recent run: %v", err)
+	}
+
+	fired := make(chan struct{}, 2)
+	runner := agent.RunnerFunc(func(_ context.Context, _ agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
+		fired <- struct{}{}
+		return agent.RunResult{Status: agent.StatusSuccess, DurationMs: 1}, nil
+	})
+	orch := service.NewOrchestrator(svc, runner, 3, encKey, slog.Default())
+
+	orch.FireSyncCompleteAgents(context.Background())
+
+	select {
+	case <-fired:
+		t.Fatal("runner fired for an agent that ran within the debounce window")
+	case <-time.After(300 * time.Millisecond):
+		// pass — debounced, no dispatch
+	}
+}

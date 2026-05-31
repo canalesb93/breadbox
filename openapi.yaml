@@ -95,7 +95,7 @@ tags:
     description: Scoped credentials for REST and MCP clients.
   - name: Settings
     description: Provider credentials and other app-config knobs.
-  - name: Agents
+  - name: Workflows
     description: Scheduled Claude Agent SDK definitions, run history, transcripts, and prompt blocks.
   - name: Webhooks
     description: Stored webhook events and on-demand replay.
@@ -369,8 +369,9 @@ paths:
         - { name: amount_min, in: query, schema: { type: number } }
         - { name: amount_max, in: query, schema: { type: number } }
         - { name: pending, in: query, schema: { type: boolean } }
+        - { name: flagged, in: query, schema: { type: boolean }, description: Filter to flagged (true) or unflagged (false) transactions. }
         - { name: deleted, in: query, schema: { type: string, enum: [include, only] }, description: Whether to include or restrict to soft-deleted transactions. }
-        - { name: category_override, in: query, schema: { type: boolean }, description: Filter by manual override flag. }
+        - { name: category_override, in: query, schema: { type: string, enum: [none, agent, user] }, description: Filter by category-override source (none/agent/user). }
       responses:
         "200":
           description: Paginated transaction list.
@@ -459,7 +460,7 @@ paths:
     patch:
       tags: [Transactions]
       summary: Set transaction category
-      description: Sets `category_id` and `category_override = true`. **Requires `full_access` scope.**
+      description: Sets `category_id` and `category_override = 'user' (manual user override)`. **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -612,6 +613,107 @@ paths:
       description: "**Requires `full_access` scope.**"
       responses:
         "204": { description: Removed. }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions/{id}/metadata:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+    put:
+      tags: [Transactions]
+      summary: Replace transaction metadata
+      description: |
+        Atomically replace the entire free-form `metadata` JSONB object on a
+        transaction. Pass `{}` to clear all keys. Touches only the metadata
+        column. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metadata]
+              properties:
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: Complete metadata replacement object.
+      responses:
+        "204": { description: Replaced. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Clear transaction metadata
+      description: "Reset the `metadata` object to `{}`. **Requires `full_access` scope.**"
+      responses:
+        "204": { description: Cleared. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions/{id}/metadata/{key}:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+      - { name: key, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Transactions]
+      summary: Set a transaction metadata key
+      description: |
+        Upsert one key in the transaction's `metadata` JSONB store, leaving
+        other keys untouched. Creates the key if absent. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  description: JSON value for the key (string, number, boolean, object, array, or null).
+      responses:
+        "204": { description: Key set. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Remove a transaction metadata key
+      description: "Delete one key from the `metadata` object. No-op if absent. **Requires `full_access` scope.**"
+      responses:
+        "204": { description: Removed. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions/{id}/flag:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Transactions]
+      summary: Flag a transaction
+      description: |
+        Mark a transaction for human attention (sets `flagged_at`). Optional body
+        `{"reason": "..."}` is recorded as a comment annotation. Retrieve flagged
+        rows with `?flagged=true`. **Requires `full_access` scope.**
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, description: Optional reason, stored as a comment annotation. }
+      responses:
+        "204": { description: Flagged. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Unflag a transaction
+      description: "Clears `flagged_at`. **Requires `full_access` scope.**"
+      responses:
+        "204": { description: Unflagged. }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /api/v1/transactions/{transaction_id}/comments:
@@ -1703,7 +1805,7 @@ paths:
       summary: Apply all rules retroactively
       description: |
         Replays every enabled rule against the historical transaction set
-        (skipping `category_override = true`). **Requires `full_access` scope.**
+        (skipping rows where `category_override <> 'none'`). **Requires `full_access` scope.**
       responses:
         "202":
           description: Application summary.
@@ -2633,10 +2735,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderConfig" }
 
-  # -- Agents --
-  /api/v1/agents:
+  # -- Workflows --
+  /api/v1/workflows:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List agent definitions
       description: Returns all agent definitions with `last_run` inlined per definition.
       responses:
@@ -2648,7 +2750,7 @@ paths:
                 type: array
                 items: { type: object, additionalProperties: true }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Create agent definition
       description: |
         Creates a Claude Agent SDK definition. Body includes the usual
@@ -2667,16 +2769,16 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/status:
+  /api/v1/workflows/status:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Readiness probe for the agent subsystem
       description: |
         Side-effect-free check that returns whether the agent subsystem
         is ready to fire a run — auth configured + sidecar binary
         discoverable. Used by the v2 SPA list page to surface onboarding
         hints inline. Does NOT call Anthropic; for a live round-trip
-        use POST /agents/test instead.
+        use POST /workflows/test instead.
       responses:
         "200":
           description: Readiness report.
@@ -2685,9 +2787,9 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-  /api/v1/agents/settings:
+  /api/v1/workflows/settings:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Get agent subsystem settings
       description: |
         Returns agent.* config from `app_config`. Token fields are masked
@@ -2700,7 +2802,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     put:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Update agent subsystem settings
       description: |
         PATCH-style update of agent.* config. Nil fields are unchanged;
@@ -2717,11 +2819,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs/{shortId}:
+  /api/v1/workflows/runs/{shortId}:
     parameters:
       - { name: shortId, in: path, required: true, schema: { type: string } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Get one agent run
       description: Resolves by short_id or UUID.
       responses:
@@ -2731,7 +2833,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     patch:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Set or clear the operator note on a run
       description: |
         Body: `{ "note": "..." }`. Empty string clears the field. Capped
@@ -2750,11 +2852,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs/{shortId}/transcript:
+  /api/v1/workflows/runs/{shortId}/transcript:
     parameters:
       - { name: shortId, in: path, required: true, schema: { type: string } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Stream agent run transcript
       description: Returns the NDJSON transcript file. 404 when not yet written.
       responses:
@@ -2765,11 +2867,11 @@ paths:
               schema: { type: string }
         "404":
           description: Transcript not available.
-  /api/v1/agents/{slug}:
+  /api/v1/workflows/{slug}:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string }, description: "slug, short_id, or UUID" }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Get one agent definition
       responses:
         "200":
@@ -2778,7 +2880,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     patch:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Partial update of an agent definition
       description: Omitted fields are unchanged. **Requires `full_access` scope.**
       requestBody:
@@ -2793,19 +2895,19 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     delete:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Delete an agent definition
       description: Historical runs preserved (FK SET NULL). **Requires `full_access` scope.**
       responses:
         "204":
           description: Deleted.
-  /api/v1/agents/{slug}/runs:
+  /api/v1/workflows/{slug}/runs:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
       - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       - { name: offset, in: query, schema: { type: integer, default: 0 } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List runs for one agent
       description: Offset-paginated run history.
       responses:
@@ -2814,11 +2916,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/{slug}/enable:
+  /api/v1/workflows/{slug}/enable:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Enable an agent
       description: Sets enabled=true. **Requires `full_access` scope.**
       responses:
@@ -2827,11 +2929,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/{slug}/disable:
+  /api/v1/workflows/{slug}/disable:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Disable an agent
       description: Sets enabled=false. **Requires `full_access` scope.**
       responses:
@@ -2840,7 +2942,7 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs:
+  /api/v1/workflows/runs:
     parameters:
       - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       - { name: offset, in: query, schema: { type: integer, default: 0 } }
@@ -2851,13 +2953,13 @@ paths:
       - { name: start, in: query, schema: { type: string }, description: "YYYY-MM-DD or RFC3339; inclusive lower bound on started_at" }
       - { name: end, in: query, schema: { type: string }, description: "YYYY-MM-DD or RFC3339; inclusive upper bound on started_at" }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List runs across all agents
       description: |
         Cross-agent run history. Each row carries `agent_slug` + `agent_name`
         in addition to the standard run fields, so callers can render an
         agent column without a second fetch. Powers the v2 SPA's global
-        `/v2/agents/runs` view. Same filters as `/agents/{slug}/runs`,
+        `/v2/agents/runs` view. Same filters as `/workflows/{slug}/runs`,
         plus the optional `agent=<slug>` narrowing filter.
       responses:
         "200":
@@ -2865,9 +2967,9 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/prompt-blocks:
+  /api/v1/workflows/prompt-blocks:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List the embedded agent prompt-block library
       description: |
         Returns every parsed block under `prompts/agents/*.md` — id,
@@ -2886,12 +2988,57 @@ paths:
               schema:
                 type: array
                 items: { type: object, additionalProperties: true }
-  /api/v1/agents/runs/recent-errors:
+  /api/v1/workflow-presets:
+    get:
+      tags: [Workflows]
+      summary: List the Workflow preset gallery
+      description: |
+        Returns the code-defined Workflow presets, each annotated with whether
+        it has been enabled (instantiated as a workflow). Presets are templates,
+        not stored rows — a row exists only once the preset is enabled.
+      responses:
+        "200":
+          description: Bare JSON array of preset views (`{slug, name, category, icon, description, enabled, ...}`).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+  /api/v1/workflow-presets/{slug}/enable:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Workflows]
+      summary: Enable a Workflow preset
+      description: |
+        Instantiate a workflow from the preset (composes its base prompt, applies
+        the preset defaults, stamps `source_template`). Optional body
+        `{"enabled": true}` starts it immediately (default: paused for review).
+        Returns the created workflow. **Requires `full_access` scope.** 409 if the
+        preset is already enabled.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean, description: Start the workflow immediately (default false). }
+      responses:
+        "201":
+          description: The instantiated workflow.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: The preset is already enabled. }
+  /api/v1/workflows/runs/recent-errors:
     parameters:
       - { name: hours, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 168 } }
       - { name: limit, in: query, schema: { type: integer, default: 5, minimum: 1, maximum: 50 } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List recent errored agent runs across all agents
       description: |
         Returns errored agent_runs from the last `hours` hours (default 24),
@@ -2905,9 +3052,9 @@ paths:
               schema:
                 type: array
                 items: { type: object, additionalProperties: true }
-  /api/v1/agents/cleanup:
+  /api/v1/workflows/cleanup:
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Run the agent cleanup pass on demand
       description: |
         Synchronously runs the same prune pass the 3:15 AM cron does:
@@ -2923,9 +3070,9 @@ paths:
               schema: { type: object, additionalProperties: true }
         "503":
           description: Agent scheduler not configured (AGENTS_DISABLED).
-  /api/v1/agents/test:
+  /api/v1/workflows/test:
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Run the agent diagnostic smoke test
       description: |
         Spawns the breadbox-agent sidecar with a tiny "say OK" prompt and
@@ -2941,11 +3088,11 @@ paths:
           description: Auth or binary not configured.
         "500":
           description: Test ran but the sidecar / model returned an error.
-  /api/v1/agents/{slug}/run:
+  /api/v1/workflows/{slug}/run:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Trigger an immediate agent run
       description: |
         Synchronously runs the named agent. Returns the resulting `agent_runs`
@@ -3230,12 +3377,21 @@ components:
         name: { type: string }
         merchant_name: { type: string, nullable: true }
         category_id: { type: string, nullable: true }
-        category_override: { type: boolean }
+        category_override: { type: string, enum: [none, agent, user], description: "Source of the current category lock (precedence user > agent > rule)." }
         pending: { type: boolean }
         deleted_at: { type: string, format: date-time, nullable: true }
         tags:
           type: array
           items: { type: string, description: Tag slug. }
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Free-form JSONB enrichment store. Always an object (empty `{}` when unset).
+        flagged_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the transaction was flagged for human attention; null when not flagged. The reason lives in a comment annotation.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       additionalProperties: true

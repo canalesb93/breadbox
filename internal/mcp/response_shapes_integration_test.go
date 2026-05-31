@@ -853,8 +853,8 @@ func TestUpdateTransactionsHandler_ResetCategoryShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
 	}
-	if got.CategoryOverride {
-		t.Errorf("category_override=true after reset; the MCP wrapper likely dropped ResetCategory")
+	if got.CategoryOverride != "none" {
+		t.Errorf("category_override <> 'none' after reset; the MCP wrapper likely dropped ResetCategory")
 	}
 }
 

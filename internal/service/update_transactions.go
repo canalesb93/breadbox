@@ -38,7 +38,7 @@ type UpdateTransactionsTagOp struct {
 // UpdateTransactionsResult is the per-op outcome returned by UpdateTransactions.
 type UpdateTransactionsResult struct {
 	TransactionID string                         `json:"transaction_id"`
-	Status        string                         `json:"status"` // "ok" or "error"
+	Status        string                         `json:"status"` // "ok", "skipped" (agent category write blocked by a user lock), or "error"
 	Error         *UpdateTransactionsResultError `json:"error,omitempty"`
 }
 
@@ -93,9 +93,12 @@ func (s *Service) UpdateTransactions(ctx context.Context, params UpdateTransacti
 
 	for i, op := range ops {
 		res := UpdateTransactionsResult{TransactionID: op.TransactionID, Status: "ok"}
-		if err := s.runUpdateOp(ctx, op, actor); err != nil {
+		var skipped bool
+		if err := s.runUpdateOp(ctx, op, actor, &skipped); err != nil {
 			res.Status = "error"
 			res.Error = errorToResultError(err)
+		} else if skipped {
+			res.Status = "skipped"
 		}
 		results[i] = res
 	}
@@ -114,7 +117,8 @@ func (s *Service) updateTransactionsAbort(ctx context.Context, ops []UpdateTrans
 	results := make([]UpdateTransactionsResult, len(ops))
 	for i, op := range ops {
 		res := UpdateTransactionsResult{TransactionID: op.TransactionID, Status: "ok"}
-		if err := s.runUpdateOpInTx(ctx, tx, op, actor); err != nil {
+		var skipped bool
+		if err := s.runUpdateOpInTx(ctx, tx, op, actor, &skipped); err != nil {
 			res.Status = "error"
 			res.Error = errorToResultError(err)
 			results[i] = res
@@ -131,6 +135,9 @@ func (s *Service) updateTransactionsAbort(ctx context.Context, ops []UpdateTrans
 			}
 			return results, fmt.Errorf("op %d (%s): %w", i, op.TransactionID, err)
 		}
+		if skipped {
+			res.Status = "skipped"
+		}
 		results[i] = res
 	}
 
@@ -141,13 +148,13 @@ func (s *Service) updateTransactionsAbort(ctx context.Context, ops []UpdateTrans
 }
 
 // runUpdateOp executes a single op with its own DB transaction.
-func (s *Service) runUpdateOp(ctx context.Context, op UpdateTransactionsOp, actor Actor) error {
+func (s *Service) runUpdateOp(ctx context.Context, op UpdateTransactionsOp, actor Actor, skipped *bool) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin op tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	if err := s.runUpdateOpInTx(ctx, tx, op, actor); err != nil {
+	if err := s.runUpdateOpInTx(ctx, tx, op, actor, skipped); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -158,8 +165,10 @@ func (s *Service) runUpdateOp(ctx context.Context, op UpdateTransactionsOp, acto
 
 // runUpdateOpInTx performs the compound operation against the supplied tx.
 // Writes happen in order: category → add tags → remove tags → comment. Each
-// change also writes an annotation for the audit trail.
-func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTransactionsOp, actor Actor) error {
+// change also writes an annotation for the audit trail. When the op's category
+// write is an agent write blocked by a 'user' lock, *skipped is set true (the
+// op itself still succeeds — tags/comment apply). skipped may be nil.
+func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTransactionsOp, actor Actor, skipped *bool) error {
 	if strings.TrimSpace(op.TransactionID) == "" {
 		return fmt.Errorf("%w: transaction_id is required", ErrInvalidParameter)
 	}
@@ -209,30 +218,57 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 			}
 			return fmt.Errorf("resolve category slug %q: %w", slug, err)
 		}
-		rows, err := qtx.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
-			ID:         txnUID,
-			CategoryID: cat.ID,
-		})
-		if err != nil {
-			return fmt.Errorf("set category override: %w", err)
+		// Precedence user > agent > rule. A user/system write stamps 'user' and
+		// always lands; an agent write stamps 'agent' but is guarded — it never
+		// overwrites a 'user' lock. The transaction was already resolved above,
+		// so 0 rows from the agent write means "exists but user-locked" → skip.
+		var landed bool
+		if actor.Type == "agent" {
+			rows, err := qtx.SetTransactionCategoryOverrideAgent(ctx, db.SetTransactionCategoryOverrideAgentParams{
+				ID:         txnUID,
+				CategoryID: cat.ID,
+			})
+			if err != nil {
+				return fmt.Errorf("set category override (agent): %w", err)
+			}
+			if rows == 0 {
+				// User-locked: leave the category untouched. Tags/comment in this
+				// op still apply; surface the skip to the caller.
+				if skipped != nil {
+					*skipped = true
+				}
+			} else {
+				landed = true
+			}
+		} else {
+			rows, err := qtx.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
+				ID:         txnUID,
+				CategoryID: cat.ID,
+			})
+			if err != nil {
+				return fmt.Errorf("set category override: %w", err)
+			}
+			if rows == 0 {
+				return fmt.Errorf("%w: transaction not found", ErrNotFound)
+			}
+			landed = true
 		}
-		if rows == 0 {
-			return fmt.Errorf("%w: transaction not found", ErrNotFound)
-		}
-		// Write category_set annotation.
-		payload := map[string]interface{}{
-			"category_slug": slug,
-			"source":        "manual",
-		}
-		if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
-			TransactionID: txnUID,
-			Kind:          "category_set",
-			ActorType:     normalizeAnnotationActorType(actor.Type),
-			ActorID:       actor.ID,
-			ActorName:     actor.Name,
-			Payload:       payload,
-		}); err != nil {
-			return fmt.Errorf("write category_set annotation: %w", err)
+		// Write the category_set annotation only when the write actually landed.
+		if landed {
+			payload := map[string]interface{}{
+				"category_slug": slug,
+				"source":        "manual",
+			}
+			if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+				TransactionID: txnUID,
+				Kind:          "category_set",
+				ActorType:     normalizeAnnotationActorType(actor.Type),
+				ActorID:       actor.ID,
+				ActorName:     actor.Name,
+				Payload:       payload,
+			}); err != nil {
+				return fmt.Errorf("write category_set annotation: %w", err)
+			}
 		}
 	}
 

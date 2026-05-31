@@ -15,7 +15,7 @@ SELECT * FROM api_keys WHERE key_hash = $1;
 -- back to parsing the slug from the key name).
 SELECT ad.id, ad.short_id, ad.name, ad.slug
 FROM api_keys ak
-JOIN agent_definitions ad ON ad.id = ak.agent_definition_id
+JOIN workflows ad ON ad.id = ak.agent_definition_id
 WHERE ak.id = $1;
 
 -- name: GetApiKeyByPrefix :one

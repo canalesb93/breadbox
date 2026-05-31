@@ -30,7 +30,7 @@ ON CONFLICT (provider_transaction_id) DO UPDATE SET
   pending = EXCLUDED.pending,
   provider_raw = COALESCE(EXCLUDED.provider_raw, transactions.provider_raw),
   category_id = CASE
-    WHEN transactions.category_override THEN transactions.category_id
+    WHEN transactions.category_override <> 'none' THEN transactions.category_id
     WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
     ELSE transactions.category_id
   END,

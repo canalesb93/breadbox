@@ -145,7 +145,7 @@ func TestApplyRule_RespectsCategoryOverride(t *testing.T) {
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != otherCat.Slug {
 		t.Fatalf("category_override is sacred: want category %q untouched, got %+v", otherCat.Slug, got.Category)
 	}
-	if !got.CategoryOverride {
+	if got.CategoryOverride == "none" {
 		t.Fatalf("category_override flag must remain true after apply, got false")
 	}
 }
@@ -258,7 +258,7 @@ func TestApplyAllRules_RespectsCategoryOverride(t *testing.T) {
 	if gotCoffee.Category == nil || gotCoffee.Category.Slug == nil || *gotCoffee.Category.Slug != otherCat.Slug {
 		t.Fatalf("category_override is sacred: want %q, got %+v", otherCat.Slug, gotCoffee.Category)
 	}
-	if !gotCoffee.CategoryOverride {
+	if gotCoffee.CategoryOverride == "none" {
 		t.Fatalf("category_override flag must remain true after apply-all")
 	}
 }

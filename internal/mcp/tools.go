@@ -25,6 +25,7 @@ type queryTransactionsInput struct {
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
 	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Flagged       *bool    `json:"flagged,omitempty" jsonschema:"Filter to flagged transactions (true) or unflagged (false). Omit to return both. Use flagged=true to retrieve transactions an agent or you have flagged for attention."`
 	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
@@ -46,6 +47,7 @@ type countTransactionsInput struct {
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
 	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Flagged       *bool    `json:"flagged,omitempty" jsonschema:"Filter to flagged transactions (true) or unflagged (false). Omit to return both. Use flagged=true to retrieve transactions an agent or you have flagged for attention."`
 	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant. Comma-separated values are ORed."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
@@ -101,6 +103,7 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 		MinAmount:     input.MinAmount,
 		MaxAmount:     input.MaxAmount,
 		Pending:       input.Pending,
+		Flagged:       input.Flagged,
 		Search:        optStr(input.Search),
 		ExcludeSearch: optStr(input.ExcludeSearch),
 		Tags:          input.Tags,
@@ -159,6 +162,7 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 		MinAmount:     input.MinAmount,
 		MaxAmount:     input.MaxAmount,
 		Pending:       input.Pending,
+		Flagged:       input.Flagged,
 		Search:        optStr(input.Search),
 		ExcludeSearch: optStr(input.ExcludeSearch),
 		Tags:          input.Tags,

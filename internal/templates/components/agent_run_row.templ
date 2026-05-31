@@ -46,6 +46,14 @@ type AgentRunRowProps struct {
 	// first. When present, the highest-priority report's title becomes
 	// the row's inline body line; extras collapse into a "+N" indicator.
 	Reports []AgentRunReportRef
+
+	// Actions is an optional trailing control rendered OUTSIDE the row's
+	// navigation anchor (its own daisy `list-row` grid column), so an
+	// interactive affordance like an OverflowMenu retrigger button won't
+	// nest inside the row link. nil = no actions cell (the default; the
+	// global /agents runs list renders identically to before). Used by
+	// the Workflows → Runs tab for a per-run "Re-run" menu.
+	Actions templ.Component
 }
 
 // AgentRunReportRef is the lightweight reference rendered on a row when
@@ -103,6 +111,11 @@ templ AgentRunRow(p AgentRunRowProps) {
 			</div>
 			@agentRunRowCost(p)
 		</a>
+		if p.Actions != nil {
+			<div class="shrink-0 self-center">
+				@p.Actions
+			</div>
+		}
 	</li>
 }
 
