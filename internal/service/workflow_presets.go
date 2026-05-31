@@ -85,6 +85,35 @@ var workflowPresets = []WorkflowPreset{
 		ScheduleCron:     "0 8 1 * *", // 1st of the month at 08:00
 		EstCostPerRunUSD: 0.04,        // monthly recurring-charge scan
 	},
+	{
+		Slug:        "backlog-closer",
+		Name:        "Backlog Closer",
+		Category:    "Categorization & Review",
+		Icon:        "list-checks",
+		Description: "A weekly deep-clean of aged uncategorized transactions — thorough, and promotes repeat patterns to rules.",
+		PromptBlocks: []string{
+			"strategy-bulk-review",
+			"review-depth-thorough",
+			"category-system",
+		},
+		ToolScope:        "read_write",
+		ScheduleCron:     "0 7 * * 1", // Mondays at 07:00 (canonical "Weekly" — drawer-selectable)
+		EstCostPerRunUSD: 0.08,        // thorough pass over an accumulated backlog
+	},
+	{
+		Slug:        "monthly-close",
+		Name:        "Monthly Close",
+		Category:    "Insights & Reports",
+		Icon:        "calendar-check",
+		Description: "A month-end summary of where the money went — by category and top merchants.",
+		PromptBlocks: []string{
+			"strategy-spending-report",
+			"merchant-analysis",
+		},
+		ToolScope:        "read_only",
+		ScheduleCron:     "0 8 1 * *", // 1st of the month at 08:00 (canonical "Monthly" — drawer-selectable)
+		EstCostPerRunUSD: 0.07,        // a full month of activity + merchant breakdown
+	},
 }
 
 // WorkflowPresetView is a preset plus its enablement state, for the gallery.
