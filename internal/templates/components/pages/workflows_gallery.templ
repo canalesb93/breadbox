@@ -219,34 +219,13 @@ templ workflowPromptPreviewModal() {
 // enabled. Instantiating a workflow is admin-only — non-admins see the
 // "Set up" control disabled with an explanatory tooltip.
 templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
-	<div class="flex items-center gap-3">
-		<!-- F2: Preview internal prompt — read-only peek at the composed base prompt. -->
-		<button
-			type="button"
-			class="btn btn-ghost btn-xs gap-1.5 text-base-content/60"
-			@click={ "previewPrompt('" + preset.Slug + "', '" + preset.Name + "')" }
-		>
-			@components.LucideIcon("file-text", "w-3.5 h-3.5")
-			<span class="hidden sm:inline">Preview prompt</span>
-		</button>
+	<div class="flex items-center gap-2">
 		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
 			@components.LucideIcon("clock", "w-3.5 h-3.5")
 			{ preset.TriggerLabel }
 		</span>
 		if preset.Enabled {
 			@workflowLastRunLine(preset.LastRun)
-			if isAdmin {
-				<!-- F3: Reconfigure — re-open the configure drawer prefilled. Admin-only (mirrors enable). -->
-				<button
-					type="button"
-					class="btn btn-ghost btn-sm gap-1.5 text-base-content/70"
-					@click={ "openReconfigure('" + preset.WorkflowSlug + "', '" + preset.Name + "')" }
-					aria-label={ "Reconfigure " + preset.Name }
-				>
-					@components.LucideIcon("sliders-horizontal", "w-4 h-4")
-					<span class="hidden sm:inline">Reconfigure</span>
-				</button>
-			}
 			<button
 				type="button"
 				class="btn btn-soft btn-sm gap-1.5"
@@ -282,6 +261,12 @@ templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
 				</button>
 			</span>
 		}
+		<!-- Secondary actions (Preview prompt, Reconfigure) live in the overflow
+		     menu so the row stays uncluttered — one primary action + toggle inline. -->
+		@components.OverflowMenu(components.OverflowMenuProps{
+			AriaLabel: preset.Name + " actions",
+			Items:     presetMenuItems(preset, isAdmin),
+		})
 	</div>
 }
 
@@ -358,9 +343,12 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					></textarea>
 					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
 				</div>
-				<label class="flex items-center gap-2 text-sm cursor-pointer">
-					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm"/>
-					Start running now
+				<label class="flex items-start gap-2 text-sm cursor-pointer">
+					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm mt-0.5"/>
+					<span>
+						Activate as soon as it's set up
+						<span class="block text-xs text-base-content/50">Leave unchecked to add it paused — you can turn it on anytime.</span>
+					</span>
 				</label>
 				if !consentAck {
 					<label class="flex items-start gap-2 text-xs cursor-pointer rounded-lg bg-base-200/60 p-3 border border-base-300">
@@ -374,12 +362,12 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 				if consentAck {
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
 						@components.LucideIcon("zap", "w-4 h-4")
-						Enable workflow
+						Set up workflow
 					</button>
 				} else {
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="!consent">
 						@components.LucideIcon("zap", "w-4 h-4")
-						Enable workflow
+						Set up workflow
 					</button>
 				}
 			}

@@ -899,6 +899,59 @@
     @apply flex-1 truncate;
   }
 
+  /* ── Collapse toggle: hover icon swap ──
+     The footer collapse button stacks three icons in one slot and
+     crossfades between them on hover so the swap reads as a morph, not a
+     hard cut: panel-left at rest, panel-left-close while expanded (the
+     click collapses), panel-left-open while collapsed (it expands). The
+     `.bb-sidebar-collapse__icons` wrapper is exactly one nav-icon wide so
+     the collapsed-rail centring geometry (which keys off a w-4 icon) is
+     preserved. All rules are scoped under `.bb-sidebar-collapse` so they
+     out-specify the generic `.bb-sidebar-link svg` opacity above. */
+  .bb-sidebar-collapse .bb-sidebar-collapse__icons {
+    @apply relative inline-flex items-center justify-center w-4 h-4 shrink-0;
+  }
+  .bb-sidebar-collapse .bb-sidebar-collapse__icon {
+    @apply absolute inset-0;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  /* At rest only the panel-left icon shows; the two directional cues are
+     hidden. (0,2,0) out-specifies the generic `.bb-sidebar-link svg`
+     opacity:.5 above.) */
+  .bb-sidebar-collapse .bb-sidebar-collapse__icon--close,
+  .bb-sidebar-collapse .bb-sidebar-collapse__icon--open {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  /* On hover, take full ownership of all three icons' opacity: blank them
+     out first, then the state-specific rule below raises exactly one. This
+     blanket (0,3,0) is what beats the generic `.bb-sidebar-link:hover svg`
+     opacity:.7 (0,2,1) — without it that rule would leak a second icon in. */
+  .bb-sidebar-collapse:hover .bb-sidebar-collapse__icon {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  /* Expanded + hover → panel-left-close fades in. */
+  .bb-sidebar-collapse:hover .bb-sidebar-collapse__icon--close {
+    opacity: 0.7;
+    transform: none;
+  }
+  /* Collapsed + hover → panel-left-open instead (close stays hidden). */
+  html[data-sidebar="collapsed"] .bb-sidebar-collapse:hover .bb-sidebar-collapse__icon--close {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  html[data-sidebar="collapsed"] .bb-sidebar-collapse:hover .bb-sidebar-collapse__icon--open {
+    opacity: 0.7;
+    transform: none;
+  }
+  /* Reduced motion: keep the swap, drop the animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .bb-sidebar-collapse .bb-sidebar-collapse__icon {
+      transition: none;
+    }
+  }
+
   /* ── Trailing loading spinner on mobile sidebar tap ──
      Injected by base.html's link-click handler. The visible spin is a
      CSS @keyframes rotate on an inline SVG (compositor-eligible so it
