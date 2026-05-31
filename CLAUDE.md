@@ -44,7 +44,7 @@ These bite in every session regardless of what you're touching.
 - **Soft deletes**: transactions use `deleted_at`; connections set `status='disconnected'`. FK policy: accounts/transactions `SET NULL` on connection delete (preserve history); `sync_logs` `CASCADE`.
 - **Encryption**: access tokens and Teller PEM files are AES-256-GCM encrypted at rest. `ENCRYPTION_KEY` (64-char hex) required at startup if any provider is configured — fail fast, not runtime.
 - **Attribution-aware filtering**: transaction queries use `COALESCE(t.attributed_user_id, bc.user_id)` for user filtering. Dependent-linked accounts excluded from totals via `a.is_dependent_linked = FALSE`.
-- **`category_override=true`** is sacred. Transaction rules and review enqueue must skip overridden rows.
+- **`category_override`** is a source enum (`none`/`agent`/`user`), not a boolean — it records who set the category, with precedence **user > agent > rule**. Rules write only `'none'` rows; agents write where `<> 'user'` (stamping `'agent'`); a `'user'` lock is sacred (nothing auto-overwrites it). See `docs/rule-dsl.md`.
 - **Shared dev DB**: multiple worktrees/agents run against one `breadbox` database. Additive migrations only (`ADD COLUMN`, `CREATE TABLE`, `CREATE INDEX`). Destructive changes (`DROP`, `ALTER TYPE`) break other running servers — coordinate first.
 - **Error envelope**: JSON `{ "error": { "code": "UPPER_SNAKE_CASE", "message": "..." } }`.
 - **Config precedence**: env vars → `app_config` DB table → defaults. Tracked in `ConfigSources` for badge rendering.
@@ -66,6 +66,7 @@ These bite in every session regardless of what you're touching.
 - Condition operators — string: `eq`, `neq`, `contains`, `not_contains`, `matches`, `in`; numeric: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`; bool: `eq`, `neq`
 - Match confidence: `auto`, `confirmed`, `rejected`
 - Match strategy: `date_amount_name`
+- Category override source: `none`, `agent`, `user` (precedence user > agent > rule)
 
 ## Local Dev
 

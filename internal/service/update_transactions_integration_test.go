@@ -61,7 +61,7 @@ func TestUpdateTransactions_CompoundOp(t *testing.T) {
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "food_and_drink_groceries" {
 		t.Errorf("expected category food_and_drink_groceries, got %+v", got.Category)
 	}
-	if !got.CategoryOverride {
+	if got.CategoryOverride == "none" {
 		t.Error("expected category_override=true after set_category")
 	}
 
@@ -258,7 +258,7 @@ func TestUpdateTransactions_ResetCategory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
 	}
-	if got.CategoryOverride {
+	if got.CategoryOverride != "none" {
 		t.Errorf("category_override = true, want false after reset")
 	}
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
@@ -333,7 +333,7 @@ func TestUpdateTransactions_ResetCategoryNoOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction pre: %v", err)
 	}
-	if pre.CategoryOverride {
+	if pre.CategoryOverride != "none" {
 		t.Fatalf("seed precondition: expected category_override=false on fresh txn, got true")
 	}
 
@@ -355,7 +355,7 @@ func TestUpdateTransactions_ResetCategoryNoOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction post: %v", err)
 	}
-	if got.CategoryOverride {
+	if got.CategoryOverride != "none" {
 		t.Errorf("category_override=true after reset, want false")
 	}
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
@@ -418,7 +418,7 @@ func TestUpdateTransactions_ResetCombinedWithTagAndComment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
 	}
-	if got.CategoryOverride {
+	if got.CategoryOverride != "none" {
 		t.Error("category_override=true after reset, want false")
 	}
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {

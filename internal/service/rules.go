@@ -1185,7 +1185,7 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 // Hit counts must reflect every condition match (sync-time parity, Q12), and
 // non-category actions (add_tag, remove_tag) legitimately fire on overridden
 // rows. The `set_category` UPDATE below enforces its own
-// `category_override = FALSE` guard so overridden rows keep their user-pinned
+// `category_override = 'none'` guard so overridden rows keep their user-pinned
 // category.
 const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
@@ -1354,7 +1354,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		if categorySetCatID.Valid {
 			_, err := tx.Exec(ctx,
 				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
+				WHERE id = ANY($2) AND category_override = 'none' AND deleted_at IS NULL`,
 				categorySetCatID, matchIDs)
 			if err != nil {
 				tx.Rollback(ctx)
@@ -1637,7 +1637,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		for catID, txnIDs := range catBatches {
 			if _, err := tx.Exec(ctx,
 				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
+				WHERE id = ANY($2) AND category_override = 'none' AND deleted_at IS NULL`,
 				catID, txnIDs); err != nil {
 				tx.Rollback(ctx)
 				return hitCounts, fmt.Errorf("update transactions: %w", err)
@@ -1773,7 +1773,7 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 
 	// Extended query to also get date and current category slug.
 	// Must match the same filters as transactionContextQuery (used by ApplyRuleRetroactively):
-	// - category_override = FALSE (rules don't overwrite manual overrides)
+	// - category_override = 'none' (rules don't overwrite manual overrides)
 	// - exclude matched dependent transactions (dedup'd via account links)
 	baseQuery := `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 		COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
@@ -1784,7 +1784,7 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories c ON t.category_id = c.id
-		WHERE t.deleted_at IS NULL AND t.category_override = FALSE
+		WHERE t.deleted_at IS NULL AND t.category_override = 'none'
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 	// When previewing for a specific rule's detail page, exclude transactions

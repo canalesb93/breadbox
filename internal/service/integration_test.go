@@ -1068,14 +1068,14 @@ func TestBulkRecategorizeByFilter_SearchFilter(t *testing.T) {
 	for rows.Next() {
 		var extID string
 		var catID pgtype.UUID
-		var override bool
+		var override string
 		if err := rows.Scan(&extID, &catID, &override); err != nil {
 			t.Fatalf("scan: %v", err)
 		}
 		if catID != targetCat.ID {
 			t.Errorf("%s: expected category %v, got %v", extID, targetCat.ID, catID)
 		}
-		if !override {
+		if override == "none" {
 			t.Errorf("%s: expected category_override=true", extID)
 		}
 	}
@@ -1136,7 +1136,7 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 		t.Fatalf("create override category: %v", err)
 	}
 	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE id = $2",
+		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE id = $2",
 		overrideCat.ID, txnSb3.ID)
 	if err != nil {
 		t.Fatalf("set override: %v", err)

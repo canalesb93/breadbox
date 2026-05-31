@@ -123,7 +123,7 @@ func TestTransactionMetadata_Validation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
 	}
-	if resp.CategoryOverride {
+	if resp.CategoryOverride != "none" {
 		t.Fatalf("metadata write flipped category_override")
 	}
 }

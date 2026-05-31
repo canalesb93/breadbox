@@ -382,20 +382,20 @@ func TestCSVImport_PreservesCategoryOverride(t *testing.T) {
 	}
 
 	if _, err := env.Pool.Exec(context.Background(),
-		`UPDATE transactions SET category_id = $1, category_override = TRUE WHERE id = $2`,
+		`UPDATE transactions SET category_id = $1, category_override = 'user' WHERE id = $2`,
 		groceries.ID, groceriesTxnID); err != nil {
 		t.Fatalf("set override: %v", err)
 	}
 
 	// Sanity: the row really is overridden.
-	var beforeOverride bool
+	var beforeOverride string
 	var beforeCategory string
 	if err := env.Pool.QueryRow(context.Background(),
 		`SELECT category_override, category_id::text FROM transactions WHERE id = $1`,
 		groceriesTxnID).Scan(&beforeOverride, &beforeCategory); err != nil {
 		t.Fatalf("read pre-state: %v", err)
 	}
-	if !beforeOverride {
+	if beforeOverride == "none" {
 		t.Fatalf("override flag did not stick")
 	}
 
@@ -407,14 +407,14 @@ func TestCSVImport_PreservesCategoryOverride(t *testing.T) {
 
 	// Override must still be true and category must still point at
 	// groceries — not be reset to uncategorized.
-	var afterOverride bool
+	var afterOverride string
 	var afterCategory string
 	if err := env.Pool.QueryRow(context.Background(),
 		`SELECT category_override, category_id::text FROM transactions WHERE id = $1`,
 		groceriesTxnID).Scan(&afterOverride, &afterCategory); err != nil {
 		t.Fatalf("read post-state: %v", err)
 	}
-	if !afterOverride {
+	if afterOverride == "none" {
 		t.Fatalf("re-import cleared category_override flag")
 	}
 	if afterCategory != beforeCategory {

@@ -478,7 +478,7 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleDeleteTransactionRule, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "apply_rules", Title: "Apply Rules Retroactively", Classification: ToolWrite,
-			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (respects category_override), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
+			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (skips rows where category_override <> 'none' — an agent or user already set it), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
 			// Not idempotent — hit_count increments on every run.
 		}, s.handleApplyRules, s),
 		makeToolDefLogged(ToolSpec{

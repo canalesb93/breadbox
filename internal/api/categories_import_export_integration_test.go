@@ -390,7 +390,7 @@ func TestImportCategories_PreservesCategoryOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get transaction: %v", err)
 	}
-	if !got.CategoryOverride {
+	if got.CategoryOverride == "none" {
 		t.Errorf("category_override: want true, got false (import must not touch transaction overrides)")
 	}
 	if pgconv.FormatUUID(got.CategoryID) != pgconv.FormatUUID(cat.ID) {
