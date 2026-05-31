@@ -198,8 +198,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// PageHeader. /agents?agent=<slug> filters the runs feed to one
 		// agent, which subsumes the old /agents/{slug}/runs route.
 		// Legacy /agents/runs and /agents/{slug}/runs 301-redirect.
-		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr, a.Config.DataDir))
-		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
+		// Legacy /agents page surface is retired — Workflows is the single
+		// automation home. The entry points 301-redirect to their Workflows
+		// equivalents (the hand-authored form pages below stay reachable by
+		// direct URL until the custom-workflow builder lands).
+		r.Get("/agents", redirectGET("/workflows/runs"))
+		r.Get("/agents/definitions", redirectGET("/workflows"))
 		r.Get("/workflows", WorkflowsGalleryPageHandler(svc, sm, tr))
 		r.Get("/workflows/runs", WorkflowRunsPageHandler(svc, sm, tr))
 		// Run detail lives under the Workflows surface; the legacy
@@ -211,10 +215,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// from the detail page's Edit button.
 		r.Get("/agents/{slug}", AgentDetailPageHandler(svc, sm, tr))
 		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
-		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr, a.Config.DataDir))
+		// A run detail is a workflow run — 301 to the canonical Workflows URL.
+		r.Get("/agents/runs/{shortId}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/workflows/runs/"+chi.URLParam(r, "shortId"), http.StatusMovedPermanently)
+		})
 		r.Get("/agents/runs", func(w http.ResponseWriter, r *http.Request) {
 			// Preserve query params so bookmarked filter URLs still work.
-			target := "/agents"
+			target := "/workflows/runs"
 			if r.URL.RawQuery != "" {
 				target += "?" + r.URL.RawQuery
 			}
@@ -222,7 +229,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		})
 		r.Get("/agents/{slug}/runs", func(w http.ResponseWriter, r *http.Request) {
 			slug := chi.URLParam(r, "slug")
-			target := "/agents?agent=" + slug
+			target := "/workflows/runs?workflow=" + slug
 			if r.URL.RawQuery != "" {
 				target += "&" + r.URL.RawQuery
 			}
