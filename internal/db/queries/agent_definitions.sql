@@ -2,9 +2,9 @@
 INSERT INTO agent_definitions (
     name, slug, prompt, system_prompt, schedule_cron,
     tool_scope, allowed_tools, model, max_turns, max_budget_usd, enabled,
-    quiet_hours_start, quiet_hours_end, trigger_on_sync_complete
+    quiet_hours_start, quiet_hours_end, trigger_on_sync_complete, source_template
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING *;
 
 -- name: GetAgentDefinition :one

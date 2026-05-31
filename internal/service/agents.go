@@ -77,6 +77,9 @@ type AgentDefinitionResponse struct {
 	// TriggerOnSyncComplete fires this agent after every successful sync
 	// (in addition to any cron schedule). Disabled by default.
 	TriggerOnSyncComplete bool             `json:"trigger_on_sync_complete"`
+	// SourceTemplate is the workflow-preset slug this definition was
+	// instantiated from, or nil if it was hand-authored.
+	SourceTemplate        *string          `json:"source_template,omitempty"`
 	LastRun               *AgentRunSummary `json:"last_run,omitempty"`
 	// CostStats30d is populated only by ListAgentDefinitions (the surface
 	// where users want to compare spend at a glance). Single-row
@@ -213,7 +216,8 @@ type CreateAgentDefinitionParams struct {
 	Enabled               bool
 	QuietHoursStart       *string // "HH:MM" 24-hour; nil disables window
 	QuietHoursEnd         *string
-	TriggerOnSyncComplete bool // fire after each successful sync completes
+	TriggerOnSyncComplete bool    // fire after each successful sync completes
+	SourceTemplate        *string // preset slug this was instantiated from; nil = hand-authored
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
@@ -460,6 +464,7 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 		QuietHoursStart:       pgconv.TextPtrIfNotEmpty(p.QuietHoursStart),
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
 		TriggerOnSyncComplete: p.TriggerOnSyncComplete,
+		SourceTemplate:        pgconv.TextPtrIfNotEmpty(p.SourceTemplate),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
@@ -1373,6 +1378,7 @@ func agentDefinitionFromRow(row db.AgentDefinition, lastRun *AgentRunSummary) Ag
 		QuietHoursStart:       pgconv.TextPtr(row.QuietHoursStart),
 		QuietHoursEnd:         pgconv.TextPtr(row.QuietHoursEnd),
 		TriggerOnSyncComplete: row.TriggerOnSyncComplete,
+		SourceTemplate:        pgconv.TextPtr(row.SourceTemplate),
 		LastRun:               lastRun,
 		CreatedAt:       pgconv.TimestampStr(row.CreatedAt),
 		UpdatedAt:       pgconv.TimestampStr(row.UpdatedAt),
