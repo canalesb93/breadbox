@@ -64,21 +64,28 @@
   prefersdark: false;
   color-scheme: light;
 
+  /* Mintlify-style tinted-neutral palette, warmed at the brand egg-yolk
+     hue (gold ~95). The base grays carry a faint WARM cast (chroma
+     ~0.004–0.008 at hue ~95) so the UI reads as a warm off-white; base-100
+     stays pure white to keep the content surface crisp. Primary is a
+     near-black warm neutral, NOT gold: a solid gold CTA collided with the
+     amber warning color, so gold is reserved for brand identity (the logo)
+     plus the warm chrome tint, and actions use a crisp dark button. */
   --color-base-100: oklch(1 0 0);
-  --color-base-200: oklch(0.97 0 0);
-  --color-base-300: oklch(0.922 0 0);
-  --color-base-content: oklch(0.145 0 0);
+  --color-base-200: oklch(0.971 0.004 95);
+  --color-base-300: oklch(0.923 0.008 95);
+  --color-base-content: oklch(0.16 0.01 95);
 
-  --color-primary: oklch(0.205 0 0);
+  --color-primary: oklch(0.205 0.012 95);
   --color-primary-content: oklch(0.985 0 0);
 
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-content: oklch(0.205 0 0);
+  --color-secondary: oklch(0.971 0.004 95);
+  --color-secondary-content: oklch(0.205 0.012 95);
 
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-content: oklch(0.205 0 0);
+  --color-accent: oklch(0.971 0.004 95);
+  --color-accent-content: oklch(0.205 0.012 95);
 
-  --color-neutral: oklch(0.205 0 0);
+  --color-neutral: oklch(0.205 0.012 95);
   --color-neutral-content: oklch(0.985 0 0);
 
   --color-info: var(--color-sky-500);
@@ -95,14 +102,16 @@
 
   --radius-selector: 0.25rem;
   --radius-field: 0.5rem;
-  --radius-box: 0.625rem;
+  /* Mintlify-tight box radius (8px) — modal/alert/etc. match the flattened
+     .bb-card below (was 0.625rem / 10px, cards were rounded-xl / 12px). */
+  --radius-box: 0.5rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
 
   --border: 1px;
   --depth: 0;
-  --noise: 0;
+  --noise: 1;
 }
 
 @plugin "daisyui/theme" {
@@ -111,22 +120,25 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: oklch(0.145 0 0);
-  --color-base-200: oklch(0.205 0 0);
-  --color-base-300: oklch(0.269 0 0);
-  --color-base-content: oklch(0.985 0 0);
+  /* Dark counterpart: same faint WARM cast on the dark grays. Primary is a
+     warm near-white (shadcn-style inverted dark primary, with dark text) —
+     gold stays brand-only, not the action color. */
+  --color-base-100: oklch(0.15 0.006 95);
+  --color-base-200: oklch(0.205 0.008 95);
+  --color-base-300: oklch(0.269 0.01 95);
+  --color-base-content: oklch(0.985 0.003 95);
 
-  --color-primary: oklch(0.922 0 0);
-  --color-primary-content: oklch(0.205 0 0);
+  --color-primary: oklch(0.922 0.008 95);
+  --color-primary-content: oklch(0.205 0.012 95);
 
-  --color-secondary: oklch(0.269 0 0);
-  --color-secondary-content: oklch(0.985 0 0);
+  --color-secondary: oklch(0.269 0.01 95);
+  --color-secondary-content: oklch(0.985 0.003 95);
 
-  --color-accent: oklch(0.371 0 0);
+  --color-accent: oklch(0.371 0.012 95);
   --color-accent-content: oklch(0.985 0 0);
 
-  --color-neutral: oklch(0.97 0 0);
-  --color-neutral-content: oklch(0.205 0 0);
+  --color-neutral: oklch(0.97 0.004 95);
+  --color-neutral-content: oklch(0.205 0.012 95);
 
   --color-info: var(--color-sky-400);
   --color-info-content: oklch(0.145 0 0);
@@ -142,14 +154,16 @@
 
   --radius-selector: 0.25rem;
   --radius-field: 0.5rem;
-  --radius-box: 0.625rem;
+  /* Mintlify-tight box radius (8px) — modal/alert/etc. match the flattened
+     .bb-card below (was 0.625rem / 10px, cards were rounded-xl / 12px). */
+  --radius-box: 0.5rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
 
   --border: 1px;
   --depth: 0;
-  --noise: 0;
+  --noise: 1;
 }
 
 /* Force-include classes that Tailwind's content scanner can't see
@@ -377,15 +391,15 @@
   .breadcrumbs { scrollbar-width: none; -ms-overflow-style: none; }
   .breadcrumbs::-webkit-scrollbar { display: none; }
 
-  /* ── Cards: shadcn-style — 1px border + subtle drop shadow ──
-   * shadcn's Card component ships `border ... shadow-sm` (both, not
-   * border-only). The prior "border, not shadow" stance read flatter
-   * than shadcn in side-by-side comparison — added shadow-sm to get
-   * the same gentle lift. Dark mode keeps the color-mix surface lift
-   * below; shadows on dark BG read as a barely-visible halo and
-   * the surface lift carries the elevation cue. */
+  /* ── Cards: Mintlify-style — flat 1px border, no drop shadow ──
+   * Mintlify's surfaces are border-only: a hairline defines the card
+   * against the bright content column, with no shadow lift. We dropped
+   * the shadcn `shadow-sm` (it read as an "off" halo on the new white
+   * content surface) and tightened the radius from rounded-xl (12px) to
+   * rounded-lg (8px). Dark mode keeps the color-mix surface lift below;
+   * the faint border carries elevation when there's no shadow. */
   .bb-card {
-    @apply bg-base-100 rounded-xl border border-base-300 shadow-sm;
+    @apply bg-base-100 rounded-lg border border-base-300;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
   }
 
@@ -704,8 +718,11 @@
   }
 
   /* ── Sidebar ── */
+  /* Recessed surface (base-200) — the content column is the bright one
+     (base-100). This is the Mintlify-style flip of the previous
+     white-sidebar / gray-content arrangement. */
   .bb-sidebar {
-    @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
+    @apply bg-base-200 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
   }
 
   .bb-sidebar-brand {
@@ -755,11 +772,15 @@
     @apply text-[0.7rem] lg:text-[0.65rem] font-medium text-base-content/40 px-3 pt-5 pb-2 lg:pb-1.5;
   }
 
+  /* Hover/active recalibrated for the recessed (base-200) rail: hover
+     darkens one step to base-300; active is a bright base-100 pill that
+     pops against the gray rail and visually links to the content column
+     (Mintlify pattern). Were both base-200 — invisible on a base-200 rail. */
   .bb-sidebar-link {
     @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-8
            shrink-0 rounded-lg text-sm font-medium
-           text-base-content/60 no-underline
-           hover:bg-base-200 hover:text-base-content;
+           text-base-content/60 no-underline border border-transparent
+           hover:bg-base-300 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
   }
 
@@ -767,8 +788,13 @@
     transform: scale(0.98);
   }
 
+  /* Active item: a bright base-100 pill (pops against the recessed rail)
+     with a dark, readable label + icon. (Label/icon stay base-content
+     rather than text-primary — the brand gold is too light to read as
+     text/thin-stroke icon on the white pill. The accent surfaces on
+     buttons, filter tabs, focus rings and links instead.) */
   .bb-sidebar-link--active {
-    @apply bg-base-200 text-base-content font-semibold;
+    @apply bg-base-100 text-base-content font-semibold border border-base-300;
   }
 
   .bb-sidebar-link i, .bb-sidebar-link svg {
@@ -1303,15 +1329,11 @@
   }
 
   /*
-   * Subtle drop shadow matching shadcn's Button component (shadow-xs).
-   * With --depth: 0 the daisyUI inset/3D shadow stack evaluates to
-   * transparent, so the button reads as completely flat without this
-   * override. shadcn doesn't shadow transparent buttons (ghost/link),
-   * so they opt out via :not().
+   * Removed the former shadcn `shadow-xs` override on solid buttons
+   * (was box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05)). Any remaining button
+   * lift is now governed solely by daisyUI's --depth theme token, so
+   * flat (--depth: 0) vs lifted (--depth: 1) is a single theme switch.
    */
-  .btn:not(.btn-ghost):not(.btn-link) {
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  }
 
   /* Button radius convention — see unlayered .btn-sm / .btn-xs override
      below the components layer. */
