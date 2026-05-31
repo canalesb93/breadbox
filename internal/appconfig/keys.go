@@ -66,6 +66,14 @@ const (
 	// one. Default: "bottts-neutral" (robot identicons on a flat
 	// transparent background).
 	KeyAvatarAgentStyle = "avatar.dicebear_style_agent"
+
+	// KeyWorkflowsConsentAckAt records when the household first
+	// acknowledged that enabling a workflow runs Claude over their
+	// financial ledger (incurring Anthropic API cost). Stored as an
+	// RFC3339 timestamp; non-empty = acknowledged. Gates the consent
+	// checkbox in the workflow configure drawer — shown on first enable,
+	// hidden thereafter.
+	KeyWorkflowsConsentAckAt = "workflows.consent_acknowledged_at"
 )
 
 // AuthMode values for KeyAgentAuthMode.

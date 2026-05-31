@@ -30,6 +30,12 @@ type WorkflowPreset struct {
 	MaxTurns              int    // 0 = DefaultAgentMaxTurns
 	ScheduleCron          string // empty = no cron
 	TriggerOnSyncComplete bool   // fire after each successful sync
+
+	// EstCostPerRunUSD is a rough per-run Anthropic-cost estimate, surfaced
+	// as a "projected cost" hint in the configure drawer so a self-hoster
+	// paying their own bill sees the order of magnitude before enabling.
+	// Deliberately approximate — actual cost is recorded per run.
+	EstCostPerRunUSD float64
 }
 
 // workflowPresets is the starter catalog. Order is the gallery display order.
@@ -50,6 +56,7 @@ var workflowPresets = []WorkflowPreset{
 		},
 		ToolScope:             "read_write",
 		TriggerOnSyncComplete: true,
+		EstCostPerRunUSD:      0.02, // short, efficient per-sync review
 	},
 	{
 		Slug:        "weekly-money-digest",
@@ -60,8 +67,9 @@ var workflowPresets = []WorkflowPreset{
 		PromptBlocks: []string{
 			"strategy-spending-report",
 		},
-		ToolScope:    "read_only",
-		ScheduleCron: "0 7 * * 1", // Mondays at 7:00
+		ToolScope:        "read_only",
+		ScheduleCron:     "0 7 * * 1", // Mondays at 7:00
+		EstCostPerRunUSD: 0.05,        // reads a week of activity for the digest
 	},
 	{
 		Slug:        "subscription-auditor",
@@ -73,8 +81,9 @@ var workflowPresets = []WorkflowPreset{
 			"strategy-anomaly-detection",
 			"merchant-analysis",
 		},
-		ToolScope:    "read_write",
-		ScheduleCron: "0 8 1 * *", // 1st of the month at 08:00
+		ToolScope:        "read_write",
+		ScheduleCron:     "0 8 1 * *", // 1st of the month at 08:00
+		EstCostPerRunUSD: 0.04,        // monthly recurring-charge scan
 	},
 }
 

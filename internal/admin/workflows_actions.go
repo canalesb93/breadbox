@@ -20,6 +20,18 @@ func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
 		_ = r.ParseForm()
+
+		// First-enable consent gate: until the household has acknowledged
+		// that workflows run Claude over their ledger (at cost), require an
+		// explicit consent=true on the enable. Server-side enforcement
+		// backs the drawer's disabled-until-checked button.
+		consented := svc.WorkflowsConsentAcknowledged(r.Context())
+		if !consented && r.FormValue("consent") != "true" {
+			writeError(w, http.StatusBadRequest, "CONSENT_REQUIRED",
+				"Acknowledge that workflows run Claude over your financial data before enabling.")
+			return
+		}
+
 		// Configure-drawer fields. enabled defaults to true (the drawer's
 		// "Enable" CTA), but the form can pass enabled=false to set up paused.
 		params := service.EnableWorkflowFromPresetParams{
@@ -42,6 +54,10 @@ func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 				writeError(w, http.StatusUnprocessableEntity, "WORKFLOW_ENABLE_FAILED", err.Error())
 			}
 			return
+		}
+		// Record the one-time consent on the first successful enable.
+		if !consented {
+			_ = svc.AcknowledgeWorkflowsConsent(r.Context())
 		}
 		writeJSON(w, http.StatusOK, wf)
 	}
