@@ -2,7 +2,10 @@
 
 package service
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type AccountResponse struct {
 	ID                string   `json:"id"`
@@ -66,6 +69,11 @@ type TransactionResponse struct {
 	// Tags attached to this transaction (slug list). Empty slice when none are
 	// attached. Populated by ListTransactions / GetTransaction.
 	Tags []string `json:"tags,omitempty"`
+
+	// Metadata is the free-form JSONB enrichment store on this transaction. Always
+	// present as a JSON object (the empty object {} when nothing has been written).
+	// Written via the scoped metadata ops; never holds first-class fields.
+	Metadata json.RawMessage `json:"metadata"`
 }
 
 type TransactionListResult struct {

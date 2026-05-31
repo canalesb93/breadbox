@@ -3,11 +3,55 @@
 package pages
 
 import (
+	"encoding/json"
+	"sort"
 	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
+
+// metadataKV is one rendered key/value row from a transaction's metadata blob.
+type metadataKV struct {
+	Key   string
+	Value string
+}
+
+// transactionMetadataPairs parses the transaction's free-form metadata JSONB
+// into sorted display rows. Returns nil for an empty/absent/invalid object so
+// the template can skip the section entirely.
+func transactionMetadataPairs(raw json.RawMessage) []metadataKV {
+	if len(raw) == 0 {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil || len(m) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]metadataKV, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, metadataKV{Key: k, Value: formatMetadataValue(m[k])})
+	}
+	return out
+}
+
+// formatMetadataValue renders a metadata value for display: strings verbatim,
+// everything else as compact JSON.
+func formatMetadataValue(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
 
 // ActivityDayGroup mirrors admin.ActivityDayGroup. Duplicated locally so the
 // templ component can consume it without importing the admin package (which
