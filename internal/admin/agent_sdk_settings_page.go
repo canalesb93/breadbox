@@ -46,6 +46,7 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			RuntimePath:           settings.RuntimePath,
 			TranscriptDir:         settings.TranscriptDir,
 			GlobalMaxBudgetUSDStr: formatOptionalBudget(settings.GlobalMaxBudgetUSD),
+			NotifyWebhookURL:      settings.NotifyWebhookURL,
 		}
 		if settings.SubscriptionToken != nil {
 			form.SubscriptionTokenDisplay = *settings.SubscriptionToken
