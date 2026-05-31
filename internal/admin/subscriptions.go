@@ -79,6 +79,18 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			}
 		}
 
+		// Order the ledger by renewal urgency: overdue → due-soon → upcoming
+		// (ascending days), then series with no projection, then likely-cancelled
+		// (stale) last. Surfaces "what's renewing soon" at the top, leveraging the
+		// renewal chip, without a separate section.
+		sort.SliceStable(active, func(i, j int) bool {
+			gi, gj := renewalSortGroup(active[i]), renewalSortGroup(active[j])
+			if gi != gj {
+				return gi < gj
+			}
+			return renewalSortDays(active[i]) < renewalSortDays(active[j])
+		})
+
 		var monthlyTotals []pages.SubscriptionMonthlyTotal
 		for _, cur := range currencyOrder {
 			monthlyTotals = append(monthlyTotals, pages.SubscriptionMonthlyTotal{
@@ -175,6 +187,7 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		SourceLabel:     sourceLabel(s.DetectionSource),
 	}
 	row.RenewalLabel, row.RenewalTone = subscriptionRenewal(s)
+	row.DaysUntilRenewal = s.DaysUntilRenewal
 	if s.LastAmount != nil {
 		row.HasAmount = true
 		row.Amount = math.Abs(*s.LastAmount)
@@ -218,6 +231,30 @@ func subscriptionRenewal(s service.SeriesResponse) (string, string) {
 	default:
 		return "", ""
 	}
+}
+
+// renewalSortGroup buckets an active-ledger row for the renewal-urgency sort:
+// 0 = has a projection and isn't stale (overdue/due-soon/upcoming), 1 = no
+// projection (paused/cancelled/unknown cadence), 2 = stale ("likely
+// cancelled") — pushed to the bottom since it isn't really "upcoming".
+func renewalSortGroup(r pages.SubscriptionRow) int {
+	switch {
+	case r.RenewalTone == "error": // stale / likely cancelled
+		return 2
+	case r.DaysUntilRenewal == nil:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// renewalSortDays is the secondary key (ascending) within a group — most
+// overdue first, then soonest upcoming. Missing projection sorts as 0.
+func renewalSortDays(r pages.SubscriptionRow) int {
+	if r.DaysUntilRenewal == nil {
+		return 0
+	}
+	return *r.DaysUntilRenewal
 }
 
 // subscriptionSignalsShape is the subset of detection_signals (§6.6) the UI

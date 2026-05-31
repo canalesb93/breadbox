@@ -54,6 +54,10 @@ type SubscriptionRow struct {
 	// user should act on (due soon / overdue / likely cancelled) get a chip.
 	RenewalLabel string // "Renews in 3d" | "5d overdue" | "Likely cancelled"
 	RenewalTone  string // info | warning | error
+	// DaysUntilRenewal is the signed day count to the next charge (negative =
+	// overdue), nil when there's no projection. Drives the ledger's
+	// renewal-urgency sort. Active series only.
+	DaysUntilRenewal *int
 
 	HasAmount bool
 	Amount    float64 // last_amount in dollars
