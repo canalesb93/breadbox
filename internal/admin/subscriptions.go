@@ -46,6 +46,7 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 		var currencyOrder []string
 		activeCount := 0
 		usersWithSeries := map[string]bool{}
+		typesPresent := map[string]bool{}
 
 		for _, s := range all {
 			// A rejected verdict ("Not a subscription") is a dismissal — it
@@ -58,6 +59,9 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			row := subscriptionRow(s, catName, userName)
 			if row.UserID != "" {
 				usersWithSeries[row.UserID] = true
+			}
+			if row.Type != "" {
+				typesPresent[row.Type] = true
 			}
 			if s.Status == service.SeriesStatusCandidate {
 				candidates = append(candidates, row)
@@ -107,6 +111,7 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			Candidates:     candidates,
 			Active:         active,
 			Users:          subscriptionUserFilters(ctx, a, usersWithSeries),
+			Types:          subscriptionTypeFilters(typesPresent),
 		}
 
 		data := map[string]any{
@@ -186,6 +191,8 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		Source:          s.DetectionSource,
 		SourceLabel:     sourceLabel(s.DetectionSource),
 	}
+	row.Type = s.Type
+	row.TypeLabel = recurringTypeLabel(s.Type)
 	row.RenewalLabel, row.RenewalTone = subscriptionRenewal(s)
 	row.DaysUntilRenewal = s.DaysUntilRenewal
 	if s.LastAmount != nil {
@@ -200,8 +207,24 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		row.UserID = *s.UserID
 		row.OwnerName = userName[*s.UserID]
 	}
-	row.Search = strings.ToLower(strings.Join([]string{s.Name, s.MerchantKey, row.CadenceLabel, row.CategoryName, row.OwnerName}, " "))
+	row.Search = strings.ToLower(strings.Join([]string{s.Name, s.MerchantKey, row.CadenceLabel, row.CategoryName, row.OwnerName, row.TypeLabel}, " "))
 	return row
+}
+
+// recurringTypeLabel renders the structured type for display.
+func recurringTypeLabel(t string) string {
+	switch t {
+	case service.SeriesTypeSubscription:
+		return "Subscription"
+	case service.SeriesTypeBill:
+		return "Bill"
+	case service.SeriesTypeLoan:
+		return "Loan"
+	case service.SeriesTypeOther:
+		return "Other"
+	default:
+		return "Subscription"
+	}
 }
 
 // subscriptionRenewal derives an attention chip (label + daisy tone) from a
@@ -227,7 +250,14 @@ func subscriptionRenewal(s service.SeriesResponse) (string, string) {
 	case service.SeriesHealthOverdue:
 		return fmt.Sprintf("%dd overdue", -days), "warning"
 	case service.SeriesHealthStale:
-		return "Likely cancelled", "error"
+		// Type-aware copy: a bill/loan that goes silent has "lapsed" (you may
+		// have missed a payment), whereas a subscription has likely been cancelled.
+		switch s.Type {
+		case service.SeriesTypeBill, service.SeriesTypeLoan:
+			return "Lapsed?", "error"
+		default:
+			return "Likely cancelled", "error"
+		}
 	default:
 		return "", ""
 	}
@@ -547,6 +577,28 @@ func subscriptionUserFilters(ctx context.Context, a *app.App, owners map[string]
 		out = append(out, pages.SubscriptionUserFilter{ID: id, Name: u.Name, First: first})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// subscriptionTypeFilters builds the "filter by type" options from the types
+// actually present, in a stable order. Returns nil for a single type (no filter
+// worth showing).
+func subscriptionTypeFilters(present map[string]bool) []pages.SubscriptionTypeFilter {
+	if len(present) < 2 {
+		return nil
+	}
+	order := []struct{ value, label string }{
+		{service.SeriesTypeSubscription, "Subscriptions"},
+		{service.SeriesTypeBill, "Bills"},
+		{service.SeriesTypeLoan, "Loans"},
+		{service.SeriesTypeOther, "Other"},
+	}
+	var out []pages.SubscriptionTypeFilter
+	for _, o := range order {
+		if present[o.value] {
+			out = append(out, pages.SubscriptionTypeFilter{Value: o.value, Label: o.label})
+		}
+	}
 	return out
 }
 

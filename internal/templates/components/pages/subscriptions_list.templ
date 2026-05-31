@@ -42,6 +42,21 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 				}
 			</div>
 		}
+		if len(p.Types) > 1 {
+			<!-- Filter by type (subscription / bill / loan / other) -->
+			<div class="flex items-center gap-2 mb-6 overflow-x-auto">
+				<div class="join">
+					<button
+						@click="filterType = 'all'"
+						:class="filterType === 'all' ? 'btn-active' : ''"
+						class="join-item btn btn-xs"
+					>All</button>
+					for _, t := range p.Types {
+						@subscriptionsTypeFilterBtn(t)
+					}
+				</div>
+			</div>
+		}
 		<!-- Stat tiles: Active · Monthly-equivalent (per currency) · Candidates -->
 		<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
 			<div class="grid grid-cols-3 divide-x divide-base-300">
@@ -130,14 +145,23 @@ templ subscriptionsUserFilterBtn(u SubscriptionUserFilter) {
 	</button>
 }
 
+templ subscriptionsTypeFilterBtn(t SubscriptionTypeFilter) {
+	<button
+		@click={ fmt.Sprintf("filterType = %q", t.Value) }
+		:class={ fmt.Sprintf("filterType === %q ? 'btn-active' : ''", t.Value) }
+		class="join-item btn btn-xs"
+	>{ t.Label }</button>
+}
+
 // subscriptionCandidateCard is one auto-detected series awaiting a verdict.
 templ subscriptionCandidateCard(s SubscriptionRow) {
 	<div
 		x-data="{ why: false }"
 		data-series-card
 		data-filter-user={ s.UserID }
+		data-type={ s.Type }
 		data-search={ s.Search }
-		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser)"
+		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && (filterType === 'all' || filterType === $el.dataset.type)"
 		x-cloak
 		class="bb-card p-4"
 	>
@@ -145,6 +169,7 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 			<div class="min-w-0 flex-1">
 				<div class="flex items-center gap-2 flex-wrap">
 					<span class="text-sm font-semibold text-base-content truncate">{ s.Name }</span>
+					<span class="badge badge-ghost badge-xs">{ s.TypeLabel }</span>
 					<span class={ "badge badge-soft badge-sm", "badge-" + s.BandTone }>{ s.ConfidenceBand } confidence</span>
 				</div>
 				<div class="text-xs text-base-content/50 mt-1">{ s.SignalSummary }</div>
@@ -218,8 +243,9 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 	<tr
 		data-series-card
 		data-filter-user={ s.UserID }
+		data-type={ s.Type }
 		data-search={ s.Search }
-		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && matches($el)"
+		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && (filterType === 'all' || filterType === $el.dataset.type) && matches($el)"
 		x-cloak
 		class="hover:bg-base-200/30 transition-colors"
 	>
@@ -229,7 +255,10 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 					@components.LucideIcon("repeat", "w-4 h-4 text-base-content opacity-40")
 				</div>
 				<div class="min-w-0">
-					<div class="text-sm font-medium truncate text-base-content">{ s.Name }</div>
+					<div class="flex items-center gap-2 min-w-0">
+						<span class="text-sm font-medium truncate text-base-content">{ s.Name }</span>
+						<span class="badge badge-ghost badge-xs shrink-0">{ s.TypeLabel }</span>
+					</div>
 					if s.CategoryName != "" {
 						<div class="text-xs text-base-content/40 truncate">{ s.CategoryName }</div>
 					}

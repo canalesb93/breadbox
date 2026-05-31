@@ -26,6 +26,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 		<!-- Status + verdict toolbar -->
 		<div class="flex items-center flex-wrap gap-2 mb-6">
 			<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.StatusTone }>{ p.Series.StatusLabel }</span>
+			<span class="badge badge-ghost badge-sm">{ p.Series.TypeLabel }</span>
 			if p.Series.Status == "candidate" {
 				<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.BandTone }>{ p.Series.ConfidenceBand } confidence</span>
 			}
@@ -49,6 +50,9 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			Icon:  "repeat",
 			Title: "Details",
 		}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Type", Caption: "Subscription, bill, loan, or other"}) {
+				<span class="badge badge-soft badge-neutral badge-sm">{ p.Series.TypeLabel }</span>
+			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence"}) {
 				<span class="text-sm">{ p.Series.CadenceLabel }</span>
 			}

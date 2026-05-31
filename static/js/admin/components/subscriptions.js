@@ -27,6 +27,7 @@
     Alpine.data('subscriptionsList', function () {
       return {
         filterUser: 'all',
+        filterType: 'all',
         filter: '',
 
         init: function () {
