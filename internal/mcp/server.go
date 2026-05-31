@@ -391,6 +391,10 @@ func (s *MCPServer) buildToolRegistry() {
 			Description: "Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide series_id to assign to an existing series, OR merchant_key + create_if_missing:true to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass transaction_ids (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). confirm:true flips it straight to active; omit to leave a reviewable candidate. Use after list_series(status=candidate) shows nothing for a subscription the user says exists.",
 		}, s.handleAssignSeries, s),
 		makeToolDefLogged(ToolSpec{
+			Name: "set_series_type", Title: "Set Recurring Type", Classification: ToolWrite,
+			Description: "Set a recurring series' type: subscription (streaming/SaaS/memberships), bill (rent/utilities/insurance/telecom), loan (mortgage/auto/student/personal), or other. Detection infers the type from the charges' category on first detection; use this to correct it. The override is sticky — re-detection won't change it back.",
+		}, s.handleSetSeriesType, s),
+		makeToolDefLogged(ToolSpec{
 			Name: "rekey_series", Title: "Re-key a Subscription", Classification: ToolWrite,
 			Description: "Correct a series' merchant_key when detection grouped it under a wrong or fallback key (e.g. 'payment' → 'spotify'). Repoints the series and its linked transactions to the new key. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects historical grouping — future charges still key off the provider name.",
 		}, s.handleRekeySeries, s),

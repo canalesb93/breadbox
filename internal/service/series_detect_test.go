@@ -225,3 +225,31 @@ func TestEvaluateGroup_AnalyzeGroupAgreesWithReason(t *testing.T) {
 		t.Errorf("analyzeGroup ok=%v but evaluateGroup reason=%q — wrappers disagree", ok, diag.Reason)
 	}
 }
+
+// --- recurring type inference (inferSeriesType) ---
+
+func TestInferSeriesType(t *testing.T) {
+	cases := map[string]string{
+		"":                                  SeriesTypeSubscription,
+		"loan_payments":                     SeriesTypeLoan,
+		"loan_payments_mortgage_payment":    SeriesTypeLoan,
+		"loan_payments_car_payment":         SeriesTypeLoan,
+		"loan_payments_student_loan_payment": SeriesTypeLoan,
+		"loan_payments_personal_loan_payment": SeriesTypeLoan,
+		"loan_payments_insurance_payment":   SeriesTypeBill, // insurance is a bill, not a loan
+		"loan_payments_credit_card_payment": SeriesTypeOther,
+		"rent_and_utilities_rent":           SeriesTypeBill,
+		"rent_and_utilities_internet_and_cable": SeriesTypeBill,
+		"rent_and_utilities_gas_and_electricity": SeriesTypeBill,
+		"general_services_insurance":        SeriesTypeBill,
+		"entertainment_tv_and_movies":       SeriesTypeSubscription,
+		"entertainment_music_and_audio":     SeriesTypeSubscription,
+		"food_and_drink_coffee":             SeriesTypeSubscription, // default
+		"general_merchandise_electronics":   SeriesTypeSubscription, // default
+	}
+	for slug, want := range cases {
+		if got := inferSeriesType(slug); got != want {
+			t.Errorf("inferSeriesType(%q) = %q, want %q", slug, got, want)
+		}
+	}
+}

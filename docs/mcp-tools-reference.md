@@ -242,7 +242,7 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. Read `status=candidate` to find series awaiting a verdict.
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. Read `status=candidate` to find series awaiting a verdict.
 
 ### get_series (Read)
 
@@ -259,6 +259,10 @@ Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a 
 ### assign_series (Write)
 
 Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide `series_id` to assign to an existing series, **or** `merchant_key` + `create_if_missing:true` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). `confirm:true` flips it straight to `active`; omit to leave a reviewable `candidate`. Use after `list_series(status=candidate)` shows nothing for a subscription the user says exists.
+
+### set_series_type (Write)
+
+Set a recurring series' `type`: `subscription` (streaming/SaaS/memberships), `bill` (rent/utilities/insurance/telecom), `loan` (mortgage/auto/student/personal), or `other`. The detector infers the type from the linked charges' dominant category at first detection; this is the correction handle. The override is **sticky** — re-detection won't revert it. (`assign_series` also accepts an optional `type` when minting.)
 
 ### rekey_series (Write)
 

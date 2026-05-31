@@ -1876,6 +1876,7 @@ paths:
                 create_if_missing: { type: boolean }
                 name: { type: string }
                 cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual] }
+                type: { type: string, enum: [subscription, bill, loan, other], description: "Optional type for a minted series; inferred from category when omitted." }
                 expected_amount: { type: number }
                 currency: { type: string }
                 category_id: { type: string }
@@ -1981,6 +1982,29 @@ paths:
       responses:
         "200":
           description: Re-keyed series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/type:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Series]
+      summary: Set a recurring series' type
+      description: "**Requires `full_access` scope.** Overrides the series type (`subscription`|`bill`|`loan`|`other`). Sticky correction — re-detection won't change it back."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [subscription, bill, loan, other] }
+      responses:
+        "200":
+          description: Updated series.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
@@ -3276,6 +3300,7 @@ components:
         expected_amount: { type: number, nullable: true }
         iso_currency_code: { type: string, nullable: true }
         status: { type: string, description: "`active`|`paused`|`cancelled`|`candidate`." }
+        type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`. Inferred from the members' dominant category at first detection; user/agent-overridable + sticky." }
         confidence: { type: string, description: "`auto`|`confirmed`|`rejected` — the verdict axis." }
         detection_source: { type: string, description: "`deterministic`|`agent`|`user`|`rule`." }
         last_amount: { type: number, nullable: true }

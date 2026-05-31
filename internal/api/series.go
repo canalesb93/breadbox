@@ -68,6 +68,7 @@ type assignSeriesRequest struct {
 	CreateIfMissing bool     `json:"create_if_missing,omitempty"`
 	Name            string   `json:"name,omitempty"`
 	Cadence         string   `json:"cadence,omitempty"`
+	Type            string   `json:"type,omitempty"`
 	ExpectedAmount  *float64 `json:"expected_amount,omitempty"`
 	Currency        *string  `json:"currency,omitempty"`
 	CategoryID      *string  `json:"category_id,omitempty"`
@@ -98,6 +99,7 @@ func AssignSeriesHandler(svc *service.Service) http.HandlerFunc {
 			CreateIfMissing: body.CreateIfMissing,
 			Name:            body.Name,
 			Cadence:         body.Cadence,
+			Type:            body.Type,
 			ExpectedAmount:  body.ExpectedAmount,
 			Currency:        body.Currency,
 			CategoryID:      body.CategoryID,
@@ -239,6 +241,30 @@ func SplitSeriesHandler(svc *service.Service) http.HandlerFunc {
 		s, err := svc.SplitSeries(r.Context(), id, body.TransactionIDs, body.NewMerchantKey, body.Name, actor)
 		if err != nil {
 			writeServiceError(w, err, "Series not found", "Failed to split series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
+// setSeriesTypeRequest is the body for POST /api/v1/series/{id}/type.
+type setSeriesTypeRequest struct {
+	Type string `json:"type"` // subscription | bill | loan | other
+}
+
+// SetSeriesTypeHandler overrides a series' type (sticky correction).
+// POST /api/v1/series/{id}/type — mirrors the set_series_type MCP tool (write).
+func SetSeriesTypeHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body setSeriesTypeRequest
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.SetSeriesType(r.Context(), id, body.Type, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to set series type")
 			return
 		}
 		writeData(w, s)
