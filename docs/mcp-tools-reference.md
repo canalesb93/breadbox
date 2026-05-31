@@ -242,11 +242,15 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Read `status=candidate` to find series awaiting a verdict.
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. Read `status=candidate` to find series awaiting a verdict.
 
 ### get_series (Read)
 
 Get one series by short ID or UUID, including its full `detection_signals` (`occurrence_count`, `interval_cv`, `cadence_snap_error`, `amount_branch`, `merchant_key_is_fallback`). Inspect before reviewing a candidate.
+
+### explain_series_candidates (Read)
+
+Answer "why isn't *merchant* a subscription?". Returns `near_misses` — every recurring-looking merchant group that is **not** already a series, each annotated with the detector's verdict: `qualifies:true` (passes every gate but isn't tracked yet — confirm it with `assign_series`) or a specific `reason` it fell short (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Each row carries a human `explanation` plus the raw numbers (`occurrence_count`, `nearest_cadence`, `median_gap_days`, `interval_cv`, `amount_min`/`amount_max`, `first_seen`/`last_seen`). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this surfaces what it skipped (ordered most-charges-first, capped at 50).
 
 ### review_series (Write)
 
@@ -255,6 +259,14 @@ Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a 
 ### assign_series (Write)
 
 Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide `series_id` to assign to an existing series, **or** `merchant_key` + `create_if_missing:true` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). `confirm:true` flips it straight to `active`; omit to leave a reviewable `candidate`. Use after `list_series(status=candidate)` shows nothing for a subscription the user says exists.
+
+### rekey_series (Write)
+
+Correct a series' `merchant_key` when detection grouped it under a wrong or fallback key (e.g. `payment` → `spotify`). Repoints the series and its linked transactions to `new_merchant_key`. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects *historical* grouping — incoming charges still key off the provider name at sync time (a merchant-key alias table is future work).
+
+### split_series (Write)
+
+Break an over-grouped series in two: move `transaction_ids` (≤50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency / user / category; rollups recompute on both sides. Errors if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series.
 
 ### add_series_tag (Write)
 

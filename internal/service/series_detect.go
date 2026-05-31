@@ -70,6 +70,18 @@ type detectionSignals struct {
 	DetectorVersion   int     `json:"detector_version"`
 }
 
+// Rejection reasons surfaced by evaluateGroup (and the explain feed). The empty
+// string means the group qualifies. These are stable identifiers — agents and
+// the UI map them to human copy ("why isn't this a subscription?").
+const (
+	seriesRejectTooFewCharges     = "too_few_charges"       // fewer than 2 charges — nothing to compare
+	seriesRejectSameDayDuplicates = "same_day_duplicates"   // all charges land on one day, no cadence
+	seriesRejectIrregularCadence  = "irregular_cadence"     // gap doesn't snap to any known cadence
+	seriesRejectTooFewOccurrences = "too_few_occurrences"   // below the precision-first occurrence floor
+	seriesRejectIntervalVariable  = "interval_too_variable" // day-gaps too irregular (interval_cv over gate)
+	seriesRejectAmountUnstable    = "amount_unstable"       // amounts neither tight-band nor clean drift
+)
+
 // groupAnalysis is the verdict for one candidate group.
 type groupAnalysis struct {
 	cadence             string
@@ -78,16 +90,55 @@ type groupAnalysis struct {
 	signals             detectionSignals
 }
 
+// groupDiagnostics carries the best-effort numbers computed about a group
+// regardless of whether it qualified — so a rejected near-miss can still
+// explain itself (how many charges, nearest cadence, interval variance, amount
+// spread). Reason is "" when the group qualified.
+type groupDiagnostics struct {
+	Reason            string
+	OccurrenceCount   int
+	NearestCadence    string  // closest cadence center even if it didn't snap
+	MedianGapDays     float64
+	IntervalCV        float64
+	AmountMinCents    int64
+	AmountMaxCents    int64
+	AmountSpreadRatio float64
+}
+
 // analyzeGroup applies the precision-first gates to one merchant+currency group
 // of charges and decides whether it is a recurring series. Pure arithmetic, no
-// I/O — the unit-tested core of the detector.
+// I/O — the unit-tested core of the detector. Thin wrapper over evaluateGroup
+// preserving the historical (analysis, ok) shape for the detection path.
 func analyzeGroup(charges []chargePoint, merchantKey, currency string) (groupAnalysis, bool) {
+	a, diag := evaluateGroup(charges, merchantKey, currency)
+	return a, diag.Reason == ""
+}
+
+// evaluateGroup is the gate core. It returns the accepted analysis (when
+// diag.Reason == "") plus diagnostics that are populated as far as the gates
+// got — so the explain feed can report *why* a near-miss fell short using the
+// same arithmetic the detector used. The accepted path is byte-identical to the
+// pre-refactor analyzeGroup.
+func evaluateGroup(charges []chargePoint, merchantKey, currency string) (groupAnalysis, groupDiagnostics) {
+	diag := groupDiagnostics{OccurrenceCount: len(charges)}
 	if len(charges) < 2 {
-		return groupAnalysis{}, false
+		diag.Reason = seriesRejectTooFewCharges
+		return groupAnalysis{}, diag
 	}
 	sorted := make([]chargePoint, len(charges))
 	copy(sorted, charges)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].date.Before(sorted[j].date) })
+
+	// Amount spread is meaningful for diagnostics regardless of the gate outcome.
+	amounts := make([]int64, len(sorted))
+	for i, c := range sorted {
+		amounts[i] = c.amountCents
+	}
+	minAmt, maxAmt := minMaxInt(amounts)
+	diag.AmountMinCents, diag.AmountMaxCents = minAmt, maxAmt
+	if minAmt > 0 {
+		diag.AmountSpreadRatio = round3(float64(maxAmt) / float64(minAmt))
+	}
 
 	// Day gaps between consecutive charges.
 	gaps := make([]float64, 0, len(sorted)-1)
@@ -95,13 +146,17 @@ func analyzeGroup(charges []chargePoint, merchantKey, currency string) (groupAna
 		gaps = append(gaps, sorted[i].date.Sub(sorted[i-1].date).Hours()/24)
 	}
 	medGap := median(gaps)
+	diag.MedianGapDays = round3(medGap)
 	if medGap <= 0 {
-		return groupAnalysis{}, false // same-day duplicates, not a cadence
+		diag.Reason = seriesRejectSameDayDuplicates
+		return groupAnalysis{}, diag
 	}
 
 	cadence, snapErr := snapCadence(medGap)
+	diag.NearestCadence = nearestCadenceName(medGap)
 	if cadence == SeriesCadenceIrregular {
-		return groupAnalysis{}, false // precision-first: detector never emits irregular
+		diag.Reason = seriesRejectIrregularCadence // precision-first: detector never emits irregular
+		return groupAnalysis{}, diag
 	}
 
 	// Occurrence floor depends on cadence: annual/semiannual qualify at 2.
@@ -110,28 +165,29 @@ func analyzeGroup(charges []chargePoint, merchantKey, currency string) (groupAna
 		floor = seriesMinOccurrencesAnnual
 	}
 	if len(sorted) < floor {
-		return groupAnalysis{}, false
+		diag.NearestCadence = cadence
+		diag.Reason = seriesRejectTooFewOccurrences
+		return groupAnalysis{}, diag
 	}
 
 	// Interval regularity — only meaningful with ≥2 gaps. The 2-charge annual
 	// case relies on the cadence-snap gate instead.
 	cv := coeffVar(gaps)
+	diag.IntervalCV = round3(cv)
+	diag.NearestCadence = cadence
 	if len(gaps) >= 2 && cv > seriesMaxIntervalCV {
-		return groupAnalysis{}, false
+		diag.Reason = seriesRejectIntervalVariable
+		return groupAnalysis{}, diag
 	}
 
 	// Amount stability: tight band OR monotonic-drift (gated on clean cadence).
-	amounts := make([]int64, len(sorted))
-	for i, c := range sorted {
-		amounts[i] = c.amountCents
-	}
 	branch, ok := amountStability(amounts, snapErr)
 	if !ok {
-		return groupAnalysis{}, false
+		diag.Reason = seriesRejectAmountUnstable
+		return groupAnalysis{}, diag
 	}
 
 	medAmt := medianInt(amounts)
-	minAmt, maxAmt := minMaxInt(amounts)
 	expected := medAmt
 	if branch == "monotonic_drift" {
 		expected = amounts[len(amounts)-1] // current price renews
@@ -164,7 +220,21 @@ func analyzeGroup(charges []chargePoint, merchantKey, currency string) (groupAna
 		expectedAmountCents: expected,
 		expectedDay:         modalDayOfMonth(sorted, cadence),
 		signals:             sig,
-	}, true
+	}, diag
+}
+
+// nearestCadenceName returns the closest cadence center to a median gap,
+// ignoring the snap tolerance — used for diagnostics so an irregular near-miss
+// can still say "looks roughly monthly".
+func nearestCadenceName(medGap float64) string {
+	best := SeriesCadenceIrregular
+	bestErr := math.MaxFloat64
+	for _, c := range cadenceCenters {
+		if e := math.Abs(medGap-c.center) / c.center; e < bestErr {
+			bestErr, best = e, c.name
+		}
+	}
+	return best
 }
 
 // snapCadence maps a median day-gap to a canonical cadence if it lands within

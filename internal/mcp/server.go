@@ -379,6 +379,10 @@ func (s *MCPServer) buildToolRegistry() {
 			Description: "Get one recurring series by short ID or UUID, including its full detection_signals. Use before reviewing a candidate to inspect the evidence (occurrence_count, interval_cv, cadence_snap_error, amount_branch, monotonic drift).",
 		}, s.handleGetSeries, s),
 		makeToolDefLogged(ToolSpec{
+			Name: "explain_series_candidates", Title: "Explain Near-Miss Subscriptions", Classification: ToolRead,
+			Description: "Answer \"why isn't <merchant> a subscription?\". Reports every recurring-looking merchant group that is NOT already a series, with the detector's verdict: qualifies=true (eligible but not tracked yet — confirm it with assign_series) or a specific reason it fell short (too_few_occurrences, irregular_cadence, interval_too_variable, amount_unstable, same_day_duplicates). Each row carries a human explanation plus the numbers (occurrence_count, nearest_cadence, median_gap_days, interval_cv, amount min/max). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this is how you surface what it skipped.",
+		}, s.handleExplainSeriesCandidates, s),
+		makeToolDefLogged(ToolSpec{
 			Name: "review_series", Title: "Review Subscription", Classification: ToolWrite,
 			Description: "Apply a verdict to a recurring series: confirm (it is a subscription → active), reject (NOT a subscription → sticky, never re-proposed at that amount band), pause, or cancel. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates the candidates surfaced by list_series(status=candidate).",
 		}, s.handleReviewSeries, s),
@@ -386,6 +390,14 @@ func (s *MCPServer) buildToolRegistry() {
 			Name: "assign_series", Title: "Assign / Create Subscription", Classification: ToolWrite,
 			Description: "Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide series_id to assign to an existing series, OR merchant_key + create_if_missing:true to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass transaction_ids (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). confirm:true flips it straight to active; omit to leave a reviewable candidate. Use after list_series(status=candidate) shows nothing for a subscription the user says exists.",
 		}, s.handleAssignSeries, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "rekey_series", Title: "Re-key a Subscription", Classification: ToolWrite,
+			Description: "Correct a series' merchant_key when detection grouped it under a wrong or fallback key (e.g. 'payment' → 'spotify'). Repoints the series and its linked transactions to the new key. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects historical grouping — future charges still key off the provider name.",
+		}, s.handleRekeySeries, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "split_series", Title: "Split a Subscription", Classification: ToolWrite,
+			Description: "Break an over-grouped series into two: move the given transaction_ids (≤50, each a current member of the source series) into a brand-new series under new_merchant_key. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency/user/category; rollups recompute on both. Errors if new_merchant_key equals the source key or already has a series.",
+		}, s.handleSplitSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "add_series_tag", Title: "Tag a Subscription", Classification: ToolWrite,
 			Description: "Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it first with create_tag).",

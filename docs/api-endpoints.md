@@ -84,9 +84,12 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
 | GET | `/series` | R | List recurring series; optional `?status=active\|candidate\|paused\|cancelled` |
+| GET | `/series/explain` | R | Near-miss feed: recurring-looking merchants not yet a series + the detector's verdict (why) |
 | GET | `/series/{id}` | R | Single series (accepts UUID or short_id) |
 | POST | `/series` | W | Create a missed series (`merchant_key`+`create_if_missing`) or assign by `series_id`; links `transaction_ids` (≤50), optional `confirm` |
 | POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series; optional `confirm` |
+| POST | `/series/{id}/rekey` | W | Correct a series' `merchant_key` (+ repoint members); errors on collision / sticky-reject |
+| POST | `/series/{id}/split` | W | Move `transaction_ids` (≤50, current members) into a new series under `new_merchant_key` |
 | POST | `/series/{id}/tags` | W | Attach a tag to a series; linked transactions inherit it |
 | DELETE | `/series/{id}/tags/{slug}` | W | Detach a tag; strips series-inherited copies from members (keeps user-added) |
 | PATCH | `/series/{id}` | W | Apply a verdict: `confirm`/`reject`/`pause`/`cancel` (user confirmation outranks agent) |

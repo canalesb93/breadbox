@@ -80,7 +80,12 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 				<span class="text-sm">{ subscriptionDetailField(p.ExpectedDay) }</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Next renewal"}) {
-				<span class="text-sm">{ subscriptionDetailField(p.NextExpected) }</span>
+				<span class="text-sm inline-flex items-center gap-2">
+					{ subscriptionDetailField(p.NextExpected) }
+					if p.Series.RenewalLabel != "" {
+						<span class={ "badge badge-soft badge-xs", "badge-" + p.Series.RenewalTone }>{ p.Series.RenewalLabel }</span>
+					}
+				</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Last seen"}) {
 				<span class="text-sm">{ subscriptionDetailField(p.LastSeen) }</span>

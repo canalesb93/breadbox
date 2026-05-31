@@ -340,6 +340,75 @@ func TestEvaluateCondition_BoolNeq(t *testing.T) {
 	}
 }
 
+func TestEvaluateCondition_InSeries(t *testing.T) {
+	cc := mustCompile(t, &Condition{Field: "in_series", Op: "eq", Value: true})
+
+	tctx := TransactionContext{InSeries: true}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected in_series eq true to match a series member")
+	}
+
+	tctx.InSeries = false
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected in_series eq true to fail for a non-member")
+	}
+}
+
+func TestEvaluateCondition_InSeriesNeq(t *testing.T) {
+	// in_series neq true == "not in any series".
+	cc := mustCompile(t, &Condition{Field: "in_series", Op: "neq", Value: true})
+
+	tctx := TransactionContext{InSeries: false}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected in_series neq true to match a non-member")
+	}
+
+	tctx.InSeries = true
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected in_series neq true to fail for a member")
+	}
+}
+
+func TestEvaluateCondition_SeriesEq(t *testing.T) {
+	cc := mustCompile(t, &Condition{Field: "series", Op: "eq", Value: "AbC12xYz"})
+
+	tctx := TransactionContext{SeriesShortID: "AbC12xYz"}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected series eq to match the assigned series short_id")
+	}
+
+	// Case-insensitive, like every other string field.
+	tctx.SeriesShortID = "abc12xyz"
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected series eq to match case-insensitively")
+	}
+
+	tctx.SeriesShortID = "OtherKey"
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected series eq to fail for a different series")
+	}
+
+	// Unassigned transaction: SeriesShortID empty → no match.
+	tctx.SeriesShortID = ""
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected series eq to fail for an unassigned transaction")
+	}
+}
+
+func TestEvaluateCondition_SeriesIn(t *testing.T) {
+	cc := mustCompile(t, &Condition{Field: "series", Op: "in", Value: []interface{}{"netflix01", "spotify02"}})
+
+	tctx := TransactionContext{SeriesShortID: "spotify02"}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected series in to match a listed series")
+	}
+
+	tctx.SeriesShortID = "hulu0003"
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected series in to fail for an unlisted series")
+	}
+}
+
 func TestEvaluateCondition_MerchantName(t *testing.T) {
 	cc := mustCompile(t, &Condition{Field: "provider_merchant_name", Op: "contains", Value: "amazon"})
 
