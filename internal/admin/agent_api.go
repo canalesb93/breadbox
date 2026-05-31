@@ -279,6 +279,10 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 			zero := 0.0
 			params.GlobalMaxBudgetUSD = &zero
 		}
+		if r.Form.Has("notify_webhook_url") {
+			v := strings.TrimSpace(r.FormValue("notify_webhook_url"))
+			params.NotifyWebhookURL = &v // empty clears; service validates http(s)
+		}
 
 		if _, err := svc.UpdateAgentSettings(r.Context(), params, a.Config.EncryptionKey, a.Config.DataDir); err != nil {
 			FlashRedirect(w, r, sm, "error", "Failed to save settings: "+err.Error(), "/settings/agents")
@@ -286,6 +290,20 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 		}
 		SetFlash(r.Context(), sm, "success", "Agent settings saved.")
 		http.Redirect(w, r, "/settings/agents", http.StatusSeeOther)
+	}
+}
+
+// NotifyTestAdminHandler handles POST /-/agents/notify-test — admin-only.
+// Fires a sample notification to the configured webhook so the operator can
+// verify wiring. Returns JSON {ok} or {ok:false, error} (rendered inline via
+// Alpine). 422 when unconfigured or the webhook errors.
+func NotifyTestAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := svc.SendTestNotification(r.Context()); err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	}
 }
 
@@ -461,4 +479,3 @@ func splitAllowedTools(raw string) []string {
 	}
 	return out
 }
-

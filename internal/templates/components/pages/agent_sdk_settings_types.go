@@ -36,6 +36,7 @@ type AgentSDKSettingsFormFields struct {
 	GlobalMaxBudgetUSDStr    string // string so empty means "no cap"
 	RuntimePath              string
 	TranscriptDir            string
+	NotifyWebhookURL         string // outbound notification webhook (empty = off)
 }
 
 // AgentSDKStatusProps mirrors service.AgentSubsystemStatus for the

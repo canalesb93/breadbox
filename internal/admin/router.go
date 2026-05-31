@@ -549,6 +549,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// smoke-test / cleanup cost money or touch the filesystem.
 			r.Post("/agents/settings", UpdateAgentSDKSettingsAdminHandler(a, svc, sm))
 			r.Post("/agents/test", SmokeTestAgentAdminHandler(a, svc))
+			r.Post("/agents/notify-test", NotifyTestAdminHandler(svc))
 			r.Post("/agents/cleanup", AgentCleanupAdminHandler(a, svc))
 		})
 	})
