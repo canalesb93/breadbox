@@ -31,43 +31,44 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 
 		statusFilter := r.URL.Query().Get("status") // "", "unread", "read"
 
-		var rawReports []service.AgentReportResponse
-		var err error
-		switch statusFilter {
-		case "unread":
-			rawReports, err = svc.ListUnreadAgentReports(ctx, 100)
-		default:
-			rawReports, err = svc.ListAgentReports(ctx, 100)
-		}
+		// Fetch the full (unfiltered) set once so the tab counts stay
+		// accurate regardless of the active filter, then filter in Go for
+		// the displayed list.
+		all, err := svc.ListAgentReports(ctx, 100)
 		if err != nil {
 			a.Logger.Error("list agent reports", "error", err)
 			http.Error(w, "Internal server error", 500)
 			return
 		}
 
-		// "read" has no dedicated query; filter in Go.
-		if statusFilter == "read" {
-			var filtered []service.AgentReportResponse
-			for _, r := range rawReports {
-				if r.ReadAt != nil {
-					filtered = append(filtered, r)
-				}
+		var unreadCount int
+		for _, rep := range all {
+			if rep.ReadAt == nil {
+				unreadCount++
 			}
-			rawReports = filtered
 		}
 
-		var reports []pages.ReportsItem
-		for _, r := range rawReports {
-			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			reports = append(reports, pages.ReportsItem{
-				ID:            r.ID,
-				Title:         r.Title,
-				Body:          r.Body,
-				Priority:      r.Priority,
-				Tags:          r.Tags,
-				DisplayAuthor: reportDisplayAuthor(r.CreatedByName, r.Author),
-				CreatedAt:     relativeTime(t),
-				IsRead:        r.ReadAt != nil,
+		reports := make([]components.ReportRowProps, 0, len(all))
+		for _, rep := range all {
+			isRead := rep.ReadAt != nil
+			switch statusFilter {
+			case "unread":
+				if isRead {
+					continue
+				}
+			case "read":
+				if !isRead {
+					continue
+				}
+			}
+			t, _ := time.Parse(time.RFC3339, rep.CreatedAt)
+			reports = append(reports, components.ReportRowProps{
+				ID:       rep.ID,
+				Title:    rep.Title,
+				Priority: rep.Priority,
+				Author:   reportDisplayAuthor(rep.CreatedByName, rep.Author),
+				Time:     relativeTime(t),
+				IsRead:   isRead,
 			})
 		}
 
@@ -75,7 +76,9 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 		props := pages.ReportsProps{
 			Reports:      reports,
 			FilterStatus: statusFilter,
-			TotalCount:   len(reports),
+			AllCount:     len(all),
+			UnreadCount:  unreadCount,
+			ReadCount:    len(all) - unreadCount,
 		}
 		tr.RenderWithTempl(w, r, data, pages.Reports(props))
 	}
@@ -108,7 +111,6 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			Title:         report.Title,
 			Body:          report.Body,
 			Priority:      report.Priority,
-			Tags:          report.Tags,
 			DisplayAuthor: reportDisplayAuthor(report.CreatedByName, report.Author),
 			CreatedAt:     t.In(loc).Format("Jan 2, 2006 at 3:04 PM"),
 			CreatedAtRel:  relativeTime(t),

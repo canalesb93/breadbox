@@ -589,12 +589,6 @@ templ feedAgentSessionBody(it FeedItem, s *FeedAgentSession, now time.Time) {
 				<span class="text-base-content/30">·</span>
 				<span>{ breakdown }</span>
 			}
-			if len(s.ReportTags) > 0 {
-				<span class="text-base-content/30 mx-1">·</span>
-				for _, t := range s.ReportTags {
-					<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-200 text-[0.65rem] font-medium text-base-content/65">{ t }</span>
-				}
-			}
 		</div>
 	} else {
 		<div class="flex items-baseline gap-1.5 flex-wrap">
@@ -663,12 +657,6 @@ templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
 			if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
 				<span class="text-base-content/30">·</span>
 				<span>{ breakdown }</span>
-			}
-			if len(b.ReportTags) > 0 {
-				<span class="text-base-content/30 mx-1">·</span>
-				for _, t := range b.ReportTags {
-					<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-200 text-[0.65rem] font-medium text-base-content/65">{ t }</span>
-				}
 			}
 		</div>
 	} else {

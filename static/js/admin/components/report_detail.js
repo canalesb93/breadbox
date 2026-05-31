@@ -8,8 +8,8 @@
 // static/js/admin/markdown.js scanner (loaded as a sibling script in
 // report_detail.templ). It picks up the `.bb-report-body[data-markdown]`
 // element on DOMContentLoaded and runs marked + DOMPurify with the
-// shared link/table/last-child enhancements. This file is now purely
-// the Alpine factory for the toolbar (mark-read, copy-link, toast).
+// shared link/table/last-child enhancements. This file is purely the
+// Alpine factory for the toolbar (mark-read, copy-link, toast).
 document.addEventListener('alpine:init', function () {
   Alpine.data('reportDetail', function () {
     return {

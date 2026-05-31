@@ -7,100 +7,79 @@ import "breadbox/internal/templates/components"
 // handler builds typed props in admin/reports.go and the bridge drops
 // the rendered HTML into base.html's TemplContent slot.
 //
-// The Alpine factory lives in static/js/admin/components/report_detail.js
-// (per docs/design-system.md → "Alpine page components"). Two CDN
-// dependencies — marked + DOMPurify — are loaded as siblings of the
-// component script with their SRI hashes intact. Loading is synchronous
-// (no defer) and at the top of the component so the factory is
-// registered before Alpine — itself <script defer> in <head> — fires
-// alpine:init.
+// The header is a purpose-built report header: a priority/unread badge
+// row, the report title as the page H1, and an `agent · time` meta line,
+// with the mark-read/unread toggle + an overflow menu (copy link, manage
+// format) trailing. The body is rendered client-side as Markdown by the
+// shared static/js/admin/markdown.js scanner (marked + DOMPurify) into
+// .bb-report-body — the two CDN deps load synchronously (no defer) so
+// Alpine.data() registration runs before alpine:init.
 //
-// Markdown rendering is delegated to the shared static/js/admin/markdown.js
-// scanner (also used by transaction-detail comments). It scans every
-// `[data-markdown]` element on DOMContentLoaded and rewrites it via
-// marked + DOMPurify, so this template only needs to point the body div
-// at its raw markdown via `data-markdown="..."`.
+// The reportDetail Alpine factory (static/js/admin/components/report_detail.js)
+// owns the toolbar: mark-read/unread, copy-link, and the success toast.
+// Scalar state (report id + is-read flag) flows in via data-* attributes
+// on the x-data root.
 templ ReportDetail(p ReportDetailProps) {
-	<!-- CDN dependencies for the shared markdown renderer, then the
-	     report_detail Alpine factory. Loaded synchronously (no defer)
-	     so Alpine.data() registration runs before alpine:init. -->
 	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
 	<script src="/static/js/admin/markdown.js"></script>
 	<script src="/static/js/admin/components/report_detail.js"></script>
-	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div x-data="reportDetail" data-report-id={ p.Report.ID } data-is-read={ boolLiteral(p.Report.IsRead) } class="max-w-4xl">
-		<!-- Toast for copy + mark-unread feedback -->
-		<div class="toast toast-top toast-center z-50" x-show="toast" x-cloak x-transition.opacity>
-			<div class="alert alert-success text-xs shadow-md">
-				@components.LucideIcon("check", "w-3.5 h-3.5")
-				<span x-text="toast"></span>
-			</div>
-		</div>
-		<!-- Message header card -->
-		<div class="bb-card mb-5">
-			<div class="px-5 sm:px-6 pt-5 pb-4">
-				<!-- Author row -->
-				<div class="flex items-center gap-3 mb-3">
-					<div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-primary/10 text-primary">
-						@components.LucideIcon("bot", "w-4.5 h-4.5")
-					</div>
-					<div class="flex-1 min-w-0">
-						<div class="flex items-center flex-wrap gap-2 mb-0.5">
-							<span class="font-semibold text-base-content">{ p.Report.DisplayAuthor }</span>
-							if p.Report.Priority == "critical" {
-								<span class="text-[0.65rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-error/10 text-error/90">Critical</span>
-							} else if p.Report.Priority == "warning" {
-								<span class="text-[0.65rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">Warning</span>
-							}
-							for _, tag := range p.Report.Tags {
-								<span class="text-[0.65rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{ tag }</span>
-							}
-						</div>
-						<p class="text-xs text-base-content/50" title={ p.Report.CreatedAt }>
-							Sent { p.Report.CreatedAtRel }
-						</p>
-					</div>
-				</div>
-				<!-- Title as the message bubble -->
-				<div class="pl-0 sm:pl-[3.25rem]">
-					<div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-4 py-3 bg-base-200/70">
-						<p class="text-sm leading-relaxed text-base-content">{ p.Report.Title }</p>
-					</div>
+	<div class="max-w-4xl mx-auto">
+		@components.BreadcrumbNav(p.Breadcrumbs)
+		<div
+			x-data="reportDetail"
+			data-report-id={ p.Report.ID }
+			data-is-read={ boolLiteral(p.Report.IsRead) }
+		>
+			<!-- Toast for copy + mark-unread feedback -->
+			<div class="toast toast-top toast-center z-50" x-show="toast" x-cloak x-transition.opacity>
+				<div class="alert alert-success text-xs shadow-md">
+					@components.LucideIcon("check", "w-3.5 h-3.5")
+					<span x-text="toast"></span>
 				</div>
 			</div>
-			<!-- Action toolbar -->
-			<div class="flex flex-wrap items-center gap-1 px-3 sm:px-4 py-2 border-t border-base-200/60 bg-base-200/20 rounded-b-2xl">
-				<button type="button" @click="toggleRead()" class="btn btn-ghost btn-xs text-xs">
-					<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-3.5 h-3.5"></i>
-					<span x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
-				</button>
-				<button type="button" @click="copyLink()" class="btn btn-ghost btn-xs text-xs">
-					@components.LucideIcon("link", "w-3.5 h-3.5")
-					<span>Copy link</span>
-				</button>
-				<div class="ml-auto">
-					<a href="/settings/mcp#report-format" class="btn btn-ghost btn-xs text-xs no-underline" title="Edit the guidelines agents follow when writing reports">
-						@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
-						<span class="hidden sm:inline">Manage report format</span>
-						<span class="sm:hidden">Format</span>
-						@components.LucideIcon("arrow-up-right", "w-3 h-3 opacity-60")
-					</a>
+			<!-- Report header -->
+			<div class="flex items-start justify-between gap-4 mb-5">
+				<div class="min-w-0">
+					<div class="flex items-center gap-2 mb-2 flex-wrap">
+						@components.ReportPriorityBadge(p.Report.Priority)
+						<span x-show="!isRead" x-cloak class="badge badge-soft badge-primary badge-sm">Unread</span>
+					</div>
+					<h1 class="text-xl sm:text-2xl font-semibold leading-snug break-words text-base-content">{ p.Report.Title }</h1>
+					<div class="mt-2.5 flex items-center gap-1.5 text-xs text-base-content/50">
+						@components.LucideIcon("bot", "w-3.5 h-3.5 text-base-content/40")
+						<span class="font-medium text-base-content/70">{ p.Report.DisplayAuthor }</span>
+						<span class="text-base-content/25">·</span>
+						<span title={ p.Report.CreatedAt }>{ p.Report.CreatedAtRel }</span>
+					</div>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					<button type="button" @click="toggleRead()" class="btn btn-ghost btn-sm gap-2">
+						<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-4 h-4"></i>
+						<span class="hidden sm:inline" x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
+					</button>
+					@components.OverflowMenu(components.OverflowMenuProps{
+						AriaLabel: "Report actions",
+						Items: []components.OverflowMenuItem{
+							{Label: "Copy link", Icon: "link", OnClick: "copyLink()"},
+							{Label: "Manage report format", Icon: "sliders-horizontal", Href: "/settings/mcp#report-format"},
+						},
+					})
 				</div>
 			</div>
-		</div>
-		<!-- Body card -->
-		<div class="bb-card">
-			<div class="px-5 sm:px-7 py-5 sm:py-6">
-				<div class="bb-report-body" data-markdown={ p.Report.Body }></div>
+			<!-- Body card — Markdown rendered client-side into .bb-report-body -->
+			<div class="bb-card">
+				<div class="px-5 sm:px-7 py-5 sm:py-6">
+					<div class="bb-report-body" data-markdown={ p.Report.Body }></div>
+				</div>
 			</div>
 		</div>
 	</div>
 }
 
 // boolLiteral mirrors the html/template default rendering of a bool —
-// `true` or `false` — so the data-is-read attribute matches the original
-// `{{.Report.IsRead}}` interpolation byte-for-byte.
+// `true` or `false` — so the data-is-read attribute matches what the
+// reportDetail factory's init() parses.
 func boolLiteral(b bool) string {
 	if b {
 		return "true"

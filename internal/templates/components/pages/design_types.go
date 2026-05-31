@@ -300,6 +300,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},
 		{
+			Slug:        "reports-table",
+			Title:       "Reports table",
+			Description: "components.ReportsTable + ReportTableRow + ReportPriorityBadge — the agent-reports index (/reports). A clean daisy table: Agent (name + time, primary dot for unread), Status (soft priority badge or em-dash), Summary (the title), and a trailing mark-read action. The whole row links to the report; the body lives on the detail page. The priority chip is reused on the report detail header.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionReportsTable() },
+		},
+		{
 			Slug:        "agent-run-chat",
 			Title:       "Agent run chat thread",
 			Description: "The chat-thread variants the /agents/runs/{id} detail page composes — assistant + user bubbles (daisy chat), tool_use + tool_result rows (expand to JSON viewer), final result bubble, and the soft-alert error row. Pairs with the markdown-prose + json-viewer sections.",

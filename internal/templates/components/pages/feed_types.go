@@ -208,7 +208,6 @@ type FeedReport struct {
 	Title         string
 	BodyExcerpt   string
 	Priority      string
-	Tags          []string
 	DisplayAuthor string
 	IsUnread      bool
 	// AvatarSeed is the agent_definition slug the report's author runs
@@ -256,11 +255,11 @@ type FeedAgentSession struct {
 	// Counts breaks the session's annotations down by category-of-action
 	// for the inline summary line ("23 categorised · 12 tagged · 8
 	// commented · 4 rules applied"). Order is fixed by the templ.
-	Categorised    int
-	Tagged         int
+	Categorised     int
+	Tagged          int
 	UntaggedRemoved int
-	Commented      int
-	RuleApplied    int
+	Commented       int
+	RuleApplied     int
 
 	SampleTransactions []FeedTransactionRef
 
@@ -273,7 +272,6 @@ type FeedAgentSession struct {
 	ReportShortID  string
 	ReportTitle    string
 	ReportPriority string
-	ReportTags     []string
 	ReportIsUnread bool
 }
 
@@ -318,7 +316,6 @@ type FeedBulkAction struct {
 	ReportShortID  string
 	ReportTitle    string
 	ReportPriority string
-	ReportTags     []string
 	ReportIsUnread bool
 }
 

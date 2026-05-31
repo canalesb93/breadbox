@@ -1,18 +1,14 @@
 package components
 
 // ReportsSkeleton renders a placeholder mirroring the layout of the
-// /reports inbox page — page header, filter tabs ("All / Unread / Read"
-// + count + "Mark all read"), and a divided card of message rows. Each
-// row mirrors reportsRow: a circular bot avatar, a meta line (author,
-// time, optional priority dot+label, optional tags), a message-bubble
-// title, and trailing inline actions (mark-read + chevron). Sized to
-// match the real component so a future swap-in (filter switch, AJAX
-// refresh, adjacent reports panel) doesn't shift layout.
+// /reports page — page header, filter tabs ("All / Unread / Read" +
+// "Mark all read"), and the daisy `table` of reports. Each row mirrors
+// ReportTableRow: an agent + time cell, a status cell, a summary cell,
+// and a trailing action. Sized to match the real component so a future
+// swap-in (filter switch, AJAX refresh) doesn't shift layout.
 //
 // /reports is a full-SSR page today; this primitive is exposed in
-// /design#loading so it's ready for the eventual AJAX swap and
-// discoverable to anyone wiring loading states for adjacent
-// agent-reports surfaces (e.g. the dashboard inbox preview).
+// /design#loading so it's ready for the eventual AJAX swap.
 //
 // Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
 // hand-rolled `bb-skeleton*` family is being retired).
@@ -28,73 +24,53 @@ templ ReportsSkeleton() {
 				<div class="skeleton h-8 w-32 rounded-md"></div>
 			</div>
 		</div>
-		<!-- Filter tabs + actions -->
-		<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto">
-			<div class="skeleton h-5 w-10 mx-2 my-2.5"></div>
-			<div class="skeleton h-5 w-16 mx-2 my-2.5"></div>
-			<div class="skeleton h-5 w-12 mx-2 my-2.5"></div>
-			<div class="ml-auto flex items-center gap-2 shrink-0">
-				<div class="skeleton h-3 w-16 hidden sm:block"></div>
-				<div class="skeleton h-8 w-28 rounded-md"></div>
+		<!-- Filter tabs + mark-all-read -->
+		<div class="flex items-center justify-between gap-2 mb-5">
+			<div class="flex items-center gap-4">
+				<div class="skeleton h-5 w-12"></div>
+				<div class="skeleton h-5 w-16"></div>
+				<div class="skeleton h-5 w-12"></div>
 			</div>
+			<div class="skeleton h-8 w-28 rounded-md shrink-0"></div>
 		</div>
-		<!-- Inbox card. Widths vary so the skeleton reads as motion. -->
-		<div class="bb-card">
-			<div class="divide-y divide-base-200/60">
-				@reportsSkeletonRow("w-28", "w-12", true, "critical", 2)
-				@reportsSkeletonRow("w-20", "w-16", false, "", 0)
-				@reportsSkeletonRow("w-32", "w-10", true, "warning", 1)
-				@reportsSkeletonRow("w-24", "w-14", false, "", 1)
-				@reportsSkeletonRow("w-36", "w-12", true, "", 0)
-				@reportsSkeletonRow("w-16", "w-10", false, "warning", 2)
+		<!-- Reports table. Summary widths vary so the skeleton reads as motion. -->
+		<div class="bb-card p-0 overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="table">
+					<tbody>
+						@reportsSkeletonRow("w-72 sm:w-96", true)
+						@reportsSkeletonRow("w-56 sm:w-80", false)
+						@reportsSkeletonRow("w-80 sm:w-[28rem]", true)
+						@reportsSkeletonRow("w-64 sm:w-72", false)
+						@reportsSkeletonRow("w-72 sm:w-[26rem]", true)
+						@reportsSkeletonRow("w-52 sm:w-64", false)
+					</tbody>
+				</table>
 			</div>
 		</div>
 	</div>
 }
 
-// reportsSkeletonRow mirrors one inbox row: bot avatar tile, meta line
-// (author + time + optional priority + optional tag chips), title-shaped
-// message bubble, and trailing actions. Widths come from the caller so a
-// stack of rows can be varied for motion. `priority` reserves the
-// dot+label slot ("critical" / "warning"); empty string leaves it out.
-// `unread` shows the mark-read button placeholder.
-templ reportsSkeletonRow(authorW string, timeW string, unread bool, priority string, tagCount int) {
-	<div class="block px-3 sm:px-5 py-4">
-		<div class="flex items-start gap-2.5 sm:gap-3">
-			<!-- Bot avatar -->
-			<div class="skeleton w-8 h-8 sm:w-9 sm:h-9 rounded-full shrink-0 mt-0.5"></div>
-			<!-- Message content -->
-			<div class="flex-1 min-w-0 space-y-1.5">
-				<!-- Meta row -->
-				<div class="flex items-center flex-wrap gap-x-2 gap-y-1">
-					<div class={ "skeleton h-3 rounded-md", authorW }></div>
-					<div class={ "skeleton h-3 rounded-md", timeW }></div>
-					if priority == "critical" {
-						<div class="skeleton h-2 w-2 rounded-full shrink-0"></div>
-						<div class="skeleton h-3 w-14 rounded-full shrink-0"></div>
-					} else if priority == "warning" {
-						<div class="skeleton h-2 w-2 rounded-full shrink-0"></div>
-						<div class="skeleton h-3 w-16 rounded-full shrink-0"></div>
-					}
-					if tagCount >= 1 {
-						<div class="skeleton h-3 w-12 rounded-full shrink-0"></div>
-					}
-					if tagCount >= 2 {
-						<div class="skeleton h-3 w-10 rounded-full shrink-0 hidden sm:block"></div>
-					}
-				</div>
-				<!-- Title message bubble -->
-				<div class="inline-block max-w-full">
-					<div class="skeleton h-10 w-72 sm:w-96 rounded-2xl rounded-tl-sm"></div>
+// reportsSkeletonRow mirrors one ReportTableRow: an agent (name + time)
+// cell, a status cell, a summary cell, and a trailing action slot.
+// `unread` reserves the mark-read button placeholder.
+templ reportsSkeletonRow(summaryW string, unread bool) {
+	<tr class="border-base-200">
+		<td>
+			<div class="flex items-center gap-2.5">
+				<div class="w-1.5 h-1.5"></div>
+				<div class="space-y-1.5">
+					<div class="skeleton h-3.5 w-24 rounded-md"></div>
+					<div class="skeleton h-3 w-14 rounded-md"></div>
 				</div>
 			</div>
-			<!-- Actions -->
-			<div class="flex items-center gap-1 shrink-0 self-center">
-				if unread {
-					<div class="skeleton h-6 w-6 rounded shrink-0"></div>
-				}
-				<div class="skeleton h-4 w-4 rounded shrink-0"></div>
-			</div>
-		</div>
-	</div>
+		</td>
+		<td><div class="skeleton h-5 w-16 rounded-full"></div></td>
+		<td><div class={ "skeleton h-4 rounded-md max-w-full", summaryW }></div></td>
+		<td class="text-right">
+			if unread {
+				<div class="skeleton h-6 w-6 rounded inline-block"></div>
+			}
+		</td>
+	</tr>
 }

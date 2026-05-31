@@ -1,0 +1,27 @@
+package components
+
+// ReportPriorityBadge renders the priority chip for an agent report — a
+// pure daisy soft badge, no layout, modelled on MCPToolClassBadge. It
+// replaces the hand-rolled `rounded-full bg-{tone}/10` chips that the
+// reports pages used (a documented daisy anti-pattern in
+// .claude/rules/daisyui.md).
+//
+// Renders nothing for the default/"info"/empty priority — a routine
+// report carries no chip; the Status column shows an em-dash instead.
+// "warning" and "critical" map to soft warning/error badges with a
+// leading glyph. Reused by the reports table's Status column and the
+// report detail header.
+templ ReportPriorityBadge(priority string) {
+	switch priority {
+		case "critical":
+			<span class="badge badge-soft badge-error badge-sm gap-1">
+				@LucideIcon("alert-octagon", "w-3 h-3")
+				Critical
+			</span>
+		case "warning":
+			<span class="badge badge-soft badge-warning badge-sm gap-1">
+				@LucideIcon("alert-triangle", "w-3 h-3")
+				Warning
+			</span>
+	}
+}

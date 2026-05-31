@@ -1,0 +1,41 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionReportsTable showcases the agent-reports index primitives —
+// ReportsList and ReportPriorityBadge — that the /reports page composes.
+// Mirrors how design_agent_run_chat.templ was split into its own sibling
+// so design_sections.templ stays focused.
+//
+// ReportsList is responsive: a table on sm+ and a stacked list on mobile.
+// At the sandbox width it renders the table; resize the standalone
+// /design/c/reports-table viewport below sm to see the stacked variant.
+// It's wrapped in a tiny literal x-data so the row interactions (full-row
+// navigation via rowNav, the optimistic mark-read dismiss) the live
+// reportsPage factory drives can be exercised here too.
+templ SectionReportsTable() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Renders the agent-reports index (canonical: <code>/reports</code>) via <code>ReportsList</code> — a clean daisy <code>table</code> on desktop, a stacked list on mobile, no bespoke wrapper. The full report body lives on the detail page.</li>
+				<li>Columns: <strong>Agent</strong> (name + relative time, with a leading primary dot for unread), <strong>Status</strong> (a soft priority badge for warning/critical, an em-dash otherwise), <strong>Summary</strong> (the report title), and a trailing hover-revealed mark-read action.</li>
+				<li>The whole row is a click target: the summary is a real <code>&lt;a&gt;</code> (keyboard / middle-click + the accessible name), and <code>rowNav</code> delegates clicks elsewhere on the row to it. The mark-read button stops propagation and optimistically dismisses the row.</li>
+				<li><code>ReportPriorityBadge</code> is the shared priority chip, reused in the detail-page header.</li>
+			</ul>
+		</div>
+		@designExample("Priority badge — ReportPriorityBadge", "Pure daisy soft badge, no layout. Default / info / empty renders nothing (the Status column shows an em-dash); warning and critical map to soft warning/error badges with a leading glyph.") {
+			<div class="flex flex-wrap items-center gap-2">
+				@components.ReportPriorityBadge("")
+				<span class="text-xs text-base-content/40">← empty renders nothing</span>
+				@components.ReportPriorityBadge("warning")
+				@components.ReportPriorityBadge("critical")
+			</div>
+		}
+		@designExample("Reports index — ReportsList", "Full variant matrix: unread rows carry a primary dot + heavier text; read rows drop the dot and fade. The status column shows a badge for warning/critical and an em-dash otherwise. Long summaries clamp to two lines. Hover a row to reveal its mark-read button. Renders as a table here; collapses to a stacked list below sm.") {
+			<div x-data="{ dismissed: {}, markRead(id) { this.dismissed[id] = true }, rowNav(e, url) { if (e.target.closest('button') || e.target.closest('a')) return; window.location.href = url } }">
+				@components.ReportsList(designReportRows())
+			</div>
+		}
+	</div>
+}
