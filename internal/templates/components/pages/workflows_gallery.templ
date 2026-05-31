@@ -55,21 +55,21 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				</div>
 			}
 		}
-		<div class="mt-4 space-y-6">
+		<div class="mt-5 space-y-8">
 			for _, cat := range p.Categories {
-				@components.SettingsSection(components.SettingsSectionProps{
-					Icon:  cat.Icon,
-					Title: cat.Name,
-				}) {
-					for _, preset := range cat.Presets {
-						@components.SettingsRow(components.SettingsRowProps{
-							Label:   preset.Name,
-							Caption: preset.Description,
-						}) {
-							@workflowPresetControl(preset, p.IsAdmin)
+				<section>
+					<!-- Section header sits on top, full-width; the presets below
+					     flow as a 2-up grid on desktop, single column on mobile. -->
+					<div class="flex items-center gap-2 mb-3 px-0.5">
+						@components.LucideIcon(cat.Icon, "w-4 h-4 text-base-content/55")
+						<h2 class="text-sm font-semibold">{ cat.Name }</h2>
+					</div>
+					<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+						for _, preset := range cat.Presets {
+							@workflowPresetCard(preset, p.IsAdmin)
 						}
-					}
-				}
+					</div>
+				</section>
 			}
 		</div>
 		<!-- Configure drawer: shared backdrop + one slide-over panel per available preset. -->
@@ -240,60 +240,104 @@ templ workflowPromptPreviewModal() {
 	</dialog>
 }
 
-// workflowPresetControl is the state-dependent right-side control: a "Set up"
-// button (opens the configure drawer) when available, a run toggle once
-// enabled. Instantiating a workflow is admin-only — non-admins see the
-// "Set up" control disabled with an explanatory tooltip.
-templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
-	<div class="flex items-center gap-2">
-		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
-			@components.LucideIcon("clock", "w-3.5 h-3.5")
-			{ preset.TriggerLabel }
-		</span>
-		if preset.Enabled {
-			@workflowLastRunLine(preset.LastRun)
-			<button
-				type="button"
-				class="btn btn-soft btn-sm gap-1.5"
-				@click={ "runWorkflow('" + preset.WorkflowSlug + "')" }
-				aria-label={ "Run " + preset.Name + " now" }
-			>
-				@components.LucideIcon("play", "w-4 h-4")
-				<span class="hidden sm:inline">Run now</span>
-			</button>
-			<input
-				type="checkbox"
-				class="toggle toggle-sm toggle-primary"
-				if preset.WorkflowEnabled {
-					checked
+// workflowPresetCard is one preset tile in the gallery grid: a leading
+// icon tile (gray, green-accented once set up), the name + description,
+// an overflow menu for secondary actions, and a bottom-aligned footer
+// carrying the run state on the left and the primary action(s) on the
+// right. Cards stretch to a uniform height per grid row (h-full + a
+// mt-auto footer) so the action rows line up across the 2-up layout.
+templ workflowPresetCard(preset WorkflowPresetCardProps, isAdmin bool) {
+	<div class="bb-card p-4 h-full flex flex-col gap-3">
+		<div class="flex items-start gap-3">
+			<div class={ presetTileClasses(preset.Enabled) }>
+				@components.LucideIcon(preset.Icon, "w-5 h-5")
+			</div>
+			<div class="flex-1 min-w-0">
+				<div class="font-medium text-sm leading-tight">{ preset.Name }</div>
+				<div class="text-xs text-base-content/60 mt-1 line-clamp-2">{ preset.Description }</div>
+			</div>
+			<!-- Secondary actions (Preview prompt, Reconfigure) live in the
+			     overflow menu so the card front stays uncluttered. -->
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: preset.Name + " actions",
+				Items:     presetMenuItems(preset, isAdmin),
+			})
+		</div>
+		<div class="flex items-center justify-between gap-2 mt-auto pt-1">
+			<div class="flex items-center gap-2 text-xs text-base-content/45 min-w-0">
+				@workflowCardStatus(preset)
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				if preset.Enabled {
+					<button
+						type="button"
+						class="btn btn-soft btn-sm gap-1.5"
+						@click={ "runWorkflow('" + preset.WorkflowSlug + "')" }
+						aria-label={ "Run " + preset.Name + " now" }
+					>
+						@components.LucideIcon("play", "w-4 h-4")
+						Run now
+					</button>
+					<input
+						type="checkbox"
+						class="toggle toggle-sm toggle-primary"
+						if preset.WorkflowEnabled {
+							checked
+						}
+						aria-label={ "Toggle " + preset.Name }
+						@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
+					/>
+				} else if isAdmin {
+					<button
+						type="button"
+						class="btn btn-soft btn-sm gap-1.5"
+						@click={ "open='" + preset.Slug + "'" }
+					>
+						@components.LucideIcon("settings-2", "w-4 h-4")
+						Set up
+					</button>
+				} else {
+					<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
+						<button type="button" class="btn btn-soft btn-sm gap-1.5" disabled>
+							@components.LucideIcon("lock", "w-4 h-4")
+							Set up
+						</button>
+					</span>
 				}
-				aria-label={ "Toggle " + preset.Name }
-				@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
-			/>
-		} else if isAdmin {
-			<button
-				type="button"
-				class="btn btn-soft btn-sm gap-1.5"
-				@click={ "open='" + preset.Slug + "'" }
-			>
-				@components.LucideIcon("settings-2", "w-4 h-4")
-				Set up
-			</button>
+			</div>
+		</div>
+	</div>
+}
+
+// workflowCardStatus is the footer-left status line: when set up, the
+// last-run pill + relative time (or a muted "Not run yet"); otherwise the
+// trigger summary so an un-configured card still tells you when it would
+// run. Always visible — the grid gives each card room even on mobile.
+templ workflowCardStatus(preset WorkflowPresetCardProps) {
+	if preset.Enabled {
+		if preset.LastRun == nil {
+			<span class="text-base-content/35">Not run yet</span>
 		} else {
-			<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
-				<button type="button" class="btn btn-soft btn-sm gap-1.5" disabled>
-					@components.LucideIcon("lock", "w-4 h-4")
-					Set up
-				</button>
+			<span class="inline-flex items-center gap-1.5 min-w-0">
+				@workflowRunStatusPill(preset.LastRun.Status)
+				if preset.LastRun.ShortID != "" {
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/workflows/runs/%s", preset.LastRun.ShortID)) }
+						class="text-base-content/60 hover:underline tabular-nums truncate"
+					>
+						{ workflowsRelativeTime(preset.LastRun.FinishedAt) }
+					</a>
+				} else {
+					<span class="text-base-content/60 tabular-nums truncate">{ workflowsRelativeTime(preset.LastRun.FinishedAt) }</span>
+				}
 			</span>
 		}
-		<!-- Secondary actions (Preview prompt, Reconfigure) live in the overflow
-		     menu so the row stays uncluttered — one primary action + toggle inline. -->
-		@components.OverflowMenu(components.OverflowMenuProps{
-			AriaLabel: preset.Name + " actions",
-			Items:     presetMenuItems(preset, isAdmin),
-		})
-	</div>
+	} else {
+		<span class="inline-flex items-center gap-1 truncate">
+			@components.LucideIcon("clock", "w-3.5 h-3.5 shrink-0")
+			{ preset.TriggerLabel }
+		</span>
+	}
 }
 
 // workflowConfigDrawer is the right-side slide-over for configuring + enabling
@@ -421,30 +465,6 @@ templ workflowScheduleOption(value, label, selected string) {
 		<option value={ value } selected>{ label }</option>
 	} else {
 		<option value={ value }>{ label }</option>
-	}
-}
-
-// workflowLastRunLine renders the inline "Last run" summary on an enabled
-// card: a status pill plus a relative-time link to the run-detail page. A nil
-// run (never run yet) renders a muted "Not run yet" so the card still reads as
-// enabled-but-idle rather than blank.
-templ workflowLastRunLine(run *WorkflowLastRunProps) {
-	if run == nil {
-		<span class="hidden md:inline text-xs text-base-content/30">Not run yet</span>
-	} else {
-		<span class="hidden md:inline-flex items-center gap-1.5 text-xs">
-			@workflowRunStatusPill(run.Status)
-			if run.ShortID != "" {
-				<a
-					href={ templ.SafeURL(fmt.Sprintf("/workflows/runs/%s", run.ShortID)) }
-					class="text-base-content/60 hover:underline tabular-nums"
-				>
-					{ workflowsRelativeTime(run.FinishedAt) }
-				</a>
-			} else {
-				<span class="text-base-content/60 tabular-nums">{ workflowsRelativeTime(run.FinishedAt) }</span>
-			}
-		</span>
 	}
 }
 

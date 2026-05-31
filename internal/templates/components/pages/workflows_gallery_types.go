@@ -17,6 +17,19 @@ func workflowCostStr(c float64) string {
 	return strconv.FormatFloat(c, 'f', 2, 64)
 }
 
+// presetTileClasses returns the classes for a preset card's leading
+// icon tile. Gray (neutral) by default; a green accent once the preset
+// has been set up as a workflow, so a glance down the grid reads which
+// automations are live. The shape (size, rounding, centering) is shared
+// across both states.
+func presetTileClasses(enabled bool) string {
+	const base = "flex items-center justify-center w-10 h-10 rounded-xl shrink-0 "
+	if enabled {
+		return base + "bg-success/15 text-success"
+	}
+	return base + "bg-base-200 text-base-content/55"
+}
+
 // presetMenuItems builds the row's overflow ("⋯") menu — the secondary
 // actions moved out of the inline row to declutter it: Preview prompt
 // always, plus Reconfigure for an enabled workflow (admin only). The

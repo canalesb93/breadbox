@@ -143,6 +143,41 @@ func TestT15WorkflowsGalleryRenders(t *testing.T) {
 	}
 }
 
+// TestT15WorkflowsGalleryGridAndTiles asserts the redesigned gallery layout:
+// presets flow in a 2-up grid (single column on mobile), and each card's
+// leading icon tile is gray by default but green-accented once the preset is
+// set up. The T15 fixture has both an enabled and a disabled preset, so both
+// tile states must appear.
+func TestT15WorkflowsGalleryGridAndTiles(t *testing.T) {
+	props := T15buildGalleryProps()
+
+	var buf strings.Builder
+	if err := WorkflowsGallery(props).Render(context.Background(), &buf); err != nil {
+		t.Fatalf("WorkflowsGallery.Render returned error: %v", err)
+	}
+	html := buf.String()
+
+	// 2-up grid on desktop, single column on mobile.
+	if !strings.Contains(html, "grid-cols-1") || !strings.Contains(html, "lg:grid-cols-2") {
+		t.Error("expected a single-column / 2-up-desktop grid wrapper (grid-cols-1 lg:grid-cols-2)")
+	}
+
+	// Green-accented tile for the enabled preset (uncategorized-review).
+	if !strings.Contains(html, "bg-success/15") {
+		t.Error("expected a green-accent icon tile (bg-success/15) for the enabled preset")
+	}
+	// Gray tile for the disabled presets.
+	if !strings.Contains(html, "bg-base-200") {
+		t.Error("expected a gray icon tile (bg-base-200) for disabled presets")
+	}
+
+	// The card surfaces the preset's own icon — e.g. "tag" for Smart
+	// Categorizer renders as a lucide-tag SVG.
+	if !strings.Contains(html, "lucide-tag") {
+		t.Error("expected the preset icon (lucide-tag) to render in its card tile")
+	}
+}
+
 // TestT15WorkflowsGalleryEnabledPresetRendersToggle asserts that a preset
 // marked Enabled=true renders a toggle checkbox rather than the "Set up" button.
 func TestT15WorkflowsGalleryEnabledPresetRendersToggle(t *testing.T) {
