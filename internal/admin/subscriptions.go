@@ -235,6 +235,9 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 	row.TypeLabel = recurringTypeLabel(s.Type)
 	row.RenewalLabel, row.RenewalTone = subscriptionRenewal(s)
 	row.DaysUntilRenewal = s.DaysUntilRenewal
+	if sig, ok := decodeSignals(s.DetectionSignals); ok {
+		row.PriceChanged = sig.AmountBranch == "monotonic_drift"
+	}
 	if s.LastAmount != nil {
 		row.HasAmount = true
 		row.Amount = math.Abs(*s.LastAmount)

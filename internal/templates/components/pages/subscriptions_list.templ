@@ -299,6 +299,12 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 			<span class="inline-flex items-center gap-1.5 flex-wrap">
 				<span class={ "badge badge-soft badge-sm", "badge-" + s.StatusTone }>{ s.StatusLabel }</span>
 				@components.SeriesRenewalChip(s.RenewalLabel, s.RenewalTone)
+				if s.PriceChanged {
+					<span class="badge badge-soft badge-warning badge-xs gap-1" title="Price has been rising">
+						@components.LucideIcon("trending-up", "w-3 h-3")
+						Price
+					</span>
+				}
 			</span>
 		</td>
 		<td class="text-right">
