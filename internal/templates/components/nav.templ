@@ -56,7 +56,7 @@ templ Nav(p NavProps) {
 		@navLink("/transactions", "receipt", "Transactions", navActive(p.CurrentPage, "transactions"))
 		@navLink("/accounts", "wallet", "Accounts", navActive(p.CurrentPage, "accounts"))
 		if p.IsEditor {
-			@navLinkBadge("/subscriptions", "repeat", "Subscriptions", navActive(p.CurrentPage, "subscriptions"), p.SeriesCandidates, "", fmt.Sprintf("%d subscription candidates need review", p.SeriesCandidates))
+			@navLinkBadge("/recurring", "repeat", "Recurring", navActive(p.CurrentPage, "recurring"), p.SeriesCandidates, "", fmt.Sprintf("%d recurring charges need review", p.SeriesCandidates))
 		}
 		if p.IsAdmin {
 			@navLinkBadge("/reports", "file-text", "Reports", navActive(p.CurrentPage, "reports"), p.UnreadReports, "", fmt.Sprintf("%d unread reports", p.UnreadReports))

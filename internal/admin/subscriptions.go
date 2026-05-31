@@ -110,8 +110,8 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 		}
 
 		data := map[string]any{
-			"PageTitle":   "Subscriptions",
-			"CurrentPage": "subscriptions",
+			"PageTitle":   "Recurring",
+			"CurrentPage": "recurring",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}
@@ -153,8 +153,8 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 		}
 
 		data := map[string]any{
-			"PageTitle":   s.Name + " — Subscription",
-			"CurrentPage": "subscriptions",
+			"PageTitle":   s.Name + " — Recurring",
+			"CurrentPage": "recurring",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}

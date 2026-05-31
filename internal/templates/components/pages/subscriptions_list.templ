@@ -20,8 +20,8 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 	<div x-data x-init="$store.shortcuts.setScope('subscriptions')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div x-data="subscriptionsList">
 		@components.PageHeader(components.PageHeaderProps{
-			Title:                "Subscriptions",
-			Subtitle:             "Recurring charges Breadbox has detected, and the candidates waiting on your call.",
+			Title:                "Recurring",
+			Subtitle:             "Recurring charges Breadbox has detected — subscriptions, bills, and more — plus the candidates waiting on your call.",
 			SubtitleHideOnMobile: true,
 			Action:               subscriptionsBetaBadge(),
 		})
@@ -79,7 +79,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 		if len(p.Candidates) == 0 && len(p.Active) == 0 {
 			@components.EmptyState(components.EmptyStateProps{
 				Icon:  "repeat",
-				Title: "No subscriptions detected yet",
+				Title: "No recurring charges detected yet",
 				Body:  "As your transactions sync, Breadbox spots recurring charges — same merchant, regular interval, steady amount — and surfaces them here for you to confirm.",
 			})
 		} else {
@@ -101,11 +101,11 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			<!-- Confirmed / live ledger -->
 			if len(p.Active) > 0 {
 				<div class="flex items-center gap-2 mb-3">
-					<h2 class="text-sm font-semibold text-base-content">Subscriptions</h2>
+					<h2 class="text-sm font-semibold text-base-content">Tracked</h2>
 					<span class="badge badge-ghost badge-sm">{ fmt.Sprintf("%d", len(p.Active)) }</span>
 				</div>
 				@components.FilterSearchInput(components.FilterSearchInputProps{
-					Placeholder: "Filter subscriptions...",
+					Placeholder: "Filter recurring charges...",
 					XModel:      "filter",
 				})
 				<div class="mt-4">
@@ -176,7 +176,7 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				class="btn btn-ghost btn-sm gap-1.5"
 			>
 				@components.LucideIcon("x", "w-4 h-4")
-				Not a subscription
+				Not recurring
 			</button>
 			<button
 				type="button"
@@ -197,7 +197,7 @@ templ subscriptionsActiveTable(p SubscriptionsListProps) {
 			<table class="table table-sm">
 				<thead class="text-xs text-base-content/60">
 					<tr>
-						<th class="min-w-[12rem]">Subscription</th>
+						<th class="min-w-[12rem]">Recurring charge</th>
 						<th class="hidden md:table-cell">Cadence</th>
 						<th class="hidden lg:table-cell">Next renewal</th>
 						<th>Status</th>
@@ -224,7 +224,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 		class="hover:bg-base-200/30 transition-colors"
 	>
 		<td>
-			<a href={ templ.SafeURL("/subscriptions/" + s.ShortID) } class="flex items-center gap-3 no-underline">
+			<a href={ templ.SafeURL("/recurring/" + s.ShortID) } class="flex items-center gap-3 no-underline">
 				<div class="w-8 h-8 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">
 					@components.LucideIcon("repeat", "w-4 h-4 text-base-content opacity-40")
 				</div>
