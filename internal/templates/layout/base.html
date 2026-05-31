@@ -437,7 +437,10 @@
     <input id="bb-drawer" type="checkbox" class="drawer-toggle" />
 
     <!-- Main content -->
-    <div class="drawer-content bg-base-200">
+    <!-- Mintlify-style surface flip: the content column is the bright
+         surface (base-100) and the sidebar is the recessed one (base-200).
+         Cards sit on white and read by their border, not a fill contrast. -->
+    <div class="drawer-content bg-base-100">
       <!-- Desktop topbar — static across every page (hidden < lg, where the
            mobile navbar below takes over). Left: breadcrumb of the current
            section/page. Right: ⌘K search, theme toggle, profile menu. -->
