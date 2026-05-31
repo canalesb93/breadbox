@@ -25,7 +25,7 @@ document.addEventListener('alpine:init', function () {
       // definition (no prompt override); on success reload to surface it.
       retrigger: function (slug) {
         var self = this;
-        fetch('/-/agents/' + encodeURIComponent(slug) + '/run', {
+        fetch('/-/workflows/' + encodeURIComponent(slug) + '/run', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'X-CSRF-Token': this.csrfToken },

@@ -15,7 +15,7 @@ import (
 // It instantiates a workflow from the preset (enabled to run). Idempotent at the
 // gallery level: an already-enabled preset returns 200 so the page just refreshes
 // to show the run toggle. The instantiated workflow's run state is then toggled
-// via the existing /-/agents/{slug}/enable|disable endpoints.
+// via the /-/workflows/{slug}/enable|disable endpoints.
 func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")

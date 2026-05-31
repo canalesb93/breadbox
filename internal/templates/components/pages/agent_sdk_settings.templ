@@ -10,7 +10,7 @@ import (
 // limits for Claude Agent SDK runs. Distinct from AgentsSettings
 // ("MCP Settings"). See .claude/rules/settings.md.
 //
-// All POST targets sit under /-/agents/* (admin-scoped). The handler
+// All POST targets sit under /-/workflows/* (admin-scoped). The handler
 // resolves masked credential display strings before render so the templ
 // stays free of nil-handling.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
@@ -113,7 +113,7 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 			Title:   "Configuration",
 			Caption: "Authentication, sidecar paths, and per-run limits",
 			Form: &components.SettingsSectionFormProps{
-				Action:    "/-/agents/settings",
+				Action:    "/-/workflows/settings",
 				CSRFToken: p.CSRFToken,
 			},
 			Footer: agentSDKConfigFooter(),
