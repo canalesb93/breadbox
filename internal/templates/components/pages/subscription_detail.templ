@@ -14,7 +14,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 	<script src="/static/js/admin/components/subscriptions.js"></script>
 	<div x-data="subscriptionsList">
 		@components.BreadcrumbNav([]components.Breadcrumb{
-			{Label: "Subscriptions", Href: "/subscriptions"},
+			{Label: "Recurring", Href: "/recurring"},
 			{Label: p.Series.Name},
 		})
 		@components.PageHeader(components.PageHeaderProps{
@@ -26,13 +26,14 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 		<!-- Status + verdict toolbar -->
 		<div class="flex items-center flex-wrap gap-2 mb-6">
 			<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.StatusTone }>{ p.Series.StatusLabel }</span>
+			@components.SeriesTypeChip(p.Series.TypeLabel, "sm")
 			if p.Series.Status == "candidate" {
-				<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.BandTone }>{ p.Series.ConfidenceBand } confidence</span>
+				@components.SeriesConfidenceChip(p.Series.ConfidenceBand, p.Series.BandTone)
 			}
 			<div class="flex-1"></div>
 			switch p.Series.Status {
 				case "candidate":
-					@subscriptionVerdictBtn(p.Series, "reject", "Not a subscription", "x", "btn-ghost")
+					@subscriptionVerdictBtn(p.Series, "reject", "Not recurring", "x", "btn-ghost")
 					@subscriptionVerdictBtn(p.Series, "confirm", "Confirm", "check", "btn-primary")
 				case "active":
 					@subscriptionVerdictBtn(p.Series, "pause", "Pause", "pause", "btn-ghost")
@@ -49,6 +50,9 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			Icon:  "repeat",
 			Title: "Details",
 		}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Type", Caption: "Subscription, bill, loan, or other"}) {
+				@components.SeriesTypeChip(p.Series.TypeLabel, "sm")
+			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence"}) {
 				<span class="text-sm">{ p.Series.CadenceLabel }</span>
 			}
@@ -66,21 +70,45 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 				<span class="text-sm">{ subscriptionDetailField(p.Series.CategoryName) }</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Tags", Caption: "Linked charges inherit these"}) {
-				if len(p.Series.Tags) > 0 {
-					<span class="inline-flex flex-wrap gap-1.5">
-						for _, tag := range p.Series.Tags {
-							<span class="badge badge-soft badge-neutral badge-sm">{ tag }</span>
-						}
-					</span>
-				} else {
-					<span class="text-base-content/40 text-sm">—</span>
-				}
+				<div class="flex flex-wrap items-center gap-1.5">
+					for _, tag := range p.Series.Tags {
+						<span class="badge badge-soft badge-neutral badge-sm gap-1">
+							{ tag }
+							<button
+								type="button"
+								@click={ fmt.Sprintf("removeSeriesTag(%q, %q)", p.Series.ShortID, tag) }
+								class="cursor-pointer opacity-60 hover:opacity-100 bg-transparent inline-flex"
+								aria-label="Remove tag"
+							>
+								@components.LucideIcon("x", "w-3 h-3")
+							</button>
+						</span>
+					}
+					if len(p.AvailableTags) > 0 {
+						<select
+							@change={ fmt.Sprintf("addSeriesTag(%q, $event.target.value)", p.Series.ShortID) }
+							class="select select-xs bg-base-200 w-auto"
+							aria-label="Add a tag"
+						>
+							<option value="">+ Add tag</option>
+							for _, opt := range p.AvailableTags {
+								<option value={ opt.Slug }>{ opt.Name }</option>
+							}
+						</select>
+					}
+					if len(p.Series.Tags) == 0 && len(p.AvailableTags) == 0 {
+						<span class="text-base-content/40 text-sm">No tags available — create one first.</span>
+					}
+				</div>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day"}) {
 				<span class="text-sm">{ subscriptionDetailField(p.ExpectedDay) }</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Next renewal"}) {
-				<span class="text-sm">{ subscriptionDetailField(p.NextExpected) }</span>
+				<span class="text-sm inline-flex items-center gap-2">
+					{ subscriptionDetailField(p.NextExpected) }
+					@components.SeriesRenewalChip(p.Series.RenewalLabel, p.Series.RenewalTone)
+				</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Last seen"}) {
 				<span class="text-sm">{ subscriptionDetailField(p.LastSeen) }</span>

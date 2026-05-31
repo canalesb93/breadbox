@@ -141,11 +141,20 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/tags", TagsPageHandler(svc, sm, tr))
 
-		// Subscriptions — recurring-series list + detail. Editor scope: the
+		// Recurring — recurring-series list + detail. Editor scope: the
 		// candidate-confirmation surface is the single human-adjudication point
-		// for detected series.
-		r.Get("/subscriptions", SubscriptionsListPageHandler(a, svc, sm, tr))
-		r.Get("/subscriptions/{id}", SubscriptionDetailHandler(a, sm, tr, svc))
+		// for detected series. Captures all recurring charges (subscriptions,
+		// bills, loans) — "subscription" is one type, not the umbrella.
+		r.Get("/recurring", SubscriptionsListPageHandler(a, svc, sm, tr))
+		r.Get("/recurring/{id}", SubscriptionDetailHandler(a, sm, tr, svc))
+		// Back-compat redirects from the former "Subscriptions" route (302 so a
+		// later change isn't browser-cached).
+		r.Get("/subscriptions", func(w http.ResponseWriter, req *http.Request) {
+			http.Redirect(w, req, "/recurring", http.StatusFound)
+		})
+		r.Get("/subscriptions/{id}", func(w http.ResponseWriter, req *http.Request) {
+			http.Redirect(w, req, "/recurring/"+chi.URLParam(req, "id"), http.StatusFound)
+		})
 
 		// Design-system sandbox. /design is the full gallery; /design/c/{slug}
 		// renders a single component family in isolation for focused screenshots.

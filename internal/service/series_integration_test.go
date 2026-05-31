@@ -463,6 +463,497 @@ func TestApplyRuleRetroactively_AssignSeries(t *testing.T) {
 	}
 }
 
+// TestRuleConditions_InSeriesAndSeries exercises the read-half of the
+// rules-engine composition: a rule conditioned on series membership
+// (in_series) or a specific series (series eq short_id) matches only the
+// linked transactions when applied retroactively. This validates the
+// recurring_series JOIN + scan added to the retroactive context query.
+func TestRuleConditions_InSeriesAndSeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	testutil.MustCreateTag(t, queries, "subscription-charge", "Subscription charge")
+	testutil.MustCreateTag(t, queries, "is-netflix", "Is Netflix")
+	acctID := seedTxnFixture(t, queries)
+	n1 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_1", "Netflix", 1599, "2026-03-15")
+	n2 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_2", "Netflix", 1599, "2026-04-15")
+	loose := testutil.MustCreateTransaction(t, queries, acctID, "STARBUCKS", "Starbucks", 599, "2026-04-16")
+	actor := service.Actor{Type: "user", Name: "Tester"}
+
+	// Link the two Netflix charges to a series; Starbucks stays unlinked.
+	series, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, TransactionIDs: []string{n1.ShortID, n2.ShortID},
+	}, actor)
+	if err != nil {
+		t.Fatalf("assign series: %v", err)
+	}
+
+	// Rule 1: in_series eq true → add_tag subscription-charge. Should hit the
+	// two members, skip Starbucks.
+	inSeriesRule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Members get a tag",
+		Conditions: service.Condition{Field: "in_series", Op: "eq", Value: true},
+		Actions:    []service.RuleAction{{Type: "add_tag", TagSlug: "subscription-charge"}},
+		Actor:      actor,
+	})
+	if err != nil {
+		t.Fatalf("create in_series rule: %v", err)
+	}
+	matched, err := svc.ApplyRuleRetroactively(ctx, inSeriesRule.ID)
+	if err != nil {
+		t.Fatalf("apply in_series rule: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("in_series matched = %d, want 2 (the two linked charges)", matched)
+	}
+	if !txnHasTag(t, pool, n1.ID, "subscription-charge") || !txnHasTag(t, pool, n2.ID, "subscription-charge") {
+		t.Error("expected both series members to receive the subscription-charge tag")
+	}
+	if txnHasTag(t, pool, loose.ID, "subscription-charge") {
+		t.Error("unlinked transaction was wrongly tagged by an in_series rule")
+	}
+
+	// Rule 2: series eq <short_id> → add_tag is-netflix. Targets the specific
+	// series by its short_id, exercising the recurring_series JOIN.
+	seriesRule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Netflix series tag",
+		Conditions: service.Condition{Field: "series", Op: "eq", Value: series.ShortID},
+		Actions:    []service.RuleAction{{Type: "add_tag", TagSlug: "is-netflix"}},
+		Actor:      actor,
+	})
+	if err != nil {
+		t.Fatalf("create series rule: %v", err)
+	}
+	matched, err = svc.ApplyRuleRetroactively(ctx, seriesRule.ID)
+	if err != nil {
+		t.Fatalf("apply series rule: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("series eq matched = %d, want 2", matched)
+	}
+	if !txnHasTag(t, pool, n1.ID, "is-netflix") {
+		t.Error("expected the matched series member to receive the is-netflix tag")
+	}
+	if txnHasTag(t, pool, loose.ID, "is-netflix") {
+		t.Error("unlinked transaction was wrongly tagged by a series eq rule")
+	}
+}
+
+// TestExplainSeriesCandidates verifies the near-miss / explain feed: a 2-charge
+// group is reported as too_few_occurrences, a clean 3-charge group qualifies but
+// is untracked, and a merchant already represented by a series is excluded.
+func TestExplainSeriesCandidates(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Near-miss: only 2 monthly charges → too_few_occurrences.
+	testutil.MustCreateTransaction(t, queries, acctID, "HULU_1", "Hulu", 1799, "2026-03-10")
+	testutil.MustCreateTransaction(t, queries, acctID, "HULU_2", "Hulu", 1799, "2026-04-10")
+	// Qualifying but untracked: 3 clean monthly charges, steady amount.
+	testutil.MustCreateTransaction(t, queries, acctID, "DISNEY_1", "Disney Plus", 1399, "2026-02-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "DISNEY_2", "Disney Plus", 1399, "2026-03-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "DISNEY_3", "Disney Plus", 1399, "2026-04-12")
+	// Already a series: linked netflix charges must be excluded from the feed.
+	n1 := testutil.MustCreateTransaction(t, queries, acctID, "NFLX_1", "Netflix", 1599, "2026-02-15")
+	n2 := testutil.MustCreateTransaction(t, queries, acctID, "NFLX_2", "Netflix", 1599, "2026-03-15")
+	n3 := testutil.MustCreateTransaction(t, queries, acctID, "NFLX_3", "Netflix", 1599, "2026-04-15")
+
+	// Populate merchant_key the way sync would — explain is read-only and assumes
+	// the key is already set (the engine sets it at upsert; backfill fills history).
+	for key, name := range map[string]string{"hulu": "Hulu", "disneyplus": "Disney Plus", "netflix": "Netflix"} {
+		if _, err := pool.Exec(ctx, `UPDATE transactions SET merchant_key=$1 WHERE provider_name=$2`, key, name); err != nil {
+			t.Fatalf("set merchant_key: %v", err)
+		}
+	}
+
+	if _, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Netflix", MerchantKey: "netflix", Cadence: service.SeriesCadenceMonthly,
+		ExpectedAmount: seriesF64Ptr(15.99), Currency: seriesStrPtr("USD"),
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: []string{n1.ShortID, n2.ShortID, n3.ShortID},
+	}, service.SystemActor()); err != nil {
+		t.Fatalf("seed netflix series: %v", err)
+	}
+
+	nm, err := svc.ExplainSeriesCandidates(ctx)
+	if err != nil {
+		t.Fatalf("ExplainSeriesCandidates: %v", err)
+	}
+
+	byKey := map[string]service.SeriesNearMiss{}
+	for _, m := range nm {
+		byKey[m.MerchantKey] = m
+	}
+
+	if _, ok := byKey["netflix"]; ok {
+		t.Error("netflix is already a series; it must not appear in the near-miss feed")
+	}
+
+	hulu, ok := byKey["hulu"]
+	if !ok {
+		t.Fatalf("hulu near-miss missing from feed (got keys %v)", keysOf(byKey))
+	}
+	if hulu.Reason != "too_few_occurrences" {
+		t.Errorf("hulu reason = %q, want too_few_occurrences", hulu.Reason)
+	}
+	if hulu.Qualifies {
+		t.Error("hulu should not qualify with only 2 charges")
+	}
+	if hulu.OccurrenceCount != 2 {
+		t.Errorf("hulu occurrence_count = %d, want 2", hulu.OccurrenceCount)
+	}
+	if hulu.Explanation == "" {
+		t.Error("hulu near-miss should carry a human explanation")
+	}
+
+	disney, ok := byKey["disneyplus"]
+	if !ok {
+		t.Fatalf("disneyplus near-miss missing from feed (got keys %v)", keysOf(byKey))
+	}
+	if !disney.Qualifies {
+		t.Errorf("disneyplus should qualify (3 clean monthly charges); reason=%q", disney.Reason)
+	}
+}
+
+func TestRekeySeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SQ *PAYMENT", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	// Mint under a fallback/over-merged key.
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Payment", MerchantKey: "payment", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: members,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+
+	rekeyed, err := svc.RekeySeries(ctx, series.ShortID, "spotify", service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("RekeySeries: %v", err)
+	}
+	if rekeyed.MerchantKey != "spotify" {
+		t.Errorf("series merchant_key = %q, want spotify", rekeyed.MerchantKey)
+	}
+
+	// All members' merchant_key repointed to the new key.
+	var n int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions WHERE series_id = $1 AND merchant_key = $2`,
+		series.ID, "spotify").Scan(&n); err != nil {
+		t.Fatalf("count repointed members: %v", err)
+	}
+	if n != 3 {
+		t.Errorf("repointed members = %d, want 3", n)
+	}
+
+	// Collision: re-keying into a key that already has a series is refused.
+	if _, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Netflix", MerchantKey: "netflix", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic,
+	}, service.SystemActor()); err != nil {
+		t.Fatalf("mint netflix: %v", err)
+	}
+	if _, err := svc.RekeySeries(ctx, series.ShortID, "netflix", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected re-key into an existing key to error (no silent merge)")
+	}
+}
+
+func TestSplitSeries(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	a := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_1", "Amazon Prime", 13900, "2024-05-01")
+	b := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_2", "Amazon Prime", 13900, "2025-05-01")
+	c := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_3", "Amazon Prime", 13900, "2026-05-01")
+	stray := testutil.MustCreateTransaction(t, queries, acctID, "PRIME_VID", "Amazon Prime Video", 499, "2026-04-10")
+
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Amazon Prime", MerchantKey: "amazonprime", Cadence: service.SeriesCadenceAnnual,
+		Source:       service.SeriesSourceDeterministic,
+		MemberTxnIDs: []string{a.ShortID, b.ShortID, c.ShortID, stray.ShortID},
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if series.OccurrenceCount != 4 {
+		t.Fatalf("source occurrence_count = %d, want 4", series.OccurrenceCount)
+	}
+
+	newS, err := svc.SplitSeries(ctx, series.ShortID, []string{stray.ShortID}, "primevideo", "Prime Video",
+		service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("SplitSeries: %v", err)
+	}
+	if newS.MerchantKey != "primevideo" {
+		t.Errorf("new series merchant_key = %q, want primevideo", newS.MerchantKey)
+	}
+	if newS.OccurrenceCount != 1 {
+		t.Errorf("new series occurrence_count = %d, want 1", newS.OccurrenceCount)
+	}
+
+	// The stray charge moved into the new series and was repointed.
+	var sid pgtype.UUID
+	var mkey string
+	if err := pool.QueryRow(ctx, `SELECT series_id, merchant_key FROM transactions WHERE id = $1`, stray.ID).Scan(&sid, &mkey); err != nil {
+		t.Fatalf("query stray: %v", err)
+	}
+	if pgconv.FormatUUID(sid) != newS.ID {
+		t.Errorf("stray series_id = %q, want %q", pgconv.FormatUUID(sid), newS.ID)
+	}
+	if mkey != "primevideo" {
+		t.Errorf("stray merchant_key = %q, want primevideo", mkey)
+	}
+
+	// Source series dropped to 3 members.
+	src, err := svc.GetSeries(ctx, series.ShortID)
+	if err != nil {
+		t.Fatalf("get source: %v", err)
+	}
+	if src.OccurrenceCount != 3 {
+		t.Errorf("source occurrence_count after split = %d, want 3", src.OccurrenceCount)
+	}
+
+	// Splitting out a transaction that isn't a member of the source errors.
+	other := testutil.MustCreateTransaction(t, queries, acctID, "OTHER", "Other Co", 100, "2026-01-01")
+	if _, err := svc.SplitSeries(ctx, series.ShortID, []string{other.ShortID}, "otherkey", "", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected splitting a non-member to error")
+	}
+	// Splitting into a key that already has a series errors.
+	if _, err := svc.SplitSeries(ctx, series.ShortID, []string{a.ShortID}, "primevideo", "", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected splitting into an existing key to error")
+	}
+}
+
+func TestSplitSeries_StripsSourceInheritedTags(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	testutil.MustCreateTag(t, queries, "on-prime", "On Prime")
+	testutil.MustCreateTag(t, queries, "user-pin", "User Pin")
+	acctID := seedTxnFixture(t, queries)
+	a := testutil.MustCreateTransaction(t, queries, acctID, "AP_1", "Amazon Prime", 13900, "2025-05-01")
+	keep := testutil.MustCreateTransaction(t, queries, acctID, "AP_2", "Amazon Prime", 13900, "2026-05-01")
+	stray := testutil.MustCreateTransaction(t, queries, acctID, "AP_VID", "Amazon Prime Video", 499, "2026-04-10")
+	actor := service.Actor{Type: "user", Name: "Tester"}
+
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Amazon Prime", MerchantKey: "amazonprime", Cadence: service.SeriesCadenceAnnual,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: []string{a.ShortID, keep.ShortID, stray.ShortID},
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+
+	// Inherit the series tag onto all members (provenance system + series short_id).
+	if err := svc.AddSeriesTag(ctx, series.ShortID, "on-prime", actor); err != nil {
+		t.Fatalf("add series tag: %v", err)
+	}
+	// A tag the user added directly to the stray charge (non-system provenance).
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)
+		 SELECT $1, id, 'user', 'Tester' FROM tags WHERE slug = 'user-pin'`, stray.ID); err != nil {
+		t.Fatalf("insert user tag: %v", err)
+	}
+	if !txnHasTag(t, pool, stray.ID, "on-prime") || !txnHasTag(t, pool, stray.ID, "user-pin") {
+		t.Fatal("precondition: stray should carry both tags before the split")
+	}
+
+	if _, err := svc.SplitSeries(ctx, series.ShortID, []string{stray.ShortID}, "primevideo", "Prime Video", actor); err != nil {
+		t.Fatalf("SplitSeries: %v", err)
+	}
+
+	// The moved member loses the SOURCE series' inherited tag but keeps the user tag.
+	if txnHasTag(t, pool, stray.ID, "on-prime") {
+		t.Error("moved member should no longer carry the source series' inherited tag")
+	}
+	if !txnHasTag(t, pool, stray.ID, "user-pin") {
+		t.Error("a user-added tag must survive the split (provenance-scoped strip)")
+	}
+	// A member that stayed keeps the source tag.
+	if !txnHasTag(t, pool, keep.ID, "on-prime") {
+		t.Error("a member that stayed should keep the source series' inherited tag")
+	}
+}
+
+func TestSeriesType_InferenceStickyAndOverride(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries) // one account for all merchant groups
+
+	seedMerchant := func(name string, dates ...string) []string {
+		ids := make([]string, 0, len(dates))
+		for _, d := range dates {
+			txn := testutil.MustCreateTransaction(t, queries, acctID, name+"_"+d, name, 999, d)
+			ids = append(ids, txn.ShortID)
+		}
+		return ids
+	}
+	mustCategory := func(slug, name string) {
+		if _, err := pool.Exec(ctx, `INSERT INTO categories (slug, display_name) VALUES ($1,$2) ON CONFLICT (slug) DO NOTHING`, slug, name); err != nil {
+			t.Fatalf("ensure category %s: %v", slug, err)
+		}
+	}
+	categorize := func(providerName, slug string) {
+		if _, err := pool.Exec(ctx, `UPDATE transactions SET category_id=(SELECT id FROM categories WHERE slug=$1) WHERE provider_name=$2`, slug, providerName); err != nil {
+			t.Fatalf("categorize %s: %v", providerName, err)
+		}
+	}
+
+	// Mortgage charges categorized as loan_payments_mortgage_payment → infer loan.
+	members := seedMerchant("WELLS FARGO MTG", "2026-02-01", "2026-03-01", "2026-04-01")
+	mustCategory("loan_payments_mortgage_payment", "Mortgage")
+	categorize("WELLS FARGO MTG", "loan_payments_mortgage_payment")
+
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Wells Fargo Mortgage", MerchantKey: "wellsfargomtg", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: members,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if series.Type != service.SeriesTypeLoan {
+		t.Errorf("inferred type = %q, want loan", series.Type)
+	}
+
+	// Sticky: recategorize members + re-detect → type must NOT change.
+	mustCategory("entertainment_tv_and_movies", "TV & Movies")
+	categorize("WELLS FARGO MTG", "entertainment_tv_and_movies")
+	re, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "wellsfargomtg", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: members,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("re-detect: %v", err)
+	}
+	if re.Type != service.SeriesTypeLoan {
+		t.Errorf("type after re-detect = %q, want loan (sticky once inferred)", re.Type)
+	}
+
+	// Explicit override wins and is validated.
+	over, err := svc.SetSeriesType(ctx, series.ShortID, service.SeriesTypeBill, service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("set type: %v", err)
+	}
+	if over.Type != service.SeriesTypeBill {
+		t.Errorf("type after override = %q, want bill", over.Type)
+	}
+	if _, err := svc.SetSeriesType(ctx, series.ShortID, "nonsense", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected invalid type to be rejected")
+	}
+
+	// Uncategorized members default to subscription.
+	plain := seedMerchant("ACME SAAS", "2026-02-09", "2026-03-09", "2026-04-09")
+	sub, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "acmesaas", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: plain,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint plain: %v", err)
+	}
+	if sub.Type != service.SeriesTypeSubscription {
+		t.Errorf("uncategorized type = %q, want subscription (default)", sub.Type)
+	}
+
+	// AssignSeries with an explicit type on a fresh mint.
+	ins := seedMerchant("GEICO", "2026-02-05", "2026-03-05", "2026-04-05")
+	a, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "geico", CreateIfMissing: true, Type: service.SeriesTypeBill, TransactionIDs: ins,
+	}, service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("assign with type: %v", err)
+	}
+	if a.Type != service.SeriesTypeBill {
+		t.Errorf("assigned type = %q, want bill", a.Type)
+	}
+}
+
+func TestReinferSeriesTypes(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	seedMerchant := func(name string, dates ...string) []string {
+		ids := make([]string, 0, len(dates))
+		for _, d := range dates {
+			txn := testutil.MustCreateTransaction(t, queries, acctID, name+"_"+d, name, 999, d)
+			ids = append(ids, txn.ShortID)
+		}
+		return ids
+	}
+	categorize := func(providerName, slug, display string) {
+		if _, err := pool.Exec(ctx, `INSERT INTO categories (slug, display_name) VALUES ($1,$2) ON CONFLICT (slug) DO NOTHING`, slug, display); err != nil {
+			t.Fatalf("ensure category: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE transactions SET category_id=(SELECT id FROM categories WHERE slug=$1) WHERE provider_name=$2`, slug, providerName); err != nil {
+			t.Fatalf("categorize: %v", err)
+		}
+	}
+
+	// A series detected BEFORE its members were categorized → defaults to
+	// subscription (inference at insert had no category signal).
+	mtg := seedMerchant("WF MTG", "2026-02-01", "2026-03-01", "2026-04-01")
+	mtgSeries, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "wfmtg", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: mtg,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint mortgage: %v", err)
+	}
+	if mtgSeries.Type != service.SeriesTypeSubscription {
+		t.Fatalf("precondition: mortgage series should default to subscription, got %q", mtgSeries.Type)
+	}
+	// Now the members get categorized as a mortgage payment.
+	categorize("WF MTG", "loan_payments_mortgage_payment", "Mortgage")
+
+	// A series already explicitly typed bill — must NOT be re-typed.
+	pge := seedMerchant("PGE", "2026-02-03", "2026-03-03", "2026-04-03")
+	pgeSeries, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "pge", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: pge,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint pge: %v", err)
+	}
+	if _, err := svc.SetSeriesType(ctx, pgeSeries.ShortID, service.SeriesTypeBill, service.Actor{Type: "user"}); err != nil {
+		t.Fatalf("set pge type: %v", err)
+	}
+	// Re-categorize PG&E members to loan (to prove the already-typed row is left alone).
+	categorize("PGE", "loan_payments_mortgage_payment", "Mortgage")
+
+	n, err := svc.ReinferSeriesTypes(ctx)
+	if err != nil {
+		t.Fatalf("ReinferSeriesTypes: %v", err)
+	}
+	if n < 1 {
+		t.Errorf("expected at least 1 series re-typed, got %d", n)
+	}
+
+	// The default-subscription mortgage series is now loan.
+	got, err := svc.GetSeries(ctx, mtgSeries.ShortID)
+	if err != nil {
+		t.Fatalf("get mortgage: %v", err)
+	}
+	if got.Type != service.SeriesTypeLoan {
+		t.Errorf("mortgage type after reinfer = %q, want loan", got.Type)
+	}
+	// The explicitly-typed bill series is untouched.
+	gotPge, err := svc.GetSeries(ctx, pgeSeries.ShortID)
+	if err != nil {
+		t.Fatalf("get pge: %v", err)
+	}
+	if gotPge.Type != service.SeriesTypeBill {
+		t.Errorf("explicitly-typed series was re-typed to %q; should stay bill", gotPge.Type)
+	}
+}
+
+func keysOf(m map[string]service.SeriesNearMiss) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 func txnHasTag(t *testing.T, pool *pgxpool.Pool, txnID pgtype.UUID, slug string) bool {
 	t.Helper()
 	var n int

@@ -30,6 +30,21 @@ func ListSeriesHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// ExplainSeriesCandidatesHandler returns the near-miss / explain feed: every
+// recurring-looking merchant group that is NOT already a series, with the
+// detector's verdict on why it did or didn't qualify.
+// GET /api/v1/series/explain — mirrors the explain_series_candidates MCP tool.
+func ExplainSeriesCandidatesHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		nearMisses, err := svc.ExplainSeriesCandidates(r.Context())
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to explain series candidates")
+			return
+		}
+		writeData(w, map[string]any{"near_misses": nearMisses})
+	}
+}
+
 // GetSeriesHandler returns a single series by short_id or uuid.
 // GET /api/v1/series/{id} — mirrors the get_series MCP tool.
 func GetSeriesHandler(svc *service.Service) http.HandlerFunc {
@@ -53,6 +68,7 @@ type assignSeriesRequest struct {
 	CreateIfMissing bool     `json:"create_if_missing,omitempty"`
 	Name            string   `json:"name,omitempty"`
 	Cadence         string   `json:"cadence,omitempty"`
+	Type            string   `json:"type,omitempty"`
 	ExpectedAmount  *float64 `json:"expected_amount,omitempty"`
 	Currency        *string  `json:"currency,omitempty"`
 	CategoryID      *string  `json:"category_id,omitempty"`
@@ -83,6 +99,7 @@ func AssignSeriesHandler(svc *service.Service) http.HandlerFunc {
 			CreateIfMissing: body.CreateIfMissing,
 			Name:            body.Name,
 			Cadence:         body.Cadence,
+			Type:            body.Type,
 			ExpectedAmount:  body.ExpectedAmount,
 			Currency:        body.Currency,
 			CategoryID:      body.CategoryID,
@@ -166,6 +183,88 @@ func RemoveSeriesTagHandler(svc *service.Service) http.HandlerFunc {
 		s, err := svc.GetSeries(r.Context(), id)
 		if err != nil {
 			writeServiceError(w, err, "Series not found", "Failed to load series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
+// rekeySeriesRequest is the body for POST /api/v1/series/{id}/rekey.
+type rekeySeriesRequest struct {
+	NewMerchantKey string `json:"new_merchant_key"`
+}
+
+// RekeySeriesHandler corrects a series' merchant_key (and repoints its members).
+// POST /api/v1/series/{id}/rekey — mirrors the rekey_series MCP tool (write).
+func RekeySeriesHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body rekeySeriesRequest
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		if strings.TrimSpace(body.NewMerchantKey) == "" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "new_merchant_key is required")
+			return
+		}
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.RekeySeries(r.Context(), id, body.NewMerchantKey, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to re-key series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
+// splitSeriesRequest is the body for POST /api/v1/series/{id}/split.
+type splitSeriesRequest struct {
+	NewMerchantKey string   `json:"new_merchant_key"`
+	Name           string   `json:"name,omitempty"`
+	TransactionIDs []string `json:"transaction_ids"`
+}
+
+// SplitSeriesHandler moves a subset of a series' members into a new series.
+// POST /api/v1/series/{id}/split — mirrors the split_series MCP tool (write).
+func SplitSeriesHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body splitSeriesRequest
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		if strings.TrimSpace(body.NewMerchantKey) == "" || len(body.TransactionIDs) == 0 {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "new_merchant_key and transaction_ids are required")
+			return
+		}
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.SplitSeries(r.Context(), id, body.TransactionIDs, body.NewMerchantKey, body.Name, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to split series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
+// setSeriesTypeRequest is the body for POST /api/v1/series/{id}/type.
+type setSeriesTypeRequest struct {
+	Type string `json:"type"` // subscription | bill | loan | other
+}
+
+// SetSeriesTypeHandler overrides a series' type (sticky correction).
+// POST /api/v1/series/{id}/type — mirrors the set_series_type MCP tool (write).
+func SetSeriesTypeHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body setSeriesTypeRequest
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.SetSeriesType(r.Context(), id, body.Type, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to set series type")
 			return
 		}
 		writeData(w, s)

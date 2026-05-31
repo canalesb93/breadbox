@@ -41,6 +41,8 @@ var validConditionFields = map[string]string{
 	"user_id":                    "string",
 	"user_name":                  "string",
 	"tags":                       "tags",
+	"series":                     "string", // recurring-series short_id the txn belongs to
+	"in_series":                  "bool",   // whether the txn belongs to any recurring series
 }
 
 // stringOps are operators valid for string fields.
@@ -347,6 +349,10 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 		return evalString(c, tctx.UserName)
 	case "tags":
 		return evalTags(c, tctx.Tags)
+	case "series":
+		return evalString(c, tctx.SeriesShortID)
+	case "in_series":
+		return evalBool(c, tctx.InSeries)
 	}
 	return false
 }
@@ -1190,18 +1196,20 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
-	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[])
+	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[]),
+	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL)
 	FROM transactions t
 	JOIN accounts a ON t.account_id = a.id
 	JOIN bank_connections bc ON a.connection_id = bc.id
 	LEFT JOIN users u ON bc.user_id = u.id
 	LEFT JOIN transaction_tags tt ON tt.transaction_id = t.id
 	LEFT JOIN tags tag ON tag.id = tt.tag_id
+	LEFT JOIN recurring_series rs ON rs.id = t.series_id
 	WHERE t.deleted_at IS NULL
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
-const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name`
+const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id`
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
@@ -1223,6 +1231,8 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	dest[9] = &r.tctx.UserID
 	dest[10] = &r.tctx.UserName
 	dest[11] = &r.tctx.Tags
+	dest[12] = &r.tctx.SeriesShortID
+	dest[13] = &r.tctx.InSeries
 	return r
 }
 
@@ -1319,7 +1329,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		rowCount := 0
 		for rows.Next() {
 			rowCount++
-			dest := make([]any, 12)
+			dest := make([]any, 14)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
@@ -1542,7 +1552,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		rowCount := 0
 		for rows.Next() {
 			rowCount++
-			dest := make([]any, 12)
+			dest := make([]any, 14)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
@@ -1778,12 +1788,13 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 	baseQuery := `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 		COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
-		t.date, COALESCE(c.slug, '')
+		t.date, COALESCE(c.slug, ''), COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL)
 		FROM transactions t
 		JOIN accounts a ON t.account_id = a.id
 		JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories c ON t.category_id = c.id
+		LEFT JOIN recurring_series rs ON rs.id = t.series_id
 		WHERE t.deleted_at IS NULL AND t.category_override = 'none'
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
@@ -1830,7 +1841,7 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 			if err := rows.Scan(&id, &tctx.Name, &tctx.MerchantName, &tctx.Amount,
 				&tctx.CategoryPrimary, &tctx.CategoryDetailed,
 				&tctx.Pending, &tctx.Provider, &tctx.AccountID, &tctx.UserID, &tctx.UserName,
-				&date, &catSlug); err != nil {
+				&date, &catSlug, &tctx.SeriesShortID, &tctx.InSeries); err != nil {
 				rows.Close()
 				return nil, fmt.Errorf("scan transaction: %w", err)
 			}

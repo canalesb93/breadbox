@@ -563,6 +563,13 @@ type TransactionContext struct {
 	// Tags is populated from transaction_tags so tag-based conditions
 	// (field: "tags") can match against the transaction's current tags.
 	Tags []string
+	// SeriesShortID is the short_id of the recurring series this transaction
+	// belongs to (field: "series"), empty when unassigned. Populated from the
+	// recurring_series JOIN in the retroactive / preview context query.
+	SeriesShortID string
+	// InSeries reports whether the transaction is linked to any recurring
+	// series (field: "in_series").
+	InSeries bool
 }
 
 type TransactionRuleResponse struct {

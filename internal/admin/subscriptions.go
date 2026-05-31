@@ -46,6 +46,10 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 		var currencyOrder []string
 		activeCount := 0
 		usersWithSeries := map[string]bool{}
+		typesPresent := map[string]bool{}
+		upcomingByCurrency := map[string]float64{}
+		var upcomingOrder []string
+		upcomingCount := 0
 
 		for _, s := range all {
 			// A rejected verdict ("Not a subscription") is a dismissal — it
@@ -58,6 +62,9 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			row := subscriptionRow(s, catName, userName)
 			if row.UserID != "" {
 				usersWithSeries[row.UserID] = true
+			}
+			if row.Type != "" {
+				typesPresent[row.Type] = true
 			}
 			if s.Status == service.SeriesStatusCandidate {
 				candidates = append(candidates, row)
@@ -75,9 +82,29 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 						currencyOrder = append(currencyOrder, cur)
 					}
 					monthlyByCurrency[cur] += monthlyEquivalent(s.Cadence, row.Amount)
+					// Upcoming spend: the next charge lands within the next 30 days.
+					if row.DaysUntilRenewal != nil && *row.DaysUntilRenewal >= 0 && *row.DaysUntilRenewal <= 30 {
+						if _, seen := upcomingByCurrency[cur]; !seen {
+							upcomingOrder = append(upcomingOrder, cur)
+						}
+						upcomingByCurrency[cur] += row.Amount
+						upcomingCount++
+					}
 				}
 			}
 		}
+
+		// Order the ledger by renewal urgency: overdue → due-soon → upcoming
+		// (ascending days), then series with no projection, then likely-cancelled
+		// (stale) last. Surfaces "what's renewing soon" at the top, leveraging the
+		// renewal chip, without a separate section.
+		sort.SliceStable(active, func(i, j int) bool {
+			gi, gj := renewalSortGroup(active[i]), renewalSortGroup(active[j])
+			if gi != gj {
+				return gi < gj
+			}
+			return renewalSortDays(active[i]) < renewalSortDays(active[j])
+		})
 
 		var monthlyTotals []pages.SubscriptionMonthlyTotal
 		for _, cur := range currencyOrder {
@@ -86,20 +113,30 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				Amount:   monthlyByCurrency[cur],
 			})
 		}
+		var upcomingTotals []pages.SubscriptionMonthlyTotal
+		for _, cur := range upcomingOrder {
+			upcomingTotals = append(upcomingTotals, pages.SubscriptionMonthlyTotal{
+				Currency: cur,
+				Amount:   upcomingByCurrency[cur],
+			})
+		}
 
 		props := pages.SubscriptionsListProps{
 			CSRFToken:      GetCSRFToken(r),
 			ActiveCount:    activeCount,
 			CandidateCount: len(candidates),
 			MonthlyTotals:  monthlyTotals,
+			UpcomingTotals: upcomingTotals,
+			UpcomingCount:  upcomingCount,
 			Candidates:     candidates,
 			Active:         active,
-			Users:          subscriptionUserFilters(ctx, a, usersWithSeries),
+			Users:          subscriptionUserFilters(userName, usersWithSeries),
+			Types:          subscriptionTypeFilters(typesPresent),
 		}
 
 		data := map[string]any{
-			"PageTitle":   "Subscriptions",
-			"CurrentPage": "subscriptions",
+			"PageTitle":   "Recurring",
+			"CurrentPage": "recurring",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}
@@ -127,6 +164,25 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			a.Logger.Error("series members", "error", err)
 		}
 
+		// Add-tag options = the vocabulary minus tags already on the series.
+		onSeries := map[string]bool{}
+		for _, tg := range row.Tags {
+			onSeries[tg] = true
+		}
+		var tagOptions []pages.SubscriptionTagOption
+		if tags, terr := svc.ListTags(ctx); terr == nil {
+			for _, t := range tags {
+				if onSeries[t.Slug] {
+					continue
+				}
+				name := t.DisplayName
+				if name == "" {
+					name = t.Slug
+				}
+				tagOptions = append(tagOptions, pages.SubscriptionTagOption{Slug: t.Slug, Name: name})
+			}
+		}
+
 		props := pages.SubscriptionDetailProps{
 			CSRFToken:       GetCSRFToken(r),
 			Series:          row,
@@ -138,11 +194,12 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			Confidence:      s.Confidence,
 			Members:         subscriptionMembers(members),
 			PriceChanges:    subscriptionPriceChanges(members),
+			AvailableTags:   tagOptions,
 		}
 
 		data := map[string]any{
-			"PageTitle":   s.Name + " — Subscription",
-			"CurrentPage": "subscriptions",
+			"PageTitle":   s.Name + " — Recurring",
+			"CurrentPage": "recurring",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}
@@ -174,6 +231,13 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		Source:          s.DetectionSource,
 		SourceLabel:     sourceLabel(s.DetectionSource),
 	}
+	row.Type = s.Type
+	row.TypeLabel = recurringTypeLabel(s.Type)
+	row.RenewalLabel, row.RenewalTone = subscriptionRenewal(s)
+	row.DaysUntilRenewal = s.DaysUntilRenewal
+	if sig, ok := decodeSignals(s.DetectionSignals); ok {
+		row.PriceChanged = sig.AmountBranch == "monotonic_drift"
+	}
 	if s.LastAmount != nil {
 		row.HasAmount = true
 		row.Amount = math.Abs(*s.LastAmount)
@@ -186,8 +250,84 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		row.UserID = *s.UserID
 		row.OwnerName = userName[*s.UserID]
 	}
-	row.Search = strings.ToLower(strings.Join([]string{s.Name, s.MerchantKey, row.CadenceLabel, row.CategoryName, row.OwnerName}, " "))
+	row.Search = strings.ToLower(strings.Join([]string{s.Name, s.MerchantKey, row.CadenceLabel, row.CategoryName, row.OwnerName, row.TypeLabel}, " "))
 	return row
+}
+
+// recurringTypeLabel renders the structured type for display.
+func recurringTypeLabel(t string) string {
+	switch t {
+	case service.SeriesTypeSubscription:
+		return "Subscription"
+	case service.SeriesTypeBill:
+		return "Bill"
+	case service.SeriesTypeLoan:
+		return "Loan"
+	case service.SeriesTypeOther:
+		return "Other"
+	default:
+		return "Subscription"
+	}
+}
+
+// subscriptionRenewal derives an attention chip (label + daisy tone) from a
+// series' renewal health (shipped on SeriesResponse). Returns empty for
+// comfortably-renewing / no-projection series — only due_soon / overdue /
+// stale earn a chip, so the ledger highlights what needs a look. Health is
+// only populated for active series, so candidates/paused/cancelled get nothing.
+func subscriptionRenewal(s service.SeriesResponse) (string, string) {
+	days := 0
+	if s.DaysUntilRenewal != nil {
+		days = *s.DaysUntilRenewal
+	}
+	switch s.RenewalHealth {
+	case service.SeriesHealthDueSoon:
+		switch {
+		case days <= 0:
+			return "Due today", "info"
+		case days == 1:
+			return "Due tomorrow", "info"
+		default:
+			return fmt.Sprintf("Renews in %dd", days), "info"
+		}
+	case service.SeriesHealthOverdue:
+		return fmt.Sprintf("%dd overdue", -days), "warning"
+	case service.SeriesHealthStale:
+		// Type-aware copy: a bill/loan that goes silent has "lapsed" (you may
+		// have missed a payment), whereas a subscription has likely been cancelled.
+		switch s.Type {
+		case service.SeriesTypeBill, service.SeriesTypeLoan:
+			return "Lapsed?", "error"
+		default:
+			return "Likely cancelled", "error"
+		}
+	default:
+		return "", ""
+	}
+}
+
+// renewalSortGroup buckets an active-ledger row for the renewal-urgency sort:
+// 0 = has a projection and isn't stale (overdue/due-soon/upcoming), 1 = no
+// projection (paused/cancelled/unknown cadence), 2 = stale ("likely
+// cancelled") — pushed to the bottom since it isn't really "upcoming".
+func renewalSortGroup(r pages.SubscriptionRow) int {
+	switch {
+	case r.RenewalTone == "error": // stale / likely cancelled
+		return 2
+	case r.DaysUntilRenewal == nil:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// renewalSortDays is the secondary key (ascending) within a group — most
+// overdue first, then soonest upcoming. Missing projection sorts as 0.
+func renewalSortDays(r pages.SubscriptionRow) int {
+	if r.DaysUntilRenewal == nil {
+		return 0
+	}
+	return *r.DaysUntilRenewal
 }
 
 // subscriptionSignalsShape is the subset of detection_signals (§6.6) the UI
@@ -461,25 +601,46 @@ func subscriptionUserNames(ctx context.Context, a *app.App) map[string]string {
 }
 
 // subscriptionUserFilters builds the household-member filter chips from the
-// users that actually own at least one series, sorted by name.
-func subscriptionUserFilters(ctx context.Context, a *app.App, owners map[string]bool) []pages.SubscriptionUserFilter {
+// users that actually own at least one series, sorted by name. Reuses the
+// name map already fetched for row rendering — no extra ListUsers query.
+func subscriptionUserFilters(userName map[string]string, owners map[string]bool) []pages.SubscriptionUserFilter {
 	if len(owners) < 2 {
 		return nil
 	}
-	users, _ := a.Queries.ListUsers(ctx)
 	var out []pages.SubscriptionUserFilter
-	for _, u := range users {
-		id := pgconv.FormatUUID(u.ID)
+	for id, name := range userName {
 		if !owners[id] {
 			continue
 		}
 		first := ""
-		if u.Name != "" {
-			first = u.Name[:1]
+		if name != "" {
+			first = name[:1]
 		}
-		out = append(out, pages.SubscriptionUserFilter{ID: id, Name: u.Name, First: first})
+		out = append(out, pages.SubscriptionUserFilter{ID: id, Name: name, First: first})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// subscriptionTypeFilters builds the "filter by type" options from the types
+// actually present, in a stable order. Returns nil for a single type (no filter
+// worth showing).
+func subscriptionTypeFilters(present map[string]bool) []pages.SubscriptionTypeFilter {
+	if len(present) < 2 {
+		return nil
+	}
+	order := []struct{ value, label string }{
+		{service.SeriesTypeSubscription, "Subscriptions"},
+		{service.SeriesTypeBill, "Bills"},
+		{service.SeriesTypeLoan, "Loans"},
+		{service.SeriesTypeOther, "Other"},
+	}
+	var out []pages.SubscriptionTypeFilter
+	for _, o := range order {
+		if present[o.value] {
+			out = append(out, pages.SubscriptionTypeFilter{Value: o.value, Label: o.label})
+		}
+	}
 	return out
 }
 

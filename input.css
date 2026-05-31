@@ -311,13 +311,25 @@
    *
    *   2. Marks that keep their official baked-in fill because the fill IS
    *      the brand. The black-on-light ones (GitHub, Anthropic) need a
-   *      flip in dark mode so they don't disappear on a base-100 surface.
-   *      Claude orange already contrasts in both modes; Teller is
-   *      multi-color and stays. */
+   *      flip to white in dark mode so they don't disappear on a base-100
+   *      surface. Claude orange already contrasts in both modes; Teller is
+   *      multi-color and stays.
+   *
+   * The flip must follow the *resolved* daisy theme, not the raw OS
+   * preference — the theme toggle ($store.theme) can force
+   * data-theme="light"/"dark" independent of prefers-color-scheme. Keying
+   * only off @media (prefers-color-scheme: dark) makes the mark turn white
+   * on a forced-light page when the OS is dark (white-on-white, invisible),
+   * and stay black on a forced-dark page when the OS is light. So pair the
+   * media query (guarded against a forced-light override) with an explicit
+   * [data-theme="dark"] rule — the same shape the .select / .bb-tx-row /
+   * .bb-tx-avatar dark overrides use below. */
   @media (prefers-color-scheme: dark) {
-    svg.brand-github path,
-    svg.brand-anthropic path { fill: #fff; }
+    :root:not([data-theme="light"]) svg.brand-github path,
+    :root:not([data-theme="light"]) svg.brand-anthropic path { fill: #fff; }
   }
+  [data-theme="dark"] svg.brand-github path,
+  [data-theme="dark"] svg.brand-anthropic path { fill: #fff; }
 
   /*
    * Pre-hydration size for Lucide placeholders.

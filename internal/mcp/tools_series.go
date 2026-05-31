@@ -31,6 +31,7 @@ type assignSeriesInput struct {
 	CreateIfMissing bool     `json:"create_if_missing,omitempty" jsonschema:"Mint a new series keyed on merchant_key when no series_id is given."`
 	Name            string   `json:"name,omitempty" jsonschema:"Optional display name for a minted series."`
 	Cadence         string   `json:"cadence,omitempty" jsonschema:"Optional cadence for a minted series: weekly, biweekly, monthly, quarterly, semiannual, annual."`
+	Type            string   `json:"type,omitempty" jsonschema:"Optional recurring-charge type for a minted series: subscription, bill, loan, or other. Omit to infer from the linked charges' category."`
 	ExpectedAmount  *float64 `json:"expected_amount,omitempty" jsonschema:"Optional expected charge amount in dollars, paired with currency."`
 	Currency        string   `json:"currency,omitempty" jsonschema:"ISO currency code for expected_amount (e.g. USD)."`
 	CategoryID      string   `json:"category_id,omitempty" jsonschema:"Optional suggested category short ID or UUID."`
@@ -50,6 +51,16 @@ func (s *MCPServer) handleListSeries(_ context.Context, _ *mcpsdk.CallToolReques
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(map[string]any{"series": series})
+}
+
+type explainSeriesInput struct{}
+
+func (s *MCPServer) handleExplainSeriesCandidates(_ context.Context, _ *mcpsdk.CallToolRequest, _ explainSeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	nearMisses, err := s.svc.ExplainSeriesCandidates(context.Background())
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(map[string]any{"near_misses": nearMisses})
 }
 
 func (s *MCPServer) handleGetSeries(_ context.Context, _ *mcpsdk.CallToolRequest, input getSeriesInput) (*mcpsdk.CallToolResult, any, error) {
@@ -81,6 +92,29 @@ func (s *MCPServer) handleReviewSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 	}
 	actor := service.ActorFromContext(ctx)
 	series, err := s.svc.ReviewSeries(context.Background(), input.ID, verdict, actor)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
+type setSeriesTypeInput struct {
+	ID   string `json:"id" jsonschema:"required,Series short ID or UUID."`
+	Type string `json:"type" jsonschema:"required,One of: subscription, bill, loan, other."`
+}
+
+func (s *MCPServer) handleSetSeriesType(ctx context.Context, _ *mcpsdk.CallToolRequest, input setSeriesTypeInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" || input.Type == "" {
+		return errorResult(fmt.Errorf("id and type are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.SetSeriesType(context.Background(), input.ID, input.Type, actor)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("series not found")), nil, nil
@@ -136,6 +170,54 @@ func (s *MCPServer) handleRemoveSeriesTag(ctx context.Context, _ *mcpsdk.CallToo
 	return jsonResult(series)
 }
 
+type rekeySeriesInput struct {
+	ID     string `json:"id" jsonschema:"required,Series short ID or UUID to re-key."`
+	NewKey string `json:"new_merchant_key" jsonschema:"required,The corrected normalized merchant key (e.g. 'spotify' rather than a fallback like 'payment'). Members' merchant_key is repointed to match."`
+}
+
+func (s *MCPServer) handleRekeySeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input rekeySeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" || input.NewKey == "" {
+		return errorResult(fmt.Errorf("id and new_merchant_key are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.RekeySeries(context.Background(), input.ID, input.NewKey, actor)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
+type splitSeriesInput struct {
+	ID             string   `json:"id" jsonschema:"required,Source series short ID or UUID to split."`
+	NewKey         string   `json:"new_merchant_key" jsonschema:"required,Merchant key for the new series the split-out charges move into. Must not already have a series and must differ from the source key."`
+	Name           string   `json:"name,omitempty" jsonschema:"Optional display name for the new series; defaults to a title-cased new_merchant_key."`
+	TransactionIDs []string `json:"transaction_ids" jsonschema:"required,Transactions (short ID or UUID) to move out of the source series into the new one. Each must currently belong to the source series. Max 50."`
+}
+
+func (s *MCPServer) handleSplitSeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input splitSeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" || input.NewKey == "" || len(input.TransactionIDs) == 0 {
+		return errorResult(fmt.Errorf("id, new_merchant_key, and transaction_ids are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.SplitSeries(context.Background(), input.ID, input.TransactionIDs, input.NewKey, input.Name, actor)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
 func (s *MCPServer) handleAssignSeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input assignSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
@@ -153,6 +235,7 @@ func (s *MCPServer) handleAssignSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 		CreateIfMissing: input.CreateIfMissing,
 		Name:            input.Name,
 		Cadence:         input.Cadence,
+		Type:            input.Type,
 		ExpectedAmount:  input.ExpectedAmount,
 		Currency:        opt(input.Currency),
 		CategoryID:      opt(input.CategoryID),

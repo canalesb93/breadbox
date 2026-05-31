@@ -13,9 +13,16 @@ type SubscriptionsListProps struct {
 	CandidateCount int
 	// Monthly-equivalent spend, one entry per currency (never summed across).
 	MonthlyTotals []SubscriptionMonthlyTotal
+	// Upcoming spend in the next 30 days — active series whose next charge lands
+	// within [0,30] days, summed per currency. UpcomingCount is how many.
+	UpcomingTotals []SubscriptionMonthlyTotal
+	UpcomingCount  int
 
 	// Household-member filter strip. Only rendered when len > 1.
 	Users []SubscriptionUserFilter
+	// Type filter strip (subscription/bill/loan/other present in the data).
+	// Only rendered when len > 1 — no point offering a filter for one type.
+	Types []SubscriptionTypeFilter
 
 	// status == 'candidate' — get the Confirm / Not-a-subscription actions.
 	Candidates []SubscriptionRow
@@ -36,6 +43,12 @@ type SubscriptionUserFilter struct {
 	First string // first letter for the avatar circle
 }
 
+// SubscriptionTypeFilter — one option in the "filter by type" segmented control.
+type SubscriptionTypeFilter struct {
+	Value string // subscription | bill | loan | other — matches row data-type
+	Label string // "Subscriptions" | "Bills" | "Loans" | "Other"
+}
+
 // SubscriptionRow is one series card. Fields are pre-formatted in the handler.
 type SubscriptionRow struct {
 	ShortID     string // short_id — drives detail link + verdict PATCH
@@ -48,6 +61,23 @@ type SubscriptionRow struct {
 	Status      string // active | paused | cancelled | candidate
 	StatusLabel string
 	StatusTone  string // success | warning | neutral | info
+
+	Type      string // subscription | bill | loan | other (raw, drives the filter)
+	TypeLabel string // "Subscription" | "Bill" | "Loan" | "Other"
+
+	// Renewal-health attention chip (active series only). Empty when the
+	// subscription renews comfortably or has no projection — only the states a
+	// user should act on (due soon / overdue / likely cancelled) get a chip.
+	RenewalLabel string // "Renews in 3d" | "5d overdue" | "Likely cancelled"
+	RenewalTone  string // info | warning | error
+	// DaysUntilRenewal is the signed day count to the next charge (negative =
+	// overdue), nil when there's no projection. Drives the ledger's
+	// renewal-urgency sort. Active series only.
+	DaysUntilRenewal *int
+	// PriceChanged flags a series the detector saw steadily raising its price
+	// (detection_signals amount_branch == "monotonic_drift") — surfaced as a
+	// "Price ↑" chip on the ledger. The detail page shows the full from→to history.
+	PriceChanged bool
 
 	HasAmount bool
 	Amount    float64 // last_amount in dollars
@@ -99,6 +129,17 @@ type SubscriptionDetailProps struct {
 
 	// Price-change history derived from members (oldest → newest change points).
 	PriceChanges []SubscriptionPriceChange
+
+	// AvailableTags is every tag in the vocabulary (slug + name), for the
+	// interactive tag editor's add-control. The template hides tags already on
+	// the series client-side.
+	AvailableTags []SubscriptionTagOption
+}
+
+// SubscriptionTagOption is one option in the detail page's add-tag picker.
+type SubscriptionTagOption struct {
+	Slug string
+	Name string
 }
 
 // SubscriptionMember is one linked charge in the detail timeline.

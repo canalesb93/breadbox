@@ -49,9 +49,22 @@ SET user_id = $2,
     next_expected_date = $17,
     occurrence_count = $18,
     detection_signals = $19,
+    type = $20,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- SeriesDominantMemberCategory returns the most common category slug among a
+-- series' live members — used to infer the series type at first detection.
+-- Returns no rows when every member is uncategorized.
+-- name: SeriesDominantMemberCategory :one
+SELECT c.slug
+FROM transactions t
+JOIN categories c ON t.category_id = c.id
+WHERE t.series_id = $1 AND t.deleted_at IS NULL
+GROUP BY c.slug
+ORDER BY COUNT(*) DESC, c.slug ASC
+LIMIT 1;
 
 -- BackLinkSeriesMembers attaches the given transactions to a series, NULL-fill
 -- only — it never clobbers a manual/rule assignment. Returns rows affected.

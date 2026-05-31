@@ -126,18 +126,11 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			{Label: "Reports", Href: "/reports"},
 			{Label: "Report"},
 		}
-		renderReportDetail(w, r, tr, data, pages.ReportDetailProps{
+		tr.RenderWithTempl(w, r, data, pages.ReportDetail(pages.ReportDetailProps{
 			Report:      detail,
 			Breadcrumbs: breadcrumbs,
-		})
+		}))
 	}
-}
-
-// renderReportDetail mirrors renderSyncLogDetail / renderPromptBuilder:
-// hands the typed ReportDetailProps to the templ component and uses
-// RenderWithTempl to host it inside base.html.
-func renderReportDetail(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.ReportDetailProps) {
-	tr.RenderWithTempl(w, r, data, pages.ReportDetail(props))
 }
 
 // MarkReportReadAdminHandler handles POST /-/reports/{id}/read.

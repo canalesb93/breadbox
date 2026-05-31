@@ -148,6 +148,7 @@ A **connection** is a bank-side OAuth link (Plaid item, Teller enrollment, or CS
 | Command | Scope | Description |
 |---------|-------|-------------|
 | `breadbox series backfill` | L | One-time all-history recurring-series detection (populates merchant keys, surfaces subscription candidates) |
+| `breadbox series reinfer-types` | L | One-time re-inference of `type` for default-`subscription` series from member categories (for series detected before the type field) |
 
 ## CSV
 
