@@ -448,7 +448,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			accountShortID         string
 			userName               pgtype.Text
 			categoryID             pgtype.UUID
-			categoryOverride       bool
+			categoryOverride       string
 			catSlug                pgtype.Text
 			catDisplayName         pgtype.Text
 			catIcon                pgtype.Text
@@ -617,7 +617,7 @@ func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
 func (s *Service) CountUncategorizedTransactions(ctx context.Context) (int64, error) {
 	var count int64
 	err := s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL AND category_override = FALSE").
+		"SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL AND category_override = 'none'").
 		Scan(&count)
 	return count, err
 }
@@ -1005,7 +1005,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			catSlug          pgtype.Text
 			catIcon          pgtype.Text
 			catColor         pgtype.Text
-			categoryOverride bool
+			categoryOverride string
 			pending          bool
 			commentCount     int64
 			hasPendingReview bool
@@ -1194,7 +1194,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			catSlug          pgtype.Text
 			catIcon          pgtype.Text
 			catColor         pgtype.Text
-			categoryOverride bool
+			categoryOverride string
 			pending          bool
 			commentCount     int64
 			hasPendingReview bool
@@ -1353,7 +1353,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		createdAt             pgtype.Timestamptz
 		updatedAt             pgtype.Timestamptz
 		categoryID            pgtype.UUID
-		categoryOverride      bool
+		categoryOverride      string
 		metadata              []byte
 	)
 

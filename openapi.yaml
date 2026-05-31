@@ -370,7 +370,7 @@ paths:
         - { name: amount_max, in: query, schema: { type: number } }
         - { name: pending, in: query, schema: { type: boolean } }
         - { name: deleted, in: query, schema: { type: string, enum: [include, only] }, description: Whether to include or restrict to soft-deleted transactions. }
-        - { name: category_override, in: query, schema: { type: boolean }, description: Filter by manual override flag. }
+        - { name: category_override, in: query, schema: { type: string, enum: [none, agent, user] }, description: Filter by category-override source (none/agent/user). }
       responses:
         "200":
           description: Paginated transaction list.
@@ -459,7 +459,7 @@ paths:
     patch:
       tags: [Transactions]
       summary: Set transaction category
-      description: Sets `category_id` and `category_override = true`. **Requires `full_access` scope.**
+      description: Sets `category_id` and `category_override = 'user' (manual user override)`. **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -1773,7 +1773,7 @@ paths:
       summary: Apply all rules retroactively
       description: |
         Replays every enabled rule against the historical transaction set
-        (skipping `category_override = true`). **Requires `full_access` scope.**
+        (skipping rows where `category_override <> 'none'`). **Requires `full_access` scope.**
       responses:
         "202":
           description: Application summary.
@@ -3212,7 +3212,7 @@ components:
         name: { type: string }
         merchant_name: { type: string, nullable: true }
         category_id: { type: string, nullable: true }
-        category_override: { type: boolean }
+        category_override: { type: string, enum: [none, agent, user], description: "Source of the current category lock (precedence user > agent > rule)." }
         pending: { type: boolean }
         deleted_at: { type: string, format: date-time, nullable: true }
         tags:

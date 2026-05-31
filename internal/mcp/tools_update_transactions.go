@@ -21,7 +21,7 @@ type updateTransactionsInput struct {
 // one transaction.
 type transactionOperationInput struct {
 	TransactionID string            `json:"transaction_id" jsonschema:"required,UUID or short ID."`
-	CategorySlug  *string           `json:"category_slug,omitempty" jsonschema:"Category slug to set (e.g. 'food_and_drink_groceries'). Sets category_override=true. Omit to leave the category unchanged. Mutually exclusive with reset_category."`
+	CategorySlug  *string           `json:"category_slug,omitempty" jsonschema:"Category slug to set (e.g. 'food_and_drink_groceries'). Omit to leave the category unchanged. Mutually exclusive with reset_category."`
 	ResetCategory bool              `json:"reset_category,omitempty" jsonschema:"Clear an existing manual category override and drop the transaction back to 'uncategorized' so rules can re-categorize it. Mutually exclusive with category_slug. Use this to undo a prior categorize/update_transactions decision."`
 	TagsToAdd     []tagOpEntryInput `json:"tags_to_add,omitempty" jsonschema:"List of tags to add. Each item: {slug}. Auto-creates persistent tags if the slug is unknown."`
 	TagsToRemove  []tagOpEntryInput `json:"tags_to_remove,omitempty" jsonschema:"List of tags to remove. Each item: {slug}."`

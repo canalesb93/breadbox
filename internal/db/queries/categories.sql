@@ -51,12 +51,12 @@ WHERE category_id = $1 AND deleted_at IS NULL;
 
 -- name: SetTransactionCategoryOverride :execrows
 UPDATE transactions
-SET category_id = $2, category_override = TRUE, updated_at = NOW()
+SET category_id = $2, category_override = 'user', updated_at = NOW()
 WHERE id = $1;
 
 -- name: ClearTransactionCategoryOverride :execrows
 UPDATE transactions
-SET category_override = FALSE, updated_at = NOW()
+SET category_override = 'none', updated_at = NOW()
 WHERE id = $1;
 
 -- name: SetCategoryOverrideFlag :execrows

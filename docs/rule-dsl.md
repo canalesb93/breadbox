@@ -123,7 +123,7 @@ Actions describe what a matching rule does to the transaction. An action array m
 
 Sets the transaction's assigned category. At most one `set_category` per rule.
 
-- Skipped when `category_override = true` on the transaction (user lock).
+- Skipped when `category_override <> 'none'` — an agent or user already set the category. Rules are the lowest priority (user > agent > rule).
 - Writes a `category_set` annotation with the rule as actor.
 
 ### `add_tag`
@@ -181,7 +181,7 @@ This is the declarative counterpart to the `assign_series` MCP tool: author the 
 
 ### Combining actions
 
-A rule can carry multiple actions of different types. Override (`category_override=true`) suppresses only the `set_category` part — `add_tag` and `add_comment` still fire.
+A rule can carry multiple actions of different types. Override (`category_override <> 'none'`) suppresses only the `set_category` part — `add_tag` and `add_comment` still fire.
 
 ```json
 {

@@ -740,8 +740,9 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	}
 
 	// set_category: write category_id when a rule matched and the transaction
-	// doesn't have a manual override. Respects the "user wins" semantic.
-	if result.CategorySlug != "" && !dbTxn.CategoryOverride {
+	// is not locked by an agent or user. Rules are the lowest priority
+	// (user > agent > rule), so they only write rows still at 'none'.
+	if result.CategorySlug != "" && dbTxn.CategoryOverride == "none" {
 		catID := resolver.CategoryIDForSlug(result.CategorySlug)
 		if !catID.Valid {
 			// Unknown slug — most commonly a category was deleted after the
@@ -752,7 +753,7 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 				"rule_id", src.ruleShortID, "rule_name", src.ruleName, "slug", result.CategorySlug)
 		} else {
 			_, err := tx.Exec(ctx,
-				`UPDATE transactions SET category_id = $1 WHERE id = $2 AND NOT category_override`,
+				`UPDATE transactions SET category_id = $1 WHERE id = $2 AND category_override = 'none'`,
 				catID, dbTxn.ID)
 			if err != nil {
 				return result.Sources, fmt.Errorf("apply rule category: %w", err)

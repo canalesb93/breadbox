@@ -63,7 +63,7 @@ A condition is one of:
 { "type": "add_comment",  "body": "Auto-flagged by recurring-charge rule" }
 ```
 
-`set_category` only fires when `category_override = false` — manually-categorized transactions are sacred.
+`set_category` only fires when `category_override = 'none'` — manually-categorized transactions are sacred.
 
 ## Pipeline-stage priority
 

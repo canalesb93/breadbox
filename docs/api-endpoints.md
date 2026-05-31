@@ -46,7 +46,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/transactions/update` | W | Atomic multi-field batch (category + tags + comment per row, max 50) |
 | POST | `/transactions/batch-categorize` | W | Set category on many transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | W | Server-side recategorize by filter |
-| PATCH | `/transactions/{id}/category` | W | Set category (`category_override=true`) |
+| PATCH | `/transactions/{id}/category` | W | Set category (`category_override='user'`) |
 | DELETE | `/transactions/{id}/category` | W | Reset category to provider default |
 | DELETE | `/transactions/{id}` | W | Soft-delete (sets `deleted_at`) |
 | POST | `/transactions/{id}/restore` | W | Restore a soft-deleted transaction |

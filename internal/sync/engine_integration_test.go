@@ -1630,7 +1630,7 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 
 	// Set a manual override pointing at the other category.
 	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE provider_transaction_id = 'txn_override'",
+		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE provider_transaction_id = 'txn_override'",
 		other.ID,
 	)
 	if err != nil {
@@ -1876,7 +1876,7 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 	// Pin a manual override on the row, swap the user's category, and remove
 	// the tag so the second sync has a clean slate to re-apply it.
 	if _, err := pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE provider_transaction_id = 'txn_override_combo'",
+		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE provider_transaction_id = 'txn_override_combo'",
 		overrideCat.ID,
 	); err != nil {
 		t.Fatalf("set override: %v", err)

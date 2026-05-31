@@ -61,7 +61,7 @@ func TestUpdateTransactions_AtomicMultiField(t *testing.T) {
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != cat.Slug {
 		t.Fatalf("want category %q, got %+v", cat.Slug, got.Category)
 	}
-	if !got.CategoryOverride {
+	if got.CategoryOverride == "none" {
 		t.Fatalf("want category_override=true after manual set")
 	}
 
@@ -214,7 +214,7 @@ func TestUpdateTransactions_BatchAbortMode(t *testing.T) {
 	if got.Category != nil && got.Category.Slug != nil && *got.Category.Slug == cat.Slug {
 		t.Fatalf("abort mode should have rolled back; category should not be %q (uncat=%s)", cat.Slug, uncat.Slug)
 	}
-	if got.CategoryOverride {
+	if got.CategoryOverride != "none" {
 		t.Fatalf("abort mode should have rolled back; category_override should be false")
 	}
 }
@@ -256,7 +256,7 @@ func TestUpdateTransactions_ResetCategory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get transaction: %v", err)
 	}
-	if got.CategoryOverride {
+	if got.CategoryOverride != "none" {
 		t.Fatalf("expected category_override cleared after reset, still true")
 	}
 }

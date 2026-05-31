@@ -1047,9 +1047,11 @@ func txdCategoryInitial(p TransactionDetailProps) string {
 }
 
 // txdCategoryOverrideAttr returns "true" / "false" for the data-category-override
-// attribute consumed by the txdCategoryEditor Alpine factory's init().
+// attribute consumed by the txdCategoryEditor Alpine factory's init(). The
+// detail-page lock toggle is binary, so any non-'none' source (user or agent)
+// reads as locked.
 func txdCategoryOverrideAttr(p TransactionDetailProps) string {
-	if p.Transaction != nil && p.Transaction.CategoryOverride {
+	if p.Transaction != nil && p.Transaction.CategoryOverride != "none" {
 		return "true"
 	}
 	return "false"

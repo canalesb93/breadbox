@@ -307,7 +307,7 @@ func (s *Service) DeleteCategory(ctx context.Context, id string) (int64, error) 
 	}
 
 	_, err = s.Pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1 WHERE category_id IS NULL AND deleted_at IS NULL AND category_override = FALSE",
+		"UPDATE transactions SET category_id = $1 WHERE category_id IS NULL AND deleted_at IS NULL AND category_override = 'none'",
 		uncategorized.ID)
 	if err != nil {
 		return count, fmt.Errorf("reassign transactions: %w", err)
@@ -515,9 +515,15 @@ func (s *Service) SetCategoryOverrideFlag(ctx context.Context, txnID string, ove
 	if err != nil {
 		return ErrNotFound
 	}
+	// The lock toggle is binary: locking pins the row as a user override;
+	// unlocking returns it to 'none' so rules (and agents) can act on it.
+	level := CategoryOverrideNone
+	if override {
+		level = CategoryOverrideUser
+	}
 	rowsAffected, err := s.Queries.SetCategoryOverrideFlag(ctx, db.SetCategoryOverrideFlagParams{
 		ID:               txnUID,
-		CategoryOverride: override,
+		CategoryOverride: level,
 	})
 	if err != nil {
 		return fmt.Errorf("set category override flag: %w", err)
@@ -629,7 +635,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	// Note: In PostgreSQL UPDATE...FROM, the target table (t) cannot be referenced
 	// in FROM-clause JOINs. The categories JOIN is only needed for CategorySlug filter
 	// and is added conditionally below.
-	query := "UPDATE transactions t SET category_id = $1, category_override = TRUE, updated_at = NOW()" +
+	query := "UPDATE transactions t SET category_id = $1, category_override = 'user', updated_at = NOW()" +
 		" FROM accounts a" +
 		" LEFT JOIN bank_connections bc ON a.connection_id = bc.id" +
 		" WHERE t.account_id = a.id AND t.deleted_at IS NULL" +
