@@ -206,11 +206,11 @@ templ agentRunErrorAlert(run AgentRunRowProps) {
 // name › <short ID>. The agent crumb links to /agents?agent=<slug> (the
 // filtered feed) so consecutive runs stay in scope.
 func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
-	out := []components.Breadcrumb{{Label: "Agents", Href: "/agents"}}
+	out := []components.Breadcrumb{{Label: "Runs", Href: "/workflows/runs"}}
 	if p.Run.AgentSlug != "" {
 		out = append(out, components.Breadcrumb{
 			Label: runDetailAgentDisplay(p.Run),
-			Href:  "/agents?agent=" + p.Run.AgentSlug,
+			Href:  "/workflows/runs?workflow=" + p.Run.AgentSlug,
 		})
 	}
 	out = append(out, components.Breadcrumb{Label: p.Run.ShortID})
