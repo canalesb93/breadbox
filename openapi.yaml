@@ -1921,17 +1921,24 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Series]
-      summary: Review recurring series (confirm/reject/pause/cancel)
-      description: "**Requires `full_access` scope.** Applies a verdict; a user's confirmation outranks a later agent write."
+      summary: Edit and/or review a recurring series
+      description: "**Requires `full_access` scope.** Partial update. `verdict` (optional) adjudicates the lifecycle (confirm/reject/pause/cancel; a user's confirmation outranks a later agent write). The remaining fields edit the series' user-owned attributes — any subset may be present, omitted fields are unchanged. Edits apply first, then the verdict, so a caller can rename-and-confirm in one request. Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature). An empty body is rejected. Detector-owned fields (merchant_key, confidence, rollups) are not editable here — use `/rekey` and the detection funnel; the `type` axis has its own `/type` endpoint."
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [verdict]
               properties:
                 verdict: { type: string, enum: [confirm, reject, pause, cancel] }
+                name: { type: string }
+                expected_amount: { type: number }
+                amount_tolerance: { type: number }
+                currency: { type: string }
+                cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual, irregular, unknown] }
+                expected_day: { type: integer }
+                category_id: { type: string }
+                user_id: { type: string }
       responses:
         "200":
           description: Updated series.
@@ -1956,6 +1963,21 @@ paths:
               properties:
                 transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
                 confirm: { type: boolean }
+      responses:
+        "200":
+          description: Updated series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/series/{id}/transactions/{txid}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: txid, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Series]
+      summary: Unlink a transaction from a recurring series
+      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`), strips the series' inherited tags from it (a user-added tag survives), and recomputes the series' rollups + next expected date. Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
       responses:
         "200":
           description: Updated series.

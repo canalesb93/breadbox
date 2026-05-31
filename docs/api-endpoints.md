@@ -88,12 +88,13 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | GET | `/series/{id}` | R | Single series (accepts UUID or short_id) |
 | POST | `/series` | W | Create a missed series (`merchant_key`+`create_if_missing`) or assign by `series_id`; links `transaction_ids` (≤50), optional `confirm` |
 | POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series; optional `confirm` |
+| DELETE | `/series/{id}/transactions/{txid}` | W | Unlink a transaction from a series; strips inherited tags, recomputes rollups; errors if not a member |
 | POST | `/series/{id}/rekey` | W | Correct a series' `merchant_key` (+ repoint members); errors on collision / sticky-reject |
 | POST | `/series/{id}/split` | W | Move `transaction_ids` (≤50, current members) into a new series under `new_merchant_key` |
 | POST | `/series/{id}/type` | W | Set the series type (`subscription`/`bill`/`loan`/`other`); sticky override of the inferred type |
 | POST | `/series/{id}/tags` | W | Attach a tag to a series; linked transactions inherit it |
 | DELETE | `/series/{id}/tags/{slug}` | W | Detach a tag; strips series-inherited copies from members (keeps user-added) |
-| PATCH | `/series/{id}` | W | Apply a verdict: `confirm`/`reject`/`pause`/`cancel` (user confirmation outranks agent) |
+| PATCH | `/series/{id}` | W | Partial update — edit attributes (`name`, `expected_amount`+`currency`, `amount_tolerance`, `cadence`, `expected_day`, `category_id`, `user_id`) and/or apply a `verdict` (`confirm`/`reject`/`pause`/`cancel`); edits apply first; user confirmation outranks agent |
 
 ## Rules
 

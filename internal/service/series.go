@@ -139,32 +139,32 @@ type SeriesUpsert struct {
 
 // SeriesResponse is the API/MCP shape of a recurring_series row.
 type SeriesResponse struct {
-	ID               string          `json:"id"`
-	ShortID          string          `json:"short_id"`
-	UserID           *string         `json:"user_id,omitempty"`
-	Name             string          `json:"name"`
-	MerchantKey      string          `json:"merchant_key"`
-	Cadence          string          `json:"cadence"`
-	ExpectedDay      *int            `json:"expected_day,omitempty"`
-	ExpectedAmount   *float64        `json:"expected_amount,omitempty"`
-	AmountTolerance  *float64        `json:"amount_tolerance,omitempty"`
-	IsoCurrencyCode  *string         `json:"iso_currency_code,omitempty"`
-	CategoryID       *string         `json:"category_id,omitempty"`
-	Status           string          `json:"status"`
-	Type             string          `json:"type"`
-	DetectionSource  string          `json:"detection_source"`
-	Confidence       string          `json:"confidence"`
-	ConfirmedByType  *string         `json:"confirmed_by_type,omitempty"`
-	LastAmount       *float64        `json:"last_amount,omitempty"`
-	LastSeenDate     *string         `json:"last_seen_date,omitempty"`
-	NextExpectedDate *string         `json:"next_expected_date,omitempty"`
+	ID               string   `json:"id"`
+	ShortID          string   `json:"short_id"`
+	UserID           *string  `json:"user_id,omitempty"`
+	Name             string   `json:"name"`
+	MerchantKey      string   `json:"merchant_key"`
+	Cadence          string   `json:"cadence"`
+	ExpectedDay      *int     `json:"expected_day,omitempty"`
+	ExpectedAmount   *float64 `json:"expected_amount,omitempty"`
+	AmountTolerance  *float64 `json:"amount_tolerance,omitempty"`
+	IsoCurrencyCode  *string  `json:"iso_currency_code,omitempty"`
+	CategoryID       *string  `json:"category_id,omitempty"`
+	Status           string   `json:"status"`
+	Type             string   `json:"type"`
+	DetectionSource  string   `json:"detection_source"`
+	Confidence       string   `json:"confidence"`
+	ConfirmedByType  *string  `json:"confirmed_by_type,omitempty"`
+	LastAmount       *float64 `json:"last_amount,omitempty"`
+	LastSeenDate     *string  `json:"last_seen_date,omitempty"`
+	NextExpectedDate *string  `json:"next_expected_date,omitempty"`
 	// RenewalHealth is a derived bucket (active|due_soon|overdue|stale|unknown)
 	// computed from NextExpectedDate vs today; only populated for active series.
 	RenewalHealth string `json:"renewal_health,omitempty"`
 	// DaysUntilRenewal is the signed day count to NextExpectedDate (negative =
 	// overdue). Nil when there's no prediction. Populated for active series.
-	DaysUntilRenewal *int `json:"days_until_renewal,omitempty"`
-	OccurrenceCount  int  `json:"occurrence_count"`
+	DaysUntilRenewal *int            `json:"days_until_renewal,omitempty"`
+	OccurrenceCount  int             `json:"occurrence_count"`
 	DetectionSignals json.RawMessage `json:"detection_signals,omitempty"`
 	Tags             []string        `json:"tags,omitempty"`
 	CreatedAt        string          `json:"created_at"`
@@ -189,6 +189,24 @@ type AssignSeriesInput struct {
 	UserID          *string  // short_id or uuid; nil = shared/household
 	TransactionIDs  []string // members to back-link (short_id or uuid), ≤50
 	Confirm         bool     // flip straight to confirmed/active in the same call
+}
+
+// EditSeriesInput is the partial-update payload for UpdateSeries. Every field is
+// a pointer: nil leaves the column unchanged. It carries only the user-owned
+// attributes — name, the expected-charge amount (+ currency / tolerance),
+// cadence, expected-day anchor, suggested category, and owner. Detector-owned
+// fields (merchant_key, confidence, detection_source, the rollups, signals) and
+// the lifecycle status are deliberately NOT editable here — those move through
+// RekeySeries, the detection funnel, and ReviewSeries verdicts respectively.
+type EditSeriesInput struct {
+	Name            *string  // non-empty display label; "" is rejected
+	ExpectedAmount  *float64 // dollars; pair with Currency
+	AmountTolerance *float64 // dollars (the ± band the detector matches within)
+	Currency        *string  // ISO code; part of the dedup signature — a change is collision-guarded
+	Cadence         *string  // weekly|biweekly|monthly|quarterly|semiannual|annual|irregular|unknown; re-derives next_expected_date
+	ExpectedDay     *int32   // day-of-month / day-of-week anchor
+	CategoryID      *string  // short_id or uuid; "" clears the suggested category
+	UserID          *string  // short_id or uuid; "" = shared/household — part of the dedup signature, collision-guarded
 }
 
 // seriesAssignMaxMembers caps the per-call back-link batch (mirrors the
@@ -889,6 +907,193 @@ func (s *Service) SetSeriesType(ctx context.Context, idOrShort, seriesType strin
 	updated, err := s.Queries.UpdateRecurringSeries(ctx, upd)
 	if err != nil {
 		return nil, fmt.Errorf("set series type: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// UpdateSeries applies a partial edit to a series' user-owned attributes (name,
+// expected amount / tolerance / currency, cadence, expected day, suggested
+// category, owner). It is an explicit override, NOT a detection proposal, so it
+// bypasses UpsertSeriesCandidate's source-precedence ladder entirely and stamps
+// detection_source from the actor — which is precisely what protects the edit
+// from being reverted by the next deterministic re-detect (deterministic ranks
+// below user/agent). Changing the currency or owner moves the row to a new dedup
+// signature, so those are collision-guarded against an existing live series the
+// same way RekeySeries guards a merchant_key change. Editing cadence re-derives
+// the projected next_expected_date so the renewal forecast stays consistent.
+func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSeriesInput, actor Actor) (*SeriesResponse, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate + resolve inputs before opening the transaction.
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, fmt.Errorf("%w: name cannot be empty", ErrInvalidParameter)
+	}
+	if in.Cadence != nil && !validSeriesCadence[strings.TrimSpace(*in.Cadence)] {
+		return nil, fmt.Errorf("%w: invalid cadence %q", ErrInvalidParameter, *in.Cadence)
+	}
+	var newCategory pgtype.UUID
+	if in.CategoryID != nil {
+		if newCategory, err = s.resolveOptionalCategoryID(ctx, in.CategoryID); err != nil {
+			return nil, err
+		}
+	}
+	var newUser pgtype.UUID
+	if in.UserID != nil {
+		if newUser, err = s.resolveOptionalUserID(ctx, in.UserID); err != nil {
+			return nil, err
+		}
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin update series: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	row, err := qtx.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+
+	upd := updateParamsFromRow(row)
+	if in.Name != nil {
+		upd.Name = strings.TrimSpace(*in.Name)
+	}
+	if in.ExpectedAmount != nil {
+		upd.ExpectedAmount = numericDollars(*in.ExpectedAmount)
+	}
+	if in.AmountTolerance != nil {
+		upd.AmountTolerance = numericDollars(*in.AmountTolerance)
+	}
+	if in.ExpectedDay != nil {
+		upd.ExpectedDay = pgconv.Int4(*in.ExpectedDay)
+	}
+	if in.CategoryID != nil {
+		upd.CategoryID = newCategory
+	}
+	if in.Cadence != nil {
+		upd.Cadence = strings.TrimSpace(*in.Cadence)
+		upd.NextExpectedDate = nextExpectedDate(upd.Cadence, row.LastSeenDate)
+	}
+	currencyChanged := false
+	if in.Currency != nil {
+		cur := pgconv.TextPtrIfNotEmpty(in.Currency)
+		currencyChanged = cur.Valid != row.IsoCurrencyCode.Valid || cur.String != row.IsoCurrencyCode.String
+		upd.IsoCurrencyCode = cur
+	}
+	ownerChanged := false
+	if in.UserID != nil {
+		ownerChanged = newUser.Valid != row.UserID.Valid || newUser.Bytes != row.UserID.Bytes
+		upd.UserID = newUser
+	}
+
+	// Currency and owner are part of the dedup signature (merchant_key, currency,
+	// user_id). A change must not silently collide with — or merge into — another
+	// live series at the new signature; mirror RekeySeries' guard.
+	if currencyChanged || ownerChanged {
+		match, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
+			MerchantKey:     upd.MerchantKey,
+			IsoCurrencyCode: upd.IsoCurrencyCode,
+			UserID:          upd.UserID,
+		})
+		if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("match target signature: %w", mErr)
+		}
+		if mErr == nil && match.ID != row.ID {
+			return nil, fmt.Errorf("%w: another series already exists for that merchant/currency/owner — editing won't merge them", ErrInvalidParameter)
+		}
+	}
+
+	// An explicit edit records the actor as the row's shaping source, lifting it
+	// above the deterministic detector on the precedence ladder so a later
+	// re-detect can't revert the human's values.
+	upd.DetectionSource = seriesSourceForActor(actor)
+
+	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
+	if err != nil {
+		return nil, fmt.Errorf("update series: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update series: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// UnlinkSeriesTransactions detaches transactions from a series — the inverse of
+// the link path (BackLinkSeriesMembers / AssignSeries). It clears each charge's
+// series_id, strips the series' system-provenance inherited tags from the
+// detached charges (a tag the user added directly survives, exactly like
+// SplitSeries), and recomputes the series' rollups + projected next charge. It
+// refuses if any listed transaction isn't a current member, so an unlink can
+// neither silently no-op nor touch a charge that belongs to another series.
+func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string, memberIDsOrShorts []string) (*SeriesResponse, error) {
+	if len(memberIDsOrShorts) == 0 {
+		return nil, fmt.Errorf("%w: at least one transaction to unlink is required", ErrInvalidParameter)
+	}
+	if len(memberIDsOrShorts) > seriesAssignMaxMembers {
+		return nil, fmt.Errorf("%w: at most %d transactions per call", ErrInvalidParameter, seriesAssignMaxMembers)
+	}
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	memberIDs, err := s.resolveTransactionIDs(ctx, memberIDsOrShorts)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin unlink: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	row, err := qtx.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+
+	detached, err := qtx.UnlinkSeriesMembers(ctx, db.UnlinkSeriesMembersParams{
+		SeriesID:       row.ID,
+		TransactionIds: memberIDs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unlink members: %w", err)
+	}
+	if int(detached) != len(memberIDs) {
+		return nil, fmt.Errorf("%w: %d of %d transactions are not current members of this series",
+			ErrInvalidParameter, len(memberIDs)-int(detached), len(memberIDs))
+	}
+
+	// Strip the series' inherited (system-provenance) tags from the detached
+	// charges — they no longer belong to it. Scoped by provenance so a tag the
+	// user added to the transaction directly survives (mirrors SplitSeries).
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM transaction_tags
+		 WHERE transaction_id = ANY($1::uuid[]) AND added_by_type = 'system' AND added_by_id = $2`,
+		memberIDs, row.ShortID); err != nil {
+		return nil, fmt.Errorf("strip series tags from unlinked members: %w", err)
+	}
+
+	updated, err := s.applyRollup(ctx, qtx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit unlink: %w", err)
 	}
 	resp := seriesFromRow(updated)
 	return &resp, nil

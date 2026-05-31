@@ -75,6 +75,16 @@ WHERE id = ANY(sqlc.arg('transaction_ids')::uuid[])
   AND series_id IS NULL
   AND deleted_at IS NULL;
 
+-- UnlinkSeriesMembers detaches the given transactions from a series (clears
+-- series_id), guarded on series_id so it can never steal a charge from another
+-- series. Returns rows affected so the caller can verify every id was a member.
+-- name: UnlinkSeriesMembers :execrows
+UPDATE transactions
+SET series_id = NULL, updated_at = NOW()
+WHERE id = ANY(sqlc.arg('transaction_ids')::uuid[])
+  AND series_id = sqlc.arg('series_id')
+  AND deleted_at IS NULL;
+
 -- SeriesMemberRollup recomputes occurrence_count / last_seen_date / last_amount
 -- from the series' live members. Returns zero rows when the series has none.
 -- name: SeriesMemberRollup :one

@@ -101,6 +101,79 @@ func (s *MCPServer) handleReviewSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 	return jsonResult(series)
 }
 
+type updateSeriesInput struct {
+	ID              string   `json:"id" jsonschema:"required,Series short ID or UUID to edit."`
+	Name            string   `json:"name,omitempty" jsonschema:"New display name. Omit to leave unchanged."`
+	ExpectedAmount  *float64 `json:"expected_amount,omitempty" jsonschema:"New expected charge amount in dollars (pair with currency). Omit to leave unchanged."`
+	AmountTolerance *float64 `json:"amount_tolerance,omitempty" jsonschema:"New ± match tolerance in dollars. Omit to leave unchanged."`
+	Currency        string   `json:"currency,omitempty" jsonschema:"New ISO currency code for the amount (e.g. USD). Part of the dedup signature — a change is collision-guarded. Omit to leave unchanged."`
+	Cadence         string   `json:"cadence,omitempty" jsonschema:"New cadence: weekly, biweekly, monthly, quarterly, semiannual, annual, irregular, unknown. Re-derives the next expected date. Omit to leave unchanged."`
+	ExpectedDay     *int32   `json:"expected_day,omitempty" jsonschema:"New day-of-month / day-of-week anchor. Omit to leave unchanged."`
+	CategoryID      string   `json:"category_id,omitempty" jsonschema:"New suggested category short ID or UUID. Omit to leave unchanged."`
+	UserID          string   `json:"user_id,omitempty" jsonschema:"New household-member owner short ID or UUID. Part of the dedup signature — a change is collision-guarded. Omit to leave unchanged."`
+}
+
+func (s *MCPServer) handleUpdateSeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateSeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" {
+		return errorResult(fmt.Errorf("id is required")), nil, nil
+	}
+	opt := func(v string) *string {
+		if v == "" {
+			return nil
+		}
+		return &v
+	}
+	edit := service.EditSeriesInput{
+		Name:            opt(input.Name),
+		ExpectedAmount:  input.ExpectedAmount,
+		AmountTolerance: input.AmountTolerance,
+		Currency:        opt(input.Currency),
+		Cadence:         opt(input.Cadence),
+		ExpectedDay:     input.ExpectedDay,
+		CategoryID:      opt(input.CategoryID),
+		UserID:          opt(input.UserID),
+	}
+	if edit.Name == nil && edit.ExpectedAmount == nil && edit.AmountTolerance == nil &&
+		edit.Currency == nil && edit.Cadence == nil && edit.ExpectedDay == nil &&
+		edit.CategoryID == nil && edit.UserID == nil {
+		return errorResult(fmt.Errorf("provide at least one field to update")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.UpdateSeries(context.Background(), input.ID, edit, actor)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
+type unlinkSeriesInput struct {
+	ID             string   `json:"id" jsonschema:"required,Series short ID or UUID."`
+	TransactionIDs []string `json:"transaction_ids" jsonschema:"required,Transactions (short ID or UUID) to detach from the series. Each must currently belong to it. Max 50."`
+}
+
+func (s *MCPServer) handleUnlinkSeriesTransactions(ctx context.Context, _ *mcpsdk.CallToolRequest, input unlinkSeriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" || len(input.TransactionIDs) == 0 {
+		return errorResult(fmt.Errorf("id and transaction_ids are required")), nil, nil
+	}
+	series, err := s.svc.UnlinkSeriesTransactions(context.Background(), input.ID, input.TransactionIDs)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(series)
+}
+
 type setSeriesTypeInput struct {
 	ID   string `json:"id" jsonschema:"required,Series short ID or UUID."`
 	Type string `json:"type" jsonschema:"required,One of: subscription, bill, loan, other."`

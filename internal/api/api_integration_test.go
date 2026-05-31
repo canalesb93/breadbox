@@ -189,7 +189,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/tags", CreateTagHandler(svc))
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
-			r.Patch("/series/{id}", ReviewSeriesHandler(svc))
+			r.Patch("/series/{id}", PatchSeriesHandler(svc))
 			r.Post("/sync", TriggerSyncHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
