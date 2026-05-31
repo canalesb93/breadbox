@@ -26,9 +26,9 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 		<!-- Status + verdict toolbar -->
 		<div class="flex items-center flex-wrap gap-2 mb-6">
 			<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.StatusTone }>{ p.Series.StatusLabel }</span>
-			<span class="badge badge-ghost badge-sm">{ p.Series.TypeLabel }</span>
+			@components.SeriesTypeChip(p.Series.TypeLabel, "sm")
 			if p.Series.Status == "candidate" {
-				<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.BandTone }>{ p.Series.ConfidenceBand } confidence</span>
+				@components.SeriesConfidenceChip(p.Series.ConfidenceBand, p.Series.BandTone)
 			}
 			<div class="flex-1"></div>
 			switch p.Series.Status {
@@ -51,7 +51,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			Title: "Details",
 		}) {
 			@components.SettingsRow(components.SettingsRowProps{Label: "Type", Caption: "Subscription, bill, loan, or other"}) {
-				<span class="badge badge-soft badge-neutral badge-sm">{ p.Series.TypeLabel }</span>
+				@components.SeriesTypeChip(p.Series.TypeLabel, "sm")
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence"}) {
 				<span class="text-sm">{ p.Series.CadenceLabel }</span>
@@ -107,9 +107,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			@components.SettingsRow(components.SettingsRowProps{Label: "Next renewal"}) {
 				<span class="text-sm inline-flex items-center gap-2">
 					{ subscriptionDetailField(p.NextExpected) }
-					if p.Series.RenewalLabel != "" {
-						<span class={ "badge badge-soft badge-xs", "badge-" + p.Series.RenewalTone }>{ p.Series.RenewalLabel }</span>
-					}
+					@components.SeriesRenewalChip(p.Series.RenewalLabel, p.Series.RenewalTone)
 				</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Last seen"}) {
