@@ -47,6 +47,9 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 		activeCount := 0
 		usersWithSeries := map[string]bool{}
 		typesPresent := map[string]bool{}
+		upcomingByCurrency := map[string]float64{}
+		var upcomingOrder []string
+		upcomingCount := 0
 
 		for _, s := range all {
 			// A rejected verdict ("Not a subscription") is a dismissal — it
@@ -79,6 +82,14 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 						currencyOrder = append(currencyOrder, cur)
 					}
 					monthlyByCurrency[cur] += monthlyEquivalent(s.Cadence, row.Amount)
+					// Upcoming spend: the next charge lands within the next 30 days.
+					if row.DaysUntilRenewal != nil && *row.DaysUntilRenewal >= 0 && *row.DaysUntilRenewal <= 30 {
+						if _, seen := upcomingByCurrency[cur]; !seen {
+							upcomingOrder = append(upcomingOrder, cur)
+						}
+						upcomingByCurrency[cur] += row.Amount
+						upcomingCount++
+					}
 				}
 			}
 		}
@@ -102,12 +113,21 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				Amount:   monthlyByCurrency[cur],
 			})
 		}
+		var upcomingTotals []pages.SubscriptionMonthlyTotal
+		for _, cur := range upcomingOrder {
+			upcomingTotals = append(upcomingTotals, pages.SubscriptionMonthlyTotal{
+				Currency: cur,
+				Amount:   upcomingByCurrency[cur],
+			})
+		}
 
 		props := pages.SubscriptionsListProps{
 			CSRFToken:      GetCSRFToken(r),
 			ActiveCount:    activeCount,
 			CandidateCount: len(candidates),
 			MonthlyTotals:  monthlyTotals,
+			UpcomingTotals: upcomingTotals,
+			UpcomingCount:  upcomingCount,
 			Candidates:     candidates,
 			Active:         active,
 			Users:          subscriptionUserFilters(ctx, a, usersWithSeries),

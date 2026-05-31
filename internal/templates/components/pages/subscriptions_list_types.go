@@ -13,6 +13,10 @@ type SubscriptionsListProps struct {
 	CandidateCount int
 	// Monthly-equivalent spend, one entry per currency (never summed across).
 	MonthlyTotals []SubscriptionMonthlyTotal
+	// Upcoming spend in the next 30 days — active series whose next charge lands
+	// within [0,30] days, summed per currency. UpcomingCount is how many.
+	UpcomingTotals []SubscriptionMonthlyTotal
+	UpcomingCount  int
 
 	// Household-member filter strip. Only rendered when len > 1.
 	Users []SubscriptionUserFilter
