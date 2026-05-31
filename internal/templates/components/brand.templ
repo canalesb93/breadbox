@@ -7,7 +7,9 @@ package components
 // All marks ship with their official brand fills baked into the
 // <path> — the marks ARE the brand, so they don't inherit container
 // color. The dark-mode invert for black-on-light marks lives in
-// input.css under `@media (prefers-color-scheme: dark)`.
+// input.css, keyed off the resolved daisy theme (both
+// prefers-color-scheme and the [data-theme] override the theme toggle
+// sets) so the mark never flips white on a forced-light page.
 //
 // Pass "" for class when no extra classes are needed.
 templ BrandIcon(slug, class string) {
