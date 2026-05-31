@@ -144,6 +144,25 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			a.Logger.Error("series members", "error", err)
 		}
 
+		// Add-tag options = the vocabulary minus tags already on the series.
+		onSeries := map[string]bool{}
+		for _, tg := range row.Tags {
+			onSeries[tg] = true
+		}
+		var tagOptions []pages.SubscriptionTagOption
+		if tags, terr := svc.ListTags(ctx); terr == nil {
+			for _, t := range tags {
+				if onSeries[t.Slug] {
+					continue
+				}
+				name := t.DisplayName
+				if name == "" {
+					name = t.Slug
+				}
+				tagOptions = append(tagOptions, pages.SubscriptionTagOption{Slug: t.Slug, Name: name})
+			}
+		}
+
 		props := pages.SubscriptionDetailProps{
 			CSRFToken:       GetCSRFToken(r),
 			Series:          row,
@@ -155,6 +174,7 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			Confidence:      s.Confidence,
 			Members:         subscriptionMembers(members),
 			PriceChanges:    subscriptionPriceChanges(members),
+			AvailableTags:   tagOptions,
 		}
 
 		data := map[string]any{

@@ -70,15 +70,36 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 				<span class="text-sm">{ subscriptionDetailField(p.Series.CategoryName) }</span>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Tags", Caption: "Linked charges inherit these"}) {
-				if len(p.Series.Tags) > 0 {
-					<span class="inline-flex flex-wrap gap-1.5">
-						for _, tag := range p.Series.Tags {
-							<span class="badge badge-soft badge-neutral badge-sm">{ tag }</span>
-						}
-					</span>
-				} else {
-					<span class="text-base-content/40 text-sm">—</span>
-				}
+				<div class="flex flex-wrap items-center gap-1.5">
+					for _, tag := range p.Series.Tags {
+						<span class="badge badge-soft badge-neutral badge-sm gap-1">
+							{ tag }
+							<button
+								type="button"
+								@click={ fmt.Sprintf("removeSeriesTag(%q, %q)", p.Series.ShortID, tag) }
+								class="cursor-pointer opacity-60 hover:opacity-100 bg-transparent inline-flex"
+								aria-label="Remove tag"
+							>
+								@components.LucideIcon("x", "w-3 h-3")
+							</button>
+						</span>
+					}
+					if len(p.AvailableTags) > 0 {
+						<select
+							@change={ fmt.Sprintf("addSeriesTag(%q, $event.target.value)", p.Series.ShortID) }
+							class="select select-xs bg-base-200 w-auto"
+							aria-label="Add a tag"
+						>
+							<option value="">+ Add tag</option>
+							for _, opt := range p.AvailableTags {
+								<option value={ opt.Slug }>{ opt.Name }</option>
+							}
+						</select>
+					}
+					if len(p.Series.Tags) == 0 && len(p.AvailableTags) == 0 {
+						<span class="text-base-content/40 text-sm">No tags available — create one first.</span>
+					}
+				</div>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day"}) {
 				<span class="text-sm">{ subscriptionDetailField(p.ExpectedDay) }</span>

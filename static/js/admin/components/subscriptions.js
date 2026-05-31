@@ -37,6 +37,55 @@
           });
         },
 
+        // Interactive series-tag editing on the detail page. Add/remove go to
+        // the same REST endpoints the add_series_tag / remove_series_tag MCP
+        // tools wrap; CSRF is auto-injected by the global fetch wrapper. Reload
+        // on success to re-render the inherited tags + the add-options.
+        addSeriesTag: function (seriesId, slug) {
+          if (!slug) return;
+          this._tagOp(
+            'POST',
+            '/api/v1/series/' + encodeURIComponent(seriesId) + '/tags',
+            { tag_slug: slug },
+            'Tag added'
+          );
+        },
+
+        removeSeriesTag: function (seriesId, slug) {
+          this._tagOp(
+            'DELETE',
+            '/api/v1/series/' + encodeURIComponent(seriesId) + '/tags/' + encodeURIComponent(slug),
+            null,
+            'Tag removed'
+          );
+        },
+
+        _tagOp: function (method, url, body, okMsg) {
+          var opts = { method: method, headers: { Accept: 'application/json' } };
+          if (body) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+          }
+          fetch(url, opts)
+            .then(function (res) {
+              if (res.ok) {
+                toast(okMsg, 'success');
+                window.location.reload();
+                return;
+              }
+              restorePageState();
+              return res.json().then(function (data) {
+                toast((data.error && data.error.message) || 'Failed to update tags.');
+              }).catch(function () {
+                toast('Failed to update tags.');
+              });
+            })
+            .catch(function () {
+              restorePageState();
+              toast('Network error. Please try again.');
+            });
+        },
+
         // Search filter for the active-ledger rows (data-search haystack).
         matches: function (el) {
           if (!this.filter) return true;
