@@ -121,6 +121,17 @@ type SubscriptionDetailProps struct {
 
 	// Price-change history derived from members (oldest → newest change points).
 	PriceChanges []SubscriptionPriceChange
+
+	// AvailableTags is every tag in the vocabulary (slug + name), for the
+	// interactive tag editor's add-control. The template hides tags already on
+	// the series client-side.
+	AvailableTags []SubscriptionTagOption
+}
+
+// SubscriptionTagOption is one option in the detail page's add-tag picker.
+type SubscriptionTagOption struct {
+	Slug string
+	Name string
 }
 
 // SubscriptionMember is one linked charge in the detail timeline.
