@@ -118,7 +118,7 @@ func TestFireSyncCompleteAgents_DebouncesRecentRun(t *testing.T) {
 
 	// A recent non-skipped run anchors the debounce window.
 	if _, err := pool.Exec(context.Background(),
-		`INSERT INTO agent_runs (agent_definition_id,"trigger",status,started_at)
+		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,started_at)
 		 VALUES ($1,'webhook','success', NOW())`, def.ID); err != nil {
 		t.Fatalf("seed recent run: %v", err)
 	}

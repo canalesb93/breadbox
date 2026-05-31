@@ -28,7 +28,7 @@ UPDATE agent_reports SET read_at = NOW() WHERE read_at IS NULL;
 DELETE FROM agent_reports WHERE id = $1;
 
 -- name: ListReportSummariesForRunIDs :many
--- Returns short report summaries for a batch of agent_runs UUIDs.
+-- Returns short report summaries for a batch of workflow_runs UUIDs.
 -- Powers the AgentRunRow chip on the runs landing — operators see
 -- "this run produced these reports" at a glance.
 SELECT

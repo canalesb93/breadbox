@@ -1,5 +1,5 @@
 -- name: CreateAgentDefinition :one
-INSERT INTO agent_definitions (
+INSERT INTO workflows (
     name, slug, prompt, system_prompt, schedule_cron,
     tool_scope, allowed_tools, model, max_turns, max_budget_usd, enabled,
     quiet_hours_start, quiet_hours_end, trigger_on_sync_complete, source_template
@@ -8,25 +8,25 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING *;
 
 -- name: GetAgentDefinition :one
-SELECT * FROM agent_definitions WHERE id = $1;
+SELECT * FROM workflows WHERE id = $1;
 
 -- name: GetAgentDefinitionByShortID :one
-SELECT * FROM agent_definitions WHERE short_id = $1;
+SELECT * FROM workflows WHERE short_id = $1;
 
 -- name: GetAgentDefinitionBySlug :one
-SELECT * FROM agent_definitions WHERE slug = $1;
+SELECT * FROM workflows WHERE slug = $1;
 
 -- name: ListAgentDefinitions :many
-SELECT * FROM agent_definitions
+SELECT * FROM workflows
 ORDER BY created_at DESC;
 
 -- name: ListEnabledAgentDefinitions :many
-SELECT * FROM agent_definitions
+SELECT * FROM workflows
 WHERE enabled = TRUE
 ORDER BY created_at DESC;
 
 -- name: UpdateAgentDefinition :one
-UPDATE agent_definitions
+UPDATE workflows
 SET name                     = $2,
     slug                     = $3,
     prompt                   = $4,
@@ -48,16 +48,16 @@ RETURNING *;
 -- name: ListAgentDefinitionsForSyncWebhook :many
 -- Used by the post-sync hook to find agents that should fire after a
 -- successful sync. Filtered by the partial index for cheap lookup.
-SELECT * FROM agent_definitions
+SELECT * FROM workflows
 WHERE enabled = TRUE AND trigger_on_sync_complete = TRUE
 ORDER BY created_at DESC;
 
 -- name: SetAgentDefinitionEnabled :one
-UPDATE agent_definitions
+UPDATE workflows
 SET enabled    = $2,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
 -- name: DeleteAgentDefinition :execrows
-DELETE FROM agent_definitions WHERE id = $1;
+DELETE FROM workflows WHERE id = $1;

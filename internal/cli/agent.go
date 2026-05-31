@@ -48,7 +48,7 @@ the full chain works:
   - SDK can reach Anthropic and produce a response
 
 No agent definition is registered, no MCP servers attached, no
-agent_runs row written. Cost is bounded to ~5¢ via the diagnostic
+workflow_runs row written. Cost is bounded to ~5¢ via the diagnostic
 budget cap.
 
 Exit codes:
@@ -70,7 +70,7 @@ Exit codes:
 		Short: "Trigger an immediate run of a named agent",
 		Long: `Run one agent end-to-end against the live system: mints a scoped API
 key, spawns the sidecar with the definition's prompt + schedule, calls
-the MCP server, persists the resulting agent_runs row, revokes the key.
+the MCP server, persists the resulting workflow_runs row, revokes the key.
 
 Equivalent to clicking "Run now" in the admin UI — useful for cron/shell
 automation or local debugging.
