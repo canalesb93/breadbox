@@ -6,77 +6,133 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// SubscriptionDetail renders /subscriptions/{short_id} — one recurring series
-// with its config grid, derived price-change history, and the timeline of
-// linked charges. Verdict actions (confirm / reject / pause / cancel) reuse the
-// `subscriptionsList` Alpine factory's window-level 'series-verdict' handler.
+// SubscriptionDetail renders /recurring/{short_id} — one recurring series with
+// an editable config grid, derived price-change history, and its linked
+// charges (rendered through the shared TxRowFeed row, with per-row unlink and a
+// search-modal to link more). All mutations go through the `seriesDetail`
+// Alpine factory (static/js/admin/components/series_detail.js).
 templ SubscriptionDetail(p SubscriptionDetailProps) {
-	<script src="/static/js/admin/components/subscriptions.js"></script>
-	<div x-data="subscriptionsList">
+	<script src="/static/js/admin/components/series_detail.js"></script>
+	<div x-data="seriesDetail" data-series-id={ p.Series.ShortID }>
 		@components.BreadcrumbNav([]components.Breadcrumb{
 			{Label: "Recurring", Href: "/recurring"},
 			{Label: p.Series.Name},
 		})
-		@components.PageHeader(components.PageHeaderProps{
-			Title:                p.Series.Name,
-			Subtitle:             subscriptionDetailSubtitle(p.Series),
-			SubtitleHideOnMobile: true,
-			Action:               subscriptionsBetaBadge(),
+		@components.EntityHeader(components.EntityHeaderProps{
+			Title:    p.Series.Name,
+			Icon:     seriesTypeIcon(p.Series.Type),
+			IconTone: seriesStatusIconTone(p.Series.Status),
+			Badges:   seriesDetailBadges(p.Series),
+			Meta:     components.EntityHeaderMeta(p.Series.CadenceLabel, p.Series.MerchantKey),
+			Action:   seriesDetailActions(p.Series),
 		})
-		<!-- Status + verdict toolbar -->
-		<div class="flex items-center flex-wrap gap-2 mb-6">
-			<span class={ "badge badge-soft badge-sm", "badge-" + p.Series.StatusTone }>{ p.Series.StatusLabel }</span>
-			@components.SeriesTypeChip(p.Series.TypeLabel, "sm")
-			if p.Series.Status == "candidate" {
-				@components.SeriesConfidenceChip(p.Series.ConfidenceBand, p.Series.BandTone)
-			}
-			<div class="flex-1"></div>
-			switch p.Series.Status {
-				case "candidate":
-					@subscriptionVerdictBtn(p.Series, "reject", "Not recurring", "x", "btn-ghost")
-					@subscriptionVerdictBtn(p.Series, "confirm", "Confirm", "check", "btn-primary")
-				case "active":
-					@subscriptionVerdictBtn(p.Series, "pause", "Pause", "pause", "btn-ghost")
-					@subscriptionVerdictBtn(p.Series, "cancel", "Cancel", "x-circle", "btn-ghost")
-				case "paused":
-					@subscriptionVerdictBtn(p.Series, "confirm", "Resume", "play", "btn-primary")
-					@subscriptionVerdictBtn(p.Series, "cancel", "Cancel", "x-circle", "btn-ghost")
-				case "cancelled":
-					@subscriptionVerdictBtn(p.Series, "confirm", "Reactivate", "rotate-ccw", "btn-primary")
-			}
-		</div>
-		<!-- Config grid -->
+		<!-- Config grid (editable) -->
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:  "repeat",
 			Title: "Details",
 		}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Name"}) {
+				<input
+					type="text"
+					value={ p.Series.Name }
+					@change={ fmt.Sprintf("saveName(%q, $event.target.value)", p.Series.ShortID) }
+					@keydown.enter.prevent="$event.target.blur()"
+					class="input input-sm w-full sm:w-64"
+					aria-label="Series name"
+				/>
+			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Type", Caption: "Subscription, bill, loan, or other"}) {
-				@components.SeriesTypeChip(p.Series.TypeLabel, "sm")
+				<select
+					@change={ fmt.Sprintf("setType(%q, $event.target.value)", p.Series.ShortID) }
+					class="select select-sm w-auto"
+					aria-label="Type"
+				>
+					for _, opt := range seriesTypeOptions {
+						<option value={ opt.Value } selected?={ p.Series.Type == opt.Value }>{ opt.Label }</option>
+					}
+				</select>
 			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence"}) {
-				<span class="text-sm">{ p.Series.CadenceLabel }</span>
+			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence", Caption: "Drives the projected next charge"}) {
+				<select
+					@change={ fmt.Sprintf("saveCadence(%q, $event.target.value)", p.Series.ShortID) }
+					class="select select-sm w-auto"
+					aria-label="Cadence"
+				>
+					for _, opt := range seriesCadenceOptions {
+						<option value={ opt.Value } selected?={ p.Series.Cadence == opt.Value }>{ opt.Label }</option>
+					}
+				</select>
 			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Last charge"}) {
-				if p.Series.HasAmount {
-					@components.Amount(components.AmountProps{Value: p.Series.Amount, Intent: components.AmountCost, Class: "text-sm font-medium"})
-				} else {
-					<span class="text-base-content/40 text-sm">—</span>
-				}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Expected amount", Caption: "± tolerance band the detector matches within"}) {
+				<div class="flex items-center gap-1.5">
+					<input
+						type="number"
+						step="0.01"
+						x-ref="expAmt"
+						if p.HasExpectedAmount {
+							value={ fmt.Sprintf("%.2f", p.ExpectedAmountValue) }
+						}
+						@change={ fmt.Sprintf("saveAmount(%q, $refs.expAmt.value, $refs.expCur.value)", p.Series.ShortID) }
+						class="input input-sm w-28"
+						placeholder="0.00"
+						aria-label="Expected amount"
+					/>
+					<input
+						type="text"
+						x-ref="expCur"
+						value={ p.Series.Currency }
+						@change={ fmt.Sprintf("saveAmount(%q, $refs.expAmt.value, $refs.expCur.value)", p.Series.ShortID) }
+						class="input input-sm w-20 uppercase"
+						placeholder="USD"
+						aria-label="Currency"
+					/>
+					<span class="text-base-content/40 text-sm whitespace-nowrap">{ subscriptionToleranceSuffix(p.AmountTolerance) }</span>
+				</div>
 			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Expected amount", Caption: "± tolerance band"}) {
-				<span class="text-sm">{ subscriptionDetailField(p.ExpectedAmount) } <span class="text-base-content/40">{ subscriptionToleranceSuffix(p.AmountTolerance) }</span></span>
+			@components.SettingsRow(components.SettingsRowProps{Label: "Tolerance", Caption: "± match band (advanced)"}) {
+				<input
+					type="number"
+					step="0.01"
+					value={ fmt.Sprintf("%.2f", p.AmountToleranceValue) }
+					@change={ fmt.Sprintf("saveTolerance(%q, $event.target.value)", p.Series.ShortID) }
+					class="input input-sm w-28"
+					aria-label="Amount tolerance"
+				/>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day", Caption: "Day of month / week anchor"}) {
+				<input
+					type="number"
+					min="1"
+					max="31"
+					if p.ExpectedDayValue > 0 {
+						value={ fmt.Sprintf("%d", p.ExpectedDayValue) }
+					}
+					@change={ fmt.Sprintf("saveExpectedDay(%q, $event.target.value)", p.Series.ShortID) }
+					class="input input-sm w-24"
+					placeholder="—"
+					aria-label="Expected day"
+				/>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Suggested category"}) {
-				<span class="text-sm">{ subscriptionDetailField(p.Series.CategoryName) }</span>
+				<select
+					@change={ fmt.Sprintf("saveCategory(%q, $event.target.value)", p.Series.ShortID) }
+					class="select select-sm w-auto max-w-[16rem]"
+					aria-label="Suggested category"
+				>
+					<option value="" selected?={ p.CurrentCategoryID == "" }>— None —</option>
+					for _, opt := range p.Categories {
+						<option value={ opt.ID } selected?={ p.CurrentCategoryID == opt.ID }>{ opt.Name }</option>
+					}
+				</select>
 			}
 			@components.SettingsRow(components.SettingsRowProps{Label: "Tags", Caption: "Linked charges inherit these"}) {
 				<div class="flex flex-wrap items-center gap-1.5">
-					for _, tag := range p.Series.Tags {
-						<span class="badge badge-soft badge-neutral badge-sm gap-1">
-							{ tag }
+					for _, chip := range p.TagChips {
+						<span class="inline-flex items-center gap-1">
+							@components.TagChipSm(chip)
 							<button
 								type="button"
-								@click={ fmt.Sprintf("removeSeriesTag(%q, %q)", p.Series.ShortID, tag) }
+								@click={ fmt.Sprintf("removeSeriesTag(%q, %q)", p.Series.ShortID, chip.Slug) }
 								class="cursor-pointer opacity-60 hover:opacity-100 bg-transparent inline-flex"
 								aria-label="Remove tag"
 							>
@@ -86,7 +142,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 					}
 					if len(p.AvailableTags) > 0 {
 						<select
-							@change={ fmt.Sprintf("addSeriesTag(%q, $event.target.value)", p.Series.ShortID) }
+							@change={ fmt.Sprintf("addSeriesTag(%q, $event.target.value); $event.target.value=''", p.Series.ShortID) }
 							class="select select-xs bg-base-200 w-auto"
 							aria-label="Add a tag"
 						>
@@ -96,15 +152,19 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 							}
 						</select>
 					}
-					if len(p.Series.Tags) == 0 && len(p.AvailableTags) == 0 {
+					if len(p.TagChips) == 0 && len(p.AvailableTags) == 0 {
 						<span class="text-base-content/40 text-sm">No tags available — create one first.</span>
 					}
 				</div>
 			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day"}) {
-				<span class="text-sm">{ subscriptionDetailField(p.ExpectedDay) }</span>
+			@components.SettingsRow(components.SettingsRowProps{Label: "Last charge"}) {
+				if p.Series.HasAmount {
+					@components.Amount(components.AmountProps{Value: p.Series.Amount, Intent: components.AmountCost, Class: "text-sm font-medium"})
+				} else {
+					<span class="text-base-content/40 text-sm">—</span>
+				}
 			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Next renewal"}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Next renewal", Caption: "Derived from cadence + last charge"}) {
 				<span class="text-sm inline-flex items-center gap-2">
 					{ subscriptionDetailField(p.NextExpected) }
 					@components.SeriesRenewalChip(p.Series.RenewalLabel, p.Series.RenewalTone)
@@ -116,7 +176,7 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 			@components.SettingsRow(components.SettingsRowProps{Label: "Detected by"}) {
 				<span class="text-sm">{ p.Series.SourceLabel }</span>
 			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Merchant key", Caption: "Normalized detection anchor"}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Merchant key", Caption: "Detection anchor — correct via re-key"}) {
 				<code class="font-mono text-xs break-all">{ subscriptionDetailField(p.Series.MerchantKey) }</code>
 			}
 		}
@@ -141,63 +201,68 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 		}
 		<!-- Linked charges -->
 		<div class="mt-6">
-			<div class="flex items-center gap-2 mb-3">
-				<h2 class="text-sm font-semibold text-base-content">Linked charges</h2>
-				<span class="badge badge-ghost badge-sm">{ fmt.Sprintf("%d", len(p.Members)) }</span>
-			</div>
+			@components.SectionHeader(components.SectionHeaderProps{
+				Icon:       "receipt",
+				Title:      "Linked charges",
+				Count:      components.SectionHeaderIntPtr(len(p.Members)),
+				CountLabel: "charges",
+				Action:     seriesLinkChargeBtn(),
+			})
 			if len(p.Members) == 0 {
 				@components.EmptyState(components.EmptyStateProps{
 					Icon:    "receipt",
 					Title:   "No linked charges",
-					Body:    "Transactions get linked to this series as they sync or when you assign them.",
+					Body:    "Transactions link to this series as they sync, or link one yourself.",
 					Compact: true,
 					InCard:  true,
 				})
 			} else {
-				<div class="bb-card overflow-hidden">
-					<div class="overflow-x-auto">
-						<table class="table table-sm">
-							<thead class="text-xs text-base-content/60">
-								<tr>
-									<th>Date</th>
-									<th>Description</th>
-									<th class="text-right">Amount</th>
-								</tr>
-							</thead>
-							<tbody>
-								for _, m := range p.Members {
-									<tr class="hover:bg-base-200/30 transition-colors">
-										<td class="text-sm text-base-content/70 whitespace-nowrap">{ m.Date }</td>
-										<td>
-											<a href={ templ.SafeURL("/transactions/" + m.ShortID) } class="text-sm text-base-content hover:underline">{ m.Name }</a>
-										</td>
-										<td class="text-right">
-											if m.HasAmount {
-												@components.Amount(components.AmountProps{Value: m.Amount, Intent: components.AmountCost, Class: "text-sm font-medium"})
-											} else {
-												<span class="text-xs text-base-content/30">—</span>
-											}
-										</td>
-									</tr>
-								}
-							</tbody>
-						</table>
-					</div>
+				<div class="bb-card overflow-hidden divide-y divide-base-300/50">
+					for _, m := range p.Members {
+						@seriesLinkedCharge(p.Series.ShortID, m)
+					}
 				</div>
 			}
 		</div>
+		@seriesLinkModal()
 	</div>
-	<script>
-		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
-	</script>
 }
 
-// subscriptionVerdictBtn renders one verdict action that dispatches to the
-// shared 'series-verdict' window handler in subscriptions.js.
-templ subscriptionVerdictBtn(s SubscriptionRow, verdict, label, icon, variant string) {
+// seriesDetailBadges is the EntityHeader badge row: status + type + (candidate) confidence.
+templ seriesDetailBadges(s SubscriptionRow) {
+	<span class={ "badge badge-soft badge-sm", "badge-" + s.StatusTone }>{ s.StatusLabel }</span>
+	@components.SeriesTypeChip(s.TypeLabel, "sm")
+	if s.Status == "candidate" {
+		@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
+	}
+}
+
+// seriesDetailActions is the EntityHeader trailing verdict cluster — the same
+// confirm/reject/pause/cancel/resume/reactivate set, by lifecycle status.
+templ seriesDetailActions(s SubscriptionRow) {
+	<div class="flex items-center gap-2">
+		switch s.Status {
+			case "candidate":
+				@seriesVerdictBtn(s, "reject", "Not recurring", "x", "btn-ghost")
+				@seriesVerdictBtn(s, "confirm", "Confirm", "check", "btn-primary")
+			case "active":
+				@seriesVerdictBtn(s, "pause", "Pause", "pause", "btn-ghost")
+				@seriesVerdictBtn(s, "cancel", "Cancel", "x-circle", "btn-ghost")
+			case "paused":
+				@seriesVerdictBtn(s, "confirm", "Resume", "play", "btn-primary")
+				@seriesVerdictBtn(s, "cancel", "Cancel", "x-circle", "btn-ghost")
+			case "cancelled":
+				@seriesVerdictBtn(s, "confirm", "Reactivate", "rotate-ccw", "btn-primary")
+		}
+	</div>
+}
+
+// seriesVerdictBtn calls submitVerdict on the seriesDetail factory directly
+// (the button lives inside the page's x-data scope).
+templ seriesVerdictBtn(s SubscriptionRow, verdict, label, icon, variant string) {
 	<button
 		type="button"
-		@click={ fmt.Sprintf("$dispatch('series-verdict', {id: %q, name: %q, verdict: %q})", s.ShortID, s.Name, verdict) }
+		@click={ fmt.Sprintf("submitVerdict(%q, %q, %q)", s.ShortID, s.Name, verdict) }
 		class={ "btn btn-sm gap-1.5", variant }
 	>
 		@components.LucideIcon(icon, "w-4 h-4")
@@ -205,11 +270,122 @@ templ subscriptionVerdictBtn(s SubscriptionRow, verdict, label, icon, variant st
 	</button>
 }
 
-func subscriptionDetailSubtitle(s SubscriptionRow) string {
-	if s.MerchantKey != "" {
-		return s.CadenceLabel + " · " + s.MerchantKey
+// seriesLinkChargeBtn opens the link-a-charge search modal.
+templ seriesLinkChargeBtn() {
+	<button type="button" @click="openLink()" class="btn btn-sm btn-ghost gap-1.5">
+		@components.LucideIcon("plus", "w-4 h-4")
+		Link a charge
+	</button>
+}
+
+// seriesLinkedCharge renders one member charge via the shared TxRowFeed row,
+// prefixed with its date and suffixed with an unlink control.
+templ seriesLinkedCharge(seriesID string, m SubscriptionMember) {
+	<div class="flex items-center gap-2 px-2 py-0.5">
+		<span class="text-xs text-base-content/50 tabular-nums w-24 shrink-0">{ m.Date }</span>
+		<div class="flex-1 min-w-0">
+			@components.TxRowFeed(components.TxRowFeedProps{
+				ShortID:       m.ShortID,
+				Description:   m.Name,
+				Amount:        m.Amount,
+				Currency:      m.Currency,
+				Pending:       m.Pending,
+				CategoryColor: m.CategoryColor,
+				CategoryIcon:  m.CategoryIcon,
+				TagCount:      m.TagCount,
+			})
+		</div>
+		<button
+			type="button"
+			@click={ fmt.Sprintf("unlinkCharge(%q, %q)", seriesID, m.ShortID) }
+			class="btn btn-ghost btn-xs btn-square shrink-0 text-base-content/40 hover:text-error"
+			aria-label="Unlink charge"
+			title="Unlink from this series"
+		>
+			@components.LucideIcon("unlink", "w-3.5 h-3.5")
+		</button>
+	</div>
+}
+
+// seriesLinkModal is the search-and-pick "Link a charge" dialog. It debounce-
+// queries /-/search/transactions (pre-rendered TxRowCompact HTML the cmdk
+// palette also uses) and links the chosen transaction.
+templ seriesLinkModal() {
+	<div class="modal modal-bottom sm:modal-middle" :class="{ 'modal-open': linkOpen }" @keydown.escape.window="closeLink()">
+		<div class="modal-box rounded-xl">
+			<h3 class="font-semibold text-base mb-1">Link a charge</h3>
+			<p class="text-xs text-base-content/50 mb-3">Search your transactions and attach one to this series.</p>
+			<input
+				id="series-link-search"
+				type="text"
+				class="input input-sm w-full mb-3"
+				placeholder="Search transactions…"
+				x-model="linkQuery"
+				@input.debounce.300ms="searchLink()"
+			/>
+			<div class="max-h-80 overflow-y-auto">
+				<template x-if="linkLoading">
+					<div class="py-6 text-center text-sm text-base-content/50">Searching…</div>
+				</template>
+				<template x-if="!linkLoading && linkQuery.length >= 2 && linkResults.length === 0">
+					<div class="py-6 text-center text-sm text-base-content/50">No matches.</div>
+				</template>
+				<template x-for="item in linkResults" :key="item.id">
+					<div class="flex items-center gap-2 py-1 border-b border-base-300/40 last:border-0">
+						<div class="flex-1 min-w-0 pointer-events-none" x-html="item.html"></div>
+						<button type="button" class="btn btn-xs btn-primary shrink-0" @click="linkCharge(item.id)">Link</button>
+					</div>
+				</template>
+			</div>
+			<div class="modal-action">
+				<button type="button" class="btn btn-sm btn-ghost" @click="closeLink()">Close</button>
+			</div>
+		</div>
+		<div class="modal-backdrop" @click="closeLink()"></div>
+	</div>
+}
+
+// seriesSelectOption is a (value,label) pair for the type/cadence selects.
+type seriesSelectOption struct{ Value, Label string }
+
+var seriesTypeOptions = []seriesSelectOption{
+	{"subscription", "Subscription"},
+	{"bill", "Bill"},
+	{"loan", "Loan"},
+	{"other", "Other"},
+}
+
+var seriesCadenceOptions = []seriesSelectOption{
+	{"weekly", "Weekly"},
+	{"biweekly", "Every 2 weeks"},
+	{"monthly", "Monthly"},
+	{"quarterly", "Quarterly"},
+	{"semiannual", "Every 6 months"},
+	{"annual", "Annual"},
+	{"irregular", "Irregular"},
+	{"unknown", "Unknown"},
+}
+
+func seriesTypeIcon(t string) string {
+	switch t {
+	case "bill":
+		return "receipt"
+	case "loan":
+		return "landmark"
+	default:
+		return "repeat"
 	}
-	return s.CadenceLabel
+}
+
+func seriesStatusIconTone(status string) components.IconTone {
+	switch status {
+	case "active":
+		return components.IconToneSuccess
+	case "candidate":
+		return components.IconToneWarning
+	default:
+		return components.IconToneNeutral
+	}
 }
 
 func subscriptionDetailField(v string) string {

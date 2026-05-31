@@ -16,6 +16,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -164,14 +165,19 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			a.Logger.Error("series members", "error", err)
 		}
 
-		// Add-tag options = the vocabulary minus tags already on the series.
+		// Resolve the series' tag slugs to full chip data (display/color/icon),
+		// and compute the add-tag options (the vocabulary minus tags already on
+		// the series) — both from one ListTags call.
 		onSeries := map[string]bool{}
 		for _, tg := range row.Tags {
 			onSeries[tg] = true
 		}
 		var tagOptions []pages.SubscriptionTagOption
+		var tagChips []components.TagChipData
 		if tags, terr := svc.ListTags(ctx); terr == nil {
+			bySlug := make(map[string]service.TagResponse, len(tags))
 			for _, t := range tags {
+				bySlug[t.Slug] = t
 				if onSeries[t.Slug] {
 					continue
 				}
@@ -181,20 +187,39 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 				}
 				tagOptions = append(tagOptions, pages.SubscriptionTagOption{Slug: t.Slug, Name: name})
 			}
+			for _, slug := range row.Tags {
+				if t, ok := bySlug[slug]; ok {
+					tagChips = append(tagChips, components.TagChipDataFromResponse(t))
+				} else {
+					tagChips = append(tagChips, components.TagChipData{Slug: slug, DisplayName: slug})
+				}
+			}
+		}
+
+		var categoryOptions []pages.SubscriptionCategoryOption
+		if cats, cerr := svc.ListCategories(ctx); cerr == nil {
+			categoryOptions = flattenCategoryOptions(cats, "")
 		}
 
 		props := pages.SubscriptionDetailProps{
-			CSRFToken:       GetCSRFToken(r),
-			Series:          row,
-			ExpectedAmount:  subscriptionMoney(s.ExpectedAmount, deref(s.IsoCurrencyCode)),
-			AmountTolerance: subscriptionMoney(s.AmountTolerance, deref(s.IsoCurrencyCode)),
-			ExpectedDay:     subscriptionExpectedDay(s.ExpectedDay),
-			NextExpected:    formatSubDate(s.NextExpectedDate, "Jan 2, 2006"),
-			LastSeen:        formatSubDate(s.LastSeenDate, "Jan 2, 2006"),
-			Confidence:      s.Confidence,
-			Members:         subscriptionMembers(members),
-			PriceChanges:    subscriptionPriceChanges(members),
-			AvailableTags:   tagOptions,
+			CSRFToken:            GetCSRFToken(r),
+			Series:               row,
+			ExpectedAmount:       subscriptionMoney(s.ExpectedAmount, deref(s.IsoCurrencyCode)),
+			AmountTolerance:      subscriptionMoney(s.AmountTolerance, deref(s.IsoCurrencyCode)),
+			ExpectedDay:          subscriptionExpectedDay(s.ExpectedDay),
+			NextExpected:         formatSubDate(s.NextExpectedDate, "Jan 2, 2006"),
+			LastSeen:             formatSubDate(s.LastSeenDate, "Jan 2, 2006"),
+			Confidence:           s.Confidence,
+			HasExpectedAmount:    s.ExpectedAmount != nil,
+			ExpectedAmountValue:  derefFloat(s.ExpectedAmount),
+			AmountToleranceValue: derefFloat(s.AmountTolerance),
+			ExpectedDayValue:     derefInt(s.ExpectedDay),
+			CurrentCategoryID:    deref(s.CategoryID),
+			Categories:           categoryOptions,
+			Members:              subscriptionMembers(members),
+			PriceChanges:         subscriptionPriceChanges(members),
+			AvailableTags:        tagOptions,
+			TagChips:             tagChips,
 		}
 
 		data := map[string]any{
@@ -541,10 +566,14 @@ func subscriptionMembers(in []service.SeriesMember) []pages.SubscriptionMember {
 			name = *m.MerchantName
 		}
 		row := pages.SubscriptionMember{
-			ShortID:  m.ShortID,
-			Date:     formatSubDate(m.Date, "Jan 2, 2006"),
-			Name:     name,
-			Currency: deref(m.Currency),
+			ShortID:       m.ShortID,
+			Date:          formatSubDate(m.Date, "Jan 2, 2006"),
+			Name:          name,
+			Currency:      deref(m.Currency),
+			Pending:       m.Pending,
+			CategoryColor: m.CategoryColor,
+			CategoryIcon:  m.CategoryIcon,
+			TagCount:      m.TagCount,
 		}
 		if m.Amount != nil {
 			row.HasAmount = true
@@ -649,4 +678,33 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func derefFloat(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
+}
+
+func derefInt(i *int) int {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
+
+// flattenCategoryOptions walks the category tree into a flat select list,
+// indenting children under their parent so the hierarchy stays legible in a
+// plain <select>. Values are category UUIDs (resolveOptionalCategoryID accepts
+// them cleanly).
+func flattenCategoryOptions(cats []service.CategoryResponse, prefix string) []pages.SubscriptionCategoryOption {
+	var out []pages.SubscriptionCategoryOption
+	for _, c := range cats {
+		out = append(out, pages.SubscriptionCategoryOption{ID: c.ID, Name: prefix + c.DisplayName})
+		if len(c.Children) > 0 {
+			out = append(out, flattenCategoryOptions(c.Children, prefix+"— ")...)
+		}
+	}
+	return out
 }

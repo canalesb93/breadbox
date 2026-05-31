@@ -2,6 +2,8 @@
 
 package pages
 
+import "breadbox/internal/templates/components"
+
 // SubscriptionsListProps is the typed input for the /subscriptions admin page.
 // Series are pre-split into Candidates (awaiting human adjudication) and Active
 // (confirmed / live), and the stat tiles are pre-computed in the handler.
@@ -115,7 +117,7 @@ type SubscriptionDetailProps struct {
 
 	Series SubscriptionRow // reuses the row shape for header chrome
 
-	// Config grid values (pre-formatted).
+	// Config grid values (pre-formatted, for read-only display fallbacks).
 	ExpectedAmount  string
 	AmountTolerance string
 	ExpectedDay     string
@@ -123,6 +125,17 @@ type SubscriptionDetailProps struct {
 	LastSeen        string
 	Confidence      string // auto | confirmed | rejected
 	CreatedAt       string
+
+	// Raw editable values — drive the inline-edit inputs (the formatted strings
+	// above are display fallbacks). Name / Type / Cadence / Currency are read
+	// off Series directly.
+	HasExpectedAmount    bool
+	ExpectedAmountValue  float64
+	AmountToleranceValue float64
+	ExpectedDayValue     int    // 0 = unset
+	CurrentCategoryID    string // selected category UUID, "" = none
+	// Categories is the full vocabulary for the suggested-category <select>.
+	Categories []SubscriptionCategoryOption
 
 	// Linked charges, newest first.
 	Members []SubscriptionMember
@@ -134,6 +147,9 @@ type SubscriptionDetailProps struct {
 	// interactive tag editor's add-control. The template hides tags already on
 	// the series client-side.
 	AvailableTags []SubscriptionTagOption
+	// TagChips is the resolved chip data (display/color/icon) for the tags
+	// currently on the series — rendered through the shared TagChip component.
+	TagChips []components.TagChipData
 }
 
 // SubscriptionTagOption is one option in the detail page's add-tag picker.
@@ -142,14 +158,26 @@ type SubscriptionTagOption struct {
 	Name string
 }
 
-// SubscriptionMember is one linked charge in the detail timeline.
+// SubscriptionCategoryOption is one option in the suggested-category select.
+type SubscriptionCategoryOption struct {
+	ID   string // category UUID (resolves cleanly server-side)
+	Name string
+}
+
+// SubscriptionMember is one linked charge in the detail list. Carries the
+// category color/icon + pending + tag count so it renders through the shared
+// TxRowFeed transaction-row component.
 type SubscriptionMember struct {
-	ShortID   string
-	Date      string // "May 1, 2026"
-	Name      string
-	HasAmount bool
-	Amount    float64
-	Currency  string
+	ShortID       string
+	Date          string // "May 1, 2026"
+	Name          string // raw provider description
+	HasAmount     bool
+	Amount        float64
+	Currency      string
+	Pending       bool
+	CategoryColor *string
+	CategoryIcon  *string
+	TagCount      int
 }
 
 // SubscriptionPriceChange marks a point where the charge amount changed.

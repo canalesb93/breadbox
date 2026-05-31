@@ -117,8 +117,23 @@ SELECT COUNT(*) FROM recurring_series WHERE deleted_at IS NULL;
 SELECT COUNT(*) FROM recurring_series
 WHERE deleted_at IS NULL AND status = 'candidate' AND confidence <> 'rejected';
 
+-- ListSeriesMembers returns a series' live member charges, newest first,
+-- enriched with the category color/icon + pending flag + tag count the shared
+-- transaction-row component renders (so linked charges look identical to the
+-- /transactions list and the dashboard feed).
 -- name: ListSeriesMembers :many
-SELECT short_id, date, provider_name, provider_merchant_name, amount, iso_currency_code
-FROM transactions
-WHERE series_id = $1 AND deleted_at IS NULL
-ORDER BY date DESC, created_at DESC;
+SELECT
+    t.short_id,
+    t.date,
+    t.provider_name,
+    t.provider_merchant_name,
+    t.amount,
+    t.iso_currency_code,
+    t.pending,
+    c.color AS category_color,
+    c.icon  AS category_icon,
+    (SELECT COUNT(*) FROM transaction_tags tt WHERE tt.transaction_id = t.id)::int AS tag_count
+FROM transactions t
+LEFT JOIN categories c ON c.id = t.category_id
+WHERE t.series_id = $1 AND t.deleted_at IS NULL
+ORDER BY t.date DESC, t.created_at DESC;

@@ -1242,14 +1242,20 @@ func (s *Service) ListSeriesByStatus(ctx context.Context, status string) ([]Seri
 	return out, nil
 }
 
-// SeriesMember is one linked transaction (charge) of a recurring series.
+// SeriesMember is one linked transaction (charge) of a recurring series. It
+// carries the category color/icon + pending flag + tag count so the admin UI
+// can render each charge through the shared transaction-row component.
 type SeriesMember struct {
-	ShortID      string   `json:"short_id"`
-	Date         *string  `json:"date,omitempty"`
-	Name         string   `json:"name"`
-	MerchantName *string  `json:"merchant_name,omitempty"`
-	Amount       *float64 `json:"amount,omitempty"`
-	Currency     *string  `json:"iso_currency_code,omitempty"`
+	ShortID       string   `json:"short_id"`
+	Date          *string  `json:"date,omitempty"`
+	Name          string   `json:"name"`
+	MerchantName  *string  `json:"merchant_name,omitempty"`
+	Amount        *float64 `json:"amount,omitempty"`
+	Currency      *string  `json:"iso_currency_code,omitempty"`
+	Pending       bool     `json:"pending"`
+	CategoryColor *string  `json:"category_color,omitempty"`
+	CategoryIcon  *string  `json:"category_icon,omitempty"`
+	TagCount      int      `json:"tag_count"`
 }
 
 // SeriesMembers returns the transactions linked to a series, newest first.
@@ -1265,12 +1271,16 @@ func (s *Service) SeriesMembers(ctx context.Context, idOrShort string) ([]Series
 	out := make([]SeriesMember, len(rows))
 	for i, r := range rows {
 		out[i] = SeriesMember{
-			ShortID:      r.ShortID,
-			Date:         dateStr(r.Date),
-			Name:         r.ProviderName,
-			MerchantName: textPtr(r.ProviderMerchantName),
-			Amount:       numericFloat(r.Amount),
-			Currency:     textPtr(r.IsoCurrencyCode),
+			ShortID:       r.ShortID,
+			Date:          dateStr(r.Date),
+			Name:          r.ProviderName,
+			MerchantName:  textPtr(r.ProviderMerchantName),
+			Amount:        numericFloat(r.Amount),
+			Currency:      textPtr(r.IsoCurrencyCode),
+			Pending:       r.Pending,
+			CategoryColor: textPtr(r.CategoryColor),
+			CategoryIcon:  textPtr(r.CategoryIcon),
+			TagCount:      int(r.TagCount),
 		}
 	}
 	return out, nil
