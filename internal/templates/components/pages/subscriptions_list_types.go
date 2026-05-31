@@ -74,6 +74,10 @@ type SubscriptionRow struct {
 	// overdue), nil when there's no projection. Drives the ledger's
 	// renewal-urgency sort. Active series only.
 	DaysUntilRenewal *int
+	// PriceChanged flags a series the detector saw steadily raising its price
+	// (detection_signals amount_branch == "monotonic_drift") — surfaced as a
+	// "Price ↑" chip on the ledger. The detail page shows the full from→to history.
+	PriceChanged bool
 
 	HasAmount bool
 	Amount    float64 // last_amount in dollars
