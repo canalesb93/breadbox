@@ -45,6 +45,13 @@ const (
 	SeriesConfidenceConfirmed = "confirmed"
 	SeriesConfidenceRejected  = "rejected"
 
+	// Recurring-charge type — the structured classification axis (mirrors the
+	// CHECK in the type migration). "subscription" is one type, not the umbrella.
+	SeriesTypeSubscription = "subscription" // streaming, SaaS, memberships
+	SeriesTypeBill         = "bill"         // rent, utilities, insurance, telecom
+	SeriesTypeLoan         = "loan"         // mortgage, auto/student/personal loans
+	SeriesTypeOther        = "other"        // recurring but uncategorized
+
 	// Renewal-health buckets — a derived (not stored) read-side signal computed
 	// from an active series' projected next_expected_date relative to today.
 	// Surfaced on SeriesResponse so agents and the UI can answer "what renews
@@ -69,6 +76,35 @@ var validSeriesCadence = map[string]bool{
 var validSeriesSource = map[string]bool{
 	SeriesSourceDeterministic: true, SeriesSourceAgent: true,
 	SeriesSourceUser: true, SeriesSourceRule: true,
+}
+
+var validSeriesType = map[string]bool{
+	SeriesTypeSubscription: true, SeriesTypeBill: true,
+	SeriesTypeLoan: true, SeriesTypeOther: true,
+}
+
+// inferSeriesType maps a (Plaid PFC) category slug to a recurring-charge type.
+// Prefix-based so it's robust to the full taxonomy; unknown/empty → subscription
+// (the most common recurring charge that isn't a bill or loan).
+func inferSeriesType(categorySlug string) string {
+	switch {
+	case categorySlug == "":
+		return SeriesTypeSubscription
+	case categorySlug == "loan_payments_insurance_payment":
+		return SeriesTypeBill // insurance is a bill, not a loan
+	case categorySlug == "loan_payments_credit_card_payment":
+		return SeriesTypeOther // a card payment is a transfer, not a tracked sub/bill/loan
+	case strings.HasPrefix(categorySlug, "loan_payments"):
+		return SeriesTypeLoan // mortgage, auto, student, personal
+	case strings.HasPrefix(categorySlug, "rent_and_utilities"):
+		return SeriesTypeBill // rent, gas/electric, internet/cable, phone, water
+	case categorySlug == "general_services_insurance":
+		return SeriesTypeBill
+	case strings.HasPrefix(categorySlug, "entertainment"):
+		return SeriesTypeSubscription // streaming, music, games
+	default:
+		return SeriesTypeSubscription
+	}
 }
 
 // SeriesVerdict is a human/agent adjudication applied via ReviewSeries.
@@ -96,6 +132,7 @@ type SeriesUpsert struct {
 	Currency         *string
 	CategoryID       *string  // short_id or uuid; advisory
 	Source           string   // deterministic|agent|user|rule (defaults deterministic)
+	Type             string   // subscription|bill|loan|other — explicit assertion (caller); when empty, inferred at first detection from the members' dominant category, then sticky
 	MemberTxnIDs     []string // transactions to back-link (short_id or uuid)
 	DetectionSignals []byte   // raw JSON signals (§6.6)
 }
@@ -114,6 +151,7 @@ type SeriesResponse struct {
 	IsoCurrencyCode  *string         `json:"iso_currency_code,omitempty"`
 	CategoryID       *string         `json:"category_id,omitempty"`
 	Status           string          `json:"status"`
+	Type             string          `json:"type"`
 	DetectionSource  string          `json:"detection_source"`
 	Confidence       string          `json:"confidence"`
 	ConfirmedByType  *string         `json:"confirmed_by_type,omitempty"`
@@ -144,6 +182,7 @@ type AssignSeriesInput struct {
 	CreateIfMissing bool     // mint a series if no SeriesID
 	Name            string   // optional display label for a minted series
 	Cadence         string   // optional proposed cadence for a minted series
+	Type            string   // optional subscription|bill|loan|other for a minted series
 	ExpectedAmount  *float64 // optional, paired with Currency
 	Currency        *string
 	CategoryID      *string  // short_id or uuid, advisory
@@ -180,6 +219,7 @@ func (s *Service) AssignSeries(ctx context.Context, in AssignSeriesInput, actor 
 			Name:           in.Name,
 			MerchantKey:    in.MerchantKey,
 			Cadence:        in.Cadence,
+			Type:           in.Type,
 			ExpectedAmount: in.ExpectedAmount,
 			Currency:       in.Currency,
 			CategoryID:     in.CategoryID,
@@ -492,6 +532,23 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 	upd.LastAmount = lastAmount
 	upd.LastSeenDate = lastSeen
 
+	// Type: sticky once set. updateParamsFromRow already preserved base.Type. On
+	// the FIRST detection of a series (fresh insert) infer it from the members'
+	// dominant category; on later writes leave it alone so a re-detect can't
+	// override a refined value. An explicit caller assertion (in.Type) always
+	// wins — that's how an agent/rule sets the type directly.
+	if !haveExisting {
+		if t := s.inferTypeFromMembers(ctx, qtx, base.ID); t != "" {
+			upd.Type = t
+		}
+	}
+	if in.Type != "" {
+		if !validSeriesType[in.Type] {
+			return nil, fmt.Errorf("%w: invalid type %q", ErrInvalidParameter, in.Type)
+		}
+		upd.Type = in.Type
+	}
+
 	// An unadjudicated (auto) candidate may have its proposed fields sharpened
 	// by a fresh write; a confirmed series gets rollups only (its adjudicated
 	// fields are sacred). Confidence/status are never downgraded by the proposal
@@ -798,6 +855,45 @@ func (s *Service) SplitSeries(ctx context.Context, idOrShort string, memberIDsOr
 	return &resp, nil
 }
 
+// inferTypeFromMembers derives a recurring-charge type from the dominant
+// category of a series' linked members. Returns "" when every member is
+// uncategorized (caller keeps the existing/default type).
+func (s *Service) inferTypeFromMembers(ctx context.Context, qtx *db.Queries, seriesID pgtype.UUID) string {
+	slug, err := qtx.SeriesDominantMemberCategory(ctx, seriesID)
+	if err != nil || slug == "" {
+		return ""
+	}
+	return inferSeriesType(slug)
+}
+
+// SetSeriesType is the explicit type override (user/agent correction). Unlike
+// detection's first-time inference, this always wins and is sticky thereafter.
+func (s *Service) SetSeriesType(ctx context.Context, idOrShort, seriesType string, actor Actor) (*SeriesResponse, error) {
+	seriesType = strings.TrimSpace(seriesType)
+	if !validSeriesType[seriesType] {
+		return nil, fmt.Errorf("%w: type must be one of subscription, bill, loan, other", ErrInvalidParameter)
+	}
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+	upd := updateParamsFromRow(row)
+	upd.Type = seriesType
+	updated, err := s.Queries.UpdateRecurringSeries(ctx, upd)
+	if err != nil {
+		return nil, fmt.Errorf("set series type: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
 // GetSeries returns a single series by short_id or uuid.
 func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
@@ -1031,6 +1127,7 @@ func updateParamsFromRow(r db.RecurringSeries) db.UpdateRecurringSeriesParams {
 		NextExpectedDate: r.NextExpectedDate,
 		OccurrenceCount:  r.OccurrenceCount,
 		DetectionSignals: r.DetectionSignals,
+		Type:             r.Type, // preserve type on every update unless a caller overrides it
 	}
 }
 
@@ -1049,6 +1146,7 @@ func seriesFromRow(r db.RecurringSeries) SeriesResponse {
 		IsoCurrencyCode:  textPtr(r.IsoCurrencyCode),
 		CategoryID:       uuidPtr(r.CategoryID),
 		Status:           r.Status,
+		Type:             r.Type,
 		DetectionSource:  r.DetectionSource,
 		Confidence:       r.Confidence,
 		ConfirmedByType:  textPtr(r.ConfirmedByType),

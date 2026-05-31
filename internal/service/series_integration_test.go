@@ -775,6 +775,98 @@ func TestSplitSeries_StripsSourceInheritedTags(t *testing.T) {
 	}
 }
 
+func TestSeriesType_InferenceStickyAndOverride(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries) // one account for all merchant groups
+
+	seedMerchant := func(name string, dates ...string) []string {
+		ids := make([]string, 0, len(dates))
+		for _, d := range dates {
+			txn := testutil.MustCreateTransaction(t, queries, acctID, name+"_"+d, name, 999, d)
+			ids = append(ids, txn.ShortID)
+		}
+		return ids
+	}
+	mustCategory := func(slug, name string) {
+		if _, err := pool.Exec(ctx, `INSERT INTO categories (slug, display_name) VALUES ($1,$2) ON CONFLICT (slug) DO NOTHING`, slug, name); err != nil {
+			t.Fatalf("ensure category %s: %v", slug, err)
+		}
+	}
+	categorize := func(providerName, slug string) {
+		if _, err := pool.Exec(ctx, `UPDATE transactions SET category_id=(SELECT id FROM categories WHERE slug=$1) WHERE provider_name=$2`, slug, providerName); err != nil {
+			t.Fatalf("categorize %s: %v", providerName, err)
+		}
+	}
+
+	// Mortgage charges categorized as loan_payments_mortgage_payment → infer loan.
+	members := seedMerchant("WELLS FARGO MTG", "2026-02-01", "2026-03-01", "2026-04-01")
+	mustCategory("loan_payments_mortgage_payment", "Mortgage")
+	categorize("WELLS FARGO MTG", "loan_payments_mortgage_payment")
+
+	series, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Wells Fargo Mortgage", MerchantKey: "wellsfargomtg", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: members,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if series.Type != service.SeriesTypeLoan {
+		t.Errorf("inferred type = %q, want loan", series.Type)
+	}
+
+	// Sticky: recategorize members + re-detect → type must NOT change.
+	mustCategory("entertainment_tv_and_movies", "TV & Movies")
+	categorize("WELLS FARGO MTG", "entertainment_tv_and_movies")
+	re, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "wellsfargomtg", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: members,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("re-detect: %v", err)
+	}
+	if re.Type != service.SeriesTypeLoan {
+		t.Errorf("type after re-detect = %q, want loan (sticky once inferred)", re.Type)
+	}
+
+	// Explicit override wins and is validated.
+	over, err := svc.SetSeriesType(ctx, series.ShortID, service.SeriesTypeBill, service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("set type: %v", err)
+	}
+	if over.Type != service.SeriesTypeBill {
+		t.Errorf("type after override = %q, want bill", over.Type)
+	}
+	if _, err := svc.SetSeriesType(ctx, series.ShortID, "nonsense", service.Actor{Type: "user"}); err == nil {
+		t.Error("expected invalid type to be rejected")
+	}
+
+	// Uncategorized members default to subscription.
+	plain := seedMerchant("ACME SAAS", "2026-02-09", "2026-03-09", "2026-04-09")
+	sub, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "acmesaas", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: plain,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint plain: %v", err)
+	}
+	if sub.Type != service.SeriesTypeSubscription {
+		t.Errorf("uncategorized type = %q, want subscription (default)", sub.Type)
+	}
+
+	// AssignSeries with an explicit type on a fresh mint.
+	ins := seedMerchant("GEICO", "2026-02-05", "2026-03-05", "2026-04-05")
+	a, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "geico", CreateIfMissing: true, Type: service.SeriesTypeBill, TransactionIDs: ins,
+	}, service.Actor{Type: "user", Name: "Tester"})
+	if err != nil {
+		t.Fatalf("assign with type: %v", err)
+	}
+	if a.Type != service.SeriesTypeBill {
+		t.Errorf("assigned type = %q, want bill", a.Type)
+	}
+}
+
 func keysOf(m map[string]service.SeriesNearMiss) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
