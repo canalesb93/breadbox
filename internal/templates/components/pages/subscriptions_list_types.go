@@ -172,6 +172,22 @@ type SubscriptionCategoryOption struct {
 	Name string
 }
 
+// RecurringSeriesFormProps drives the /recurring/new create form. On a
+// validation error the handler re-renders with Error set and the entered
+// values preserved (sticky form).
+type RecurringSeriesFormProps struct {
+	CSRFToken      string
+	Error          string
+	Name           string
+	Type           string
+	Cadence        string
+	Currency       string
+	ExpectedAmount string
+	ExpectedDay    string
+	CategoryID     string
+	Categories     []SubscriptionCategoryOption
+}
+
 // SubscriptionMember is one linked charge in the detail list. Carries the
 // category color/icon + pending + tag count so it renders through the shared
 // TxRowFeed transaction-row component.

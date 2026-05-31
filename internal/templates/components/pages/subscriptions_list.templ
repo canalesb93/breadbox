@@ -21,7 +21,8 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			Title:                "Recurring",
 			Subtitle:             "Recurring charges Breadbox has detected — subscriptions, bills, and more — plus the candidates waiting on your call.",
 			SubtitleHideOnMobile: true,
-			Action:               subscriptionsBetaBadge(),
+			SecondaryAction:      subscriptionsBetaBadge(),
+			Action:               components.PageHeaderAction(templ.SafeURL("/recurring/new"), "plus", "New series"),
 		})
 		<!-- Stat row: Active · Monthly-equivalent · Due in 30 days · Needs review -->
 		<div class="mb-6">

@@ -1,0 +1,75 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// RecurringSeriesForm renders /recurring/new — a from-scratch create form for a
+// recurring charge the detector hasn't surfaced. Composed from the settings
+// vocabulary (SettingsSection / SettingsRow) for consistency with the detail
+// page. Plain POST form (no Alpine) → CreateRecurringSeriesHandler mints an
+// active, confirmed, user-authored series and redirects to its detail page.
+templ RecurringSeriesForm(p RecurringSeriesFormProps) {
+	@components.BreadcrumbNav([]components.Breadcrumb{
+		{Label: "Recurring", Href: "/recurring"},
+		{Label: "New series"},
+	})
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "New recurring series",
+		Subtitle:             "Add a recurring charge Breadbox hasn't detected yet. It starts active and confirmed.",
+		SubtitleHideOnMobile: true,
+	})
+	<form method="POST" action="/recurring/new" class="max-w-2xl">
+		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+		if p.Error != "" {
+			<div role="alert" class="alert alert-error rounded-xl mb-4">
+				@components.LucideIcon("alert-triangle", "w-4 h-4")
+				<span>{ p.Error }</span>
+			</div>
+		}
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:  "repeat",
+			Title: "Details",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "What you call this recurring charge"}) {
+				<input type="text" name="name" value={ p.Name } required placeholder="e.g. Netflix" class="input input-sm w-full sm:w-80" aria-label="Name"/>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Type"}) {
+				<select name="type" class="select select-sm w-auto" aria-label="Type">
+					for _, opt := range seriesTypeOptions {
+						<option value={ opt.Value } selected?={ p.Type == opt.Value }>{ opt.Label }</option>
+					}
+				</select>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Cadence", Caption: "How often it charges"}) {
+				<select name="cadence" class="select select-sm w-auto" aria-label="Cadence">
+					for _, opt := range seriesCadenceOptions {
+						<option value={ opt.Value } selected?={ p.Cadence == opt.Value }>{ opt.Label }</option>
+					}
+				</select>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Expected amount", Caption: "Optional — the typical charge"}) {
+				<div class="flex items-center gap-1.5">
+					<input type="number" step="0.01" name="expected_amount" value={ p.ExpectedAmount } placeholder="0.00" class="input input-sm w-28" aria-label="Expected amount"/>
+					<input type="text" name="currency" value={ p.Currency } placeholder="USD" class="input input-sm w-20 uppercase" aria-label="Currency"/>
+				</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Expected day", Caption: "Optional day-of-month / week anchor"}) {
+				<input type="number" min="1" max="31" name="expected_day" value={ p.ExpectedDay } placeholder="—" class="input input-sm w-24" aria-label="Expected day"/>
+			}
+			@components.SettingsRow(components.SettingsRowProps{Label: "Suggested category", Caption: "Optional"}) {
+				<select name="category_id" class="select select-sm w-auto max-w-[16rem]" aria-label="Suggested category">
+					<option value="" selected?={ p.CategoryID == "" }>— None —</option>
+					for _, opt := range p.Categories {
+						<option value={ opt.ID } selected?={ p.CategoryID == opt.ID }>{ opt.Name }</option>
+					}
+				</select>
+			}
+		}
+		<div class="bb-action-row">
+			<a href="/recurring" class="btn btn-ghost btn-sm">Cancel</a>
+			<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+				@components.LucideIcon("plus", "w-4 h-4")
+				Create series
+			</button>
+		</div>
+	</form>
+}

@@ -146,6 +146,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// for detected series. Captures all recurring charges (subscriptions,
 		// bills, loans) — "subscription" is one type, not the umbrella.
 		r.Get("/recurring", SubscriptionsListPageHandler(a, svc, sm, tr))
+		// Create-from-scratch (static segment registered before the {id} param).
+		r.Get("/recurring/new", NewRecurringSeriesPageHandler(a, svc, sm, tr))
+		r.Post("/recurring/new", CreateRecurringSeriesHandler(a, svc, sm, tr))
 		r.Get("/recurring/{id}", SubscriptionDetailHandler(a, sm, tr, svc))
 		// Back-compat redirects from the former "Subscriptions" route (302 so a
 		// later change isn't browser-cached).

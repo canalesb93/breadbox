@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -249,6 +250,136 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 		}
 		tr.RenderWithTempl(w, r, data, pages.SubscriptionDetail(props))
 	}
+}
+
+// NewRecurringSeriesPageHandler renders the create-from-scratch form at
+// GET /recurring/new — for a recurring charge the detector hasn't surfaced.
+func NewRecurringSeriesPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var categoryOptions []pages.SubscriptionCategoryOption
+		if cats, cerr := svc.ListCategories(ctx); cerr == nil {
+			categoryOptions = flattenCategoryOptions(cats, "")
+		}
+		props := pages.RecurringSeriesFormProps{
+			CSRFToken:  GetCSRFToken(r),
+			Type:       service.SeriesTypeSubscription,
+			Cadence:    service.SeriesCadenceMonthly,
+			Currency:   "USD",
+			Categories: categoryOptions,
+		}
+		data := map[string]any{
+			"PageTitle":   "New recurring series",
+			"CurrentPage": "recurring",
+			"CSRFToken":   GetCSRFToken(r),
+		}
+		tr.RenderWithTempl(w, r, data, pages.RecurringSeriesForm(props))
+	}
+}
+
+// CreateRecurringSeriesHandler handles POST /recurring/new — mints an ACTIVE,
+// CONFIRMED, user-authored series (not a candidate in the review queue),
+// deriving a merchant_key from the name, then redirects to its detail page.
+func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		typ := strings.TrimSpace(r.FormValue("type"))
+		cadence := strings.TrimSpace(r.FormValue("cadence"))
+		currency := strings.ToUpper(strings.TrimSpace(r.FormValue("currency")))
+		amountStr := strings.TrimSpace(r.FormValue("expected_amount"))
+		dayStr := strings.TrimSpace(r.FormValue("expected_day"))
+		categoryID := strings.TrimSpace(r.FormValue("category_id"))
+
+		// Re-render the form with an error + the entered values on validation fail.
+		rerender := func(msg string) {
+			var categoryOptions []pages.SubscriptionCategoryOption
+			if cats, cerr := svc.ListCategories(ctx); cerr == nil {
+				categoryOptions = flattenCategoryOptions(cats, "")
+			}
+			tr.RenderWithTempl(w, r, map[string]any{
+				"PageTitle":   "New recurring series",
+				"CurrentPage": "recurring",
+				"CSRFToken":   GetCSRFToken(r),
+			}, pages.RecurringSeriesForm(pages.RecurringSeriesFormProps{
+				CSRFToken: GetCSRFToken(r), Error: msg,
+				Name: name, Type: typ, Cadence: cadence, Currency: currency,
+				ExpectedAmount: amountStr, ExpectedDay: dayStr, CategoryID: categoryID,
+				Categories: categoryOptions,
+			}))
+		}
+
+		if name == "" {
+			rerender("Name is required.")
+			return
+		}
+		var amount *float64
+		if amountStr != "" {
+			f, err := strconv.ParseFloat(amountStr, 64)
+			if err != nil {
+				rerender("Expected amount must be a number.")
+				return
+			}
+			amount = &f
+		}
+
+		actor := ActorFromSession(sm, r)
+		in := service.AssignSeriesInput{
+			MerchantKey:     slugifyMerchantKey(name),
+			CreateIfMissing: true,
+			Confirm:         true, // a deliberate manual entry is active+confirmed, not a candidate
+			Name:            name,
+			Cadence:         cadence,
+			Type:            typ,
+			ExpectedAmount:  amount,
+			Currency:        strPtrIfNotEmpty(currency),
+			CategoryID:      strPtrIfNotEmpty(categoryID),
+		}
+		resp, err := svc.AssignSeries(ctx, in, actor)
+		if err != nil {
+			rerender("Could not create the series: " + err.Error())
+			return
+		}
+
+		// expected_day isn't part of the create funnel — set it as a follow-up edit.
+		if dayStr != "" {
+			if d, derr := strconv.Atoi(dayStr); derr == nil {
+				day := int32(d)
+				if _, uerr := svc.UpdateSeries(ctx, resp.ShortID, service.EditSeriesInput{ExpectedDay: &day}, actor); uerr != nil {
+					a.Logger.Warn("set expected_day on new series", "error", uerr)
+				}
+			}
+		}
+
+		http.Redirect(w, r, "/recurring/"+resp.ShortID, http.StatusSeeOther)
+	}
+}
+
+// slugifyMerchantKey derives a stable merchant_key anchor from a user-supplied
+// name (lowercase alphanumerics). Incoming charges still key off the provider
+// name at sync time, so this only anchors the manual series' identity.
+func slugifyMerchantKey(name string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "series"
+	}
+	return b.String()
+}
+
+func strPtrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // subscriptionRow maps a service.SeriesResponse to the templ row shape,
