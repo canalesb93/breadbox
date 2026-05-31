@@ -1,0 +1,31 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// workflowsTabBar renders the Gallery / Runs two-tab nav shared between
+// /workflows (the preset gallery) and /workflows/runs (the run history).
+// Both pages mount it immediately under the PageHeader so the user can
+// switch between "browse & enable" and "what has run" without a trip to
+// the sidebar — mirrors the agents Runs/Agents shell.
+//
+// active is the slug of the current tab — "gallery" or "runs".
+templ workflowsTabBar(active string) {
+	@components.TabBar(components.TabBarProps{
+		Variant:   "border",
+		AriaLabel: "Workflows sections",
+		Items: []components.TabBarItem{
+			{
+				Label:  "Gallery",
+				Href:   "/workflows",
+				Icon:   "layout-grid",
+				Active: active == "gallery",
+			},
+			{
+				Label:  "Runs",
+				Href:   "/workflows/runs",
+				Icon:   "history",
+				Active: active == "runs",
+			},
+		},
+	})
+}

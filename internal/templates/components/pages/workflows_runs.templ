@@ -1,0 +1,150 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// WorkflowRuns is the /workflows/runs tab: run history scoped to
+// preset-instantiated workflows, with a status TabBar, a workflow
+// filter, a per-run retrigger menu, and offset pagination. Shares the
+// Gallery/Runs shell with the preset gallery.
+templ WorkflowRuns(p WorkflowRunsProps) {
+	<script src="/static/js/admin/components/workflows_runs.js"></script>
+	<div
+		x-data="workflowsRuns"
+		data-csrf={ p.CSRFToken }
+		x-init="$store.shortcuts.setScope('workflows')"
+		x-destroy="$store.shortcuts.setScope('global')"
+	>
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Workflows",
+			Subtitle:             "Run history across your enabled workflows.",
+			SubtitleHideOnMobile: true,
+		})
+		@workflowsTabBar("runs")
+		<div class="mt-4 space-y-4">
+			@workflowRunsFilters(p)
+			if len(p.Rows) == 0 {
+				@workflowRunsEmpty(p)
+			} else {
+				@components.AgentRunRowList() {
+					for _, r := range p.Rows {
+						@components.AgentRunRow(workflowRunRow(r, p.SubsystemReady))
+					}
+				}
+				@workflowRunsPagination(p)
+			}
+		</div>
+	</div>
+}
+
+// workflowRunsFilters renders the status TabBar (segmented box variant)
+// plus the workflow dropdown. Status switches via plain links (each
+// preserves the workflow filter); the workflow select is a GET form so
+// it works without JS and preserves the active status.
+templ workflowRunsFilters(p WorkflowRunsProps) {
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		@components.TabBar(components.TabBarProps{
+			Variant:   "box",
+			AriaLabel: "Filter runs by status",
+			Items: []components.TabBarItem{
+				{Label: "All", Href: workflowRunsHref("", p.WorkflowSlug), Active: p.StatusFilter == ""},
+				{Label: "Success", Href: workflowRunsHref("success", p.WorkflowSlug), Active: p.StatusFilter == "success"},
+				{Label: "Error", Href: workflowRunsHref("error", p.WorkflowSlug), Active: p.StatusFilter == "error"},
+				{Label: "In progress", Href: workflowRunsHref("in_progress", p.WorkflowSlug), Active: p.StatusFilter == "in_progress"},
+				{Label: "Skipped", Href: workflowRunsHref("skipped", p.WorkflowSlug), Active: p.StatusFilter == "skipped"},
+			},
+		})
+		if len(p.Options) > 0 {
+			<form method="GET" action="/workflows/runs" class="shrink-0">
+				<input type="hidden" name="status" value={ p.StatusFilter }/>
+				<select
+					name="workflow"
+					class="select select-sm bg-base-200 w-full sm:w-56"
+					onchange="this.form.submit()"
+					aria-label="Filter by workflow"
+				>
+					if p.WorkflowSlug == "" {
+						<option value="" selected>All workflows</option>
+					} else {
+						<option value="">All workflows</option>
+					}
+					for _, o := range p.Options {
+						if o.Slug == p.WorkflowSlug {
+							<option value={ o.Slug } selected>{ o.Name }</option>
+						} else {
+							<option value={ o.Slug }>{ o.Name }</option>
+						}
+					}
+				</select>
+			</form>
+		}
+	</div>
+}
+
+// workflowRunActions is the per-row trailing menu: re-run the workflow
+// now (disabled when the runtime isn't ready) or jump to the run detail.
+// retrigger() lives in workflows_runs.js and POSTs to the existing
+// admin run-now endpoint.
+templ workflowRunActions(slug, shortID string, ready bool) {
+	@components.OverflowMenu(components.OverflowMenuProps{
+		AriaLabel: "Run " + shortID + " actions",
+		Size:      "xs",
+		Items: []components.OverflowMenuItem{
+			{
+				Label:     "Re-run workflow",
+				Icon:      "refresh-cw",
+				OnClick:   "retrigger('" + slug + "')",
+				Disabled:  !ready,
+				AriaLabel: "Re-run this workflow now",
+			},
+			{
+				Label: "View run",
+				Icon:  "external-link",
+				Href:  templ.SafeURL("/agents/runs/" + shortID),
+			},
+		},
+	})
+}
+
+// workflowRunsEmpty is the no-runs / no-match card.
+templ workflowRunsEmpty(p WorkflowRunsProps) {
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:    "history",
+		Title:   workflowRunsEmptyTitle(p),
+		Body:    "Runs appear here after a workflow fires — on its schedule, after a sync, or when you re-run it.",
+		Compact: true,
+		InCard:  true,
+	})
+}
+
+// workflowRunsPagination renders prev/next offset controls as a daisy
+// join, shown only when there's somewhere to page to.
+templ workflowRunsPagination(p WorkflowRunsProps) {
+	if p.Offset > 0 || p.HasMore {
+		<div class="flex justify-center pt-1">
+			<div class="join">
+				if p.Offset > 0 {
+					<a class="join-item btn btn-sm gap-1" href={ workflowRunsPageHref(p, -1) }>
+						@components.LucideIcon("chevron-left", "w-4 h-4")
+						Prev
+					</a>
+				} else {
+					<button class="join-item btn btn-sm gap-1" disabled>
+						@components.LucideIcon("chevron-left", "w-4 h-4")
+						Prev
+					</button>
+				}
+				if p.HasMore {
+					<a class="join-item btn btn-sm gap-1" href={ workflowRunsPageHref(p, 1) }>
+						Next
+						@components.LucideIcon("chevron-right", "w-4 h-4")
+					</a>
+				} else {
+					<button class="join-item btn btn-sm gap-1" disabled>
+						Next
+						@components.LucideIcon("chevron-right", "w-4 h-4")
+					</button>
+				}
+			</div>
+		</div>
+	}
+}

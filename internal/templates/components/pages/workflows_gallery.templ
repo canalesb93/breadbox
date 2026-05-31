@@ -18,6 +18,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 			Subtitle:             "One-click AI automations that run on your Breadbox.",
 			SubtitleHideOnMobile: true,
 		})
+		@workflowsTabBar("gallery")
 		if !p.Status.Ready {
 			<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
 				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")

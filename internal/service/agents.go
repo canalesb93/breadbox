@@ -59,28 +59,28 @@ var validAgentSlug = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`
 
 // AgentDefinitionResponse is the API shape for an agent_definition row.
 type AgentDefinitionResponse struct {
-	ID              string           `json:"id"`
-	ShortID         string           `json:"short_id"`
-	Name            string           `json:"name"`
-	Slug            string           `json:"slug"`
-	Prompt          string           `json:"prompt"`
-	SystemPrompt    *string          `json:"system_prompt,omitempty"`
-	ScheduleCron    *string          `json:"schedule_cron,omitempty"`
-	ToolScope       string           `json:"tool_scope"`
-	AllowedTools    []string         `json:"allowed_tools"`
-	Model           string           `json:"model"`
-	MaxTurns        int              `json:"max_turns"`
-	MaxBudgetUSD    *float64         `json:"max_budget_usd,omitempty"`
-	Enabled               bool             `json:"enabled"`
-	QuietHoursStart       *string          `json:"quiet_hours_start,omitempty"`
-	QuietHoursEnd         *string          `json:"quiet_hours_end,omitempty"`
+	ID              string   `json:"id"`
+	ShortID         string   `json:"short_id"`
+	Name            string   `json:"name"`
+	Slug            string   `json:"slug"`
+	Prompt          string   `json:"prompt"`
+	SystemPrompt    *string  `json:"system_prompt,omitempty"`
+	ScheduleCron    *string  `json:"schedule_cron,omitempty"`
+	ToolScope       string   `json:"tool_scope"`
+	AllowedTools    []string `json:"allowed_tools"`
+	Model           string   `json:"model"`
+	MaxTurns        int      `json:"max_turns"`
+	MaxBudgetUSD    *float64 `json:"max_budget_usd,omitempty"`
+	Enabled         bool     `json:"enabled"`
+	QuietHoursStart *string  `json:"quiet_hours_start,omitempty"`
+	QuietHoursEnd   *string  `json:"quiet_hours_end,omitempty"`
 	// TriggerOnSyncComplete fires this agent after every successful sync
 	// (in addition to any cron schedule). Disabled by default.
-	TriggerOnSyncComplete bool             `json:"trigger_on_sync_complete"`
+	TriggerOnSyncComplete bool `json:"trigger_on_sync_complete"`
 	// SourceTemplate is the workflow-preset slug this definition was
 	// instantiated from, or nil if it was hand-authored.
-	SourceTemplate        *string          `json:"source_template,omitempty"`
-	LastRun               *AgentRunSummary `json:"last_run,omitempty"`
+	SourceTemplate *string          `json:"source_template,omitempty"`
+	LastRun        *AgentRunSummary `json:"last_run,omitempty"`
 	// CostStats30d is populated only by ListAgentDefinitions (the surface
 	// where users want to compare spend at a glance). Single-row
 	// GetAgentDefinition leaves it nil so the edit-page hot path doesn't
@@ -102,8 +102,8 @@ type AgentDefinitionResponse struct {
 	// non-skipped runs. Used by the admin UI to surface a warning when 2+
 	// recent runs hit a safety ceiling. List-only; nil when no run history.
 	RecentCapStats *AgentRecentCapStats `json:"recent_cap_stats,omitempty"`
-	CreatedAt        string  `json:"created_at"`
-	UpdatedAt        string  `json:"updated_at"`
+	CreatedAt      string               `json:"created_at"`
+	UpdatedAt      string               `json:"updated_at"`
 }
 
 // AgentRecentErrorStats is the "is this agent broken right now?" signal —
@@ -161,13 +161,13 @@ type AgentRunResponse struct {
 	// turns at run-start" would be clearer. Pair with turn_count to
 	// render "actual / cap". Until iter-33 this column erroneously
 	// mirrored turn_count, making every run look like it hit the cap.
-	MaxTurnsUsed        *int     `json:"max_turns_used,omitempty"`
-	NumToolCalls        *int     `json:"num_tool_calls,omitempty"`
-	ErrorMessage        *string  `json:"error_message,omitempty"`
-	TranscriptPath      *string  `json:"transcript_path,omitempty"`
-	SessionID           *string  `json:"session_id,omitempty"`
-	OperatorNote        *string  `json:"operator_note,omitempty"`
-	PromptPrefix        *string  `json:"prompt_prefix,omitempty"`
+	MaxTurnsUsed   *int    `json:"max_turns_used,omitempty"`
+	NumToolCalls   *int    `json:"num_tool_calls,omitempty"`
+	ErrorMessage   *string `json:"error_message,omitempty"`
+	TranscriptPath *string `json:"transcript_path,omitempty"`
+	SessionID      *string `json:"session_id,omitempty"`
+	OperatorNote   *string `json:"operator_note,omitempty"`
+	PromptPrefix   *string `json:"prompt_prefix,omitempty"`
 	// HitCap names the safety ceiling this run bumped into when it
 	// terminated, if any: "max_turns" | "max_budget" | nil. Lets the v2
 	// SPA flag "ran into the ceiling" runs separately from clean successes.
@@ -792,6 +792,11 @@ type AllAgentRunListParams struct {
 	HitCap        string
 	Start         *time.Time
 	End           *time.Time
+	// WorkflowsOnly restricts the result to runs whose definition was
+	// instantiated from a workflow preset (source_template IS NOT NULL).
+	// Powers the Workflows → Runs tab, which shows only preset-backed
+	// runs (not hand-authored agents). Default false = every definition.
+	WorkflowsOnly bool
 }
 
 // ListAllAgentRuns returns offset-paginated runs across every agent,
@@ -854,6 +859,11 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		where = append(where, fmt.Sprintf("r.started_at <= $%d", idx))
 		args = append(args, *p.End)
 		idx++
+	}
+	if p.WorkflowsOnly {
+		// d is the agent_definitions JOIN below; preset-instantiated
+		// workflows carry a non-null source_template.
+		where = append(where, "d.source_template IS NOT NULL")
 	}
 
 	whereClause := ""
@@ -1362,26 +1372,26 @@ func agentIntFromInt4(n pgtype.Int4) *int {
 
 func agentDefinitionFromRow(row db.AgentDefinition, lastRun *AgentRunSummary) AgentDefinitionResponse {
 	return AgentDefinitionResponse{
-		ID:              pgconv.FormatUUID(row.ID),
-		ShortID:         row.ShortID,
-		Name:            row.Name,
-		Slug:            row.Slug,
-		Prompt:          row.Prompt,
-		SystemPrompt:    pgconv.TextPtr(row.SystemPrompt),
-		ScheduleCron:    pgconv.TextPtr(row.ScheduleCron),
-		ToolScope:       row.ToolScope,
-		AllowedTools:    agentAllowedToolsFromBytes(row.AllowedTools),
-		Model:           row.Model,
-		MaxTurns:        int(row.MaxTurns),
-		MaxBudgetUSD:    agentFloatFromNumeric(row.MaxBudgetUsd),
-		Enabled:         row.Enabled,
+		ID:                    pgconv.FormatUUID(row.ID),
+		ShortID:               row.ShortID,
+		Name:                  row.Name,
+		Slug:                  row.Slug,
+		Prompt:                row.Prompt,
+		SystemPrompt:          pgconv.TextPtr(row.SystemPrompt),
+		ScheduleCron:          pgconv.TextPtr(row.ScheduleCron),
+		ToolScope:             row.ToolScope,
+		AllowedTools:          agentAllowedToolsFromBytes(row.AllowedTools),
+		Model:                 row.Model,
+		MaxTurns:              int(row.MaxTurns),
+		MaxBudgetUSD:          agentFloatFromNumeric(row.MaxBudgetUsd),
+		Enabled:               row.Enabled,
 		QuietHoursStart:       pgconv.TextPtr(row.QuietHoursStart),
 		QuietHoursEnd:         pgconv.TextPtr(row.QuietHoursEnd),
 		TriggerOnSyncComplete: row.TriggerOnSyncComplete,
 		SourceTemplate:        pgconv.TextPtr(row.SourceTemplate),
 		LastRun:               lastRun,
-		CreatedAt:       pgconv.TimestampStr(row.CreatedAt),
-		UpdatedAt:       pgconv.TimestampStr(row.UpdatedAt),
+		CreatedAt:             pgconv.TimestampStr(row.CreatedAt),
+		UpdatedAt:             pgconv.TimestampStr(row.UpdatedAt),
 	}
 }
 
