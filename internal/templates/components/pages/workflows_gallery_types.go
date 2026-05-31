@@ -3,8 +3,11 @@
 package pages
 
 import (
+	"fmt"
 	"strconv"
 	"time"
+
+	"breadbox/internal/templates/components"
 )
 
 // workflowCostStr formats a per-run cost estimate as a 2-decimal string
@@ -12,6 +15,27 @@ import (
 // reactive projectedCost() JS call).
 func workflowCostStr(c float64) string {
 	return strconv.FormatFloat(c, 'f', 2, 64)
+}
+
+// presetMenuItems builds the row's overflow ("⋯") menu — the secondary
+// actions moved out of the inline row to declutter it: Preview prompt
+// always, plus Reconfigure for an enabled workflow (admin only). The
+// OnClick strings invoke the workflowsGallery Alpine factory methods and
+// render inside the gallery's x-data root, so the handlers resolve.
+func presetMenuItems(preset WorkflowPresetCardProps, isAdmin bool) []components.OverflowMenuItem {
+	items := []components.OverflowMenuItem{{
+		Label:   "Preview prompt",
+		Icon:    "file-text",
+		OnClick: fmt.Sprintf("previewPrompt('%s', '%s')", preset.Slug, preset.Name),
+	}}
+	if preset.Enabled && isAdmin {
+		items = append(items, components.OverflowMenuItem{
+			Label:   "Reconfigure",
+			Icon:    "sliders-horizontal",
+			OnClick: fmt.Sprintf("openReconfigure('%s', '%s')", preset.WorkflowSlug, preset.Name),
+		})
+	}
+	return items
 }
 
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.
