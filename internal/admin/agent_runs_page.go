@@ -277,7 +277,9 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 		}
 
 		title := "Run " + row.ShortID
-		data := BaseTemplateData(r, sm, "agents", title)
+		// Run detail is part of the Workflows surface now (reached from the
+		// Workflows → Runs tab), so it highlights the Workflows nav item.
+		data := BaseTemplateData(r, sm, "workflows", title)
 		tr.RenderWithTempl(w, r, data, pages.AgentRunDetail(props))
 	}
 }

@@ -17,8 +17,8 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 	<script src="/static/js/admin/components/agent_sdk_settings.js"></script>
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
-			Title:    "Agents",
-			Subtitle: "Auth, sidecar binary, and execution limits for Claude Agent SDK runs",
+			Title:    "Workflows",
+			Subtitle: "Authentication, runtime, and spend controls that govern your workflow runs",
 		})
 		if p.FormError != "" {
 			<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">

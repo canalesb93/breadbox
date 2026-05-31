@@ -81,7 +81,7 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			HouseholdSpend30dStr: formatHouseholdSpend(spend),
 		}
 
-		data := BaseTemplateData(r, sm, "agents-settings", "Agents settings")
+		data := BaseTemplateData(r, sm, "agents-settings", "Workflows settings")
 		data["CSRFToken"] = props.CSRFToken
 		data["Flash"] = nil
 		renderSettingsTab(tr, w, r, data, pages.SettingsTabAgents, pages.AgentSDKSettings(props))

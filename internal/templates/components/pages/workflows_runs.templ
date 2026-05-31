@@ -99,7 +99,7 @@ templ workflowRunActions(slug, shortID string, ready bool) {
 			{
 				Label: "View run",
 				Icon:  "external-link",
-				Href:  templ.SafeURL("/agents/runs/" + shortID),
+				Href:  templ.SafeURL("/workflows/runs/" + shortID),
 			},
 		},
 	})
