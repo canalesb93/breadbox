@@ -222,7 +222,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
 		"au.short_id AS attributed_user_short_id, au.name AS attributed_user_name, " +
-		"COALESCE(au.short_id, u.short_id) AS effective_user_short_id " +
+		"COALESCE(au.short_id, u.short_id) AS effective_user_short_id, " +
+		"t.metadata " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -457,6 +458,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			attributedUserShortID  pgtype.Text
 			attributedUserName     pgtype.Text
 			effectiveUserShortID   pgtype.Text
+			metadata               []byte
 		)
 
 		if err := rows.Scan(
@@ -471,7 +473,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
 			&attributedUserShortID, &attributedUserName,
-			&effectiveUserShortID,
+			&effectiveUserShortID, &metadata,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -529,6 +531,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			Pending:             pending,
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
+			Metadata:            metadataToRaw(metadata),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -1316,7 +1319,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 			t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name,
 			t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence,
 			t.provider_payment_channel, t.pending, t.created_at, t.updated_at,
-			t.category_id, t.category_override
+			t.category_id, t.category_override, t.metadata
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN bank_connections bc ON bc.id = a.connection_id
@@ -1351,6 +1354,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		updatedAt             pgtype.Timestamptz
 		categoryID            pgtype.UUID
 		categoryOverride      bool
+		metadata              []byte
 	)
 
 	if err := s.Pool.QueryRow(ctx, q, uid).Scan(
@@ -1361,7 +1365,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		&datetime, &authorizedDatetime, &providerName, &providerMerchant,
 		&providerCatPrimary, &providerCatDetailed, &providerCatConf,
 		&providerChannel, &pending, &createdAt, &updatedAt,
-		&categoryID, &categoryOverride,
+		&categoryID, &categoryOverride, &metadata,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -1404,6 +1408,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		Pending:                    pending,
 		CreatedAt:                  pgconv.TimestampStr(createdAt),
 		UpdatedAt:                  pgconv.TimestampStr(updatedAt),
+		Metadata:                   metadataToRaw(metadata),
 	}
 
 	if categoryID.Valid {

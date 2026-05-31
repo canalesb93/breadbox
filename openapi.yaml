@@ -614,6 +614,76 @@ paths:
         "204": { description: Removed. }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/transactions/{id}/metadata:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+    put:
+      tags: [Transactions]
+      summary: Replace transaction metadata
+      description: |
+        Atomically replace the entire free-form `metadata` JSONB object on a
+        transaction. Pass `{}` to clear all keys. Touches only the metadata
+        column. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metadata]
+              properties:
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: Complete metadata replacement object.
+      responses:
+        "204": { description: Replaced. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Clear transaction metadata
+      description: "Reset the `metadata` object to `{}`. **Requires `full_access` scope.**"
+      responses:
+        "204": { description: Cleared. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions/{id}/metadata/{key}:
+    parameters:
+      - $ref: "#/components/parameters/IDPath"
+      - { name: key, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Transactions]
+      summary: Set a transaction metadata key
+      description: |
+        Upsert one key in the transaction's `metadata` JSONB store, leaving
+        other keys untouched. Creates the key if absent. **Requires `full_access` scope.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  description: JSON value for the key (string, number, boolean, object, array, or null).
+      responses:
+        "204": { description: Key set. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Remove a transaction metadata key
+      description: "Delete one key from the `metadata` object. No-op if absent. **Requires `full_access` scope.**"
+      responses:
+        "204": { description: Removed. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/transactions/{transaction_id}/comments:
     parameters:
       - { name: transaction_id, in: path, required: true, schema: { type: string } }
@@ -3148,6 +3218,10 @@ components:
         tags:
           type: array
           items: { type: string, description: Tag slug. }
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Free-form JSONB enrichment store. Always an object (empty `{}` when unset).
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       additionalProperties: true

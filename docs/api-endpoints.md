@@ -52,6 +52,10 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/transactions/{id}/restore` | W | Restore a soft-deleted transaction |
 | POST | `/transactions/{id}/tags` | W | Attach a tag to a transaction |
 | DELETE | `/transactions/{id}/tags/{slug}` | W | Detach a tag from a transaction |
+| PATCH | `/transactions/{id}/metadata/{key}` | W | Upsert one free-form metadata key |
+| DELETE | `/transactions/{id}/metadata/{key}` | W | Remove one metadata key |
+| PUT | `/transactions/{id}/metadata` | W | Replace the entire metadata object |
+| DELETE | `/transactions/{id}/metadata` | W | Clear metadata to `{}` |
 | POST | `/transactions/{transaction_id}/comments` | W | Add a comment |
 | PUT | `/transactions/{transaction_id}/comments/{id}` | W | Edit a comment |
 | DELETE | `/transactions/{transaction_id}/comments/{id}` | W | Delete a comment |

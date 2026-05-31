@@ -422,6 +422,31 @@ func (s *MCPServer) buildToolRegistry() {
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
 		}, s.handleUpdateTransactions, s),
 
+		// --- Transaction metadata (free-form JSONB enrichment store) ---
+		// Four deliberately-scoped ops; each touches ONLY the metadata column and
+		// names exactly what it does so an agent can't clobber sibling keys or
+		// other fields. Metadata is returned on every transaction read.
+		makeToolDefLogged(ToolSpec{
+			Name: "set_transaction_metadata", Title: "Set Transaction Metadata", Classification: ToolWrite,
+			Description: "Upsert ONE key in a transaction's free-form metadata JSONB store, leaving every other key untouched. Creates the key if absent, overwrites if present. The value may be any JSON value (string, number, boolean, object, array). Use slug-like keys, max 128 chars (e.g. 'tax_deductible', 'trip', 'reimbursable_by'). Metadata is a place for enrichment your household cares about that isn't a first-class field — it is NOT a substitute for category or tags. Returned on every transaction read (query_transactions, the transaction resource). Example: {\"transaction_id\":\"k7Xm9pQ2\",\"key\":\"tax_deductible\",\"value\":true}.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleSetTransactionMetadata, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "remove_transaction_metadata", Title: "Remove Transaction Metadata Key", Classification: ToolWrite,
+			Description: "Delete ONE key from a transaction's metadata JSONB store. No-op (still succeeds) if the key isn't present. Other keys are untouched.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleRemoveTransactionMetadata, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "replace_transaction_metadata", Title: "Replace Transaction Metadata", Classification: ToolWrite,
+			Description: "Atomically replace the ENTIRE metadata object on a transaction. Use to write a structured payload in one call. Pass {} to clear all keys. Prefer set_transaction_metadata when you only mean to change one key — replace overwrites everything.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleReplaceTransactionMetadata, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "clear_transaction_metadata", Title: "Clear Transaction Metadata", Classification: ToolWrite,
+			Description: "Reset a transaction's metadata to the empty object {}, removing all keys. Equivalent to replace_transaction_metadata with {}.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleClearTransactionMetadata, s),
+
 		// --- Activity timeline ---
 		makeToolDefLogged(ToolSpec{
 			Name: "list_annotations", Title: "List Activity Timeline", Classification: ToolRead,
