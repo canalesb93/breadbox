@@ -30,17 +30,15 @@ func presetTileClasses(enabled bool) string {
 	return base + "bg-base-200 text-base-content/55"
 }
 
-// presetMenuItems builds the row's overflow ("⋯") menu — the secondary
-// actions moved out of the inline row to declutter it: Preview prompt
-// always, plus Reconfigure for an enabled workflow (admin only). The
-// OnClick strings invoke the workflowsGallery Alpine factory methods and
-// render inside the gallery's x-data root, so the handlers resolve.
+// presetMenuItems builds a card's overflow ("⋯") menu. Preview prompt now
+// lives inside the configure / reconfigure drawer (it's a setup-time concern),
+// so the only menu action is Reconfigure for an already-enabled workflow that
+// the viewer can edit. The slice is empty for un-enabled presets and for
+// non-admins — the card guards on len() and skips the kebab entirely. The
+// OnClick string invokes the workflowsGallery Alpine factory and renders inside
+// the gallery's x-data root, so the handler resolves.
 func presetMenuItems(preset WorkflowPresetCardProps, isAdmin bool) []components.OverflowMenuItem {
-	items := []components.OverflowMenuItem{{
-		Label:   "Preview prompt",
-		Icon:    "file-text",
-		OnClick: fmt.Sprintf("previewPrompt('%s', '%s')", preset.Slug, preset.Name),
-	}}
+	var items []components.OverflowMenuItem
 	if preset.Enabled && isAdmin {
 		items = append(items, components.OverflowMenuItem{
 			Label:   "Reconfigure",

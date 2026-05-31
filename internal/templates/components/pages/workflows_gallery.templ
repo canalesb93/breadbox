@@ -133,6 +133,14 @@ templ workflowReconfigureDrawer() {
 					<div>
 						<div class="font-semibold leading-tight" x-text="reconfigure.name || 'Reconfigure workflow'"></div>
 						<div class="text-xs text-base-content/60 mt-1">Adjust how this workflow runs. Its base behavior stays the same.</div>
+						<button
+							type="button"
+							class="btn btn-ghost btn-xs gap-1 mt-2 -ml-1 text-base-content/70"
+							@click="previewPrompt(reconfigure.slug, reconfigure.name)"
+						>
+							@components.LucideIcon("file-text", "w-3.5 h-3.5")
+							Preview prompt
+						</button>
 					</div>
 				</div>
 				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">
@@ -256,12 +264,14 @@ templ workflowPresetCard(preset WorkflowPresetCardProps, isAdmin bool) {
 				<div class="font-medium text-sm leading-tight">{ preset.Name }</div>
 				<div class="text-xs text-base-content/60 mt-1 line-clamp-2">{ preset.Description }</div>
 			</div>
-			<!-- Secondary actions (Preview prompt, Reconfigure) live in the
-			     overflow menu so the card front stays uncluttered. -->
-			@components.OverflowMenu(components.OverflowMenuProps{
-				AriaLabel: preset.Name + " actions",
-				Items:     presetMenuItems(preset, isAdmin),
-			})
+			<!-- Reconfigure (enabled + admin) is the only overflow action; the
+			     kebab is omitted entirely when there's nothing to put in it. -->
+			if len(presetMenuItems(preset, isAdmin)) > 0 {
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: preset.Name + " actions",
+					Items:     presetMenuItems(preset, isAdmin),
+				})
+			}
 		</div>
 		<div class="flex items-center justify-between gap-2 mt-auto pt-1">
 			<div class="flex items-center gap-2 text-xs text-base-content/45 min-w-0">
@@ -368,6 +378,14 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					<div>
 						<div class="font-semibold leading-tight">{ preset.Name }</div>
 						<div class="text-xs text-base-content/60 mt-1">{ preset.Description }</div>
+						<button
+							type="button"
+							class="btn btn-ghost btn-xs gap-1 mt-2 -ml-1 text-base-content/70"
+							@click={ "previewPrompt('" + preset.Slug + "', '" + preset.Name + "')" }
+						>
+							@components.LucideIcon("file-text", "w-3.5 h-3.5")
+							Preview prompt
+						</button>
 					</div>
 				</div>
 				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">

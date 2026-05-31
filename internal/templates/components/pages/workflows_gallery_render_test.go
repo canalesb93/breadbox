@@ -176,6 +176,12 @@ func TestT15WorkflowsGalleryGridAndTiles(t *testing.T) {
 	if !strings.Contains(html, "lucide-tag") {
 		t.Error("expected the preset icon (lucide-tag) to render in its card tile")
 	}
+
+	// Preview prompt now lives inside the configure/reconfigure drawer, not
+	// the card ⋯ menu. The button + its handler should be present (admin view).
+	if !strings.Contains(html, "Preview prompt") || !strings.Contains(html, "previewPrompt(") {
+		t.Error("expected the Preview prompt affordance inside the drawer (button + handler)")
+	}
 }
 
 // TestT15WorkflowsGalleryEnabledPresetRendersToggle asserts that a preset
@@ -267,6 +273,11 @@ func TestT15WorkflowsGalleryNonAdminDisablesSetUp(t *testing.T) {
 	// Non-admin: no configure drawer should be rendered (drawers are admin-only).
 	if strings.Contains(html, "submitDrawer") {
 		t.Error("expected no configure drawer (submitDrawer) for non-admin user")
+	}
+	// Preview prompt lives only inside the (admin-only) drawer now, so a
+	// non-admin sees no Preview prompt affordance at all.
+	if strings.Contains(html, "Preview prompt") {
+		t.Error("expected no Preview prompt affordance for non-admin (it lives in the admin-only drawer)")
 	}
 }
 
