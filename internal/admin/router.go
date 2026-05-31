@@ -192,6 +192,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr, a.Config.DataDir))
 		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
 		r.Get("/workflows", WorkflowsGalleryPageHandler(svc, sm, tr))
+		r.Get("/workflows/runs", WorkflowRunsPageHandler(svc, sm, tr))
 		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
 		// /agents/{slug} is the per-agent landing page (lifetime stats +
 		// last 10 runs); /agents/{slug}/edit remains the form, reachable

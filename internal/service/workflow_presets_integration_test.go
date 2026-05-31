@@ -121,3 +121,46 @@ func TestEnableWorkflowFromPreset_PostSyncIgnoresSchedule(t *testing.T) {
 		t.Fatalf("routine-reviewer should trigger on sync")
 	}
 }
+
+func TestListAllAgentRuns_WorkflowsOnly(t *testing.T) {
+	svc, _, pool := newService(t)
+	ctx := context.Background()
+
+	// A preset-instantiated workflow (source_template set) ...
+	wf, err := svc.EnableWorkflowFromPreset(ctx, "routine-reviewer", service.EnableWorkflowFromPresetParams{Enabled: false})
+	if err != nil {
+		t.Fatalf("EnableWorkflowFromPreset: %v", err)
+	}
+	// ... and a hand-authored agent (no source_template).
+	plain := mustCreateAgentDefinition(t, svc, "plain-agent-runs", true)
+
+	// One run apiece. short_id/id/started_at are DB-defaulted.
+	for _, defID := range []string{wf.ID, plain.ID} {
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO agent_runs (agent_definition_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
+			defID); err != nil {
+			t.Fatalf("insert run for %s: %v", defID, err)
+		}
+	}
+
+	// Unfiltered: both runs.
+	all, err := svc.ListAllAgentRuns(ctx, service.AllAgentRunListParams{Limit: 50})
+	if err != nil {
+		t.Fatalf("ListAllAgentRuns(all): %v", err)
+	}
+	if len(all.Runs) != 2 {
+		t.Fatalf("unfiltered = %d runs, want 2", len(all.Runs))
+	}
+
+	// WorkflowsOnly: just the preset-backed run.
+	only, err := svc.ListAllAgentRuns(ctx, service.AllAgentRunListParams{Limit: 50, WorkflowsOnly: true})
+	if err != nil {
+		t.Fatalf("ListAllAgentRuns(workflows): %v", err)
+	}
+	if len(only.Runs) != 1 {
+		t.Fatalf("WorkflowsOnly = %d runs, want 1", len(only.Runs))
+	}
+	if only.Runs[0].AgentSlug != wf.Slug {
+		t.Fatalf("WorkflowsOnly run slug = %q, want %q", only.Runs[0].AgentSlug, wf.Slug)
+	}
+}
