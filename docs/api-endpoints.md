@@ -56,6 +56,8 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | DELETE | `/transactions/{id}/metadata/{key}` | W | Remove one metadata key |
 | PUT | `/transactions/{id}/metadata` | W | Replace the entire metadata object |
 | DELETE | `/transactions/{id}/metadata` | W | Clear metadata to `{}` |
+| POST | `/transactions/{id}/flag` | W | Flag for attention (optional `reason` → comment) |
+| DELETE | `/transactions/{id}/flag` | W | Clear the flag |
 | POST | `/transactions/{transaction_id}/comments` | W | Add a comment |
 | PUT | `/transactions/{transaction_id}/comments/{id}` | W | Edit a comment |
 | DELETE | `/transactions/{transaction_id}/comments/{id}` | W | Delete a comment |

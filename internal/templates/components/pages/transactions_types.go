@@ -64,6 +64,7 @@ type TransactionsProps struct {
 	FilterMinAmount   string
 	FilterMaxAmount   string
 	FilterPending     string
+	FilterFlagged     string
 	FilterSearch      string
 	FilterSearchMode  string
 	FilterSearchField string
@@ -97,6 +98,7 @@ func (p TransactionsProps) HasActiveFilters() bool {
 		p.FilterMinAmount != "" ||
 		p.FilterMaxAmount != "" ||
 		p.FilterPending != "" ||
+		p.FilterFlagged != "" ||
 		len(p.FilterTags) > 0 ||
 		len(p.FilterAnyTag) > 0
 }

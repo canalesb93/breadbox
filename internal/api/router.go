@@ -189,6 +189,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Delete("/transactions/{id}/metadata/{key}", RemoveTransactionMetadataKeyHandler(svc))
 			r.Put("/transactions/{id}/metadata", ReplaceTransactionMetadataHandler(svc))
 			r.Delete("/transactions/{id}/metadata", ClearTransactionMetadataHandler(svc))
+			r.Post("/transactions/{id}/flag", FlagTransactionHandler(svc))
+			r.Delete("/transactions/{id}/flag", UnflagTransactionHandler(svc))
 			r.Post("/tags", CreateTagHandler(svc))
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
 			r.Post("/series", AssignSeriesHandler(svc))

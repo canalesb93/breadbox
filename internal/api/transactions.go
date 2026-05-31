@@ -28,6 +28,7 @@ type transactionFilters struct {
 	MinAmount     *float64
 	MaxAmount     *float64
 	Pending       *bool
+	Flagged       *bool
 	Search        *string
 	SearchMode    *string
 	ExcludeSearch *string
@@ -89,6 +90,12 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (f transact
 	}
 
 	f.Pending, err = parseBoolParam(q, "pending")
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	f.Flagged, err = parseBoolParam(q, "flagged")
 	if err != nil {
 		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
@@ -174,6 +181,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			MinAmount:     f.MinAmount,
 			MaxAmount:     f.MaxAmount,
 			Pending:       f.Pending,
+			Flagged:       f.Flagged,
 			Search:        f.Search,
 			SearchMode:    f.SearchMode,
 			ExcludeSearch: f.ExcludeSearch,
@@ -237,6 +245,7 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			MinAmount:     f.MinAmount,
 			MaxAmount:     f.MaxAmount,
 			Pending:       f.Pending,
+			Flagged:       f.Flagged,
 			Search:        f.Search,
 			SearchMode:    f.SearchMode,
 			ExcludeSearch: f.ExcludeSearch,

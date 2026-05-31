@@ -369,6 +369,7 @@ paths:
         - { name: amount_min, in: query, schema: { type: number } }
         - { name: amount_max, in: query, schema: { type: number } }
         - { name: pending, in: query, schema: { type: boolean } }
+        - { name: flagged, in: query, schema: { type: boolean }, description: Filter to flagged (true) or unflagged (false) transactions. }
         - { name: deleted, in: query, schema: { type: string, enum: [include, only] }, description: Whether to include or restrict to soft-deleted transactions. }
         - { name: category_override, in: query, schema: { type: string, enum: [none, agent, user] }, description: Filter by category-override source (none/agent/user). }
       responses:
@@ -681,6 +682,37 @@ paths:
       description: "Delete one key from the `metadata` object. No-op if absent. **Requires `full_access` scope.**"
       responses:
         "204": { description: Removed. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/transactions/{id}/flag:
+    parameters: [{ $ref: "#/components/parameters/IDPath" }]
+    post:
+      tags: [Transactions]
+      summary: Flag a transaction
+      description: |
+        Mark a transaction for human attention (sets `flagged_at`). Optional body
+        `{"reason": "..."}` is recorded as a comment annotation. Retrieve flagged
+        rows with `?flagged=true`. **Requires `full_access` scope.**
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, description: Optional reason, stored as a comment annotation. }
+      responses:
+        "204": { description: Flagged. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Transactions]
+      summary: Unflag a transaction
+      description: "Clears `flagged_at`. **Requires `full_access` scope.**"
+      responses:
+        "204": { description: Unflagged. }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -3222,6 +3254,11 @@ components:
           type: object
           additionalProperties: true
           description: Free-form JSONB enrichment store. Always an object (empty `{}` when unset).
+        flagged_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the transaction was flagged for human attention; null when not flagged. The reason lives in a comment annotation.
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       additionalProperties: true
