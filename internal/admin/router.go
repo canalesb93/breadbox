@@ -445,7 +445,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/agents/{slug}/update", UpdateAgentDefinitionAdminHandler(svc, sm))
 			r.Post("/agents/{slug}/delete", DeleteAgentDefinitionAdminHandler(svc, sm))
 			r.Post("/agents/{slug}/enable", EnableAgentAdminHandler(svc))
-			r.Post("/workflow-presets/{slug}/enable", EnableWorkflowPresetAdminHandler(svc))
+			// Instantiating a NEW autonomous workflow from a preset is the
+			// high-authority act (it authorizes recurring AI spend on shared
+			// household data), so it's admin-only — RequireAdmin upgrades this
+			// one route above the surrounding editor group. Managing an
+			// already-instantiated workflow's run state stays editor.
+			r.With(RequireAdmin(sm)).Post("/workflow-presets/{slug}/enable", EnableWorkflowPresetAdminHandler(svc))
 			r.Post("/agents/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/agents/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/agents/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))

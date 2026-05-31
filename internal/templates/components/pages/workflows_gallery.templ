@@ -61,7 +61,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 							Label:   preset.Name,
 							Caption: preset.Description,
 						}) {
-							@workflowPresetControl(preset)
+							@workflowPresetControl(preset, p.IsAdmin)
 						}
 					}
 				}
@@ -80,10 +80,14 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 			class="fixed inset-0 bg-black/40 z-40"
 			@click="open=''"
 		></div>
-		for _, cat := range p.Categories {
-			for _, preset := range cat.Presets {
-				if !preset.Enabled {
-					@workflowConfigDrawer(preset, p.ConsentAcknowledged)
+		// Drawers exist only for the admin who can actually submit them; a
+		// non-admin can't open one (the "Set up" control is disabled).
+		if p.IsAdmin {
+			for _, cat := range p.Categories {
+				for _, preset := range cat.Presets {
+					if !preset.Enabled {
+						@workflowConfigDrawer(preset, p.ConsentAcknowledged)
+					}
 				}
 			}
 		}
@@ -91,8 +95,10 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 }
 
 // workflowPresetControl is the state-dependent right-side control: a "Set up"
-// button (opens the configure drawer) when available, a run toggle once enabled.
-templ workflowPresetControl(preset WorkflowPresetCardProps) {
+// button (opens the configure drawer) when available, a run toggle once
+// enabled. Instantiating a workflow is admin-only — non-admins see the
+// "Set up" control disabled with an explanatory tooltip.
+templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
 	<div class="flex items-center gap-3">
 		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
 			@components.LucideIcon("clock", "w-3.5 h-3.5")
@@ -108,7 +114,7 @@ templ workflowPresetControl(preset WorkflowPresetCardProps) {
 				aria-label={ "Toggle " + preset.Name }
 				@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
 			/>
-		} else {
+		} else if isAdmin {
 			<button
 				type="button"
 				class="btn btn-soft btn-sm gap-1.5"
@@ -117,6 +123,13 @@ templ workflowPresetControl(preset WorkflowPresetCardProps) {
 				@components.LucideIcon("settings-2", "w-4 h-4")
 				Set up
 			</button>
+		} else {
+			<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
+				<button type="button" class="btn btn-soft btn-sm gap-1.5" disabled>
+					@components.LucideIcon("lock", "w-4 h-4")
+					Set up
+				</button>
+			</span>
 		}
 	</div>
 }
