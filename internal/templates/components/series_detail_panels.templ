@@ -126,15 +126,22 @@ type SeriesEvidenceRow struct {
 
 type SeriesEvidenceProps struct {
 	Rows []SeriesEvidenceRow
+	// Unlinkable opts the linked (non-projected) rows into a hover-revealed
+	// unlink control that calls unlinkCharge(seriesShortID, txShortID) in the
+	// page's Alpine scope. Left false (the default) the timeline is read-only,
+	// which is how the /design sandbox renders it.
+	Unlinkable    bool
+	SeriesShortID string
 }
 
 templ SeriesEvidenceTimeline(p SeriesEvidenceProps) {
 	<div class="bb-card p-4 sm:p-5">
 		<div class="relative pl-1">
-			<!-- continuous rail behind the markers -->
-			<div class="absolute left-[15px] top-4 bottom-4 w-px bg-base-300"></div>
+			<!-- continuous rail behind the markers — centered on the w-7 marker
+			     column (pl-1 = 4px + half of 28px = 18px). -->
+			<div class="absolute left-[18px] top-5 bottom-5 w-px bg-base-300"></div>
 			for _, row := range p.Rows {
-				<div class="relative flex items-center gap-3 py-1.5">
+				<div class="group relative flex items-center gap-3 py-1.5">
 					<div class="relative z-10 w-7 h-7 rounded-full bg-base-100 flex items-center justify-center shrink-0">
 						@seriesEvidenceMarker(row.State)
 					</div>
@@ -148,6 +155,17 @@ templ SeriesEvidenceTimeline(p SeriesEvidenceProps) {
 							<span class={ "text-xs", templ.KV("text-success", row.NoteTone == "success"), templ.KV("text-base-content/45", row.NoteTone != "success") }>{ row.Note }</span>
 						}
 					</div>
+					if p.Unlinkable && row.ShortID != "" && row.State != "projected" {
+						<button
+							type="button"
+							class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error shrink-0"
+							@click={ "unlinkCharge('" + p.SeriesShortID + "', '" + row.ShortID + "')" }
+							aria-label="Unlink charge"
+							title="Unlink from this series"
+						>
+							@LucideIcon("unlink", "w-3.5 h-3.5")
+						</button>
+					}
 					<div class={ "text-sm font-semibold tabular-nums shrink-0", templ.KV("text-base-content/40 font-normal", row.State == "projected") }>{ row.AmountText }</div>
 				</div>
 				if row.HasPrice {

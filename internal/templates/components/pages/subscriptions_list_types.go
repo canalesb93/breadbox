@@ -2,7 +2,10 @@
 
 package pages
 
-import "breadbox/internal/templates/components"
+import (
+	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+)
 
 // SubscriptionsListProps is the typed input for the /subscriptions admin page.
 // Series are pre-split into Candidates (awaiting human adjudication) and Active
@@ -158,6 +161,20 @@ type SubscriptionDetailProps struct {
 	// TagChips is the resolved chip data (display/color/icon) for the tags
 	// currently on the series — rendered through the shared TagChip component.
 	TagChips []components.TagChipData
+
+	// --- Detection-forward panels (assembled in the handler) ---
+	Detection components.SeriesDetectionProps
+	Evidence  components.SeriesEvidenceProps
+	Facts     components.SeriesFactStripProps
+
+	// --- Shared-picker payloads ---
+	// CategoryTree seeds window.__bbCategories for the shared categoryPicker.
+	CategoryTree []service.CategoryResponse
+	// AllTags seeds window.__bbAllTags + the tag picker's availableTags list.
+	AllTags []service.TagResponse
+	// CurrentTagSlugs are the tags already on the series (the picker shows them
+	// as "present" so the user can add/remove in one session).
+	CurrentTagSlugs []string
 }
 
 // SubscriptionTagOption is one option in the detail page's add-tag picker.

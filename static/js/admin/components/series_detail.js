@@ -1,15 +1,19 @@
-// Recurring-series detail page (/recurring/{id}) Alpine component.
+// Recurring-series detail page (/recurring/{id}) Alpine component — the
+// detection-forward redesign.
 //
 // Convention reference: docs/design-system.md -> "Alpine page components".
 //
-// Owns every mutation on the detail page: inline field edits (name, amount,
-// cadence, expected day, tolerance, category) via PATCH /api/v1/series/{id};
-// the type axis via POST /api/v1/series/{id}/type; tags via the series tag
-// endpoints; lifecycle verdicts; and link/unlink of member charges (the latter
-// powered by a search modal over /-/search/transactions). Every write reloads
-// on success so the server re-derives dependent fields (next renewal, renewal
-// health, rollups, price history) — correctness over a no-reload flourish.
-// CSRF is auto-injected by the global fetch wrapper in base.html.
+// Editing model (hybrid):
+//   - INLINE in the Rule card: type (POST /type), category (shared
+//     categoryPicker -> PATCH), tags (shared tag picker -> series tag
+//     endpoints), merchant-key re-key (POST /rekey).
+//   - DRAWER + explicit Save: name, cadence, expected amount + currency,
+//     tolerance, expected day -> one PATCH /api/v1/series/{id}.
+//   - Evidence rows: per-row unlink (DELETE) + a "Link a charge" search modal.
+//
+// Every write reloads on success so the server re-derives the detection
+// summary, match window, evidence timeline, and renewal projection. CSRF is
+// auto-injected by the global fetch wrapper in base.html.
 (function () {
   function restorePageState() {
     if (window.bbProgress && window.bbProgress.finish) window.bbProgress.finish();
@@ -25,10 +29,24 @@
     window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
   }
 
+  function parseJSONScript(id, fallback) {
+    var el = document.getElementById(id);
+    if (!el) return fallback;
+    try { return JSON.parse(el.textContent) || fallback; } catch (e) { return fallback; }
+  }
+
+  // Seed the globals the shared category + tag pickers read on first render.
+  (function seedGlobals() {
+    window.__bbCategories = parseJSONScript('series-detail-categories', window.__bbCategories || []);
+    window.__bbAllTags = parseJSONScript('series-detail-alltags', window.__bbAllTags || []);
+  })();
+
   document.addEventListener('alpine:init', function () {
     Alpine.data('seriesDetail', function () {
       return {
         seriesId: '',
+        currentTags: [],
+        editOpen: false,
         // Link-a-charge modal state.
         linkOpen: false,
         linkQuery: '',
@@ -38,98 +56,110 @@
 
         init: function () {
           this.seriesId = (this.$root && this.$root.dataset.seriesId) || '';
+          this.currentTags = parseJSONScript('series-detail-current-tags', []);
         },
 
-        // --- Generic writers -------------------------------------------------
-
-        // _write fires a mutation and reloads on success; on failure it restores
-        // page chrome and surfaces the server's error message.
+        // --- Generic writer: mutate then reload on success ------------------
         _write: function (method, url, body, okMsg, failMsg) {
           var opts = { method: method, headers: { Accept: 'application/json' } };
           if (body) {
             opts.headers['Content-Type'] = 'application/json';
             opts.body = JSON.stringify(body);
           }
-          fetch(url, opts)
-            .then(function (res) {
-              if (res.ok) {
-                toast(okMsg, 'success');
-                window.location.reload();
-                return;
-              }
-              restorePageState();
-              return res.json().then(function (data) {
-                toast((data.error && data.error.message) || failMsg);
-              }).catch(function () { toast(failMsg); });
-            })
-            .catch(function () { restorePageState(); toast('Network error. Please try again.'); });
+          return fetch(url, opts).then(function (res) {
+            if (res.ok) {
+              toast(okMsg, 'success');
+              window.location.reload();
+              return true;
+            }
+            restorePageState();
+            return res.json().then(function (data) {
+              toast((data.error && data.error.message) || failMsg);
+            }).catch(function () { toast(failMsg); }).then(function () { return false; });
+          }).catch(function () { restorePageState(); toast('Network error. Please try again.'); return false; });
         },
 
-        patch: function (seriesId, body, okMsg) {
-          this._write('PATCH', '/api/v1/series/' + encodeURIComponent(seriesId), body, okMsg || 'Saved', 'Failed to save.');
+        // --- Drawer: edit the heavier fields, one Save ----------------------
+        saveDrawer: function (form) {
+          var f = new FormData(form);
+          var body = { name: (f.get('name') || '').trim(), cadence: f.get('cadence') };
+          var amt = (f.get('expected_amount') || '').trim();
+          if (amt !== '') body.expected_amount = parseFloat(amt);
+          var cur = (f.get('currency') || '').trim();
+          if (cur !== '') body.currency = cur.toUpperCase();
+          var tol = (f.get('amount_tolerance') || '').trim();
+          if (tol !== '') body.amount_tolerance = parseFloat(tol);
+          var day = (f.get('expected_day') || '').trim();
+          if (day !== '') body.expected_day = parseInt(day, 10);
+          if (!body.name) { toast('Name cannot be empty.'); return; }
+          this._write('PATCH', '/api/v1/series/' + encodeURIComponent(this.seriesId), body, 'Saved', 'Failed to save.');
         },
 
-        // --- Field editors ---------------------------------------------------
-
-        saveName: function (seriesId, value) {
-          var v = (value || '').trim();
-          if (!v) { toast('Name cannot be empty.'); return; }
-          this.patch(seriesId, { name: v }, 'Name updated');
-        },
-
-        saveCadence: function (seriesId, value) {
-          this.patch(seriesId, { cadence: value }, 'Cadence updated');
-        },
-
-        saveExpectedDay: function (seriesId, value) {
-          var n = parseInt(value, 10);
-          if (isNaN(n)) { toast('Expected day must be a number.'); return; }
-          this.patch(seriesId, { expected_day: n }, 'Expected day updated');
-        },
-
-        saveAmount: function (seriesId, amount, currency) {
-          var n = parseFloat(amount);
-          if (isNaN(n)) { toast('Amount must be a number.'); return; }
-          var body = { expected_amount: n };
-          if (currency) body.currency = currency;
-          this.patch(seriesId, body, 'Expected amount updated');
-        },
-
-        saveTolerance: function (seriesId, value) {
-          var n = parseFloat(value);
-          if (isNaN(n)) { toast('Tolerance must be a number.'); return; }
-          this.patch(seriesId, { amount_tolerance: n }, 'Tolerance updated');
-        },
-
-        saveCategory: function (seriesId, value) {
-          // "" clears the suggested category.
-          this.patch(seriesId, { category_id: value }, 'Category updated');
-        },
-
+        // --- Inline edits ---------------------------------------------------
         setType: function (seriesId, value) {
           this._write('POST', '/api/v1/series/' + encodeURIComponent(seriesId) + '/type', { type: value }, 'Type updated', 'Failed to set type.');
         },
 
-        // --- Verdicts --------------------------------------------------------
+        saveCategory: function (detail) {
+          this._write('PATCH', '/api/v1/series/' + encodeURIComponent(this.seriesId), { category_id: detail.id || '' }, 'Category updated', 'Failed to update category.');
+        },
 
+        rekey: function (seriesId, newKey) {
+          newKey = (newKey || '').trim();
+          if (!newKey) { toast('Merchant key cannot be empty.'); return; }
+          this._write('POST', '/api/v1/series/' + encodeURIComponent(seriesId) + '/rekey', { new_merchant_key: newKey }, 'Re-keyed', 'Failed to re-key.');
+        },
+
+        // --- Verdicts -------------------------------------------------------
         submitVerdict: function (seriesId, seriesName, verdict) {
           var label = { confirm: 'Confirmed', reject: 'Marked not recurring', pause: 'Paused', cancel: 'Cancelled' }[verdict] || 'Updated';
           this._write('PATCH', '/api/v1/series/' + encodeURIComponent(seriesId), { verdict: verdict }, label + (seriesName ? ': ' + seriesName : ''), 'Failed to update recurring charge.');
         },
 
-        // --- Tags ------------------------------------------------------------
+        // --- Tags: shared picker + per-chip remove --------------------------
+        openTagPicker: function () {
+          var counts = {};
+          this.currentTags.forEach(function (slug) { counts[slug] = 1; });
+          window.dispatchEvent(new CustomEvent('open-tag-picker', {
+            detail: {
+              sourceId: 'series-tag',
+              transactionIds: [],
+              txCount: 0,
+              appliedCounts: counts,
+              availableTags: window.__bbAllTags || [],
+            },
+          }));
+        },
 
-        addSeriesTag: function (seriesId, slug) {
-          if (!slug) return;
-          this._write('POST', '/api/v1/series/' + encodeURIComponent(seriesId) + '/tags', { tag_slug: slug }, 'Tag added', 'Failed to add tag.');
+        // Apply the picker's add/remove diff via the series tag endpoints, then
+        // reload once (so members re-inherit / shed the tags).
+        applyTagDiff: function (adds, removes) {
+          var self = this;
+          var ops = [];
+          (adds || []).forEach(function (slug) {
+            ops.push(self._tagOp('POST', '/api/v1/series/' + encodeURIComponent(self.seriesId) + '/tags', { tag_slug: slug }));
+          });
+          (removes || []).forEach(function (slug) {
+            ops.push(self._tagOp('DELETE', '/api/v1/series/' + encodeURIComponent(self.seriesId) + '/tags/' + encodeURIComponent(slug), null));
+          });
+          if (ops.length === 0) return;
+          Promise.all(ops).then(function () {
+            toast('Tags updated', 'success');
+            window.location.reload();
+          }).catch(function () { restorePageState(); toast('Failed to update tags.'); });
         },
 
         removeSeriesTag: function (seriesId, slug) {
           this._write('DELETE', '/api/v1/series/' + encodeURIComponent(seriesId) + '/tags/' + encodeURIComponent(slug), null, 'Tag removed', 'Failed to remove tag.');
         },
 
-        // --- Member charges --------------------------------------------------
+        _tagOp: function (method, url, body) {
+          var opts = { method: method, headers: { Accept: 'application/json' } };
+          if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+          return fetch(url, opts).then(function (res) { if (!res.ok) throw new Error('tag op failed'); });
+        },
 
+        // --- Member charges -------------------------------------------------
         unlinkCharge: function (seriesId, txId) {
           this._write('DELETE', '/api/v1/series/' + encodeURIComponent(seriesId) + '/transactions/' + encodeURIComponent(txId), null, 'Charge unlinked', 'Failed to unlink charge.');
         },
@@ -138,8 +168,6 @@
           this._write('POST', '/api/v1/series/' + encodeURIComponent(this.seriesId) + '/transactions', { transaction_ids: [txId] }, 'Charge linked', 'Failed to link charge.');
         },
 
-        // Link-a-charge modal: debounced search reusing the /-/search/transactions
-        // endpoint (returns pre-rendered TxRowCompact HTML the cmdk palette uses).
         openLink: function () { this.linkOpen = true; this.linkQuery = ''; this.linkResults = []; this.$nextTick(function () { var i = document.getElementById('series-link-search'); if (i) i.focus(); }); },
         closeLink: function () { this.linkOpen = false; },
 
