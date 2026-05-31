@@ -258,6 +258,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionBadges() },
 		},
 		{
+			Slug:        "recurring-chips",
+			Title:       "Recurring chips",
+			Description: "Shared chips for the Recurring (recurring-series) surfaces: SeriesTypeChip (type), SeriesRenewalChip (renewal health), SeriesConfidenceChip (detection band). Used across the ledger, candidate cards, and detail page.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionRecurringChips() },
+		},
+		{
 			Slug:        "tags",
 			Title:       "Tags",
 			Description: "Pill-shaped colored tags — bb-tag, bb-tag-sm, bb-tag-lg, bb-tag-ghost, bb-tag-add.",

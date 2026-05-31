@@ -210,6 +210,36 @@ templ SectionBadges() {
 	</div>
 }
 
+templ SectionRecurringChips() {
+	<div class="flex flex-col gap-6">
+		@designExample("Type (SeriesTypeChip)", "Structured recurring type — quiet metadata badge. size \"xs\" on dense ledger rows, \"sm\" on the detail header/config.") {
+			<div class="flex flex-wrap items-center gap-2">
+				@components.SeriesTypeChip("Subscription", "xs")
+				@components.SeriesTypeChip("Bill", "xs")
+				@components.SeriesTypeChip("Loan", "xs")
+				@components.SeriesTypeChip("Other", "xs")
+				@components.SeriesTypeChip("Loan", "sm")
+			</div>
+		}
+		@designExample("Renewal health (SeriesRenewalChip)", "Attention chip for an active series' next charge. Only due-soon / overdue / stale earn one; type-aware copy (bill/loan \"Lapsed?\" vs subscription \"Likely cancelled\"). Empty label renders nothing.") {
+			<div class="flex flex-wrap items-center gap-2">
+				@components.SeriesRenewalChip("Due tomorrow", "info")
+				@components.SeriesRenewalChip("Renews in 5d", "info")
+				@components.SeriesRenewalChip("5d overdue", "warning")
+				@components.SeriesRenewalChip("Likely cancelled", "error")
+				@components.SeriesRenewalChip("Lapsed?", "error")
+			</div>
+		}
+		@designExample("Detection confidence (SeriesConfidenceChip)", "Candidate detection band, derived from detection_signals. success / warning / neutral by band.") {
+			<div class="flex flex-wrap items-center gap-2">
+				@components.SeriesConfidenceChip("High", "success")
+				@components.SeriesConfidenceChip("Medium", "warning")
+				@components.SeriesConfidenceChip("Low", "neutral")
+			</div>
+		}
+	</div>
+}
+
 // ─── Alerts ────────────────────────────────────────────────────────────
 
 templ SectionAlerts() {

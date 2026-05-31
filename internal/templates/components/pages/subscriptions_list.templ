@@ -169,8 +169,8 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 			<div class="min-w-0 flex-1">
 				<div class="flex items-center gap-2 flex-wrap">
 					<span class="text-sm font-semibold text-base-content truncate">{ s.Name }</span>
-					<span class="badge badge-ghost badge-xs">{ s.TypeLabel }</span>
-					<span class={ "badge badge-soft badge-sm", "badge-" + s.BandTone }>{ s.ConfidenceBand } confidence</span>
+					@components.SeriesTypeChip(s.TypeLabel, "xs")
+					@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
 				</div>
 				<div class="text-xs text-base-content/50 mt-1">{ s.SignalSummary }</div>
 				<button
@@ -257,7 +257,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 				<div class="min-w-0">
 					<div class="flex items-center gap-2 min-w-0">
 						<span class="text-sm font-medium truncate text-base-content">{ s.Name }</span>
-						<span class="badge badge-ghost badge-xs shrink-0">{ s.TypeLabel }</span>
+						@components.SeriesTypeChip(s.TypeLabel, "xs")
 					</div>
 					if s.CategoryName != "" {
 						<div class="text-xs text-base-content/40 truncate">{ s.CategoryName }</div>
@@ -276,9 +276,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 		<td>
 			<span class="inline-flex items-center gap-1.5 flex-wrap">
 				<span class={ "badge badge-soft badge-sm", "badge-" + s.StatusTone }>{ s.StatusLabel }</span>
-				if s.RenewalLabel != "" {
-					<span class={ "badge badge-soft badge-xs", "badge-" + s.RenewalTone }>{ s.RenewalLabel }</span>
-				}
+				@components.SeriesRenewalChip(s.RenewalLabel, s.RenewalTone)
 			</span>
 		</td>
 		<td class="text-right">
