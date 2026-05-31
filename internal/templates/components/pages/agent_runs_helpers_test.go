@@ -2,7 +2,93 @@
 
 package pages
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestAgentRunFriendlyError(t *testing.T) {
+	cases := []struct {
+		name      string
+		raw       string
+		wantEmpty bool
+		// substr must appear in the friendly message when wantEmpty is false.
+		substr string
+	}{
+		{
+			name:   "opaque claude-code exit (the run Ricardo hit)",
+			raw:    "agent: unknown: Claude Code process exited with code 1",
+			substr: "expired or invalid Anthropic credential",
+		},
+		{
+			name:   "zero-message stream end",
+			raw:    "agent: auth_error: agent SDK stream ended without yielding any messages — likely an invalid auth credential",
+			substr: "no output",
+		},
+		{
+			name:   "typed auth_error",
+			raw:    "agent: auth_error: 401 unauthorized [stderr=…]",
+			substr: "rejected the credential",
+		},
+		{
+			name:   "typed api_error",
+			raw:    "agent: api_error: overloaded",
+			substr: "transient",
+		},
+		{
+			name:   "typed network_error",
+			raw:    "agent: network_error: fetch failed: ENOTFOUND",
+			substr: "outbound connectivity",
+		},
+		{
+			name:   "spec_invalid is a bug",
+			raw:    "agent: spec_invalid: zod parse failed",
+			substr: "Breadbox bug",
+		},
+		{
+			name:   "missing runner binary",
+			raw:    "agent: breadbox-agent binary not found",
+			substr: "isn't installed",
+		},
+		{
+			name:   "concurrency skip",
+			raw:    "agent: another run is already in progress",
+			substr: "another run was already in progress",
+		},
+		{
+			name:   "budget cap",
+			raw:    "agent: run exceeded budget cap",
+			substr: "budget cap",
+		},
+		{
+			name:   "server restart still mapped",
+			raw:    "run interrupted by server restart",
+			substr: "safe to re-run",
+		},
+		{
+			name:      "genuinely unknown falls through to raw",
+			raw:       "agent: unknown: some brand-new failure mode nobody mapped",
+			wantEmpty: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := AgentRunFriendlyError(c.raw)
+			if c.wantEmpty {
+				if got != "" {
+					t.Errorf("expected no friendly mapping, got %q", got)
+				}
+				return
+			}
+			if got == "" {
+				t.Fatalf("expected a friendly mapping for %q, got empty", c.raw)
+			}
+			if !strings.Contains(strings.ToLower(got), strings.ToLower(c.substr)) {
+				t.Errorf("friendly message %q does not contain %q", got, c.substr)
+			}
+		})
+	}
+}
 
 func TestFilterTranscriptForDisplay_DropsEmptyResult(t *testing.T) {
 	in := []TranscriptEvent{
