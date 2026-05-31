@@ -41,6 +41,19 @@ func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 		if cron := r.FormValue("schedule_cron"); cron != "" {
 			params.ScheduleCron = &cron
 		}
+		// Any non-control form field is a preset-specialized option (e.g.
+		// apply_mode); the service validates each against the preset's
+		// declared options and ignores unknown keys.
+		control := map[string]bool{
+			"enabled": true, "schedule_cron": true,
+			"additional_instructions": true, "consent": true, "_csrf": true,
+		}
+		params.Options = map[string]string{}
+		for key := range r.Form {
+			if !control[key] {
+				params.Options[key] = r.FormValue(key)
+			}
+		}
 		wf, err := svc.EnableWorkflowFromPreset(r.Context(), slug, params)
 		if err != nil {
 			switch {

@@ -59,8 +59,29 @@ type WorkflowPresetCardProps struct {
 	TriggerOnSync    bool    // true = post-sync event trigger (no schedule editing)
 	EstCostPerRunUSD float64 // rough per-run cost estimate for the projected-cost hint
 
+	// Options are the preset's specialized configuration selects, rendered
+	// in the configure drawer (e.g. apply-mode for categorization presets).
+	Options []WorkflowPresetOptionProps
+
 	// Enablement state.
 	Enabled         bool   // the preset has been instantiated as a workflow
 	WorkflowSlug    string // slug of the instantiated workflow (when Enabled)
 	WorkflowEnabled bool   // the instantiated workflow's run toggle (when Enabled)
+}
+
+// WorkflowPresetOptionProps is one specialized option (a single-select) in
+// the configure drawer.
+type WorkflowPresetOptionProps struct {
+	Key     string
+	Label   string
+	Help    string
+	Default string // default choice Value (pre-selected)
+	Choices []WorkflowPresetChoiceProps
+}
+
+// WorkflowPresetChoiceProps is one option value (the prompt Directive lives
+// server-side; the drawer only needs the value + label).
+type WorkflowPresetChoiceProps struct {
+	Value string
+	Label string
 }
