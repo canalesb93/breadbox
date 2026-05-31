@@ -97,6 +97,15 @@ List all categories in the 2-level hierarchy. Returns slug, display name, parent
 
 Export the full category tree as TSV. Useful for backup or transfer.
 
+### list_workflows (Read)
+
+List the household's automation layer. Returns two arrays:
+
+- `workflows` — the enabled, preset-backed Workflows. Each row carries `name`, `slug`, `preset` (the workflow-preset slug it was instantiated from), `enabled` (a workflow can be instantiated but paused), `trigger` (`sync` = after each successful sync \| `schedule` = cron \| `manual`), `schedule_cron` (when `trigger=schedule`), `tool_scope` (`read_only` \| `read_write`), and `last_run_status` + `last_run_at` (omitted when the workflow has never run).
+- `presets` — the full catalog of available presets it could enable. Each row carries `slug`, `name`, `category`, `description`, `tool_scope`, `trigger`, default `schedule_cron`, and `enabled` (true when already instantiated as a workflow).
+
+Read this to see what runs automatically before proposing new rules or reports — an existing workflow may already cover the task. Hand-authored agents (no source preset) are excluded; enabling or configuring a workflow is an admin-UI action (the `/workflows` gallery), not an MCP write.
+
 ---
 
 ## Categorization Tools

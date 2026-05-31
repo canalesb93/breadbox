@@ -81,6 +81,48 @@ var applyModeOption = WorkflowPresetOption{
 	},
 }
 
+// lookbackWindowOption is the shared "how far back to scan" choice for the
+// alerts/anomaly presets. The default (7 days) carries no directive — the base
+// strategy blocks already say "default: last 7 days"; the 30/90-day choices
+// append a directive that widens the window the run reasons over.
+var lookbackWindowOption = WorkflowPresetOption{
+	Key:     "lookback_window",
+	Label:   "Lookback window",
+	Help:    "How far back each run scans for anomalies.",
+	Default: "7",
+	Choices: []WorkflowPresetChoice{
+		{Value: "7", Label: "Last 7 days", Directive: ""},
+		{
+			Value:     "30",
+			Label:     "Last 30 days",
+			Directive: "LOOKBACK WINDOW — 30 DAYS: Scan the last 30 days, not the default 7. Wherever a step says \"last 7 days\", read it as \"last 30 days\". Establish baselines from the period immediately preceding the window so a one-month scan still has something to compare against.",
+		},
+		{
+			Value:     "90",
+			Label:     "Last 90 days",
+			Directive: "LOOKBACK WINDOW — 90 DAYS: Scan the last 90 days, not the default 7. Wherever a step says \"last 7 days\", read it as \"last 90 days\". This is a wide, catch-up sweep — prioritize the highest-signal findings and don't re-flag items a prior run already surfaced.",
+		},
+	},
+}
+
+// reportVerbosityOption is the shared "how much detail to write" choice for the
+// alerts/anomaly presets. Concise is the default (no directive); detailed
+// appends a directive asking for fuller evidence and reasoning in the report.
+var reportVerbosityOption = WorkflowPresetOption{
+	Key:     "report_verbosity",
+	Label:   "Report verbosity",
+	Help:    "How much detail each report carries.",
+	Default: "concise",
+	Choices: []WorkflowPresetChoice{
+		{Value: "concise", Label: "Concise — headline findings", Directive: ""},
+		{
+			Value:     "detailed",
+			Label:     "Detailed — full evidence",
+			Directive: "REPORT VERBOSITY — DETAILED: Write a thorough report. For every flagged item include the full evidence trail (amounts, dates, merchant, account, and the baseline you compared against) and a one-line rationale. Open with a short summary of what you scanned and the headline count, then the itemized findings. When nothing is flagged, still summarize what you checked and why the window is clean.",
+		},
+	},
+}
+
 // resolveOptionDirectives returns the prompt text to append for a preset's
 // chosen options. Each option resolves to a choice — the submitted value if
 // valid, otherwise the option's Default — and any non-empty Directive is
@@ -188,6 +230,57 @@ var workflowPresets = []WorkflowPreset{
 		ToolScope:        "read_only",
 		ScheduleCron:     "0 8 1 * *", // 1st of the month at 08:00 (canonical "Monthly" — drawer-selectable)
 		EstCostPerRunUSD: 0.07,        // a full month of activity + merchant breakdown
+	},
+
+	// ── Alerts & Anomalies ──────────────────────────────────────────────────
+	// Watchdogs that surface things worth a human's eyeballs. Each flags via a
+	// `needs-review` tag + a report and never recategorizes; the two read_write
+	// sentinels run after each sync for fast feedback, the read_only watch runs
+	// weekly. All three expose the shared Lookback window + Report verbosity
+	// options so a household can tune scan breadth and report detail.
+	{
+		Slug:        "large-charge-sentinel",
+		Name:        "Large Charge Sentinel",
+		Category:    "Alerts & Anomalies",
+		Icon:        "trending-up",
+		Description: "Flags unusually large individual charges relative to your normal spending, right after each sync.",
+		PromptBlocks: []string{
+			"strategy-large-charge-sentinel",
+			"merchant-analysis",
+		},
+		ToolScope:             "read_write", // tags flagged charges for human review
+		TriggerOnSyncComplete: true,
+		EstCostPerRunUSD:      0.03, // scans recent debits + a baseline pass per sync
+		Options:               []WorkflowPresetOption{lookbackWindowOption, reportVerbosityOption},
+	},
+	{
+		Slug:        "new-merchant-watch",
+		Name:        "New-Merchant Watch",
+		Category:    "Alerts & Anomalies",
+		Icon:        "store",
+		Description: "A weekly report of first-seen merchants — new subscriptions and one-off vendors you may not recognize.",
+		PromptBlocks: []string{
+			"strategy-anomaly-detection",
+			"merchant-analysis",
+		},
+		ToolScope:        "read_only", // reports only; never tags or recategorizes
+		ScheduleCron:     "0 7 * * 1", // Mondays at 07:00 (canonical "Weekly")
+		EstCostPerRunUSD: 0.04,        // a week of merchant-summary comparison
+		Options:          []WorkflowPresetOption{lookbackWindowOption, reportVerbosityOption},
+	},
+	{
+		Slug:        "duplicate-charge-detector",
+		Name:        "Duplicate Charge Detector",
+		Category:    "Alerts & Anomalies",
+		Icon:        "copy",
+		Description: "Flags likely double-bills and gateway-retry duplicates so you can dispute them, right after each sync.",
+		PromptBlocks: []string{
+			"strategy-duplicate-detection",
+		},
+		ToolScope:             "read_write", // tags suspected duplicates for review
+		TriggerOnSyncComplete: true,
+		EstCostPerRunUSD:      0.03, // pairwise scan over recent debits per sync
+		Options:               []WorkflowPresetOption{lookbackWindowOption, reportVerbosityOption},
 	},
 }
 

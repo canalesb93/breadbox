@@ -480,6 +480,17 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/workflows/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/workflows/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
+
+			// Preview the composed internal base prompt for a preset (read-only JSON).
+			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
+			// Reconfigure an already-enabled workflow (schedule, additional
+			// instructions, options). GET returns the live config to prefill
+			// the configure drawer; POST re-composes the prompt + schedule.
+			// Both are admin-only — RequireAdmin upgrades them above the
+			// surrounding editor group, mirroring the preset-enable guard,
+			// because a reconfigure re-authorizes recurring AI spend behavior.
+			r.With(RequireAdmin(sm)).Get("/workflows/{slug}/config", WorkflowConfigAdminHandler(svc))
+			r.With(RequireAdmin(sm)).Post("/workflows/{slug}/reconfigure", ReconfigureWorkflowAdminHandler(svc))
 		})
 
 		// Admin-only API routes.

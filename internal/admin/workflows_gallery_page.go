@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -33,6 +34,29 @@ func buildWorkflowSpendBanner(s service.HouseholdSpendStatus) pages.WorkflowSpen
 	}
 }
 
+// buildWorkflowLastRun maps a service run summary (string RFC3339 timestamps)
+// into the gallery card's last-run view. Prefers CompletedAt; falls back to
+// StartedAt for an in-progress run so the relative time still renders. A
+// timestamp that won't parse leaves FinishedAt zero — workflowsRelativeTime
+// then renders an empty string, which is fine (the status pill still shows).
+func buildWorkflowLastRun(run *service.AgentRunSummary) *pages.WorkflowLastRunProps {
+	if run == nil {
+		return nil
+	}
+	out := &pages.WorkflowLastRunProps{
+		ShortID: run.ShortID,
+		Status:  run.Status,
+	}
+	when := run.StartedAt
+	if run.CompletedAt != nil && *run.CompletedAt != "" {
+		when = *run.CompletedAt
+	}
+	if t, err := time.Parse(time.RFC3339, when); err == nil {
+		out.FinishedAt = t
+	}
+	return out
+}
+
 // WorkflowsGalleryPageHandler renders GET /workflows — the codified preset
 // gallery. Presets come from the code registry (service.ListWorkflowPresets);
 // enabling one instantiates a workflow. Mirrors AgentsListPageHandler.
@@ -46,13 +70,17 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			status     *service.AgentSubsystemStatus
 			consented  bool
 			spend      service.HouseholdSpendStatus
+			lastRuns   map[string]*service.AgentRunSummary
 			wg         sync.WaitGroup
 		)
-		wg.Add(4)
+		wg.Add(5)
 		go func() { defer wg.Done(); presets, presetsErr = svc.ListWorkflowPresets(ctx) }()
 		go func() { defer wg.Done(); status = svc.GetAgentSubsystemStatus(ctx) }()
 		go func() { defer wg.Done(); consented = svc.WorkflowsConsentAcknowledged(ctx) }()
 		go func() { defer wg.Done(); spend, _ = svc.HouseholdSpendStatus(ctx) }()
+		// Last-run summaries are a soft enrichment: a query hiccup drops the
+		// per-card "Last run" line but doesn't fail the gallery.
+		go func() { defer wg.Done(); lastRuns, _ = svc.GetEnabledWorkflowLastRuns(ctx) }()
 		wg.Wait()
 
 		if presetsErr != nil {
@@ -61,7 +89,7 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 		}
 
 		props := pages.WorkflowsGalleryProps{
-			Categories:          groupWorkflowPresets(presets),
+			Categories:          groupWorkflowPresets(presets, lastRuns),
 			Status:              buildAgentsListStatus(status),
 			CSRFToken:           GetCSRFToken(r),
 			ConsentAcknowledged: consented,
@@ -75,8 +103,11 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 }
 
 // groupWorkflowPresets buckets presets into category sections, preserving the
-// registry order for both categories and presets within them.
-func groupWorkflowPresets(views []service.WorkflowPresetView) []pages.WorkflowCategoryProps {
+// registry order for both categories and presets within them. lastRuns maps an
+// instantiated workflow's slug → its most-recent run summary (nil/absent when a
+// preset isn't enabled or has never run); it drives the per-card "Last run"
+// line.
+func groupWorkflowPresets(views []service.WorkflowPresetView, lastRuns map[string]*service.AgentRunSummary) []pages.WorkflowCategoryProps {
 	order := make([]string, 0)
 	byCat := make(map[string][]pages.WorkflowPresetCardProps)
 	for _, v := range views {
@@ -97,6 +128,9 @@ func groupWorkflowPresets(views []service.WorkflowPresetView) []pages.WorkflowCa
 		}
 		if v.WorkflowSlug != nil {
 			card.WorkflowSlug = *v.WorkflowSlug
+			if run := lastRuns[*v.WorkflowSlug]; run != nil {
+				card.LastRun = buildWorkflowLastRun(run)
+			}
 		}
 		if v.WorkflowEnabled != nil {
 			card.WorkflowEnabled = *v.WorkflowEnabled
