@@ -1,0 +1,80 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// WorkflowsGallery is the /workflows preset gallery: codified, one-click
+// automations grouped by category. Enabling a preset instantiates a workflow;
+// an instantiated workflow shows a run toggle.
+templ WorkflowsGallery(p WorkflowsGalleryProps) {
+	<script src="/static/js/admin/components/workflows_gallery.js"></script>
+	<div
+		x-data="workflowsGallery"
+		data-csrf={ p.CSRFToken }
+		x-init="$store.shortcuts.setScope('workflows')"
+		x-destroy="$store.shortcuts.setScope('global')"
+	>
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Workflows",
+			Subtitle:             "One-click AI automations that run on your Breadbox.",
+			SubtitleHideOnMobile: true,
+		})
+		if !p.Status.Ready {
+			<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
+				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
+				<div class="flex-1">
+					<div class="font-semibold text-sm">Set up the agent runtime first</div>
+					<div class="text-xs opacity-80">Configure an Anthropic API key in Settings to actually run these workflows. You can still enable presets — they'll stay paused until the runtime is ready.</div>
+				</div>
+				<a href="/settings/agents" class="btn btn-sm btn-ghost">Configure</a>
+			</div>
+		}
+		<div class="mt-4 space-y-6">
+			for _, cat := range p.Categories {
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:  cat.Icon,
+					Title: cat.Name,
+				}) {
+					for _, preset := range cat.Presets {
+						@components.SettingsRow(components.SettingsRowProps{
+							Label:   preset.Name,
+							Caption: preset.Description,
+						}) {
+							@workflowPresetControl(preset)
+						}
+					}
+				}
+			}
+		</div>
+	</div>
+}
+
+// workflowPresetControl is the state-dependent right-side control: an enable
+// button when the preset is available, a run toggle once it's instantiated.
+templ workflowPresetControl(preset WorkflowPresetCardProps) {
+	<div class="flex items-center gap-3">
+		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
+			@components.LucideIcon("clock", "w-3.5 h-3.5")
+			{ preset.TriggerLabel }
+		</span>
+		if preset.Enabled {
+			<input
+				type="checkbox"
+				class="toggle toggle-sm toggle-primary"
+				if preset.WorkflowEnabled {
+					checked
+				}
+				aria-label={ "Toggle " + preset.Name }
+				@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
+			/>
+		} else {
+			<button
+				type="button"
+				class="btn btn-soft btn-sm gap-1.5"
+				@click={ "enablePreset('" + preset.Slug + "', $event.target)" }
+			>
+				@components.LucideIcon("plus", "w-4 h-4")
+				Enable
+			</button>
+		}
+	</div>
+}
