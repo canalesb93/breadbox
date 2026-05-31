@@ -191,6 +191,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Legacy /agents/runs and /agents/{slug}/runs 301-redirect.
 		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr, a.Config.DataDir))
 		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
+		r.Get("/workflows", WorkflowsGalleryPageHandler(svc, sm, tr))
 		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
 		// /agents/{slug} is the per-agent landing page (lifetime stats +
 		// last 10 runs); /agents/{slug}/edit remains the form, reachable
@@ -443,6 +444,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/agents/{slug}/update", UpdateAgentDefinitionAdminHandler(svc, sm))
 			r.Post("/agents/{slug}/delete", DeleteAgentDefinitionAdminHandler(svc, sm))
 			r.Post("/agents/{slug}/enable", EnableAgentAdminHandler(svc))
+			r.Post("/workflow-presets/{slug}/enable", EnableWorkflowPresetAdminHandler(svc))
 			r.Post("/agents/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/agents/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/agents/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
