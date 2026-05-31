@@ -867,6 +867,85 @@ func TestSeriesType_InferenceStickyAndOverride(t *testing.T) {
 	}
 }
 
+func TestReinferSeriesTypes(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	seedMerchant := func(name string, dates ...string) []string {
+		ids := make([]string, 0, len(dates))
+		for _, d := range dates {
+			txn := testutil.MustCreateTransaction(t, queries, acctID, name+"_"+d, name, 999, d)
+			ids = append(ids, txn.ShortID)
+		}
+		return ids
+	}
+	categorize := func(providerName, slug, display string) {
+		if _, err := pool.Exec(ctx, `INSERT INTO categories (slug, display_name) VALUES ($1,$2) ON CONFLICT (slug) DO NOTHING`, slug, display); err != nil {
+			t.Fatalf("ensure category: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE transactions SET category_id=(SELECT id FROM categories WHERE slug=$1) WHERE provider_name=$2`, slug, providerName); err != nil {
+			t.Fatalf("categorize: %v", err)
+		}
+	}
+
+	// A series detected BEFORE its members were categorized → defaults to
+	// subscription (inference at insert had no category signal).
+	mtg := seedMerchant("WF MTG", "2026-02-01", "2026-03-01", "2026-04-01")
+	mtgSeries, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "wfmtg", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: mtg,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint mortgage: %v", err)
+	}
+	if mtgSeries.Type != service.SeriesTypeSubscription {
+		t.Fatalf("precondition: mortgage series should default to subscription, got %q", mtgSeries.Type)
+	}
+	// Now the members get categorized as a mortgage payment.
+	categorize("WF MTG", "loan_payments_mortgage_payment", "Mortgage")
+
+	// A series already explicitly typed bill — must NOT be re-typed.
+	pge := seedMerchant("PGE", "2026-02-03", "2026-03-03", "2026-04-03")
+	pgeSeries, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		MerchantKey: "pge", Cadence: service.SeriesCadenceMonthly,
+		Source: service.SeriesSourceDeterministic, MemberTxnIDs: pge,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint pge: %v", err)
+	}
+	if _, err := svc.SetSeriesType(ctx, pgeSeries.ShortID, service.SeriesTypeBill, service.Actor{Type: "user"}); err != nil {
+		t.Fatalf("set pge type: %v", err)
+	}
+	// Re-categorize PG&E members to loan (to prove the already-typed row is left alone).
+	categorize("PGE", "loan_payments_mortgage_payment", "Mortgage")
+
+	n, err := svc.ReinferSeriesTypes(ctx)
+	if err != nil {
+		t.Fatalf("ReinferSeriesTypes: %v", err)
+	}
+	if n < 1 {
+		t.Errorf("expected at least 1 series re-typed, got %d", n)
+	}
+
+	// The default-subscription mortgage series is now loan.
+	got, err := svc.GetSeries(ctx, mtgSeries.ShortID)
+	if err != nil {
+		t.Fatalf("get mortgage: %v", err)
+	}
+	if got.Type != service.SeriesTypeLoan {
+		t.Errorf("mortgage type after reinfer = %q, want loan", got.Type)
+	}
+	// The explicitly-typed bill series is untouched.
+	gotPge, err := svc.GetSeries(ctx, pgeSeries.ShortID)
+	if err != nil {
+		t.Fatalf("get pge: %v", err)
+	}
+	if gotPge.Type != service.SeriesTypeBill {
+		t.Errorf("explicitly-typed series was re-typed to %q; should stay bill", gotPge.Type)
+	}
+}
+
 func keysOf(m map[string]service.SeriesNearMiss) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
