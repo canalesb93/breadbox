@@ -17,6 +17,27 @@ import (
 // window (vs a calendar month) avoids a reset-day spend spike.
 const HouseholdCeilingWindow = 30 * 24 * time.Hour
 
+// PostSyncDebounceWindow coalesces rapid post-sync triggers: when a
+// workflow already ran (non-skipped) within this window, a fresh
+// sync-complete event for it is debounced rather than fanning out to
+// another run. Sync can fire frequently (webhook bursts, manual
+// re-syncs); the next run still picks up everything synced since, so
+// coalescing loses no coverage. Hardcoded — not a knob users tune.
+const PostSyncDebounceWindow = 15 * time.Minute
+
+// RecentRunExistsForDefinition reports whether a non-skipped run for the
+// definition started at/after `since`. Drives the post-sync debounce.
+func (s *Service) RecentRunExistsForDefinition(ctx context.Context, defID string, since time.Time) (bool, error) {
+	uid, err := pgconv.ParseUUID(defID)
+	if err != nil {
+		return false, fmt.Errorf("recent run exists: parse def id: %w", err)
+	}
+	return s.Queries.ExistsRecentRunForDefinition(ctx, db.ExistsRecentRunForDefinitionParams{
+		DefinitionID: uid,
+		Since:        pgconv.Timestamptz(since),
+	})
+}
+
 // HouseholdCostSince sums total_cost_usd across every workflow/agent run
 // started at/after `since` (skipped rows excluded). Powers the spend
 // ceiling gate and the settings spend display.
