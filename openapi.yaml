@@ -95,7 +95,7 @@ tags:
     description: Scoped credentials for REST and MCP clients.
   - name: Settings
     description: Provider credentials and other app-config knobs.
-  - name: Agents
+  - name: Workflows
     description: Scheduled Claude Agent SDK definitions, run history, transcripts, and prompt blocks.
   - name: Webhooks
     description: Stored webhook events and on-demand replay.
@@ -2647,10 +2647,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderConfig" }
 
-  # -- Agents --
-  /api/v1/agents:
+  # -- Workflows --
+  /api/v1/workflows:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List agent definitions
       description: Returns all agent definitions with `last_run` inlined per definition.
       responses:
@@ -2662,7 +2662,7 @@ paths:
                 type: array
                 items: { type: object, additionalProperties: true }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Create agent definition
       description: |
         Creates a Claude Agent SDK definition. Body includes the usual
@@ -2681,16 +2681,16 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/status:
+  /api/v1/workflows/status:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Readiness probe for the agent subsystem
       description: |
         Side-effect-free check that returns whether the agent subsystem
         is ready to fire a run — auth configured + sidecar binary
         discoverable. Used by the v2 SPA list page to surface onboarding
         hints inline. Does NOT call Anthropic; for a live round-trip
-        use POST /agents/test instead.
+        use POST /workflows/test instead.
       responses:
         "200":
           description: Readiness report.
@@ -2699,9 +2699,9 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-  /api/v1/agents/settings:
+  /api/v1/workflows/settings:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Get agent subsystem settings
       description: |
         Returns agent.* config from `app_config`. Token fields are masked
@@ -2714,7 +2714,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     put:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Update agent subsystem settings
       description: |
         PATCH-style update of agent.* config. Nil fields are unchanged;
@@ -2731,11 +2731,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs/{shortId}:
+  /api/v1/workflows/runs/{shortId}:
     parameters:
       - { name: shortId, in: path, required: true, schema: { type: string } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Get one agent run
       description: Resolves by short_id or UUID.
       responses:
@@ -2745,7 +2745,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     patch:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Set or clear the operator note on a run
       description: |
         Body: `{ "note": "..." }`. Empty string clears the field. Capped
@@ -2764,11 +2764,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs/{shortId}/transcript:
+  /api/v1/workflows/runs/{shortId}/transcript:
     parameters:
       - { name: shortId, in: path, required: true, schema: { type: string } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Stream agent run transcript
       description: Returns the NDJSON transcript file. 404 when not yet written.
       responses:
@@ -2779,11 +2779,11 @@ paths:
               schema: { type: string }
         "404":
           description: Transcript not available.
-  /api/v1/agents/{slug}:
+  /api/v1/workflows/{slug}:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string }, description: "slug, short_id, or UUID" }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Get one agent definition
       responses:
         "200":
@@ -2792,7 +2792,7 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     patch:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Partial update of an agent definition
       description: Omitted fields are unchanged. **Requires `full_access` scope.**
       requestBody:
@@ -2807,19 +2807,19 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
     delete:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Delete an agent definition
       description: Historical runs preserved (FK SET NULL). **Requires `full_access` scope.**
       responses:
         "204":
           description: Deleted.
-  /api/v1/agents/{slug}/runs:
+  /api/v1/workflows/{slug}/runs:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
       - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       - { name: offset, in: query, schema: { type: integer, default: 0 } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List runs for one agent
       description: Offset-paginated run history.
       responses:
@@ -2828,11 +2828,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/{slug}/enable:
+  /api/v1/workflows/{slug}/enable:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Enable an agent
       description: Sets enabled=true. **Requires `full_access` scope.**
       responses:
@@ -2841,11 +2841,11 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/{slug}/disable:
+  /api/v1/workflows/{slug}/disable:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Disable an agent
       description: Sets enabled=false. **Requires `full_access` scope.**
       responses:
@@ -2854,7 +2854,7 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/runs:
+  /api/v1/workflows/runs:
     parameters:
       - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       - { name: offset, in: query, schema: { type: integer, default: 0 } }
@@ -2865,13 +2865,13 @@ paths:
       - { name: start, in: query, schema: { type: string }, description: "YYYY-MM-DD or RFC3339; inclusive lower bound on started_at" }
       - { name: end, in: query, schema: { type: string }, description: "YYYY-MM-DD or RFC3339; inclusive upper bound on started_at" }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List runs across all agents
       description: |
         Cross-agent run history. Each row carries `agent_slug` + `agent_name`
         in addition to the standard run fields, so callers can render an
         agent column without a second fetch. Powers the v2 SPA's global
-        `/v2/agents/runs` view. Same filters as `/agents/{slug}/runs`,
+        `/v2/agents/runs` view. Same filters as `/workflows/{slug}/runs`,
         plus the optional `agent=<slug>` narrowing filter.
       responses:
         "200":
@@ -2879,9 +2879,9 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/agents/prompt-blocks:
+  /api/v1/workflows/prompt-blocks:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List the embedded agent prompt-block library
       description: |
         Returns every parsed block under `prompts/agents/*.md` — id,
@@ -2902,7 +2902,7 @@ paths:
                 items: { type: object, additionalProperties: true }
   /api/v1/workflow-presets:
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List the Workflow preset gallery
       description: |
         Returns the code-defined Workflow presets, each annotated with whether
@@ -2920,7 +2920,7 @@ paths:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Enable a Workflow preset
       description: |
         Instantiate a workflow from the preset (composes its base prompt, applies
@@ -2945,12 +2945,12 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: The preset is already enabled. }
-  /api/v1/agents/runs/recent-errors:
+  /api/v1/workflows/runs/recent-errors:
     parameters:
       - { name: hours, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 168 } }
       - { name: limit, in: query, schema: { type: integer, default: 5, minimum: 1, maximum: 50 } }
     get:
-      tags: [Agents]
+      tags: [Workflows]
       summary: List recent errored agent runs across all agents
       description: |
         Returns errored agent_runs from the last `hours` hours (default 24),
@@ -2964,9 +2964,9 @@ paths:
               schema:
                 type: array
                 items: { type: object, additionalProperties: true }
-  /api/v1/agents/cleanup:
+  /api/v1/workflows/cleanup:
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Run the agent cleanup pass on demand
       description: |
         Synchronously runs the same prune pass the 3:15 AM cron does:
@@ -2982,9 +2982,9 @@ paths:
               schema: { type: object, additionalProperties: true }
         "503":
           description: Agent scheduler not configured (AGENTS_DISABLED).
-  /api/v1/agents/test:
+  /api/v1/workflows/test:
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Run the agent diagnostic smoke test
       description: |
         Spawns the breadbox-agent sidecar with a tiny "say OK" prompt and
@@ -3000,11 +3000,11 @@ paths:
           description: Auth or binary not configured.
         "500":
           description: Test ran but the sidecar / model returned an error.
-  /api/v1/agents/{slug}/run:
+  /api/v1/workflows/{slug}/run:
     parameters:
       - { name: slug, in: path, required: true, schema: { type: string } }
     post:
-      tags: [Agents]
+      tags: [Workflows]
       summary: Trigger an immediate agent run
       description: |
         Synchronously runs the named agent. Returns the resulting `agent_runs`
