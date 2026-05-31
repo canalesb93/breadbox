@@ -19,6 +19,11 @@ import (
 // A short timeout keeps a slow/hung webhook from blocking the caller.
 var notifyHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
+// notifyBodyMaxLen caps the report body carried in a notification payload.
+// Sinks like ntfy / Slack / push relays truncate or choke on multi-KB
+// bodies; the deep link in the payload carries the reader to the full text.
+const notifyBodyMaxLen = 480
+
 // NotificationPayload is the JSON body POSTed to the configured notification
 // webhook. Shaped to be readable by generic sinks (ntfy, Slack-compatible
 // relays, email bridges) without per-provider formatting.
@@ -30,6 +35,44 @@ type NotificationPayload struct {
 	Workflow string `json:"workflow,omitempty"` // originating workflow name
 	URL      string `json:"url,omitempty"`      // deep link back into Breadbox
 	SentAt   string `json:"sent_at"`            // RFC3339
+}
+
+// reportNotificationPayload maps a freshly-created report into the outbound
+// notification shape. Priority is normalized to the canonical info/warning/
+// critical set; an unknown value falls back to "info" so a sink that keys
+// behavior off priority never sees something unexpected. The body is
+// truncated — the URL deep link carries the reader to the full report.
+func reportNotificationPayload(r AgentReportResponse, workflow string) NotificationPayload {
+	return NotificationPayload{
+		Event:    "report",
+		Title:    r.Title,
+		Body:     truncateNotifyBody(r.Body),
+		Priority: normalizeNotifyPriority(r.Priority),
+		Workflow: workflow,
+		URL:      "/reports/" + r.ShortID,
+	}
+}
+
+// normalizeNotifyPriority clamps a report priority to the canonical
+// info/warning/critical set, defaulting to "info".
+func normalizeNotifyPriority(p string) string {
+	switch p {
+	case "warning", "critical":
+		return p
+	default:
+		return "info"
+	}
+}
+
+// truncateNotifyBody trims a report body to notifyBodyMaxLen runes, appending
+// an ellipsis when it had to cut. Rune-aware so a multibyte body never splits
+// mid-character.
+func truncateNotifyBody(body string) string {
+	r := []rune(body)
+	if len(r) <= notifyBodyMaxLen {
+		return body
+	}
+	return strings.TrimRight(string(r[:notifyBodyMaxLen]), " \t\n") + "…"
 }
 
 // WorkflowNotificationConfigured reports whether an outbound webhook URL is set.

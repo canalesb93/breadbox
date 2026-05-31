@@ -2,7 +2,10 @@
 
 package pages
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 // workflowCostStr formats a per-run cost estimate as a 2-decimal string
 // for the drawer's projected-cost hint (and as a literal arg into the
@@ -67,6 +70,22 @@ type WorkflowPresetCardProps struct {
 	Enabled         bool   // the preset has been instantiated as a workflow
 	WorkflowSlug    string // slug of the instantiated workflow (when Enabled)
 	WorkflowEnabled bool   // the instantiated workflow's run toggle (when Enabled)
+
+	// LastRun is the most recent run of the instantiated workflow, surfaced
+	// inline on enabled cards as a "Last run" status + relative time. nil when
+	// the workflow has never run (or isn't enabled). The "Run now" button uses
+	// WorkflowSlug; this only drives the status line.
+	LastRun *WorkflowLastRunProps
+}
+
+// WorkflowLastRunProps is the inline last-run summary on an enabled card: a
+// status pill plus a relative-time link to the run-detail page. FinishedAt is
+// the run's completion time (falling back to start time for in-progress runs),
+// rendered via workflowsRelativeTime.
+type WorkflowLastRunProps struct {
+	ShortID    string // run short_id — deep-links to /workflows/runs/{shortID} when set
+	Status     string // run status enum: success | error | in_progress | skipped
+	FinishedAt time.Time
 }
 
 // WorkflowPresetOptionProps is one specialized option (a single-select) in

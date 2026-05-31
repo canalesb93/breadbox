@@ -10,6 +10,32 @@ document.addEventListener('alpine:init', function () {
       // (empty string = no drawer).
       open: '',
 
+      // --- F2: preview internal prompt -----------------------------------
+      // State for the "Preview prompt" modal: the composed base prompt is
+      // fetched on demand from /-/workflows/{slug}/prompt and rendered in a
+      // <pre>. previewLoading drives the in-modal spinner.
+      previewTitle: '',
+      previewBody: '',
+      previewLoading: false,
+      // -------------------------------------------------------------------
+
+      // --- F3: reconfigure an enabled workflow ---------------------------
+      // The single, data-driven reconfigure drawer is opened by re-using the
+      // same `open` slot with the special value 'reconfigure'. Its fields are
+      // hydrated from GET /-/workflows/{slug}/config so the drawer renders
+      // prefilled with the workflow's live schedule, options, and additional
+      // instructions. reconfigure.loading drives the in-drawer spinner.
+      reconfigure: {
+        loading: false,
+        slug: '',
+        name: '',
+        triggerOnSync: false,
+        scheduleCron: '',
+        additionalInstructions: '',
+        options: [], // [{ key, label, help, selected, choices: [{value,label}] }]
+      },
+      // -------------------------------------------------------------------
+
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
       },
@@ -87,6 +113,142 @@ document.addEventListener('alpine:init', function () {
             self.restorePageState();
           });
       },
+
+      // --- F1: run an enabled workflow now -------------------------------
+      // toast dispatches the global bb-toast event (handled in base.html).
+      toast: function (message, type) {
+        window.dispatchEvent(
+          new CustomEvent('bb-toast', { detail: { message: message, type: type || 'info' } })
+        );
+      },
+
+      // Run an enabled workflow on demand. The run is async server-side
+      // (202 Accepted returns the in_progress row immediately), so we show an
+      // optimistic "started" toast the instant the request is accepted rather
+      // than waiting on the run. Concurrency/budget/auth refusals come back as
+      // error envelopes — surface their message instead of the optimistic toast.
+      runWorkflow: function (workflowSlug) {
+        var self = this;
+        self.toast('Starting run…', 'info');
+        self._post('/-/workflows/' + encodeURIComponent(workflowSlug) + '/run')
+          .then(function (res) {
+            if (res.ok) {
+              self.toast('Workflow run started.', 'success');
+              return;
+            }
+            return res
+              .json()
+              .catch(function () {
+                return null;
+              })
+              .then(function (body) {
+                var msg = (body && body.error && body.error.message) || 'Could not start the run.';
+                self.toast(msg, 'error');
+              });
+          })
+          .catch(function (e) {
+            console.error('runWorkflow failed', e);
+            self.toast('Network error — could not start the run.', 'error');
+            self.restorePageState();
+          });
+      },
+      // -------------------------------------------------------------------
+
+      // --- F3: reconfigure an enabled workflow ---------------------------
+      // Open the shared reconfigure drawer prefilled with an enabled
+      // workflow's live config (schedule, options, additional instructions),
+      // fetched from GET /-/workflows/{slug}/config.
+      openReconfigure: function (slug, name) {
+        var self = this;
+        self.reconfigure.slug = slug;
+        self.reconfigure.name = name || slug;
+        self.reconfigure.loading = true;
+        self.reconfigure.options = [];
+        self.reconfigure.additionalInstructions = '';
+        self.reconfigure.scheduleCron = '';
+        self.reconfigure.triggerOnSync = false;
+        self.open = 'reconfigure';
+        fetch('/-/workflows/' + encodeURIComponent(slug) + '/config', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            self.reconfigure.name = data.name || self.reconfigure.name;
+            self.reconfigure.triggerOnSync = !!data.trigger_on_sync;
+            self.reconfigure.scheduleCron = data.schedule_cron || '';
+            self.reconfigure.additionalInstructions = data.additional_instructions || '';
+            self.reconfigure.options = Array.isArray(data.options) ? data.options : [];
+          })
+          .catch(function (e) {
+            console.error('openReconfigure failed', e);
+            self.open = '';
+            self.restorePageState();
+          })
+          .finally(function () {
+            self.reconfigure.loading = false;
+          });
+      },
+
+      // Submit the reconfigure drawer: re-compose the workflow's schedule,
+      // options, and additional instructions via POST
+      // /-/workflows/{slug}/reconfigure, then reload to reflect the new
+      // trigger label. The run-state toggle is untouched by a reconfigure.
+      submitReconfigure: function (form) {
+        var self = this;
+        var slug = self.reconfigure.slug;
+        if (!slug) return;
+        var fd = new FormData(form);
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        self._post('/-/workflows/' + encodeURIComponent(slug) + '/reconfigure', new URLSearchParams(fd).toString())
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            window.location.reload();
+          })
+          .catch(function (e) {
+            console.error('submitReconfigure failed', e);
+            if (btn) btn.disabled = false;
+            self.restorePageState();
+          });
+      },
+      // -------------------------------------------------------------------
+
+      // --- F2: preview internal prompt -----------------------------------
+      // Open the shared "Preview prompt" dialog and fetch the preset's fully
+      // composed base prompt (read-only). The <dialog id="wf-prompt-preview">
+      // lives once in the gallery template; this opens it and fills the body.
+      previewPrompt: function (slug, name) {
+        var self = this;
+        self.previewTitle = name || slug;
+        self.previewBody = '';
+        self.previewLoading = true;
+        var dialog = document.getElementById('wf-prompt-preview');
+        if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+        fetch('/-/workflows/' + encodeURIComponent(slug) + '/prompt', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            self.previewTitle = data.title || self.previewTitle;
+            self.previewBody = data.prompt || '';
+          })
+          .catch(function (e) {
+            console.error('previewPrompt failed', e);
+            self.previewBody = 'Could not load the prompt for this workflow. Please try again.';
+          })
+          .finally(function () {
+            self.previewLoading = false;
+          });
+      },
+      // -------------------------------------------------------------------
     };
   });
 });

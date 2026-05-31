@@ -144,6 +144,7 @@ func TestToolRegistryScopeContract(t *testing.T) {
 		"list_series",
 		"get_series",
 		"explain_series_candidates",
+		"list_workflows",
 	}
 	if len(readNames) != len(wantReads) {
 		t.Errorf("read tool count = %d, want %d (got %v)", len(readNames), len(wantReads), readNames)

@@ -170,6 +170,7 @@ func NewRootCmd(version string) *cobra.Command {
 	AddCategoriesCmd(root)
 	AddTagsCmd(root)
 	AddRulesCmd(root)
+	AddWorkflowsCmd(root)
 	AddReportsCmd(root)
 	AddConnectionsCmd(root)
 	AddSyncCmd(root)
