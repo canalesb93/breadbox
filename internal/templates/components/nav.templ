@@ -117,7 +117,15 @@ templ Nav(p NavProps) {
 			aria-label="Toggle sidebar"
 			title="Collapse sidebar"
 		>
-			@LucideIcon("panel-left", "")
+			// Three stacked icons crossfade on hover: panel-left at rest, then a
+			// directional cue — panel-left-close while expanded (the click will
+			// collapse), panel-left-open while collapsed (it will expand). The
+			// swap is driven entirely in CSS off :hover + html[data-sidebar].
+			<span class="bb-sidebar-collapse__icons">
+				@LucideIcon("panel-left", "bb-sidebar-collapse__icon bb-sidebar-collapse__icon--rest")
+				@LucideIcon("panel-left-close", "bb-sidebar-collapse__icon bb-sidebar-collapse__icon--close")
+				@LucideIcon("panel-left-open", "bb-sidebar-collapse__icon bb-sidebar-collapse__icon--open")
+			</span>
 			<span class="bb-sidebar-link__label">Collapse</span>
 		</button>
 	</div>
