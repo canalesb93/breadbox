@@ -933,6 +933,46 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 	}, nil
 }
 
+// WorkflowRunStatusCounts returns a status→count map across preset-backed
+// workflow runs (source_template IS NOT NULL), optionally narrowed to one
+// workflow. Powers the count badges on the Workflows → Runs status tabs.
+// Same hand-rolled SQL pattern as ListAllAgentRuns.
+func (s *Service) WorkflowRunStatusCounts(ctx context.Context, workflowSlugOrID string) (map[string]int, error) {
+	where := []string{"d.source_template IS NOT NULL"}
+	args := []any{}
+	if workflowSlugOrID != "" {
+		def, err := s.resolveAgentDefinition(ctx, workflowSlugOrID)
+		if err != nil {
+			// Unknown filter → no counts (mirrors the runs page dropping a
+			// bad workflow filter rather than erroring).
+			return map[string]int{}, nil
+		}
+		where = append(where, "r.agent_definition_id = $1")
+		args = append(args, def.ID)
+	}
+	query := "SELECT r.status, COUNT(*) FROM agent_runs r " +
+		"JOIN agent_definitions d ON d.id = r.agent_definition_id WHERE " +
+		strings.Join(where, " AND ") + " GROUP BY r.status"
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("workflow run status counts: %w", err)
+	}
+	defer rows.Close()
+	out := make(map[string]int, 5)
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return nil, fmt.Errorf("scan status count: %w", err)
+		}
+		out[status] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate status counts: %w", err)
+	}
+	return out, nil
+}
+
 // AgentRunNoteMaxLen caps the operator note size both in the admin
 // textarea and on the server. Free-form text but bounded so we don't
 // accidentally host arbitrarily-large blobs.
