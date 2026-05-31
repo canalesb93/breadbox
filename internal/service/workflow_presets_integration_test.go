@@ -192,3 +192,44 @@ func TestWorkflowPresetsHaveCostEstimates(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkflowRunStatusCounts(t *testing.T) {
+	svc, _, pool := newService(t)
+	ctx := context.Background()
+
+	wf, err := svc.EnableWorkflowFromPreset(ctx, "routine-reviewer", service.EnableWorkflowFromPresetParams{Enabled: false})
+	if err != nil {
+		t.Fatalf("EnableWorkflowFromPreset: %v", err)
+	}
+	plain := mustCreateAgentDefinition(t, svc, "plain-counts", true)
+
+	ins := func(defID, status string) {
+		if _, e := pool.Exec(ctx,
+			`INSERT INTO agent_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron',$2)`,
+			defID, status); e != nil {
+			t.Fatalf("insert run: %v", e)
+		}
+	}
+	ins(wf.ID, "success")
+	ins(wf.ID, "success")
+	ins(wf.ID, "error")
+	ins(wf.ID, "skipped")
+	ins(plain.ID, "success") // not a workflow → excluded
+
+	counts, err := svc.WorkflowRunStatusCounts(ctx, "")
+	if err != nil {
+		t.Fatalf("WorkflowRunStatusCounts: %v", err)
+	}
+	if counts["success"] != 2 || counts["error"] != 1 || counts["skipped"] != 1 {
+		t.Fatalf("counts = %v, want success:2 error:1 skipped:1 (plain excluded)", counts)
+	}
+
+	// Filtered to the one workflow — same tally.
+	scoped, err := svc.WorkflowRunStatusCounts(ctx, wf.Slug)
+	if err != nil {
+		t.Fatalf("scoped counts: %v", err)
+	}
+	if scoped["success"] != 2 {
+		t.Fatalf("scoped success = %d, want 2", scoped["success"])
+	}
+}

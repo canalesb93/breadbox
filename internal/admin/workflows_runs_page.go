@@ -77,6 +77,14 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			}
 		}
 
+		// Status-tab badges respect the (finalized) workflow filter but not
+		// the status filter, so each tab shows its own tally. Best-effort.
+		counts, _ := svc.WorkflowRunStatusCounts(ctx, workflowSlug)
+		all := 0
+		for _, n := range counts {
+			all += n
+		}
+
 		props := pages.WorkflowRunsProps{
 			StatusFilter:   status,
 			WorkflowSlug:   workflowSlug,
@@ -86,6 +94,13 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			HasMore:        result.HasMore,
 			CSRFToken:      GetCSRFToken(r),
 			SubsystemReady: buildAgentsListStatus(subStatus).Ready,
+			Counts: pages.WorkflowRunStatusCounts{
+				All:        all,
+				Success:    counts["success"],
+				Error:      counts["error"],
+				InProgress: counts["in_progress"],
+				Skipped:    counts["skipped"],
+			},
 		}
 
 		props.Rows = make([]components.AgentRunRowProps, 0, len(result.Runs))

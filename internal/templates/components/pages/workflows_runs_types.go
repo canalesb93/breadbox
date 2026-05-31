@@ -29,6 +29,28 @@ type WorkflowRunsProps struct {
 	// isn't configured, the "Re-run" item renders disabled instead of
 	// firing a run that would only fail.
 	SubsystemReady bool
+
+	// Counts drives the per-status badges on the status tabs (respecting
+	// the active workflow filter, ignoring the active status filter).
+	Counts WorkflowRunStatusCounts
+}
+
+// WorkflowRunStatusCounts holds the run tally per status tab.
+type WorkflowRunStatusCounts struct {
+	All        int
+	Success    int
+	Error      int
+	InProgress int
+	Skipped    int
+}
+
+// workflowCountPtr adapts a count to TabBarItem.Count (*int), collapsing
+// zero to nil so empty-status tabs render no badge.
+func workflowCountPtr(n int) *int {
+	if n == 0 {
+		return nil
+	}
+	return &n
 }
 
 // WorkflowRunFilterOption is one entry in the workflow filter dropdown.
