@@ -4,6 +4,7 @@ package admin
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -12,6 +13,25 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 )
+
+// buildWorkflowSpendBanner derives the gallery's spend-ceiling banner from
+// the rolling-window spend status. No ceiling (unset or <= 0) → no banner.
+// Shown at >= 80% of the ceiling; "Over" once spend reaches it (runs paused).
+func buildWorkflowSpendBanner(s service.HouseholdSpendStatus) pages.WorkflowSpendBanner {
+	if s.CeilingUSD == nil || *s.CeilingUSD <= 0 {
+		return pages.WorkflowSpendBanner{}
+	}
+	ceiling := *s.CeilingUSD
+	pct := int(s.SpentUSD / ceiling * 100)
+	over := s.SpentUSD >= ceiling
+	return pages.WorkflowSpendBanner{
+		Show:       over || pct >= 80,
+		Over:       over,
+		SpentStr:   "$" + strconv.FormatFloat(s.SpentUSD, 'f', 2, 64),
+		CeilingStr: "$" + strconv.FormatFloat(ceiling, 'f', 2, 64),
+		PctStr:     strconv.Itoa(pct) + "%",
+	}
+}
 
 // WorkflowsGalleryPageHandler renders GET /workflows — the codified preset
 // gallery. Presets come from the code registry (service.ListWorkflowPresets);
@@ -25,12 +45,14 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			presetsErr error
 			status     *service.AgentSubsystemStatus
 			consented  bool
+			spend      service.HouseholdSpendStatus
 			wg         sync.WaitGroup
 		)
-		wg.Add(3)
+		wg.Add(4)
 		go func() { defer wg.Done(); presets, presetsErr = svc.ListWorkflowPresets(ctx) }()
 		go func() { defer wg.Done(); status = svc.GetAgentSubsystemStatus(ctx) }()
 		go func() { defer wg.Done(); consented = svc.WorkflowsConsentAcknowledged(ctx) }()
+		go func() { defer wg.Done(); spend, _ = svc.HouseholdSpendStatus(ctx) }()
 		wg.Wait()
 
 		if presetsErr != nil {
@@ -43,6 +65,7 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			Status:              buildAgentsListStatus(status),
 			CSRFToken:           GetCSRFToken(r),
 			ConsentAcknowledged: consented,
+			Spend:               buildWorkflowSpendBanner(spend),
 		}
 
 		data := BaseTemplateData(r, sm, "workflows", "Workflows")

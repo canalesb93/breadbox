@@ -21,6 +21,20 @@ type WorkflowsGalleryProps struct {
 	// workflows run Claude over their ledger. When false, each configure
 	// drawer shows a required consent checkbox gating the Enable button.
 	ConsentAcknowledged bool
+	// Spend drives the optional top-of-gallery spend-ceiling banner.
+	Spend WorkflowSpendBanner
+}
+
+// WorkflowSpendBanner is the gallery's spend-ceiling state: shown when a
+// ceiling is set and 30-day spend is at/over 80% of it. Over=true means
+// runs are currently paused (spent >= ceiling); otherwise it's an
+// "approaching" warning. Strings are preformatted ("$2.72", "85%").
+type WorkflowSpendBanner struct {
+	Show       bool
+	Over       bool
+	SpentStr   string
+	CeilingStr string
+	PctStr     string
 }
 
 // WorkflowCategoryProps groups presets under a section header.
