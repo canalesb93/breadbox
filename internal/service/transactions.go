@@ -223,7 +223,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
 		"au.short_id AS attributed_user_short_id, au.name AS attributed_user_name, " +
 		"COALESCE(au.short_id, u.short_id) AS effective_user_short_id, " +
-		"t.metadata " +
+		"t.metadata, t.flagged_at " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -315,6 +315,13 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Pending)
 		argN++
+	}
+	if params.Flagged != nil {
+		if *params.Flagged {
+			buf.WriteString(" AND t.flagged_at IS NOT NULL")
+		} else {
+			buf.WriteString(" AND t.flagged_at IS NULL")
+		}
 	}
 
 	if params.Search != nil {
@@ -459,6 +466,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			attributedUserName     pgtype.Text
 			effectiveUserShortID   pgtype.Text
 			metadata               []byte
+			flaggedAt              pgtype.Timestamptz
 		)
 
 		if err := rows.Scan(
@@ -473,7 +481,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
 			&attributedUserShortID, &attributedUserName,
-			&effectiveUserShortID, &metadata,
+			&effectiveUserShortID, &metadata, &flaggedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -532,6 +540,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
 			Metadata:            metadataToRaw(metadata),
+			FlaggedAt:           timestampStr(flaggedAt),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -707,6 +716,13 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		args = append(args, *params.Pending)
 		argN++
 	}
+	if params.Flagged != nil {
+		if *params.Flagged {
+			buf.WriteString(" AND t.flagged_at IS NOT NULL")
+		} else {
+			buf.WriteString(" AND t.flagged_at IS NULL")
+		}
+	}
 
 	if params.Search != nil {
 		mode := ""
@@ -771,7 +787,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
-		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
+		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id, " +
+		"t.flagged_at " +
 		"FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -885,6 +902,13 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Pending)
 		argN++
+	}
+	if params.Flagged != nil {
+		if *params.Flagged {
+			buf.WriteString(" AND t.flagged_at IS NOT NULL")
+		} else {
+			buf.WriteString(" AND t.flagged_at IS NULL")
+		}
 	}
 
 	if params.Search != nil {
@@ -1012,6 +1036,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
 			effectiveUserID  pgtype.UUID
+			flaggedAt        pgtype.Timestamptz
 		)
 
 		if err := rows.Scan(
@@ -1020,7 +1045,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
 			&categoryOverride, &pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
-			&effectiveUserID,
+			&effectiveUserID, &flaggedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -1062,6 +1087,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			Pending:             pending,
 			CommentCount:        int(commentCount),
 			HasPendingReview:    hasPendingReview,
+			FlaggedAt:           timestampStr(flaggedAt),
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
 		})
@@ -1160,7 +1186,8 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
-		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
+		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id, " +
+		"t.flagged_at " +
 		"FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -1201,6 +1228,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
 			effectiveUserID  pgtype.UUID
+			flaggedAt        pgtype.Timestamptz
 		)
 		if err := rows.Scan(
 			&id, &accountID, &accountName,
@@ -1208,7 +1236,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
 			&categoryOverride, &pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
-			&effectiveUserID,
+			&effectiveUserID, &flaggedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -1247,6 +1275,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			Pending:             pending,
 			CommentCount:        int(commentCount),
 			HasPendingReview:    hasPendingReview,
+			FlaggedAt:           timestampStr(flaggedAt),
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
 		}
@@ -1319,7 +1348,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 			t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name,
 			t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence,
 			t.provider_payment_channel, t.pending, t.created_at, t.updated_at,
-			t.category_id, t.category_override, t.metadata
+			t.category_id, t.category_override, t.metadata, t.flagged_at
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN bank_connections bc ON bc.id = a.connection_id
@@ -1355,6 +1384,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		categoryID            pgtype.UUID
 		categoryOverride      string
 		metadata              []byte
+		flaggedAt             pgtype.Timestamptz
 	)
 
 	if err := s.Pool.QueryRow(ctx, q, uid).Scan(
@@ -1365,7 +1395,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		&datetime, &authorizedDatetime, &providerName, &providerMerchant,
 		&providerCatPrimary, &providerCatDetailed, &providerCatConf,
 		&providerChannel, &pending, &createdAt, &updatedAt,
-		&categoryID, &categoryOverride, &metadata,
+		&categoryID, &categoryOverride, &metadata, &flaggedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -1409,6 +1439,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		CreatedAt:                  pgconv.TimestampStr(createdAt),
 		UpdatedAt:                  pgconv.TimestampStr(updatedAt),
 		Metadata:                   metadataToRaw(metadata),
+		FlaggedAt:                  timestampStr(flaggedAt),
 	}
 
 	if categoryID.Valid {

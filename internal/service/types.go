@@ -74,6 +74,10 @@ type TransactionResponse struct {
 	// present as a JSON object (the empty object {} when nothing has been written).
 	// Written via the scoped metadata ops; never holds first-class fields.
 	Metadata json.RawMessage `json:"metadata"`
+
+	// FlaggedAt is set when the transaction is flagged for human attention
+	// (null when not flagged). The reason lives in a comment annotation.
+	FlaggedAt *string `json:"flagged_at,omitempty"`
 }
 
 type TransactionListResult struct {
@@ -104,6 +108,7 @@ type TransactionListParams struct {
 	MinAmount        *float64
 	MaxAmount        *float64
 	Pending          *bool
+	Flagged          *bool
 	Search           *string
 	SearchMode       *string // contains (default), words, fuzzy
 	ExcludeSearch    *string
@@ -128,6 +133,7 @@ type TransactionCountParams struct {
 	MinAmount        *float64
 	MaxAmount        *float64
 	Pending          *bool
+	Flagged          *bool
 	Search           *string
 	SearchMode       *string
 	ExcludeSearch    *string
@@ -316,6 +322,7 @@ type AdminTransactionListParams struct {
 	MinAmount     *float64
 	MaxAmount     *float64
 	Pending       *bool
+	Flagged       *bool
 	Search        *string
 	SearchMode    *string
 	SearchField   *string // "all" (default), "name", "merchant"
@@ -348,6 +355,7 @@ type AdminTransactionRow struct {
 	Pending             bool
 	CommentCount        int
 	HasPendingReview    bool
+	FlaggedAt           *string
 	CreatedAt           string
 	UpdatedAt           string
 	// Tags attached to this transaction. Populated as a separate batched

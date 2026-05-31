@@ -447,6 +447,18 @@ func (s *MCPServer) buildToolRegistry() {
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
 		}, s.handleClearTransactionMetadata, s),
 
+		// --- Flag (surface a transaction for human attention) ---
+		makeToolDefLogged(ToolSpec{
+			Name: "flag_transaction", Title: "Flag Transaction", Classification: ToolWrite,
+			Description: "Flag a transaction for human attention (sets flagged_at) without changing its category. Pass an optional `reason` — it's recorded as a comment annotation on the timeline. This is the 'look at this' escape hatch: when you auto-categorize but are unsure, or spot something worth a human glance, flag it instead of guessing. Retrieve flagged transactions with query_transactions(flagged=true). Idempotent: re-flagging refreshes the timestamp.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleFlagTransaction, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "unflag_transaction", Title: "Unflag Transaction", Classification: ToolWrite,
+			Description: "Clear the flag on a transaction (sets flagged_at = NULL). No-op if it isn't flagged.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleUnflagTransaction, s),
+
 		// --- Activity timeline ---
 		makeToolDefLogged(ToolSpec{
 			Name: "list_annotations", Title: "List Activity Timeline", Classification: ToolRead,

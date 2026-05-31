@@ -85,6 +85,9 @@ func buildTransactionFilterChips(
 	} else if props.FilterPending == "false" {
 		add("Pending: No", "pending")
 	}
+	if props.FilterFlagged == "true" {
+		add("Flagged", "flagged")
+	}
 
 	// Tag chips drop a single slug out of the CSV rather than clearing the
 	// whole list. "tags" and "any_tag" are exclusive in the UI but handled

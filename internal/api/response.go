@@ -4,6 +4,8 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
 	mw "breadbox/internal/middleware"
@@ -30,6 +32,16 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	return true
+}
+
+// decodeJSONOptional decodes the JSON body into v when one is present. An empty
+// body is treated as success (v keeps its zero values); a malformed non-empty
+// body returns an error. Use for endpoints whose request body is optional.
+func decodeJSONOptional(r *http.Request, v any) error {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+	return nil
 }
 
 // writeServiceError maps a service-layer sentinel error to the canonical
