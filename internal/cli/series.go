@@ -28,7 +28,14 @@ func AddSeriesCmd(root *cobra.Command) {
 			return runSeriesBackfill()
 		},
 	}
-	series.AddCommand(backfill)
+	reinferTypes := &cobra.Command{
+		Use:   "reinfer-types",
+		Short: "Re-infer the type of default-'subscription' series from member categories (one-time)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSeriesReinferTypes()
+		},
+	}
+	series.AddCommand(backfill, reinferTypes)
 	root.AddCommand(series)
 }
 
@@ -53,5 +60,29 @@ func runSeriesBackfill() error {
 	}
 	logger.Info("recurring-series backfill complete", "candidates", n)
 	fmt.Printf("Detected %d recurring-series candidate(s).\n", n)
+	return nil
+}
+
+func runSeriesReinferTypes() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	logger := newLogger(cfg)
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+	defer pool.Close()
+
+	svc := service.New(db.New(pool), pool, nil, logger)
+	n, err := svc.ReinferSeriesTypes(ctx)
+	if err != nil {
+		return fmt.Errorf("series reinfer-types: %w", err)
+	}
+	logger.Info("recurring-series type re-inference complete", "retyped", n)
+	fmt.Printf("Re-typed %d recurring series.\n", n)
 	return nil
 }

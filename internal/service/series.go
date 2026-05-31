@@ -894,6 +894,36 @@ func (s *Service) SetSeriesType(ctx context.Context, idOrShort, seriesType strin
 	return &resp, nil
 }
 
+// ReinferSeriesTypes re-derives the type of every series still at the default
+// 'subscription' from its members' dominant category — a one-time backfill for
+// series detected before the type field existed (type is sticky-after-insert,
+// so they never re-type on their own). Series already typed bill/loan/other are
+// left untouched, and a series whose members still infer 'subscription' is a
+// no-op. Returns the number actually re-typed.
+func (s *Service) ReinferSeriesTypes(ctx context.Context) (int, error) {
+	rows, err := s.Queries.ListRecurringSeries(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("list series: %w", err)
+	}
+	retyped := 0
+	for _, row := range rows {
+		if row.Type != SeriesTypeSubscription {
+			continue // already typed (non-default) — leave deliberate values alone
+		}
+		inferred := s.inferTypeFromMembers(ctx, s.Queries, row.ID)
+		if inferred == "" || inferred == row.Type {
+			continue
+		}
+		upd := updateParamsFromRow(row)
+		upd.Type = inferred
+		if _, err := s.Queries.UpdateRecurringSeries(ctx, upd); err != nil {
+			return retyped, fmt.Errorf("re-type series %s: %w", row.ShortID, err)
+		}
+		retyped++
+	}
+	return retyped, nil
+}
+
 // GetSeries returns a single series by short_id or uuid.
 func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
