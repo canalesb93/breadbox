@@ -230,3 +230,12 @@ SELECT
     ), 0)::float8 / 1000.0)::float8                        AS avg_duration_seconds
 FROM agent_runs
 WHERE agent_definition_id = $1;
+
+-- GetHouseholdCostSince sums total_cost_usd across ALL agent definitions
+-- for runs started at/after the given instant, excluding skipped rows.
+-- Powers the household spend-ceiling gate + the settings spend display.
+-- name: GetHouseholdCostSince :one
+SELECT COALESCE(SUM(total_cost_usd), 0)::numeric(12,4) AS total_cost_usd
+FROM agent_runs
+WHERE started_at >= sqlc.arg(since)
+  AND status != 'skipped';

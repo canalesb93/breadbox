@@ -587,6 +587,11 @@ func RunAgentNowHandler(svc *service.Service, orch *service.Orchestrator) http.H
 				"Another agent run is in progress. Retry when it completes.")
 			return
 		}
+		if errors.Is(runErr, service.ErrBudgetCeilingReached) {
+			mw.WriteError(w, http.StatusTooManyRequests,
+				"BUDGET_CEILING_REACHED", runErr.Error())
+			return
+		}
 		if errors.Is(runErr, agent.ErrAuthNotConfigured) {
 			mw.WriteError(w, http.StatusUnprocessableEntity,
 				"AUTH_NOT_CONFIGURED",

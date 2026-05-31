@@ -181,6 +181,10 @@ func RunAgentNowAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc 
 				writeError(w, http.StatusServiceUnavailable, "CONCURRENCY_LOCKED", "Another run is in progress")
 				return
 			}
+			if errors.Is(err, service.ErrBudgetCeilingReached) {
+				writeError(w, http.StatusTooManyRequests, "BUDGET_CEILING_REACHED", err.Error())
+				return
+			}
 			if errors.Is(err, agent.ErrAuthNotConfigured) {
 				writeError(w, http.StatusUnprocessableEntity, "AUTH_NOT_CONFIGURED", err.Error())
 				return
