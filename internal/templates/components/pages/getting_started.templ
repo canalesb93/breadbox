@@ -298,17 +298,17 @@ templ gsStep5(p GettingStartedProps) {
 				</div>
 				<div class="flex items-center gap-2 sm:hidden">
 					if p.HasAPIKey {
-						<a href="/agent-prompts" class="btn btn-ghost btn-sm">View Agents</a>
+						<a href="/workflows" class="btn btn-ghost btn-sm">View workflows</a>
 					} else {
-						<a href="/agent-prompts" class="btn btn-primary btn-sm">Set Up Agents</a>
+						<a href="/workflows" class="btn btn-primary btn-sm">Set up workflows</a>
 					}
 				</div>
 			</div>
 			<div class="hidden sm:flex flex-shrink-0">
 				if p.HasAPIKey {
-					<a href="/agent-prompts" class="btn btn-ghost btn-sm">View Agents</a>
+					<a href="/workflows" class="btn btn-ghost btn-sm">View workflows</a>
 				} else {
-					<a href="/agent-prompts" class="btn btn-primary btn-sm">Set Up Agents</a>
+					<a href="/workflows" class="btn btn-primary btn-sm">Set up workflows</a>
 				}
 			</div>
 		</div>

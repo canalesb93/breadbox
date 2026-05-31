@@ -1,0 +1,260 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// WorkflowsGallery is the /workflows preset gallery: codified, configurable,
+// one-click automations grouped by category. "Set up" opens a right-side
+// configure drawer; enabling instantiates a workflow with a run toggle.
+templ WorkflowsGallery(p WorkflowsGalleryProps) {
+	<script src="/static/js/admin/components/workflows_gallery.js"></script>
+	<div
+		x-data="workflowsGallery"
+		data-csrf={ p.CSRFToken }
+		x-init="$store.shortcuts.setScope('workflows')"
+		x-destroy="$store.shortcuts.setScope('global')"
+	>
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Workflows",
+			Subtitle:             "One-click AI automations that run on your Breadbox.",
+			SubtitleHideOnMobile: true,
+		})
+		@workflowsTabBar("gallery")
+		if !p.Status.Ready {
+			<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
+				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
+				<div class="flex-1">
+					<div class="font-semibold text-sm">Set up the agent runtime first</div>
+					<div class="text-xs opacity-80">Configure an Anthropic API key in Settings to actually run these workflows. You can still enable presets — they'll stay paused until the runtime is ready.</div>
+				</div>
+				<a href="/settings/agents" class="btn btn-sm btn-ghost">Configure</a>
+			</div>
+		}
+		if p.Spend.Show {
+			if p.Spend.Over {
+				<div role="alert" class="alert alert-error rounded-xl mt-4 mb-2">
+					@components.LucideIcon("octagon-x", "w-5 h-5 shrink-0")
+					<div class="flex-1">
+						<div class="font-semibold text-sm">Workflows paused — spend ceiling reached</div>
+						<div class="text-xs opacity-80">30-day spend { p.Spend.SpentStr } has reached your ceiling ({ p.Spend.CeilingStr }). New runs are paused until spend ages out of the window or you raise the ceiling.</div>
+					</div>
+					<a href="/settings/agents" class="btn btn-sm btn-ghost">Adjust</a>
+				</div>
+			} else {
+				<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
+					@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
+					<div class="flex-1">
+						<div class="font-semibold text-sm">Approaching spend ceiling</div>
+						<div class="text-xs opacity-80">{ p.Spend.PctStr } used — { p.Spend.SpentStr } of { p.Spend.CeilingStr } in the last 30 days.</div>
+					</div>
+					<a href="/settings/agents" class="btn btn-sm btn-ghost">Adjust</a>
+				</div>
+			}
+		}
+		<div class="mt-4 space-y-6">
+			for _, cat := range p.Categories {
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:  cat.Icon,
+					Title: cat.Name,
+				}) {
+					for _, preset := range cat.Presets {
+						@components.SettingsRow(components.SettingsRowProps{
+							Label:   preset.Name,
+							Caption: preset.Description,
+						}) {
+							@workflowPresetControl(preset, p.IsAdmin)
+						}
+					}
+				}
+			}
+		</div>
+		<!-- Configure drawer: shared backdrop + one slide-over panel per available preset. -->
+		<div
+			x-show="open"
+			x-cloak
+			x-transition:enter="transition-opacity ease-out duration-200"
+			x-transition:enter-start="opacity-0"
+			x-transition:enter-end="opacity-100"
+			x-transition:leave="transition-opacity ease-in duration-150"
+			x-transition:leave-start="opacity-100"
+			x-transition:leave-end="opacity-0"
+			class="fixed inset-0 bg-black/40 z-40"
+			@click="open=''"
+		></div>
+		// Drawers exist only for the admin who can actually submit them; a
+		// non-admin can't open one (the "Set up" control is disabled).
+		if p.IsAdmin {
+			for _, cat := range p.Categories {
+				for _, preset := range cat.Presets {
+					if !preset.Enabled {
+						@workflowConfigDrawer(preset, p.ConsentAcknowledged)
+					}
+				}
+			}
+		}
+	</div>
+}
+
+// workflowPresetControl is the state-dependent right-side control: a "Set up"
+// button (opens the configure drawer) when available, a run toggle once
+// enabled. Instantiating a workflow is admin-only — non-admins see the
+// "Set up" control disabled with an explanatory tooltip.
+templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
+	<div class="flex items-center gap-3">
+		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
+			@components.LucideIcon("clock", "w-3.5 h-3.5")
+			{ preset.TriggerLabel }
+		</span>
+		if preset.Enabled {
+			<input
+				type="checkbox"
+				class="toggle toggle-sm toggle-primary"
+				if preset.WorkflowEnabled {
+					checked
+				}
+				aria-label={ "Toggle " + preset.Name }
+				@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
+			/>
+		} else if isAdmin {
+			<button
+				type="button"
+				class="btn btn-soft btn-sm gap-1.5"
+				@click={ "open='" + preset.Slug + "'" }
+			>
+				@components.LucideIcon("settings-2", "w-4 h-4")
+				Set up
+			</button>
+		} else {
+			<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
+				<button type="button" class="btn btn-soft btn-sm gap-1.5" disabled>
+					@components.LucideIcon("lock", "w-4 h-4")
+					Set up
+				</button>
+			</span>
+		}
+	</div>
+}
+
+// workflowConfigDrawer is the right-side slide-over for configuring + enabling
+// one preset: trigger/schedule, projected cost, additional instructions,
+// run-now, and (on first enable) a consent acknowledgement. consentAck=true
+// hides the consent gate once the household has already acknowledged.
+templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
+	<div
+		x-show={ "open === '" + preset.Slug + "'" }
+		x-cloak
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="translate-x-full"
+		x-transition:enter-end="translate-x-0"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="translate-x-0"
+		x-transition:leave-end="translate-x-full"
+		class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 border-l border-base-300 shadow-xl flex flex-col"
+		@keydown.escape.window="open=''"
+	>
+		<form
+			x-data={ "{ cron: '" + preset.ScheduleCron + "', consent: false }" }
+			class="flex flex-col h-full"
+			@submit.prevent={ "submitDrawer('" + preset.Slug + "', $event.target)" }
+		>
+			<div class="flex items-start justify-between gap-3 p-5 border-b border-base-300">
+				<div class="flex items-start gap-3">
+					@components.LucideIcon(preset.Icon, "w-5 h-5 mt-0.5 text-base-content/60 shrink-0")
+					<div>
+						<div class="font-semibold leading-tight">{ preset.Name }</div>
+						<div class="text-xs text-base-content/60 mt-1">{ preset.Description }</div>
+					</div>
+				</div>
+				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">
+					@components.LucideIcon("x", "w-4 h-4")
+				</button>
+			</div>
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				<div>
+					<div class="text-sm font-medium mb-1.5">When it runs</div>
+					if preset.TriggerOnSync {
+						<div class="text-sm text-base-content/70 flex items-center gap-2">
+							@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/50")
+							After each successful sync
+						</div>
+						<div class="text-xs text-base-content/45 mt-1.5 flex items-center gap-1">
+							@components.LucideIcon("circle-dollar-sign", "w-3.5 h-3.5")
+							{ "≈ $" + workflowCostStr(preset.EstCostPerRunUSD) + " per run" }
+						</div>
+					} else {
+						<select name="schedule_cron" x-model="cron" class="select select-sm w-full">
+							@workflowScheduleOption("0 8 * * *", "Daily — 8:00 AM", preset.ScheduleCron)
+							@workflowScheduleOption("0 7 * * 1", "Weekly — Monday 7:00 AM", preset.ScheduleCron)
+							@workflowScheduleOption("0 8 1 * *", "Monthly — 1st, 8:00 AM", preset.ScheduleCron)
+						</select>
+						<div
+							class="text-xs text-base-content/45 mt-1.5 flex items-center gap-1"
+							x-text={ "projectedCost(cron, " + workflowCostStr(preset.EstCostPerRunUSD) + ", false)" }
+						></div>
+					}
+				</div>
+				for _, opt := range preset.Options {
+					<div>
+						<div class="text-sm font-medium mb-1.5">{ opt.Label }</div>
+						<select name={ opt.Key } class="select select-sm w-full">
+							for _, ch := range opt.Choices {
+								if ch.Value == opt.Default {
+									<option value={ ch.Value } selected>{ ch.Label }</option>
+								} else {
+									<option value={ ch.Value }>{ ch.Label }</option>
+								}
+							}
+						</select>
+						if opt.Help != "" {
+							<div class="text-xs text-base-content/40 mt-1">{ opt.Help }</div>
+						}
+					</div>
+				}
+				<div>
+					<div class="text-sm font-medium mb-1.5">
+						Additional instructions
+						<span class="text-base-content/40 font-normal">(optional)</span>
+					</div>
+					<textarea
+						name="additional_instructions"
+						rows="4"
+						class="textarea textarea-bordered w-full text-sm"
+						placeholder="Anything specific this workflow should watch for, or how it should behave…"
+					></textarea>
+					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
+				</div>
+				<label class="flex items-center gap-2 text-sm cursor-pointer">
+					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm"/>
+					Start running now
+				</label>
+				if !consentAck {
+					<label class="flex items-start gap-2 text-xs cursor-pointer rounded-lg bg-base-200/60 p-3 border border-base-300">
+						<input type="checkbox" name="consent" value="true" x-model="consent" class="checkbox checkbox-xs mt-0.5"/>
+						<span class="text-base-content/70">I understand this runs Claude over my household's financial data via the Anthropic API, which incurs usage cost.</span>
+					</label>
+				}
+			</div>
+			<div class="flex items-center justify-end gap-2 p-4 border-t border-base-300">
+				<button type="button" class="btn btn-ghost btn-sm" @click="open=''">Cancel</button>
+				if consentAck {
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+						@components.LucideIcon("zap", "w-4 h-4")
+						Enable workflow
+					</button>
+				} else {
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="!consent">
+						@components.LucideIcon("zap", "w-4 h-4")
+						Enable workflow
+					</button>
+				}
+			</div>
+		</form>
+	</div>
+}
+
+templ workflowScheduleOption(value, label, selected string) {
+	if value == selected {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}

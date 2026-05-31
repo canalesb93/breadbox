@@ -442,9 +442,46 @@ func (s *MCPServer) buildToolRegistry() {
 		// the row settles in the same place), so hosts can retry safely.
 		makeToolDefLogged(ToolSpec{
 			Name: "update_transactions", Title: "Update Transactions", Classification: ToolWrite,
-			Description: "Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The canonical tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error).",
+			Description: "Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The canonical tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Category writes follow precedence user > agent > rule: an agent op that targets a user-locked row comes back with status 'skipped' (its category is left alone; any tags/comment in that op still apply). The response summary carries succeeded / skipped / failed counts.",
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
 		}, s.handleUpdateTransactions, s),
+
+		// --- Transaction metadata (free-form JSONB enrichment store) ---
+		// Four deliberately-scoped ops; each touches ONLY the metadata column and
+		// names exactly what it does so an agent can't clobber sibling keys or
+		// other fields. Metadata is returned on every transaction read.
+		makeToolDefLogged(ToolSpec{
+			Name: "set_transaction_metadata", Title: "Set Transaction Metadata", Classification: ToolWrite,
+			Description: "Upsert ONE key in a transaction's free-form metadata JSONB store, leaving every other key untouched. Creates the key if absent, overwrites if present. The value may be any JSON value (string, number, boolean, object, array). Use slug-like keys, max 128 chars (e.g. 'tax_deductible', 'trip', 'reimbursable_by'). Metadata is a place for enrichment your household cares about that isn't a first-class field — it is NOT a substitute for category or tags. Returned on every transaction read (query_transactions, the transaction resource). Example: {\"transaction_id\":\"k7Xm9pQ2\",\"key\":\"tax_deductible\",\"value\":true}.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleSetTransactionMetadata, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "remove_transaction_metadata", Title: "Remove Transaction Metadata Key", Classification: ToolWrite,
+			Description: "Delete ONE key from a transaction's metadata JSONB store. No-op (still succeeds) if the key isn't present. Other keys are untouched.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleRemoveTransactionMetadata, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "replace_transaction_metadata", Title: "Replace Transaction Metadata", Classification: ToolWrite,
+			Description: "Atomically replace the ENTIRE metadata object on a transaction. Use to write a structured payload in one call. Pass {} to clear all keys. Prefer set_transaction_metadata when you only mean to change one key — replace overwrites everything.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleReplaceTransactionMetadata, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "clear_transaction_metadata", Title: "Clear Transaction Metadata", Classification: ToolWrite,
+			Description: "Reset a transaction's metadata to the empty object {}, removing all keys. Equivalent to replace_transaction_metadata with {}.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleClearTransactionMetadata, s),
+
+		// --- Flag (surface a transaction for human attention) ---
+		makeToolDefLogged(ToolSpec{
+			Name: "flag_transaction", Title: "Flag Transaction", Classification: ToolWrite,
+			Description: "Flag a transaction for human attention (sets flagged_at) without changing its category. Pass an optional `reason` — it's recorded as a comment annotation on the timeline. This is the 'look at this' escape hatch: when you auto-categorize but are unsure, or spot something worth a human glance, flag it instead of guessing. Retrieve flagged transactions with query_transactions(flagged=true). Idempotent: re-flagging refreshes the timestamp.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleFlagTransaction, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "unflag_transaction", Title: "Unflag Transaction", Classification: ToolWrite,
+			Description: "Clear the flag on a transaction (sets flagged_at = NULL). No-op if it isn't flagged.",
+			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
+		}, s.handleUnflagTransaction, s),
 
 		// --- Activity timeline ---
 		makeToolDefLogged(ToolSpec{
@@ -477,7 +514,7 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleDeleteTransactionRule, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "apply_rules", Title: "Apply Rules Retroactively", Classification: ToolWrite,
-			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (respects category_override), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
+			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (skips rows where category_override <> 'none' — an agent or user already set it), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
 			// Not idempotent — hit_count increments on every run.
 		}, s.handleApplyRules, s),
 		makeToolDefLogged(ToolSpec{

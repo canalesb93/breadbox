@@ -14,6 +14,8 @@ document.addEventListener('alpine:init', function () {
       cleanupState: 'idle',
       cleanupResult: null,
       cleanupError: null,
+      notifyState: 'idle',
+      notifyError: null,
 
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
@@ -35,7 +37,7 @@ document.addEventListener('alpine:init', function () {
         this.smokeState = 'loading';
         this.smokeResult = null;
         this.smokeError = null;
-        this._post('/-/agents/test')
+        this._post('/-/workflows/test')
           .then(function (res) {
             return res.json().then(function (body) {
               return { ok: res.ok, status: res.status, body: body };
@@ -61,7 +63,7 @@ document.addEventListener('alpine:init', function () {
         this.cleanupState = 'loading';
         this.cleanupResult = null;
         this.cleanupError = null;
-        this._post('/-/agents/cleanup')
+        this._post('/-/workflows/cleanup')
           .then(function (res) {
             return res.json().then(function (body) {
               return { ok: res.ok, status: res.status, body: body };
@@ -79,6 +81,30 @@ document.addEventListener('alpine:init', function () {
           .catch(function (e) {
             self.cleanupError = (e && e.message) || 'Request failed';
             self.cleanupState = 'error';
+          });
+      },
+
+      runNotifyTest: function () {
+        var self = this;
+        this.notifyState = 'loading';
+        this.notifyError = null;
+        this._post('/-/workflows/notify-test')
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { ok: res.ok, status: res.status, body: body };
+            });
+          })
+          .then(function (r) {
+            if (!r.ok || (r.body && r.body.ok === false)) {
+              self.notifyError = (r.body && r.body.error) || ('HTTP ' + r.status);
+              self.notifyState = 'error';
+              return;
+            }
+            self.notifyState = 'ok';
+          })
+          .catch(function (e) {
+            self.notifyError = (e && e.message) || 'Request failed';
+            self.notifyState = 'error';
           });
       },
     };

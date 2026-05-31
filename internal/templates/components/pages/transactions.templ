@@ -297,6 +297,14 @@ templ txFilters(p TransactionsProps) {
 						@txSelectOption("false", "No", p.FilterPending)
 					</select>
 				</label>
+				<label class="bb-filter-label">
+					Flagged
+					<select name="flagged" class="select select-sm w-full">
+						<option value="">All</option>
+						@txSelectOption("true", "Flagged only", p.FilterFlagged)
+						@txSelectOption("false", "Not flagged", p.FilterFlagged)
+					</select>
+				</label>
 			</div>
 			<!-- Search within filters -->
 			<div class="border-t border-base-200 pt-4 mb-4" x-data={ txSearchModeInit(p.FilterSearchMode) }>

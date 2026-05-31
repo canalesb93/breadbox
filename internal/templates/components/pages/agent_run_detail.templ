@@ -24,7 +24,7 @@ import (
 //	└──────────────┴─────────────────────────────────────┘
 //
 // Live updates: when the run is in_progress, an Alpine factory
-// (`agentRunDetail`) polls `GET /-/agents/runs/{shortId}/live` every
+// (`agentRunDetail`) polls `GET /-/workflows/runs/{shortId}/live` every
 // 3 s and patches the transcript + stats panel HTML in-place. We no
 // longer emit `<meta http-equiv="refresh">` — full-page reloads kill
 // scroll position and any open <details> nodes.
@@ -206,11 +206,11 @@ templ agentRunErrorAlert(run AgentRunRowProps) {
 // name › <short ID>. The agent crumb links to /agents?agent=<slug> (the
 // filtered feed) so consecutive runs stay in scope.
 func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
-	out := []components.Breadcrumb{{Label: "Agents", Href: "/agents"}}
+	out := []components.Breadcrumb{{Label: "Runs", Href: "/workflows/runs"}}
 	if p.Run.AgentSlug != "" {
 		out = append(out, components.Breadcrumb{
 			Label: runDetailAgentDisplay(p.Run),
-			Href:  "/agents?agent=" + p.Run.AgentSlug,
+			Href:  "/workflows/runs?workflow=" + p.Run.AgentSlug,
 		})
 	}
 	out = append(out, components.Breadcrumb{Label: p.Run.ShortID})
@@ -221,7 +221,7 @@ func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
 
 // agentRunTranscriptCard is the left-column chat thread. The inner
 // `bb-run-thread` container is the x-ref="thread" target the Alpine
-// poller refreshes from /-/agents/runs/{id}/live.
+// poller refreshes from /-/workflows/runs/{id}/live.
 templ agentRunTranscriptCard(p AgentRunDetailProps) {
 	<div class="bb-card p-4">
 		<div class="flex items-center justify-between mb-3">
@@ -260,7 +260,7 @@ const agentRunTranscriptMaxEventsConst = 500
 
 // AgentRunTranscriptFragment renders just the inner transcript
 // (per-event blocks + empty-state placeholder). Exported so the
-// /-/agents/runs/{id}/live admin endpoint can render the fragment
+// /-/workflows/runs/{id}/live admin endpoint can render the fragment
 // without re-rendering the surrounding card chrome.
 templ AgentRunTranscriptFragment(p AgentRunDetailProps) {
 	@agentRunPromptIntro(p)
@@ -531,7 +531,7 @@ templ agentRunStatsCard(p AgentRunDetailProps) {
 
 // agentRunNoteCard renders the operator note as a click-to-edit block.
 // Default mode shows the note (or "Add a note…" placeholder); clicking
-// flips into a textarea that PATCHes /api/v1/agents/runs/{shortId} on
+// flips into a textarea that PATCHes /api/v1/workflows/runs/{shortId} on
 // save. No more full-page POST → reload.
 templ agentRunNoteCard(p AgentRunDetailProps) {
 	<div

@@ -808,7 +808,7 @@ func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
 	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_3", "Amazon Fresh", 4500, "2025-06-03")
 
 	// Set category_override=TRUE on one of them (simulating a manual categorization).
-	_, err := pool.Exec(ctx, "UPDATE transactions SET category_override = TRUE WHERE id = $1", txn1.ID)
+	_, err := pool.Exec(ctx, "UPDATE transactions SET category_override = 'user' WHERE id = $1", txn1.ID)
 	if err != nil {
 		t.Fatalf("set category_override: %v", err)
 	}
@@ -1298,7 +1298,7 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 	// match for the rule's conditions, but the set_category UPDATE will skip
 	// it — hit_count should still include it.
 	if _, err := pool.Exec(ctx,
-		`UPDATE transactions SET category_override = TRUE WHERE id = $1`, txn1.ID); err != nil {
+		`UPDATE transactions SET category_override = 'user' WHERE id = $1`, txn1.ID); err != nil {
 		t.Fatalf("set category_override: %v", err)
 	}
 

@@ -10,15 +10,15 @@ import (
 // limits for Claude Agent SDK runs. Distinct from AgentsSettings
 // ("MCP Settings"). See .claude/rules/settings.md.
 //
-// All POST targets sit under /-/agents/* (admin-scoped). The handler
+// All POST targets sit under /-/workflows/* (admin-scoped). The handler
 // resolves masked credential display strings before render so the templ
 // stays free of nil-handling.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
 	<script src="/static/js/admin/components/agent_sdk_settings.js"></script>
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
-			Title:    "Agents",
-			Subtitle: "Auth, sidecar binary, and execution limits for Claude Agent SDK runs",
+			Title:    "Workflows",
+			Subtitle: "Authentication, runtime, and spend controls that govern your workflow runs",
 		})
 		if p.FormError != "" {
 			<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">
@@ -113,7 +113,7 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 			Title:   "Configuration",
 			Caption: "Authentication, sidecar paths, and per-run limits",
 			Form: &components.SettingsSectionFormProps{
-				Action:    "/-/agents/settings",
+				Action:    "/-/workflows/settings",
 				CSRFToken: p.CSRFToken,
 			},
 			Footer: agentSDKConfigFooter(),
@@ -218,8 +218,8 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 				/>
 			}
 			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Global max budget",
-				Caption: "Optional USD ceiling per run. Leave empty for no global cap.",
+				Label:   "Household spend ceiling",
+				Caption: "Pause all workflow runs once 30-day spend reaches this (USD). Empty = no cap.",
 				For:     "global_max_budget_usd",
 			}) {
 				<div class="flex items-center gap-2">
@@ -236,6 +236,27 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 						class="input input-sm w-28"
 					/>
 				</div>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Spent (last 30 days)",
+				Caption: "Rolling total across every workflow run; skipped runs excluded.",
+			}) {
+				<span class="text-sm tabular-nums text-base-content/80">{ p.HouseholdSpend30dStr }</span>
+			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Notification webhook",
+				Caption: "POST workflow notifications to this http(s) URL (ntfy / Slack / Discord / email bridge). Empty = off.",
+				For:     "notify_webhook_url",
+				Stack:   true,
+			}) {
+				<input
+					id="notify_webhook_url"
+					type="url"
+					name="notify_webhook_url"
+					value={ p.Form.NotifyWebhookURL }
+					placeholder="https://ntfy.sh/my-breadbox-topic"
+					class="bb-form-input font-mono w-full"
+				/>
 			}
 			if p.FieldErrors["max_concurrent"] != "" || p.FieldErrors["global_max_budget_usd"] != "" {
 				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
@@ -335,6 +356,40 @@ templ agentSDKDiagnosticsSection(csrfToken string) {
 					</span>
 				</button>
 			}
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Test notification",
+				Caption: "Sends a sample payload to the configured webhook",
+			}) {
+				<button
+					type="button"
+					class="btn btn-ghost btn-sm"
+					@click="runNotifyTest()"
+					:disabled="notifyState === 'loading'"
+				>
+					<span x-show="notifyState !== 'loading'" class="flex items-center gap-1.5">
+						@components.LucideIcon("bell", "w-4 h-4") Send test
+					</span>
+					<span x-show="notifyState === 'loading'" x-cloak class="flex items-center gap-1.5">
+						<span class="loading loading-spinner loading-xs"></span> Sending…
+					</span>
+				</button>
+			}
+			<template x-if="notifyState === 'ok'">
+				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+					<div role="alert" class="alert alert-success alert-soft rounded-xl">
+						@components.LucideIcon("circle-check", "w-4 h-4")
+						<span>Test notification sent — check your webhook destination.</span>
+					</div>
+				}
+			</template>
+			<template x-if="notifyState === 'error' && notifyError">
+				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+					<div role="alert" class="alert alert-error alert-soft rounded-xl">
+						@components.LucideIcon("circle-x", "w-4 h-4")
+						<span x-text="'Test notification failed: ' + notifyError"></span>
+					</div>
+				}
+			</template>
 			<template x-if="smokeState === 'ok' && smokeResult">
 				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
 					<div class="rounded-lg bg-base-200/60 p-4 space-y-2">

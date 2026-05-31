@@ -118,6 +118,10 @@ func parseAdminTxFilters(r *http.Request) service.AdminTransactionListParams {
 		b := v == "true"
 		params.Pending = &b
 	}
+	if v := q.Get("flagged"); v != "" {
+		b := v == "true"
+		params.Flagged = &b
+	}
 	if v := q.Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
 		params.SearchMode = &v
 	}
@@ -328,6 +332,7 @@ func renderTransactions(w http.ResponseWriter, r *http.Request, tr *TemplateRend
 		FilterMinAmount:   q.Get("min_amount"),
 		FilterMaxAmount:   q.Get("max_amount"),
 		FilterPending:     q.Get("pending"),
+		FilterFlagged:     q.Get("flagged"),
 		FilterSearch:      q.Get("search"),
 		FilterSearchMode:  q.Get("search_mode"),
 		FilterSearchField: q.Get("search_field"),
@@ -1435,7 +1440,7 @@ func TimelineRowsHandler(a *app.App, sm *scs.SessionManager, svc *service.Servic
 var txFilterParams = []string{
 	"start_date", "end_date", "account_id", "user_id",
 	"connection_id", "category", "min_amount", "max_amount",
-	"pending", "search", "search_mode", "search_field", "sort",
+	"pending", "flagged", "search", "search_mode", "search_field", "sort",
 	"tags", "any_tag",
 }
 

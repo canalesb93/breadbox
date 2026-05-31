@@ -24,7 +24,7 @@ import (
 )
 
 // DefaultAgentModel is the model used when a definition omits one.
-// claude-opus-4-7 is the latest Opus (matches the agent_definitions
+// claude-opus-4-7 is the latest Opus (matches the workflows
 // migration default).
 const DefaultAgentModel = "claude-opus-4-7"
 
@@ -48,7 +48,7 @@ var defaultAgentSystemPrompt = func() string {
 // DefaultAgentMaxTurns is the per-run turn cap when a definition omits one.
 const DefaultAgentMaxTurns = 10
 
-// DefaultAgentMaxBudgetUSD mirrors the agent_definitions migration default.
+// DefaultAgentMaxBudgetUSD mirrors the workflows migration default.
 // The column is NOT NULL, so we always send a value to sqlc.
 const DefaultAgentMaxBudgetUSD = 1.0
 
@@ -59,25 +59,28 @@ var validAgentSlug = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$`
 
 // AgentDefinitionResponse is the API shape for an agent_definition row.
 type AgentDefinitionResponse struct {
-	ID              string           `json:"id"`
-	ShortID         string           `json:"short_id"`
-	Name            string           `json:"name"`
-	Slug            string           `json:"slug"`
-	Prompt          string           `json:"prompt"`
-	SystemPrompt    *string          `json:"system_prompt,omitempty"`
-	ScheduleCron    *string          `json:"schedule_cron,omitempty"`
-	ToolScope       string           `json:"tool_scope"`
-	AllowedTools    []string         `json:"allowed_tools"`
-	Model           string           `json:"model"`
-	MaxTurns        int              `json:"max_turns"`
-	MaxBudgetUSD    *float64         `json:"max_budget_usd,omitempty"`
-	Enabled               bool             `json:"enabled"`
-	QuietHoursStart       *string          `json:"quiet_hours_start,omitempty"`
-	QuietHoursEnd         *string          `json:"quiet_hours_end,omitempty"`
+	ID              string   `json:"id"`
+	ShortID         string   `json:"short_id"`
+	Name            string   `json:"name"`
+	Slug            string   `json:"slug"`
+	Prompt          string   `json:"prompt"`
+	SystemPrompt    *string  `json:"system_prompt,omitempty"`
+	ScheduleCron    *string  `json:"schedule_cron,omitempty"`
+	ToolScope       string   `json:"tool_scope"`
+	AllowedTools    []string `json:"allowed_tools"`
+	Model           string   `json:"model"`
+	MaxTurns        int      `json:"max_turns"`
+	MaxBudgetUSD    *float64 `json:"max_budget_usd,omitempty"`
+	Enabled         bool     `json:"enabled"`
+	QuietHoursStart *string  `json:"quiet_hours_start,omitempty"`
+	QuietHoursEnd   *string  `json:"quiet_hours_end,omitempty"`
 	// TriggerOnSyncComplete fires this agent after every successful sync
 	// (in addition to any cron schedule). Disabled by default.
-	TriggerOnSyncComplete bool             `json:"trigger_on_sync_complete"`
-	LastRun               *AgentRunSummary `json:"last_run,omitempty"`
+	TriggerOnSyncComplete bool `json:"trigger_on_sync_complete"`
+	// SourceTemplate is the workflow-preset slug this definition was
+	// instantiated from, or nil if it was hand-authored.
+	SourceTemplate *string          `json:"source_template,omitempty"`
+	LastRun        *AgentRunSummary `json:"last_run,omitempty"`
 	// CostStats30d is populated only by ListAgentDefinitions (the surface
 	// where users want to compare spend at a glance). Single-row
 	// GetAgentDefinition leaves it nil so the edit-page hot path doesn't
@@ -99,8 +102,8 @@ type AgentDefinitionResponse struct {
 	// non-skipped runs. Used by the admin UI to surface a warning when 2+
 	// recent runs hit a safety ceiling. List-only; nil when no run history.
 	RecentCapStats *AgentRecentCapStats `json:"recent_cap_stats,omitempty"`
-	CreatedAt        string  `json:"created_at"`
-	UpdatedAt        string  `json:"updated_at"`
+	CreatedAt      string               `json:"created_at"`
+	UpdatedAt      string               `json:"updated_at"`
 }
 
 // AgentRecentErrorStats is the "is this agent broken right now?" signal —
@@ -158,13 +161,13 @@ type AgentRunResponse struct {
 	// turns at run-start" would be clearer. Pair with turn_count to
 	// render "actual / cap". Until iter-33 this column erroneously
 	// mirrored turn_count, making every run look like it hit the cap.
-	MaxTurnsUsed        *int     `json:"max_turns_used,omitempty"`
-	NumToolCalls        *int     `json:"num_tool_calls,omitempty"`
-	ErrorMessage        *string  `json:"error_message,omitempty"`
-	TranscriptPath      *string  `json:"transcript_path,omitempty"`
-	SessionID           *string  `json:"session_id,omitempty"`
-	OperatorNote        *string  `json:"operator_note,omitempty"`
-	PromptPrefix        *string  `json:"prompt_prefix,omitempty"`
+	MaxTurnsUsed   *int    `json:"max_turns_used,omitempty"`
+	NumToolCalls   *int    `json:"num_tool_calls,omitempty"`
+	ErrorMessage   *string `json:"error_message,omitempty"`
+	TranscriptPath *string `json:"transcript_path,omitempty"`
+	SessionID      *string `json:"session_id,omitempty"`
+	OperatorNote   *string `json:"operator_note,omitempty"`
+	PromptPrefix   *string `json:"prompt_prefix,omitempty"`
 	// HitCap names the safety ceiling this run bumped into when it
 	// terminated, if any: "max_turns" | "max_budget" | nil. Lets the v2
 	// SPA flag "ran into the ceiling" runs separately from clean successes.
@@ -213,7 +216,8 @@ type CreateAgentDefinitionParams struct {
 	Enabled               bool
 	QuietHoursStart       *string // "HH:MM" 24-hour; nil disables window
 	QuietHoursEnd         *string
-	TriggerOnSyncComplete bool // fire after each successful sync completes
+	TriggerOnSyncComplete bool    // fire after each successful sync completes
+	SourceTemplate        *string // preset slug this was instantiated from; nil = hand-authored
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
@@ -460,6 +464,7 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 		QuietHoursStart:       pgconv.TextPtrIfNotEmpty(p.QuietHoursStart),
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
 		TriggerOnSyncComplete: p.TriggerOnSyncComplete,
+		SourceTemplate:        pgconv.TextPtrIfNotEmpty(p.SourceTemplate),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
@@ -671,7 +676,7 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 		       cache_creation_tokens, turn_count, max_turns_used, num_tool_calls,
 		       error_message, transcript_path, session_id,
 		       operator_note, prompt_prefix, hit_cap
-		FROM agent_runs
+		FROM workflow_runs
 		WHERE %s
 		ORDER BY started_at DESC
 		LIMIT $%d OFFSET $%d`,
@@ -685,7 +690,7 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 
 	var out []AgentRunResponse
 	for rows.Next() {
-		var r db.AgentRun
+		var r db.WorkflowRun
 		if scanErr := rows.Scan(
 			&r.ID, &r.ShortID, &r.AgentDefinitionID, &r.Trigger, &r.Status,
 			&r.StartedAt, &r.CompletedAt, &r.DurationMs, &r.TotalCostUsd,
@@ -787,10 +792,15 @@ type AllAgentRunListParams struct {
 	HitCap        string
 	Start         *time.Time
 	End           *time.Time
+	// WorkflowsOnly restricts the result to runs whose definition was
+	// instantiated from a workflow preset (source_template IS NOT NULL).
+	// Powers the Workflows → Runs tab, which shows only preset-backed
+	// runs (not hand-authored agents). Default false = every definition.
+	WorkflowsOnly bool
 }
 
 // ListAllAgentRuns returns offset-paginated runs across every agent,
-// joined against agent_definitions so each row carries the agent's slug
+// joined against workflows so each row carries the agent's slug
 // and name. Powers the cross-agent global runs view.
 //
 // Same hand-rolled SQL pattern as ListAgentRuns — composable WHERE
@@ -850,6 +860,11 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		args = append(args, *p.End)
 		idx++
 	}
+	if p.WorkflowsOnly {
+		// d is the workflows JOIN below; preset-instantiated
+		// workflows carry a non-null source_template.
+		where = append(where, "d.source_template IS NOT NULL")
+	}
 
 	whereClause := ""
 	if len(where) > 0 {
@@ -865,8 +880,8 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		       r.error_message, r.transcript_path, r.session_id,
 		       r.operator_note, r.prompt_prefix, r.hit_cap,
 		       d.slug, d.name
-		FROM agent_runs r
-		JOIN agent_definitions d ON d.id = r.agent_definition_id
+		FROM workflow_runs r
+		JOIN workflows d ON d.id = r.agent_definition_id
 		%s
 		ORDER BY r.started_at DESC
 		LIMIT $%d OFFSET $%d`,
@@ -880,7 +895,7 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 
 	var out []AgentRunWithAgentResponse
 	for rows.Next() {
-		var r db.AgentRun
+		var r db.WorkflowRun
 		var slug, name string
 		if scanErr := rows.Scan(
 			&r.ID, &r.ShortID, &r.AgentDefinitionID, &r.Trigger, &r.Status,
@@ -916,6 +931,46 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		Offset:  offset,
 		HasMore: hasMore,
 	}, nil
+}
+
+// WorkflowRunStatusCounts returns a status→count map across preset-backed
+// workflow runs (source_template IS NOT NULL), optionally narrowed to one
+// workflow. Powers the count badges on the Workflows → Runs status tabs.
+// Same hand-rolled SQL pattern as ListAllAgentRuns.
+func (s *Service) WorkflowRunStatusCounts(ctx context.Context, workflowSlugOrID string) (map[string]int, error) {
+	where := []string{"d.source_template IS NOT NULL"}
+	args := []any{}
+	if workflowSlugOrID != "" {
+		def, err := s.resolveAgentDefinition(ctx, workflowSlugOrID)
+		if err != nil {
+			// Unknown filter → no counts (mirrors the runs page dropping a
+			// bad workflow filter rather than erroring).
+			return map[string]int{}, nil
+		}
+		where = append(where, "r.agent_definition_id = $1")
+		args = append(args, def.ID)
+	}
+	query := "SELECT r.status, COUNT(*) FROM workflow_runs r " +
+		"JOIN workflows d ON d.id = r.agent_definition_id WHERE " +
+		strings.Join(where, " AND ") + " GROUP BY r.status"
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("workflow run status counts: %w", err)
+	}
+	defer rows.Close()
+	out := make(map[string]int, 5)
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return nil, fmt.Errorf("scan status count: %w", err)
+		}
+		out[status] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate status counts: %w", err)
+	}
+	return out, nil
 }
 
 // AgentRunNoteMaxLen caps the operator note size both in the admin
@@ -965,7 +1020,7 @@ func (s *Service) notifyDefinitionChanged() {
 // --- Orchestrator-facing helpers (called by internal/service/agent_orchestrator.go) ---
 
 // CreateAgentRunDB inserts an in_progress run row.
-func (s *Service) CreateAgentRunDB(ctx context.Context, defID pgtype.UUID, trigger string) (db.AgentRun, error) {
+func (s *Service) CreateAgentRunDB(ctx context.Context, defID pgtype.UUID, trigger string) (db.WorkflowRun, error) {
 	return s.Queries.CreateAgentRun(ctx, db.CreateAgentRunParams{
 		AgentDefinitionID: defID,
 		Trigger:           trigger,
@@ -1003,7 +1058,7 @@ func (s *Service) SetAgentRunPromptPrefixDB(ctx context.Context, runID pgtype.UU
 // Called by the orchestrator after CompleteAgentRunDB when the runner
 // surfaces ErrMaxTurnsReached / ErrBudgetExceeded. cap must be one of
 // "max_turns", "max_budget" — the DB CHECK rejects others.
-func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, cap string) (db.AgentRun, error) {
+func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, cap string) (db.WorkflowRun, error) {
 	return s.Queries.SetAgentRunHitCap(ctx, db.SetAgentRunHitCapParams{
 		ID:     runID,
 		HitCap: pgtype.Text{String: cap, Valid: cap != ""},
@@ -1026,7 +1081,7 @@ func (s *Service) SetAgentRunHitCapDB(ctx context.Context, runID pgtype.UUID, ca
 // Sidecar crashes (e.g. exit 127) attach full stderr to result.Err,
 // which can easily reach several KB — capped at runErrorMessageMax to
 // keep the column readable in the UI and bounded in size.
-func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult, maxTurnsCap int) (db.AgentRun, error) {
+func (s *Service) CompleteAgentRunDB(ctx context.Context, runID pgtype.UUID, result agent.RunResult, maxTurnsCap int) (db.WorkflowRun, error) {
 	costPtr := result.TotalCostUSD
 	errMsg := truncateRunError(result.Err)
 	return s.Queries.CompleteAgentRun(ctx, db.CompleteAgentRunParams{
@@ -1067,7 +1122,7 @@ func truncateRunError(err error) string {
 
 // AgentRunFromRow is exported so the orchestrator (same package) can build
 // API responses from raw db rows.
-func AgentRunFromRow(row db.AgentRun) AgentRunResponse {
+func AgentRunFromRow(row db.WorkflowRun) AgentRunResponse {
 	return agentRunFromRow(row)
 }
 
@@ -1212,22 +1267,22 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 
 // --- internal helpers ---
 
-func (s *Service) resolveAgentDefinition(ctx context.Context, slugOrID string) (db.AgentDefinition, error) {
+func (s *Service) resolveAgentDefinition(ctx context.Context, slugOrID string) (db.Workflow, error) {
 	if slugOrID == "" {
-		return db.AgentDefinition{}, ErrNotFound
+		return db.Workflow{}, ErrNotFound
 	}
 	// Try slug first.
 	if row, err := s.Queries.GetAgentDefinitionBySlug(ctx, slugOrID); err == nil {
 		return row, nil
 	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return db.AgentDefinition{}, fmt.Errorf("get by slug: %w", err)
+		return db.Workflow{}, fmt.Errorf("get by slug: %w", err)
 	}
 	// Try short_id (8 chars).
 	if len(slugOrID) == 8 {
 		if row, err := s.Queries.GetAgentDefinitionByShortID(ctx, slugOrID); err == nil {
 			return row, nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return db.AgentDefinition{}, fmt.Errorf("get by short_id: %w", err)
+			return db.Workflow{}, fmt.Errorf("get by short_id: %w", err)
 		}
 	}
 	// Try UUID.
@@ -1235,31 +1290,31 @@ func (s *Service) resolveAgentDefinition(ctx context.Context, slugOrID string) (
 		if row, err := s.Queries.GetAgentDefinition(ctx, u); err == nil {
 			return row, nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return db.AgentDefinition{}, fmt.Errorf("get by uuid: %w", err)
+			return db.Workflow{}, fmt.Errorf("get by uuid: %w", err)
 		}
 	}
-	return db.AgentDefinition{}, ErrNotFound
+	return db.Workflow{}, ErrNotFound
 }
 
-func (s *Service) resolveAgentRun(ctx context.Context, shortIDOrUUID string) (db.AgentRun, error) {
+func (s *Service) resolveAgentRun(ctx context.Context, shortIDOrUUID string) (db.WorkflowRun, error) {
 	if shortIDOrUUID == "" {
-		return db.AgentRun{}, ErrNotFound
+		return db.WorkflowRun{}, ErrNotFound
 	}
 	if len(shortIDOrUUID) == 8 {
 		if row, err := s.Queries.GetAgentRunByShortID(ctx, shortIDOrUUID); err == nil {
 			return row, nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return db.AgentRun{}, fmt.Errorf("get run by short_id: %w", err)
+			return db.WorkflowRun{}, fmt.Errorf("get run by short_id: %w", err)
 		}
 	}
 	if u, err := pgconv.ParseUUID(shortIDOrUUID); err == nil {
 		if row, err := s.Queries.GetAgentRun(ctx, u); err == nil {
 			return row, nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return db.AgentRun{}, fmt.Errorf("get run by uuid: %w", err)
+			return db.WorkflowRun{}, fmt.Errorf("get run by uuid: %w", err)
 		}
 	}
-	return db.AgentRun{}, ErrNotFound
+	return db.WorkflowRun{}, ErrNotFound
 }
 
 func (s *Service) lastRunSummary(ctx context.Context, defID pgtype.UUID) (*AgentRunSummary, error) {
@@ -1355,31 +1410,32 @@ func agentIntFromInt4(n pgtype.Int4) *int {
 	return &v
 }
 
-func agentDefinitionFromRow(row db.AgentDefinition, lastRun *AgentRunSummary) AgentDefinitionResponse {
+func agentDefinitionFromRow(row db.Workflow, lastRun *AgentRunSummary) AgentDefinitionResponse {
 	return AgentDefinitionResponse{
-		ID:              pgconv.FormatUUID(row.ID),
-		ShortID:         row.ShortID,
-		Name:            row.Name,
-		Slug:            row.Slug,
-		Prompt:          row.Prompt,
-		SystemPrompt:    pgconv.TextPtr(row.SystemPrompt),
-		ScheduleCron:    pgconv.TextPtr(row.ScheduleCron),
-		ToolScope:       row.ToolScope,
-		AllowedTools:    agentAllowedToolsFromBytes(row.AllowedTools),
-		Model:           row.Model,
-		MaxTurns:        int(row.MaxTurns),
-		MaxBudgetUSD:    agentFloatFromNumeric(row.MaxBudgetUsd),
-		Enabled:         row.Enabled,
+		ID:                    pgconv.FormatUUID(row.ID),
+		ShortID:               row.ShortID,
+		Name:                  row.Name,
+		Slug:                  row.Slug,
+		Prompt:                row.Prompt,
+		SystemPrompt:          pgconv.TextPtr(row.SystemPrompt),
+		ScheduleCron:          pgconv.TextPtr(row.ScheduleCron),
+		ToolScope:             row.ToolScope,
+		AllowedTools:          agentAllowedToolsFromBytes(row.AllowedTools),
+		Model:                 row.Model,
+		MaxTurns:              int(row.MaxTurns),
+		MaxBudgetUSD:          agentFloatFromNumeric(row.MaxBudgetUsd),
+		Enabled:               row.Enabled,
 		QuietHoursStart:       pgconv.TextPtr(row.QuietHoursStart),
 		QuietHoursEnd:         pgconv.TextPtr(row.QuietHoursEnd),
 		TriggerOnSyncComplete: row.TriggerOnSyncComplete,
+		SourceTemplate:        pgconv.TextPtr(row.SourceTemplate),
 		LastRun:               lastRun,
-		CreatedAt:       pgconv.TimestampStr(row.CreatedAt),
-		UpdatedAt:       pgconv.TimestampStr(row.UpdatedAt),
+		CreatedAt:             pgconv.TimestampStr(row.CreatedAt),
+		UpdatedAt:             pgconv.TimestampStr(row.UpdatedAt),
 	}
 }
 
-func agentRunFromRow(row db.AgentRun) AgentRunResponse {
+func agentRunFromRow(row db.WorkflowRun) AgentRunResponse {
 	var defID *string
 	if row.AgentDefinitionID.Valid {
 		s := pgconv.FormatUUID(row.AgentDefinitionID)
@@ -1411,7 +1467,7 @@ func agentRunFromRow(row db.AgentRun) AgentRunResponse {
 	}
 }
 
-func agentRunSummaryFromRow(row db.AgentRun) AgentRunSummary {
+func agentRunSummaryFromRow(row db.WorkflowRun) AgentRunSummary {
 	return AgentRunSummary{
 		ShortID:      row.ShortID,
 		Status:       row.Status,

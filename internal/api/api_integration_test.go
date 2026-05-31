@@ -997,7 +997,7 @@ func TestAPI_SetTransactionCategory_Success(t *testing.T) {
 	assertStatus(t, getResp, http.StatusOK)
 	var txnData map[string]any
 	parseJSON(t, getResp, &txnData)
-	if txnData["category_override"] != true {
+	if txnData["category_override"] != "user" {
 		t.Error("expected category_override=true after manual set")
 	}
 }
@@ -1028,7 +1028,7 @@ func TestAPI_ResetTransactionCategory_Success(t *testing.T) {
 	getResp := env.doGet(t, "/api/v1/transactions/"+txnID)
 	var txnData map[string]any
 	parseJSON(t, getResp, &txnData)
-	if txnData["category_override"] == true {
+	if txnData["category_override"] == "user" {
 		t.Error("expected category_override=false after reset")
 	}
 }

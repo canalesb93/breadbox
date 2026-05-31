@@ -26,7 +26,7 @@ func numericFromFloat(t *testing.T, v float64) pgtype.Numeric {
 	return n
 }
 
-func mustCreateDefinition(t *testing.T, q *db.Queries, slug string, enabled bool) db.AgentDefinition {
+func mustCreateDefinition(t *testing.T, q *db.Queries, slug string, enabled bool) db.Workflow {
 	t.Helper()
 	ctx := context.Background()
 	out, err := q.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
@@ -245,7 +245,7 @@ func TestDeleteAgentRunsOlderThan(t *testing.T) {
 	d := mustCreateDefinition(t, q, "qry-cleanup-"+t.Name(), true)
 	// Insert a deliberately-old completed run via direct SQL.
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO agent_runs (agent_definition_id, "trigger", status, started_at, completed_at)
+		INSERT INTO workflow_runs (agent_definition_id, "trigger", status, started_at, completed_at)
 		VALUES ($1, 'manual', 'success', NOW() - INTERVAL '31 days', NOW() - INTERVAL '31 days')
 	`, d.ID); err != nil {
 		t.Fatalf("insert old run: %v", err)

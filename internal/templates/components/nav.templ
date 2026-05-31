@@ -63,7 +63,7 @@ templ Nav(p NavProps) {
 		}
 		<div class="bb-sidebar-section">Manage</div>
 		if p.IsEditor {
-			@navLink("/agents", "bot-message-square", "Agents", navActive(p.CurrentPage, "agents"))
+			@navLink("/workflows", "workflow", "Workflows", navActive(p.CurrentPage, "workflows"))
 		}
 		if p.IsAdmin {
 			@navLink("/rules", "zap", "Rules", navActive(p.CurrentPage, "rules"))
@@ -72,14 +72,20 @@ templ Nav(p NavProps) {
 		if p.IsEditor {
 			@navLink("/tags", "tags", "Tags", navActive(p.CurrentPage, "tags"))
 		}
+		// System sits at the foot of the rail. The header renders for every
+		// role because Settings (account self-service at /settings/account) is
+		// available to all authenticated users — viewers included — so the
+		// section can't be gated behind IsEditor the way the connection/
+		// household/log admin tools are.
+		<div class="bb-sidebar-section">System</div>
 		if p.IsEditor {
-			<div class="bb-sidebar-section">System</div>
 			@navLinkBadge("/connections", "link", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
 			if p.IsAdmin {
 				@navLink("/household", "users", "Household", navActive(p.CurrentPage, "household"))
 				@navLink("/logs", "scroll-text", "Logs", navActive(p.CurrentPage, "logs"))
 			}
 		}
+		@navLink("/settings/account", "settings", "Settings", navSettingsActive(p.CurrentPage))
 	</nav>
 	if p.NavUpdateAvailable && p.IsAdmin {
 		<a
@@ -160,6 +166,22 @@ templ navExternalLink(href, icon, label string) {
 
 func navActive(current, page string) string {
 	if current == page {
+		return "bb-sidebar-link--active"
+	}
+	return ""
+}
+
+// navSettingsActive lights the single Settings rail link on any /settings/*
+// tab. Each settings sub-page reports its own CurrentPage id rather than a
+// shared "settings" one (account → members.go; general/system/help →
+// settings.go; providers → providers.go; mcp → settings_agents.go;
+// agents-settings → agent_sdk_settings_page.go; api-keys → apikeys.go;
+// backups → backups.go), so a plain navActive(…, "settings") would never
+// match. Keep this set in sync with those handlers' currentPage values.
+func navSettingsActive(current string) string {
+	switch current {
+	case "account", "general", "system", "help", "providers",
+		"mcp", "agents-settings", "api-keys", "backups":
 		return "bb-sidebar-link--active"
 	}
 	return ""

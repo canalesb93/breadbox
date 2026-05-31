@@ -51,12 +51,20 @@ WHERE category_id = $1 AND deleted_at IS NULL;
 
 -- name: SetTransactionCategoryOverride :execrows
 UPDATE transactions
-SET category_id = $2, category_override = TRUE, updated_at = NOW()
+SET category_id = $2, category_override = 'user', updated_at = NOW()
 WHERE id = $1;
+
+-- name: SetTransactionCategoryOverrideAgent :execrows
+-- Agent category write. Precedence user > agent > rule: an agent may overwrite
+-- a 'none' or 'agent' row but NEVER a 'user' lock. Returns 0 rows affected when
+-- the row exists but is user-locked, so the caller can report a skip.
+UPDATE transactions
+SET category_id = $2, category_override = 'agent', updated_at = NOW()
+WHERE id = $1 AND category_override <> 'user';
 
 -- name: ClearTransactionCategoryOverride :execrows
 UPDATE transactions
-SET category_override = FALSE, updated_at = NOW()
+SET category_override = 'none', updated_at = NOW()
 WHERE id = $1;
 
 -- name: SetCategoryOverrideFlag :execrows

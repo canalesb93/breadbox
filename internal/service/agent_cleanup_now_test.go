@@ -47,7 +47,7 @@ func TestRunCleanupNow(t *testing.T) {
 	defUUID, _ := pgconv.ParseUUID(def.ID)
 	mustInsertCompletedRun(t, q, defUUID, "0.01")
 	if _, err := pool.Exec(ctx,
-		`UPDATE agent_runs SET started_at = $1, completed_at = $1
+		`UPDATE workflow_runs SET started_at = $1, completed_at = $1
 		 WHERE agent_definition_id = $2`,
 		time.Now().AddDate(0, 0, -40), defUUID); err != nil {
 		t.Fatalf("backdate first row: %v", err)
