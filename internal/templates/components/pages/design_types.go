@@ -200,7 +200,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "sidebar-user-menu",
 			Title:       "Sidebar user menu",
-			Description: "Consolidated identity + actions popover at the bottom of the sidebar. Trigger shows avatar + display name + role; popover holds Settings, Documentation, GitHub, an editor-only /design shortcut, and a destructive Sign out below an <hr> separator. Use components.SidebarUserMenu.",
+			Description: "Consolidated identity + actions popover at the bottom of the sidebar. Trigger shows avatar + display name + role; popover holds Documentation, GitHub, an editor-only /design shortcut, and a destructive Sign out below an <hr> separator. (Settings lives in the sidebar System section, not here.) Use components.SidebarUserMenu.",
 			Group:       "navigation",
 			Render:      func() templ.Component { return SectionSidebarUserMenu() },
 		},
