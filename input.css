@@ -100,11 +100,13 @@
   --color-error: oklch(0.577 0.245 27.325);
   --color-error-content: oklch(0.985 0 0);
 
-  --radius-selector: 0.25rem;
-  --radius-field: 0.5rem;
-  /* Mintlify-tight box radius (8px) — modal/alert/etc. match the flattened
-     .bb-card below (was 0.625rem / 10px, cards were rounded-xl / 12px). */
-  --radius-box: 0.5rem;
+  /* Radii matched to the Mintlify dashboard/docs (measured from
+     app.mintlify.com → buttons 12px, and docs.breadbox.sh → .card 16px,
+     small elements 6px): small controls (checkbox/toggle/badge) 6px,
+     fields (button/input/select/tab) 12px, boxes (card/modal/alert) 16px. */
+  --radius-selector: 0.375rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -152,11 +154,13 @@
   --color-error: oklch(0.704 0.191 22.216);
   --color-error-content: oklch(0.145 0 0);
 
-  --radius-selector: 0.25rem;
-  --radius-field: 0.5rem;
-  /* Mintlify-tight box radius (8px) — modal/alert/etc. match the flattened
-     .bb-card below (was 0.625rem / 10px, cards were rounded-xl / 12px). */
-  --radius-box: 0.5rem;
+  /* Radii matched to the Mintlify dashboard/docs (measured from
+     app.mintlify.com → buttons 12px, and docs.breadbox.sh → .card 16px,
+     small elements 6px): small controls (checkbox/toggle/badge) 6px,
+     fields (button/input/select/tab) 12px, boxes (card/modal/alert) 16px. */
+  --radius-selector: 0.375rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -395,11 +399,11 @@
    * Mintlify's surfaces are border-only: a hairline defines the card
    * against the bright content column, with no shadow lift. We dropped
    * the shadcn `shadow-sm` (it read as an "off" halo on the new white
-   * content surface) and tightened the radius from rounded-xl (12px) to
-   * rounded-lg (8px). Dark mode keeps the color-mix surface lift below;
-   * the faint border carries elevation when there's no shadow. */
+   * content surface). Radius is rounded-2xl (16px) to match Mintlify's
+   * .card radius (measured on docs.breadbox.sh). Dark mode keeps the
+   * color-mix surface lift below; the faint border carries elevation. */
   .bb-card {
-    @apply bg-base-100 rounded-lg border border-base-300;
+    @apply bg-base-100 rounded-2xl border border-base-300;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
   }
 
@@ -1351,10 +1355,14 @@
   .btn-outline:focus-visible,
   .btn-outline:active,
   .btn-outline.btn-active {
-    --btn-bg: color-mix(in oklch, var(--btn-color) 12%, transparent) !important;
     --btn-fg: var(--btn-color) !important;
     --btn-border: var(--btn-color) !important;
   }
+  /* The hover/press FILL for outline buttons is set UNLAYERED near the
+     bottom of this file (search "Outline button hover/press fill"). daisy
+     paints the button background with a layered !important that a @layer
+     components rule — and even an inline style — can't beat, so the fill
+     has to live unlayered. */
 
   /* Button radius convention — see unlayered .btn-sm / .btn-xs override
      below the components layer. */
@@ -3055,6 +3063,23 @@
  * daisy's own transition rule. */
 .dropdown[popover]:not(:popover-open) {
   transition: none;
+}
+
+/* Outline button hover/press fill. Unlayered + currentColor:
+ *  - Unlayered so it beats daisy's layered `!important` button background
+ *    (a @layer components rule loses to it; even inline styles lose).
+ *  - currentColor (the button's own text colour) so the tint tracks the
+ *    variant AND stays a valid color on a plain `.btn-outline`, whose
+ *    `--btn-color` is unset — a `var(--btn-color)` mix there is invalid and
+ *    silently dropped.
+ * Press (:active) lands a touch darker than hover. The border + text stay
+ * pinned by the @layer rule above, so the outline never disappears. */
+.btn-outline:hover {
+  background-color: color-mix(in oklch, currentColor 16%, transparent) !important;
+}
+.btn-outline:active,
+.btn-outline.btn-active {
+  background-color: color-mix(in oklch, currentColor 24%, transparent) !important;
 }
 
 /* ── Command palette: tx-row horizontal alignment ──
