@@ -58,7 +58,18 @@ func migrateDB(databaseURL string) error {
 		return fmt.Errorf("set dialect: %w", err)
 	}
 
-	if err := goose.Up(sqlDB, "migrations"); err != nil {
+	// WithAllowMissing: apply out-of-order ("missing") migrations instead of
+	// aborting. Breadbox runs several feature sprints in parallel, each on its
+	// own branch; two sprints can pick migration timestamps that interleave, so
+	// after both merge a lower-timestamped migration can land *after* a
+	// higher-timestamped one is already applied. Plain goose.Up treats that as
+	// "found N missing migrations before current version" and refuses to run,
+	// which crash-loops the app on deploy (the #1647 Workflows incident:
+	// versions 20260531062826/070344/074239 were behind the already-applied
+	// recurring_series_type 20260531074852). Migrations here are additive-only
+	// (.claude/rules/migrations.md), so applying a straggler out of order is
+	// safe — far better than wedging the deploy.
+	if err := goose.Up(sqlDB, "migrations", goose.WithAllowMissing()); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 	return nil

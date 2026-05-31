@@ -416,17 +416,16 @@ jobs:
           # Prune unused images after the new one is live — without this,
           # every deploy leaves the old image behind and the dev box's disk
           # eventually fills to 100% (wedged the box once; see incident).
-          # Run migrations explicitly before `up -d`. Migrations run as a
-          # one-shot `migrate` service that `app` waits on (depends_on:
-          # condition: service_completed_successfully); but `docker compose up
-          # -d` reuses the previously-completed `migrate` container on redeploy
-          # and skips it, so new migrations never apply and the app boots
-          # failing /health/ready ("pending migrations detected: database is
-          # behind") — this wedged prod on the #1647 (workflows) deploy.
-          # `run --rm migrate` always spins a fresh one-off from the
-          # just-pulled image, applying the pending set every deploy (a failure
-          # aborts before the app is touched); `up -d`'s dependency is a no-op.
-          script: cd ${{ secrets.DEPLOY_PATH }} && docker compose pull && docker compose run --rm migrate && docker compose up -d && docker image prune -af
+          # The deployed docker-compose.yml runs the app as
+          #   command: sh -c "/app/breadbox migrate && /app/breadbox serve"
+          # so migrations apply automatically each time the container (re)starts
+          # — there is NO separate `migrate` compose service on the box. Do NOT
+          # add `docker compose run --rm migrate` here: it fails with "no such
+          # service: migrate" and aborts the deploy (the reverted #1650 did
+          # exactly this). Just pull the new image and recreate; the entrypoint
+          # migrates. Prune unused images afterward — otherwise the dev box's
+          # disk fills to 100% (it wedged the box once).
+          script: cd ${{ secrets.DEPLOY_PATH }} && docker compose pull && docker compose up -d && docker image prune -af
 
       - name: Verify health
         run: |
