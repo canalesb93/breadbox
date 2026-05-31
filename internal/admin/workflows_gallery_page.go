@@ -66,6 +66,7 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			CSRFToken:           GetCSRFToken(r),
 			ConsentAcknowledged: consented,
 			Spend:               buildWorkflowSpendBanner(spend),
+			IsAdmin:             IsAdmin(sm, r),
 		}
 
 		data := BaseTemplateData(r, sm, "workflows", "Workflows")

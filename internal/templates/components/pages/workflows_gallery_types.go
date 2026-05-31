@@ -23,6 +23,9 @@ type WorkflowsGalleryProps struct {
 	ConsentAcknowledged bool
 	// Spend drives the optional top-of-gallery spend-ceiling banner.
 	Spend WorkflowSpendBanner
+	// IsAdmin gates the "Set up" action: instantiating a workflow from a
+	// preset is admin-only. Non-admins see a disabled control + hint.
+	IsAdmin bool
 }
 
 // WorkflowSpendBanner is the gallery's spend-ceiling state: shown when a
