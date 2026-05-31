@@ -484,14 +484,29 @@
      `<div id="anchor">` for hash deep-links, which defeats sibling rules.
      The page header carries no bottom border, so the first section's top
      border reads as the line under the title. */
+  /* Each section is its own inline-size container so the gutter/content
+     split flips on the *available* width, not the viewport. The live
+     Settings page sits in a narrow column (viewport − app sidebar −
+     settings rail), so a viewport `lg:` breakpoint flipped to two columns
+     while the content column was still cramped (~1030px viewport → a
+     ~290px control column). A container query measures the real width, so
+     the same section behaves correctly on the live page and in the
+     wide-open /design sandbox. */
   .bb-settings-section {
     @apply border-t border-base-200 py-7;
+    container: settings-section / inline-size;
   }
   .bb-settings-section__grid {
-    @apply grid grid-cols-1 gap-x-10 gap-y-3 lg:grid-cols-[14rem_minmax(0,1fr)];
+    @apply grid grid-cols-1 gap-x-10 gap-y-3;
   }
-  .bb-settings-section--full .bb-settings-section__grid {
-    @apply lg:grid-cols-1;
+  /* Two-column (gutter + content) only once the section is wide enough to
+     give the content column a comfortable minimum: 14rem gutter + 2.5rem
+     gap + ~10rem leaves the content ≥ ~24rem before flipping. `--full`
+     sections stay single-column at every width. */
+  @container settings-section (min-width: 40rem) {
+    .bb-settings-section:not(.bb-settings-section--full) .bb-settings-section__grid {
+      grid-template-columns: 14rem minmax(0, 1fr);
+    }
   }
   /* Left gutter — section identity. Quiet by design; the card on the
      right carries the working hierarchy. Top-aligned with the content. */
@@ -580,47 +595,40 @@
     @apply flex items-center justify-end gap-2 mt-4 pt-3 border-t border-base-200;
   }
 
-  /* === Settings shell: a rail that extends the app sidebar + content ===
-     On lg+ the rail is a base-100 panel flush against the app sidebar
-     (its negative margins cancel <main>'s padding so it reaches the
-     sidebar edge and runs full height), with the same link language as
-     .bb-sidebar-link — so it reads as the sidebar's navigation continuing
-     into Settings. Below lg it collapses to a horizontal scroll strip. */
-  /* The layout fills at least the viewport (minus <main>'s p-6) so the
-     rail's self-stretch reaches the bottom even on short tabs (Account,
-     API Keys) — otherwise the base-100 panel stops mid-page and the
-     sidebar-extension illusion breaks. */
+  /* === Settings shell: the rail is a true extension of the app sidebar ===
+     On lg+ the rail is a FIXED, full-height base-200 column pinned flush
+     against the app sidebar's right edge — same recessed surface + link
+     language as .bb-sidebar, so Settings reads as the sidebar's own
+     sub-navigation rather than page content. It sits above the sticky
+     topbar and pushes the topbar + page body to its right (the :has()
+     offsets at the end of this block). Below lg it collapses to an in-flow
+     horizontal scroll strip at the top of the tab. */
   .bb-settings-layout {
     @apply flex flex-col lg:flex-row lg:min-h-[calc(100vh-3rem)];
   }
-  /* Negative margins cancel <main>'s p-6 so the rail bleeds to the
-     sidebar edge + the viewport top/bottom; self-stretch + the layout's
-     min-height make the base-100 panel span the full height. The list
-     inside is sticky (below) so it stays put while a long tab scrolls. */
+  /* Mobile default: an in-flow strip above the content. The lg+ block
+     below lifts it out into the fixed sidebar-extension column. */
   .bb-settings-rail {
-    @apply shrink-0 mb-5 lg:mb-0 lg:w-56 lg:self-stretch
-           lg:-my-6 lg:-ml-6 lg:py-6 lg:pl-6 lg:pr-4
-           lg:bg-base-100 lg:border-r lg:border-base-300;
+    @apply shrink-0 mb-5;
   }
-  /* Mobile: horizontal scroll strip. lg+: a sticky vertical column that
-     scrolls on its own if the items ever exceed the viewport height
-     (small screens, many sections) instead of clipping. */
   .bb-settings-rail__list {
-    @apply flex flex-row gap-1 overflow-x-auto pb-1
-           lg:flex-col lg:gap-0.5 lg:pb-0 lg:sticky lg:top-6
-           lg:overflow-x-visible lg:overflow-y-auto lg:max-h-[calc(100vh-3rem)];
+    @apply flex flex-row gap-1 overflow-x-auto pb-1;
   }
   .bb-settings-rail__group-label {
     @apply hidden lg:block text-[0.65rem] font-medium uppercase tracking-wide text-base-content/40 px-3 pt-5 pb-1.5;
   }
+  /* Items mirror .bb-sidebar-link: muted by default, base-300 on hover, and
+     a bright base-100 pill (with a hairline border) when active — which
+     pops against the recessed base-200 rail. The transparent default
+     border keeps the active border from shifting layout. */
   .bb-settings-rail__item {
     @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-8 shrink-0
-           rounded-lg text-sm font-medium whitespace-nowrap no-underline
-           text-base-content/60 hover:bg-base-200 hover:text-base-content;
+           rounded-lg text-sm font-medium whitespace-nowrap no-underline border border-transparent
+           text-base-content/60 hover:bg-base-300 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease;
   }
   .bb-settings-rail__item[data-active="true"] {
-    @apply bg-base-200 text-base-content font-semibold;
+    @apply bg-base-100 text-base-content font-semibold border-base-300;
   }
   .bb-settings-rail__item i, .bb-settings-rail__item svg {
     @apply w-4 h-4 opacity-50;
@@ -633,7 +641,56 @@
     @apply opacity-100;
   }
   .bb-settings-content {
-    @apply flex-1 min-w-0 lg:pl-10 lg:max-w-5xl;
+    @apply flex-1 min-w-0 lg:max-w-5xl;
+  }
+
+  /* lg+: lift the rail into a fixed, full-height column and push the
+     topbar + body to its right. */
+  @media (min-width: 1024px) {
+    .bb-settings-rail {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      /* Pinned to the app sidebar's right edge. `left` tracks the sidebar
+         width (16rem expanded / 4rem collapsed — same hardcoded geometry as
+         the collapsible-sidebar block near the bottom of this file); the
+         body offset below is the constant rail width. */
+      left: 16rem;
+      width: 14rem;
+      margin: 0;
+      z-index: 31; /* above the sticky topbar (z-30) */
+      display: flex;
+      flex-direction: column;
+      /* Same vertical + horizontal rhythm as .bb-sidebar (py-5 / px-3) so the
+         rail's first tab top-aligns with the sidebar's brand row. No topbar
+         clearance is needed — the topbar is offset to the rail's right, not
+         stacked above it, so there's nothing overhead to avoid. */
+      padding: 1.25rem 0.75rem;
+      background-color: var(--color-base-200);
+      border-right: 1px solid var(--color-base-300);
+      transition: left 0.22s ease; /* lockstep with the sidebar collapse */
+    }
+    html[data-sidebar="collapsed"] .bb-settings-rail {
+      left: 4rem; /* --bb-rail-collapsed-w */
+    }
+    /* The list fills the rail and scrolls on its own if the sections ever
+       overflow a short viewport. */
+    .bb-settings-rail__list {
+      flex: 1 1 auto;
+      min-height: 0;
+      flex-direction: column;
+      gap: 0.125rem;
+      overflow-x: visible;
+      overflow-y: auto;
+      padding-bottom: 0;
+    }
+    /* Offset the topbar + body by the rail width so they begin to its
+       right. Scoped to Settings via :has() — the rail only exists there,
+       so every other page keeps its full-width topbar. */
+    .drawer-content:has(.bb-settings-layout) .bb-topbar,
+    .drawer-content:has(.bb-settings-layout) > main {
+      margin-left: 14rem;
+    }
   }
 
   /* Form inputs/selects with subtle base-200 bg that clears on focus. */
@@ -3058,7 +3115,8 @@
   .bb-sidebar-brand,
   .bb-sidebar-link__label,
   .bb-sidebar-brand-text,
-  .bb-sidebar-section {
+  .bb-sidebar-section,
+  .bb-settings-rail {
     transition: none;
   }
 }
