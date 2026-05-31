@@ -160,6 +160,33 @@
   </script>
 
   <script>
+    // Alpine store: $store.drawers
+    //
+    // Drives the shared right-side slide-over (components.Drawer). One
+    // drawer is open at a time, keyed by the id passed to the component.
+    // Open from anywhere — a button, a row action, a page factory:
+    //   <button @click="$store.drawers.open('edit-note')">Edit</button>
+    //   Alpine.store('drawers').open('edit-note')   // from JS
+    // close() is also bound to Escape + backdrop click by the component.
+    // Body scroll is locked while a drawer is open so the page behind it
+    // doesn't scroll under the panel.
+    document.addEventListener('alpine:init', function() {
+      Alpine.store('drawers', {
+        active: null,
+        is: function(id) { return this.active === id; },
+        open: function(id) {
+          this.active = id;
+          document.documentElement.style.overflow = 'hidden';
+        },
+        close: function() {
+          this.active = null;
+          document.documentElement.style.overflow = '';
+        },
+      });
+    });
+  </script>
+
+  <script>
     // Alpine store: $store.theme
     //
     // Single source of truth for the theme preference, shared by every
