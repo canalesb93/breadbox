@@ -39,6 +39,8 @@ func MapServiceError(err error) (ServiceErrorResponse, bool) {
 		return ServiceErrorResponse{Status: http.StatusBadRequest, Code: "INVALID_CURSOR", Message: err.Error()}, true
 	case errors.Is(err, service.ErrForbidden):
 		return ServiceErrorResponse{Status: http.StatusForbidden, Code: "FORBIDDEN", Message: err.Error()}, true
+	case errors.Is(err, service.ErrConflict):
+		return ServiceErrorResponse{Status: http.StatusConflict, Code: "CONFLICT", Message: err.Error()}, true
 	case errors.Is(err, service.ErrSyncInProgress):
 		return ServiceErrorResponse{Status: http.StatusConflict, Code: "SYNC_IN_PROGRESS", Message: err.Error()}, true
 	case errors.Is(err, service.ErrUserHasDependents):

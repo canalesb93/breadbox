@@ -2900,6 +2900,51 @@ paths:
               schema:
                 type: array
                 items: { type: object, additionalProperties: true }
+  /api/v1/workflow-presets:
+    get:
+      tags: [Agents]
+      summary: List the Workflow preset gallery
+      description: |
+        Returns the code-defined Workflow presets, each annotated with whether
+        it has been enabled (instantiated as a workflow). Presets are templates,
+        not stored rows — a row exists only once the preset is enabled.
+      responses:
+        "200":
+          description: Bare JSON array of preset views (`{slug, name, category, icon, description, enabled, ...}`).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, additionalProperties: true }
+  /api/v1/workflow-presets/{slug}/enable:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Agents]
+      summary: Enable a Workflow preset
+      description: |
+        Instantiate a workflow from the preset (composes its base prompt, applies
+        the preset defaults, stamps `source_template`). Optional body
+        `{"enabled": true}` starts it immediately (default: paused for review).
+        Returns the created workflow. **Requires `full_access` scope.** 409 if the
+        preset is already enabled.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean, description: Start the workflow immediately (default false). }
+      responses:
+        "201":
+          description: The instantiated workflow.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: The preset is already enabled. }
   /api/v1/agents/runs/recent-errors:
     parameters:
       - { name: hours, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 168 } }

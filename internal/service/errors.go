@@ -12,6 +12,9 @@ var (
 	ErrInvalidParameter = errors.New("invalid parameter")
 	ErrSyncInProgress   = errors.New("sync already in progress")
 	ErrForbidden        = errors.New("forbidden")
+	// ErrConflict signals that a request conflicts with current state (e.g.
+	// enabling a workflow preset that is already enabled). Maps to 409.
+	ErrConflict = errors.New("conflict")
 	// ErrInvalidState signals that an entity is in a state that disallows the
 	// requested transition (e.g. completing an already-expired hosted-link
 	// session). Distinct from ErrInvalidParameter (bad input) and ErrNotFound

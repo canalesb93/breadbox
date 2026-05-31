@@ -288,6 +288,8 @@ Agent definitions are scheduled Claude Agent SDK runs that call breadbox MCP to 
 | GET | `/agents/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200); filters: `status`, `trigger`, `hit_cap` (`max_turns`/`max_budget`/`any`), `start`, `end` |
 | GET | `/agents/runs` | R | Cross-agent run history with `agent_slug`+`agent_name` per row; same filters as `/agents/{slug}/runs` plus optional `agent=<slug>` to narrow to one definition |
 | GET | `/agents/prompt-blocks` | R | Parsed view of the embedded `prompts/agents/*.md` library — id, title, description, group (`strategy`/`depth`/`integration`/`knowledge`), and full markdown content |
+| GET | `/workflow-presets` | R | List the code-defined Workflow preset gallery, annotated with enabled-state |
+| POST | `/workflow-presets/{slug}/enable` | W | Instantiate a workflow from a preset (409 if already enabled) |
 | GET | `/agents/runs/recent-errors` | R | Errored runs across all agents in the last `hours` (default 24, max 168); `?limit=5` (max 50); joined with `agent_slug`+`agent_name` for deep-link |
 | GET | `/agents/runs/{shortId}` | R | One run detail (by short_id or UUID) |
 | PATCH | `/agents/runs/{shortId}` | W | Set/clear the operator note on a run. Body `{ "note": "..." }`; empty string clears. Capped at 2000 chars |

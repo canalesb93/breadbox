@@ -127,6 +127,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/agents/runs/{shortId}/transcript", GetAgentRunTranscriptHandler(svc, a))
 		r.Get("/agents/{slug}", GetAgentDefinitionHandler(svc))
 		r.Get("/agents/{slug}/runs", ListAgentRunsHandler(svc))
+		r.Get("/workflow-presets", ListWorkflowPresetsHandler(svc))
 		r.Get("/providers", ListProvidersHandler(a))
 		r.Get("/providers/{name}", GetProviderHandler(a))
 		r.Get("/headless/bootstrap", HeadlessBootstrapHandler(svc, a, version))
@@ -203,6 +204,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Put("/settings/providers/teller", UpdateTellerConfigHandler(a))
 			// Agents — write endpoints (full_access scope).
 			r.Post("/agents", CreateAgentDefinitionHandler(svc))
+			r.Post("/workflow-presets/{slug}/enable", EnableWorkflowPresetHandler(svc))
 			r.Put("/agents/settings", UpdateAgentSettingsHandler(svc, a))
 			r.Patch("/agents/{slug}", UpdateAgentDefinitionHandler(svc))
 			r.Delete("/agents/{slug}", DeleteAgentDefinitionHandler(svc))
