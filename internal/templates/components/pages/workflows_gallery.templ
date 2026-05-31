@@ -2,9 +2,9 @@ package pages
 
 import "breadbox/internal/templates/components"
 
-// WorkflowsGallery is the /workflows preset gallery: codified, one-click
-// automations grouped by category. Enabling a preset instantiates a workflow;
-// an instantiated workflow shows a run toggle.
+// WorkflowsGallery is the /workflows preset gallery: codified, configurable,
+// one-click automations grouped by category. "Set up" opens a right-side
+// configure drawer; enabling instantiates a workflow with a run toggle.
 templ WorkflowsGallery(p WorkflowsGalleryProps) {
 	<script src="/static/js/admin/components/workflows_gallery.js"></script>
 	<div
@@ -45,11 +45,31 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				}
 			}
 		</div>
+		<!-- Configure drawer: shared backdrop + one slide-over panel per available preset. -->
+		<div
+			x-show="open"
+			x-cloak
+			x-transition:enter="transition-opacity ease-out duration-200"
+			x-transition:enter-start="opacity-0"
+			x-transition:enter-end="opacity-100"
+			x-transition:leave="transition-opacity ease-in duration-150"
+			x-transition:leave-start="opacity-100"
+			x-transition:leave-end="opacity-0"
+			class="fixed inset-0 bg-black/40 z-40"
+			@click="open=''"
+		></div>
+		for _, cat := range p.Categories {
+			for _, preset := range cat.Presets {
+				if !preset.Enabled {
+					@workflowConfigDrawer(preset)
+				}
+			}
+		}
 	</div>
 }
 
-// workflowPresetControl is the state-dependent right-side control: an enable
-// button when the preset is available, a run toggle once it's instantiated.
+// workflowPresetControl is the state-dependent right-side control: a "Set up"
+// button (opens the configure drawer) when available, a run toggle once enabled.
 templ workflowPresetControl(preset WorkflowPresetCardProps) {
 	<div class="flex items-center gap-3">
 		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
@@ -70,11 +90,95 @@ templ workflowPresetControl(preset WorkflowPresetCardProps) {
 			<button
 				type="button"
 				class="btn btn-soft btn-sm gap-1.5"
-				@click={ "enablePreset('" + preset.Slug + "', $event.target)" }
+				@click={ "open='" + preset.Slug + "'" }
 			>
-				@components.LucideIcon("plus", "w-4 h-4")
-				Enable
+				@components.LucideIcon("settings-2", "w-4 h-4")
+				Set up
 			</button>
 		}
 	</div>
+}
+
+// workflowConfigDrawer is the right-side slide-over for configuring + enabling
+// one preset: trigger/schedule, additional instructions, and run-now.
+templ workflowConfigDrawer(preset WorkflowPresetCardProps) {
+	<div
+		x-show={ "open === '" + preset.Slug + "'" }
+		x-cloak
+		x-transition:enter="transition ease-out duration-200"
+		x-transition:enter-start="translate-x-full"
+		x-transition:enter-end="translate-x-0"
+		x-transition:leave="transition ease-in duration-150"
+		x-transition:leave-start="translate-x-0"
+		x-transition:leave-end="translate-x-full"
+		class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 border-l border-base-300 shadow-xl flex flex-col"
+		@keydown.escape.window="open=''"
+	>
+		<form
+			class="flex flex-col h-full"
+			@submit.prevent={ "submitDrawer('" + preset.Slug + "', $event.target)" }
+		>
+			<div class="flex items-start justify-between gap-3 p-5 border-b border-base-300">
+				<div class="flex items-start gap-3">
+					@components.LucideIcon(preset.Icon, "w-5 h-5 mt-0.5 text-base-content/60 shrink-0")
+					<div>
+						<div class="font-semibold leading-tight">{ preset.Name }</div>
+						<div class="text-xs text-base-content/60 mt-1">{ preset.Description }</div>
+					</div>
+				</div>
+				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">
+					@components.LucideIcon("x", "w-4 h-4")
+				</button>
+			</div>
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				<div>
+					<div class="text-sm font-medium mb-1.5">When it runs</div>
+					if preset.TriggerOnSync {
+						<div class="text-sm text-base-content/70 flex items-center gap-2">
+							@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/50")
+							After each successful sync
+						</div>
+					} else {
+						<select name="schedule_cron" class="select select-sm w-full">
+							@workflowScheduleOption("0 8 * * *", "Daily — 8:00 AM", preset.ScheduleCron)
+							@workflowScheduleOption("0 7 * * 1", "Weekly — Monday 7:00 AM", preset.ScheduleCron)
+							@workflowScheduleOption("0 8 1 * *", "Monthly — 1st, 8:00 AM", preset.ScheduleCron)
+						</select>
+					}
+				</div>
+				<div>
+					<div class="text-sm font-medium mb-1.5">
+						Additional instructions
+						<span class="text-base-content/40 font-normal">(optional)</span>
+					</div>
+					<textarea
+						name="additional_instructions"
+						rows="4"
+						class="textarea textarea-bordered w-full text-sm"
+						placeholder="Anything specific this workflow should watch for, or how it should behave…"
+					></textarea>
+					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
+				</div>
+				<label class="flex items-center gap-2 text-sm cursor-pointer">
+					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm"/>
+					Start running now
+				</label>
+			</div>
+			<div class="flex items-center justify-end gap-2 p-4 border-t border-base-300">
+				<button type="button" class="btn btn-ghost btn-sm" @click="open=''">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("zap", "w-4 h-4")
+					Enable workflow
+				</button>
+			</div>
+		</form>
+	</div>
+}
+
+templ workflowScheduleOption(value, label, selected string) {
+	if value == selected {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
 }

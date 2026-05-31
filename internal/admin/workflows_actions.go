@@ -19,13 +19,25 @@ import (
 func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
-		wf, err := svc.EnableWorkflowFromPreset(r.Context(), slug, service.EnableWorkflowFromPresetParams{Enabled: true})
+		_ = r.ParseForm()
+		// Configure-drawer fields. enabled defaults to true (the drawer's
+		// "Enable" CTA), but the form can pass enabled=false to set up paused.
+		params := service.EnableWorkflowFromPresetParams{
+			Enabled:                r.FormValue("enabled") != "false",
+			AdditionalInstructions: r.FormValue("additional_instructions"),
+		}
+		if cron := r.FormValue("schedule_cron"); cron != "" {
+			params.ScheduleCron = &cron
+		}
+		wf, err := svc.EnableWorkflowFromPreset(r.Context(), slug, params)
 		if err != nil {
 			switch {
 			case errors.Is(err, service.ErrConflict):
 				writeJSON(w, http.StatusOK, map[string]any{"slug": slug, "already_enabled": true})
 			case errors.Is(err, service.ErrNotFound):
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Workflow preset not found")
+			case errors.Is(err, service.ErrInvalidParameter):
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			default:
 				writeError(w, http.StatusUnprocessableEntity, "WORKFLOW_ENABLE_FAILED", err.Error())
 			}

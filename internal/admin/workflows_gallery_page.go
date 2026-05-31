@@ -57,13 +57,15 @@ func groupWorkflowPresets(views []service.WorkflowPresetView) []pages.WorkflowCa
 			order = append(order, v.Category)
 		}
 		card := pages.WorkflowPresetCardProps{
-			Slug:         v.Slug,
-			Name:         v.Name,
-			Description:  v.Description,
-			Icon:         v.Icon,
-			TriggerLabel: presetTriggerLabel(v),
-			ToolScope:    v.ToolScope,
-			Enabled:      v.Enabled,
+			Slug:          v.Slug,
+			Name:          v.Name,
+			Description:   v.Description,
+			Icon:          v.Icon,
+			TriggerLabel:  presetTriggerLabel(v),
+			ToolScope:     v.ToolScope,
+			ScheduleCron:  v.ScheduleCron,
+			TriggerOnSync: v.TriggerOnSyncComplete,
+			Enabled:       v.Enabled,
 		}
 		if v.WorkflowSlug != nil {
 			card.WorkflowSlug = *v.WorkflowSlug
