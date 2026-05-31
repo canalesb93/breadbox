@@ -21,7 +21,7 @@
 - Deferred (post–iteration 1): the other 13 presets, outbound notification sink (→ Sync Watchdog + Alerts category), custom-workflow builder.
 
 ## PR checklist (iteration 1)
-- [ ] **PR 1 — `transactions.metadata` JSONB field (standalone).** Migration + sqlc regen; scoped MCP/REST ops (set/remove/replace/clear, metadata-only); tx-detail key/value view + provenance; tests; openapi + api-endpoints.
+- [x] **PR 1 — `transactions.metadata` JSONB field (standalone).** ✅ MERGED #1615 (squash 68180491). Migration + scoped MCP/REST ops (set/remove/replace/clear, metadata-only) + admin tx-detail key/value section + integration tests + openapi/api-endpoints. Per-key provenance via annotations deferred to the flag/comment PR.
 - [ ] **PR 2 — `category_override` boolean→enum + precedence.** Breaking type migration + backfill; rewire rule-skip (`='none'`), `ApplyAgentCategory` guarded path (`<>'user'`→`'agent'`), manual edits (`'user'`); update all `category_override` queries + sqlc regen; tests.
 - [ ] **PR 3 — `transactions.flagged_at` + flag action.** Additive field + partial index; flag op (set `flagged_at` + comment annotation); saved "Flagged" filter; tests.
 - [ ] **PR 4 — Rename agents→workflows (incl. DB tables) + preset registry.** Table renames (`workflows`/`workflow_runs`) + sqlc regen (`Workflow`/`WorkflowRun`); API+UI+MCP rename (`/api/v1/workflows/*`, nav, `workflow_*` tools, openapi, api-endpoints, external docs); `//go:build !lite` preset registry + `source_template` + `EnableWorkflowFromPreset` + 3 presets as registry data; hide custom-CRUD form. Atomic to compile.
