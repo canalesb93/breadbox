@@ -26,6 +26,9 @@ type SubscriptionsListProps struct {
 	// Only rendered when len > 1 — no point offering a filter for one type.
 	Types []SubscriptionTypeFilter
 
+	// ActiveTab selects which tab renders: "active" (default) or "review".
+	ActiveTab string
+
 	// status == 'candidate' — get the Confirm / Not-a-subscription actions.
 	Candidates []SubscriptionRow
 	// status in (active, paused, cancelled) — the confirmed/live ledger.
@@ -104,6 +107,11 @@ type SubscriptionRow struct {
 	// Monthly-equivalent contribution (active rows) — used nowhere in the row
 	// itself but kept for parity / future per-row display.
 	MonthlyEquiv float64
+
+	// Members holds a bounded sample of the linked charges, populated only for
+	// candidates so the review card can show the evidence the detector grouped
+	// before the user commits to confirming.
+	Members []SubscriptionMember
 
 	// Filter support.
 	UserID    string // formatted UUID, "" for shared/household

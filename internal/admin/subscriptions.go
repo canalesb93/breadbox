@@ -28,6 +28,10 @@ import (
 // awaiting a verdict) are split out from the confirmed/live ledger, and the
 // stat tiles (active count, monthly-equivalent spend per currency, candidates
 // awaiting review) are computed here.
+// subscriptionCandidateEvidenceMax caps how many member charges a candidate
+// card previews as detection evidence (the rest are summarized as "+N more").
+const subscriptionCandidateEvidenceMax = 5
+
 func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -68,6 +72,15 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				typesPresent[row.Type] = true
 			}
 			if s.Status == service.SeriesStatusCandidate {
+				// Attach a bounded sample of the charges the detector grouped so
+				// the review card shows the evidence before the user confirms.
+				if mem, merr := svc.SeriesMembers(ctx, s.ShortID); merr == nil {
+					ev := subscriptionMembers(mem)
+					if len(ev) > subscriptionCandidateEvidenceMax {
+						ev = ev[:subscriptionCandidateEvidenceMax]
+					}
+					row.Members = ev
+				}
 				candidates = append(candidates, row)
 				continue
 			}
@@ -122,8 +135,14 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			})
 		}
 
+		activeTab := "active"
+		if r.URL.Query().Get("tab") == "review" {
+			activeTab = "review"
+		}
+
 		props := pages.SubscriptionsListProps{
 			CSRFToken:      GetCSRFToken(r),
+			ActiveTab:      activeTab,
 			ActiveCount:    activeCount,
 			CandidateCount: len(candidates),
 			MonthlyTotals:  monthlyTotals,

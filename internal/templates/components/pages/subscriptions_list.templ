@@ -6,15 +6,13 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// SubscriptionsList renders the /subscriptions admin page — the single
-// human-adjudication surface for recurring series. Candidates (auto-detected,
-// awaiting a verdict) sit up top with Confirm / Not-a-subscription actions and
-// a derived confidence chip; the confirmed/live ledger follows as a sortable
-// table.
+// SubscriptionsList renders /recurring — the human-adjudication surface for
+// recurring series. A stat row sits on top, then two tabs: "Active" (the
+// confirmed/live ledger, the default landing) and "Needs review" (auto-detected
+// candidates awaiting a verdict, each showing the charges it was detected from).
 //
-// Alpine factory `subscriptionsList` (member filter + search + verdict submit)
-// lives in static/js/admin/components/subscriptions.js. Loaded synchronously
-// (no defer) per docs/design-system.md → "Alpine page components".
+// Alpine factory `subscriptionsList` (member + type + search filters, verdict
+// submit) lives in static/js/admin/components/subscriptions.js.
 templ SubscriptionsList(p SubscriptionsListProps) {
 	<script src="/static/js/admin/components/subscriptions.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('subscriptions')" x-destroy="$store.shortcuts.setScope('global')"></div>
@@ -25,93 +23,38 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			SubtitleHideOnMobile: true,
 			Action:               subscriptionsBetaBadge(),
 		})
-		if len(p.Users) > 1 {
-			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto overflow-y-hidden">
-				<button
-					@click="filterUser = 'all'"
-					:class="filterUser === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
-					class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
-				>
-					<span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
-						@components.LucideIcon("users", "w-3 h-3")
-					</span>
-					All
-				</button>
-				for _, u := range p.Users {
-					@subscriptionsUserFilterBtn(u)
-				}
-			</div>
-		}
-		if len(p.Types) > 1 {
-			<!-- Filter by type (subscription / bill / loan / other) -->
-			<div class="flex items-center gap-2 mb-6 overflow-x-auto">
-				<div class="join">
-					<button
-						@click="filterType = 'all'"
-						:class="filterType === 'all' ? 'btn-active' : ''"
-						class="join-item btn btn-xs"
-					>All</button>
-					for _, t := range p.Types {
-						@subscriptionsTypeFilterBtn(t)
-					}
-				</div>
-			</div>
-		}
-		<!-- Stat tiles: Active · Monthly-equivalent · Due in 30 days · Needs review -->
-		<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
-			<div class="grid grid-cols-2 lg:grid-cols-4 gap-px bg-base-300">
-				<div class="bg-base-100 px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-					<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Active</div>
-					<div class="text-sm sm:text-2xl font-semibold tracking-tight truncate">{ fmt.Sprintf("%d", p.ActiveCount) }</div>
-				</div>
-				<div class="bg-base-100 px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-					<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Monthly equivalent</div>
-					if len(p.MonthlyTotals) == 0 {
-						<div class="text-sm sm:text-2xl font-semibold tracking-tight text-base-content/30 truncate">—</div>
-					} else {
-						<div class="truncate">
-							for i, t := range p.MonthlyTotals {
-								<div class={ "truncate", templ.KV("mt-0.5", i > 0) }>
-									@components.Amount(components.AmountProps{
-										Value:  t.Amount,
-										Intent: components.AmountCost,
-										Class:  amountTileClass(i),
-									})
-									if len(p.MonthlyTotals) > 1 {
-										<span class="text-[0.6rem] sm:text-xs text-base-content/40 ml-1">{ t.Currency }</span>
-									}
-								</div>
-							}
-						</div>
-					}
-				</div>
-				<div class="bg-base-100 px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-					<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1" title="Charges renewing in the next 30 days">Due in 30 days</div>
-					if len(p.UpcomingTotals) == 0 {
-						<div class="text-sm sm:text-2xl font-semibold tracking-tight text-base-content/30 truncate">—</div>
-					} else {
-						<div class="truncate">
-							for i, t := range p.UpcomingTotals {
-								<div class={ "truncate", templ.KV("mt-0.5", i > 0) }>
-									@components.Amount(components.AmountProps{
-										Value:  t.Amount,
-										Intent: components.AmountCost,
-										Class:  amountTileClass(i),
-									})
-									if len(p.UpcomingTotals) > 1 {
-										<span class="text-[0.6rem] sm:text-xs text-base-content/40 ml-1">{ t.Currency }</span>
-									}
-								</div>
-							}
-						</div>
-						<div class="text-[0.6rem] sm:text-xs text-base-content/40 mt-0.5 truncate">{ fmt.Sprintf("%d charge%s", p.UpcomingCount, plural(p.UpcomingCount)) }</div>
-					}
-				</div>
-				<div class="bg-base-100 px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-					<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Needs review</div>
-					<div class={ "text-sm sm:text-2xl font-semibold tracking-tight truncate", templ.KV("text-warning", p.CandidateCount > 0) }>{ fmt.Sprintf("%d", p.CandidateCount) }</div>
-				</div>
-			</div>
+		<!-- Stat row: Active · Monthly-equivalent · Due in 30 days · Needs review -->
+		<div class="mb-6">
+			@components.StatTileRow() {
+				@components.StatTile(components.StatTileProps{
+					Icon:        "repeat",
+					Label:       "Active",
+					Value:       fmt.Sprintf("%d", p.ActiveCount),
+					Description: "tracked",
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:        "calendar",
+					Label:       "Monthly equivalent",
+					Value:       subTileMoney(p.MonthlyTotals),
+					Description: subTileMoneyExtra(p.MonthlyTotals),
+					Tone:        components.StatTonePrimary,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:        "clock",
+					Label:       "Due in 30 days",
+					Value:       subTileMoney(p.UpcomingTotals),
+					Description: subUpcomingDesc(p.UpcomingCount),
+					Tone:        components.StatToneInfo,
+				})
+				@components.StatTile(components.StatTileProps{
+					Icon:        "inbox",
+					Label:       "Needs review",
+					Value:       fmt.Sprintf("%d", p.CandidateCount),
+					Description: subNeedsReviewDesc(p.CandidateCount),
+					Tone:        subNeedsReviewTone(p.CandidateCount),
+					Href:        templ.SafeURL("/recurring?tab=review"),
+				})
+			}
 		</div>
 		if len(p.Candidates) == 0 && len(p.Active) == 0 {
 			@components.EmptyState(components.EmptyStateProps{
@@ -120,51 +63,86 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 				Body:  "As your transactions sync, Breadbox spots recurring charges — same merchant, regular interval, steady amount — and surfaces them here for you to confirm.",
 			})
 		} else {
-			<!-- Candidates: the adjudication queue -->
-			if len(p.Candidates) > 0 {
-				<div class="mb-8">
-					<div class="flex items-center gap-2 mb-3">
-						<h2 class="text-sm font-semibold text-base-content">Needs review</h2>
-						<span class="badge badge-soft badge-warning badge-sm">{ fmt.Sprintf("%d", len(p.Candidates)) }</span>
-						<span class="text-xs text-base-content/40 hidden sm:inline">Highest-confidence first</span>
-					</div>
-					<div class="space-y-3">
-						for _, s := range p.Candidates {
-							@subscriptionCandidateCard(s)
-						}
-					</div>
+			<!-- Primary tabs: Active (default) / Needs review -->
+			@components.TabBar(components.TabBarProps{
+				AriaLabel: "Recurring views",
+				Items: []components.TabBarItem{
+					{Label: "Active", Href: templ.SafeURL("/recurring"), Active: p.ActiveTab != "review", Count: intPtr(len(p.Active))},
+					{Label: "Needs review", Href: templ.SafeURL("/recurring?tab=review"), Active: p.ActiveTab == "review", Count: intPtr(len(p.Candidates))},
+				},
+			})
+			<!-- Member + type filters (client-side, apply within the active tab) -->
+			if len(p.Users) > 1 || len(p.Types) > 1 {
+				<div class="flex flex-wrap items-center gap-3 mt-4">
+					if len(p.Users) > 1 {
+						<div class="join">
+							<button @click="filterUser = 'all'" :class="filterUser === 'all' ? 'btn-active' : ''" class="join-item btn btn-xs">Everyone</button>
+							for _, u := range p.Users {
+								@subscriptionsUserFilterBtn(u)
+							}
+						</div>
+					}
+					if len(p.Types) > 1 {
+						<div class="join">
+							<button @click="filterType = 'all'" :class="filterType === 'all' ? 'btn-active' : ''" class="join-item btn btn-xs">All types</button>
+							for _, t := range p.Types {
+								@subscriptionsTypeFilterBtn(t)
+							}
+						</div>
+					}
 				</div>
 			}
-			<!-- Confirmed / live ledger -->
-			if len(p.Active) > 0 {
-				<div class="flex items-center gap-2 mb-3">
-					<h2 class="text-sm font-semibold text-base-content">Tracked</h2>
-					<span class="badge badge-ghost badge-sm">{ fmt.Sprintf("%d", len(p.Active)) }</span>
+			if p.ActiveTab == "review" {
+				<!-- Needs review: the adjudication queue, with detection evidence -->
+				<div class="mt-5">
+					if len(p.Candidates) == 0 {
+						@components.EmptyState(components.EmptyStateProps{
+							Icon:    "check-check",
+							Title:   "Nothing to review",
+							Body:    "No candidate recurring charges are waiting on a verdict.",
+							Compact: true,
+							InCard:  true,
+						})
+					} else {
+						<div class="space-y-3">
+							for _, s := range p.Candidates {
+								@subscriptionCandidateCard(s)
+							}
+						</div>
+					}
 				</div>
-				@components.FilterSearchInput(components.FilterSearchInputProps{
-					Placeholder: "Filter recurring charges...",
-					XModel:      "filter",
-				})
-				<div class="mt-4">
-					@subscriptionsActiveTable(p)
+			} else {
+				<!-- Active: the confirmed / live ledger -->
+				<div class="mt-5">
+					if len(p.Active) == 0 {
+						@components.EmptyState(components.EmptyStateProps{
+							Icon:    "repeat",
+							Title:   "No tracked recurring charges yet",
+							Body:    "Confirm a candidate from Needs review and it'll show up here.",
+							Compact: true,
+							InCard:  true,
+						})
+					} else {
+						@components.FilterSearchInput(components.FilterSearchInputProps{
+							Placeholder: "Filter recurring charges...",
+							XModel:      "filter",
+						})
+						<div class="mt-4">
+							@subscriptionsActiveTable(p)
+						</div>
+					}
 				</div>
 			}
 		}
 	</div>
-	<script>
-		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
-	</script>
 }
 
 templ subscriptionsUserFilterBtn(u SubscriptionUserFilter) {
 	<button
 		@click={ fmt.Sprintf("filterUser = %q", u.ID) }
-		:class={ fmt.Sprintf("filterUser === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", u.ID) }
-		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
-	>
-		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ u.First }</span>
-		{ u.Name }
-	</button>
+		:class={ fmt.Sprintf("filterUser === %q ? 'btn-active' : ''", u.ID) }
+		class="join-item btn btn-xs"
+	>{ u.Name }</button>
 }
 
 templ subscriptionsTypeFilterBtn(t SubscriptionTypeFilter) {
@@ -175,7 +153,9 @@ templ subscriptionsTypeFilterBtn(t SubscriptionTypeFilter) {
 	>{ t.Label }</button>
 }
 
-// subscriptionCandidateCard is one auto-detected series awaiting a verdict.
+// subscriptionCandidateCard is one auto-detected series awaiting a verdict. It
+// surfaces the detection rationale (signal summary + raw signals) AND the
+// actual charges it was detected from, so Confirm is an informed decision.
 templ subscriptionCandidateCard(s SubscriptionRow) {
 	<div
 		x-data="{ why: false }"
@@ -190,7 +170,7 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 		<div class="flex items-start justify-between gap-4">
 			<div class="min-w-0 flex-1">
 				<div class="flex items-center gap-2 flex-wrap">
-					<span class="text-sm font-semibold text-base-content truncate">{ s.Name }</span>
+					<a href={ templ.SafeURL("/recurring/" + s.ShortID) } class="text-sm font-semibold text-base-content truncate hover:underline">{ s.Name }</a>
 					@components.SeriesTypeChip(s.TypeLabel, "xs")
 					@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
 				</div>
@@ -200,7 +180,9 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 					@click="why = !why"
 					class="text-xs text-base-content/40 hover:text-base-content/70 inline-flex items-center gap-1 mt-2 cursor-pointer bg-transparent"
 				>
-					<i data-lucide="chevron-right" class="w-3 h-3" :class="why ? 'rotate-90' : ''"></i>
+					<span class="transition-transform" :class="why ? 'rotate-90' : ''">
+						@components.LucideIcon("chevron-right", "w-3 h-3")
+					</span>
 					Why detected?
 				</button>
 				<pre x-show="why" x-cloak class="mt-2 text-[0.7rem] leading-relaxed bg-base-200/50 rounded-lg p-3 overflow-x-auto text-base-content/70">{ s.SignalsJSON }</pre>
@@ -216,6 +198,20 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				<div class="text-xs text-base-content/40 mt-0.5">{ s.CadenceLabel }</div>
 			</div>
 		</div>
+		<!-- Evidence: the charges this candidate was detected from. -->
+		if len(s.Members) > 0 {
+			<div class="mt-3 pt-3 border-t border-base-200">
+				<div class="text-[0.7rem] uppercase tracking-wider text-base-content/40 mb-1">Based on these charges</div>
+				<div>
+					for _, m := range s.Members {
+						@seriesEvidenceCharge(m)
+					}
+				</div>
+				if s.OccurrenceCount > len(s.Members) {
+					<div class="text-xs text-base-content/40 mt-1.5 pl-1">+ { fmt.Sprintf("%d", s.OccurrenceCount-len(s.Members)) } more</div>
+				}
+			</div>
+		}
 		<div class="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-base-200">
 			<button
 				type="button"
@@ -233,6 +229,27 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				@components.LucideIcon("check", "w-4 h-4")
 				Confirm
 			</button>
+		</div>
+	</div>
+}
+
+// seriesEvidenceCharge renders one member charge (read-only) via the shared
+// TxRowFeed row — used inside a candidate card's evidence list.
+templ seriesEvidenceCharge(m SubscriptionMember) {
+	<div class="flex items-center gap-2 py-0.5">
+		<span class="text-xs text-base-content/45 tabular-nums w-20 shrink-0">{ m.Date }</span>
+		<div class="flex-1 min-w-0">
+			@components.TxRowFeed(components.TxRowFeedProps{
+				ShortID:       m.ShortID,
+				Description:   m.Name,
+				Amount:        m.Amount,
+				Currency:      m.Currency,
+				Pending:       m.Pending,
+				CategoryColor: m.CategoryColor,
+				CategoryIcon:  m.CategoryIcon,
+				TagCount:      m.TagCount,
+				Dimmed:        true,
+			})
 		</div>
 	</div>
 }
@@ -321,19 +338,53 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 	</tr>
 }
 
-// subscriptionsBetaBadge marks Subscriptions as a v1/beta feature. Rendered in
-// the page header's trailing action slot on both list and detail.
+// subscriptionsBetaBadge marks Recurring as a v1/beta feature.
 templ subscriptionsBetaBadge() {
-	<span class="badge badge-soft badge-info badge-sm" title="Subscriptions is a new feature — detection is still being tuned">Beta</span>
+	<span class="badge badge-soft badge-info badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
 }
 
-// amountTileClass sizes the first monthly-total prominently and any
-// additional currencies smaller beneath it.
-func amountTileClass(i int) string {
-	if i == 0 {
-		return "text-sm sm:text-2xl font-semibold tracking-tight"
+func intPtr(n int) *int { return &n }
+
+// subTileMoney formats the first currency's total for a stat tile ("$170.48"
+// or "170.48 EUR"); "—" when there's nothing.
+func subTileMoney(totals []SubscriptionMonthlyTotal) string {
+	if len(totals) == 0 {
+		return "—"
 	}
-	return "text-xs sm:text-sm font-medium text-base-content/60"
+	t := totals[0]
+	if t.Currency == "" || t.Currency == "USD" {
+		return fmt.Sprintf("$%.2f", t.Amount)
+	}
+	return fmt.Sprintf("%.2f %s", t.Amount, t.Currency)
+}
+
+// subTileMoneyExtra notes additional currencies folded out of the headline tile.
+func subTileMoneyExtra(totals []SubscriptionMonthlyTotal) string {
+	if len(totals) <= 1 {
+		return ""
+	}
+	return fmt.Sprintf("+%d more currenc%s", len(totals)-1, map[bool]string{true: "y", false: "ies"}[len(totals)-1 == 1])
+}
+
+func subUpcomingDesc(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d charge%s", n, plural(n))
+}
+
+func subNeedsReviewDesc(n int) string {
+	if n == 0 {
+		return "all caught up"
+	}
+	return "awaiting your call"
+}
+
+func subNeedsReviewTone(n int) components.StatTileTone {
+	if n > 0 {
+		return components.StatToneWarning
+	}
+	return components.StatToneNeutral
 }
 
 // plural returns "s" unless n == 1.
