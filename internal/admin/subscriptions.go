@@ -130,7 +130,7 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			UpcomingCount:  upcomingCount,
 			Candidates:     candidates,
 			Active:         active,
-			Users:          subscriptionUserFilters(ctx, a, usersWithSeries),
+			Users:          subscriptionUserFilters(userName, usersWithSeries),
 			Types:          subscriptionTypeFilters(typesPresent),
 		}
 
@@ -601,23 +601,22 @@ func subscriptionUserNames(ctx context.Context, a *app.App) map[string]string {
 }
 
 // subscriptionUserFilters builds the household-member filter chips from the
-// users that actually own at least one series, sorted by name.
-func subscriptionUserFilters(ctx context.Context, a *app.App, owners map[string]bool) []pages.SubscriptionUserFilter {
+// users that actually own at least one series, sorted by name. Reuses the
+// name map already fetched for row rendering — no extra ListUsers query.
+func subscriptionUserFilters(userName map[string]string, owners map[string]bool) []pages.SubscriptionUserFilter {
 	if len(owners) < 2 {
 		return nil
 	}
-	users, _ := a.Queries.ListUsers(ctx)
 	var out []pages.SubscriptionUserFilter
-	for _, u := range users {
-		id := pgconv.FormatUUID(u.ID)
+	for id, name := range userName {
 		if !owners[id] {
 			continue
 		}
 		first := ""
-		if u.Name != "" {
-			first = u.Name[:1]
+		if name != "" {
+			first = name[:1]
 		}
-		out = append(out, pages.SubscriptionUserFilter{ID: id, Name: u.Name, First: first})
+		out = append(out, pages.SubscriptionUserFilter{ID: id, Name: name, First: first})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
