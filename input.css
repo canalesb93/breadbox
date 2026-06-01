@@ -1499,9 +1499,83 @@
     transition: background-color 0.12s ease;
   }
 
-  /* ── Toggle transitions ── */
+  /* ── iOS-style toggle ──────────────────────────────────────────────
+   * Reshapes daisyUI 5's .toggle into an Apple/iOS switch: a full-pill,
+   * borderless track, a filled gray "off" state (base-300 — which maps
+   * almost exactly onto Apple's #E9E9EA light / #39393D dark), an
+   * Apple-green "on" state, and a white CIRCULAR knob carrying Apple's
+   * two-layer drop shadow. The knob slide reuses daisy's existing grid-
+   * column swap (1fr/0fr → 0fr/1fr); we only retune the easing to an
+   * iOS spring curve.
+   *
+   * `!important` mirrors the existing .toggle/.btn/.modal-box overrides:
+   * daisyUI emits `.toggle{…}` / `.toggle:checked{…}` in a component
+   * sublayer that wins over our @layer components on cascade order, so
+   * the declarations that must beat daisy carry !important. Color
+   * modifiers (toggle-primary, toggle-success, …) stay live by
+   * reassigning --bb-toggle-on instead of hard-coding the on color. */
   .toggle {
-    transition: background-color 0.2s ease, border-color 0.2s ease !important;
+    --bb-toggle-on: #34c759; /* Apple system green */
+    --bb-toggle-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    border-color: transparent !important;
+    background-color: var(--color-base-300) !important;
+    border-radius: 999px !important;
+    box-shadow: none !important;
+    transition:
+      background-color 0.25s var(--bb-toggle-ease),
+      grid-template-columns 0.25s var(--bb-toggle-ease) !important;
+  }
+
+  /* Knob: white circle + Apple's two-layer shadow, in both states. */
+  .toggle::before {
+    border-radius: 999px !important;
+    background-color: #fff !important;
+    box-shadow:
+      0 3px 8px oklch(0 0 0 / 0.15),
+      0 1px 1px oklch(0 0 0 / 0.16) !important;
+    outline: none !important;
+    transition:
+      translate 0.25s var(--bb-toggle-ease),
+      inset-inline-start 0.25s var(--bb-toggle-ease) !important;
+  }
+
+  /* On state — track turns green; knob stays white and slides right
+     (the grid-column swap that slides it is daisy's, left intact). */
+  .toggle:checked,
+  .toggle[aria-checked="true"],
+  .toggle:has(> input:checked) {
+    background-color: var(--bb-toggle-on) !important;
+  }
+  .toggle:checked::before,
+  .toggle[aria-checked="true"]::before,
+  .toggle:has(> input:checked)::before {
+    background-color: #fff !important;
+  }
+
+  /* Color modifiers keep working by re-pointing the on color. */
+  .toggle-primary {
+    --bb-toggle-on: var(--color-primary);
+  }
+  .toggle-secondary {
+    --bb-toggle-on: var(--color-secondary);
+  }
+  .toggle-accent {
+    --bb-toggle-on: var(--color-accent);
+  }
+  .toggle-neutral {
+    --bb-toggle-on: var(--color-neutral);
+  }
+  .toggle-info {
+    --bb-toggle-on: var(--color-info);
+  }
+  .toggle-success {
+    --bb-toggle-on: var(--color-success);
+  }
+  .toggle-warning {
+    --bb-toggle-on: var(--color-warning);
+  }
+  .toggle-error {
+    --bb-toggle-on: var(--color-error);
   }
 
   /* ── Select/Input focus transitions ── */
