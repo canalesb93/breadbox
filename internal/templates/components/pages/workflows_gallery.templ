@@ -87,7 +87,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				}
 			}
 		}
-		<!-- F2: Preview-prompt modal — one shared daisy dialog filled on demand by previewPrompt(). -->
+		// F2: workflow-prompt preview modal — one shared daisy dialog filled on demand by previewPrompt().
 		@workflowPromptPreviewModal()
 		// F3: one shared reconfigure drawer, hydrated by openReconfigure() from
 		// GET /-/workflows/{slug}/config. Admin-only (the link that opens it is).
@@ -205,8 +205,8 @@ templ workflowPromptPreviewModal() {
 				<span class="loading loading-spinner loading-sm"></span>
 				Loading prompt…
 			</div>
-			<!-- Rendered as markdown via bbRenderMarkdown() in previewPrompt();
-			     x-ref lets the factory target this element after the async fetch. -->
+			// Rendered as markdown via bbRenderMarkdown() in previewPrompt();
+			// x-ref lets the factory target this element after the async fetch.
 			<div
 				x-show="!previewLoading"
 				x-cloak

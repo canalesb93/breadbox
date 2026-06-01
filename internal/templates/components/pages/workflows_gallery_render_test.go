@@ -177,10 +177,11 @@ func TestT15WorkflowsGalleryGridAndTiles(t *testing.T) {
 		t.Error("expected the preset icon (lucide-tag) to render in its card tile")
 	}
 
-	// Preview prompt now lives inside the configure/reconfigure drawer, not
-	// the card ⋯ menu. The button + its handler should be present (admin view).
-	if !strings.Contains(html, "Preview prompt") || !strings.Contains(html, "previewPrompt(") {
-		t.Error("expected the Preview prompt affordance inside the drawer (button + handler)")
+	// The workflow-prompt preview now lives inside the configure/reconfigure
+	// drawer, not the card ⋯ menu. The button + its handler should be present
+	// (admin view).
+	if !strings.Contains(html, "Workflow prompt") || !strings.Contains(html, "previewPrompt(") {
+		t.Error("expected the Workflow prompt affordance inside the drawer (button + handler)")
 	}
 
 	// The cleaned-up row uses a settings gear (not a ⋯ kebab) as the
@@ -316,10 +317,13 @@ func TestT15WorkflowsGalleryNonAdminDisablesSetUp(t *testing.T) {
 	if strings.Contains(html, "submitDrawer") {
 		t.Error("expected no configure drawer (submitDrawer) for non-admin user")
 	}
-	// Preview prompt lives only inside the (admin-only) drawer now, so a
-	// non-admin sees no Preview prompt affordance at all.
-	if strings.Contains(html, "Preview prompt") {
-		t.Error("expected no Preview prompt affordance for non-admin (it lives in the admin-only drawer)")
+	// The workflow-prompt preview opener lives only inside the (admin-only)
+	// drawers, so a non-admin gets no previewPrompt() affordance. (The shared
+	// preview <dialog> itself is always in the DOM — its title fallback
+	// literal "Workflow prompt" is inert without a button to open it — so we
+	// assert on the open handler, not the label.)
+	if strings.Contains(html, "previewPrompt(") {
+		t.Error("expected no previewPrompt() affordance for non-admin (it lives in the admin-only drawer)")
 	}
 }
 
