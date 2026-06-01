@@ -21,12 +21,13 @@ import (
 // handler and the template stay decoupled from the html/template
 // renderer. Called by every branch of LoginHandler that needs to show
 // the form (GET + error paths).
-func renderLogin(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, username, errMsg string) {
+func renderLogin(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, username, errMsg string, devLogin bool) {
 	props := pages.LoginProps{
-		PageTitle: "Sign In",
-		CSRFToken: GenerateCSRFToken(r.Context(), sm),
-		Username:  username,
-		Error:     errMsg,
+		PageTitle:    "Sign In",
+		CSRFToken:    GenerateCSRFToken(r.Context(), sm),
+		Username:     username,
+		Error:        errMsg,
+		ShowDevLogin: devLogin,
 	}
 	if f := GetFlash(r.Context(), sm); f != nil {
 		props.FlashType = f.Type
@@ -68,15 +69,16 @@ var ValidRoles = map[string]bool{
 var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), 12)
 
 // LoginHandler returns an http.HandlerFunc that handles GET and POST /login.
-// Single table lookup against auth_accounts.
-func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRenderer) http.HandlerFunc {
+// Single table lookup against auth_accounts. devLogin, when true (set only for
+// ENVIRONMENT=local), renders the one-tap quick-login button on the form.
+func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRenderer, devLogin bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			if sm.GetString(r.Context(), sessionKeyAccountID) != "" {
 				http.Redirect(w, r, "/", http.StatusSeeOther)
 				return
 			}
-			renderLogin(w, r, sm, "", "")
+			renderLogin(w, r, sm, "", "", devLogin)
 			return
 		}
 
@@ -85,12 +87,12 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 		password := r.FormValue("password")
 
 		if username == "" || password == "" {
-			renderLogin(w, r, sm, username, "Invalid email or password")
+			renderLogin(w, r, sm, username, "Invalid email or password", devLogin)
 			return
 		}
 
 		renderLoginError := func() {
-			renderLogin(w, r, sm, username, "Invalid email or password")
+			renderLogin(w, r, sm, username, "Invalid email or password", devLogin)
 		}
 
 		// Single table lookup.
@@ -105,7 +107,7 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 		// Account exists but no password set yet — tell user to use setup link.
 		if account.HashedPassword == nil {
 			bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-			renderLogin(w, r, sm, username, "Your account hasn't been set up yet. Ask your administrator for a setup link.")
+			renderLogin(w, r, sm, username, "Your account hasn't been set up yet. Ask your administrator for a setup link.", devLogin)
 			return
 		}
 
