@@ -6,6 +6,9 @@ RETURNING *;
 -- name: GetAgentReport :one
 SELECT * FROM agent_reports WHERE id = $1;
 
+-- name: GetAgentReportUUIDByShortID :one
+SELECT id FROM agent_reports WHERE short_id = $1;
+
 -- name: ListAgentReports :many
 SELECT * FROM agent_reports ORDER BY created_at DESC LIMIT $1;
 

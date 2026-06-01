@@ -85,3 +85,8 @@ func (s *Service) resolveAnnotationID(ctx context.Context, idOrShort string) (pg
 func (s *Service) resolveSeriesID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
 	return s.resolveID(ctx, idOrShort, s.Queries.GetRecurringSeriesUUIDByShortID, ErrNotFound)
 }
+
+// resolveAgentReportID accepts either a UUID string or a short ID for an agent report.
+func (s *Service) resolveAgentReportID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
+	return s.resolveID(ctx, idOrShort, s.Queries.GetAgentReportUUIDByShortID, ErrNotFound)
+}

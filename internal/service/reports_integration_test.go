@@ -291,6 +291,73 @@ func TestGetAgentReport_InvalidID(t *testing.T) {
 	}
 }
 
+// TestGetAgentReport_ByShortID guards the transcript "Reports" link, which
+// builds /reports/{short_id}. GetAgentReport must resolve a short ID, not only
+// a UUID.
+func TestGetAgentReport_ByShortID(t *testing.T) {
+	svc, _, _ := newService(t)
+	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
+
+	created, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "info", nil, "", "", "")
+	if err != nil {
+		t.Fatalf("CreateAgentReport: %v", err)
+	}
+	if created.ShortID == "" {
+		t.Fatal("expected a non-empty ShortID")
+	}
+
+	got, err := svc.GetAgentReport(context.Background(), created.ShortID)
+	if err != nil {
+		t.Fatalf("GetAgentReport by short ID: %v", err)
+	}
+	if got.ID != created.ID {
+		t.Errorf("short-ID lookup returned %q, want %q", got.ID, created.ID)
+	}
+	if got.ShortID != created.ShortID {
+		t.Errorf("short-ID lookup returned ShortID %q, want %q", got.ShortID, created.ShortID)
+	}
+}
+
+func TestMarkAgentReportRead_ByShortID(t *testing.T) {
+	svc, _, _ := newService(t)
+	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
+
+	created, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "info", nil, "", "", "")
+	if err != nil {
+		t.Fatalf("CreateAgentReport: %v", err)
+	}
+
+	if err := svc.MarkAgentReportRead(context.Background(), created.ShortID); err != nil {
+		t.Fatalf("MarkAgentReportRead by short ID: %v", err)
+	}
+
+	count, err := svc.CountUnreadAgentReports(context.Background())
+	if err != nil {
+		t.Fatalf("CountUnreadAgentReports: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 unread after marking read by short ID, got %d", count)
+	}
+}
+
+func TestDeleteAgentReport_ByShortID(t *testing.T) {
+	svc, _, _ := newService(t)
+	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}
+
+	created, err := svc.CreateAgentReport(context.Background(), "Title", "Body", actor, "info", nil, "", "", "")
+	if err != nil {
+		t.Fatalf("CreateAgentReport: %v", err)
+	}
+
+	if err := svc.DeleteAgentReport(context.Background(), created.ShortID); err != nil {
+		t.Fatalf("DeleteAgentReport by short ID: %v", err)
+	}
+
+	if _, err := svc.GetAgentReport(context.Background(), created.ID); err == nil {
+		t.Fatal("expected report to be gone after delete by short ID")
+	}
+}
+
 func TestCreateAgentReport_AllPriorities(t *testing.T) {
 	svc, _, _ := newService(t)
 	actor := service.Actor{Type: "agent", ID: "a1", Name: "Agent"}

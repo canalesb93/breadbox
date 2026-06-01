@@ -238,10 +238,15 @@ func (s *Service) CountUnreadAgentReports(ctx context.Context) (int64, error) {
 	return s.Queries.CountUnreadAgentReports(ctx)
 }
 
-// GetAgentReport returns a single report by ID.
+// GetAgentReport returns a single report by ID or short ID. A malformed ID
+// (neither a UUID nor a short ID) is ErrInvalidParameter (400); a well-formed
+// reference to a nonexistent report is ErrNotFound (404).
 func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentReportResponse, error) {
-	uid, err := pgconv.ParseUUID(reportID)
+	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return AgentReportResponse{}, ErrNotFound
+		}
 		return AgentReportResponse{}, fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	row, err := s.Queries.GetAgentReport(ctx, uid)
@@ -258,8 +263,11 @@ func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentRep
 // report with the given ID exists. Returns nil (idempotent) if the report
 // exists but is already read.
 func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) error {
-	uid, err := pgconv.ParseUUID(reportID)
+	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	// Use Pool.Exec directly to inspect rows affected — sqlc's :exec discards
@@ -288,8 +296,11 @@ func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) erro
 // MarkAgentReportUnread clears read_at on a single report, returning it to the
 // unread queue. Returns ErrNotFound if no report with the given ID exists.
 func (s *Service) MarkAgentReportUnread(ctx context.Context, reportID string) error {
-	uid, err := pgconv.ParseUUID(reportID)
+	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	tag, err := s.Pool.Exec(ctx,
@@ -311,8 +322,11 @@ func (s *Service) MarkAllAgentReportsRead(ctx context.Context) error {
 // DeleteAgentReport hard-deletes a single report by ID. Returns ErrNotFound
 // if no report with the given ID exists.
 func (s *Service) DeleteAgentReport(ctx context.Context, reportID string) error {
-	uid, err := pgconv.ParseUUID(reportID)
+	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	tag, err := s.Pool.Exec(ctx, "DELETE FROM agent_reports WHERE id = $1", uid)
