@@ -238,11 +238,16 @@ func (s *Service) CountUnreadAgentReports(ctx context.Context) (int64, error) {
 	return s.Queries.CountUnreadAgentReports(ctx)
 }
 
-// GetAgentReport returns a single report by ID or short ID.
+// GetAgentReport returns a single report by ID or short ID. A malformed ID
+// (neither a UUID nor a short ID) is ErrInvalidParameter (400); a well-formed
+// reference to a nonexistent report is ErrNotFound (404).
 func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentReportResponse, error) {
 	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
-		return AgentReportResponse{}, ErrNotFound
+		if errors.Is(err, ErrNotFound) {
+			return AgentReportResponse{}, ErrNotFound
+		}
+		return AgentReportResponse{}, fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	row, err := s.Queries.GetAgentReport(ctx, uid)
 	if err != nil {
@@ -260,7 +265,10 @@ func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentRep
 func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) error {
 	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
-		return ErrNotFound
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	// Use Pool.Exec directly to inspect rows affected — sqlc's :exec discards
 	// the CommandTag. The generated query has `AND read_at IS NULL`, so a
@@ -290,7 +298,10 @@ func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) erro
 func (s *Service) MarkAgentReportUnread(ctx context.Context, reportID string) error {
 	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
-		return ErrNotFound
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	tag, err := s.Pool.Exec(ctx,
 		"UPDATE agent_reports SET read_at = NULL WHERE id = $1", uid)
@@ -313,7 +324,10 @@ func (s *Service) MarkAllAgentReportsRead(ctx context.Context) error {
 func (s *Service) DeleteAgentReport(ctx context.Context, reportID string) error {
 	uid, err := s.resolveAgentReportID(ctx, reportID)
 	if err != nil {
-		return ErrNotFound
+		if errors.Is(err, ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
 	tag, err := s.Pool.Exec(ctx, "DELETE FROM agent_reports WHERE id = $1", uid)
 	if err != nil {
