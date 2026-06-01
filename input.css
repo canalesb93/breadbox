@@ -617,10 +617,13 @@
   .bb-settings-rail__group-label {
     @apply hidden lg:block text-[0.65rem] font-medium uppercase tracking-wide text-base-content/40 px-3 pt-5 pb-1.5;
   }
-  /* Items mirror .bb-sidebar-link: muted by default, base-300 on hover, and
-     a bright base-100 pill (with a hairline border) when active — which
-     pops against the recessed base-200 rail. The transparent default
-     border keeps the active border from shifting layout. */
+  /* Items mirror .bb-sidebar-link: muted by default, base-300 on hover,
+     and a base-300 fill (no border) when active — the active background
+     matches the hover background, so the row reads as "settled here"
+     rather than as a separate pill. Weight (font-semibold) + a
+     full-opacity icon keep the active item distinct from a transient
+     hover. The transparent default border is kept so the box-model
+     matches the inactive state (no layout shift). */
   .bb-settings-rail__item {
     @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-8 shrink-0
            rounded-lg text-sm font-medium whitespace-nowrap no-underline border border-transparent
@@ -628,7 +631,7 @@
     transition: background-color 0.15s ease, color 0.15s ease;
   }
   .bb-settings-rail__item[data-active="true"] {
-    @apply bg-base-100 text-base-content font-semibold border-base-300;
+    @apply bg-base-300 text-base-content font-semibold;
   }
   .bb-settings-rail__item i, .bb-settings-rail__item svg {
     @apply w-4 h-4 opacity-50;
@@ -861,13 +864,17 @@
     transform: scale(0.98);
   }
 
-  /* Active item: a bright base-100 pill (pops against the recessed rail)
-     with a dark, readable label + icon. (Label/icon stay base-content
-     rather than text-primary — the brand gold is too light to read as
-     text/thin-stroke icon on the white pill. The accent surfaces on
-     buttons, filter tabs, focus rings and links instead.) */
+  /* Active item: a base-300 fill (no border) — the same background as
+     hover — so the row reads as "settled here" rather than as a separate
+     pill. Weight (font-semibold) + a full-opacity icon distinguish
+     active from a transient hover. (Label/icon stay base-content rather
+     than text-primary — the brand gold is too light to read as a
+     text/thin-stroke icon. The accent surfaces on buttons, filter tabs,
+     focus rings and links instead.) The base .bb-sidebar-link keeps its
+     transparent border so the borderless active state doesn't shift
+     layout. */
   .bb-sidebar-link--active {
-    @apply bg-base-100 text-base-content font-semibold border border-base-300;
+    @apply bg-base-300 text-base-content font-semibold;
   }
 
   .bb-sidebar-link i, .bb-sidebar-link svg {
