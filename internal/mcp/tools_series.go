@@ -120,21 +120,15 @@ func (s *MCPServer) handleUpdateSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 	if input.ID == "" {
 		return errorResult(fmt.Errorf("id is required")), nil, nil
 	}
-	opt := func(v string) *string {
-		if v == "" {
-			return nil
-		}
-		return &v
-	}
 	edit := service.EditSeriesInput{
-		Name:            opt(input.Name),
+		Name:            optStr(input.Name),
 		ExpectedAmount:  input.ExpectedAmount,
 		AmountTolerance: input.AmountTolerance,
-		Currency:        opt(input.Currency),
-		Cadence:         opt(input.Cadence),
+		Currency:        optStr(input.Currency),
+		Cadence:         optStr(input.Cadence),
 		ExpectedDay:     input.ExpectedDay,
-		CategoryID:      opt(input.CategoryID),
-		UserID:          opt(input.UserID),
+		CategoryID:      optStr(input.CategoryID),
+		UserID:          optStr(input.UserID),
 	}
 	if edit.Name == nil && edit.ExpectedAmount == nil && edit.AmountTolerance == nil &&
 		edit.Currency == nil && edit.Cadence == nil && edit.ExpectedDay == nil &&
@@ -297,23 +291,17 @@ func (s *MCPServer) handleAssignSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 		return errorResult(err), nil, nil
 	}
 	actor := service.ActorFromContext(ctx)
-	opt := func(v string) *string {
-		if v == "" {
-			return nil
-		}
-		return &v
-	}
 	series, err := s.svc.AssignSeries(context.Background(), service.AssignSeriesInput{
-		SeriesID:        opt(input.SeriesID),
+		SeriesID:        optStr(input.SeriesID),
 		MerchantKey:     input.MerchantKey,
 		CreateIfMissing: input.CreateIfMissing,
 		Name:            input.Name,
 		Cadence:         input.Cadence,
 		Type:            input.Type,
 		ExpectedAmount:  input.ExpectedAmount,
-		Currency:        opt(input.Currency),
-		CategoryID:      opt(input.CategoryID),
-		UserID:          opt(input.UserID),
+		Currency:        optStr(input.Currency),
+		CategoryID:      optStr(input.CategoryID),
+		UserID:          optStr(input.UserID),
 		TransactionIDs:  input.TransactionIDs,
 		Confirm:         input.Confirm,
 	}, actor)

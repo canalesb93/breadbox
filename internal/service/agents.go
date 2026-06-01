@@ -75,7 +75,7 @@ type AgentDefinitionResponse struct {
 	QuietHoursStart *string  `json:"quiet_hours_start,omitempty"`
 	QuietHoursEnd   *string  `json:"quiet_hours_end,omitempty"`
 	// TriggerOnSyncComplete fires this agent after every successful sync
-	// (in addition to any cron schedule). Disabled by default.
+	// (independent of cron).
 	TriggerOnSyncComplete bool `json:"trigger_on_sync_complete"`
 	// SourceTemplate is the workflow-preset slug this definition was
 	// instantiated from, or nil if it was hand-authored.
@@ -156,11 +156,8 @@ type AgentRunResponse struct {
 	CacheReadTokens     *int     `json:"cache_read_tokens,omitempty"`
 	CacheCreationTokens *int     `json:"cache_creation_tokens,omitempty"`
 	TurnCount           *int     `json:"turn_count,omitempty"`
-	// MaxTurnsUsed is the per-run snapshot of the agent's max_turns cap
-	// at the time the run started. Named for historical reasons; "max
-	// turns at run-start" would be clearer. Pair with turn_count to
-	// render "actual / cap". Until iter-33 this column erroneously
-	// mirrored turn_count, making every run look like it hit the cap.
+	// MaxTurnsUsed is the max_turns cap snapshotted at run start; pair
+	// with turn_count for "actual / cap" rendering.
 	MaxTurnsUsed   *int    `json:"max_turns_used,omitempty"`
 	NumToolCalls   *int    `json:"num_tool_calls,omitempty"`
 	ErrorMessage   *string `json:"error_message,omitempty"`
