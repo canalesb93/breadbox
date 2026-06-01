@@ -2677,14 +2677,16 @@
 
         // Toggle theme: flip between system and the opposite of the OS theme
         // (always a visible change — never the cycle()'s system→light→dark
-        // no-op). Bound to '*' (Shift+8 on a US layout) — the dispatcher
-        // rejects Cmd/Ctrl/Alt but allows Shift, and the browser folds Shift+8
-        // into e.key='*', so we match the resulting character directly
-        // (layout-independent). Mirrors the command palette's "Toggle theme"
-        // action — keep them on the same store method.
+        // no-op). Bound to 'shift+*' — on a US layout '*' is itself Shift+8,
+        // so the keycap reads "⇧ *" which is clearer than a bare "*". The
+        // dispatcher rejects Cmd/Ctrl/Alt but allows Shift and tries a
+        // 'shift+<key>' spec before plain single-key matching, so Shift+8
+        // (which the browser folds into e.key='*', shiftKey=true) matches
+        // here. Mirrors the command palette's "Toggle theme" action — keep
+        // them on the same store method.
         reg.register({
           id: 'global.theme.toggle',
-          keys: '*',
+          keys: 'shift+*',
           description: 'Toggle theme (system ↔ opposite)',
           group: 'Actions',
           scope: 'global',
@@ -2847,12 +2849,14 @@
           return;
         }
 
-        // Shift-modified single-letter match (e.g. 'shift+r'). Cmd/Ctrl/Alt
-        // are still rejected up top; Shift is folded into e.key by the browser
-        // (shift+r → e.key='R'). Specs that opt in via 'shift+<letter>' are
-        // tried first, then fall through to plain single-key matching so
-        // existing 'R'/'/'/'?' bindings still work as before.
-        if (e.shiftKey && key.length === 1 && /[a-zA-Z]/.test(key)) {
+        // Shift-modified single-key match (e.g. 'shift+r', 'shift+*').
+        // Cmd/Ctrl/Alt are still rejected up top; Shift is folded into e.key
+        // by the browser — letters arrive uppercased (shift+r → 'R', so we
+        // lowercase), symbols arrive as the shifted glyph (shift+8 → '*').
+        // Specs that opt in via 'shift+<key>' are tried first, then fall
+        // through to plain single-key matching so existing '/' and '?'
+        // bindings (which carry no 'shift+' spec) still work as before.
+        if (e.shiftKey && key.length === 1) {
           var modSpec = matchSingle(reg, 'shift+' + key.toLowerCase());
           if (shouldFire(modSpec) && typeof modSpec.action === 'function') {
             e.preventDefault();
