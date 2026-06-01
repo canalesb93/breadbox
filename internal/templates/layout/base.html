@@ -238,6 +238,18 @@
           var next = { system: 'light', light: 'dark', dark: 'system' };
           this.set(next[this.preference] || 'system');
         },
+        // toggle() is the command-palette / '*'-shortcut "Toggle theme"
+        // action. Unlike cycle() — system → light → dark → system, which can
+        // land on a visual no-op when the active theme already matches the OS
+        // (e.g. dark → system while the OS is dark looks identical) — toggle()
+        // flips between 'system' and the OPPOSITE of the current OS theme, so
+        // a toggle is *always* a visible change. OS dark → bounce system(dark)
+        // ↔ light; OS light → bounce system(light) ↔ dark. Keyed off the
+        // resolved theme so an explicit light/dark preference still flips.
+        toggle: function() {
+          var opposite = this.systemDark ? 'light' : 'dark';
+          this.set(this.resolved === opposite ? 'system' : opposite);
+        },
         init: function() {
           var self = this;
           mq.addEventListener('change', function(e) { self.systemDark = e.matches; });
@@ -1900,10 +1912,16 @@
         { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
         { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/settings/api-keys', keywords: 'new token' },
         { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/household/new', keywords: 'new person family' },
-        // Action item (no href) — cycles $store.theme system → light → dark.
-        // shortcutId links to the '*' binding seeded in seedRegistry() so the
-        // palette row shows the same keycap hint as the help modal.
-        { id: 'act-theme', shortcutId: 'global.theme.cycle', group: 'Quick Actions', title: 'Toggle theme', desc: 'Cycle theme: system → light → dark', icon: 'sun-moon', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').cycle(); }, keywords: 'theme dark light mode appearance toggle system color scheme night day' },
+        // Theme actions (no href) — drive $store.theme directly. `act-theme`
+        // is the smart toggle: it always flips to a visibly different theme
+        // (system ↔ opposite-of-OS) so a toggle is never a no-op. The three
+        // explicit actions set a specific preference. shortcutId on the toggle
+        // links to the '*' binding seeded in seedRegistry() so the palette row
+        // shows the same keycap hint as the help modal (and the same behavior).
+        { id: 'act-theme', shortcutId: 'global.theme.toggle', group: 'Quick Actions', title: 'Toggle theme', desc: 'Flip between system and its opposite', icon: 'sun-moon', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').toggle(); }, keywords: 'theme dark light mode appearance toggle system color scheme night day switch' },
+        { id: 'act-theme-light', group: 'Quick Actions', title: 'Light theme', desc: 'Always use the light theme', icon: 'sun', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('light'); }, keywords: 'theme light mode appearance bright day color scheme set' },
+        { id: 'act-theme-dark', group: 'Quick Actions', title: 'Dark theme', desc: 'Always use the dark theme', icon: 'moon', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('dark'); }, keywords: 'theme dark mode appearance night color scheme set' },
+        { id: 'act-theme-system', group: 'Quick Actions', title: 'System theme', desc: 'Match your OS appearance', icon: 'monitor', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('system'); }, keywords: 'theme system auto os appearance default color scheme automatic set' },
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
@@ -2657,18 +2675,20 @@
           visible: true
         });
 
-        // Cycle theme: system → light → dark. Bound to '*' (Shift+8 on a
-        // US layout) — the dispatcher rejects Cmd/Ctrl/Alt but allows Shift,
-        // and the browser folds Shift+8 into e.key='*', so we match the
-        // resulting character directly (layout-independent). Mirrors the
-        // command palette's "Toggle theme" action.
+        // Toggle theme: flip between system and the opposite of the OS theme
+        // (always a visible change — never the cycle()'s system→light→dark
+        // no-op). Bound to '*' (Shift+8 on a US layout) — the dispatcher
+        // rejects Cmd/Ctrl/Alt but allows Shift, and the browser folds Shift+8
+        // into e.key='*', so we match the resulting character directly
+        // (layout-independent). Mirrors the command palette's "Toggle theme"
+        // action — keep them on the same store method.
         reg.register({
-          id: 'global.theme.cycle',
+          id: 'global.theme.toggle',
           keys: '*',
-          description: 'Toggle theme (system → light → dark)',
+          description: 'Toggle theme (system ↔ opposite)',
           group: 'Actions',
           scope: 'global',
-          action: function() { if (Alpine.store('theme')) Alpine.store('theme').cycle(); }
+          action: function() { if (Alpine.store('theme')) Alpine.store('theme').toggle(); }
         });
 
         Object.keys(goRoutes).forEach(function(k) {
