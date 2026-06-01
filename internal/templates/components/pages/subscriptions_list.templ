@@ -3,6 +3,7 @@ package pages
 import (
 	"fmt"
 
+	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
 
@@ -223,7 +224,7 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				<div class="text-[0.7rem] uppercase tracking-wider text-base-content/40 mb-1">Based on these charges</div>
 				<div>
 					for _, m := range s.MemberRows {
-						@components.TxRowCompact(m)
+						@seriesChargeRow(m)
 					}
 				</div>
 				if s.OccurrenceCount > len(s.MemberRows) {
@@ -248,6 +249,19 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				@components.LucideIcon("check", "w-4 h-4")
 				Confirm
 			</button>
+		</div>
+	</div>
+}
+
+// seriesChargeRow renders one linked charge as a leading date column + the
+// shared TxRowCompact (date suppressed — the left column carries it). Shared by
+// the Needs-review candidate evidence and the detail-page "Charges in this
+// series" list so both read identically.
+templ seriesChargeRow(tx service.AdminTransactionRow) {
+	<div class="flex items-center gap-2">
+		<span class="text-xs text-base-content/45 tabular-nums w-24 shrink-0 text-right">{ seriesChargeDate(tx.Date) }</span>
+		<div class="flex-1 min-w-0">
+			@components.TxRowCompactNoDate(tx)
 		</div>
 	</div>
 }

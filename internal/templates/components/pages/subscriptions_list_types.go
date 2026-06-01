@@ -3,6 +3,8 @@
 package pages
 
 import (
+	"time"
+
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
@@ -236,6 +238,15 @@ type SubscriptionSignalFact struct {
 	Label string // "Timing regularity"
 	Value string // "Very regular (±4%)"
 	Tone  string // success | warning | neutral
+}
+
+// seriesChargeDate formats an AdminTransactionRow.Date ("2006-01-02") as the
+// leading date label in the series charge list ("Jan 2, 2006"); raw on parse fail.
+func seriesChargeDate(s string) string {
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t.Format("Jan 2, 2006")
+	}
+	return s
 }
 
 // subscriptionSignalFactClass maps a signal-fact tone to the value text color.

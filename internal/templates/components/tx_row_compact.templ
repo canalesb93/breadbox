@@ -11,6 +11,17 @@ import (
 // (dashboard recent txns, rule detail tables). No selection, no inline
 // category picker, no expand panel. Mirrors the "tx-row-compact" partial.
 templ TxRowCompact(tx service.AdminTransactionRow) {
+	@txRowCompactBody(tx, false)
+}
+
+// TxRowCompactNoDate is TxRowCompact without the trailing date — used where a
+// separate leading date column already carries it (e.g. the recurring-series
+// "Charges in this series" list, which emphasises chronology in a left column).
+templ TxRowCompactNoDate(tx service.AdminTransactionRow) {
+	@txRowCompactBody(tx, true)
+}
+
+templ txRowCompactBody(tx service.AdminTransactionRow, hideDate bool) {
 	<a href={ templ.SafeURL("/transactions/" + tx.ID) } class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
 		<!-- Category avatar. Categorised rows render the coloured circle;
 		     uncategorised rows render the neutral `circle-off` glyph. Owner
@@ -54,7 +65,8 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 			</div>
 		</div>
 		<!-- Date + Amount. Pending rows get a small clock icon left of the
-		     amount plus a softer glyph color; row height stays stable. -->
+		     amount plus a softer glyph color; row height stays stable. The date
+		     is suppressed when a caller provides its own date column. -->
 		<div class="shrink-0 text-right flex flex-col items-end gap-0.5">
 			<div class="flex items-center justify-end gap-1">
 				if tx.Pending {
@@ -66,7 +78,9 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 					Class:   "text-sm font-semibold",
 				})
 			</div>
-			<span class="text-[0.65rem] text-base-content/40 tabular-nums">{ relativeDate(tx.Date) }</span>
+			if !hideDate {
+				<span class="text-[0.65rem] text-base-content/40 tabular-nums">{ relativeDate(tx.Date) }</span>
+			}
 		</div>
 	</a>
 }
