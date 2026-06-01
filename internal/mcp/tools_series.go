@@ -164,7 +164,8 @@ func (s *MCPServer) handleUnlinkSeriesTransactions(ctx context.Context, _ *mcpsd
 	if input.ID == "" || len(input.TransactionIDs) == 0 {
 		return errorResult(fmt.Errorf("id and transaction_ids are required")), nil, nil
 	}
-	series, err := s.svc.UnlinkSeriesTransactions(context.Background(), input.ID, input.TransactionIDs)
+	actor := service.ActorFromContext(ctx)
+	series, err := s.svc.UnlinkSeriesTransactions(context.Background(), input.ID, input.TransactionIDs, actor)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("series not found")), nil, nil

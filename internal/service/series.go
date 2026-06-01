@@ -237,7 +237,7 @@ func (s *Service) AssignSeries(ctx context.Context, in AssignSeriesInput, actor 
 	var resp *SeriesResponse
 	switch {
 	case in.SeriesID != nil && strings.TrimSpace(*in.SeriesID) != "":
-		linked, err := s.linkSeriesMembers(ctx, *in.SeriesID, in.TransactionIDs)
+		linked, err := s.linkSeriesMembers(ctx, *in.SeriesID, in.TransactionIDs, actor)
 		if err != nil {
 			return nil, err
 		}
@@ -365,7 +365,7 @@ func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID p
 // linkSeriesMembers back-links transactions to an existing series (NULL-fill
 // only) and recomputes its rollups, in one transaction. Used by the
 // existing-series branch of AssignSeries.
-func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, memberIDsOrShorts []string) (*SeriesResponse, error) {
+func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, memberIDsOrShorts []string, actor Actor) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
 	if err != nil {
 		return nil, err
@@ -390,6 +390,11 @@ func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, membe
 		return nil, fmt.Errorf("get series: %w", err)
 	}
 	if len(memberIDs) > 0 {
+		// Newly-linked subset (before the NULL-fill) drives the timeline event.
+		newlyLinked, err := unlinkedMemberSubset(ctx, tx, memberIDs)
+		if err != nil {
+			return nil, err
+		}
 		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
 			SeriesID:       row.ID,
 			TransactionIds: memberIDs,
@@ -401,6 +406,9 @@ func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, membe
 			Column2:  memberIDs,
 		}); err != nil {
 			return nil, fmt.Errorf("apply series tags to members: %w", err)
+		}
+		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, row.ShortID, row.Name, actor); err != nil {
+			return nil, fmt.Errorf("emit series_assigned annotations: %w", err)
 		}
 	}
 	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, row.ID)
@@ -548,6 +556,13 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 	// 4. Back-link member transactions (NULL-fill only) and materialize the
 	// series' tags onto the freshly-linked members (NULL-fill via ON CONFLICT).
 	if len(memberIDs) > 0 {
+		// Only the charges actually linked by this call (currently series-less)
+		// get a timeline event — a re-detect NULL-fills already-linked members
+		// and must not re-emit.
+		newlyLinked, err := unlinkedMemberSubset(ctx, tx, memberIDs)
+		if err != nil {
+			return nil, err
+		}
 		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
 			SeriesID:       base.ID,
 			TransactionIds: memberIDs,
@@ -559,6 +574,9 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 			Column2:  memberIDs,
 		}); err != nil {
 			return nil, fmt.Errorf("apply series tags to members: %w", err)
+		}
+		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, base.ShortID, base.Name, actor); err != nil {
+			return nil, fmt.Errorf("emit series_assigned annotations: %w", err)
 		}
 	}
 
@@ -1157,7 +1175,7 @@ func (s *Service) updateSeriesInTx(ctx context.Context, qtx *db.Queries, id pgty
 // SplitSeries), and recomputes the series' rollups + projected next charge. It
 // refuses if any listed transaction isn't a current member, so an unlink can
 // neither silently no-op nor touch a charge that belongs to another series.
-func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string, memberIDsOrShorts []string) (*SeriesResponse, error) {
+func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string, memberIDsOrShorts []string, actor Actor) (*SeriesResponse, error) {
 	if len(memberIDsOrShorts) == 0 {
 		return nil, fmt.Errorf("%w: at least one transaction to unlink is required", ErrInvalidParameter)
 	}
@@ -1213,6 +1231,11 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 		 WHERE transaction_id = ANY($1::uuid[]) AND added_by_type = 'system' AND added_by_id = $2`,
 		memberIDs, row.ShortID); err != nil {
 		return nil, fmt.Errorf("strip series tags from unlinked members: %w", err)
+	}
+
+	// Timeline event on each detached charge (all confirmed members above).
+	if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesUnlinked, memberIDs, row.ShortID, row.Name, actor); err != nil {
+		return nil, fmt.Errorf("emit series_unlinked annotations: %w", err)
 	}
 
 	updated, err := s.applyRollup(ctx, qtx, row.ID)
@@ -1474,6 +1497,68 @@ func (s *Service) resolveTransactionIDs(ctx context.Context, idsOrShorts []strin
 		out = append(out, id)
 	}
 	return out, nil
+}
+
+// Annotation kinds for recurring-series membership events on the transaction
+// activity timeline (see internal/db/migrations/*_annotations_series_kinds.sql).
+const (
+	annotationKindSeriesAssigned = "series_assigned"
+	annotationKindSeriesUnlinked = "series_unlinked"
+)
+
+// unlinkedMemberSubset returns the subset of ids whose transactions are not yet
+// in any series (series_id IS NULL). Used so series_assigned annotations are
+// emitted only for charges the back-link actually links — never re-emitted on a
+// deterministic re-detect, which NULL-fills already-linked members.
+func unlinkedMemberSubset(ctx context.Context, tx pgx.Tx, ids []pgtype.UUID) ([]pgtype.UUID, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT id FROM transactions WHERE id = ANY($1::uuid[]) AND series_id IS NULL AND deleted_at IS NULL`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("query unlinked members: %w", err)
+	}
+	defer rows.Close()
+	var out []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan unlinked member: %w", err)
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// emitSeriesMembershipAnnotations writes one series_assigned / series_unlinked
+// annotation per affected transaction, atomic with the surrounding tx (q is the
+// tx-scoped *db.Queries). The payload carries the series short_id + name so the
+// timeline can render and deep-link the sentence.
+func emitSeriesMembershipAnnotations(ctx context.Context, q *db.Queries, kind string, txnIDs []pgtype.UUID, seriesShortID, seriesName string, actor Actor) error {
+	if len(txnIDs) == 0 {
+		return nil
+	}
+	if actor.Type == "" {
+		actor = SystemActor()
+	}
+	payload := map[string]interface{}{
+		"series_id":   seriesShortID,
+		"series_name": seriesName,
+	}
+	for _, txnID := range txnIDs {
+		if err := writeAnnotation(ctx, q, writeAnnotationParams{
+			TransactionID: txnID,
+			Kind:          kind,
+			ActorType:     normalizeAnnotationActorType(actor.Type),
+			ActorID:       actor.ID,
+			ActorName:     actor.Name,
+			Payload:       payload,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // dedupeUUIDs returns ids with duplicate values removed, preserving order.

@@ -726,7 +726,7 @@ CHECK (added_by_type IN ('user', 'agent', 'rule', 'system'))
 | `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
 | `short_id` | `TEXT` | No | trigger-generated | 8-character base62 alias. |
 | `transaction_id` | `UUID` | No | — | FK → `transactions(id)`. CASCADE DELETE. |
-| `kind` | `TEXT` | No | — | One of `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`. |
+| `kind` | `TEXT` | No | — | One of `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`, `sync_started`, `sync_updated`, `transaction_deleted`, `transaction_restored`, `series_assigned`, `series_unlinked`. |
 | `actor_type` | `TEXT` | No | — | `user`, `agent`, or `system`. |
 | `actor_id` | `TEXT` | Yes | `NULL` | Attribution ID (admin user ID, API key prefix, etc.). |
 | `actor_name` | `TEXT` | No | — | Display name of the actor. |

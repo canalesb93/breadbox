@@ -270,9 +270,37 @@ func enrichOne(a Annotation, tagDisplay, categoryDisplay func(string) string) An
 		a.Subject = a.ActorName
 		from, to := readStatusChange(a.Payload)
 		a.Summary = formatSyncUpdatedSummary(a.ActorName, from, to)
+
+	case "series_assigned", "series_unlinked":
+		seriesName, _ := a.Payload["series_name"].(string)
+		if a.Kind == "series_assigned" {
+			a.Action = "linked"
+		} else {
+			a.Action = "unlinked"
+		}
+		a.Subject = seriesName
+		a.Summary = formatSeriesMembershipSummary(a.ActorName, a.Action, seriesName)
 	}
 
 	return a
+}
+
+// formatSeriesMembershipSummary renders the timeline sentence for a
+// series_assigned / series_unlinked row, e.g. "Alice linked this to Netflix" /
+// "Linked to Netflix" (system). Mirrors the other system-row sentence shapes.
+func formatSeriesMembershipSummary(actor, action, seriesName string) string {
+	if seriesName == "" {
+		seriesName = "a recurring series"
+	}
+	verb, capVerb, prep := "linked", "Linked", "to"
+	if action == "unlinked" {
+		verb, capVerb, prep = "unlinked", "Unlinked", "from"
+	}
+	if actor == "" {
+		// System-attributed (detection): no actor name.
+		return capVerb + " " + prep + " " + seriesName
+	}
+	return actor + " " + verb + " this " + prep + " " + seriesName
 }
 
 // formatDeletedCommentSummary renders the tombstone sentence shown in place

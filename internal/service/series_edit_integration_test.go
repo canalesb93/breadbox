@@ -140,7 +140,7 @@ func TestUnlinkSeriesTransactions_DetachAndRollup(t *testing.T) {
 	}
 
 	// Unlink the most-recent charge (2026-04-15, members[2]).
-	updated, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{members[2]})
+	updated, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{members[2]}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("UnlinkSeriesTransactions: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestUnlinkSeriesTransactions_DetachAndRollup(t *testing.T) {
 
 	// Unlinking a transaction that isn't a member errors (doesn't touch others).
 	loose := testutil.MustCreateTransaction(t, queries, acctID, "LOOSE", "Loose Co", 100, "2026-01-01")
-	if _, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{loose.ShortID}); err == nil {
+	if _, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{loose.ShortID}, service.SystemActor()); err == nil {
 		t.Error("expected unlinking a non-member to error")
 	}
 }
@@ -196,7 +196,7 @@ func TestUnlinkSeriesTransactions_StripsInheritedTags(t *testing.T) {
 		t.Fatal("precondition: dropped charge should carry both tags")
 	}
 
-	if _, err := svc.UnlinkSeriesTransactions(ctx, series.ShortID, []string{drop.ShortID}); err != nil {
+	if _, err := svc.UnlinkSeriesTransactions(ctx, series.ShortID, []string{drop.ShortID}, actor); err != nil {
 		t.Fatalf("UnlinkSeriesTransactions: %v", err)
 	}
 
@@ -284,7 +284,7 @@ func TestUnlinkSeriesTransactions_DuplicateIDs(t *testing.T) {
 		t.Fatalf("mint: %v", err)
 	}
 
-	updated, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{members[2], members[2]})
+	updated, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{members[2], members[2]}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("UnlinkSeriesTransactions with duplicate id: %v", err)
 	}
@@ -327,6 +327,47 @@ func TestAssignSeries_FailIfExists(t *testing.T) {
 		MerchantKey: "netflix", CreateIfMissing: true, Confirm: true, FailIfExists: true, Name: "Netflix",
 	}, user); !errors.Is(err, service.ErrConflict) {
 		t.Errorf("strict create over a rejected series: err = %v, want ErrConflict", err)
+	}
+}
+
+// TestSeriesMembershipAnnotations proves the timeline events: linking members
+// emits one series_assigned per newly-linked charge, a re-detect does NOT
+// re-emit (NULL-fill only), and unlinking emits series_unlinked.
+func TestSeriesMembershipAnnotations(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	countKind := func(kind string) int {
+		var n int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM annotations WHERE kind = $1`, kind).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", kind, err)
+		}
+		return n
+	}
+
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if got := countKind("series_assigned"); got != 3 {
+		t.Errorf("series_assigned after mint = %d, want 3 (one per linked member)", got)
+	}
+
+	// A deterministic re-detect NULL-fills already-linked members → no re-emit.
+	if _, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor()); err != nil {
+		t.Fatalf("re-detect: %v", err)
+	}
+	if got := countKind("series_assigned"); got != 3 {
+		t.Errorf("series_assigned after re-detect = %d, want 3 (must not re-emit)", got)
+	}
+
+	// Unlinking a member emits exactly one series_unlinked.
+	if _, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{members[2]}, service.Actor{Type: "user", Name: "Tester"}); err != nil {
+		t.Fatalf("unlink: %v", err)
+	}
+	if got := countKind("series_unlinked"); got != 1 {
+		t.Errorf("series_unlinked after unlink = %d, want 1", got)
 	}
 }
 
