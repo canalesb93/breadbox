@@ -43,6 +43,10 @@ func (*TemplateRenderer) SetVersion(string) {}
 // internal/version into the stub.
 func (*TemplateRenderer) SetVersionChecker(any) {}
 
+// SetAppConfigReader is a no-op on headless builds. Accepts any to avoid
+// dragging internal/appconfig into the stub.
+func (*TemplateRenderer) SetAppConfigReader(any) {}
+
 // NewSessionManager mirrors the real signature. Returns a real (empty)
 // scs.SessionManager so chi middleware that handles it as an interface
 // continues to type-check.
