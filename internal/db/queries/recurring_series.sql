@@ -75,6 +75,16 @@ WHERE id = ANY(sqlc.arg('transaction_ids')::uuid[])
   AND series_id IS NULL
   AND deleted_at IS NULL;
 
+-- UnlinkSeriesMembers detaches the given transactions from a series (clears
+-- series_id), guarded on series_id so it can never steal a charge from another
+-- series. Returns rows affected so the caller can verify every id was a member.
+-- name: UnlinkSeriesMembers :execrows
+UPDATE transactions
+SET series_id = NULL, updated_at = NOW()
+WHERE id = ANY(sqlc.arg('transaction_ids')::uuid[])
+  AND series_id = sqlc.arg('series_id')
+  AND deleted_at IS NULL;
+
 -- SeriesMemberRollup recomputes occurrence_count / last_seen_date / last_amount
 -- from the series' live members. Returns zero rows when the series has none.
 -- name: SeriesMemberRollup :one
@@ -107,8 +117,23 @@ SELECT COUNT(*) FROM recurring_series WHERE deleted_at IS NULL;
 SELECT COUNT(*) FROM recurring_series
 WHERE deleted_at IS NULL AND status = 'candidate' AND confidence <> 'rejected';
 
+-- ListSeriesMembers returns a series' live member charges, newest first,
+-- enriched with the category color/icon + pending flag + tag count the shared
+-- transaction-row component renders (so linked charges look identical to the
+-- /transactions list and the dashboard feed).
 -- name: ListSeriesMembers :many
-SELECT short_id, date, provider_name, provider_merchant_name, amount, iso_currency_code
-FROM transactions
-WHERE series_id = $1 AND deleted_at IS NULL
-ORDER BY date DESC, created_at DESC;
+SELECT
+    t.short_id,
+    t.date,
+    t.provider_name,
+    t.provider_merchant_name,
+    t.amount,
+    t.iso_currency_code,
+    t.pending,
+    c.color AS category_color,
+    c.icon  AS category_icon,
+    (SELECT COUNT(*) FROM transaction_tags tt WHERE tt.transaction_id = t.id)::int AS tag_count
+FROM transactions t
+LEFT JOIN categories c ON c.id = t.category_id
+WHERE t.series_id = $1 AND t.deleted_at IS NULL
+ORDER BY t.date DESC, t.created_at DESC;

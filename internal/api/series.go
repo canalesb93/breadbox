@@ -271,33 +271,98 @@ func SetSeriesTypeHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-// reviewSeriesRequest is the body for PATCH /api/v1/series/{id}.
-type reviewSeriesRequest struct {
-	Verdict string `json:"verdict"` // confirm | reject | pause | cancel
+// patchSeriesRequest is the body for PATCH /api/v1/series/{id} — a partial
+// update. `verdict` (optional) adjudicates the lifecycle (confirm|reject|pause|
+// cancel); the remaining fields edit the series' user-owned attributes. Any
+// subset may be present; edits apply first, then the verdict, so a caller can
+// rename-and-confirm in one request. An empty body is rejected.
+type patchSeriesRequest struct {
+	Verdict         string   `json:"verdict,omitempty"`
+	Name            *string  `json:"name,omitempty"`
+	ExpectedAmount  *float64 `json:"expected_amount,omitempty"`
+	AmountTolerance *float64 `json:"amount_tolerance,omitempty"`
+	Currency        *string  `json:"currency,omitempty"`
+	Cadence         *string  `json:"cadence,omitempty"`
+	ExpectedDay     *int32   `json:"expected_day,omitempty"`
+	CategoryID      *string  `json:"category_id,omitempty"`
+	UserID          *string  `json:"user_id,omitempty"`
 }
 
-// ReviewSeriesHandler applies a verdict to a series (the agent's + user's
-// verdict tool). PATCH /api/v1/series/{id} — mirrors the review_series MCP tool.
+func (b patchSeriesRequest) hasEdit() bool {
+	return b.Name != nil || b.ExpectedAmount != nil || b.AmountTolerance != nil ||
+		b.Currency != nil || b.Cadence != nil || b.ExpectedDay != nil ||
+		b.CategoryID != nil || b.UserID != nil
+}
+
+// PatchSeriesHandler partially updates a series — edit its user-owned attributes
+// and/or apply a lifecycle verdict in one call. PATCH /api/v1/series/{id} —
+// mirrors the update_series (edit) + review_series (verdict) MCP tools.
 // Requires full_access scope (write).
-func ReviewSeriesHandler(svc *service.Service) http.HandlerFunc {
+func PatchSeriesHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		var body reviewSeriesRequest
+		var body patchSeriesRequest
 		if !decodeJSON(w, r, &body) {
 			return
 		}
 		verdict := service.SeriesVerdict(strings.TrimSpace(body.Verdict))
-		switch verdict {
-		case service.VerdictConfirm, service.VerdictReject, service.VerdictPause, service.VerdictCancel:
-		default:
+		hasVerdict := strings.TrimSpace(body.Verdict) != ""
+		if hasVerdict {
+			switch verdict {
+			case service.VerdictConfirm, service.VerdictReject, service.VerdictPause, service.VerdictCancel:
+			default:
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
+					"verdict must be one of: confirm, reject, pause, cancel")
+				return
+			}
+		}
+		if !hasVerdict && !body.hasEdit() {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER",
-				"verdict must be one of: confirm, reject, pause, cancel")
+				"provide a verdict and/or at least one editable field")
 			return
 		}
+
 		actor := service.ActorFromContext(r.Context())
-		s, err := svc.ReviewSeries(r.Context(), id, verdict, actor)
+
+		// Apply edit + verdict atomically in one transaction (PatchSeries), so a
+		// combined request like {name, verdict:confirm} can never leave the edit
+		// committed while reporting failure.
+		var edit *service.EditSeriesInput
+		if body.hasEdit() {
+			edit = &service.EditSeriesInput{
+				Name:            body.Name,
+				ExpectedAmount:  body.ExpectedAmount,
+				AmountTolerance: body.AmountTolerance,
+				Currency:        body.Currency,
+				Cadence:         body.Cadence,
+				ExpectedDay:     body.ExpectedDay,
+				CategoryID:      body.CategoryID,
+				UserID:          body.UserID,
+			}
+		}
+		var verdictPtr *service.SeriesVerdict
+		if hasVerdict {
+			verdictPtr = &verdict
+		}
+		s, err := svc.PatchSeries(r.Context(), id, edit, verdictPtr, actor)
 		if err != nil {
-			writeServiceError(w, err, "Series not found", "Failed to review series")
+			writeServiceError(w, err, "Series not found", "Failed to update series")
+			return
+		}
+		writeData(w, s)
+	}
+}
+
+// UnlinkSeriesTransactionHandler detaches a single transaction from a series.
+// DELETE /api/v1/series/{id}/transactions/{txid} — mirrors the
+// unlink_series_transactions MCP tool. Requires full_access scope (write).
+func UnlinkSeriesTransactionHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		txID := chi.URLParam(r, "txid")
+		s, err := svc.UnlinkSeriesTransactions(r.Context(), id, []string{txID})
+		if err != nil {
+			writeServiceError(w, err, "Series or transaction not found", "Failed to unlink transaction")
 			return
 		}
 		writeData(w, s)

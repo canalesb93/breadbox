@@ -265,6 +265,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionRecurringChips() },
 		},
 		{
+			Slug:        "recurring-detail",
+			Title:       "Recurring detail panels",
+			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz), SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset), and SeriesFactStrip (read-only derived facts). The handler assembles the values; these are pure presentation.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionRecurringDetail() },
+		},
+		{
 			Slug:        "tags",
 			Title:       "Tags",
 			Description: "Pill-shaped colored tags — bb-tag, bb-tag-sm, bb-tag-lg, bb-tag-ghost, bb-tag-add.",

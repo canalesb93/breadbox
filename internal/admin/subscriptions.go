@@ -6,16 +6,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -27,6 +30,10 @@ import (
 // awaiting a verdict) are split out from the confirmed/live ledger, and the
 // stat tiles (active count, monthly-equivalent spend per currency, candidates
 // awaiting review) are computed here.
+// subscriptionCandidateEvidenceMax caps how many member charges a candidate
+// card previews as detection evidence (the rest are summarized as "+N more").
+const subscriptionCandidateEvidenceMax = 5
+
 func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -67,6 +74,15 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				typesPresent[row.Type] = true
 			}
 			if s.Status == service.SeriesStatusCandidate {
+				// Attach a bounded sample of the charges the detector grouped so
+				// the review card shows the evidence before the user confirms.
+				if mem, merr := svc.SeriesMembers(ctx, s.ShortID); merr == nil {
+					ev := subscriptionMembers(mem)
+					if len(ev) > subscriptionCandidateEvidenceMax {
+						ev = ev[:subscriptionCandidateEvidenceMax]
+					}
+					row.Members = ev
+				}
 				candidates = append(candidates, row)
 				continue
 			}
@@ -121,8 +137,14 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			})
 		}
 
+		activeTab := "active"
+		if r.URL.Query().Get("tab") == "review" {
+			activeTab = "review"
+		}
+
 		props := pages.SubscriptionsListProps{
 			CSRFToken:      GetCSRFToken(r),
+			ActiveTab:      activeTab,
 			ActiveCount:    activeCount,
 			CandidateCount: len(candidates),
 			MonthlyTotals:  monthlyTotals,
@@ -164,37 +186,63 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			a.Logger.Error("series members", "error", err)
 		}
 
-		// Add-tag options = the vocabulary minus tags already on the series.
+		// Tags: full vocabulary (seeds the shared picker), chip data for the
+		// tags currently on the series, and the legacy add-select options —
+		// all from one ListTags call.
 		onSeries := map[string]bool{}
 		for _, tg := range row.Tags {
 			onSeries[tg] = true
 		}
+		allTags, _ := svc.ListTags(ctx)
+		bySlug := make(map[string]service.TagResponse, len(allTags))
 		var tagOptions []pages.SubscriptionTagOption
-		if tags, terr := svc.ListTags(ctx); terr == nil {
-			for _, t := range tags {
-				if onSeries[t.Slug] {
-					continue
-				}
-				name := t.DisplayName
-				if name == "" {
-					name = t.Slug
-				}
-				tagOptions = append(tagOptions, pages.SubscriptionTagOption{Slug: t.Slug, Name: name})
+		var tagChips []components.TagChipData
+		for _, t := range allTags {
+			bySlug[t.Slug] = t
+			if onSeries[t.Slug] {
+				continue
+			}
+			name := t.DisplayName
+			if name == "" {
+				name = t.Slug
+			}
+			tagOptions = append(tagOptions, pages.SubscriptionTagOption{Slug: t.Slug, Name: name})
+		}
+		for _, slug := range row.Tags {
+			if t, ok := bySlug[slug]; ok {
+				tagChips = append(tagChips, components.TagChipDataFromResponse(t))
+			} else {
+				tagChips = append(tagChips, components.TagChipData{Slug: slug, DisplayName: slug})
 			}
 		}
 
+		catTree, _ := svc.ListCategories(ctx)
+
 		props := pages.SubscriptionDetailProps{
-			CSRFToken:       GetCSRFToken(r),
-			Series:          row,
-			ExpectedAmount:  subscriptionMoney(s.ExpectedAmount, deref(s.IsoCurrencyCode)),
-			AmountTolerance: subscriptionMoney(s.AmountTolerance, deref(s.IsoCurrencyCode)),
-			ExpectedDay:     subscriptionExpectedDay(s.ExpectedDay),
-			NextExpected:    formatSubDate(s.NextExpectedDate, "Jan 2, 2006"),
-			LastSeen:        formatSubDate(s.LastSeenDate, "Jan 2, 2006"),
-			Confidence:      s.Confidence,
-			Members:         subscriptionMembers(members),
-			PriceChanges:    subscriptionPriceChanges(members),
-			AvailableTags:   tagOptions,
+			CSRFToken:            GetCSRFToken(r),
+			Series:               row,
+			ExpectedAmount:       subscriptionMoney(s.ExpectedAmount, deref(s.IsoCurrencyCode)),
+			AmountTolerance:      subscriptionMoney(s.AmountTolerance, deref(s.IsoCurrencyCode)),
+			ExpectedDay:          subscriptionExpectedDay(s.ExpectedDay),
+			NextExpected:         formatSubDate(s.NextExpectedDate, "Jan 2, 2006"),
+			LastSeen:             formatSubDate(s.LastSeenDate, "Jan 2, 2006"),
+			Confidence:           s.Confidence,
+			HasExpectedAmount:    s.ExpectedAmount != nil,
+			ExpectedAmountValue:  derefFloat(s.ExpectedAmount),
+			AmountToleranceValue: derefFloat(s.AmountTolerance),
+			ExpectedDayValue:     derefInt(s.ExpectedDay),
+			CurrentCategoryID:    deref(s.CategoryID),
+			Categories:           flattenCategoryOptions(catTree, ""),
+			Members:              subscriptionMembers(members),
+			PriceChanges:         subscriptionPriceChanges(members),
+			AvailableTags:        tagOptions,
+			TagChips:             tagChips,
+			Detection:            assembleSeriesDetection(*s, members),
+			Evidence:             assembleSeriesEvidence(*s, members),
+			Facts:                assembleSeriesFacts(*s, row),
+			CategoryTree:         catTree,
+			AllTags:              allTags,
+			CurrentTagSlugs:      row.Tags,
 		}
 
 		data := map[string]any{
@@ -205,6 +253,414 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 		}
 		tr.RenderWithTempl(w, r, data, pages.SubscriptionDetail(props))
 	}
+}
+
+// --- Detection-forward detail assembly -------------------------------------
+
+// seriesMatchStrength maps a series' confidence to the detection-panel badge.
+func seriesMatchStrength(s service.SeriesResponse) (string, string) {
+	if s.Confidence == service.SeriesConfidenceConfirmed {
+		return "Strong match", "success"
+	}
+	band, _ := subscriptionConfidenceBand(s)
+	switch band {
+	case "High":
+		return "Strong match", "success"
+	case "Medium":
+		return "Likely match", "warning"
+	default:
+		return "Weak match", "neutral"
+	}
+}
+
+func seriesCadencePhrase(cadence string) string {
+	switch cadence {
+	case service.SeriesCadenceWeekly:
+		return "about every week"
+	case service.SeriesCadenceBiweekly:
+		return "about every 2 weeks"
+	case service.SeriesCadenceMonthly:
+		return "about every month"
+	case service.SeriesCadenceQuarterly:
+		return "about every quarter"
+	case service.SeriesCadenceSemiannual:
+		return "about every 6 months"
+	case service.SeriesCadenceAnnual:
+		return "about every year"
+	default:
+		return "on an irregular cadence"
+	}
+}
+
+func seriesDayPhrase(cadence string, day *int) string {
+	if day == nil || *day < 1 {
+		return ""
+	}
+	switch cadence {
+	case service.SeriesCadenceMonthly, service.SeriesCadenceQuarterly,
+		service.SeriesCadenceSemiannual, service.SeriesCadenceAnnual:
+		return "around the " + ordinal(*day)
+	default:
+		return ""
+	}
+}
+
+func ordinal(n int) string {
+	suffix := "th"
+	if n%100 < 11 || n%100 > 13 {
+		switch n % 10 {
+		case 1:
+			suffix = "st"
+		case 2:
+			suffix = "nd"
+		case 3:
+			suffix = "rd"
+		}
+	}
+	return fmt.Sprintf("%d%s", n, suffix)
+}
+
+func seriesMoney(v float64, currency string) string {
+	if currency == "" || currency == "USD" {
+		return fmt.Sprintf("$%.2f", v)
+	}
+	return fmt.Sprintf("%.2f %s", v, currency)
+}
+
+func seriesMoneyWhole(v float64, currency string) string {
+	if currency == "" || currency == "USD" {
+		return fmt.Sprintf("$%.0f", v)
+	}
+	return fmt.Sprintf("%.0f %s", v, currency)
+}
+
+func pctStr(v float64) string {
+	if v < 0 {
+		v = 0
+	}
+	if v > 100 {
+		v = 100
+	}
+	return strconv.FormatFloat(v, 'f', 1, 64)
+}
+
+func chargesWord(n int) string {
+	if n == 1 {
+		return "1 charge"
+	}
+	return fmt.Sprintf("%d charges", n)
+}
+
+// assembleSeriesDetection builds the detection-summary panel: match-strength
+// badge, plain-language sentence, and (when an amount is known) the match-window.
+func assembleSeriesDetection(s service.SeriesResponse, members []service.SeriesMember) components.SeriesDetectionProps {
+	cur := deref(s.IsoCurrencyCode)
+	label, tone := seriesMatchStrength(s)
+	d := components.SeriesDetectionProps{
+		StrengthLabel: label,
+		StrengthTone:  tone,
+		MerchantKey:   s.MerchantKey,
+		CadencePhrase: seriesCadencePhrase(s.Cadence),
+		DayPhrase:     seriesDayPhrase(s.Cadence, s.ExpectedDay),
+	}
+	if s.ExpectedAmount != nil {
+		d.HasAmount = true
+		d.AmountText = seriesMoney(*s.ExpectedAmount, cur)
+		d.ToleranceText = seriesMoney(derefFloat(s.AmountTolerance), cur)
+		d.Window = buildSeriesMatchWindow(*s.ExpectedAmount, derefFloat(s.AmountTolerance), cur, members)
+	}
+	return d
+}
+
+func buildSeriesMatchWindow(expected, tol float64, cur string, members []service.SeriesMember) *components.SeriesMatchWindowProps {
+	if tol <= 0 {
+		tol = 1.0
+	}
+	lower, upper := expected-tol, expected+tol
+	prior, hasPrior := seriesPriorPrice(members, lower)
+
+	lo := lower
+	if hasPrior && prior < lo {
+		lo = prior
+	}
+	hi := upper
+	span := hi - lo
+	if span <= 0 {
+		span = tol*2 + 1
+	}
+	pad := span * 0.35
+	if pad < tol {
+		pad = tol
+	}
+	axisMin := math.Floor(lo - pad)
+	axisMax := math.Ceil(hi + pad)
+	if axisMax <= axisMin {
+		axisMax = axisMin + 1
+	}
+	pct := func(v float64) float64 { return (v - axisMin) / (axisMax - axisMin) * 100 }
+
+	inWin := 0
+	for _, m := range members {
+		if m.Amount == nil {
+			continue
+		}
+		a := math.Abs(*m.Amount)
+		if a >= lower-0.005 && a <= upper+0.005 {
+			inWin++
+		}
+	}
+
+	w := &components.SeriesMatchWindowProps{
+		RangeText:    seriesMoney(lower, cur) + " – " + seriesMoney(upper, cur),
+		AxisMinText:  seriesMoneyWhole(axisMin, cur),
+		AxisMaxText:  seriesMoneyWhole(axisMax, cur),
+		ExpectedText: seriesMoney(expected, cur) + " expected",
+		InWindowText: chargesWord(inWin),
+		BandLeftPct:  pctStr(pct(lower)),
+		BandWidthPct: pctStr(pct(upper) - pct(lower)),
+		ExpectedPct:  pctStr(pct(expected)),
+	}
+	if hasPrior {
+		w.HasPrior = true
+		w.PriorPct = pctStr(pct(prior))
+		w.PriorText = seriesMoney(prior, cur) + " · prior price"
+	}
+	return w
+}
+
+// seriesPriorPrice returns the highest member amount strictly below the match
+// band's lower bound — the price tier before the most recent step-up.
+func seriesPriorPrice(members []service.SeriesMember, lower float64) (float64, bool) {
+	best, found := 0.0, false
+	for _, m := range members {
+		if m.Amount == nil {
+			continue
+		}
+		a := math.Abs(*m.Amount)
+		if a < lower-0.005 && (!found || a > best) {
+			best, found = a, true
+		}
+	}
+	return best, found
+}
+
+// assembleSeriesEvidence builds the charge timeline: a projected next charge,
+// then the members newest-first with matched/prior markers and a price-change
+// inset on the member where the amount first stepped to a new value.
+func assembleSeriesEvidence(s service.SeriesResponse, members []service.SeriesMember) components.SeriesEvidenceProps {
+	cur := deref(s.IsoCurrencyCode)
+	hasExp := s.ExpectedAmount != nil
+	expected := derefFloat(s.ExpectedAmount)
+	tol := derefFloat(s.AmountTolerance)
+	if tol <= 0 {
+		tol = 1.0
+	}
+
+	// Transition points: walk oldest→newest (members are newest-first), mark a
+	// member when its amount differs from the previous one.
+	type transition struct{ from, to float64 }
+	transitions := map[string]transition{}
+	prev, havePrev := 0.0, false
+	for i := len(members) - 1; i >= 0; i-- {
+		m := members[i]
+		if m.Amount == nil {
+			continue
+		}
+		a := math.Abs(*m.Amount)
+		if havePrev && math.Abs(a-prev) > 0.005 {
+			transitions[m.ShortID] = transition{from: prev, to: a}
+		}
+		prev, havePrev = a, true
+	}
+
+	var rows []components.SeriesEvidenceRow
+	if hasExp {
+		if nd := formatSubDate(s.NextExpectedDate, "Jan 2, 2006"); nd != "" {
+			rows = append(rows, components.SeriesEvidenceRow{
+				Date: nd, AmountText: "~" + seriesMoney(expected, cur),
+				State: "projected", Note: "projected", NoteTone: "neutral",
+			})
+		}
+	}
+	for _, m := range members {
+		a := 0.0
+		if m.Amount != nil {
+			a = math.Abs(*m.Amount)
+		}
+		state := "prior"
+		if !hasExp || math.Abs(a-expected) <= tol+0.005 {
+			state = "matched"
+		}
+		row := components.SeriesEvidenceRow{
+			ShortID:    m.ShortID,
+			Date:       formatSubDate(m.Date, "Jan 2, 2006"),
+			AmountText: seriesMoney(a, cur),
+			State:      state,
+		}
+		if t, ok := transitions[m.ShortID]; ok {
+			row.Note, row.NoteTone = "first at new price", "success"
+			row.HasPrice = true
+			row.PriceFrom = seriesMoney(t.from, cur)
+			row.PriceTo = seriesMoney(t.to, cur)
+		}
+		rows = append(rows, row)
+	}
+	return components.SeriesEvidenceProps{Rows: rows, Unlinkable: true, SeriesShortID: s.ShortID}
+}
+
+func assembleSeriesFacts(s service.SeriesResponse, row pages.SubscriptionRow) components.SeriesFactStripProps {
+	dash := func(v string) string {
+		if v == "" {
+			return "—"
+		}
+		return v
+	}
+	lastCharge := "—"
+	if s.LastAmount != nil {
+		lastCharge = subscriptionMoney(s.LastAmount, deref(s.IsoCurrencyCode))
+	}
+	return components.SeriesFactStripProps{Facts: []components.SeriesFact{
+		{Label: "Last charge", Value: lastCharge},
+		{Label: "Next renewal", Value: dash(formatSubDate(s.NextExpectedDate, "Jan 2, 2006"))},
+		{Label: "Last seen", Value: dash(formatSubDate(s.LastSeenDate, "Jan 2, 2006"))},
+		{Label: "Detected by", Value: dash(row.SourceLabel)},
+	}}
+}
+
+// NewRecurringSeriesPageHandler renders the create-from-scratch form at
+// GET /recurring/new — for a recurring charge the detector hasn't surfaced.
+func NewRecurringSeriesPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var categoryOptions []pages.SubscriptionCategoryOption
+		if cats, cerr := svc.ListCategories(ctx); cerr == nil {
+			categoryOptions = flattenCategoryOptions(cats, "")
+		}
+		props := pages.RecurringSeriesFormProps{
+			CSRFToken:  GetCSRFToken(r),
+			Type:       service.SeriesTypeSubscription,
+			Cadence:    service.SeriesCadenceMonthly,
+			Currency:   "USD",
+			Categories: categoryOptions,
+		}
+		data := map[string]any{
+			"PageTitle":   "New recurring series",
+			"CurrentPage": "recurring",
+			"CSRFToken":   GetCSRFToken(r),
+		}
+		tr.RenderWithTempl(w, r, data, pages.RecurringSeriesForm(props))
+	}
+}
+
+// CreateRecurringSeriesHandler handles POST /recurring/new — mints an ACTIVE,
+// CONFIRMED, user-authored series (not a candidate in the review queue),
+// deriving a merchant_key from the name, then redirects to its detail page.
+func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(r.FormValue("name"))
+		typ := strings.TrimSpace(r.FormValue("type"))
+		cadence := strings.TrimSpace(r.FormValue("cadence"))
+		currency := strings.ToUpper(strings.TrimSpace(r.FormValue("currency")))
+		amountStr := strings.TrimSpace(r.FormValue("expected_amount"))
+		dayStr := strings.TrimSpace(r.FormValue("expected_day"))
+		categoryID := strings.TrimSpace(r.FormValue("category_id"))
+
+		// Re-render the form with an error + the entered values on validation fail.
+		rerender := func(msg string) {
+			var categoryOptions []pages.SubscriptionCategoryOption
+			if cats, cerr := svc.ListCategories(ctx); cerr == nil {
+				categoryOptions = flattenCategoryOptions(cats, "")
+			}
+			tr.RenderWithTempl(w, r, map[string]any{
+				"PageTitle":   "New recurring series",
+				"CurrentPage": "recurring",
+				"CSRFToken":   GetCSRFToken(r),
+			}, pages.RecurringSeriesForm(pages.RecurringSeriesFormProps{
+				CSRFToken: GetCSRFToken(r), Error: msg,
+				Name: name, Type: typ, Cadence: cadence, Currency: currency,
+				ExpectedAmount: amountStr, ExpectedDay: dayStr, CategoryID: categoryID,
+				Categories: categoryOptions,
+			}))
+		}
+
+		if name == "" {
+			rerender("Name is required.")
+			return
+		}
+		var amount *float64
+		if amountStr != "" {
+			f, err := strconv.ParseFloat(amountStr, 64)
+			if err != nil {
+				rerender("Expected amount must be a number.")
+				return
+			}
+			amount = &f
+		}
+		var day *int32
+		if dayStr != "" {
+			d, derr := strconv.Atoi(dayStr)
+			if derr != nil || d < 1 || d > 31 {
+				rerender("Expected day must be a number from 1 to 31.")
+				return
+			}
+			d32 := int32(d)
+			day = &d32
+		}
+
+		actor := ActorFromSession(sm, r)
+		in := service.AssignSeriesInput{
+			MerchantKey:     slugifyMerchantKey(name),
+			CreateIfMissing: true,
+			Confirm:         true, // a deliberate manual entry is active+confirmed, not a candidate
+			FailIfExists:    true, // a deliberate create must not silently adopt/revive an existing series
+			Name:            name,
+			Cadence:         cadence,
+			Type:            typ,
+			ExpectedAmount:  amount,
+			ExpectedDay:     day, // threaded into the insert, not a swallowed follow-up edit
+			Currency:        strPtrIfNotEmpty(currency),
+			CategoryID:      strPtrIfNotEmpty(categoryID),
+		}
+		resp, err := svc.AssignSeries(ctx, in, actor)
+		if err != nil {
+			if errors.Is(err, service.ErrConflict) {
+				rerender(err.Error())
+				return
+			}
+			rerender("Could not create the series: " + err.Error())
+			return
+		}
+
+		http.Redirect(w, r, "/recurring/"+resp.ShortID, http.StatusSeeOther)
+	}
+}
+
+// slugifyMerchantKey derives a stable merchant_key anchor from a user-supplied
+// name (lowercase alphanumerics). Incoming charges still key off the provider
+// name at sync time, so this only anchors the manual series' identity.
+func slugifyMerchantKey(name string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "series"
+	}
+	return b.String()
+}
+
+func strPtrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // subscriptionRow maps a service.SeriesResponse to the templ row shape,
@@ -504,14 +960,15 @@ func sourceLabel(s string) string {
 	}
 }
 
+// subscriptionMoney delegates to seriesMoney so every money string across the
+// recurring surfaces formats identically ("$15.99" for USD/blank, "15.99 EUR"
+// otherwise) — previously this and seriesMoney disagreed and the same series
+// rendered "$15.99" in the detection panel but "15.99 USD" in the fact strip.
 func subscriptionMoney(v *float64, currency string) string {
 	if v == nil {
 		return ""
 	}
-	if currency == "" {
-		return fmt.Sprintf("%.2f", math.Abs(*v))
-	}
-	return fmt.Sprintf("%.2f %s", math.Abs(*v), currency)
+	return seriesMoney(math.Abs(*v), currency)
 }
 
 func subscriptionExpectedDay(d *int) string {
@@ -541,10 +998,14 @@ func subscriptionMembers(in []service.SeriesMember) []pages.SubscriptionMember {
 			name = *m.MerchantName
 		}
 		row := pages.SubscriptionMember{
-			ShortID:  m.ShortID,
-			Date:     formatSubDate(m.Date, "Jan 2, 2006"),
-			Name:     name,
-			Currency: deref(m.Currency),
+			ShortID:       m.ShortID,
+			Date:          formatSubDate(m.Date, "Jan 2, 2006"),
+			Name:          name,
+			Currency:      deref(m.Currency),
+			Pending:       m.Pending,
+			CategoryColor: m.CategoryColor,
+			CategoryIcon:  m.CategoryIcon,
+			TagCount:      m.TagCount,
 		}
 		if m.Amount != nil {
 			row.HasAmount = true
@@ -649,4 +1110,33 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func derefFloat(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
+}
+
+func derefInt(i *int) int {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
+
+// flattenCategoryOptions walks the category tree into a flat select list,
+// indenting children under their parent so the hierarchy stays legible in a
+// plain <select>. Values are category UUIDs (resolveOptionalCategoryID accepts
+// them cleanly).
+func flattenCategoryOptions(cats []service.CategoryResponse, prefix string) []pages.SubscriptionCategoryOption {
+	var out []pages.SubscriptionCategoryOption
+	for _, c := range cats {
+		out = append(out, pages.SubscriptionCategoryOption{ID: c.ID, Name: prefix + c.DisplayName})
+		if len(c.Children) > 0 {
+			out = append(out, flattenCategoryOptions(c.Children, prefix+"— ")...)
+		}
+	}
+	return out
 }

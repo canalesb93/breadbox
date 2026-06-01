@@ -240,6 +240,60 @@ templ SectionRecurringChips() {
 	</div>
 }
 
+// ─── Recurring detail panels ─────────────────────────────────────────────
+
+templ SectionRecurringDetail() {
+	<div class="flex flex-col gap-6">
+		@designExample("Detection panel (SeriesDetectionPanel)", "The detection-forward hero: a match-strength badge, a plain-language summary, and the match-window range viz. Reframes a series as a detection rule, not a settings form.") {
+			@components.SeriesDetectionPanel(components.SeriesDetectionProps{
+				StrengthLabel: "Strong match",
+				StrengthTone:  "success",
+				MerchantKey:   "lumio*tv",
+				HasAmount:     true,
+				AmountText:    "$15.99",
+				ToleranceText: "$1.00",
+				CadencePhrase: "about every month",
+				DayPhrase:     "around the 15th",
+				Window: &components.SeriesMatchWindowProps{
+					RangeText:    "$14.99 – $16.99",
+					AxisMinText:  "$13",
+					AxisMaxText:  "$18",
+					ExpectedText: "$15.99 expected",
+					InWindowText: "2 charges",
+					BandLeftPct:  "39.8",
+					BandWidthPct: "40",
+					ExpectedPct:  "59.8",
+					HasPrior:     true,
+					PriorPct:     "19.8",
+					PriorText:    "$13.99 · prior price",
+				},
+			})
+		}
+		@designExample("Evidence timeline (SeriesEvidenceTimeline)", "The charges a series was detected from: projected next (dashed), matched (✓), and prior-price (·) markers on a continuous rail, with a price-change inset where the amount stepped.") {
+			@components.SeriesEvidenceTimeline(components.SeriesEvidenceProps{
+				Rows: []components.SeriesEvidenceRow{
+					{Date: "Jun 15, 2026", AmountText: "~$15.99", State: "projected", Note: "projected", NoteTone: "neutral"},
+					{Date: "May 15, 2026", AmountText: "$15.99", State: "matched"},
+					{Date: "Apr 15, 2026", AmountText: "$15.99", State: "matched", Note: "first at new price", NoteTone: "success", HasPrice: true, PriceFrom: "$13.99", PriceTo: "$15.99"},
+					{Date: "Mar 15, 2026", AmountText: "$13.99", State: "prior"},
+					{Date: "Feb 15, 2026", AmountText: "$13.99", State: "prior"},
+					{Date: "Jan 15, 2026", AmountText: "$13.99", State: "prior"},
+				},
+			})
+		}
+		@designExample("Fact strip (SeriesFactStrip)", "Read-only derived facts pinned to the page foot — last charge, next renewal, last seen, detected-by. Hairline-divided, no icons.") {
+			@components.SeriesFactStrip(components.SeriesFactStripProps{
+				Facts: []components.SeriesFact{
+					{Label: "Last charge", Value: "$15.99"},
+					{Label: "Next renewal", Value: "Jun 15, 2026"},
+					{Label: "Last seen", Value: "May 15, 2026"},
+					{Label: "Detected by", Value: "Auto-matched"},
+				},
+			})
+		}
+	</div>
+}
+
 // ─── Alerts ────────────────────────────────────────────────────────────
 
 templ SectionAlerts() {
