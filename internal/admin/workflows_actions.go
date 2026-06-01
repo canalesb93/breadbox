@@ -34,19 +34,24 @@ func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 
 		// Configure-drawer fields. enabled defaults to true (the drawer's
 		// "Enable" CTA), but the form can pass enabled=false to set up paused.
+		cfg, cfgControl := parseWorkflowFormConfig(r)
 		params := service.EnableWorkflowFromPresetParams{
 			Enabled:                r.FormValue("enabled") != "false",
 			AdditionalInstructions: r.FormValue("additional_instructions"),
-		}
-		if cron := r.FormValue("schedule_cron"); cron != "" {
-			params.ScheduleCron = &cron
+			TriggerOnSync:          cfg.TriggerOnSync,
+			ScheduleCron:           cfg.ScheduleCron,
+			Model:                  cfg.Model,
+			MaxTurns:               cfg.MaxTurns,
+			MaxBudgetUSD:           cfg.MaxBudgetUSD,
 		}
 		// Any non-control form field is a preset-specialized option (e.g.
 		// apply_mode); the service validates each against the preset's
 		// declared options and ignores unknown keys.
 		control := map[string]bool{
-			"enabled": true, "schedule_cron": true,
-			"additional_instructions": true, "consent": true, "_csrf": true,
+			"enabled": true, "additional_instructions": true, "consent": true, "_csrf": true,
+		}
+		for k := range cfgControl {
+			control[k] = true
 		}
 		params.Options = map[string]string{}
 		for key := range r.Form {

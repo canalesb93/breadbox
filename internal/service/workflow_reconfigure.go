@@ -41,11 +41,19 @@ type WorkflowConfig struct {
 	Slug string `json:"slug"`
 	// Name is the workflow's display name.
 	Name string `json:"name"`
-	// TriggerOnSync is true for post-sync presets (schedule not editable).
+	// TriggerOnSync is true when the workflow fires after each sync (vs a
+	// custom cron). The drawer's trigger radio is seeded from this; it's
+	// now user-switchable per workflow, not fixed by the preset.
 	TriggerOnSync bool `json:"trigger_on_sync"`
-	// ScheduleCron is the live cron for scheduled presets (empty for
-	// post-sync). The drawer's schedule select is seeded from this.
+	// ScheduleCron is the live cron when on a custom schedule (empty when
+	// trigger_on_sync). The drawer's schedule field is seeded from this.
 	ScheduleCron string `json:"schedule_cron"`
+	// Model is the workflow's current model id (drives the model select).
+	Model string `json:"model"`
+	// MaxTurns / MaxBudgetUSD seed the Advanced section. 0 / 0 mean "use
+	// the default" (the drawer shows the effective default in that case).
+	MaxTurns     int     `json:"max_turns"`
+	MaxBudgetUSD float64 `json:"max_budget_usd"`
 	// AdditionalInstructions is the per-workflow tuning currently appended
 	// to the composed base prompt (empty when none).
 	AdditionalInstructions string `json:"additional_instructions"`
@@ -59,9 +67,22 @@ type WorkflowConfig struct {
 // prompt blocks are NOT editable here (they're the preset's identity); only
 // the household-tunable layers on top are.
 type UpdateWorkflowConfigParams struct {
-	// ScheduleCron overrides the schedule for scheduled presets. nil = leave
-	// the schedule untouched; ignored entirely for post-sync presets.
+	// TriggerOnSync, when non-nil, switches the workflow's trigger:
+	// true = after each sync (cron cleared); false = custom schedule (uses
+	// ScheduleCron). nil leaves the trigger untouched. The two modes are
+	// mutually exclusive — the scheduler keys off a non-empty cron and the
+	// sync hook off the flag, so leaving both set would double-fire; the
+	// service enforces the exclusivity here.
+	TriggerOnSync *bool
+	// ScheduleCron is the cron when on a custom schedule. nil = leave
+	// untouched; applied only when the (resulting) trigger is a schedule.
 	ScheduleCron *string
+	// Model overrides the run model. nil/empty = leave untouched.
+	Model *string
+	// MaxTurns / MaxBudgetUSD override the Advanced caps. nil = leave
+	// untouched.
+	MaxTurns     *int
+	MaxBudgetUSD *float64
 	// AdditionalInstructions replaces the appended per-workflow tuning. An
 	// empty string clears it.
 	AdditionalInstructions string
@@ -145,10 +166,15 @@ func (s *Service) GetWorkflowConfig(ctx context.Context, slug string) (*Workflow
 		Slug:                   def.Slug,
 		Name:                   def.Name,
 		TriggerOnSync:          def.TriggerOnSyncComplete,
+		Model:                  def.Model,
+		MaxTurns:               def.MaxTurns,
 		AdditionalInstructions: instructions,
 	}
 	if def.ScheduleCron != nil {
 		cfg.ScheduleCron = *def.ScheduleCron
+	}
+	if def.MaxBudgetUSD != nil {
+		cfg.MaxBudgetUSD = *def.MaxBudgetUSD
 	}
 	for _, opt := range preset.Options {
 		co := WorkflowConfigOption{
@@ -192,7 +218,7 @@ func composeWorkflowPrompt(preset WorkflowPreset, options map[string]string, add
 // untouched — toggling runs stays on the enable/disable endpoints. Resolves
 // by slug; returns the updated definition.
 func (s *Service) UpdateWorkflowConfig(ctx context.Context, slug string, params UpdateWorkflowConfigParams) (*AgentDefinitionResponse, error) {
-	_, preset, err := s.presetForEnabledWorkflow(ctx, slug)
+	def, preset, err := s.presetForEnabledWorkflow(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -204,13 +230,50 @@ func (s *Service) UpdateWorkflowConfig(ctx context.Context, slug string, params 
 
 	update := UpdateAgentDefinitionParams{Prompt: &prompt}
 
-	// Scheduled presets accept a cron override; post-sync presets keep their
-	// event trigger (no cron), mirroring EnableWorkflowFromPreset.
-	if !preset.TriggerOnSyncComplete && params.ScheduleCron != nil {
-		cron := strings.TrimSpace(*params.ScheduleCron)
-		if cron != "" {
-			update.ScheduleCron = &cron
+	// Trigger + schedule. The trigger is now user-switchable per workflow
+	// (not fixed by the preset). The two modes are mutually exclusive — see
+	// the UpdateWorkflowConfigParams.TriggerOnSync doc.
+	switch {
+	case params.TriggerOnSync != nil && *params.TriggerOnSync:
+		// After each sync: set the flag, clear the cron (empty ptr → NULL via
+		// TextPtrIfNotEmpty) so the scheduler doesn't also register it.
+		t := true
+		empty := ""
+		update.TriggerOnSyncComplete = &t
+		update.ScheduleCron = &empty
+	case params.TriggerOnSync != nil:
+		// Custom schedule: clear the sync flag, set the cron.
+		f := false
+		update.TriggerOnSyncComplete = &f
+		if params.ScheduleCron != nil {
+			if cron := strings.TrimSpace(*params.ScheduleCron); cron != "" {
+				update.ScheduleCron = &cron
+			}
 		}
+	default:
+		// Trigger not specified — legacy cron-only update path. A bare
+		// schedule applies only to a workflow already on a custom schedule;
+		// a post-sync workflow ignores it (switching a post-sync workflow to
+		// a schedule requires the explicit TriggerOnSync=false switch above,
+		// which also clears the sync flag) so the two trigger modes can never
+		// both be live.
+		if !def.TriggerOnSyncComplete && params.ScheduleCron != nil {
+			if cron := strings.TrimSpace(*params.ScheduleCron); cron != "" {
+				update.ScheduleCron = &cron
+			}
+		}
+	}
+
+	if params.Model != nil {
+		if m := strings.TrimSpace(*params.Model); m != "" {
+			update.Model = &m
+		}
+	}
+	if params.MaxTurns != nil {
+		update.MaxTurns = params.MaxTurns
+	}
+	if params.MaxBudgetUSD != nil {
+		update.MaxBudgetUSD = params.MaxBudgetUSD
 	}
 
 	return s.UpdateAgentDefinition(ctx, slug, update)

@@ -114,28 +114,15 @@ templ workflowReconfigureDrawer() {
 				Icon:      "sliders-horizontal",
 				TitleExpr: "reconfigure.name || 'Reconfigure workflow'",
 				Subtitle:  "Adjust how this workflow runs. Its base behavior stays the same.",
+				Right:     workflowReconfigureToggle(),
 			})
 			<div x-show="reconfigure.loading" class="flex items-center gap-2 text-sm text-base-content/60 p-5">
 				<span class="loading loading-spinner loading-sm"></span>
 				Loading configuration…
 			</div>
 			<div x-show="!reconfigure.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
-				<div>
-					<div class="text-sm font-medium mb-1.5">When it runs</div>
-					<template x-if="reconfigure.triggerOnSync">
-						<div class="text-sm text-base-content/70 flex items-center gap-2">
-							@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/50")
-							After each successful sync
-						</div>
-					</template>
-					<template x-if="!reconfigure.triggerOnSync">
-						<select name="schedule_cron" x-model="reconfigure.scheduleCron" class="select select-sm w-full">
-							<option value="0 8 * * *">Daily — 8:00 AM</option>
-							<option value="0 7 * * 1">Weekly — Monday 7:00 AM</option>
-							<option value="0 8 1 * *">Monthly — 1st, 8:00 AM</option>
-						</select>
-					</template>
-				</div>
+				@workflowTriggerFields("reconfigure.triggerOnSync", "reconfigure.scheduleCron")
+				@workflowModelField("reconfigure.model")
 				<template x-for="opt in reconfigure.options" :key="opt.key">
 					<div>
 						<div class="text-sm font-medium mb-1.5" x-text="opt.label"></div>
@@ -171,6 +158,7 @@ templ workflowReconfigureDrawer() {
 					></textarea>
 					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
 				</div>
+				@workflowAdvancedFields("reconfigure.maxTurns", "reconfigure.maxBudget")
 			</div>
 			@components.DrawerFooter() {
 				<button
@@ -285,7 +273,7 @@ templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 			<button
 				type="button"
 				class="btn btn-ghost btn-sm btn-square text-base-content/55"
-				@click={ "openReconfigure('" + preset.WorkflowSlug + "', '" + preset.Name + "')" }
+				@click={ "openReconfigure('" + preset.WorkflowSlug + "', '" + preset.Name + "', " + workflowBoolJS(preset.WorkflowEnabled) + ")" }
 				aria-label={ "Configure " + preset.Name }
 			>
 				@components.LucideIcon("settings", "w-4 h-4")
@@ -295,13 +283,13 @@ templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 		<input
 			type="checkbox"
 			class="toggle toggle-sm"
-			@click.prevent={ "$store.drawers.open('wf-config-" + preset.Slug + "')" }
+			@click.prevent={ workflowOpenConfigJS(preset) }
 			aria-label={ "Set up " + preset.Name }
 		/>
 		<button
 			type="button"
 			class="btn btn-ghost btn-sm btn-square text-base-content/55"
-			@click={ "$store.drawers.open('wf-config-" + preset.Slug + "')" }
+			@click={ workflowOpenConfigJS(preset) }
 			aria-label={ "Set up " + preset.Name }
 		>
 			@components.LucideIcon("settings", "w-4 h-4")
@@ -311,6 +299,145 @@ templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 			<input type="checkbox" class="toggle toggle-sm" disabled aria-label={ "Toggle " + preset.Name }/>
 		</span>
 	}
+}
+
+// ─── Shared drawer config fields ────────────────────────────────────────
+// These sub-templs are bound to Alpine variable *names* (passed as strings)
+// so the setup drawer (local x-data, server-seeded) and the reconfigure
+// drawer (reconfigure.* state, JS-hydrated) share one implementation.
+
+// workflowTriggerFields renders the Mintlify-style "When should the workflow
+// run?" radio cards (Custom schedule / After each sync) plus, when custom,
+// the schedule shortcut pills + cron input + a live human-readable preview.
+// triggerVar holds 'true'|'false' (matching the trigger_on_sync form field);
+// cronVar holds the cron string (the schedule_cron form field).
+templ workflowTriggerFields(triggerVar, cronVar string) {
+	<div>
+		<div class="text-sm font-medium mb-2">When should the workflow run?</div>
+		<div class="grid grid-cols-2 gap-2">
+			<label class="cursor-pointer">
+				<input type="radio" name="trigger_on_sync" value="false" x-model={ triggerVar } @change={ "describeCron(" + cronVar + ")" } class="peer sr-only"/>
+				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-success peer-checked:bg-success/5">
+					<div class="flex items-center gap-2">
+						@components.LucideIcon("calendar-clock", "w-4 h-4 text-base-content/60")
+						<span class="text-sm font-medium">Custom schedule</span>
+					</div>
+					<div class="text-xs text-base-content/55 mt-1">On a recurring cron schedule</div>
+				</div>
+			</label>
+			<label class="cursor-pointer">
+				<input type="radio" name="trigger_on_sync" value="true" x-model={ triggerVar } class="peer sr-only"/>
+				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-success peer-checked:bg-success/5">
+					<div class="flex items-center gap-2">
+						@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/60")
+						<span class="text-sm font-medium">After each sync</span>
+					</div>
+					<div class="text-xs text-base-content/55 mt-1">Right after new data lands</div>
+				</div>
+			</label>
+		</div>
+		<div x-show={ triggerVar + " === 'false'" } x-cloak class="mt-3 space-y-2">
+			<div class="text-xs font-medium text-base-content/70">Schedule</div>
+			<div class="flex flex-wrap gap-1.5">
+				@workflowCronPill(cronVar, "0 8 * * *", "Daily")
+				@workflowCronPill(cronVar, "0 7 * * 1", "Every Monday")
+				@workflowCronPill(cronVar, "0 7 * * 5", "Every Friday")
+				@workflowCronPill(cronVar, "0 8 1 * *", "Monthly")
+			</div>
+			<input
+				type="text"
+				name="schedule_cron"
+				x-model={ cronVar }
+				@input.debounce.400ms={ "describeCron(" + cronVar + ")" }
+				class="input input-sm w-full font-mono"
+				placeholder="0 8 * * *"
+				autocomplete="off"
+				spellcheck="false"
+			/>
+			<div class="text-xs text-base-content/55 flex items-center gap-1.5 min-h-4">
+				<span x-show="cronPreviewLoading" class="loading loading-spinner loading-xs"></span>
+				<span x-text="cronPreview || 'Enter a schedule'"></span>
+			</div>
+		</div>
+	</div>
+}
+
+// workflowCronPill is one schedule shortcut. Sets cronVar to a known cron and
+// refreshes the preview; highlights when it matches the current value.
+templ workflowCronPill(cronVar, value, label string) {
+	<button
+		type="button"
+		class="btn btn-xs btn-soft"
+		x-bind:class={ cronVar + " === '" + value + "' ? 'btn-success' : ''" }
+		@click={ cronVar + " = '" + value + "'; describeCron(" + cronVar + ")" }
+	>
+		{ label }
+	</button>
+}
+
+// workflowModelField is the model <select>, bound to modelVar (the `model`
+// form field). Options come from the shared DefaultAgentModelOptions list.
+templ workflowModelField(modelVar string) {
+	<div>
+		<div class="text-sm font-medium mb-1.5">Model</div>
+		<select name="model" x-model={ modelVar } class="select select-sm w-full">
+			for _, opt := range DefaultAgentModelOptions() {
+				<option value={ opt.Value }>{ opt.Label }</option>
+			}
+		</select>
+	</div>
+}
+
+// workflowAdvancedFields is the collapsible Advanced section: the per-run cost
+// cap (max_budget_usd) and turn cap (max_turns). Collapsed by default. Bound to
+// budgetVar / turnsVar (the corresponding form fields).
+templ workflowAdvancedFields(turnsVar, budgetVar string) {
+	<div x-data="{ advOpen: false }" class="border-t border-base-200 pt-3">
+		<button type="button" class="flex items-center gap-1.5 text-sm font-medium text-base-content/70 w-full" @click="advOpen = !advOpen">
+			@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
+			Advanced
+			<span class="ml-auto transition-transform" x-bind:class="advOpen ? 'rotate-90' : ''">
+				@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content/40")
+			</span>
+		</button>
+		<div x-show="advOpen" x-cloak x-collapse class="space-y-3 pt-3">
+			<div>
+				<div class="text-sm font-medium mb-1.5">Max cost per run (USD)</div>
+				<input type="number" name="max_budget_usd" x-model={ budgetVar } min="0" max="1000" step="0.5" class="input input-sm w-full" placeholder="1.00"/>
+				<div class="text-xs text-base-content/45 mt-1">Stops the run if its cumulative Anthropic cost passes this cap.</div>
+			</div>
+			<div>
+				<div class="text-sm font-medium mb-1.5">Max turns</div>
+				<input type="number" name="max_turns" x-model={ turnsVar } min="0" max="100" step="1" class="input input-sm w-full" placeholder="10"/>
+				<div class="text-xs text-base-content/45 mt-1">Caps how many assistant/tool turns a single run can take.</div>
+			</div>
+		</div>
+	</div>
+}
+
+// workflowActivateToggle is the setup drawer's header toggle (Mintlify-style):
+// the `enabled` form field as a toggle, so "set up" and "activate" are one
+// gesture. Checked by default; unchecking sets up the workflow paused.
+templ workflowActivateToggle() {
+	<label class="flex items-center gap-2 cursor-pointer tooltip tooltip-bottom" data-tip="Activate as soon as it's set up">
+		<span class="text-xs text-base-content/55 hidden sm:inline">Activate</span>
+		<input type="checkbox" name="enabled" value="true" checked class="toggle toggle-sm toggle-primary"/>
+	</label>
+}
+
+// workflowReconfigureToggle is the reconfigure drawer's header toggle: the
+// workflow's live run state. Unlike the setup toggle it isn't a form field —
+// it flips run-state immediately via toggleWorkflow (separate from Save).
+templ workflowReconfigureToggle() {
+	<label class="flex items-center gap-2 cursor-pointer">
+		<span class="text-xs text-base-content/55 hidden sm:inline" x-text="reconfigure.enabled ? 'On' : 'Off'"></span>
+		<input
+			type="checkbox"
+			class="toggle toggle-sm toggle-primary"
+			x-model="reconfigure.enabled"
+			@change="toggleWorkflow(reconfigure.slug, $event.target)"
+		/>
+	</label>
 }
 
 // workflowConfigDrawer is the right-side slide-over for configuring + enabling
@@ -323,7 +450,7 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 		Title: "Set up " + preset.Name,
 	}) {
 		<form
-			x-data={ "{ cron: '" + preset.ScheduleCron + "', consent: false }" }
+			x-data={ workflowConfigDrawerData(preset) }
 			class="flex flex-col h-full"
 			@submit.prevent={ "submitDrawer('" + preset.Slug + "', $event.target)" }
 		>
@@ -331,31 +458,11 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 				Icon:     preset.Icon,
 				Title:    preset.Name,
 				Subtitle: preset.Description,
+				Right:    workflowActivateToggle(),
 			})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
-				<div>
-					<div class="text-sm font-medium mb-1.5">When it runs</div>
-					if preset.TriggerOnSync {
-						<div class="text-sm text-base-content/70 flex items-center gap-2">
-							@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/50")
-							After each successful sync
-						</div>
-						<div class="text-xs text-base-content/45 mt-1.5 flex items-center gap-1">
-							@components.LucideIcon("circle-dollar-sign", "w-3.5 h-3.5")
-							{ "≈ $" + workflowCostStr(preset.EstCostPerRunUSD) + " per run" }
-						</div>
-					} else {
-						<select name="schedule_cron" x-model="cron" class="select select-sm w-full">
-							@workflowScheduleOption("0 8 * * *", "Daily — 8:00 AM", preset.ScheduleCron)
-							@workflowScheduleOption("0 7 * * 1", "Weekly — Monday 7:00 AM", preset.ScheduleCron)
-							@workflowScheduleOption("0 8 1 * *", "Monthly — 1st, 8:00 AM", preset.ScheduleCron)
-						</select>
-						<div
-							class="text-xs text-base-content/45 mt-1.5 flex items-center gap-1"
-							x-text={ "projectedCost(cron, " + workflowCostStr(preset.EstCostPerRunUSD) + ", false)" }
-						></div>
-					}
-				</div>
+				@workflowTriggerFields("triggerOnSync", "cron")
+				@workflowModelField("model")
 				for _, opt := range preset.Options {
 					<div>
 						<div class="text-sm font-medium mb-1.5">{ opt.Label }</div>
@@ -396,13 +503,7 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					></textarea>
 					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
 				</div>
-				<label class="flex items-start gap-2 text-sm cursor-pointer">
-					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm mt-0.5"/>
-					<span>
-						Activate as soon as it's set up
-						<span class="block text-xs text-base-content/50">Leave unchecked to add it paused — you can turn it on anytime.</span>
-					</span>
-				</label>
+				@workflowAdvancedFields("maxTurns", "maxBudget")
 				if !consentAck {
 					<label class="flex items-start gap-2 text-xs cursor-pointer rounded-lg bg-base-200/60 p-3 border border-base-300">
 						<input type="checkbox" name="consent" value="true" x-model="consent" class="checkbox checkbox-xs mt-0.5"/>
@@ -428,10 +529,3 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 	}
 }
 
-templ workflowScheduleOption(value, label, selected string) {
-	if value == selected {
-		<option value={ value } selected>{ label }</option>
-	} else {
-		<option value={ value }>{ label }</option>
-	}
-}

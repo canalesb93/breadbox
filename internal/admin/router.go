@@ -493,6 +493,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 			// Preview the composed internal base prompt for a preset (read-only JSON).
 			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
+			// Human-readable preview of a cron expression for the schedule field
+			// (read-only JSON). Single-segment path — never shadows {slug}/*.
+			r.Get("/workflows/cron-preview", WorkflowCronPreviewAdminHandler(svc))
 			// Reconfigure an already-enabled workflow (schedule, additional
 			// instructions, options). GET returns the live config to prefill
 			// the configure drawer; POST re-composes the prompt + schedule.
