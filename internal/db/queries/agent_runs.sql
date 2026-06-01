@@ -1,6 +1,6 @@
 -- name: CreateAgentRun :one
-INSERT INTO workflow_runs (agent_definition_id, "trigger", status, started_at)
-VALUES ($1, $2, 'in_progress', NOW())
+INSERT INTO workflow_runs (agent_definition_id, "trigger", model, status, started_at)
+VALUES ($1, $2, $3, 'in_progress', NOW())
 RETURNING *;
 
 -- name: GetAgentRun :one

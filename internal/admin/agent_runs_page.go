@@ -359,6 +359,7 @@ func agentRunRowFromResponse(run service.AgentRunResponse) pages.AgentRunRowProp
 		ShortID: run.ShortID,
 		Status:  run.Status,
 		Trigger: run.Trigger,
+		Model:   run.Model,
 	}
 	if t, err := time.Parse(time.RFC3339, run.StartedAt); err == nil {
 		row.StartedAt = t

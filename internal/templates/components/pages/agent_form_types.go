@@ -93,6 +93,27 @@ func DefaultAgentModelOptions() []AgentModelOption {
 	}
 }
 
+// AgentModelShortLabel returns a compact, human-friendly label for the
+// model a run executed with — e.g. "claude-opus-4-7" → "Opus 4.7". Used
+// on the run-detail page where the verbose form-option labels are too
+// long. Unknown/custom IDs fall back to the raw string so disclosure
+// stays honest; an empty model (runs predating the snapshot column)
+// returns "" so callers can omit the affordance entirely.
+func AgentModelShortLabel(model string) string {
+	switch model {
+	case "":
+		return ""
+	case "claude-opus-4-7":
+		return "Opus 4.7"
+	case "claude-sonnet-4-6":
+		return "Sonnet 4.6"
+	case "claude-haiku-4-5":
+		return "Haiku 4.5"
+	default:
+		return model
+	}
+}
+
 // fieldErr returns the validation message for a given field name, or empty
 // string when none. Used by the templ to conditionally render an inline
 // error paragraph without nil-map panics.

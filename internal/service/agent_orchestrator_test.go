@@ -63,6 +63,12 @@ func TestOrchestratorRunNow_Success(t *testing.T) {
 		t.Errorf("SessionID = %v, want sess-test", runResp.SessionID)
 	}
 
+	// The model the run executed with is snapshotted onto the run at
+	// creation (not just the definition), so the runs page can disclose it.
+	if runResp.Model != def.Model {
+		t.Errorf("runResp.Model = %q, want %q (snapshot of def.Model)", runResp.Model, def.Model)
+	}
+
 	// Verify the row was persisted with the same fields.
 	persisted, err := svc.GetAgentRun(context.Background(), runResp.ShortID)
 	if err != nil {
@@ -70,6 +76,9 @@ func TestOrchestratorRunNow_Success(t *testing.T) {
 	}
 	if persisted.Status != agent.StatusSuccess {
 		t.Errorf("persisted Status = %q, want success", persisted.Status)
+	}
+	if persisted.Model != def.Model {
+		t.Errorf("persisted Model = %q, want %q", persisted.Model, def.Model)
 	}
 }
 

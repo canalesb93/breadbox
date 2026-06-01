@@ -31,6 +31,11 @@ type AgentRunRowProps struct {
 	Turns      int
 	Note       string
 
+	// Model is the Claude model this run executed with, snapshotted at
+	// run creation (e.g. "claude-opus-4-7"). Empty for runs predating the
+	// snapshot. Surfaced on the run-detail page, not the spare list row.
+	Model string
+
 	// ErrorMessage is the raw error_message column. Empty for non-errored
 	// runs. ErrorMessageFriendly is the operator-friendly translation;
 	// empty when no special mapping applies, in which case the raw message
