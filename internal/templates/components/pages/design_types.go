@@ -307,6 +307,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},
 		{
+			Slug:        "workflow-preset-card",
+			Title:       "Workflow preset card",
+			Description: "The /workflows gallery tile (workflowPresetCard) — a leading status tile (gray → green once set up), name + clamped description, an overflow kebab for Reconfigure, and a bottom-aligned footer carrying run state + the primary action (Set up, or Run now + the run toggle). Flows in a 2-up grid; secondary actions live in the configure / reconfigure drawer.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionWorkflowPresetCard() },
+		},
+		{
 			Slug:        "reports-table",
 			Title:       "Reports table",
 			Description: "components.ReportsTable + ReportTableRow + ReportPriorityBadge — the agent-reports index (/reports). A clean daisy table: Agent (name + time, primary dot for unread), Status (soft priority badge or em-dash), Summary (the title), and a trailing mark-read action. The whole row links to the report; the body lives on the detail page. The priority chip is reused on the report detail header.",
