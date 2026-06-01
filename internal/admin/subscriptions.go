@@ -77,11 +77,16 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				// Attach a bounded sample of the charges the detector grouped so
 				// the review card shows the evidence before the user confirms.
 				if mem, merr := svc.SeriesMembers(ctx, s.ShortID); merr == nil {
-					ev := subscriptionMembers(mem)
-					if len(ev) > subscriptionCandidateEvidenceMax {
-						ev = ev[:subscriptionCandidateEvidenceMax]
+					ids := make([]string, 0, len(mem))
+					for _, m := range mem {
+						ids = append(ids, m.ShortID)
 					}
-					row.Members = ev
+					if len(ids) > subscriptionCandidateEvidenceMax {
+						ids = ids[:subscriptionCandidateEvidenceMax]
+					}
+					if rows, rerr := svc.GetAdminTransactionRowsByIDs(ctx, ids); rerr == nil {
+						row.MemberRows = rows
+					}
 				}
 				candidates = append(candidates, row)
 				continue
@@ -185,6 +190,17 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 		if err != nil {
 			a.Logger.Error("series members", "error", err)
 		}
+		// Canonical transaction rows for the "Charges in this series" list,
+		// rendered via the shared TxRowCompact (carries its own date/account/
+		// category) — same row as the /transactions list.
+		memberIDs := make([]string, 0, len(members))
+		for _, m := range members {
+			memberIDs = append(memberIDs, m.ShortID)
+		}
+		memberRows, mrErr := svc.GetAdminTransactionRowsByIDs(ctx, memberIDs)
+		if mrErr != nil {
+			a.Logger.Error("series member rows", "error", mrErr)
+		}
 
 		// Tags: full vocabulary (seeds the shared picker), chip data for the
 		// tags currently on the series, and the legacy add-select options —
@@ -233,7 +249,7 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			ExpectedDayValue:     derefInt(s.ExpectedDay),
 			CurrentCategoryID:    deref(s.CategoryID),
 			Categories:           flattenCategoryOptions(catTree, ""),
-			Members:              subscriptionMembers(members),
+			MemberRows:           memberRows,
 			PriceChanges:         subscriptionPriceChanges(members),
 			AvailableTags:        tagOptions,
 			TagChips:             tagChips,
@@ -1070,32 +1086,6 @@ func formatSubDate(s *string, layout string) string {
 		return *s
 	}
 	return t.Format(layout)
-}
-
-func subscriptionMembers(in []service.SeriesMember) []pages.SubscriptionMember {
-	out := make([]pages.SubscriptionMember, 0, len(in))
-	for _, m := range in {
-		name := m.Name
-		if m.MerchantName != nil && *m.MerchantName != "" {
-			name = *m.MerchantName
-		}
-		row := pages.SubscriptionMember{
-			ShortID:       m.ShortID,
-			Date:          formatSubDate(m.Date, "Jan 2, 2006"),
-			Name:          name,
-			Currency:      deref(m.Currency),
-			Pending:       m.Pending,
-			CategoryColor: m.CategoryColor,
-			CategoryIcon:  m.CategoryIcon,
-			TagCount:      m.TagCount,
-		}
-		if m.Amount != nil {
-			row.HasAmount = true
-			row.Amount = math.Abs(*m.Amount)
-		}
-		out = append(out, row)
-	}
-	return out
 }
 
 // subscriptionPriceChanges walks the members oldest→newest and records each
