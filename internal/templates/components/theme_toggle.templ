@@ -23,17 +23,28 @@ package components
 // three; btn-square reserves the box so there's no layout shift.
 //
 // The daisy tooltip surfaces the global "Toggle theme" shortcut (⇧ *,
-// registered in base.html) as a KbdCombo pill — the same blended-pill
-// shape the keyboard-shortcuts modal renders for this binding. It
-// replaces the old native :title so we don't stack a browser tooltip on
-// top of the CSS one; :aria-label still carries the live preference for
-// screen readers. KbdCombo self-hides on touch, where there's no hover.
+// registered in base.html) as a blended-pill kbd combo — the same shape
+// the keyboard-shortcuts modal renders for this binding. It replaces the
+// old native :title so we don't stack a browser tooltip on top of the CSS
+// one; :aria-label still carries the live preference for screen readers.
+//
+// The pill is composed inline rather than via KbdCombo("shift","*"):
+// KbdCombo can only render text glyphs, and the typographic '*' sits high
+// and reads small in a keycap. Reusing the same .bb-kbd-combo classes with
+// the centered lucide `asterisk` icon in the second cell reads cleaner
+// while staying visually identical to the shared component. Same two-layer
+// touch guard (hidden sm:inline-flex + x-show) so it disappears on touch.
 templ ThemeToggle() {
 	<div class="tooltip tooltip-bottom" x-data>
 		<div class="tooltip-content">
 			<span class="inline-flex items-center gap-1.5 whitespace-nowrap">
 				Toggle theme
-				@KbdCombo("shift", "*")
+				<span class="bb-kbd-combo hidden sm:inline-flex" x-show="!$store.device.isTouch">
+					<span class="bb-kbd-combo__key">{ kbdGlyph("shift") }</span>
+					<span class="bb-kbd-combo__key">
+						@LucideIcon("asterisk", "w-3 h-3")
+					</span>
+				</span>
 			</span>
 		</div>
 		<button
