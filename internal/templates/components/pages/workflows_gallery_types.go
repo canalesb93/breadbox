@@ -3,11 +3,8 @@
 package pages
 
 import (
-	"fmt"
 	"strconv"
 	"time"
-
-	"breadbox/internal/templates/components"
 )
 
 // workflowCostStr formats a per-run cost estimate as a 2-decimal string
@@ -17,25 +14,19 @@ func workflowCostStr(c float64) string {
 	return strconv.FormatFloat(c, 'f', 2, 64)
 }
 
-// presetMenuItems builds the row's overflow ("⋯") menu — the secondary
-// actions moved out of the inline row to declutter it: Preview prompt
-// always, plus Reconfigure for an enabled workflow (admin only). The
-// OnClick strings invoke the workflowsGallery Alpine factory methods and
-// render inside the gallery's x-data root, so the handlers resolve.
-func presetMenuItems(preset WorkflowPresetCardProps, isAdmin bool) []components.OverflowMenuItem {
-	items := []components.OverflowMenuItem{{
-		Label:   "Preview prompt",
-		Icon:    "file-text",
-		OnClick: fmt.Sprintf("previewPrompt('%s', '%s')", preset.Slug, preset.Name),
-	}}
-	if preset.Enabled && isAdmin {
-		items = append(items, components.OverflowMenuItem{
-			Label:   "Reconfigure",
-			Icon:    "sliders-horizontal",
-			OnClick: fmt.Sprintf("openReconfigure('%s', '%s')", preset.WorkflowSlug, preset.Name),
-		})
+// presetTileClasses returns the classes for a preset card's leading
+// icon tile. Gray (neutral) by default; a green accent once the preset
+// has been set up as a workflow, so a glance down the grid reads which
+// automations are live. The shape (size, rounding, centering) is shared
+// across both states.
+// The tile is `relative` so an enabled card can pin a small status dot
+// (last-run error) to its corner.
+func presetTileClasses(enabled bool) string {
+	const base = "relative flex items-center justify-center w-10 h-10 rounded-xl shrink-0 "
+	if enabled {
+		return base + "bg-success/15 text-success"
 	}
-	return items
+	return base + "bg-base-200 text-base-content/55"
 }
 
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.

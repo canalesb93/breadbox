@@ -307,6 +307,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionAgentRunRows() },
 		},
 		{
+			Slug:        "workflow-preset-card",
+			Title:       "Workflow preset card",
+			Description: "The /workflows gallery row (workflowPresetCard) — a clean Mintlify-style single line: a leading status tile (gray → green once set up; a red dot flags a failed last run), name + clamped description, and the run toggle + a settings gear. The gear opens the configure / reconfigure drawer, where Set up, Run now, Reconfigure, and Preview prompt all live. Flows in a 2-up grid.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionWorkflowPresetCard() },
+		},
+		{
 			Slug:        "reports-table",
 			Title:       "Reports table",
 			Description: "components.ReportsTable + ReportTableRow + ReportPriorityBadge — the agent-reports index (/reports). A clean daisy table: Agent (name + time, primary dot for unread), Status (soft priority badge or em-dash), Summary (the title), and a trailing mark-read action. The whole row links to the report; the body lives on the detail page. The priority chip is reused on the report detail header.",

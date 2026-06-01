@@ -1,0 +1,45 @@
+package pages
+
+// SectionWorkflowPresetCard renders the variants of the /workflows gallery
+// preset tile (workflowPresetCard): the leading status tile (gray → green
+// once set up), the name + clamped description, the Reconfigure overflow
+// kebab, and the bottom-aligned footer carrying run state on the left and
+// the primary action on the right. Each example uses the same
+// `grid grid-cols-1 lg:grid-cols-2` wrapper the live gallery does so the
+// 2-up layout reads true.
+//
+// The card's actions resolve against the workflowsGallery Alpine factory on
+// the live page; here they're stubbed by an inline x-data so the sandbox
+// stays self-contained (clicking a control is an inert no-op — no console
+// error, and no drawer since the drawers live at the gallery root).
+templ SectionWorkflowPresetCard() {
+	<div class="flex flex-col gap-6" x-data="{ open: '', runWorkflow() {}, toggleWorkflow() {}, openReconfigure() {}, previewPrompt() {} }">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>One preset row in the <code>/workflows</code> gallery grid (<code>grid-cols-1 lg:grid-cols-2</code>) — a clean Mintlify-style single line: vertically-centered icon tile, name + two-line description, and the controls on the right.</li>
+				<li>The icon tile carries set-up state — gray until configured, a green accent once a workflow exists; a small red dot flags a failed last run.</li>
+				<li>Right side is just the run toggle + a settings gear. The gear opens the configure (not set up) / reconfigure (set up) drawer; Set up, Run now, Reconfigure, and Preview prompt all live in that drawer. A not-set-up toggle opens the setup drawer instead of flipping; non-admins get a disabled toggle.</li>
+			</ul>
+		</div>
+		@designExample("Not set up", "Gray tile, name + description, and an off toggle + gear on the right — both open the configure drawer (you can't enable without picking a schedule + acknowledging cost). Scheduled and post-sync presets look identical here; the trigger is chosen in the drawer.") {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				@workflowPresetCard(designWFCardNotSetUp(), true)
+				@workflowPresetCard(designWFCardNotSetUpSync(), true)
+			</div>
+		}
+		@designExample("Set up — run states", "Green tile once configured. The run toggle (left of the gear) reflects enabled vs paused; the gear opens the reconfigure drawer (where Run now + Preview prompt live). A failed last run pins a small red dot to the tile corner — see Large Charge Sentinel.") {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				@workflowPresetCard(designWFCardRunning(), true)
+				@workflowPresetCard(designWFCardPaused(), true)
+				@workflowPresetCard(designWFCardError(), true)
+				@workflowPresetCard(designWFCardNeverRun(), true)
+			</div>
+		}
+		@designExample("Non-admin", "Viewers can't instantiate a workflow: the toggle is disabled with a tooltip and no gear renders.") {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				@workflowPresetCard(designWFCardNotSetUp(), false)
+			</div>
+		}
+	</div>
+}

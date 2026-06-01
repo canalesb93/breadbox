@@ -143,6 +143,89 @@ func TestT15WorkflowsGalleryRenders(t *testing.T) {
 	}
 }
 
+// TestT15WorkflowsGalleryGridAndTiles asserts the redesigned gallery layout:
+// presets flow in a 2-up grid (single column on mobile), and each card's
+// leading icon tile is gray by default but green-accented once the preset is
+// set up. The T15 fixture has both an enabled and a disabled preset, so both
+// tile states must appear.
+func TestT15WorkflowsGalleryGridAndTiles(t *testing.T) {
+	props := T15buildGalleryProps()
+
+	var buf strings.Builder
+	if err := WorkflowsGallery(props).Render(context.Background(), &buf); err != nil {
+		t.Fatalf("WorkflowsGallery.Render returned error: %v", err)
+	}
+	html := buf.String()
+
+	// 2-up grid on desktop, single column on mobile.
+	if !strings.Contains(html, "grid-cols-1") || !strings.Contains(html, "lg:grid-cols-2") {
+		t.Error("expected a single-column / 2-up-desktop grid wrapper (grid-cols-1 lg:grid-cols-2)")
+	}
+
+	// Green-accented tile for the enabled preset (uncategorized-review).
+	if !strings.Contains(html, "bg-success/15") {
+		t.Error("expected a green-accent icon tile (bg-success/15) for the enabled preset")
+	}
+	// Gray tile for the disabled presets.
+	if !strings.Contains(html, "bg-base-200") {
+		t.Error("expected a gray icon tile (bg-base-200) for disabled presets")
+	}
+
+	// The card surfaces the preset's own icon — e.g. "tag" for Smart
+	// Categorizer renders as a lucide-tag SVG.
+	if !strings.Contains(html, "lucide-tag") {
+		t.Error("expected the preset icon (lucide-tag) to render in its card tile")
+	}
+
+	// Preview prompt now lives inside the configure/reconfigure drawer, not
+	// the card ⋯ menu. The button + its handler should be present (admin view).
+	if !strings.Contains(html, "Preview prompt") || !strings.Contains(html, "previewPrompt(") {
+		t.Error("expected the Preview prompt affordance inside the drawer (button + handler)")
+	}
+
+	// The cleaned-up row uses a settings gear (not a ⋯ kebab) as the
+	// drawer entry point.
+	if !strings.Contains(html, "lucide-settings") {
+		t.Error("expected a settings gear (lucide-settings) on the row")
+	}
+	if strings.Contains(html, "lucide-ellipsis") {
+		t.Error("expected no ⋯ kebab on the row (replaced by the gear)")
+	}
+}
+
+// TestT15WorkflowsGalleryLastRunErrorDot asserts a failed last run pins a
+// red status dot to the icon tile, and a clean run does not.
+func TestT15WorkflowsGalleryLastRunErrorDot(t *testing.T) {
+	base := WorkflowsGalleryProps{
+		CSRFToken: "csrf",
+		IsAdmin:   true,
+		Status:    AgentSubsystemStatusProps{Ready: true},
+	}
+	mk := func(status string) string {
+		props := base
+		props.Categories = []WorkflowCategoryProps{{
+			Name: "Cat", Icon: "sparkles",
+			Presets: []WorkflowPresetCardProps{{
+				Slug: "p", Name: "P", Description: "d", Icon: "sparkles",
+				Enabled: true, WorkflowSlug: "p", WorkflowEnabled: true,
+				LastRun: &WorkflowLastRunProps{ShortID: "r1", Status: status},
+			}},
+		}}
+		var buf strings.Builder
+		if err := WorkflowsGallery(props).Render(context.Background(), &buf); err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		return buf.String()
+	}
+
+	if !strings.Contains(mk("error"), "bg-error") {
+		t.Error("expected a red status dot (bg-error) on a card whose last run errored")
+	}
+	if strings.Contains(mk("success"), "bg-error") {
+		t.Error("did not expect a red status dot on a card whose last run succeeded")
+	}
+}
+
 // TestT15WorkflowsGalleryEnabledPresetRendersToggle asserts that a preset
 // marked Enabled=true renders a toggle checkbox rather than the "Set up" button.
 func TestT15WorkflowsGalleryEnabledPresetRendersToggle(t *testing.T) {
@@ -232,6 +315,11 @@ func TestT15WorkflowsGalleryNonAdminDisablesSetUp(t *testing.T) {
 	// Non-admin: no configure drawer should be rendered (drawers are admin-only).
 	if strings.Contains(html, "submitDrawer") {
 		t.Error("expected no configure drawer (submitDrawer) for non-admin user")
+	}
+	// Preview prompt lives only inside the (admin-only) drawer now, so a
+	// non-admin sees no Preview prompt affordance at all.
+	if strings.Contains(html, "Preview prompt") {
+		t.Error("expected no Preview prompt affordance for non-admin (it lives in the admin-only drawer)")
 	}
 }
 
