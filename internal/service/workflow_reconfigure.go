@@ -218,7 +218,7 @@ func composeWorkflowPrompt(preset WorkflowPreset, options map[string]string, add
 // untouched — toggling runs stays on the enable/disable endpoints. Resolves
 // by slug; returns the updated definition.
 func (s *Service) UpdateWorkflowConfig(ctx context.Context, slug string, params UpdateWorkflowConfigParams) (*AgentDefinitionResponse, error) {
-	_, preset, err := s.presetForEnabledWorkflow(ctx, slug)
+	def, preset, err := s.presetForEnabledWorkflow(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -251,8 +251,13 @@ func (s *Service) UpdateWorkflowConfig(ctx context.Context, slug string, params 
 			}
 		}
 	default:
-		// Trigger not specified — legacy cron-only update path.
-		if params.ScheduleCron != nil {
+		// Trigger not specified — legacy cron-only update path. A bare
+		// schedule applies only to a workflow already on a custom schedule;
+		// a post-sync workflow ignores it (switching a post-sync workflow to
+		// a schedule requires the explicit TriggerOnSync=false switch above,
+		// which also clears the sync flag) so the two trigger modes can never
+		// both be live.
+		if !def.TriggerOnSyncComplete && params.ScheduleCron != nil {
 			if cron := strings.TrimSpace(*params.ScheduleCron); cron != "" {
 				update.ScheduleCron = &cron
 			}
