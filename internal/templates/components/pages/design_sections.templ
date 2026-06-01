@@ -784,6 +784,82 @@ templ SectionModals() {
 	</div>
 }
 
+// ─── Drawer (slide-over) ───────────────────────────────────────────────
+
+// SectionDrawer demos the shared components.Drawer slide-over. The
+// section root carries x-data so the trigger buttons' @click bind in
+// both the full gallery and the standalone embed; $store.drawers is
+// defined globally in layout/base.html and is present in both. Only one
+// drawer opens at a time, so all the demo panels can render at once.
+templ SectionDrawer() {
+	<div x-data class="flex flex-col gap-6">
+		@designExample("Anatomy", "Backdrop + sliding panel + DrawerHeader (icon · title · subtitle · close) + scrollable body + DrawerFooter (sticky actions). Opened via the global $store.drawers store keyed by id; Escape and a backdrop click close it.") {
+			<button type="button" class="btn btn-primary btn-sm gap-1.5" @click="$store.drawers.open('ds-drawer-edit')">
+				@components.LucideIcon("pencil", "w-4 h-4")
+				Open edit drawer
+			</button>
+			@components.Drawer(components.DrawerProps{ID: "ds-drawer-edit", Title: "Edit category"}) {
+				<form class="flex flex-col h-full" @submit.prevent="$store.drawers.close()">
+					@components.DrawerHeader(components.DrawerHeaderProps{
+						Icon:     "pencil",
+						Title:    "Edit category",
+						Subtitle: "A focused edit surface — no full-page navigation.",
+					})
+					<div class="flex-1 overflow-y-auto p-5 space-y-5">
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-drawer-name">Name</label>
+							<input id="ds-drawer-name" type="text" class="input w-full" placeholder="e.g. Groceries" value="Groceries"/>
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="ds-drawer-note">Note</label>
+							<textarea id="ds-drawer-note" class="textarea w-full" rows="4" placeholder="Optional description…"></textarea>
+						</div>
+					</div>
+					@components.DrawerFooter() {
+						<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+						<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+							@components.LucideIcon("check", "w-4 h-4")
+							Save
+						</button>
+					}
+				</form>
+			}
+		}
+		@designExample("Sizes", "Size prop → panel max-width: sm (max-w-sm) · md (max-w-md, default) · lg (max-w-lg) · xl (max-w-2xl). Default md fits a single-column edit form — pick the smallest the content reads well in.") {
+			<div class="flex flex-wrap items-center gap-2">
+				<button type="button" class="btn btn-sm" @click="$store.drawers.open('ds-drawer-sm')">sm</button>
+				<button type="button" class="btn btn-sm" @click="$store.drawers.open('ds-drawer-md')">md (default)</button>
+				<button type="button" class="btn btn-sm" @click="$store.drawers.open('ds-drawer-lg')">lg</button>
+				<button type="button" class="btn btn-sm" @click="$store.drawers.open('ds-drawer-xl')">xl</button>
+			</div>
+			@components.Drawer(components.DrawerProps{ID: "ds-drawer-sm", Title: "Small", Size: "sm"}) {
+				@designDrawerSizeBody("Small", "max-w-sm")
+			}
+			@components.Drawer(components.DrawerProps{ID: "ds-drawer-md", Title: "Medium", Size: "md"}) {
+				@designDrawerSizeBody("Medium", "max-w-md (default)")
+			}
+			@components.Drawer(components.DrawerProps{ID: "ds-drawer-lg", Title: "Large", Size: "lg"}) {
+				@designDrawerSizeBody("Large", "max-w-lg")
+			}
+			@components.Drawer(components.DrawerProps{ID: "ds-drawer-xl", Title: "Extra large", Size: "xl"}) {
+				@designDrawerSizeBody("Extra large", "max-w-2xl")
+			}
+		}
+	</div>
+}
+
+// designDrawerSizeBody is the shared body for the Drawer "Sizes" demo —
+// a header naming the size, a sentence, and a close button.
+templ designDrawerSizeBody(label, width string) {
+	@components.DrawerHeader(components.DrawerHeaderProps{Icon: "panel-right", Title: label + " drawer", Subtitle: width})
+	<div class="flex-1 overflow-y-auto p-5">
+		<p class="text-sm text-base-content/70">This panel is <span class="font-mono">{ width }</span>.</p>
+	</div>
+	@components.DrawerFooter() {
+		<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Close</button>
+	}
+}
+
 // ─── Loading & skeletons ───────────────────────────────────────────────
 
 templ SectionLoading() {

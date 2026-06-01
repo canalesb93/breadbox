@@ -12,6 +12,12 @@ import "strings"
 // separate list because the failure modes differ: the only overlap
 // today is the startup orphan-cleanup message, which both subsystems
 // write verbatim and both want to surface as "safe to retry".
+//
+// The raw message is the typed RunError taxonomy from
+// internal/agent/errors.go rendered as "agent: <code>: <message>
+// [stderr=…]". Patterns match a lowercased substring and the FIRST
+// match wins, so order specific diagnostic text before the broad
+// "agent: <code>:" catches below it.
 func AgentRunFriendlyError(raw string) string {
 	lower := strings.ToLower(raw)
 	for _, m := range AgentRunFriendlyErrorMappings {
@@ -27,10 +33,66 @@ type agentRunErrorMapping struct {
 	message string
 }
 
+// AgentRunFriendlyErrorMappings translates the raw run error into a
+// one-line headline the operator can act on. The raw message stays
+// visible beneath it for bug reports, so these stay short and
+// action-oriented. Order matters — see AgentRunFriendlyError.
 var AgentRunFriendlyErrorMappings = []agentRunErrorMapping{
+	// ── Specific diagnostic text (match before the generic codes) ──
 	{
 		pattern: "interrupted by server restart",
 		message: "Interrupted by a server restart — safe to re-run.",
+	},
+	{
+		// The Claude Agent SDK's generic wrapper when the underlying
+		// `claude` runner exits non-zero without surfacing a reason.
+		// Stays an "unknown" code on purpose, but in practice this is
+		// almost always a credential the SDK rejected before printing
+		// anything — point the operator at auth without over-claiming.
+		pattern: "claude code process exited",
+		message: "The Claude runner exited before reporting a reason — most often an expired or invalid Anthropic credential. Re-check Settings → Workflows auth, then re-run.",
+	},
+	{
+		// Sidecar's zero-message branch (it stamps auth_error + this text).
+		pattern: "stream ended without yielding any messages",
+		message: "The run produced no output — usually an invalid Anthropic credential or a runner that failed to start. Re-check Settings → Workflows auth, then re-run.",
+	},
+	{
+		pattern: "breadbox-agent binary not found",
+		message: "The workflow runner isn't installed on this server. Install it (make agent-sidecar-install-user) and re-run.",
+	},
+	{
+		pattern: "another run is already in progress",
+		message: "Skipped — another run was already in progress. It'll run on the next trigger, or re-run now.",
+	},
+	// ── Typed RunError codes (broad fallbacks) ──
+	{
+		pattern: "agent: auth_error",
+		message: "Anthropic rejected the credential (invalid, expired, or wrong account). Rotate the API key or subscription token in Settings → Workflows, then re-run.",
+	},
+	{
+		pattern: "agent: api_error",
+		message: "Anthropic's API returned an error (overloaded or rate-limited). This is usually transient — re-run in a few minutes.",
+	},
+	{
+		pattern: "agent: network_error",
+		message: "Couldn't reach Anthropic (network, DNS, or TLS). Check the server's outbound connectivity, then re-run.",
+	},
+	{
+		pattern: "agent: tool_error",
+		message: "A tool call failed mid-run. Open the transcript below to see which one, then re-run once it's resolved.",
+	},
+	{
+		pattern: "agent: spec_invalid",
+		message: "Internal error — the run spec failed validation. This is a Breadbox bug, not a configuration issue; please report it.",
+	},
+	{
+		pattern: "agent: interrupted",
+		message: "Interrupted before finishing (server shutdown or cancellation) — safe to re-run.",
+	},
+	{
+		pattern: "exceeded budget cap",
+		message: "Stopped at the per-run budget cap. Raise the budget in the workflow's settings if it needs more room.",
 	},
 }
 

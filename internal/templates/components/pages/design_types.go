@@ -371,6 +371,13 @@ func DesignSections() []DesignSection {
 			Group:       "feedback",
 			Render:      func() templ.Component { return SectionModals() },
 		},
+		{
+			Slug:        "drawers",
+			Title:       "Drawer (slide-over)",
+			Description: "Right-side slide-over sheet for focused create/edit flows without leaving the page — backdrop + sliding panel + DrawerHeader + scrollable body + DrawerFooter. Opened from anywhere via $store.drawers.open('<id>'). Drives the Workflows Set up / Configure / Reconfigure flows; reach for it for simple inline edits instead of a full page or a cramped modal.",
+			Group:       "feedback",
+			Render:      func() templ.Component { return SectionDrawer() },
+		},
 
 		// ── Patterns ────────────────────────────────────────────────
 		{

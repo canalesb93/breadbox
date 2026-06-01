@@ -6,9 +6,11 @@ document.addEventListener('alpine:init', function () {
   Alpine.data('workflowsGallery', function () {
     return {
       csrfToken: '',
-      // open holds the slug of the preset whose configure drawer is showing
-      // (empty string = no drawer).
-      open: '',
+      // Drawer open/close is owned by the global $store.drawers store
+      // (see layout/base.html). The configure drawers are keyed
+      // 'wf-config-<presetSlug>'; the shared reconfigure drawer is
+      // 'wf-reconfigure'. open()/close() are called from the template
+      // (Set up / Cancel / Escape / backdrop) and from openReconfigure().
 
       // --- F2: preview internal prompt -----------------------------------
       // State for the "Preview prompt" modal: the composed base prompt is
@@ -167,7 +169,7 @@ document.addEventListener('alpine:init', function () {
         self.reconfigure.additionalInstructions = '';
         self.reconfigure.scheduleCron = '';
         self.reconfigure.triggerOnSync = false;
-        self.open = 'reconfigure';
+        Alpine.store('drawers').open('wf-reconfigure');
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/config', {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
@@ -185,7 +187,7 @@ document.addEventListener('alpine:init', function () {
           })
           .catch(function (e) {
             console.error('openReconfigure failed', e);
-            self.open = '';
+            Alpine.store('drawers').close();
             self.restorePageState();
           })
           .finally(function () {

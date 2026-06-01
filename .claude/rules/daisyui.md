@@ -59,7 +59,7 @@ Always use the daisy component (with our standard overlays only):
 | `toast` | `toast toast-center toast-bottom` | One toast pattern. |
 | `tooltip` | `tooltip tooltip-top` + `data-tip="…"` | Don't roll your own tooltip. |
 | `loading` | `loading loading-spinner loading-xs/sm/md` | Only `loading-spinner` in practice — acceptable. |
-| `drawer` | `drawer lg:drawer-open` | Single use in `base.html`. |
+| `drawer` | `drawer lg:drawer-open` | Sidebar layout — single use in `base.html`. For a right-side slide-over sheet use `components.Drawer`, NOT this. |
 | `steps` | `steps steps-horizontal` | Wizard progress. CSV import should be on this. |
 | `tabs` | `tabs tabs-border` (or `tabs-box` for filter-tabs) | **Adopt — currently 0 callers.** |
 | `stat` / `stats` | `stats stats-horizontal` | **Adopt for dashboard tiles — currently 0 callers.** |
@@ -98,6 +98,14 @@ These exist because daisy doesn't cover the case. Keep using them; do
 If you find yourself wanting to write a new `bb-*` class that
 overlaps with daisy, **stop**: either adopt the daisy primitive or
 write a templ component that wraps it.
+**Right-side slide-over → `components.Drawer`.** Daisy's `drawer` is
+the sidebar layout (the one in `base.html`), not a right-anchored
+sheet. For focused inline create/edit flows use the shared
+`components.Drawer` + `DrawerHeader` + `DrawerFooter` templ
+components, opened via the global `$store.drawers` store. Don't
+hand-roll the backdrop+panel+slide chrome again — see
+`/design/c/drawers` and `docs/design-system.md`.
+
 
 ## Anti-patterns (actively being removed)
 
