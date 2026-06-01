@@ -31,11 +31,25 @@ document.addEventListener('alpine:init', function () {
         loading: false,
         slug: '',
         name: '',
-        triggerOnSync: false,
+        enabled: false, // run-state, driven by the header toggle (toggleWorkflow)
+        // triggerOnSync is a STRING ('true' | 'false') so the trigger radios
+        // can bind via x-model and submit as the trigger_on_sync form field.
+        triggerOnSync: 'false',
         scheduleCron: '',
+        model: '',
+        maxTurns: '',
+        maxBudget: '',
         additionalInstructions: '',
         options: [], // [{ key, label, help, selected, choices: [{value,label}] }]
       },
+      // -------------------------------------------------------------------
+
+      // --- Schedule preview ----------------------------------------------
+      // cronPreview holds the human-readable rendering of the current cron
+      // (from GET /-/workflows/cron-preview). Shared by both drawers since
+      // only one is open at a time. describeCron() refreshes it.
+      cronPreview: '',
+      cronPreviewLoading: false,
       // -------------------------------------------------------------------
 
       init: function () {
@@ -160,15 +174,20 @@ document.addEventListener('alpine:init', function () {
       // Open the shared reconfigure drawer prefilled with an enabled
       // workflow's live config (schedule, options, additional instructions),
       // fetched from GET /-/workflows/{slug}/config.
-      openReconfigure: function (slug, name) {
+      openReconfigure: function (slug, name, enabled) {
         var self = this;
         self.reconfigure.slug = slug;
         self.reconfigure.name = name || slug;
+        self.reconfigure.enabled = !!enabled;
         self.reconfigure.loading = true;
         self.reconfigure.options = [];
         self.reconfigure.additionalInstructions = '';
         self.reconfigure.scheduleCron = '';
-        self.reconfigure.triggerOnSync = false;
+        self.reconfigure.triggerOnSync = 'false';
+        self.reconfigure.model = '';
+        self.reconfigure.maxTurns = '';
+        self.reconfigure.maxBudget = '';
+        self.cronPreview = '';
         Alpine.store('drawers').open('wf-reconfigure');
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/config', {
           credentials: 'same-origin',
@@ -180,10 +199,14 @@ document.addEventListener('alpine:init', function () {
           })
           .then(function (data) {
             self.reconfigure.name = data.name || self.reconfigure.name;
-            self.reconfigure.triggerOnSync = !!data.trigger_on_sync;
+            self.reconfigure.triggerOnSync = data.trigger_on_sync ? 'true' : 'false';
             self.reconfigure.scheduleCron = data.schedule_cron || '';
+            self.reconfigure.model = data.model || '';
+            self.reconfigure.maxTurns = data.max_turns ? String(data.max_turns) : '';
+            self.reconfigure.maxBudget = data.max_budget_usd ? String(data.max_budget_usd) : '';
             self.reconfigure.additionalInstructions = data.additional_instructions || '';
             self.reconfigure.options = Array.isArray(data.options) ? data.options : [];
+            if (self.reconfigure.triggerOnSync === 'false') self.describeCron(self.reconfigure.scheduleCron);
           })
           .catch(function (e) {
             console.error('openReconfigure failed', e);
@@ -192,6 +215,35 @@ document.addEventListener('alpine:init', function () {
           })
           .finally(function () {
             self.reconfigure.loading = false;
+          });
+      },
+
+      // describeCron fetches a human-readable rendering of a cron expression
+      // for the schedule preview. Debounced at the call site
+      // (@input.debounce in the template); here it just fetches + stores.
+      describeCron: function (cron) {
+        var self = this;
+        cron = (cron || '').trim();
+        if (!cron) {
+          self.cronPreview = '';
+          return;
+        }
+        self.cronPreviewLoading = true;
+        fetch('/-/workflows/cron-preview?cron=' + encodeURIComponent(cron), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            return res.json();
+          })
+          .then(function (data) {
+            self.cronPreview = data && data.description ? data.description : '';
+          })
+          .catch(function () {
+            self.cronPreview = '';
+          })
+          .finally(function () {
+            self.cronPreviewLoading = false;
           });
       },
 

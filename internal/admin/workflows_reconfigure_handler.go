@@ -44,11 +44,14 @@ func ReconfigureWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 		slug := chi.URLParam(r, "slug")
 		_ = r.ParseForm()
 
+		cfg, cfgControl := parseWorkflowFormConfig(r)
 		params := service.UpdateWorkflowConfigParams{
 			AdditionalInstructions: r.FormValue("additional_instructions"),
-		}
-		if cron := r.FormValue("schedule_cron"); cron != "" {
-			params.ScheduleCron = &cron
+			TriggerOnSync:          cfg.TriggerOnSync,
+			ScheduleCron:           cfg.ScheduleCron,
+			Model:                  cfg.Model,
+			MaxTurns:               cfg.MaxTurns,
+			MaxBudgetUSD:           cfg.MaxBudgetUSD,
 		}
 		// Any non-control form field is a preset-specialized option (e.g.
 		// apply_mode); the service validates each against the preset's
@@ -56,9 +59,11 @@ func ReconfigureWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 		// Same control-key set as the enable handler, minus enable-only
 		// fields (enabled/consent) that don't apply to a reconfigure.
 		control := map[string]bool{
-			"schedule_cron":           true,
 			"additional_instructions": true,
 			"_csrf":                   true,
+		}
+		for k := range cfgControl {
+			control[k] = true
 		}
 		params.Options = map[string]string{}
 		for key := range r.Form {

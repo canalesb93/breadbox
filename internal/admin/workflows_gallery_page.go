@@ -114,6 +114,14 @@ func groupWorkflowPresets(views []service.WorkflowPresetView, lastRuns map[strin
 		if _, seen := byCat[v.Category]; !seen {
 			order = append(order, v.Category)
 		}
+		model := v.Model
+		if model == "" {
+			model = service.DefaultAgentModel
+		}
+		maxTurns := v.MaxTurns
+		if maxTurns == 0 {
+			maxTurns = service.DefaultAgentMaxTurns
+		}
 		card := pages.WorkflowPresetCardProps{
 			Slug:             v.Slug,
 			Name:             v.Name,
@@ -124,6 +132,8 @@ func groupWorkflowPresets(views []service.WorkflowPresetView, lastRuns map[strin
 			ScheduleCron:     v.ScheduleCron,
 			TriggerOnSync:    v.TriggerOnSyncComplete,
 			EstCostPerRunUSD: v.EstCostPerRunUSD,
+			Model:            model,
+			MaxTurns:         maxTurns,
 			Enabled:          v.Enabled,
 		}
 		if v.WorkflowSlug != nil {

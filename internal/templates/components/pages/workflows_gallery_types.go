@@ -3,15 +3,58 @@
 package pages
 
 import (
-	"strconv"
+	"fmt"
+	"strings"
 	"time"
 )
 
-// workflowCostStr formats a per-run cost estimate as a 2-decimal string
-// for the drawer's projected-cost hint (and as a literal arg into the
-// reactive projectedCost() JS call).
-func workflowCostStr(c float64) string {
-	return strconv.FormatFloat(c, 'f', 2, 64)
+// workflowConfigDrawerData builds the Alpine x-data object literal for the
+// setup drawer, seeded from the preset's defaults. Mirrors the field set the
+// reconfigure drawer hydrates from GET /config so both drawers share the
+// trigger / schedule / model / advanced sub-templs. Values are quoted strings
+// (form-friendly); cron falls back to a daily default when the preset has none.
+func workflowConfigDrawerData(p WorkflowPresetCardProps) string {
+	trigger := "false" // custom schedule
+	if p.TriggerOnSync {
+		trigger = "true"
+	}
+	cron := strings.TrimSpace(p.ScheduleCron)
+	if cron == "" {
+		cron = "0 8 * * *"
+	}
+	turns := p.MaxTurns
+	if turns <= 0 {
+		turns = 10
+	}
+	return fmt.Sprintf(
+		"{ triggerOnSync: '%s', cron: '%s', model: '%s', maxTurns: '%d', maxBudget: '%s', consent: false }",
+		trigger, cron, p.Model, turns, "1",
+	)
+}
+
+// workflowBoolJS renders a Go bool as a JS boolean literal, for inline
+// Alpine @click expressions (e.g. the reconfigure gear passing run-state).
+func workflowBoolJS(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// workflowOpenConfigJS builds the @click for a not-set-up card's Set-up
+// controls: open the per-preset config drawer and, for a custom-schedule
+// preset, seed the live cron preview so it's populated before the first
+// interaction. Post-sync presets skip the preview (no schedule shown).
+func workflowOpenConfigJS(p WorkflowPresetCardProps) string {
+	open := "$store.drawers.open('wf-config-" + p.Slug + "')"
+	if p.TriggerOnSync {
+		return open
+	}
+	cron := strings.TrimSpace(p.ScheduleCron)
+	if cron == "" {
+		cron = "0 8 * * *"
+	}
+	return open + "; describeCron('" + cron + "')"
 }
 
 // presetTileClasses returns the classes for a preset card's leading
@@ -74,8 +117,13 @@ type WorkflowPresetCardProps struct {
 	TriggerLabel     string  // human-readable trigger summary ("After each sync", "Weekly")
 	ToolScope        string  // "read_only" | "read_write" — drives a small "applies changes" hint
 	ScheduleCron     string  // default cron for scheduled presets (empty for post-sync)
-	TriggerOnSync    bool    // true = post-sync event trigger (no schedule editing)
+	TriggerOnSync    bool    // default trigger: true = post-sync; user-switchable in the drawer
 	EstCostPerRunUSD float64 // rough per-run cost estimate for the projected-cost hint
+
+	// Model / MaxTurns seed the setup drawer's model select + Advanced
+	// section. Resolved to non-empty/non-zero defaults by the page handler.
+	Model    string
+	MaxTurns int
 
 	// Options are the preset's specialized configuration selects, rendered
 	// in the configure drawer (e.g. apply-mode for categorization presets).

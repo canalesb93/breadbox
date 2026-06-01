@@ -363,9 +363,20 @@ type EnableWorkflowFromPresetParams struct {
 	// Enabled controls whether the instantiated workflow runs immediately.
 	// Defaults to false (instantiated but paused) so a household can review it.
 	Enabled bool
-	// ScheduleCron overrides the preset's default cron for scheduled presets
-	// (ignored for post-sync presets). nil = use the preset default.
+	// TriggerOnSync, when non-nil, overrides the preset's default trigger:
+	// true = after each sync; false = custom schedule (uses ScheduleCron).
+	// nil = use the preset's default. The trigger is user-selectable at
+	// setup, not fixed by the preset.
+	TriggerOnSync *bool
+	// ScheduleCron overrides the cron when on a custom schedule. nil = use
+	// the preset default (falling back to a daily default if the preset has
+	// none — e.g. a post-sync preset switched to a custom schedule).
 	ScheduleCron *string
+	// Model overrides the run model. nil/empty = use the preset's model.
+	Model *string
+	// MaxTurns / MaxBudgetUSD override the Advanced caps. nil = preset/default.
+	MaxTurns     *int
+	MaxBudgetUSD *float64
 	// AdditionalInstructions, when non-empty, is appended to the composed base
 	// prompt every run — the household's per-workflow tuning, mirroring
 	// Mintlify's "additional prompt over the base prompt".
@@ -429,16 +440,38 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 		TriggerOnSyncComplete: preset.TriggerOnSyncComplete,
 		SourceTemplate:        &preset.Slug,
 	}
-	// Scheduled presets accept a cron override; post-sync presets keep their
-	// event trigger (no cron).
-	if !preset.TriggerOnSyncComplete {
-		cron := preset.ScheduleCron
+	// Model override (Advanced / model select). Blank falls back to the preset.
+	if params.Model != nil {
+		if m := strings.TrimSpace(*params.Model); m != "" {
+			create.Model = m
+		}
+	}
+	if params.MaxTurns != nil && *params.MaxTurns > 0 {
+		create.MaxTurns = *params.MaxTurns
+	}
+	if params.MaxBudgetUSD != nil {
+		create.MaxBudgetUSD = params.MaxBudgetUSD
+	}
+
+	// Trigger is user-selectable at setup (custom schedule vs after-each-sync),
+	// not fixed by the preset. The two modes are mutually exclusive — only a
+	// custom schedule gets a cron, so a post-sync run never also fires on cron.
+	triggerOnSync := preset.TriggerOnSyncComplete
+	if params.TriggerOnSync != nil {
+		triggerOnSync = *params.TriggerOnSync
+	}
+	create.TriggerOnSyncComplete = triggerOnSync
+	if !triggerOnSync {
+		cron := strings.TrimSpace(preset.ScheduleCron)
 		if params.ScheduleCron != nil && strings.TrimSpace(*params.ScheduleCron) != "" {
 			cron = strings.TrimSpace(*params.ScheduleCron)
 		}
-		if cron != "" {
-			create.ScheduleCron = &cron
+		if cron == "" {
+			// A post-sync preset switched to a custom schedule has no preset
+			// cron — seed a sensible daily default the drawer can override.
+			cron = "0 8 * * *"
 		}
+		create.ScheduleCron = &cron
 	}
 	return s.CreateAgentDefinition(ctx, create)
 }

@@ -122,6 +122,10 @@ type DrawerHeaderProps struct {
 	TitleExpr    string // Alpine x-text expression; overrides Title
 	Subtitle     string
 	SubtitleExpr string // Alpine x-text expression; overrides Subtitle
+	// Right is an optional control rendered between the title block and the
+	// close button (e.g. a status toggle, Mintlify-style). Sits on the
+	// header's top line, vertically centered against the title.
+	Right templ.Component
 }
 
 templ DrawerHeader(p DrawerHeaderProps) {
@@ -143,9 +147,14 @@ templ DrawerHeader(p DrawerHeaderProps) {
 				}
 			</div>
 		</div>
-		<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="$store.drawers.close()" aria-label="Close">
-			@LucideIcon("x", "w-4 h-4")
-		</button>
+		<div class="flex items-center gap-2 shrink-0">
+			if p.Right != nil {
+				@p.Right
+			}
+			<button type="button" class="btn btn-ghost btn-sm btn-square" @click="$store.drawers.close()" aria-label="Close">
+				@LucideIcon("x", "w-4 h-4")
+			</button>
+		</div>
 	</div>
 }
 
