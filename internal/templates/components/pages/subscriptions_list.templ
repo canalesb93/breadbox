@@ -173,9 +173,13 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				<div class="flex items-center gap-2 flex-wrap">
 					<a href={ templ.SafeURL("/recurring/" + s.ShortID) } class="text-sm font-semibold text-base-content truncate hover:underline">{ s.Name }</a>
 					@components.SeriesTypeChip(s.TypeLabel, "xs")
-					@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
 				</div>
-				<div class="text-xs text-base-content/50 mt-1">{ s.SignalSummary }</div>
+				<!-- Detection strength reads with the rationale, not as a second
+				     pill in the title (the title carries the type chip only). -->
+				<div class="flex items-center gap-1.5 text-xs text-base-content/50 mt-1">
+					@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
+					<span>{ s.SignalSummary }</span>
+				</div>
 				<button
 					type="button"
 					@click="why = !why"
@@ -186,7 +190,21 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 					</span>
 					Why detected?
 				</button>
-				<pre x-show="why" x-cloak class="mt-2 text-[0.7rem] leading-relaxed bg-base-200/50 rounded-lg p-3 overflow-x-auto text-base-content/70">{ s.SignalsJSON }</pre>
+				<div x-show="why" x-cloak class="mt-2 rounded-lg bg-base-200/50 p-3">
+					if len(s.SignalFacts) > 0 {
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+							for _, f := range s.SignalFacts {
+								<div class="flex items-center gap-2 text-xs min-w-0">
+									@components.LucideIcon(f.Icon, "w-3.5 h-3.5 text-base-content/40 shrink-0")
+									<span class="text-base-content/50 shrink-0">{ f.Label }</span>
+									<span class={ "font-medium ml-auto text-right truncate", subscriptionSignalFactClass(f.Tone) }>{ f.Value }</span>
+								</div>
+							}
+						</div>
+					} else {
+						<p class="text-xs text-base-content/50">No detection signals recorded — created manually or by an agent.</p>
+					}
+				</div>
 			</div>
 			<div class="text-right shrink-0">
 				if s.HasAmount {
@@ -205,7 +223,7 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 				<div class="text-[0.7rem] uppercase tracking-wider text-base-content/40 mb-1">Based on these charges</div>
 				<div>
 					for _, m := range s.Members {
-						@seriesEvidenceCharge(m)
+						@seriesChargeRow(m)
 					}
 				</div>
 				if s.OccurrenceCount > len(s.Members) {
@@ -234,9 +252,10 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 	</div>
 }
 
-// seriesEvidenceCharge renders one member charge (read-only) via the shared
-// TxRowFeed row — used inside a candidate card's evidence list.
-templ seriesEvidenceCharge(m SubscriptionMember) {
+// seriesChargeRow renders one member charge via the shared TxRowFeed row with a
+// leading date column. Shared by the Needs-review candidate evidence list and
+// the "Charges in this series" list on the detail page so both read identically.
+templ seriesChargeRow(m SubscriptionMember) {
 	<div class="flex items-center gap-2 py-0.5">
 		<span class="text-xs text-base-content/45 tabular-nums w-20 shrink-0">{ m.Date }</span>
 		<div class="flex-1 min-w-0">

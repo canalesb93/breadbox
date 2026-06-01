@@ -51,18 +51,18 @@ templ SeriesDetectionPanel(p SeriesDetectionProps) {
 				{ p.StrengthLabel }
 			</span>
 		</div>
-		<p class="text-base sm:text-lg leading-relaxed text-base-content/70">
-			Matches charges from <code class="font-mono text-sm bg-base-200 text-base-content/80 rounded px-1.5 py-0.5">{ p.MerchantKey }</code>
+		<p class="text-sm leading-relaxed text-base-content/70">
+			Matches charges from <code class="font-mono text-xs bg-base-200 text-base-content/80 rounded px-1.5 py-0.5">{ p.MerchantKey }</code>
 			if p.HasAmount {
-				near <span class="font-semibold text-base-content">{ p.AmountText }</span> <span class="text-base-content/45">(±{ p.ToleranceText })</span>,
+				near <span class="font-medium text-base-content">{ p.AmountText }</span> <span class="text-base-content/45">(±{ p.ToleranceText })</span>,
 			} else {
 				,
 			}
 			if p.DayPhrase != "" {
-				<span class="font-semibold text-base-content">{ p.CadencePhrase }</span>
-				<span class="font-semibold text-base-content">{ p.DayPhrase }.</span>
+				<span class="font-medium text-base-content">{ p.CadencePhrase }</span>
+				<span class="font-medium text-base-content">{ p.DayPhrase }.</span>
 			} else {
-				<span class="font-semibold text-base-content">{ p.CadencePhrase }.</span>
+				<span class="font-medium text-base-content">{ p.CadencePhrase }.</span>
 			}
 		</p>
 		if p.Window != nil {

@@ -100,7 +100,11 @@ type SubscriptionRow struct {
 	ConfidenceBand string // "High" | "Medium" | "Low"
 	BandTone       string // success | warning | neutral
 	SignalSummary  string // "11 charges · monthly · ±0% spread"
-	SignalsJSON    string // pretty-printed detection_signals for the disclosure
+	SignalsJSON    string // pretty-printed detection_signals (raw fallback)
+	// SignalFacts is the parsed "Why detected" surface: the raw detection_signals
+	// rendered as labelled criteria (charges seen, cadence, timing regularity,
+	// amount pattern) instead of a raw JSON blob.
+	SignalFacts []SubscriptionSignalFact
 
 	Source       string // deterministic | agent | user | rule
 	SourceLabel  string
@@ -219,6 +223,28 @@ type SubscriptionMember struct {
 	CategoryColor *string
 	CategoryIcon  *string
 	TagCount      int
+}
+
+// SubscriptionSignalFact is one parsed detection criterion for the "Why
+// detected" surface — a labelled, human-readable reading of a single
+// detection_signals field (replaces the raw JSON dump).
+type SubscriptionSignalFact struct {
+	Icon  string // lucide name
+	Label string // "Timing regularity"
+	Value string // "Very regular (±4%)"
+	Tone  string // success | warning | neutral
+}
+
+// subscriptionSignalFactClass maps a signal-fact tone to the value text color.
+func subscriptionSignalFactClass(tone string) string {
+	switch tone {
+	case "success":
+		return "text-success"
+	case "warning":
+		return "text-warning"
+	default:
+		return "text-base-content/80"
+	}
 }
 
 // SubscriptionPriceChange marks a point where the charge amount changed.
