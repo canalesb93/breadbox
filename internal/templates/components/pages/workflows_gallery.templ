@@ -1,6 +1,11 @@
 package pages
 
-import "breadbox/internal/templates/components"
+import (
+	"fmt"
+	"time"
+
+	"breadbox/internal/templates/components"
+)
 
 // WorkflowsGallery is the /workflows preset gallery: codified, configurable,
 // one-click automations grouped by category. "Set up" opens a right-side
@@ -67,19 +72,8 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				}
 			}
 		</div>
-		<!-- Configure drawer: shared backdrop + one slide-over panel per available preset. -->
-		<div
-			x-show="open"
-			x-cloak
-			x-transition:enter="transition-opacity ease-out duration-200"
-			x-transition:enter-start="opacity-0"
-			x-transition:enter-end="opacity-100"
-			x-transition:leave="transition-opacity ease-in duration-150"
-			x-transition:leave-start="opacity-100"
-			x-transition:leave-end="opacity-0"
-			class="fixed inset-0 bg-black/40 z-40"
-			@click="open=''"
-		></div>
+		<!-- Configure drawer: one components.Drawer slide-over per available preset. -->
+		<!-- Each Drawer renders its own backdrop + panel via the shared $store.drawers store. -->
 		// Drawers exist only for the admin who can actually submit them; a
 		// non-admin can't open one (the "Set up" control is disabled).
 		if p.IsAdmin {
@@ -91,7 +85,133 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				}
 			}
 		}
+		<!-- F2: Preview-prompt modal — one shared daisy dialog filled on demand by previewPrompt(). -->
+		@workflowPromptPreviewModal()
+		// F3: one shared reconfigure drawer, hydrated by openReconfigure() from
+		// GET /-/workflows/{slug}/config. Admin-only (the link that opens it is).
+		if p.IsAdmin {
+			@workflowReconfigureDrawer()
+		}
 	</div>
+}
+
+// workflowReconfigureDrawer is the single, data-driven slide-over for
+// editing an already-enabled workflow's configurable layers (schedule,
+// options, additional instructions). Unlike workflowConfigDrawer (one
+// server-rendered panel per available preset), this drawer is hydrated at
+// runtime by openReconfigure() from GET /-/workflows/{slug}/config and
+// submits to POST /-/workflows/{slug}/reconfigure. It never touches the
+// run-state toggle or the base prompt.
+templ workflowReconfigureDrawer() {
+	@components.Drawer(components.DrawerProps{
+		ID:    "wf-reconfigure",
+		Title: "Reconfigure workflow",
+	}) {
+		<form class="flex flex-col h-full" @submit.prevent="submitReconfigure($event.target)">
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:      "sliders-horizontal",
+				TitleExpr: "reconfigure.name || 'Reconfigure workflow'",
+				Subtitle:  "Adjust how this workflow runs. Its base behavior stays the same.",
+			})
+			<div x-show="reconfigure.loading" class="flex items-center gap-2 text-sm text-base-content/60 p-5">
+				<span class="loading loading-spinner loading-sm"></span>
+				Loading configuration…
+			</div>
+			<div x-show="!reconfigure.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
+				<div>
+					<div class="text-sm font-medium mb-1.5">When it runs</div>
+					<template x-if="reconfigure.triggerOnSync">
+						<div class="text-sm text-base-content/70 flex items-center gap-2">
+							@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/50")
+							After each successful sync
+						</div>
+					</template>
+					<template x-if="!reconfigure.triggerOnSync">
+						<select name="schedule_cron" x-model="reconfigure.scheduleCron" class="select select-sm w-full">
+							<option value="0 8 * * *">Daily — 8:00 AM</option>
+							<option value="0 7 * * 1">Weekly — Monday 7:00 AM</option>
+							<option value="0 8 1 * *">Monthly — 1st, 8:00 AM</option>
+						</select>
+					</template>
+				</div>
+				<template x-for="opt in reconfigure.options" :key="opt.key">
+					<div>
+						<div class="text-sm font-medium mb-1.5" x-text="opt.label"></div>
+						<select :name="opt.key" x-model="opt.selected" class="select select-sm w-full">
+							<template x-for="ch in opt.choices" :key="ch.value">
+								<option :value="ch.value" x-text="ch.label"></option>
+							</template>
+						</select>
+						<div class="text-xs text-base-content/40 mt-1" x-show="opt.help" x-text="opt.help"></div>
+					</div>
+				</template>
+				<div>
+					<div class="text-sm font-medium mb-1.5">
+						Additional instructions
+						<span class="text-base-content/40 font-normal">(optional)</span>
+					</div>
+					<textarea
+						name="additional_instructions"
+						rows="4"
+						class="textarea textarea-bordered w-full text-sm"
+						placeholder="Anything specific this workflow should watch for, or how it should behave…"
+						x-model="reconfigure.additionalInstructions"
+					></textarea>
+					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
+				</div>
+			</div>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="reconfigure.loading">
+					@components.LucideIcon("save", "w-4 h-4")
+					Save changes
+				</button>
+			}
+		</form>
+	}
+}
+
+// workflowPromptPreviewModal is the shared read-only dialog that shows a
+// preset's fully composed internal base prompt. previewPrompt() in the
+// gallery factory opens it (dialog.showModal()) and fills previewTitle /
+// previewBody from GET /-/workflows/{slug}/prompt.
+templ workflowPromptPreviewModal() {
+	<dialog id="wf-prompt-preview" class="modal modal-bottom sm:modal-middle">
+		<div class="modal-box max-w-2xl">
+			<div class="flex items-start justify-between gap-3 mb-3">
+				<div class="flex items-start gap-2 min-w-0">
+					@components.LucideIcon("file-text", "w-5 h-5 mt-0.5 text-base-content/60 shrink-0")
+					<div class="min-w-0">
+						<h3 class="text-base font-semibold leading-tight truncate" x-text="previewTitle || 'Workflow prompt'"></h3>
+						<p class="text-xs text-base-content/60 mt-0.5">The built-in base prompt this workflow runs with, before any additional instructions.</p>
+					</div>
+				</div>
+				<form method="dialog">
+					<button class="btn btn-ghost btn-sm btn-square shrink-0" aria-label="Close">
+						@components.LucideIcon("x", "w-4 h-4")
+					</button>
+				</form>
+			</div>
+			<div x-show="previewLoading" class="flex items-center gap-2 text-sm text-base-content/60 py-6">
+				<span class="loading loading-spinner loading-sm"></span>
+				Loading prompt…
+			</div>
+			<pre
+				x-show="!previewLoading"
+				x-cloak
+				class="text-xs whitespace-pre-wrap break-words bg-base-200 rounded-xl p-4 max-h-[60vh] overflow-y-auto font-mono leading-relaxed"
+				x-text="previewBody"
+			></pre>
+			<div class="modal-action mt-4">
+				<form method="dialog">
+					<button class="btn btn-ghost btn-sm">Close</button>
+				</form>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
 }
 
 // workflowPresetControl is the state-dependent right-side control: a "Set up"
@@ -99,12 +219,22 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 // enabled. Instantiating a workflow is admin-only — non-admins see the
 // "Set up" control disabled with an explanatory tooltip.
 templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
-	<div class="flex items-center gap-3">
+	<div class="flex items-center gap-2">
 		<span class="hidden sm:inline-flex items-center gap-1 text-xs text-base-content/40">
 			@components.LucideIcon("clock", "w-3.5 h-3.5")
 			{ preset.TriggerLabel }
 		</span>
 		if preset.Enabled {
+			@workflowLastRunLine(preset.LastRun)
+			<button
+				type="button"
+				class="btn btn-soft btn-sm gap-1.5"
+				@click={ "runWorkflow('" + preset.WorkflowSlug + "')" }
+				aria-label={ "Run " + preset.Name + " now" }
+			>
+				@components.LucideIcon("play", "w-4 h-4")
+				<span class="hidden sm:inline">Run now</span>
+			</button>
 			<input
 				type="checkbox"
 				class="toggle toggle-sm toggle-primary"
@@ -118,7 +248,7 @@ templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
 			<button
 				type="button"
 				class="btn btn-soft btn-sm gap-1.5"
-				@click={ "open='" + preset.Slug + "'" }
+				@click={ "$store.drawers.open('wf-config-" + preset.Slug + "')" }
 			>
 				@components.LucideIcon("settings-2", "w-4 h-4")
 				Set up
@@ -131,6 +261,12 @@ templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
 				</button>
 			</span>
 		}
+		<!-- Secondary actions (Preview prompt, Reconfigure) live in the overflow
+		     menu so the row stays uncluttered — one primary action + toggle inline. -->
+		@components.OverflowMenu(components.OverflowMenuProps{
+			AriaLabel: preset.Name + " actions",
+			Items:     presetMenuItems(preset, isAdmin),
+		})
 	</div>
 }
 
@@ -139,35 +275,20 @@ templ workflowPresetControl(preset WorkflowPresetCardProps, isAdmin bool) {
 // run-now, and (on first enable) a consent acknowledgement. consentAck=true
 // hides the consent gate once the household has already acknowledged.
 templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
-	<div
-		x-show={ "open === '" + preset.Slug + "'" }
-		x-cloak
-		x-transition:enter="transition ease-out duration-200"
-		x-transition:enter-start="translate-x-full"
-		x-transition:enter-end="translate-x-0"
-		x-transition:leave="transition ease-in duration-150"
-		x-transition:leave-start="translate-x-0"
-		x-transition:leave-end="translate-x-full"
-		class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 border-l border-base-300 shadow-xl flex flex-col"
-		@keydown.escape.window="open=''"
-	>
+	@components.Drawer(components.DrawerProps{
+		ID:    "wf-config-" + preset.Slug,
+		Title: "Set up " + preset.Name,
+	}) {
 		<form
 			x-data={ "{ cron: '" + preset.ScheduleCron + "', consent: false }" }
 			class="flex flex-col h-full"
 			@submit.prevent={ "submitDrawer('" + preset.Slug + "', $event.target)" }
 		>
-			<div class="flex items-start justify-between gap-3 p-5 border-b border-base-300">
-				<div class="flex items-start gap-3">
-					@components.LucideIcon(preset.Icon, "w-5 h-5 mt-0.5 text-base-content/60 shrink-0")
-					<div>
-						<div class="font-semibold leading-tight">{ preset.Name }</div>
-						<div class="text-xs text-base-content/60 mt-1">{ preset.Description }</div>
-					</div>
-				</div>
-				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">
-					@components.LucideIcon("x", "w-4 h-4")
-				</button>
-			</div>
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     preset.Icon,
+				Title:    preset.Name,
+				Subtitle: preset.Description,
+			})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
 				<div>
 					<div class="text-sm font-medium mb-1.5">When it runs</div>
@@ -222,9 +343,12 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					></textarea>
 					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
 				</div>
-				<label class="flex items-center gap-2 text-sm cursor-pointer">
-					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm"/>
-					Start running now
+				<label class="flex items-start gap-2 text-sm cursor-pointer">
+					<input type="checkbox" name="enabled" value="true" checked class="checkbox checkbox-sm mt-0.5"/>
+					<span>
+						Activate as soon as it's set up
+						<span class="block text-xs text-base-content/50">Leave unchecked to add it paused — you can turn it on anytime.</span>
+					</span>
 				</label>
 				if !consentAck {
 					<label class="flex items-start gap-2 text-xs cursor-pointer rounded-lg bg-base-200/60 p-3 border border-base-300">
@@ -233,22 +357,22 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					</label>
 				}
 			</div>
-			<div class="flex items-center justify-end gap-2 p-4 border-t border-base-300">
-				<button type="button" class="btn btn-ghost btn-sm" @click="open=''">Cancel</button>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
 				if consentAck {
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
 						@components.LucideIcon("zap", "w-4 h-4")
-						Enable workflow
+						Set up workflow
 					</button>
 				} else {
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="!consent">
 						@components.LucideIcon("zap", "w-4 h-4")
-						Enable workflow
+						Set up workflow
 					</button>
 				}
-			</div>
+			}
 		</form>
-	</div>
+	}
 }
 
 templ workflowScheduleOption(value, label, selected string) {
@@ -256,5 +380,69 @@ templ workflowScheduleOption(value, label, selected string) {
 		<option value={ value } selected>{ label }</option>
 	} else {
 		<option value={ value }>{ label }</option>
+	}
+}
+
+// workflowLastRunLine renders the inline "Last run" summary on an enabled
+// card: a status pill plus a relative-time link to the run-detail page. A nil
+// run (never run yet) renders a muted "Not run yet" so the card still reads as
+// enabled-but-idle rather than blank.
+templ workflowLastRunLine(run *WorkflowLastRunProps) {
+	if run == nil {
+		<span class="hidden md:inline text-xs text-base-content/30">Not run yet</span>
+	} else {
+		<span class="hidden md:inline-flex items-center gap-1.5 text-xs">
+			@workflowRunStatusPill(run.Status)
+			if run.ShortID != "" {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/workflows/runs/%s", run.ShortID)) }
+					class="text-base-content/60 hover:underline tabular-nums"
+				>
+					{ workflowsRelativeTime(run.FinishedAt) }
+				</a>
+			} else {
+				<span class="text-base-content/60 tabular-nums">{ workflowsRelativeTime(run.FinishedAt) }</span>
+			}
+		</span>
+	}
+}
+
+// workflowRunStatusPill mirrors agentsListStatusPill — a soft daisy badge per
+// run status. Kept local so the pages package stays self-contained and the
+// gallery doesn't depend on the agents-list table's render helpers.
+templ workflowRunStatusPill(status string) {
+	switch status {
+		case "success":
+			<span class="badge badge-soft badge-success badge-xs">success</span>
+		case "error":
+			<span class="badge badge-soft badge-error badge-xs">error</span>
+		case "in_progress":
+			<span class="badge badge-soft badge-info badge-xs">running</span>
+		case "skipped":
+			<span class="badge badge-ghost badge-xs">skipped</span>
+		default:
+			<span class="badge badge-ghost badge-xs">{ status }</span>
+	}
+}
+
+// workflowsRelativeTime renders a compact "N ago" string for the last-run
+// line. Thin local copy of agentsListRelativeTime (same algorithm) so the
+// gallery doesn't reach across page files for a single helper.
+func workflowsRelativeTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2")
 	}
 }

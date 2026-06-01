@@ -201,8 +201,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// PageHeader. /agents?agent=<slug> filters the runs feed to one
 		// agent, which subsumes the old /agents/{slug}/runs route.
 		// Legacy /agents/runs and /agents/{slug}/runs 301-redirect.
-		r.Get("/agents", AgentRunsListPageHandler(svc, sm, tr, a.Config.DataDir))
-		r.Get("/agents/definitions", AgentsListPageHandler(svc, sm, tr))
+		// Legacy /agents page surface is retired — Workflows is the single
+		// automation home. The entry points 301-redirect to their Workflows
+		// equivalents (the hand-authored form pages below stay reachable by
+		// direct URL until the custom-workflow builder lands).
+		r.Get("/agents", redirectGET("/workflows/runs"))
+		r.Get("/agents/definitions", redirectGET("/workflows"))
 		r.Get("/workflows", WorkflowsGalleryPageHandler(svc, sm, tr))
 		r.Get("/workflows/runs", WorkflowRunsPageHandler(svc, sm, tr))
 		// Run detail lives under the Workflows surface; the legacy
@@ -214,10 +218,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// from the detail page's Edit button.
 		r.Get("/agents/{slug}", AgentDetailPageHandler(svc, sm, tr))
 		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
-		r.Get("/agents/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr, a.Config.DataDir))
+		// A run detail is a workflow run — 301 to the canonical Workflows URL.
+		r.Get("/agents/runs/{shortId}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/workflows/runs/"+chi.URLParam(r, "shortId"), http.StatusMovedPermanently)
+		})
 		r.Get("/agents/runs", func(w http.ResponseWriter, r *http.Request) {
 			// Preserve query params so bookmarked filter URLs still work.
-			target := "/agents"
+			target := "/workflows/runs"
 			if r.URL.RawQuery != "" {
 				target += "?" + r.URL.RawQuery
 			}
@@ -225,7 +232,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		})
 		r.Get("/agents/{slug}/runs", func(w http.ResponseWriter, r *http.Request) {
 			slug := chi.URLParam(r, "slug")
-			target := "/agents?agent=" + slug
+			target := "/workflows/runs?workflow=" + slug
 			if r.URL.RawQuery != "" {
 				target += "&" + r.URL.RawQuery
 			}
@@ -483,6 +490,17 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/workflows/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/workflows/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
+
+			// Preview the composed internal base prompt for a preset (read-only JSON).
+			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
+			// Reconfigure an already-enabled workflow (schedule, additional
+			// instructions, options). GET returns the live config to prefill
+			// the configure drawer; POST re-composes the prompt + schedule.
+			// Both are admin-only — RequireAdmin upgrades them above the
+			// surrounding editor group, mirroring the preset-enable guard,
+			// because a reconfigure re-authorizes recurring AI spend behavior.
+			r.With(RequireAdmin(sm)).Get("/workflows/{slug}/config", WorkflowConfigAdminHandler(svc))
+			r.With(RequireAdmin(sm)).Post("/workflows/{slug}/reconfigure", ReconfigureWorkflowAdminHandler(svc))
 		})
 
 		// Admin-only API routes.

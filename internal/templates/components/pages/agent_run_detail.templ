@@ -2,6 +2,7 @@ package pages
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/templates/components"
@@ -44,11 +45,22 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 		data-run-status={ p.Run.Status }
 		data-started-at={ p.Run.StartedAt.Format(time.RFC3339Nano) }
 		data-poll-seconds={ pollSeconds(p) }
+		data-workflow-slug={ p.Run.AgentSlug }
+		data-csrf={ p.CSRFToken }
 		x-init="$store.shortcuts.setScope('agent-run-detail'); init()"
 		x-destroy="$store.shortcuts.setScope('global')"
 	>
+		<!-- Effective prompt for the "Copy prompt" affordance. Rendered as a
+		     hidden <template> so the (potentially large) text never paints but
+		     is still readable by the Alpine factory. The per-run prefix is
+		     appended to the user prompt the same way the orchestrator
+		     assembles the run, so "Copy prompt" yields what the agent saw. -->
+		if effectiveRunPrompt(p) != "" {
+			<template x-ref="promptText">{ effectiveRunPrompt(p) }</template>
+		}
 		@components.BreadcrumbNav(agentRunDetailBreadcrumbs(p))
 		@agentRunDetailHeader(p)
+		@agentRunSummaryStats(p)
 		if p.Run.Status == "error" && p.Run.ErrorMessage != "" {
 			@agentRunErrorAlert(p.Run)
 		}
@@ -156,18 +168,120 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 					Jump to result
 				</button>
 			}
-			if p.Run.AgentSlug != "" {
-				<a
-					href={ templ.SafeURL("/agents?agent=" + p.Run.AgentSlug + "&run=1") }
+			if effectiveRunPrompt(p) != "" {
+				<button
+					type="button"
 					class="btn btn-sm btn-ghost gap-2"
-					title="Run this agent again"
+					title="Copy the prompt this run was given"
+					@click="copyPrompt()"
+					:class="copiedPrompt ? 'btn-success' : ''"
 				>
-					@components.LucideIcon("play", "w-4 h-4")
-					Re-run
-				</a>
+					<i data-lucide="clipboard" class="w-4 h-4" x-show="!copiedPrompt"></i>
+					<i data-lucide="check" class="w-4 h-4" x-show="copiedPrompt" x-cloak></i>
+					<span x-text="copiedPrompt ? 'Copied' : 'Copy prompt'"></span>
+				</button>
+			}
+			if p.Run.AgentSlug != "" {
+				<button
+					type="button"
+					class="btn btn-sm btn-primary gap-2"
+					title="Run this workflow again now"
+					@click="rerun()"
+					:disabled="rerunning"
+				>
+					<span x-show="!rerunning" class="contents">
+						@components.LucideIcon("play", "w-4 h-4")
+						Re-run
+					</span>
+					<span x-show="rerunning" x-cloak class="contents">
+						<span class="loading loading-spinner loading-xs"></span>
+						Starting…
+					</span>
+				</button>
 			}
 		</div>
 	</div>
+}
+
+// agentRunSummaryStats is the compact at-a-glance strip directly under
+// the sticky header — status, duration, trigger, and cost in a daisy
+// `stats` block. It restates the four facts an operator scans for first
+// without making them hunt through the Usage card in the side panel.
+// daisy `stats` is the canonical home for these tiles per
+// .claude/rules/daisyui.md (the rule explicitly nominates `stats
+// stats-horizontal` for dashboard-tile clusters); cost reuses the same
+// canonical Amount renderer as the rest of the page.
+templ agentRunSummaryStats(p AgentRunDetailProps) {
+	<div class="stats stats-horizontal bb-card w-full overflow-x-auto mb-4">
+		<div class="stat px-4 py-3">
+			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Status</div>
+			<div class="stat-value text-base font-semibold">
+				@agentRunSummaryStatus(p.Run.Status)
+			</div>
+		</div>
+		<div class="stat px-4 py-3">
+			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Duration</div>
+			<div class="stat-value text-base font-semibold tabular-nums">{ formatAgentRunDuration(p.Run.DurationMs) }</div>
+		</div>
+		<div class="stat px-4 py-3">
+			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Trigger</div>
+			<div class="stat-value text-base font-semibold capitalize">
+				if p.Run.Trigger != "" {
+					{ p.Run.Trigger }
+				} else {
+					<span class="text-base-content/40">—</span>
+				}
+			</div>
+		</div>
+		<div class="stat px-4 py-3">
+			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Cost</div>
+			<div class="stat-value text-base font-semibold">
+				@agentRunCost(p.Run.CostUSD, "font-semibold tabular-nums")
+			</div>
+		</div>
+	</div>
+}
+
+// agentRunSummaryStatus renders the run status as a soft badge for
+// terminal states. in_progress renders a small inline spinner + "running"
+// label rather than a badge — loading states never sit inside a daisy
+// badge (badges are reserved for terminal/categorical state).
+templ agentRunSummaryStatus(status string) {
+	switch status {
+		case "success":
+			<span class="badge badge-soft badge-success badge-sm">success</span>
+		case "error":
+			<span class="badge badge-soft badge-error badge-sm">error</span>
+		case "timeout":
+			<span class="badge badge-soft badge-error badge-sm">timeout</span>
+		case "skipped":
+			<span class="badge badge-ghost badge-sm">skipped</span>
+		case "in_progress":
+			<span class="inline-flex items-center gap-1.5 text-primary text-sm">
+				<span class="loading loading-spinner loading-xs"></span>
+				running
+			</span>
+		default:
+			<span class="text-base-content/40 text-sm">{ status }</span>
+	}
+}
+
+// effectiveRunPrompt assembles the prompt the "Copy prompt" affordance
+// hands to the operator: the user prompt the agent was given, with the
+// per-run operator prefix prepended when one was supplied (matching the
+// orchestrator's assembly order). Returns "" when neither is present, in
+// which case the Copy-prompt button is omitted entirely.
+func effectiveRunPrompt(p AgentRunDetailProps) string {
+	prefix := strings.TrimSpace(p.PromptPrefix)
+	body := strings.TrimSpace(p.Prompt)
+	switch {
+	case prefix != "" && body != "":
+		return prefix + "\n\n" + body
+	case prefix != "":
+		return prefix
+	default:
+		return body
+	}
 }
 
 // agentRunHeaderBackHref returns the "back" target for the sticky header.

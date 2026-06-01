@@ -33,11 +33,93 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 			</div>
 		}
 		<div class="space-y-6">
+			@agentSDKOverviewSection(p.Overview)
 			@agentSDKStatusSection(p.Status)
 			@agentSDKConfigSection(p)
 			@agentSDKDiagnosticsSection(p.CSRFToken)
 		</div>
 	</div>
+}
+
+// ---------------------------------------------------------------------
+// Overview (read-only)
+// ---------------------------------------------------------------------
+
+// agentSDKOverviewSection is a read-only at-a-glance panel: how many
+// workflows are live, rolling 30-day spend against the ceiling, the
+// trailing-7-day run breakdown, and the next scheduled run. Stat tiles
+// follow the Backups data-viz pattern (bb-card grid) rather than
+// SettingsRow, since they are data-viz, not editable controls.
+templ agentSDKOverviewSection(o AgentSDKOverviewProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "layout-dashboard",
+		Title:   "Overview",
+		Caption: "Live workflows, spend, and recent run activity at a glance",
+	}) {
+		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+			<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+				<div class="bb-card p-4">
+					<div class="text-xs text-base-content/40 mb-1">Enabled workflows</div>
+					<div class="text-2xl font-bold tabular-nums">{ strconv.Itoa(o.EnabledCount) }</div>
+				</div>
+				<div class="bb-card p-4">
+					<div class="text-xs text-base-content/40 mb-1">Spend (30d)</div>
+					<div class="text-2xl font-bold tabular-nums">{ o.Spend30dStr }</div>
+					<div class="text-xs mt-0.5 flex items-center gap-1.5">
+						<span class="text-base-content/40">{ o.SpendVsCeilingStr }</span>
+						if o.SpendPctStr != "" {
+							if o.SpendOverCeiling {
+								<span class="badge badge-soft badge-error badge-xs">{ o.SpendPctStr }</span>
+							} else {
+								<span class="badge badge-soft badge-neutral badge-xs">{ o.SpendPctStr }</span>
+							}
+						}
+					</div>
+				</div>
+				<div class="bb-card p-4">
+					<div class="text-xs text-base-content/40 mb-1">Runs (7d)</div>
+					<div class="text-2xl font-bold tabular-nums">{ strconv.Itoa(o.Runs7dTotal) }</div>
+					if o.Runs7dTotal > 0 {
+						<div class="flex flex-wrap items-center gap-1 mt-1.5">
+							for _, sc := range o.Runs7dByStatus {
+								if sc.Count > 0 {
+									<span class={ agentSDKBadgeClass(sc.Tone) } title={ sc.Label }>{ strconv.Itoa(sc.Count) } { sc.Label }</span>
+								}
+							}
+						</div>
+					} else {
+						<div class="text-xs text-base-content/40 mt-1.5">No runs this week</div>
+					}
+				</div>
+				<div class="bb-card p-4">
+					<div class="text-xs text-base-content/40 mb-1">Next run</div>
+					if o.HasNextRun {
+						<div class="text-lg font-semibold leading-tight">{ o.NextRunRelStr }</div>
+						<div class="text-xs text-base-content/40 mt-0.5">{ o.NextRunWhenStr }</div>
+						<div class="text-xs text-base-content/60 truncate mt-0.5" title={ o.NextRunWorkflow }>{ o.NextRunWorkflow }</div>
+					} else {
+						<div class="text-lg font-semibold leading-tight text-base-content/40">None scheduled</div>
+						<div class="text-xs text-base-content/40 mt-0.5">No enabled workflow has a schedule</div>
+					}
+				</div>
+			</div>
+		}
+	}
+}
+
+// agentSDKBadgeClass maps a daisy tone to the soft-badge class used in the
+// 7-day run breakdown. Keeps the tone-→class switch out of the markup.
+func agentSDKBadgeClass(tone string) string {
+	switch tone {
+	case "success":
+		return "badge badge-soft badge-success badge-xs"
+	case "error":
+		return "badge badge-soft badge-error badge-xs"
+	case "info":
+		return "badge badge-soft badge-info badge-xs"
+	default:
+		return "badge badge-soft badge-neutral badge-xs"
+	}
 }
 
 // ---------------------------------------------------------------------

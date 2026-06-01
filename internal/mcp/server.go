@@ -371,6 +371,10 @@ func (s *MCPServer) buildToolRegistry() {
 			Description: "List transaction rules with their conditions, actions, and pipeline stage. Mirror of breadbox://rules. Filter by category_slug, enabled, or search by name. Read this before authoring new rules to avoid duplicates.",
 		}, s.handleListTransactionRules, s),
 		makeToolDefLogged(ToolSpec{
+			Name: "list_workflows", Title: "List Workflows", Classification: ToolRead,
+			Description: "List the household's automation layer: the `workflows` it has enabled (each carries name, slug, trigger sync|schedule|manual, schedule_cron, tool_scope, the source `preset` it was instantiated from, plus last_run_status + last_run_at), and the full catalog of available `presets` it could enable (slug, name, category, description, tool_scope, trigger, default schedule_cron, and whether it's already enabled). Read this to see what runs automatically before suggesting new rules or reports — an existing workflow may already cover the task. Enabling/configuring workflows is an admin-UI action (the /workflows gallery), not an MCP write.",
+		}, s.handleListWorkflows, s),
+		makeToolDefLogged(ToolSpec{
 			Name: "list_series", Title: "List Recurring Series", Classification: ToolRead,
 			Description: "List detected recurring series (subscriptions, bills, loans). Optional status filter (active|candidate|paused|cancelled). Each row carries cadence, expected_amount + iso_currency_code (never sum across currencies), next_expected_date, occurrence_count, confidence (auto|confirmed|rejected), and detection_signals — the raw evidence the detector used (interval_cv, amount_branch, merchant_key_is_fallback). Read status=candidate to find series awaiting a confirm/reject verdict; calibrate from the signals before deciding.",
 		}, s.handleListSeries, s),

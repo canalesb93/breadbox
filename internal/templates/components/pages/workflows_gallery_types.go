@@ -2,13 +2,40 @@
 
 package pages
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+	"time"
+
+	"breadbox/internal/templates/components"
+)
 
 // workflowCostStr formats a per-run cost estimate as a 2-decimal string
 // for the drawer's projected-cost hint (and as a literal arg into the
 // reactive projectedCost() JS call).
 func workflowCostStr(c float64) string {
 	return strconv.FormatFloat(c, 'f', 2, 64)
+}
+
+// presetMenuItems builds the row's overflow ("⋯") menu — the secondary
+// actions moved out of the inline row to declutter it: Preview prompt
+// always, plus Reconfigure for an enabled workflow (admin only). The
+// OnClick strings invoke the workflowsGallery Alpine factory methods and
+// render inside the gallery's x-data root, so the handlers resolve.
+func presetMenuItems(preset WorkflowPresetCardProps, isAdmin bool) []components.OverflowMenuItem {
+	items := []components.OverflowMenuItem{{
+		Label:   "Preview prompt",
+		Icon:    "file-text",
+		OnClick: fmt.Sprintf("previewPrompt('%s', '%s')", preset.Slug, preset.Name),
+	}}
+	if preset.Enabled && isAdmin {
+		items = append(items, components.OverflowMenuItem{
+			Label:   "Reconfigure",
+			Icon:    "sliders-horizontal",
+			OnClick: fmt.Sprintf("openReconfigure('%s', '%s')", preset.WorkflowSlug, preset.Name),
+		})
+	}
+	return items
 }
 
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.
@@ -67,6 +94,22 @@ type WorkflowPresetCardProps struct {
 	Enabled         bool   // the preset has been instantiated as a workflow
 	WorkflowSlug    string // slug of the instantiated workflow (when Enabled)
 	WorkflowEnabled bool   // the instantiated workflow's run toggle (when Enabled)
+
+	// LastRun is the most recent run of the instantiated workflow, surfaced
+	// inline on enabled cards as a "Last run" status + relative time. nil when
+	// the workflow has never run (or isn't enabled). The "Run now" button uses
+	// WorkflowSlug; this only drives the status line.
+	LastRun *WorkflowLastRunProps
+}
+
+// WorkflowLastRunProps is the inline last-run summary on an enabled card: a
+// status pill plus a relative-time link to the run-detail page. FinishedAt is
+// the run's completion time (falling back to start time for in-progress runs),
+// rendered via workflowsRelativeTime.
+type WorkflowLastRunProps struct {
+	ShortID    string // run short_id — deep-links to /workflows/runs/{shortID} when set
+	Status     string // run status enum: success | error | in_progress | skipped
+	FinishedAt time.Time
 }
 
 // WorkflowPresetOptionProps is one specialized option (a single-select) in

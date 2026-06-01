@@ -37,11 +37,18 @@ document.addEventListener('alpine:init', function () {
       pollTimer: null,
       allOpen: false,
       copiedRunId: false,
+      // Re-run + copy-prompt affordances in the sticky header.
+      workflowSlug: '',
+      csrfToken: '',
+      rerunning: false,
+      copiedPrompt: false,
 
       init: function () {
         var root = this.$el;
         this.shortId = root.dataset.runShortId || '';
         this.status = root.dataset.runStatus || '';
+        this.workflowSlug = root.dataset.workflowSlug || '';
+        this.csrfToken = root.dataset.csrf || '';
         this.pollSeconds = parseInt(root.dataset.pollSeconds || '0', 10);
         var startedAt = root.dataset.startedAt || '';
         if (startedAt) {
@@ -256,6 +263,87 @@ document.addEventListener('alpine:init', function () {
         // Brief highlight pulse so the eye catches where we landed.
         target.classList.add('bb-run-summary--flash');
         setTimeout(function () { target.classList.remove('bb-run-summary--flash'); }, 1200);
+      },
+
+      // restorePageState clears the global SPA progress bar + content
+      // fade after an async action fails. Required on every error path
+      // per .claude/rules/ui.md — without it the page stays blurred.
+      restorePageState: function () {
+        if (window.bbProgress) window.bbProgress.finish();
+        var main = document.querySelector('main');
+        if (main) {
+          main.style.opacity = '';
+          main.style.filter = '';
+          main.style.pointerEvents = '';
+        }
+      },
+
+      // copyPrompt copies the prompt this run was given (per-run prefix +
+      // user prompt, server-assembled into the hidden <template x-ref>).
+      // Mirrors copyRunId's copied-flag flip for the inline confirmation.
+      copyPrompt: function () {
+        var tpl = this.$refs.promptText;
+        if (!tpl) return;
+        // <template> content lives in .content; fall back to textContent
+        // for browsers that flatten it (none we target, but cheap).
+        var text = (tpl.content ? tpl.content.textContent : tpl.textContent) || '';
+        text = text.trim();
+        if (!text) return;
+        var self = this;
+        copyText(text).then(function (ok) {
+          if (!ok) return;
+          self.copiedPrompt = true;
+          window.dispatchEvent(new CustomEvent('bb-toast', {
+            detail: { message: 'Prompt copied', type: 'success' },
+          }));
+          setTimeout(function () { self.copiedPrompt = false; }, 1600);
+        });
+      },
+
+      // rerun fires a fresh run of this run's workflow via the canonical
+      // admin run-now endpoint (a workflow IS an agent_definition) and,
+      // on success, navigates to the new run's detail page so the
+      // operator watches it stream. No prompt override — this re-runs the
+      // workflow as configured. Concurrency / budget guards surface as a
+      // toast rather than a silent failure.
+      rerun: function () {
+        if (this.rerunning || !this.workflowSlug) return;
+        this.rerunning = true;
+        var self = this;
+        fetch('/-/workflows/' + encodeURIComponent(this.workflowSlug) + '/run', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRF-Token': this.csrfToken,
+          },
+        })
+          .then(function (res) {
+            return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+          })
+          .then(function (r) {
+            if (!r.ok) {
+              var msg = (r.body && r.body.error && r.body.error.message) || 'Could not start the run.';
+              throw new Error(msg);
+            }
+            window.dispatchEvent(new CustomEvent('bb-toast', {
+              detail: { message: 'Run started', type: 'success' },
+            }));
+            var newId = r.body && r.body.short_id;
+            if (newId) {
+              window.location.href = '/workflows/runs/' + encodeURIComponent(newId);
+            } else {
+              window.location.reload();
+            }
+          })
+          .catch(function (err) {
+            self.rerunning = false;
+            self.restorePageState();
+            window.dispatchEvent(new CustomEvent('bb-toast', {
+              detail: { message: err.message || 'Could not start the run.', type: 'error' },
+            }));
+            console.warn('[agent run rerun]', err);
+          });
       },
     };
   });

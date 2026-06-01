@@ -181,6 +181,59 @@ The Go server already serves `static/` via `http.FileServer`. The generated CSS 
 </div>
 ```
 
+### Drawer / slide-over (`components.Drawer`)
+
+The canonical **right-side slide-over** for focused create/edit flows
+that shouldn't take over the whole page or fight for room inside a
+modal. Backdrop + sliding panel + `DrawerHeader` (icon · title ·
+subtitle · close) + scrollable body + `DrawerFooter` (sticky actions).
+Reach for it for **simple inline edits** (rename, reconfigure, set up)
+where a full page is too heavy and a centered modal is too cramped for
+a vertical form.
+
+Why a templ component and not daisy: DaisyUI's `drawer` is the
+**sidebar layout** primitive (the one in `base.html`) — it's not a
+right-anchored sheet. This is the justified extension; don't hand-roll
+a fifth copy of the chrome.
+
+Open/close is driven by the global `$store.drawers` Alpine store
+(defined in `layout/base.html`) keyed by the `ID` you pass. Only one
+drawer is open at a time, so many `Drawer` instances can sit on one
+page and only the matching one + its backdrop show. Escape and a
+backdrop click both close; body scroll is locked while open.
+
+```go
+// Trigger — from markup or JS:
+//   <button @click="$store.drawers.open('edit-note')">Edit</button>
+//   Alpine.store('drawers').open('edit-note')
+
+@components.Drawer(components.DrawerProps{ID: "edit-note", Title: "Edit note"}) {
+    <form class="flex flex-col h-full" @submit.prevent="save($event.target)">
+        @components.DrawerHeader(components.DrawerHeaderProps{
+            Icon:     "pencil",
+            Title:    "Edit note",
+            Subtitle: "A focused edit surface.",
+        })
+        <div class="flex-1 overflow-y-auto p-5 space-y-5">
+            <textarea name="note" class="textarea w-full" rows="4"></textarea>
+        </div>
+        @components.DrawerFooter() {
+            <button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        }
+    </form>
+}
+```
+
+`DrawerProps.Size` maps to panel max-width: `sm`→`max-w-sm`,
+`md`→`max-w-md` (default), `lg`→`max-w-lg`, `xl`→`max-w-2xl`. For a
+header set at runtime (a drawer hydrated by JS), pass
+`DrawerHeaderProps.TitleExpr` / `SubtitleExpr` (Alpine `x-text`
+expressions) instead of the static strings. Live variants:
+`/design/c/drawers`. Reference call sites: the Workflows gallery's
+**Set up** / **Configure** / **Reconfigure** flows
+(`workflows_gallery.templ`).
+
 ### Page Header (`.bb-page-header`)
 
 Every top-level admin page opens with a `.bb-page-header` row: the `<h1 class="bb-page-title">` (plus optional subtitle) on the left, and an optional **primary action** on the right (Save, Create, Sync All, Reconcile, Add Member, etc.).

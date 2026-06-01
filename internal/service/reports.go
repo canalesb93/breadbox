@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -124,7 +125,30 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		return AgentReportResponse{}, fmt.Errorf("create agent report: %w", err)
 	}
 
-	return agentReportFromRow(report), nil
+	resp := agentReportFromRow(report)
+
+	// Fan the report out to the operator's configured notification sink.
+	// Only workflow/agent-authored reports notify — an operator submitting
+	// a report from the dashboard doesn't need to be pinged about their own
+	// action. This is strictly best-effort: it runs async on a fresh,
+	// time-bounded context (the request ctx may already be cancelled by the
+	// time the webhook fires) and never blocks or fails report creation.
+	// SendWorkflowNotification is itself a no-op when no webhook is set, so
+	// the goroutine is cheap in the common (unconfigured) case.
+	if actor.Type == "agent" {
+		payload := reportNotificationPayload(resp, actor.Name)
+		go func() {
+			nctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := s.SendWorkflowNotification(nctx, payload); err != nil && s.Logger != nil {
+				s.Logger.Warn("workflow report notification failed",
+					"report_id", resp.ShortID,
+					"error", err)
+			}
+		}()
+	}
+
+	return resp, nil
 }
 
 // AgentRunReportSummary is the compact report-reference shape rendered
