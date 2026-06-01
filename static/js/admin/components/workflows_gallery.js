@@ -14,8 +14,9 @@ document.addEventListener('alpine:init', function () {
 
       // --- F2: preview internal prompt -----------------------------------
       // State for the "Preview prompt" modal: the composed base prompt is
-      // fetched on demand from /-/workflows/{slug}/prompt and rendered in a
-      // <pre>. previewLoading drives the in-modal spinner.
+      // fetched on demand from /-/workflows/{slug}/prompt and rendered as
+      // markdown (via bbRenderMarkdown) into the x-ref="previewBody" element.
+      // previewLoading drives the in-modal spinner.
       previewTitle: '',
       previewBody: '',
       previewLoading: false,
@@ -248,7 +249,28 @@ document.addEventListener('alpine:init', function () {
           })
           .finally(function () {
             self.previewLoading = false;
+            self.renderPreviewBody();
           });
+      },
+
+      // Render the fetched base prompt as markdown into the preview element.
+      // The body arrives async and the modal is reused across opens, so we
+      // clear bbRenderMarkdown's idempotency flag (data-markdown-rendered)
+      // before re-pointing data-markdown at the new content. Falls back to
+      // plain text if the shared renderer isn't loaded.
+      renderPreviewBody: function () {
+        var self = this;
+        self.$nextTick(function () {
+          var el = self.$refs.previewBody;
+          if (!el) return;
+          el.removeAttribute('data-markdown-rendered');
+          el.setAttribute('data-markdown', self.previewBody || '');
+          if (typeof window.bbRenderMarkdown === 'function') {
+            window.bbRenderMarkdown(el);
+          } else {
+            el.textContent = self.previewBody || '';
+          }
+        });
       },
       // -------------------------------------------------------------------
     };
