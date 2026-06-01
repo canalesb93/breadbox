@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"breadbox/internal/appconfig"
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
@@ -297,6 +298,7 @@ type TemplateRenderer struct {
 	sm             *scs.SessionManager
 	version        string
 	versionChecker *version.Checker
+	appcfg         appconfig.Reader
 }
 
 // NewTemplateRenderer parses all embedded templates and returns a renderer.
@@ -489,11 +491,10 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		}
 		// Auto-inject version update status for nav footer.
 		if _, exists := m["NavUpdateAvailable"]; !exists && tr.versionChecker != nil {
-			updateAvailable, latest, err := tr.versionChecker.CheckForUpdate(r.Context())
-			if err == nil && updateAvailable != nil && *updateAvailable && latest != nil {
+			if show, ver, url := updateCallout(r.Context(), tr.versionChecker, tr.appcfg); show {
 				m["NavUpdateAvailable"] = true
-				m["NavLatestVersion"] = latest.Version
-				m["NavLatestURL"] = latest.URL
+				m["NavLatestVersion"] = ver
+				m["NavLatestURL"] = url
 			}
 		}
 		// Auto-inject sidebar notification badges from middleware context.
@@ -639,6 +640,13 @@ func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 	tr.versionChecker = vc
 }
 
+// SetAppConfigReader wires the app_config reader used to honor a dismissed
+// update banner (the "update_dismissed_version" key). Optional — when nil,
+// dismissal is not consulted and the callout shows whenever an update exists.
+func (tr *TemplateRenderer) SetAppConfigReader(r appconfig.Reader) {
+	tr.appcfg = r
+}
+
 // ruleFieldLabel maps a rule-condition field name to its human-readable
 // label. Falls back to title-casing the raw identifier so unknown fields
 // still read reasonably.
@@ -755,4 +763,3 @@ func ruleValueFormat(v any) string {
 		return fmt.Sprint(v)
 	}
 }
-

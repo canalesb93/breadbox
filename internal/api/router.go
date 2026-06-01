@@ -304,6 +304,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		} else {
 			tr.SetVersion(a.Config.Version)
 			tr.SetVersionChecker(a.VersionChecker)
+			tr.SetAppConfigReader(a.Queries)
 			adminRouter := admin.NewAdminRouter(a, sm, tr, svc, mcpServer)
 			r.Mount("/", adminRouter)
 		}

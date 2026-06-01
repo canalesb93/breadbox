@@ -1013,6 +1013,47 @@
     @apply bg-warning/22 text-warning;
   }
 
+  /* ── Update-available callout card ──
+     A small "what's new"-style nudge pinned to the foot of the rail (above
+     the Collapse button) when an admin runs an older release than the latest
+     GitHub tag. A bright base-100 card on the recessed base-200 rail with a
+     dismiss ✕. Part of the bespoke .bb-sidebar-* rail surface (daisy has no
+     sidebar-callout primitive); the collapsed-rail hide lives with the other
+     collapse rules below. */
+  .bb-update-card {
+    @apply relative mt-2 flex flex-col gap-1 rounded-xl border border-base-300
+           bg-base-100 p-3 shadow-sm;
+  }
+  .bb-update-card__dismiss {
+    @apply absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center
+           rounded-md text-base-content/40 cursor-pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .bb-update-card__dismiss:hover {
+    @apply bg-base-200 text-base-content/70;
+  }
+  .bb-update-card__dismiss svg { @apply h-3.5 w-3.5; }
+  .bb-update-card__eyebrow {
+    @apply inline-flex items-center gap-1 text-[0.7rem] font-semibold uppercase
+           tracking-wide text-success;
+  }
+  .bb-update-card__eyebrow svg { @apply h-3.5 w-3.5; }
+  .bb-update-card__title {
+    @apply pr-5 text-sm font-semibold leading-tight text-base-content;
+  }
+  .bb-update-card__desc {
+    @apply text-xs leading-snug text-base-content/60;
+  }
+  .bb-update-card__action {
+    @apply mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary no-underline;
+  }
+  .bb-update-card__action:hover { @apply underline; }
+  .bb-update-card__action svg {
+    @apply h-3.5 w-3.5;
+    transition: transform 0.15s ease;
+  }
+  .bb-update-card__action:hover svg { transform: translateX(2px); }
+
   /* ── Tag chips (pill-shaped) ── */
   /*
    * Canonical tag styling. Always pill-shaped to differentiate from status badges.
@@ -3232,6 +3273,11 @@
   /* Badges have nowhere to sit in the rail. */
   html[data-sidebar="collapsed"] .bb-sidebar .bb-nav-badge,
   html[data-sidebar="collapsed"] .bb-sidebar .badge {
+    display: none;
+  }
+
+  /* The update callout card can't fold into the 4rem icon rail. */
+  html[data-sidebar="collapsed"] .bb-sidebar .bb-update-card {
     display: none;
   }
 }

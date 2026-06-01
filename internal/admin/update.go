@@ -11,13 +11,42 @@ import (
 	"net/http"
 
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/version"
 )
 
-// DismissUpdateHandler handles POST /admin/api/update/dismiss.
+// updateCallout reports whether the "update available" sidebar callout should
+// render, combining the cached GitHub version check with the admin's last
+// dismissal. The callout is suppressed once the newest release has been
+// dismissed (stored in app_config under "update_dismissed_version" by
+// DismissUpdateHandler) and resurfaces automatically when a release newer than
+// the dismissed one ships. cfg may be nil, in which case dismissal is ignored.
+//
+// Intentionally consulted only for the passive sidebar nudge — the Settings →
+// System version badge always reflects true version state regardless of
+// dismissal, so dismissing the nudge never makes the app claim it's "up to
+// date" when it isn't.
+func updateCallout(ctx context.Context, vc *version.Checker, cfg appconfig.Reader) (show bool, latestVersion, latestURL string) {
+	if vc == nil {
+		return false, "", ""
+	}
+	available, latest, err := vc.CheckForUpdate(ctx)
+	if err != nil || available == nil || !*available || latest == nil {
+		return false, "", ""
+	}
+	if cfg != nil {
+		if dismissed := appconfig.String(ctx, cfg, "update_dismissed_version", ""); dismissed == latest.Version {
+			return false, "", ""
+		}
+	}
+	return true, latest.Version, latest.URL
+}
+
+// DismissUpdateHandler handles POST /-/update/dismiss.
 // It stores the dismissed version in app_config so the banner is hidden until
-// a newer release is published.
+// a newer release is published (read back by updateCallout).
 func DismissUpdateHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
@@ -37,7 +66,7 @@ func DismissUpdateHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
-// TriggerUpdateHandler handles POST /admin/api/update.
+// TriggerUpdateHandler handles POST /-/update.
 // It pulls the latest Docker image via the Docker Engine API (Unix socket).
 // After pulling, the admin must run `docker compose up -d` to apply the update.
 func TriggerUpdateHandler(a *app.App) http.HandlerFunc {

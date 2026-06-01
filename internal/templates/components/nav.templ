@@ -87,18 +87,40 @@ templ Nav(p NavProps) {
 		}
 		@navLink("/settings/account", "settings", "Settings", navSettingsActive(p.CurrentPage))
 	</nav>
+	// Update-available callout. A small card pinned to the foot of the rail
+	// (above the Collapse button) when an admin runs an older release than the
+	// latest GitHub tag. The ✕ POSTs the version to /-/update/dismiss (CSRF
+	// auto-injected by base.html's fetch wrapper) so it stays gone until a
+	// newer release ships. Hidden in the collapsed icon-rail (no room) — see
+	// the .bb-update-card rule in input.css. Dismissal is read back server-side
+	// in templates.go::updateCallout so it survives navigation.
 	if p.NavUpdateAvailable && p.IsAdmin {
-		<a
-			href={ templ.SafeURL(p.NavLatestURL) }
-			target="_blank"
-			rel="noopener noreferrer"
-			class="bb-sidebar-link text-warning"
-			title={ "Release notes for " + p.NavLatestVersion }
-		>
-			@LucideIcon("arrow-up-circle", "")
-			<span class="bb-sidebar-link__label">Update available</span>
-			<span class="badge badge-soft badge-warning badge-xs">{ p.NavLatestVersion }</span>
-		</a>
+		<div class="bb-update-card" x-data="{ shown: true }" x-show="shown" data-version={ p.NavLatestVersion }>
+			<button
+				type="button"
+				class="bb-update-card__dismiss"
+				aria-label="Dismiss update notice"
+				@click="shown = false; fetch('/-/update/dismiss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: $root.dataset.version }) }).catch(() => {})"
+			>
+				@LucideIcon("x", "")
+			</button>
+			<span class="bb-update-card__eyebrow">
+				@LucideIcon("arrow-up-circle", "")
+				Update
+			</span>
+			<p class="bb-update-card__title">Version { p.NavLatestVersion }</p>
+			<p class="bb-update-card__desc">A new release of Breadbox is available.</p>
+			<a
+				href={ templ.SafeURL(p.NavLatestURL) }
+				target="_blank"
+				rel="noopener noreferrer"
+				class="bb-update-card__action"
+				title={ "Release notes for " + p.NavLatestVersion }
+			>
+				Release notes
+				@LucideIcon("arrow-right", "")
+			</a>
+		</div>
 	}
 	// Collapse toggle — pinned to the rail's foot (Mintlify-style). Desktop
 	// only; on mobile the drawer is a transient overlay with no collapsed
