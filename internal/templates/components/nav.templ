@@ -183,13 +183,13 @@ func navActive(current, page string) string {
 // tab. Each settings sub-page reports its own CurrentPage id rather than a
 // shared "settings" one (account → members.go; general/system/help →
 // settings.go; providers → providers.go; mcp → settings_agents.go;
-// agents-settings → agent_sdk_settings_page.go; api-keys → apikeys.go;
+// workflows-settings → agent_sdk_settings_page.go; api-keys → apikeys.go;
 // backups → backups.go), so a plain navActive(…, "settings") would never
 // match. Keep this set in sync with those handlers' currentPage values.
 func navSettingsActive(current string) string {
 	switch current {
 	case "account", "general", "system", "help", "providers",
-		"mcp", "agents-settings", "api-keys", "backups":
+		"mcp", "workflows-settings", "api-keys", "backups":
 		return "bb-sidebar-link--active"
 	}
 	return ""

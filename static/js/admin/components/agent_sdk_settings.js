@@ -1,7 +1,7 @@
 // Agent SDK settings — Diagnostics card factory.
 //
 // Powers the "Run smoke test" + "Run cleanup now" buttons on
-// /settings/agents. Reads its CSRF token from a sibling data-* attribute on
+// /settings/workflows. Reads its CSRF token from a sibling data-* attribute on
 // the x-data root so the factory itself takes no arguments (per the
 // docs/design-system.md → "Alpine page components" convention).
 document.addEventListener('alpine:init', function () {

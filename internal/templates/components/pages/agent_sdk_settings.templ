@@ -33,7 +33,6 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 			</div>
 		}
 		<div class="space-y-6">
-			@agentSDKOverviewSection(p.Overview)
 			@agentSDKStatusSection(p.Status)
 			@agentSDKConfigSection(p)
 			@agentSDKDiagnosticsSection(p.CSRFToken)
@@ -42,90 +41,8 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 }
 
 // ---------------------------------------------------------------------
-// Overview (read-only)
-// ---------------------------------------------------------------------
-
-// agentSDKOverviewSection is a read-only at-a-glance panel: how many
-// workflows are live, rolling 30-day spend against the ceiling, the
-// trailing-7-day run breakdown, and the next scheduled run. Stat tiles
-// follow the Backups data-viz pattern (bb-card grid) rather than
-// SettingsRow, since they are data-viz, not editable controls.
-templ agentSDKOverviewSection(o AgentSDKOverviewProps) {
-	@components.SettingsSection(components.SettingsSectionProps{
-		Icon:    "layout-dashboard",
-		Title:   "Overview",
-		Caption: "Live workflows, spend, and recent run activity at a glance",
-	}) {
-		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-			<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-				<div class="bb-card p-4">
-					<div class="text-xs text-base-content/40 mb-1">Enabled workflows</div>
-					<div class="text-2xl font-bold tabular-nums">{ strconv.Itoa(o.EnabledCount) }</div>
-				</div>
-				<div class="bb-card p-4">
-					<div class="text-xs text-base-content/40 mb-1">Spend (30d)</div>
-					<div class="text-2xl font-bold tabular-nums">{ o.Spend30dStr }</div>
-					<div class="text-xs mt-0.5 flex items-center gap-1.5">
-						<span class="text-base-content/40">{ o.SpendVsCeilingStr }</span>
-						if o.SpendPctStr != "" {
-							if o.SpendOverCeiling {
-								<span class="badge badge-soft badge-error badge-xs">{ o.SpendPctStr }</span>
-							} else {
-								<span class="badge badge-soft badge-neutral badge-xs">{ o.SpendPctStr }</span>
-							}
-						}
-					</div>
-				</div>
-				<div class="bb-card p-4">
-					<div class="text-xs text-base-content/40 mb-1">Runs (7d)</div>
-					<div class="text-2xl font-bold tabular-nums">{ strconv.Itoa(o.Runs7dTotal) }</div>
-					if o.Runs7dTotal > 0 {
-						<div class="flex flex-wrap items-center gap-1 mt-1.5">
-							for _, sc := range o.Runs7dByStatus {
-								if sc.Count > 0 {
-									<span class={ agentSDKBadgeClass(sc.Tone) } title={ sc.Label }>{ strconv.Itoa(sc.Count) } { sc.Label }</span>
-								}
-							}
-						</div>
-					} else {
-						<div class="text-xs text-base-content/40 mt-1.5">No runs this week</div>
-					}
-				</div>
-				<div class="bb-card p-4">
-					<div class="text-xs text-base-content/40 mb-1">Next run</div>
-					if o.HasNextRun {
-						<div class="text-lg font-semibold leading-tight">{ o.NextRunRelStr }</div>
-						<div class="text-xs text-base-content/40 mt-0.5">{ o.NextRunWhenStr }</div>
-						<div class="text-xs text-base-content/60 truncate mt-0.5" title={ o.NextRunWorkflow }>{ o.NextRunWorkflow }</div>
-					} else {
-						<div class="text-lg font-semibold leading-tight text-base-content/40">None scheduled</div>
-						<div class="text-xs text-base-content/40 mt-0.5">No enabled workflow has a schedule</div>
-					}
-				</div>
-			</div>
-		}
-	}
-}
-
-// agentSDKBadgeClass maps a daisy tone to the soft-badge class used in the
-// 7-day run breakdown. Keeps the tone-→class switch out of the markup.
-func agentSDKBadgeClass(tone string) string {
-	switch tone {
-	case "success":
-		return "badge badge-soft badge-success badge-xs"
-	case "error":
-		return "badge badge-soft badge-error badge-xs"
-	case "info":
-		return "badge badge-soft badge-info badge-xs"
-	default:
-		return "badge badge-soft badge-neutral badge-xs"
-	}
-}
-
-// ---------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------
-
 templ agentSDKStatusSection(s AgentSDKStatusProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "activity",
@@ -187,7 +104,6 @@ func agentSDKBinaryCaption(s AgentSDKStatusProps) string {
 // ---------------------------------------------------------------------
 // Configuration form
 // ---------------------------------------------------------------------
-
 templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 	<div x-data={ "{ authMode: " + jsString(p.Form.AuthMode) + " }" }>
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -206,44 +122,46 @@ templ agentSDKConfigSection(p AgentSDKSettingsProps) {
 				Stack:   true,
 			}) {
 				<div class="space-y-3">
-					<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'subscription' && 'bg-base-200/60 ring-primary/40'">
-						<input
-							type="radio"
-							name="auth_mode"
-							value="subscription"
-							class="radio radio-sm radio-primary mt-0.5 shrink-0"
-							x-model="authMode"
-							if p.Form.AuthMode == "subscription" {
-								checked
-							}
-						/>
-						@components.BrandIcon("claude", "w-5 h-5 mt-0.5 shrink-0")
-						<div class="min-w-0 flex-1">
-							<div class="text-sm font-medium">Subscription token <span class="badge badge-soft badge-success badge-xs ml-1">recommended</span></div>
-							<div class="text-xs text-base-content/50 mt-0.5">Generate from <code class="text-xs">claude setup-token</code>. Charges your Claude Pro / Max subscription.</div>
-						</div>
-					</label>
-					<div x-show="authMode === 'subscription'" x-cloak class="pl-9">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'subscription' && 'bg-base-200/60 ring-primary/40'">
+							<input
+								type="radio"
+								name="auth_mode"
+								value="subscription"
+								class="radio radio-sm radio-primary mt-0.5 shrink-0"
+								x-model="authMode"
+								if p.Form.AuthMode == "subscription" {
+									checked
+								}
+							/>
+							@components.BrandIcon("claude", "w-5 h-5 mt-0.5 shrink-0")
+							<div class="min-w-0 flex-1">
+								<div class="text-sm font-medium">Subscription token <span class="badge badge-soft badge-success badge-xs ml-1">recommended</span></div>
+								<div class="text-xs text-base-content/50 mt-0.5">Generate from <code class="text-xs">claude setup-token</code>. Charges your Claude Pro / Max subscription.</div>
+							</div>
+						</label>
+						<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'api_key' && 'bg-base-200/60 ring-primary/40'">
+							<input
+								type="radio"
+								name="auth_mode"
+								value="api_key"
+								class="radio radio-sm radio-primary mt-0.5 shrink-0"
+								x-model="authMode"
+								if p.Form.AuthMode == "api_key" {
+									checked
+								}
+							/>
+							@components.BrandIcon("anthropic", "w-5 h-5 mt-0.5 shrink-0")
+							<div class="min-w-0 flex-1">
+								<div class="text-sm font-medium">API key</div>
+								<div class="text-xs text-base-content/50 mt-0.5">From <a class="link link-hover" href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — pay-as-you-go.</div>
+							</div>
+						</label>
+					</div>
+					<div x-show="authMode === 'subscription'" x-cloak>
 						@agentSDKMaskedInput("subscription_token", "Subscription token", p.Form.SubscriptionTokenDisplay, p.FieldErrors["subscription_token"])
 					</div>
-					<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'api_key' && 'bg-base-200/60 ring-primary/40'">
-						<input
-							type="radio"
-							name="auth_mode"
-							value="api_key"
-							class="radio radio-sm radio-primary mt-0.5 shrink-0"
-							x-model="authMode"
-							if p.Form.AuthMode == "api_key" {
-								checked
-							}
-						/>
-						@components.BrandIcon("anthropic", "w-5 h-5 mt-0.5 shrink-0")
-						<div class="min-w-0 flex-1">
-							<div class="text-sm font-medium">API key</div>
-							<div class="text-xs text-base-content/50 mt-0.5">From <a class="link link-hover" href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — pay-as-you-go.</div>
-						</div>
-					</label>
-					<div x-show="authMode === 'api_key'" x-cloak class="pl-9">
+					<div x-show="authMode === 'api_key'" x-cloak>
 						@agentSDKMaskedInput("anthropic_api_key", "Anthropic API key", p.Form.AnthropicAPIKeyDisplay, p.FieldErrors["anthropic_api_key"])
 					</div>
 				</div>
@@ -394,7 +312,6 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 // ---------------------------------------------------------------------
 // Diagnostics
 // ---------------------------------------------------------------------
-
 templ agentSDKDiagnosticsSection(csrfToken string) {
 	<div x-data="agentSDKDiagnostics" data-csrf={ csrfToken }>
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -413,7 +330,8 @@ templ agentSDKDiagnosticsSection(csrfToken string) {
 					:disabled="smokeState === 'loading'"
 				>
 					<span x-show="smokeState !== 'loading'" class="flex items-center gap-1.5">
-						@components.LucideIcon("zap", "w-4 h-4") Run smoke test
+						@components.LucideIcon("zap", "w-4 h-4")
+						Run smoke test
 					</span>
 					<span x-show="smokeState === 'loading'" x-cloak class="flex items-center gap-1.5">
 						<span class="loading loading-spinner loading-xs"></span> Running…
@@ -431,7 +349,8 @@ templ agentSDKDiagnosticsSection(csrfToken string) {
 					:disabled="cleanupState === 'loading'"
 				>
 					<span x-show="cleanupState !== 'loading'" class="flex items-center gap-1.5">
-						@components.LucideIcon("broom", "w-4 h-4") Run cleanup
+						@components.LucideIcon("broom", "w-4 h-4")
+						Run cleanup
 					</span>
 					<span x-show="cleanupState === 'loading'" x-cloak class="flex items-center gap-1.5">
 						<span class="loading loading-spinner loading-xs"></span> Cleaning…
@@ -449,7 +368,8 @@ templ agentSDKDiagnosticsSection(csrfToken string) {
 					:disabled="notifyState === 'loading'"
 				>
 					<span x-show="notifyState !== 'loading'" class="flex items-center gap-1.5">
-						@components.LucideIcon("bell", "w-4 h-4") Send test
+						@components.LucideIcon("bell", "w-4 h-4")
+						Send test
 					</span>
 					<span x-show="notifyState === 'loading'" x-cloak class="flex items-center gap-1.5">
 						<span class="loading loading-spinner loading-xs"></span> Sending…

@@ -82,7 +82,7 @@ templ Drawer(p DrawerProps) {
 			x-transition:leave="transition ease-in duration-150"
 			x-transition:leave-start="translate-x-0"
 			x-transition:leave-end="translate-x-full"
-			@keydown.escape.window="$store.drawers.close()"
+			@keydown.escape.window="if (!document.querySelector('dialog[open]')) $store.drawers.close()"
 			role="dialog"
 			aria-modal="true"
 			if p.Title != "" {
