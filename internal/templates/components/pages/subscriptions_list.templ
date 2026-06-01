@@ -3,6 +3,7 @@ package pages
 import (
 	"fmt"
 
+	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
 
@@ -218,16 +219,16 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 			</div>
 		</div>
 		<!-- Evidence: the charges this candidate was detected from. -->
-		if len(s.Members) > 0 {
+		if len(s.MemberRows) > 0 {
 			<div class="mt-3 pt-3 border-t border-base-200">
 				<div class="text-[0.7rem] uppercase tracking-wider text-base-content/40 mb-1">Based on these charges</div>
 				<div>
-					for _, m := range s.Members {
+					for _, m := range s.MemberRows {
 						@seriesChargeRow(m)
 					}
 				</div>
-				if s.OccurrenceCount > len(s.Members) {
-					<div class="text-xs text-base-content/40 mt-1.5 pl-1">+ { fmt.Sprintf("%d", s.OccurrenceCount-len(s.Members)) } more</div>
+				if s.OccurrenceCount > len(s.MemberRows) {
+					<div class="text-xs text-base-content/40 mt-1.5 pl-1">+ { fmt.Sprintf("%d", s.OccurrenceCount-len(s.MemberRows)) } more</div>
 				}
 			</div>
 		}
@@ -252,24 +253,15 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 	</div>
 }
 
-// seriesChargeRow renders one member charge via the shared TxRowFeed row with a
-// leading date column. Shared by the Needs-review candidate evidence list and
-// the "Charges in this series" list on the detail page so both read identically.
-templ seriesChargeRow(m SubscriptionMember) {
-	<div class="flex items-center gap-2 py-0.5">
-		<span class="text-xs text-base-content/45 tabular-nums w-20 shrink-0">{ m.Date }</span>
+// seriesChargeRow renders one linked charge as a leading date column + the
+// shared TxRowCompact (date suppressed — the left column carries it). Shared by
+// the Needs-review candidate evidence and the detail-page "Charges in this
+// series" list so both read identically.
+templ seriesChargeRow(tx service.AdminTransactionRow) {
+	<div class="flex items-center gap-2">
+		<span class="text-xs text-base-content/45 tabular-nums w-24 shrink-0 text-right">{ seriesChargeDate(tx.Date) }</span>
 		<div class="flex-1 min-w-0">
-			@components.TxRowFeed(components.TxRowFeedProps{
-				ShortID:       m.ShortID,
-				Description:   m.Name,
-				Amount:        m.Amount,
-				Currency:      m.Currency,
-				Pending:       m.Pending,
-				CategoryColor: m.CategoryColor,
-				CategoryIcon:  m.CategoryIcon,
-				TagCount:      m.TagCount,
-				Dimmed:        true,
-			})
+			@components.TxRowCompactNoDate(tx)
 		</div>
 	</div>
 }

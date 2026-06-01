@@ -3,6 +3,8 @@
 package pages
 
 import (
+	"time"
+
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
@@ -115,10 +117,11 @@ type SubscriptionRow struct {
 	// itself but kept for parity / future per-row display.
 	MonthlyEquiv float64
 
-	// Members holds a bounded sample of the linked charges, populated only for
-	// candidates so the review card can show the evidence the detector grouped
-	// before the user commits to confirming.
-	Members []SubscriptionMember
+	// MemberRows holds a bounded sample of the linked charges as canonical
+	// transaction rows (rendered via the shared TxRowCompact), populated only
+	// for candidates so the review card shows the evidence — account, category,
+	// date — before the user commits to confirming.
+	MemberRows []service.AdminTransactionRow
 
 	// Filter support.
 	UserID    string // formatted UUID, "" for shared/household
@@ -152,8 +155,10 @@ type SubscriptionDetailProps struct {
 	// Categories is the full vocabulary for the suggested-category <select>.
 	Categories []SubscriptionCategoryOption
 
-	// Linked charges, newest first.
-	Members []SubscriptionMember
+	// Linked charges (newest first) as canonical transaction rows, rendered
+	// with the shared TxRowCompact so the "Charges in this series" list reads
+	// identically to the /transactions list.
+	MemberRows []service.AdminTransactionRow
 
 	// Price-change history derived from members (oldest → newest change points).
 	PriceChanges []SubscriptionPriceChange
@@ -233,6 +238,15 @@ type SubscriptionSignalFact struct {
 	Label string // "Timing regularity"
 	Value string // "Very regular (±4%)"
 	Tone  string // success | warning | neutral
+}
+
+// seriesChargeDate formats an AdminTransactionRow.Date ("2006-01-02") as the
+// leading date label in the series charge list ("Jan 2, 2006"); raw on parse fail.
+func seriesChargeDate(s string) string {
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t.Format("Jan 2, 2006")
+	}
+	return s
 }
 
 // subscriptionSignalFactClass maps a signal-fact tone to the value text color.
