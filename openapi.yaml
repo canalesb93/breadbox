@@ -2038,7 +2038,7 @@ paths:
                 amount_tolerance: { type: number }
                 currency: { type: string }
                 cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual, irregular, unknown] }
-                expected_day: { type: integer }
+                expected_day: { type: integer, description: "Day-of-month / day-of-week anchor (1–31). Send 0 to clear the anchor; omit to leave unchanged." }
                 category_id: { type: string }
                 user_id: { type: string }
       responses:

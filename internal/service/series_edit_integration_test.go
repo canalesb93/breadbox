@@ -4,6 +4,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 
@@ -207,5 +208,149 @@ func TestUnlinkSeriesTransactions_StripsInheritedTags(t *testing.T) {
 	}
 	if !txnHasTag(t, pool, keep.ID, "on-sub") {
 		t.Error("a member that stayed should keep the series' inherited tag")
+	}
+}
+
+// TestUpdateSeries_ClearExpectedDay proves the day anchor can be cleared back to
+// NULL by passing 0 (the contract the Edit drawer relies on for a blank field).
+func TestUpdateSeries_ClearExpectedDay(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	created, _ := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	user := service.Actor{Type: "user", Name: "Tester"}
+
+	withDay, err := svc.UpdateSeries(ctx, created.ShortID, service.EditSeriesInput{ExpectedDay: seriesI32Ptr(15)}, user)
+	if err != nil {
+		t.Fatalf("set day: %v", err)
+	}
+	if withDay.ExpectedDay == nil || *withDay.ExpectedDay != 15 {
+		t.Fatalf("expected_day = %v, want 15", withDay.ExpectedDay)
+	}
+
+	cleared, err := svc.UpdateSeries(ctx, created.ShortID, service.EditSeriesInput{ExpectedDay: seriesI32Ptr(0)}, user)
+	if err != nil {
+		t.Fatalf("clear day: %v", err)
+	}
+	if cleared.ExpectedDay != nil {
+		t.Errorf("expected_day = %v, want nil (cleared)", *cleared.ExpectedDay)
+	}
+}
+
+// TestUpdateSeries_CollisionGuardSkipsDeadRows proves the currency/owner guard
+// only fires on a LIVE series at the target signature: a cancelled series there
+// must not block an otherwise-valid currency edit (the user can't see it).
+func TestUpdateSeries_CollisionGuardSkipsDeadRows(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, _ = seedRecurring(t, queries, "NETFLIX", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+
+	usd, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Netflix", MerchantKey: "netflix", Cadence: service.SeriesCadenceMonthly,
+		Currency: seriesStrPtr("USD"), Source: service.SeriesSourceDeterministic,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint usd: %v", err)
+	}
+	// An EUR series at the target signature, then cancelled — it's dead.
+	eur, err := svc.UpsertSeriesCandidate(ctx, service.SeriesUpsert{
+		Name: "Netflix EU", MerchantKey: "netflix", Cadence: service.SeriesCadenceMonthly,
+		Currency: seriesStrPtr("EUR"), Source: service.SeriesSourceDeterministic,
+	}, service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint eur: %v", err)
+	}
+	if _, err := svc.ReviewSeries(ctx, eur.ShortID, service.VerdictCancel, service.Actor{Type: "user", Name: "Tester"}); err != nil {
+		t.Fatalf("cancel eur: %v", err)
+	}
+
+	// Editing the USD series to EUR must now succeed — the only EUR row is dead.
+	if _, err := svc.UpdateSeries(ctx, usd.ShortID, service.EditSeriesInput{
+		Currency: seriesStrPtr("EUR"),
+	}, service.Actor{Type: "user", Name: "Tester"}); err != nil {
+		t.Errorf("currency edit blocked by a cancelled (dead) row: %v", err)
+	}
+}
+
+// TestUnlinkSeriesTransactions_DuplicateIDs proves passing the same charge twice
+// detaches it once and does NOT falsely report it as a non-member (the
+// detached-count guard would otherwise misfire).
+func TestUnlinkSeriesTransactions_DuplicateIDs(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	created, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	if err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+
+	updated, err := svc.UnlinkSeriesTransactions(ctx, created.ShortID, []string{members[2], members[2]})
+	if err != nil {
+		t.Fatalf("UnlinkSeriesTransactions with duplicate id: %v", err)
+	}
+	if updated.OccurrenceCount != 2 {
+		t.Errorf("occurrence_count = %d, want 2", updated.OccurrenceCount)
+	}
+	if n := countLinkedMembers(t, pool, created.ID); n != 2 {
+		t.Errorf("linked members = %d, want 2", n)
+	}
+}
+
+// TestAssignSeries_FailIfExists proves a deliberate create (FailIfExists) refuses
+// to adopt an existing live series or resurrect a rejected one, returning
+// ErrConflict instead of silently mutating it.
+func TestAssignSeries_FailIfExists(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, _ = seedRecurring(t, queries, "NETFLIX", []string{"2026-02-15", "2026-03-15"})
+	user := service.Actor{Type: "user", Name: "Tester"}
+
+	existing, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, Confirm: true, Name: "Netflix",
+	}, user)
+	if err != nil {
+		t.Fatalf("seed existing: %v", err)
+	}
+
+	// A strict create at the same signature must conflict, not adopt.
+	if _, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, Confirm: true, FailIfExists: true, Name: "Netflix",
+	}, user); !errors.Is(err, service.ErrConflict) {
+		t.Errorf("strict create over a live series: err = %v, want ErrConflict", err)
+	}
+
+	// And over a rejected signature it must conflict (not resurrect it).
+	if _, err := svc.ReviewSeries(ctx, existing.ShortID, service.VerdictReject, user); err != nil {
+		t.Fatalf("reject existing: %v", err)
+	}
+	if _, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		MerchantKey: "netflix", CreateIfMissing: true, Confirm: true, FailIfExists: true, Name: "Netflix",
+	}, user); !errors.Is(err, service.ErrConflict) {
+		t.Errorf("strict create over a rejected series: err = %v, want ErrConflict", err)
+	}
+}
+
+// TestPatchSeries_EditAndVerdictAtomic proves the combined edit+verdict path
+// applies both in one transaction: a rename + confirm lands the new name AND the
+// confirmed/active verdict in a single call.
+func TestPatchSeries_EditAndVerdictAtomic(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedRecurring(t, queries, "SPOTIFY", []string{"2026-02-15", "2026-03-15", "2026-04-15"})
+	created, _ := svc.UpsertSeriesCandidate(ctx, spotifyUpsert(members), service.SystemActor())
+	user := service.Actor{Type: "user", Name: "Tester"}
+
+	verdict := service.VerdictConfirm
+	patched, err := svc.PatchSeries(ctx, created.ShortID, &service.EditSeriesInput{
+		Name: seriesStrPtr("Spotify Family"),
+	}, &verdict, user)
+	if err != nil {
+		t.Fatalf("PatchSeries: %v", err)
+	}
+	if patched.Name != "Spotify Family" {
+		t.Errorf("name = %q, want Spotify Family (edit applied)", patched.Name)
+	}
+	if patched.Confidence != service.SeriesConfidenceConfirmed || patched.Status != service.SeriesStatusActive {
+		t.Errorf("confidence/status = %q/%q, want confirmed/active (verdict applied)", patched.Confidence, patched.Status)
 	}
 }

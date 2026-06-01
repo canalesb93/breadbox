@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -600,33 +601,39 @@ func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			}
 			amount = &f
 		}
+		var day *int32
+		if dayStr != "" {
+			d, derr := strconv.Atoi(dayStr)
+			if derr != nil || d < 1 || d > 31 {
+				rerender("Expected day must be a number from 1 to 31.")
+				return
+			}
+			d32 := int32(d)
+			day = &d32
+		}
 
 		actor := ActorFromSession(sm, r)
 		in := service.AssignSeriesInput{
 			MerchantKey:     slugifyMerchantKey(name),
 			CreateIfMissing: true,
 			Confirm:         true, // a deliberate manual entry is active+confirmed, not a candidate
+			FailIfExists:    true, // a deliberate create must not silently adopt/revive an existing series
 			Name:            name,
 			Cadence:         cadence,
 			Type:            typ,
 			ExpectedAmount:  amount,
+			ExpectedDay:     day, // threaded into the insert, not a swallowed follow-up edit
 			Currency:        strPtrIfNotEmpty(currency),
 			CategoryID:      strPtrIfNotEmpty(categoryID),
 		}
 		resp, err := svc.AssignSeries(ctx, in, actor)
 		if err != nil {
+			if errors.Is(err, service.ErrConflict) {
+				rerender(err.Error())
+				return
+			}
 			rerender("Could not create the series: " + err.Error())
 			return
-		}
-
-		// expected_day isn't part of the create funnel — set it as a follow-up edit.
-		if dayStr != "" {
-			if d, derr := strconv.Atoi(dayStr); derr == nil {
-				day := int32(d)
-				if _, uerr := svc.UpdateSeries(ctx, resp.ShortID, service.EditSeriesInput{ExpectedDay: &day}, actor); uerr != nil {
-					a.Logger.Warn("set expected_day on new series", "error", uerr)
-				}
-			}
 		}
 
 		http.Redirect(w, r, "/recurring/"+resp.ShortID, http.StatusSeeOther)
@@ -953,14 +960,15 @@ func sourceLabel(s string) string {
 	}
 }
 
+// subscriptionMoney delegates to seriesMoney so every money string across the
+// recurring surfaces formats identically ("$15.99" for USD/blank, "15.99 EUR"
+// otherwise) — previously this and seriesMoney disagreed and the same series
+// rendered "$15.99" in the detection panel but "15.99 USD" in the fact strip.
 func subscriptionMoney(v *float64, currency string) string {
 	if v == nil {
 		return ""
 	}
-	if currency == "" {
-		return fmt.Sprintf("%.2f", math.Abs(*v))
-	}
-	return fmt.Sprintf("%.2f %s", math.Abs(*v), currency)
+	return seriesMoney(math.Abs(*v), currency)
 }
 
 func subscriptionExpectedDay(d *int) string {

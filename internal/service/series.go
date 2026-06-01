@@ -135,6 +135,10 @@ type SeriesUpsert struct {
 	Type             string   // subscription|bill|loan|other — explicit assertion (caller); when empty, inferred at first detection from the members' dominant category, then sticky
 	MemberTxnIDs     []string // transactions to back-link (short_id or uuid)
 	DetectionSignals []byte   // raw JSON signals (§6.6)
+	// FailIfExists makes the upsert a strict create: return ErrConflict when a
+	// series already exists at the signature instead of adopting/reviving it.
+	// The detector leaves this false; the "create from scratch" UI sets it true.
+	FailIfExists bool
 }
 
 // SeriesResponse is the API/MCP shape of a recurring_series row.
@@ -184,11 +188,18 @@ type AssignSeriesInput struct {
 	Cadence         string   // optional proposed cadence for a minted series
 	Type            string   // optional subscription|bill|loan|other for a minted series
 	ExpectedAmount  *float64 // optional, paired with Currency
+	ExpectedDay     *int32   // optional day-of-month / day-of-week anchor for a minted series
 	Currency        *string
 	CategoryID      *string  // short_id or uuid, advisory
 	UserID          *string  // short_id or uuid; nil = shared/household
 	TransactionIDs  []string // members to back-link (short_id or uuid), ≤50
 	Confirm         bool     // flip straight to confirmed/active in the same call
+	// FailIfExists turns a mint into a strict create: if a series already exists
+	// at the (merchant_key, currency, user) signature, return ErrConflict instead
+	// of silently adopting (or, for a rejected signature, resurrecting) it. The
+	// detector leaves this false (re-detect is idempotent); the deliberate
+	// "create from scratch" UI sets it true.
+	FailIfExists bool
 }
 
 // EditSeriesInput is the partial-update payload for UpdateSeries. Every field is
@@ -239,10 +250,12 @@ func (s *Service) AssignSeries(ctx context.Context, in AssignSeriesInput, actor 
 			Cadence:        in.Cadence,
 			Type:           in.Type,
 			ExpectedAmount: in.ExpectedAmount,
+			ExpectedDay:    in.ExpectedDay,
 			Currency:       in.Currency,
 			CategoryID:     in.CategoryID,
 			Source:         seriesSourceForActor(actor),
 			MemberTxnIDs:   in.TransactionIDs,
+			FailIfExists:   in.FailIfExists,
 		}, actor)
 		if err != nil {
 			return nil, err
@@ -481,10 +494,21 @@ func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, ac
 		return nil, fmt.Errorf("match series: %w", matchErr)
 	}
 
-	// 2. A rejected verdict is sticky — never re-propose. Return it untouched.
+	// 2. A rejected verdict is sticky — never re-propose. Return it untouched
+	// (or refuse, when the caller demanded a fresh create).
 	if haveExisting && existing.Confidence == SeriesConfidenceRejected {
+		if in.FailIfExists {
+			return nil, fmt.Errorf("%w: a recurring series for this merchant was previously dismissed — reopen it from the Recurring list instead of creating a new one", ErrConflict)
+		}
 		resp := seriesFromRow(existing)
 		return &resp, nil
+	}
+
+	// A deliberate "create from scratch" must not silently adopt an existing
+	// live series at the same signature (that would mutate it under the user's
+	// nose and, with Confirm, flip its verdict). Refuse and point them at it.
+	if haveExisting && in.FailIfExists {
+		return nil, fmt.Errorf("%w: a recurring series already exists for this merchant — edit it from the Recurring list instead of creating a new one", ErrConflict)
 	}
 
 	// 3. Establish the target row (insert a fresh candidate, or reuse the match).
@@ -628,12 +652,34 @@ func (s *Service) ReviewSeries(ctx context.Context, idOrShort string, verdict Se
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin review series: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	updated, err := reviewSeriesInTx(ctx, qtx, id, verdict, actor)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit review series: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// reviewSeriesInTx applies a verdict to the row identified by id within an open
+// transaction and returns the updated row. Shared by ReviewSeries (verdict-only)
+// and PatchSeries (edit + verdict in one transaction).
+func reviewSeriesInTx(ctx context.Context, qtx *db.Queries, id pgtype.UUID, verdict SeriesVerdict, actor Actor) (db.RecurringSeries, error) {
+	row, err := qtx.GetRecurringSeriesByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
+			return db.RecurringSeries{}, ErrNotFound
 		}
-		return nil, fmt.Errorf("get series: %w", err)
+		return db.RecurringSeries{}, fmt.Errorf("get series: %w", err)
 	}
 
 	// User outranks agent on adjudicated rows: an agent cannot overturn a
@@ -642,8 +688,7 @@ func (s *Service) ReviewSeries(ctx context.Context, idOrShort string, verdict Se
 		row.Confidence == SeriesConfidenceConfirmed &&
 		row.ConfirmedByType.Valid && row.ConfirmedByType.String == "user" &&
 		actor.Type == "agent" {
-		resp := seriesFromRow(row)
-		return &resp, nil
+		return row, nil
 	}
 
 	upd := updateParamsFromRow(row)
@@ -661,15 +706,14 @@ func (s *Service) ReviewSeries(ctx context.Context, idOrShort string, verdict Se
 	case VerdictCancel:
 		upd.Status = SeriesStatusCancelled
 	default:
-		return nil, fmt.Errorf("%w: unknown verdict %q", ErrInvalidParameter, verdict)
+		return db.RecurringSeries{}, fmt.Errorf("%w: unknown verdict %q", ErrInvalidParameter, verdict)
 	}
 
-	updated, err := s.Queries.UpdateRecurringSeries(ctx, upd)
+	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
 	if err != nil {
-		return nil, fmt.Errorf("review series: %w", err)
+		return db.RecurringSeries{}, fmt.Errorf("review series: %w", err)
 	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
+	return updated, nil
 }
 
 // RekeySeries changes a series' merchant_key (correcting a wrong or over-merged
@@ -927,25 +971,9 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 	if err != nil {
 		return nil, err
 	}
-
-	// Validate + resolve inputs before opening the transaction.
-	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
-		return nil, fmt.Errorf("%w: name cannot be empty", ErrInvalidParameter)
-	}
-	if in.Cadence != nil && !validSeriesCadence[strings.TrimSpace(*in.Cadence)] {
-		return nil, fmt.Errorf("%w: invalid cadence %q", ErrInvalidParameter, *in.Cadence)
-	}
-	var newCategory pgtype.UUID
-	if in.CategoryID != nil {
-		if newCategory, err = s.resolveOptionalCategoryID(ctx, in.CategoryID); err != nil {
-			return nil, err
-		}
-	}
-	var newUser pgtype.UUID
-	if in.UserID != nil {
-		if newUser, err = s.resolveOptionalUserID(ctx, in.UserID); err != nil {
-			return nil, err
-		}
+	newCategory, newUser, err := s.validateAndResolveEdit(ctx, in)
+	if err != nil {
+		return nil, err
 	}
 
 	tx, err := s.Pool.Begin(ctx)
@@ -955,12 +983,99 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 	defer tx.Rollback(ctx)
 	qtx := s.Queries.WithTx(tx)
 
+	updated, err := s.updateSeriesInTx(ctx, qtx, id, in, newCategory, newUser, actor)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update series: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// PatchSeries applies an optional partial edit and an optional verdict to a
+// series in a SINGLE transaction. A combined REST PATCH (e.g. rename + confirm)
+// is therefore atomic: if the verdict fails, the edit rolls back with it, so a
+// failed response never leaves a half-applied change. Pass nil for either part
+// to skip it; at least one must be non-nil.
+func (s *Service) PatchSeries(ctx context.Context, idOrShort string, edit *EditSeriesInput, verdict *SeriesVerdict, actor Actor) (*SeriesResponse, error) {
+	if edit == nil && verdict == nil {
+		return nil, fmt.Errorf("%w: provide an edit and/or a verdict", ErrInvalidParameter)
+	}
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	var newCategory, newUser pgtype.UUID
+	if edit != nil {
+		if newCategory, newUser, err = s.validateAndResolveEdit(ctx, *edit); err != nil {
+			return nil, err
+		}
+	}
+
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin patch series: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	var updated db.RecurringSeries
+	if edit != nil {
+		if updated, err = s.updateSeriesInTx(ctx, qtx, id, *edit, newCategory, newUser, actor); err != nil {
+			return nil, err
+		}
+	}
+	if verdict != nil {
+		// reviewSeriesInTx re-reads the row, so it sees the edit applied above
+		// within this same transaction.
+		if updated, err = reviewSeriesInTx(ctx, qtx, id, *verdict, actor); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit patch series: %w", err)
+	}
+	resp := seriesFromRow(updated)
+	return &resp, nil
+}
+
+// validateAndResolveEdit checks an EditSeriesInput and resolves its category /
+// user references to UUIDs, before any transaction is opened.
+func (s *Service) validateAndResolveEdit(ctx context.Context, in EditSeriesInput) (newCategory, newUser pgtype.UUID, err error) {
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return newCategory, newUser, fmt.Errorf("%w: name cannot be empty", ErrInvalidParameter)
+	}
+	if in.Cadence != nil && !validSeriesCadence[strings.TrimSpace(*in.Cadence)] {
+		return newCategory, newUser, fmt.Errorf("%w: invalid cadence %q", ErrInvalidParameter, *in.Cadence)
+	}
+	if in.ExpectedDay != nil && *in.ExpectedDay > 31 {
+		return newCategory, newUser, fmt.Errorf("%w: expected_day must be 1–31 (or 0 to clear)", ErrInvalidParameter)
+	}
+	if in.CategoryID != nil {
+		if newCategory, err = s.resolveOptionalCategoryID(ctx, in.CategoryID); err != nil {
+			return newCategory, newUser, err
+		}
+	}
+	if in.UserID != nil {
+		if newUser, err = s.resolveOptionalUserID(ctx, in.UserID); err != nil {
+			return newCategory, newUser, err
+		}
+	}
+	return newCategory, newUser, nil
+}
+
+// updateSeriesInTx applies a partial edit to the row identified by id within an
+// open transaction (category / user already resolved by the caller) and returns
+// the updated row. Shared by UpdateSeries and PatchSeries.
+func (s *Service) updateSeriesInTx(ctx context.Context, qtx *db.Queries, id pgtype.UUID, in EditSeriesInput, newCategory, newUser pgtype.UUID, actor Actor) (db.RecurringSeries, error) {
 	row, err := qtx.GetRecurringSeriesByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
+			return db.RecurringSeries{}, ErrNotFound
 		}
-		return nil, fmt.Errorf("get series: %w", err)
+		return db.RecurringSeries{}, fmt.Errorf("get series: %w", err)
 	}
 
 	upd := updateParamsFromRow(row)
@@ -974,7 +1089,12 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 		upd.AmountTolerance = numericDollars(*in.AmountTolerance)
 	}
 	if in.ExpectedDay != nil {
-		upd.ExpectedDay = pgconv.Int4(*in.ExpectedDay)
+		// 0 (or negative) clears the day anchor back to NULL; 1–31 sets it.
+		if *in.ExpectedDay <= 0 {
+			upd.ExpectedDay = pgtype.Int4{}
+		} else {
+			upd.ExpectedDay = pgconv.Int4(*in.ExpectedDay)
+		}
 	}
 	if in.CategoryID != nil {
 		upd.CategoryID = newCategory
@@ -997,7 +1117,10 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 
 	// Currency and owner are part of the dedup signature (merchant_key, currency,
 	// user_id). A change must not silently collide with — or merge into — another
-	// live series at the new signature; mirror RekeySeries' guard.
+	// LIVE series at the new signature; mirror RekeySeries' guard. A cancelled
+	// row is dead (no collision); a rejected row is surfaced with a specific
+	// reason — otherwise the refusal reads as inexplicable, since the user can't
+	// see the conflicting rejected/cancelled series.
 	if currencyChanged || ownerChanged {
 		match, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
 			MerchantKey:     upd.MerchantKey,
@@ -1005,10 +1128,13 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 			UserID:          upd.UserID,
 		})
 		if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("match target signature: %w", mErr)
+			return db.RecurringSeries{}, fmt.Errorf("match target signature: %w", mErr)
 		}
-		if mErr == nil && match.ID != row.ID {
-			return nil, fmt.Errorf("%w: another series already exists for that merchant/currency/owner — editing won't merge them", ErrInvalidParameter)
+		if mErr == nil && match.ID != row.ID && match.Status != SeriesStatusCancelled {
+			if match.Confidence == SeriesConfidenceRejected {
+				return db.RecurringSeries{}, fmt.Errorf("%w: that merchant/currency/owner is a rejected signature — editing onto it would resurrect a dismissed series", ErrInvalidParameter)
+			}
+			return db.RecurringSeries{}, fmt.Errorf("%w: another series already exists for that merchant/currency/owner — editing won't merge them", ErrInvalidParameter)
 		}
 	}
 
@@ -1019,13 +1145,9 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 
 	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
 	if err != nil {
-		return nil, fmt.Errorf("update series: %w", err)
+		return db.RecurringSeries{}, fmt.Errorf("update series: %w", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit update series: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
+	return updated, nil
 }
 
 // UnlinkSeriesTransactions detaches transactions from a series — the inverse of
@@ -1050,6 +1172,11 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 	if err != nil {
 		return nil, err
 	}
+	// Dedup: the same charge passed twice (or its uuid + short_id) resolves to
+	// duplicate UUIDs, but `id = ANY` detaches each row once — so the
+	// detached-count check below would otherwise misfire and falsely reject a
+	// legitimate unlink.
+	memberIDs = dedupeUUIDs(memberIDs)
 
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
@@ -1347,6 +1474,20 @@ func (s *Service) resolveTransactionIDs(ctx context.Context, idsOrShorts []strin
 		out = append(out, id)
 	}
 	return out, nil
+}
+
+// dedupeUUIDs returns ids with duplicate values removed, preserving order.
+func dedupeUUIDs(ids []pgtype.UUID) []pgtype.UUID {
+	seen := make(map[[16]byte]struct{}, len(ids))
+	out := make([]pgtype.UUID, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id.Bytes]; ok {
+			continue
+		}
+		seen[id.Bytes] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 // updateParamsFromRow seeds an UpdateRecurringSeriesParams from an existing row

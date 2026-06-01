@@ -108,7 +108,7 @@ type updateSeriesInput struct {
 	AmountTolerance *float64 `json:"amount_tolerance,omitempty" jsonschema:"New ± match tolerance in dollars. Omit to leave unchanged."`
 	Currency        string   `json:"currency,omitempty" jsonschema:"New ISO currency code for the amount (e.g. USD). Part of the dedup signature — a change is collision-guarded. Omit to leave unchanged."`
 	Cadence         string   `json:"cadence,omitempty" jsonschema:"New cadence: weekly, biweekly, monthly, quarterly, semiannual, annual, irregular, unknown. Re-derives the next expected date. Omit to leave unchanged."`
-	ExpectedDay     *int32   `json:"expected_day,omitempty" jsonschema:"New day-of-month / day-of-week anchor. Omit to leave unchanged."`
+	ExpectedDay     *int32   `json:"expected_day,omitempty" jsonschema:"New day-of-month / day-of-week anchor (1–31). Send 0 to clear the anchor; omit to leave unchanged."`
 	CategoryID      string   `json:"category_id,omitempty" jsonschema:"New suggested category short ID or UUID. Omit to leave unchanged."`
 	UserID          string   `json:"user_id,omitempty" jsonschema:"New household-member owner short ID or UUID. Part of the dedup signature — a change is collision-guarded. Omit to leave unchanged."`
 }

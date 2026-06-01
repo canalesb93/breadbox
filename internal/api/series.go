@@ -323,12 +323,13 @@ func PatchSeriesHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		actor := service.ActorFromContext(r.Context())
-		var (
-			s   *service.SeriesResponse
-			err error
-		)
+
+		// Apply edit + verdict atomically in one transaction (PatchSeries), so a
+		// combined request like {name, verdict:confirm} can never leave the edit
+		// committed while reporting failure.
+		var edit *service.EditSeriesInput
 		if body.hasEdit() {
-			s, err = svc.UpdateSeries(r.Context(), id, service.EditSeriesInput{
+			edit = &service.EditSeriesInput{
 				Name:            body.Name,
 				ExpectedAmount:  body.ExpectedAmount,
 				AmountTolerance: body.AmountTolerance,
@@ -337,18 +338,16 @@ func PatchSeriesHandler(svc *service.Service) http.HandlerFunc {
 				ExpectedDay:     body.ExpectedDay,
 				CategoryID:      body.CategoryID,
 				UserID:          body.UserID,
-			}, actor)
-			if err != nil {
-				writeServiceError(w, err, "Series not found", "Failed to update series")
-				return
 			}
 		}
+		var verdictPtr *service.SeriesVerdict
 		if hasVerdict {
-			s, err = svc.ReviewSeries(r.Context(), id, verdict, actor)
-			if err != nil {
-				writeServiceError(w, err, "Series not found", "Failed to review series")
-				return
-			}
+			verdictPtr = &verdict
+		}
+		s, err := svc.PatchSeries(r.Context(), id, edit, verdictPtr, actor)
+		if err != nil {
+			writeServiceError(w, err, "Series not found", "Failed to update series")
+			return
 		}
 		writeData(w, s)
 	}

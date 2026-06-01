@@ -89,8 +89,11 @@
           if (cur !== '') body.currency = cur.toUpperCase();
           var tol = (f.get('amount_tolerance') || '').trim();
           if (tol !== '') body.amount_tolerance = parseFloat(tol);
+          // Always send expected_day: a blank field clears the anchor (the
+          // service treats 0 as "clear back to NULL"). The input is pre-filled
+          // with the current day, so an untouched Save preserves it.
           var day = (f.get('expected_day') || '').trim();
-          if (day !== '') body.expected_day = parseInt(day, 10);
+          body.expected_day = day === '' ? 0 : parseInt(day, 10);
           if (!body.name) { toast('Name cannot be empty.'); return; }
           this._write('PATCH', '/api/v1/series/' + encodeURIComponent(this.seriesId), body, 'Saved', 'Failed to save.');
         },
