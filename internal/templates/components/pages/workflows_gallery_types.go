@@ -3,11 +3,8 @@
 package pages
 
 import (
-	"fmt"
 	"strconv"
 	"time"
-
-	"breadbox/internal/templates/components"
 )
 
 // workflowCostStr formats a per-run cost estimate as a 2-decimal string
@@ -22,31 +19,14 @@ func workflowCostStr(c float64) string {
 // has been set up as a workflow, so a glance down the grid reads which
 // automations are live. The shape (size, rounding, centering) is shared
 // across both states.
+// The tile is `relative` so an enabled card can pin a small status dot
+// (last-run error) to its corner.
 func presetTileClasses(enabled bool) string {
-	const base = "flex items-center justify-center w-10 h-10 rounded-xl shrink-0 "
+	const base = "relative flex items-center justify-center w-10 h-10 rounded-xl shrink-0 "
 	if enabled {
 		return base + "bg-success/15 text-success"
 	}
 	return base + "bg-base-200 text-base-content/55"
-}
-
-// presetMenuItems builds a card's overflow ("⋯") menu. Preview prompt now
-// lives inside the configure / reconfigure drawer (it's a setup-time concern),
-// so the only menu action is Reconfigure for an already-enabled workflow that
-// the viewer can edit. The slice is empty for un-enabled presets and for
-// non-admins — the card guards on len() and skips the kebab entirely. The
-// OnClick string invokes the workflowsGallery Alpine factory and renders inside
-// the gallery's x-data root, so the handler resolves.
-func presetMenuItems(preset WorkflowPresetCardProps, isAdmin bool) []components.OverflowMenuItem {
-	var items []components.OverflowMenuItem
-	if preset.Enabled && isAdmin {
-		items = append(items, components.OverflowMenuItem{
-			Label:   "Reconfigure",
-			Icon:    "sliders-horizontal",
-			OnClick: fmt.Sprintf("openReconfigure('%s', '%s')", preset.WorkflowSlug, preset.Name),
-		})
-	}
-	return items
 }
 
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.

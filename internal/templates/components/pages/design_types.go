@@ -309,7 +309,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "workflow-preset-card",
 			Title:       "Workflow preset card",
-			Description: "The /workflows gallery tile (workflowPresetCard) — a leading status tile (gray → green once set up), name + clamped description, an overflow kebab for Reconfigure, and a bottom-aligned footer carrying run state + the primary action (Set up, or Run now + the run toggle). Flows in a 2-up grid; secondary actions live in the configure / reconfigure drawer.",
+			Description: "The /workflows gallery row (workflowPresetCard) — a clean Mintlify-style single line: a leading status tile (gray → green once set up; a red dot flags a failed last run), name + clamped description, and the run toggle + a settings gear. The gear opens the configure / reconfigure drawer, where Set up, Run now, Reconfigure, and Preview prompt all live. Flows in a 2-up grid.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionWorkflowPresetCard() },
 		},

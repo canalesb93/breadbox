@@ -17,18 +17,18 @@ templ SectionWorkflowPresetCard() {
 		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
 			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
 			<ul class="space-y-1 list-disc pl-4">
-				<li>One preset tile in the <code>/workflows</code> gallery grid (<code>grid-cols-1 lg:grid-cols-2</code>). The leading icon tile carries set-up state — gray until configured, a green accent once a workflow exists.</li>
-				<li>Footer-left is run state: the trigger summary while un-configured; once set up, a last-run pill + relative time, or a muted "Not run yet". Footer-right is the primary action — Set up, or Run now + the run toggle.</li>
-				<li>Secondary actions (Preview prompt, Reconfigure) live in the configure / reconfigure drawer, not on the card. The ⋯ kebab shows only on an enabled card an admin can reconfigure, and is omitted otherwise.</li>
+				<li>One preset row in the <code>/workflows</code> gallery grid (<code>grid-cols-1 lg:grid-cols-2</code>) — a clean Mintlify-style single line: vertically-centered icon tile, name + two-line description, and the controls on the right.</li>
+				<li>The icon tile carries set-up state — gray until configured, a green accent once a workflow exists; a small red dot flags a failed last run.</li>
+				<li>Right side is just the run toggle + a settings gear. The gear opens the configure (not set up) / reconfigure (set up) drawer; Set up, Run now, Reconfigure, and Preview prompt all live in that drawer. A not-set-up toggle opens the setup drawer instead of flipping; non-admins get a disabled toggle.</li>
 			</ul>
 		</div>
-		@designExample("Not set up", "Gray tile, the trigger summary on the left, and a Set up button that opens the configure drawer. No kebab — there's nothing to reconfigure yet. Scheduled presets show their cadence; post-sync presets read \"After each sync\".") {
+		@designExample("Not set up", "Gray tile, name + description, and an off toggle + gear on the right — both open the configure drawer (you can't enable without picking a schedule + acknowledging cost). Scheduled and post-sync presets look identical here; the trigger is chosen in the drawer.") {
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
 				@workflowPresetCard(designWFCardNotSetUp(), true)
 				@workflowPresetCard(designWFCardNotSetUpSync(), true)
 			</div>
 		}
-		@designExample("Set up — run states", "Green tile once configured. The footer reflects the latest run: success + relative time, an error pill, or a muted \"Not run yet\". The toggle on the right reflects enabled vs paused; the ⋯ kebab carries Reconfigure.") {
+		@designExample("Set up — run states", "Green tile once configured. The run toggle (left of the gear) reflects enabled vs paused; the gear opens the reconfigure drawer (where Run now + Preview prompt live). A failed last run pins a small red dot to the tile corner — see Large Charge Sentinel.") {
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
 				@workflowPresetCard(designWFCardRunning(), true)
 				@workflowPresetCard(designWFCardPaused(), true)
@@ -36,7 +36,7 @@ templ SectionWorkflowPresetCard() {
 				@workflowPresetCard(designWFCardNeverRun(), true)
 			</div>
 		}
-		@designExample("Non-admin", "Viewers can't instantiate a workflow: the Set up control is disabled with a lock + tooltip, and no kebab renders.") {
+		@designExample("Non-admin", "Viewers can't instantiate a workflow: the toggle is disabled with a tooltip and no gear renders.") {
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
 				@workflowPresetCard(designWFCardNotSetUp(), false)
 			</div>

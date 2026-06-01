@@ -182,6 +182,48 @@ func TestT15WorkflowsGalleryGridAndTiles(t *testing.T) {
 	if !strings.Contains(html, "Preview prompt") || !strings.Contains(html, "previewPrompt(") {
 		t.Error("expected the Preview prompt affordance inside the drawer (button + handler)")
 	}
+
+	// The cleaned-up row uses a settings gear (not a ⋯ kebab) as the
+	// drawer entry point.
+	if !strings.Contains(html, "lucide-settings") {
+		t.Error("expected a settings gear (lucide-settings) on the row")
+	}
+	if strings.Contains(html, "lucide-ellipsis") {
+		t.Error("expected no ⋯ kebab on the row (replaced by the gear)")
+	}
+}
+
+// TestT15WorkflowsGalleryLastRunErrorDot asserts a failed last run pins a
+// red status dot to the icon tile, and a clean run does not.
+func TestT15WorkflowsGalleryLastRunErrorDot(t *testing.T) {
+	base := WorkflowsGalleryProps{
+		CSRFToken: "csrf",
+		IsAdmin:   true,
+		Status:    AgentSubsystemStatusProps{Ready: true},
+	}
+	mk := func(status string) string {
+		props := base
+		props.Categories = []WorkflowCategoryProps{{
+			Name: "Cat", Icon: "sparkles",
+			Presets: []WorkflowPresetCardProps{{
+				Slug: "p", Name: "P", Description: "d", Icon: "sparkles",
+				Enabled: true, WorkflowSlug: "p", WorkflowEnabled: true,
+				LastRun: &WorkflowLastRunProps{ShortID: "r1", Status: status},
+			}},
+		}}
+		var buf strings.Builder
+		if err := WorkflowsGallery(props).Render(context.Background(), &buf); err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		return buf.String()
+	}
+
+	if !strings.Contains(mk("error"), "bg-error") {
+		t.Error("expected a red status dot (bg-error) on a card whose last run errored")
+	}
+	if strings.Contains(mk("success"), "bg-error") {
+		t.Error("did not expect a red status dot on a card whose last run succeeded")
+	}
 }
 
 // TestT15WorkflowsGalleryEnabledPresetRendersToggle asserts that a preset

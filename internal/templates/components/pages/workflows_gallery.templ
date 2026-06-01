@@ -1,11 +1,6 @@
 package pages
 
-import (
-	"fmt"
-	"time"
-
-	"breadbox/internal/templates/components"
-)
+import "breadbox/internal/templates/components"
 
 // WorkflowsGallery is the /workflows preset gallery: codified, configurable,
 // one-click automations grouped by category. "Set up" opens a right-side
@@ -133,14 +128,6 @@ templ workflowReconfigureDrawer() {
 					<div>
 						<div class="font-semibold leading-tight" x-text="reconfigure.name || 'Reconfigure workflow'"></div>
 						<div class="text-xs text-base-content/60 mt-1">Adjust how this workflow runs. Its base behavior stays the same.</div>
-						<button
-							type="button"
-							class="btn btn-ghost btn-xs gap-1 mt-2 -ml-1 text-base-content/70"
-							@click="previewPrompt(reconfigure.slug, reconfigure.name)"
-						>
-							@components.LucideIcon("file-text", "w-3.5 h-3.5")
-							Preview prompt
-						</button>
 					</div>
 				</div>
 				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">
@@ -180,9 +167,19 @@ templ workflowReconfigureDrawer() {
 					</div>
 				</template>
 				<div>
-					<div class="text-sm font-medium mb-1.5">
-						Additional instructions
-						<span class="text-base-content/40 font-normal">(optional)</span>
+					<div class="flex items-center justify-between gap-2 mb-1.5">
+						<div class="text-sm font-medium">
+							Additional instructions
+							<span class="text-base-content/40 font-normal">(optional)</span>
+						</div>
+						<button
+							type="button"
+							class="btn btn-ghost btn-xs gap-1 text-base-content/55"
+							@click="previewPrompt(reconfigure.slug, reconfigure.name)"
+						>
+							@components.LucideIcon("file-text", "w-3.5 h-3.5")
+							Preview prompt
+						</button>
 					</div>
 					<textarea
 						name="additional_instructions"
@@ -194,12 +191,23 @@ templ workflowReconfigureDrawer() {
 					<div class="text-xs text-base-content/40 mt-1">Appended to the workflow's built-in prompt on every run.</div>
 				</div>
 			</div>
-			<div class="flex items-center justify-end gap-2 p-4 border-t border-base-300">
-				<button type="button" class="btn btn-ghost btn-sm" @click="open=''">Cancel</button>
-				<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="reconfigure.loading">
-					@components.LucideIcon("save", "w-4 h-4")
-					Save changes
+			<div class="flex items-center justify-between gap-2 p-4 border-t border-base-300">
+				<button
+					type="button"
+					class="btn btn-soft btn-sm gap-1.5"
+					@click="runWorkflow(reconfigure.slug); open=''"
+					x-bind:disabled="reconfigure.loading"
+				>
+					@components.LucideIcon("play", "w-4 h-4")
+					Run now
 				</button>
+				<div class="flex items-center gap-2">
+					<button type="button" class="btn btn-ghost btn-sm" @click="open=''">Cancel</button>
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="reconfigure.loading">
+						@components.LucideIcon("save", "w-4 h-4")
+						Save changes
+					</button>
+				</div>
 			</div>
 		</form>
 	</div>
@@ -248,104 +256,78 @@ templ workflowPromptPreviewModal() {
 	</dialog>
 }
 
-// workflowPresetCard is one preset tile in the gallery grid: a leading
-// icon tile (gray, green-accented once set up), the name + description,
-// an overflow menu for secondary actions, and a bottom-aligned footer
-// carrying the run state on the left and the primary action(s) on the
-// right. Cards stretch to a uniform height per grid row (h-full + a
-// mt-auto footer) so the action rows line up across the 2-up layout.
+// workflowPresetCard is one preset row in the gallery grid — a clean,
+// Mintlify-style single line: a vertically-centered icon tile (gray,
+// green once set up; a small red dot flags a failed last run), the name
+// + a two-line description, and the run toggle + a settings gear on the
+// right. Set up, Run now, Reconfigure, and Preview prompt all live in the
+// drawer the gear opens, so the row itself stays uncluttered.
 templ workflowPresetCard(preset WorkflowPresetCardProps, isAdmin bool) {
-	<div class="bb-card p-4 h-full flex flex-col gap-3">
-		<div class="flex items-start gap-3">
-			<div class={ presetTileClasses(preset.Enabled) }>
-				@components.LucideIcon(preset.Icon, "w-5 h-5")
-			</div>
-			<div class="flex-1 min-w-0">
-				<div class="font-medium text-sm leading-tight">{ preset.Name }</div>
-				<div class="text-xs text-base-content/60 mt-1 line-clamp-2">{ preset.Description }</div>
-			</div>
-			<!-- Reconfigure (enabled + admin) is the only overflow action; the
-			     kebab is omitted entirely when there's nothing to put in it. -->
-			if len(presetMenuItems(preset, isAdmin)) > 0 {
-				@components.OverflowMenu(components.OverflowMenuProps{
-					AriaLabel: preset.Name + " actions",
-					Items:     presetMenuItems(preset, isAdmin),
-				})
+	<div class="bb-card px-4 py-3 h-full flex items-center gap-3">
+		<div class={ presetTileClasses(preset.Enabled) }>
+			@components.LucideIcon(preset.Icon, "w-5 h-5")
+			if preset.LastRun != nil && preset.LastRun.Status == "error" {
+				<span
+					class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-base-100"
+					title="Last run failed"
+				></span>
 			}
 		</div>
-		<div class="flex items-center justify-between gap-2 mt-auto pt-1">
-			<div class="flex items-center gap-2 text-xs text-base-content/45 min-w-0">
-				@workflowCardStatus(preset)
-			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				if preset.Enabled {
-					<button
-						type="button"
-						class="btn btn-soft btn-sm gap-1.5"
-						@click={ "runWorkflow('" + preset.WorkflowSlug + "')" }
-						aria-label={ "Run " + preset.Name + " now" }
-					>
-						@components.LucideIcon("play", "w-4 h-4")
-						Run now
-					</button>
-					<input
-						type="checkbox"
-						class="toggle toggle-sm toggle-primary"
-						if preset.WorkflowEnabled {
-							checked
-						}
-						aria-label={ "Toggle " + preset.Name }
-						@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
-					/>
-				} else if isAdmin {
-					<button
-						type="button"
-						class="btn btn-soft btn-sm gap-1.5"
-						@click={ "open='" + preset.Slug + "'" }
-					>
-						@components.LucideIcon("settings-2", "w-4 h-4")
-						Set up
-					</button>
-				} else {
-					<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
-						<button type="button" class="btn btn-soft btn-sm gap-1.5" disabled>
-							@components.LucideIcon("lock", "w-4 h-4")
-							Set up
-						</button>
-					</span>
-				}
-			</div>
+		<div class="flex-1 min-w-0">
+			<div class="font-medium text-sm leading-tight">{ preset.Name }</div>
+			<div class="text-xs text-base-content/60 mt-0.5 line-clamp-2">{ preset.Description }</div>
+		</div>
+		<div class="flex items-center gap-1 shrink-0">
+			@workflowCardControls(preset, isAdmin)
 		</div>
 	</div>
 }
 
-// workflowCardStatus is the footer-left status line: when set up, the
-// last-run pill + relative time (or a muted "Not run yet"); otherwise the
-// trigger summary so an un-configured card still tells you when it would
-// run. Always visible — the grid gives each card room even on mobile.
-templ workflowCardStatus(preset WorkflowPresetCardProps) {
+// workflowCardControls is the right-side cluster: the run toggle + a gear
+// that opens the configure (not set up) / reconfigure (set up) drawer —
+// the Mintlify shape, two controls, no buttons or kebab. A not-set-up
+// toggle opens the setup drawer instead of flipping (you can't enable
+// without choosing a schedule + acknowledging cost); non-admins get a
+// disabled toggle with a tooltip.
+templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 	if preset.Enabled {
-		if preset.LastRun == nil {
-			<span class="text-base-content/35">Not run yet</span>
-		} else {
-			<span class="inline-flex items-center gap-1.5 min-w-0">
-				@workflowRunStatusPill(preset.LastRun.Status)
-				if preset.LastRun.ShortID != "" {
-					<a
-						href={ templ.SafeURL(fmt.Sprintf("/workflows/runs/%s", preset.LastRun.ShortID)) }
-						class="text-base-content/60 hover:underline tabular-nums truncate"
-					>
-						{ workflowsRelativeTime(preset.LastRun.FinishedAt) }
-					</a>
-				} else {
-					<span class="text-base-content/60 tabular-nums truncate">{ workflowsRelativeTime(preset.LastRun.FinishedAt) }</span>
-				}
-			</span>
+		<input
+			type="checkbox"
+			class="toggle toggle-sm toggle-primary"
+			if preset.WorkflowEnabled {
+				checked
+			}
+			aria-label={ "Toggle " + preset.Name }
+			@change={ "toggleWorkflow('" + preset.WorkflowSlug + "', $event.target)" }
+		/>
+		if isAdmin {
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square text-base-content/55"
+				@click={ "openReconfigure('" + preset.WorkflowSlug + "', '" + preset.Name + "')" }
+				aria-label={ "Configure " + preset.Name }
+			>
+				@components.LucideIcon("settings", "w-4 h-4")
+			</button>
 		}
+	} else if isAdmin {
+		<input
+			type="checkbox"
+			class="toggle toggle-sm"
+			@click.prevent={ "open='" + preset.Slug + "'" }
+			aria-label={ "Set up " + preset.Name }
+		/>
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square text-base-content/55"
+			@click={ "open='" + preset.Slug + "'" }
+			aria-label={ "Set up " + preset.Name }
+		>
+			@components.LucideIcon("settings", "w-4 h-4")
+		</button>
 	} else {
-		<span class="inline-flex items-center gap-1 truncate">
-			@components.LucideIcon("clock", "w-3.5 h-3.5 shrink-0")
-			{ preset.TriggerLabel }
+		<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
+			<input type="checkbox" class="toggle toggle-sm" disabled aria-label={ "Toggle " + preset.Name }/>
 		</span>
 	}
 }
@@ -378,14 +360,6 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					<div>
 						<div class="font-semibold leading-tight">{ preset.Name }</div>
 						<div class="text-xs text-base-content/60 mt-1">{ preset.Description }</div>
-						<button
-							type="button"
-							class="btn btn-ghost btn-xs gap-1 mt-2 -ml-1 text-base-content/70"
-							@click={ "previewPrompt('" + preset.Slug + "', '" + preset.Name + "')" }
-						>
-							@components.LucideIcon("file-text", "w-3.5 h-3.5")
-							Preview prompt
-						</button>
 					</div>
 				</div>
 				<button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" @click="open=''" aria-label="Close">
@@ -434,9 +408,19 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 					</div>
 				}
 				<div>
-					<div class="text-sm font-medium mb-1.5">
-						Additional instructions
-						<span class="text-base-content/40 font-normal">(optional)</span>
+					<div class="flex items-center justify-between gap-2 mb-1.5">
+						<div class="text-sm font-medium">
+							Additional instructions
+							<span class="text-base-content/40 font-normal">(optional)</span>
+						</div>
+						<button
+							type="button"
+							class="btn btn-ghost btn-xs gap-1 text-base-content/55"
+							@click={ "previewPrompt('" + preset.Slug + "', '" + preset.Name + "')" }
+						>
+							@components.LucideIcon("file-text", "w-3.5 h-3.5")
+							Preview prompt
+						</button>
 					</div>
 					<textarea
 						name="additional_instructions"
@@ -483,45 +467,5 @@ templ workflowScheduleOption(value, label, selected string) {
 		<option value={ value } selected>{ label }</option>
 	} else {
 		<option value={ value }>{ label }</option>
-	}
-}
-
-// workflowRunStatusPill mirrors agentsListStatusPill — a soft daisy badge per
-// run status. Kept local so the pages package stays self-contained and the
-// gallery doesn't depend on the agents-list table's render helpers.
-templ workflowRunStatusPill(status string) {
-	switch status {
-		case "success":
-			<span class="badge badge-soft badge-success badge-xs">success</span>
-		case "error":
-			<span class="badge badge-soft badge-error badge-xs">error</span>
-		case "in_progress":
-			<span class="badge badge-soft badge-info badge-xs">running</span>
-		case "skipped":
-			<span class="badge badge-ghost badge-xs">skipped</span>
-		default:
-			<span class="badge badge-ghost badge-xs">{ status }</span>
-	}
-}
-
-// workflowsRelativeTime renders a compact "N ago" string for the last-run
-// line. Thin local copy of agentsListRelativeTime (same algorithm) so the
-// gallery doesn't reach across page files for a single helper.
-func workflowsRelativeTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	case d < 7*24*time.Hour:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	default:
-		return t.Format("Jan 2")
 	}
 }
