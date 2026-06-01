@@ -172,6 +172,9 @@ type AgentRunResponse struct {
 	// terminated, if any: "max_turns" | "max_budget" | nil. Lets the v2
 	// SPA flag "ran into the ceiling" runs separately from clean successes.
 	HitCap *string `json:"hit_cap,omitempty"`
+	// Model is the Claude model this run executed with, snapshotted at run
+	// creation. Empty for runs created before the snapshot column existed.
+	Model string `json:"model,omitempty"`
 }
 
 // AgentRunListResult is the paginated envelope for run lists.
@@ -878,7 +881,7 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		       r.duration_ms, r.total_cost_usd, r.input_tokens, r.output_tokens, r.cache_read_tokens,
 		       r.cache_creation_tokens, r.turn_count, r.max_turns_used, r.num_tool_calls,
 		       r.error_message, r.transcript_path, r.session_id,
-		       r.operator_note, r.prompt_prefix, r.hit_cap,
+		       r.operator_note, r.prompt_prefix, r.hit_cap, r.model,
 		       d.slug, d.name
 		FROM workflow_runs r
 		JOIN workflows d ON d.id = r.agent_definition_id
@@ -903,7 +906,7 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 			&r.InputTokens, &r.OutputTokens, &r.CacheReadTokens,
 			&r.CacheCreationTokens, &r.TurnCount, &r.MaxTurnsUsed,
 			&r.NumToolCalls, &r.ErrorMessage, &r.TranscriptPath, &r.SessionID,
-			&r.OperatorNote, &r.PromptPrefix, &r.HitCap,
+			&r.OperatorNote, &r.PromptPrefix, &r.HitCap, &r.Model,
 			&slug, &name,
 		); scanErr != nil {
 			return nil, fmt.Errorf("scan agent run: %w", scanErr)
@@ -1019,11 +1022,15 @@ func (s *Service) notifyDefinitionChanged() {
 
 // --- Orchestrator-facing helpers (called by internal/service/agent_orchestrator.go) ---
 
-// CreateAgentRunDB inserts an in_progress run row.
-func (s *Service) CreateAgentRunDB(ctx context.Context, defID pgtype.UUID, trigger string) (db.WorkflowRun, error) {
+// CreateAgentRunDB inserts an in_progress run row. model is snapshotted onto
+// the run (not just the definition) so the run discloses the model it actually
+// executed with even after the definition's model changes — see the
+// add_model_to_workflow_runs migration.
+func (s *Service) CreateAgentRunDB(ctx context.Context, defID pgtype.UUID, trigger, model string) (db.WorkflowRun, error) {
 	return s.Queries.CreateAgentRun(ctx, db.CreateAgentRunParams{
 		AgentDefinitionID: defID,
 		Trigger:           trigger,
+		Model:             model,
 	})
 }
 
@@ -1464,6 +1471,7 @@ func agentRunFromRow(row db.WorkflowRun) AgentRunResponse {
 		OperatorNote:        pgconv.TextPtr(row.OperatorNote),
 		PromptPrefix:        pgconv.TextPtr(row.PromptPrefix),
 		HitCap:              pgconv.TextPtr(row.HitCap),
+		Model:               row.Model,
 	}
 }
 

@@ -149,6 +149,13 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 					<span title={ p.Run.StartedAt.Format(time.RFC3339) }>{ formatAgentRunStarted(p.Run.StartedAt) }</span>
 					<span class="opacity-50">·</span>
 					<span x-ref="duration" class="tabular-nums">{ formatAgentRunDuration(p.Run.DurationMs) }</span>
+					if AgentModelShortLabel(p.Run.Model) != "" {
+						<span class="opacity-50">·</span>
+						<span class="inline-flex items-center gap-1" title={ "Model: " + p.Run.Model }>
+							@components.LucideIcon("cpu", "w-3 h-3")
+							{ AgentModelShortLabel(p.Run.Model) }
+						</span>
+					}
 					<span x-show="status==='in_progress'" x-cloak class="inline-flex items-center gap-1 text-primary">
 						<span class="loading loading-spinner loading-xs"></span>
 						<span class="text-[0.65rem] uppercase tracking-wider">live</span>
@@ -204,13 +211,14 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 }
 
 // agentRunSummaryStats is the compact at-a-glance strip directly under
-// the sticky header — status, duration, trigger, and cost in a daisy
-// `stats` block. It restates the four facts an operator scans for first
+// the sticky header — status, duration, trigger, model, and cost in a
+// daisy `stats` block. It restates the facts an operator scans for first
 // without making them hunt through the Usage card in the side panel.
-// daisy `stats` is the canonical home for these tiles per
-// .claude/rules/daisyui.md (the rule explicitly nominates `stats
-// stats-horizontal` for dashboard-tile clusters); cost reuses the same
-// canonical Amount renderer as the rest of the page.
+// The Model tile is omitted for runs predating the per-run model
+// snapshot (empty model). daisy `stats` is the canonical home for these
+// tiles per .claude/rules/daisyui.md (the rule explicitly nominates
+// `stats stats-horizontal` for dashboard-tile clusters); cost reuses the
+// same canonical Amount renderer as the rest of the page.
 templ agentRunSummaryStats(p AgentRunDetailProps) {
 	<div class="stats stats-horizontal bb-card w-full overflow-x-auto mb-4">
 		<div class="stat px-4 py-3">
@@ -233,6 +241,12 @@ templ agentRunSummaryStats(p AgentRunDetailProps) {
 				}
 			</div>
 		</div>
+		if AgentModelShortLabel(p.Run.Model) != "" {
+			<div class="stat px-4 py-3">
+				<div class="stat-title text-[0.65rem] uppercase tracking-wider">Model</div>
+				<div class="stat-value text-base font-semibold" title={ p.Run.Model }>{ AgentModelShortLabel(p.Run.Model) }</div>
+			</div>
+		}
 		<div class="stat px-4 py-3">
 			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Cost</div>
 			<div class="stat-value text-base font-semibold">

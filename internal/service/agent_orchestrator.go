@@ -230,7 +230,7 @@ func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionRespon
 		if perr != nil {
 			return nil, fmt.Errorf("orchestrator: parse def id: %w", perr)
 		}
-		runRow, crerr := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
+		runRow, crerr := o.svc.CreateAgentRunDB(ctx, defUUID, trigger, def.Model)
 		if crerr != nil {
 			return nil, fmt.Errorf("orchestrator: create ceiling-skipped run row: %w (ceiling: %v)", crerr, cerr)
 		}
@@ -245,7 +245,7 @@ func (o *Orchestrator) RunOrSkip(ctx context.Context, def *AgentDefinitionRespon
 		if perr != nil {
 			return nil, fmt.Errorf("orchestrator: parse def id: %w", perr)
 		}
-		runRow, crerr := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
+		runRow, crerr := o.svc.CreateAgentRunDB(ctx, defUUID, trigger, def.Model)
 		if crerr != nil {
 			return nil, fmt.Errorf("orchestrator: create skipped run row: %w (acquire err: %v)", crerr, err)
 		}
@@ -346,7 +346,7 @@ func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionRespo
 		return nil, fmt.Errorf("orchestrator: parse def id: %w", err), nil
 	}
 
-	runRow, err := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
+	runRow, err := o.svc.CreateAgentRunDB(ctx, defUUID, trigger, def.Model)
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: create run row: %w", err), nil
 	}
@@ -449,7 +449,7 @@ func (o *Orchestrator) runLocked(ctx context.Context, def *AgentDefinitionRespon
 		return nil, fmt.Errorf("orchestrator: parse def id: %w", err)
 	}
 
-	runRow, err := o.svc.CreateAgentRunDB(ctx, defUUID, trigger)
+	runRow, err := o.svc.CreateAgentRunDB(ctx, defUUID, trigger, def.Model)
 	if err != nil {
 		return nil, fmt.Errorf("orchestrator: create run row: %w", err)
 	}
