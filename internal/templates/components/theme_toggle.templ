@@ -21,25 +21,38 @@ package components
 // All three glyphs render server-side and are gated by x-show once Alpine
 // hydrates. x-cloak hides them until then so a reload doesn't flash all
 // three; btn-square reserves the box so there's no layout shift.
+//
+// The daisy tooltip surfaces the global "Toggle theme" shortcut (⇧ *,
+// registered in base.html) as a KbdCombo pill — the same blended-pill
+// shape the keyboard-shortcuts modal renders for this binding. It
+// replaces the old native :title so we don't stack a browser tooltip on
+// top of the CSS one; :aria-label still carries the live preference for
+// screen readers. KbdCombo self-hides on touch, where there's no hover.
 templ ThemeToggle() {
-	<button
-		type="button"
-		class="btn btn-sm btn-square btn-ghost text-base-content/60"
-		x-data
-		@click="$store.theme.cycle()"
-		:title="$store.theme.title"
-		:aria-label="$store.theme.title"
-	>
-		<span x-cloak x-show="$store.theme.preference === 'system'" class="contents">
-			@LucideIcon("monitor", "w-4 h-4")
-		</span>
-		<span x-cloak x-show="$store.theme.preference === 'light'" class="contents">
-			@LucideIcon("sun", "w-4 h-4")
-		</span>
-		<span x-cloak x-show="$store.theme.preference === 'dark'" class="contents">
-			@LucideIcon("moon", "w-4 h-4")
-		</span>
-	</button>
+	<div class="tooltip tooltip-bottom" x-data>
+		<div class="tooltip-content">
+			<span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+				Toggle theme
+				@KbdCombo("shift", "*")
+			</span>
+		</div>
+		<button
+			type="button"
+			class="btn btn-sm btn-square btn-ghost text-base-content/60"
+			@click="$store.theme.cycle()"
+			:aria-label="$store.theme.title"
+		>
+			<span x-cloak x-show="$store.theme.preference === 'system'" class="contents">
+				@LucideIcon("monitor", "w-4 h-4")
+			</span>
+			<span x-cloak x-show="$store.theme.preference === 'light'" class="contents">
+				@LucideIcon("sun", "w-4 h-4")
+			</span>
+			<span x-cloak x-show="$store.theme.preference === 'dark'" class="contents">
+				@LucideIcon("moon", "w-4 h-4")
+			</span>
+		</button>
+	</div>
 }
 
 // ThemeControl is the explicit segmented control for the Settings →
