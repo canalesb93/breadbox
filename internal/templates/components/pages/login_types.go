@@ -12,4 +12,8 @@ type LoginProps struct {
 	Error     string
 	FlashType string
 	FlashMsg  string
+	// ShowDevLogin renders a one-tap quick-login button that posts the
+	// seeded dev credentials (admin@example.com / password). Set only when
+	// the server runs with ENVIRONMENT=local — never in docker/prod.
+	ShowDevLogin bool
 }

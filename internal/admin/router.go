@@ -34,11 +34,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Get("/avatars/preview/{seed}", AvatarPreviewHandler())
 	r.Get("/avatars/{id}", AvatarHandler(a))
 
-	// Unauthenticated routes.
+	// Unauthenticated routes. devLogin gates the one-tap quick-login button
+	// on the form: shown only for ENVIRONMENT=local, never docker/prod.
+	devLogin := a.Config.Environment == "local"
 	r.Group(func(r chi.Router) {
 		r.Use(OAuthLoginReturnMiddleware(sm))
-		r.Get("/login", LoginHandler(sm, a.Queries, tr))
-		r.Post("/login", LoginHandler(sm, a.Queries, tr))
+		r.Get("/login", LoginHandler(sm, a.Queries, tr, devLogin))
+		r.Post("/login", LoginHandler(sm, a.Queries, tr, devLogin))
 	})
 	r.Post("/logout", LogoutHandler(sm))
 

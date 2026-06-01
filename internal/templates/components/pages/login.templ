@@ -62,5 +62,20 @@ templ Login(p LoginProps) {
 				@components.LucideIcon("arrow-right", "w-4 h-4 ml-1")
 			</button>
 		</form>
+		if p.ShowDevLogin {
+			<div class="divider text-xs text-base-content/40 my-6">Dev instance</div>
+			<form method="POST" action="/login">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<input type="hidden" name="username" value="admin@example.com"/>
+				<input type="hidden" name="password" value="password"/>
+				<input type="hidden" name="remember_me" value="1"/>
+				<button type="submit" class="btn btn-soft btn-block h-12 gap-2 font-medium">
+					@components.LucideIcon("terminal", "w-4 h-4")
+					Sign in as admin@example.com
+				</button>
+			</form>
+		}
 	}
 }
