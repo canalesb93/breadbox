@@ -20,6 +20,9 @@ document.addEventListener('alpine:init', function () {
       previewTitle: '',
       previewBody: '',
       previewLoading: false,
+      // previewCopied briefly flips true after a successful Copy so the
+      // button can show a "Copied" confirmation.
+      previewCopied: false,
       // -------------------------------------------------------------------
 
       // --- F3: reconfigure an enabled workflow ---------------------------
@@ -230,7 +233,11 @@ document.addEventListener('alpine:init', function () {
           return;
         }
         self.cronPreviewLoading = true;
-        fetch('/-/workflows/cron-preview?cron=' + encodeURIComponent(cron), {
+        // Pass the viewer's IANA timezone so the preview renders the schedule
+        // in their local time (the scheduler fires cron in the server's tz).
+        var tz = '';
+        try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { tz = ''; }
+        fetch('/-/workflows/cron-preview?cron=' + encodeURIComponent(cron) + (tz ? '&tz=' + encodeURIComponent(tz) : ''), {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
         })
@@ -322,7 +329,52 @@ document.addEventListener('alpine:init', function () {
           } else {
             el.textContent = self.previewBody || '';
           }
+          // The body element is reused across opens; reset its scroll so a
+          // new prompt always starts at the top rather than wherever the
+          // previous one was left scrolled. The element is x-show-gated on
+          // previewLoading, so a same-tick reset can land while it's still
+          // display:none (a no-op). rAF defers until after x-show flushes and
+          // the element is laid out, so the reset actually sticks.
+          el.scrollTop = 0;
+          requestAnimationFrame(function () { el.scrollTop = 0; });
         });
+      },
+
+      // copyPrompt copies the raw (markdown source) workflow prompt to the
+      // clipboard. Bound to the modal's Copy button and the 'c' shortcut.
+      // Flashes previewCopied for confirmation. Falls back to a hidden
+      // textarea + execCommand on browsers without the async clipboard API.
+      copyPrompt: function () {
+        var self = this;
+        var text = self.previewBody || '';
+        if (!text) return;
+        var done = function () {
+          self.previewCopied = true;
+          setTimeout(function () { self.previewCopied = false; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(function () {
+            self._copyFallback(text, done);
+          });
+        } else {
+          self._copyFallback(text, done);
+        }
+      },
+
+      _copyFallback: function (text, done) {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          done();
+        } catch (e) {
+          console.error('copyPrompt fallback failed', e);
+        }
       },
       // -------------------------------------------------------------------
     };

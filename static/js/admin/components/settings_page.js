@@ -270,7 +270,7 @@ document.addEventListener('alpine:init', function () {
 // Valid settings tab ids — used by parseSettingsRedirect to classify a
 // response URL as inside the settings space.
 var BB_SETTINGS_PAGE_TABS = {
-  account: 1, general: 1, system: 1, providers: 1, agents: 1,
+  account: 1, general: 1, system: 1, providers: 1, workflows: 1,
   mcp: 1, 'api-keys': 1, backups: 1, help: 1,
 };
 
@@ -360,7 +360,7 @@ var BB_SETTINGS_SKELETONS = {
   'api-keys': { sections: [3, 3] },
   backups: { sections: [3, 2, 2] },
   providers: { sections: [3, 3, 2] },
-  agents: { sections: [3, 4, 2] },
+  workflows: { sections: [3, 4, 2] },
   mcp: { sections: [2, 2, 2, 3] },
   _default: { sections: [3, 3] },
 };

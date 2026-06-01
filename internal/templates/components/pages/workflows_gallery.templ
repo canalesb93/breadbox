@@ -33,7 +33,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 					<div class="font-semibold text-sm">Set up the agent runtime first</div>
 					<div class="text-xs opacity-80">Configure an Anthropic API key in Settings to actually run these workflows. You can still enable presets — they'll stay paused until the runtime is ready.</div>
 				</div>
-				<a href="/settings/agents" class="btn btn-sm btn-ghost">Configure</a>
+				<a href="/settings/workflows" class="btn btn-sm btn-ghost">Configure</a>
 			</div>
 		}
 		if p.Spend.Show {
@@ -44,7 +44,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 						<div class="font-semibold text-sm">Workflows paused — spend ceiling reached</div>
 						<div class="text-xs opacity-80">30-day spend { p.Spend.SpentStr } has reached your ceiling ({ p.Spend.CeilingStr }). New runs are paused until spend ages out of the window or you raise the ceiling.</div>
 					</div>
-					<a href="/settings/agents" class="btn btn-sm btn-ghost">Adjust</a>
+					<a href="/settings/workflows" class="btn btn-sm btn-ghost">Adjust</a>
 				</div>
 			} else {
 				<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
@@ -53,7 +53,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 						<div class="font-semibold text-sm">Approaching spend ceiling</div>
 						<div class="text-xs opacity-80">{ p.Spend.PctStr } used — { p.Spend.SpentStr } of { p.Spend.CeilingStr } in the last 30 days.</div>
 					</div>
-					<a href="/settings/agents" class="btn btn-sm btn-ghost">Adjust</a>
+					<a href="/settings/workflows" class="btn btn-sm btn-ghost">Adjust</a>
 				</div>
 			}
 		}
@@ -126,11 +126,11 @@ templ workflowReconfigureDrawer() {
 				<template x-for="opt in reconfigure.options" :key="opt.key">
 					<div>
 						<div class="text-sm font-medium mb-1.5" x-text="opt.label"></div>
-						<select :name="opt.key" x-model="opt.selected" class="select select-sm w-full">
+						<div class="join w-full rounded-lg overflow-hidden">
 							<template x-for="ch in opt.choices" :key="ch.value">
-								<option :value="ch.value" x-text="ch.label"></option>
+								<input type="radio" :name="opt.key" :value="ch.value" x-model="opt.selected" :aria-label="ch.label" class="join-item btn btn-sm flex-1 checked:btn-primary"/>
 							</template>
-						</select>
+						</div>
 						<div class="text-xs text-base-content/40 mt-1" x-show="opt.help" x-text="opt.help"></div>
 					</div>
 				</template>
@@ -146,7 +146,7 @@ templ workflowReconfigureDrawer() {
 							@click="previewPrompt(reconfigure.slug, reconfigure.name)"
 						>
 							@components.LucideIcon("file-text", "w-3.5 h-3.5")
-							Preview prompt
+							Workflow prompt
 						</button>
 					</div>
 					<textarea
@@ -185,7 +185,7 @@ templ workflowReconfigureDrawer() {
 // gallery factory opens it (dialog.showModal()) and fills previewTitle /
 // previewBody from GET /-/workflows/{slug}/prompt.
 templ workflowPromptPreviewModal() {
-	<dialog id="wf-prompt-preview" class="modal modal-bottom sm:modal-middle">
+	<dialog id="wf-prompt-preview" class="modal modal-bottom sm:modal-middle" @keydown.c="if (!$event.metaKey && !$event.ctrlKey) copyPrompt()">
 		<div class="modal-box max-w-2xl">
 			<div class="flex items-start justify-between gap-3 mb-3">
 				<div class="flex items-start gap-2 min-w-0">
@@ -214,6 +214,17 @@ templ workflowPromptPreviewModal() {
 				class="bb-prose text-sm bg-base-200 rounded-xl p-4 max-h-[60vh] overflow-y-auto break-words"
 			></div>
 			<div class="modal-action mt-4">
+				<button type="button" class="btn btn-sm gap-2" :class="previewCopied ? 'btn-success' : 'btn-primary'" @click="copyPrompt()">
+					<span x-show="!previewCopied" class="inline-flex items-center gap-2">
+						@components.LucideIcon("copy", "w-4 h-4")
+						Copy
+						@components.Kbd("c")
+					</span>
+					<span x-show="previewCopied" x-cloak class="inline-flex items-center gap-2">
+						@components.LucideIcon("check", "w-4 h-4")
+						Copied
+					</span>
+				</button>
 				<form method="dialog">
 					<button class="btn btn-ghost btn-sm">Close</button>
 				</form>
@@ -262,7 +273,7 @@ templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 	if preset.Enabled {
 		<input
 			type="checkbox"
-			class="toggle toggle-sm toggle-primary"
+			class="toggle toggle-sm"
 			if preset.WorkflowEnabled {
 				checked
 			}
@@ -317,7 +328,7 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 		<div class="grid grid-cols-2 gap-2">
 			<label class="cursor-pointer">
 				<input type="radio" name="trigger_on_sync" value="false" x-model={ triggerVar } @change={ "describeCron(" + cronVar + ")" } class="peer sr-only"/>
-				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-success peer-checked:bg-success/5">
+				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
 					<div class="flex items-center gap-2">
 						@components.LucideIcon("calendar-clock", "w-4 h-4 text-base-content/60")
 						<span class="text-sm font-medium">Custom schedule</span>
@@ -327,7 +338,7 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 			</label>
 			<label class="cursor-pointer">
 				<input type="radio" name="trigger_on_sync" value="true" x-model={ triggerVar } class="peer sr-only"/>
-				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-success peer-checked:bg-success/5">
+				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
 					<div class="flex items-center gap-2">
 						@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/60")
 						<span class="text-sm font-medium">After each sync</span>
@@ -367,8 +378,8 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 templ workflowCronPill(cronVar, value, label string) {
 	<button
 		type="button"
-		class="btn btn-xs btn-soft"
-		x-bind:class={ cronVar + " === '" + value + "' ? 'btn-success' : ''" }
+		class="btn btn-sm"
+		x-bind:class={ cronVar + " === '" + value + "' ? 'btn-primary' : 'btn-soft'" }
 		@click={ cronVar + " = '" + value + "'; describeCron(" + cronVar + ")" }
 	>
 		{ label }
@@ -392,24 +403,19 @@ templ workflowModelField(modelVar string) {
 // cap (max_budget_usd) and turn cap (max_turns). Collapsed by default. Bound to
 // budgetVar / turnsVar (the corresponding form fields).
 templ workflowAdvancedFields(turnsVar, budgetVar string) {
-	<div x-data="{ advOpen: false }" class="border-t border-base-200 pt-3">
-		<button type="button" class="flex items-center gap-1.5 text-sm font-medium text-base-content/70 w-full" @click="advOpen = !advOpen">
+	<div class="border-t border-base-200 pt-3">
+		<div class="flex items-center gap-1.5 text-sm font-medium text-base-content/70 mb-2">
 			@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
 			Advanced
-			<span class="ml-auto transition-transform" x-bind:class="advOpen ? 'rotate-90' : ''">
-				@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content/40")
-			</span>
-		</button>
-		<div x-show="advOpen" x-cloak x-collapse class="space-y-3 pt-3">
+		</div>
+		<div class="grid grid-cols-2 gap-3">
 			<div>
-				<div class="text-sm font-medium mb-1.5">Max cost per run (USD)</div>
+				<div class="text-sm font-medium mb-1.5">Max cost / run (USD)</div>
 				<input type="number" name="max_budget_usd" x-model={ budgetVar } min="0" max="1000" step="0.5" class="input input-sm w-full" placeholder="1.00"/>
-				<div class="text-xs text-base-content/45 mt-1">Stops the run if its cumulative Anthropic cost passes this cap.</div>
 			</div>
 			<div>
 				<div class="text-sm font-medium mb-1.5">Max turns</div>
 				<input type="number" name="max_turns" x-model={ turnsVar } min="0" max="100" step="1" class="input input-sm w-full" placeholder="10"/>
-				<div class="text-xs text-base-content/45 mt-1">Caps how many assistant/tool turns a single run can take.</div>
 			</div>
 		</div>
 	</div>
@@ -421,7 +427,7 @@ templ workflowAdvancedFields(turnsVar, budgetVar string) {
 templ workflowActivateToggle() {
 	<label class="flex items-center gap-2 cursor-pointer tooltip tooltip-bottom" data-tip="Activate as soon as it's set up">
 		<span class="text-xs text-base-content/55 hidden sm:inline">Activate</span>
-		<input type="checkbox" name="enabled" value="true" checked class="toggle toggle-sm toggle-primary"/>
+		<input type="checkbox" name="enabled" value="true" checked class="toggle toggle-sm"/>
 	</label>
 }
 
@@ -433,7 +439,7 @@ templ workflowReconfigureToggle() {
 		<span class="text-xs text-base-content/55 hidden sm:inline" x-text="reconfigure.enabled ? 'On' : 'Off'"></span>
 		<input
 			type="checkbox"
-			class="toggle toggle-sm toggle-primary"
+			class="toggle toggle-sm"
 			x-model="reconfigure.enabled"
 			@change="toggleWorkflow(reconfigure.slug, $event.target)"
 		/>
@@ -466,15 +472,15 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 				for _, opt := range preset.Options {
 					<div>
 						<div class="text-sm font-medium mb-1.5">{ opt.Label }</div>
-						<select name={ opt.Key } class="select select-sm w-full">
+						<div class="join w-full rounded-lg overflow-hidden">
 							for _, ch := range opt.Choices {
 								if ch.Value == opt.Default {
-									<option value={ ch.Value } selected>{ ch.Label }</option>
+									<input type="radio" name={ opt.Key } value={ ch.Value } aria-label={ ch.Label } class="join-item btn btn-sm flex-1 checked:btn-primary" checked/>
 								} else {
-									<option value={ ch.Value }>{ ch.Label }</option>
+									<input type="radio" name={ opt.Key } value={ ch.Value } aria-label={ ch.Label } class="join-item btn btn-sm flex-1 checked:btn-primary"/>
 								}
 							}
-						</select>
+						</div>
 						if opt.Help != "" {
 							<div class="text-xs text-base-content/40 mt-1">{ opt.Help }</div>
 						}
@@ -492,7 +498,7 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 							@click={ "previewPrompt('" + preset.Slug + "', '" + preset.Name + "')" }
 						>
 							@components.LucideIcon("file-text", "w-3.5 h-3.5")
-							Preview prompt
+							Workflow prompt
 						</button>
 					</div>
 					<textarea
@@ -528,4 +534,3 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 		</form>
 	}
 }
-

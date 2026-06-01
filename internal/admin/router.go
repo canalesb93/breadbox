@@ -359,9 +359,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// review guidelines, report format, and per-tool toggles. POST
 		// targets remain at /-/mcp-settings/* (registered below).
 		r.Get("/settings/mcp", AgentsSettingsHandler(svc, mcpServer, sm, tr))
-		// Agent SDK settings — Claude Agent SDK auth, sidecar, and run
+		// Workflow runtime settings — Claude Agent SDK auth, sidecar, and run
 		// ceilings. Admin-only because tokens are sensitive and runs cost.
-		r.Get("/settings/agents", AgentSDKSettingsPageHandler(a, svc, sm, tr))
+		r.Get("/settings/workflows", AgentSDKSettingsPageHandler(a, svc, sm, tr))
+		// Back-compat: the tab used to live at /settings/agents.
+		r.Get("/settings/agents", redirectGET("/settings/workflows"))
 		r.Get("/agents-settings", redirectGET("/settings/mcp"))
 		r.Get("/mcp-getting-started", redirectGET("/agent-prompts"))
 		r.Get("/agent-wizard", redirectGET("/agent-prompts"))
