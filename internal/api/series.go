@@ -360,7 +360,8 @@ func UnlinkSeriesTransactionHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		txID := chi.URLParam(r, "txid")
-		s, err := svc.UnlinkSeriesTransactions(r.Context(), id, []string{txID})
+		actor := service.ActorFromContext(r.Context())
+		s, err := svc.UnlinkSeriesTransactions(r.Context(), id, []string{txID}, actor)
 		if err != nil {
 			writeServiceError(w, err, "Series or transaction not found", "Failed to unlink transaction")
 			return

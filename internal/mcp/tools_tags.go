@@ -17,7 +17,7 @@ import (
 
 type listAnnotationsInput struct {
 	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
-	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync. Empty = all kinds. Pass ['comment'] for the comment-only timeline. Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated) for the specific event. Pass ['sync'] to see initial-import + pending-flip rows."`
+	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync, series. Empty = all kinds. Pass ['comment'] for the comment-only timeline. Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated|linked|unlinked) for the specific event. Pass ['series'] to see recurring-series link/unlink events."`
 	ActorTypes    []string `json:"actor_types,omitempty" jsonschema:"Optional actor-type filter: any of user, agent, system. Empty = all actors. Pass ['user'] for the canonical 'any human input?' check — drops rule churn and prior agent activity in one filter. Combine with kinds for fine-grained slices."`
 	Since         string   `json:"since,omitempty" jsonschema:"Optional RFC3339 timestamp; return only annotations whose created_at is strictly after this time. Lets an agent that already saw the timeline once skip to the new tail. Malformed timestamps are rejected with a clear error."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Optional cap on returned rows — returns the most recent N (timeline tail) in chronological order. 0 (default) = full timeline; max 200; negative is rejected. Pair with since to bound a delta read."`
@@ -134,6 +134,7 @@ var mcpAnnotationKinds = map[string][]string{
 	"tag":      {"tag_added", "tag_removed"},
 	"category": {"category_set"},
 	"sync":     {"sync_started", "sync_updated"},
+	"series":   {"series_assigned", "series_unlinked"},
 }
 
 // mapAnnotationKinds translates the agent-facing generic kinds into the raw DB
@@ -149,7 +150,7 @@ func mapAnnotationKinds(kinds []string) ([]string, error) {
 	for _, k := range kinds {
 		raw, ok := mcpAnnotationKinds[k]
 		if !ok {
-			return nil, fmt.Errorf("invalid kind %q: expected one of comment, rule, tag, category, sync", k)
+			return nil, fmt.Errorf("invalid kind %q: expected one of comment, rule, tag, category, sync, series", k)
 		}
 		for _, r := range raw {
 			if seen[r] {
@@ -253,13 +254,13 @@ func toMCPAnnotation(a service.Annotation) mcpAnnotation {
 		// Surface the rule's short_id as `rule_id` (canonical handle for
 		// agents). Falls back to the FK column's UUID for raw rows where
 		// enrichment hasn't populated RuleShortID yet.
-		RuleID:        ruleHandle(a),
-		ActorType:     a.ActorType,
-		ActorID:       a.ActorID,
-		ActorName:     a.ActorName,
-		SessionID:     a.SessionID,
-		Payload:       a.Payload,
-		CreatedAt:     a.CreatedAt,
+		RuleID:    ruleHandle(a),
+		ActorType: a.ActorType,
+		ActorID:   a.ActorID,
+		ActorName: a.ActorName,
+		SessionID: a.SessionID,
+		Payload:   a.Payload,
+		CreatedAt: a.CreatedAt,
 	}
 }
 

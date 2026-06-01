@@ -684,6 +684,7 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 		BandTone:        bandTone,
 		SignalSummary:   subscriptionSignalSummary(s),
 		SignalsJSON:     prettySignals(s.DetectionSignals),
+		SignalFacts:     subscriptionSignalFacts(s),
 		Source:          s.DetectionSource,
 		SourceLabel:     sourceLabel(s.DetectionSource),
 	}
@@ -860,6 +861,87 @@ func subscriptionSignalSummary(s service.SeriesResponse) string {
 		parts = append(parts, amountPhrase)
 	}
 	return strings.Join(parts, " · ")
+}
+
+// subscriptionSignalFacts parses detection_signals into labelled criteria for
+// the "Why detected" surface — a readable breakdown (charges seen, cadence,
+// timing regularity, amount pattern) instead of a raw JSON dump. Returns nil
+// when there are no signals (manual / agent-created series) so the card falls
+// back to a plain note.
+func subscriptionSignalFacts(s service.SeriesResponse) []pages.SubscriptionSignalFact {
+	sig, ok := decodeSignals(s.DetectionSignals)
+	if !ok {
+		return nil
+	}
+	occ := s.OccurrenceCount
+	if sig.OccurrenceCount > 0 {
+		occ = sig.OccurrenceCount
+	}
+	occTone := "neutral"
+	switch {
+	case occ >= 6:
+		occTone = "success"
+	case occ <= 3:
+		occTone = "warning"
+	}
+
+	cadence := sig.Cadence
+	if cadence == "" {
+		cadence = strings.ToLower(cadenceLabel(s.Cadence))
+	}
+
+	facts := []pages.SubscriptionSignalFact{
+		{Icon: "hash", Label: "Charges seen", Value: fmt.Sprintf("%d", occ), Tone: occTone},
+		{Icon: "calendar", Label: "Cadence", Value: cadence, Tone: "neutral"},
+	}
+
+	// Timing regularity from the interval coefficient of variation (0 = perfectly
+	// even spacing). Lower CV ⇒ stronger recurring signal.
+	regularity, regTone := intervalRegularity(sig.IntervalCV)
+	facts = append(facts, pages.SubscriptionSignalFact{
+		Icon: "activity", Label: "Timing", Value: regularity, Tone: regTone,
+	})
+
+	// Amount pattern from the detector's amount branch.
+	amountValue, amountTone := amountPattern(sig)
+	facts = append(facts, pages.SubscriptionSignalFact{
+		Icon: "dollar-sign", Label: "Amount", Value: amountValue, Tone: amountTone,
+	})
+	return facts
+}
+
+// intervalRegularity turns the interval coefficient of variation into a phrase +
+// tone. CV is stddev/mean of the gaps between charges.
+func intervalRegularity(cv float64) (string, string) {
+	switch {
+	case cv <= 0.0001:
+		return "Perfectly even spacing", "success"
+	case cv < 0.10:
+		return fmt.Sprintf("Very regular (±%.0f%%)", cv*100), "success"
+	case cv < 0.25:
+		return fmt.Sprintf("Regular (±%.0f%%)", cv*100), "success"
+	case cv < 0.50:
+		return fmt.Sprintf("Somewhat irregular (±%.0f%%)", cv*100), "warning"
+	default:
+		return fmt.Sprintf("Irregular (±%.0f%%)", cv*100), "neutral"
+	}
+}
+
+// amountPattern turns the detector's amount branch + spread into a phrase + tone.
+func amountPattern(sig subscriptionSignalsShape) (string, string) {
+	switch sig.AmountBranch {
+	case "monotonic_drift":
+		return "Rising over time", "warning"
+	case "tight":
+		if pct := (sig.AmountSpreadRatio - 1) * 100; pct >= 1 {
+			return fmt.Sprintf("Stable (±%.0f%%)", pct), "success"
+		}
+		return "Identical each time", "success"
+	case "":
+		return "—", "neutral"
+	default:
+		return "Variable", "neutral"
+	}
 }
 
 func prettySignals(raw json.RawMessage) string {

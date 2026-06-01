@@ -48,6 +48,19 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 		<div class="mt-5">
 			@components.SeriesFactStrip(p.Facts)
 		</div>
+		<!-- The actual charges linked to this series, rendered with the shared
+		     transaction-row component (same row used across the app) so you can
+		     see — and click into — exactly what's included before confirming. -->
+		if len(p.Members) > 0 {
+			<div class="mt-5">
+				@seriesPanelHeader("receipt", "Charges in this series", fmt.Sprintf("%d linked", len(p.Members)), nil)
+				<div class="bb-card p-3 sm:p-4">
+					for _, m := range p.Members {
+						@seriesChargeRow(m)
+					}
+				</div>
+			</div>
+		}
 		@seriesEditDrawer(p)
 		@seriesLinkModal()
 	</div>
