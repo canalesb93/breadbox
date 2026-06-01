@@ -2163,13 +2163,9 @@
               this.closePalette();
               return;
             }
-            if (window.bbProgress) window.bbProgress.start();
-            var main = document.querySelector('main');
-            if (main) {
-              main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
-              main.style.opacity = '0.6';
-              main.style.filter = 'blur(1px)';
-              main.style.pointerEvents = 'none';
+            if (window.bbProgress) {
+              window.bbProgress.start();
+              window.bbProgress.fadeMainOut();
             }
             window.location.href = item.href;
           }
@@ -2400,11 +2396,30 @@
         }, 150);
       }
 
-      // Expose globally
-      window.bbProgress = { start: start, finish: finish, setProgress: setProgress };
+      // Soft page-out fade applied to <main> before a full-page navigation.
+      //
+      // Centralized so the click handler, the command palette, and the
+      // chord dispatcher all fade identically. The blur is deliberately
+      // skipped whenever a fixed Settings rail is on the page: a CSS
+      // `filter` on an ancestor turns that ancestor into the containing
+      // block for its position:fixed descendants, which would rip the
+      // viewport-anchored rail out of place and park it mid-screen for the
+      // duration of the fade (regression once Settings grew a full-page
+      // fixed rail). `opacity` creates no containing block, so opacity-only
+      // leaves the rail pinned.
+      function fadeMainOut() {
+        var main = document.querySelector('main');
+        if (!main) return;
+        main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
+        main.style.opacity = '0.6';
+        main.style.pointerEvents = 'none';
+        if (!main.querySelector('.bb-settings-rail')) {
+          main.style.filter = 'blur(1px)';
+        }
+      }
 
-      // Main content area for fade effect
-      var mainContent = document.querySelector('main');
+      // Expose globally
+      window.bbProgress = { start: start, finish: finish, setProgress: setProgress, fadeMainOut: fadeMainOut };
 
       // Intercept navigation clicks (sidebar links, breadcrumbs, any internal link)
       document.addEventListener('click', function(e) {
@@ -2433,12 +2448,7 @@
         start();
 
         // Subtle content fade during navigation
-        if (mainContent) {
-          mainContent.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
-          mainContent.style.opacity = '0.6';
-          mainContent.style.filter = 'blur(1px)';
-          mainContent.style.pointerEvents = 'none';
-        }
+        fadeMainOut();
 
         // Mobile sidebar: optimistically move the active marker to the
         // clicked tab and show a trailing spinner. The drawer intentionally
@@ -2583,13 +2593,9 @@
           window.dispatchEvent(new CustomEvent('open-settings', { detail: { tab: settingsTab } }));
           return;
         }
-        if (window.bbProgress) window.bbProgress.start();
-        var main = document.querySelector('main');
-        if (main) {
-          main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
-          main.style.opacity = '0.6';
-          main.style.filter = 'blur(1px)';
-          main.style.pointerEvents = 'none';
+        if (window.bbProgress) {
+          window.bbProgress.start();
+          window.bbProgress.fadeMainOut();
         }
         window.location.href = path;
       }
