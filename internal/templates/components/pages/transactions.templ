@@ -445,15 +445,16 @@ templ txResultsShell(p TransactionsProps) {
 					</label>
 				</div>
 			</div>
-			<!-- View Toggle — daisy join + join-item btn (segmented control).
+			<!-- View Toggle — canonical daisy segmented control: join + join-item btn,
+			     active item marked with btn-active (see /design "Join — segmented control").
 			     Sits to the right of the select toggle so view-mode + selection
 			     mode read as a single results-scoped cluster. -->
-			<div class="join border border-base-300 bg-base-200">
-				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'grouped' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
+			<div class="join">
+				<button type="button" class="btn btn-xs join-item gap-1.5" :class="$store.txView.mode === 'grouped' && 'btn-active'" :aria-pressed="$store.txView.mode === 'grouped'" @click="$store.txView.setMode('grouped')" title="Date grouped view">
 					@components.LucideIcon("calendar-days", "w-3.5 h-3.5")
 					<span class="hidden sm:inline">Grouped</span>
 				</button>
-				<button type="button" class="join-item btn btn-xs btn-ghost rounded-md gap-1.5" :class="$store.txView.mode === 'list' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/50'" @click="$store.txView.setMode('list')" title="Flat list view">
+				<button type="button" class="btn btn-xs join-item gap-1.5" :class="$store.txView.mode === 'list' && 'btn-active'" :aria-pressed="$store.txView.mode === 'list'" @click="$store.txView.setMode('list')" title="Flat list view">
 					@components.LucideIcon("list", "w-3.5 h-3.5")
 					<span class="hidden sm:inline">List</span>
 				</button>
