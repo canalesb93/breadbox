@@ -3041,7 +3041,7 @@ templ SectionUserAvatar() {
 // OnShuffle are Alpine expressions, so the component is state-agnostic.
 templ SectionEditableAvatar() {
 	<div class="flex flex-col gap-6">
-		@designExample("Shuffle to reseed — tap the avatar", "The entire avatar is the shuffle control (one button): pointer cursor, and on hover the ring + corner badge tint primary. Tap anywhere and the state change is animated — the current avatar dims, scales down and blurs under a spinner while the new DiceBear SVG fetches, then the fresh avatar springs back in (overshoot ease) as the spinner fades. The chip shows the current seed.") {
+		@designExample("Shuffle to reseed — tap the avatar", "The entire avatar is the shuffle control (one button): pointer cursor, and on hover the corner badge's glyph softly tints primary. Tap anywhere and the state change is animated — the current avatar dims, scales down and blurs under a spinner while the new DiceBear SVG fetches, then the fresh avatar springs back in (overshoot ease) as the spinner fades. Transitions are scoped to transform/filter/opacity so flipping the theme never flashes a stroke. The chip shows the current seed.") {
 			<div x-data="{ s: 'editable-demo' }" class="flex items-center gap-4">
 				@components.EditableAvatar(components.EditableAvatarProps{
 					SrcExpr:   "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'",
