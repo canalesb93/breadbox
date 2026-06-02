@@ -23,18 +23,20 @@ type EditableAvatarProps struct {
 }
 
 // EditableAvatar renders a live avatar whose entire surface is the
-// shuffle/regenerate control, with a deliberate (but gentle) animated state
-// change: on tap the current avatar dims, scales down and blurs under a
-// spinner while the freshly-seeded image fetches, then springs back in
-// (overshoot ease) as the spinner fades; the corner badge's glyph softly tints
-// primary on hover and spins while loading. The whole circle is one button
-// (pointer cursor, primary focus ring, press feedback).
+// shuffle/regenerate control:
 //
-// Transitions are deliberately scoped to transform/filter/opacity (avatar) and
-// color (badge glyph) so that flipping the light/dark theme — which swaps every
-// color variable at once — does NOT animate the ring/border/background and
-// flash a stroke; those snap instantly. Local Alpine state (imgLoading) drives
-// the loading animation, cleared by the <img>'s load/error events.
+//   - Hover: the whole avatar lifts slightly (scale) and the corner badge's
+//     glyph tints primary — a clear but gentle "this is interactive" cue.
+//   - Press: a small scale-down for tactile feedback.
+//   - Tap (shuffle): the current avatar dims, scales down and blurs under a
+//     spinner while the freshly-seeded image fetches, then springs back in
+//     (overshoot ease) as the spinner fades.
+//
+// Hover/press/loading motion is all transform/filter/opacity (plus the badge
+// glyph's color), so flipping the light/dark theme — which swaps every color
+// variable at once — never animates the ring/border/background into a flashing
+// stroke; those snap. Local Alpine state (imgLoading) drives the loading
+// animation, cleared by the <img>'s load/error events.
 //
 //	@components.EditableAvatar(components.EditableAvatarProps{
 //		SrcExpr:   "reconfigureAvatarSrc()",
@@ -49,7 +51,7 @@ templ EditableAvatar(p EditableAvatarProps) {
 		x-bind:aria-busy="imgLoading"
 		title="Shuffle avatar"
 		aria-label="Shuffle avatar"
-		class={ "group relative shrink-0 rounded-full cursor-pointer transition-transform duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 " + editableAvatarSizeClass(p.SizeClass) }
+		class={ "group relative shrink-0 rounded-full cursor-pointer transition-transform duration-200 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 " + editableAvatarSizeClass(p.SizeClass) }
 	>
 		<img
 			x-bind:src={ p.SrcExpr }
@@ -76,16 +78,15 @@ templ EditableAvatar(p EditableAvatarProps) {
 			<span class="loading loading-spinner loading-sm text-primary"></span>
 		</span>
 		<!-- Corner badge: the shuffle cue. The glyph softly tints primary on
-		     hover (color only — so the theme flip never animates the border) and
-		     spins while loading. -->
+		     hover and while loading (color only — so the theme flip never
+		     animates the border). It doesn't rotate; the overlay spinner is the
+		     loading indicator. -->
 		<span
 			aria-hidden="true"
 			x-bind:class="imgLoading ? 'text-primary' : ''"
 			class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-base-100 border border-base-300 shadow-sm flex items-center justify-center text-base-content/55 transition-[color] duration-200 group-hover:text-primary"
 		>
-			<span x-bind:class="imgLoading ? 'animate-spin' : ''" class="inline-flex">
-				@LucideIcon("shuffle", "w-3 h-3")
-			</span>
+			@LucideIcon("shuffle", "w-3 h-3")
 		</span>
 	</button>
 }
