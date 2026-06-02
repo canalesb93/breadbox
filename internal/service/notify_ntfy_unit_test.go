@@ -148,12 +148,18 @@ func TestBuildNtfyRequest(t *testing.T) {
 		Priority: "warning",
 		URL:      "https://bb.example.com/reports/xyz",
 	}
-	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/breadbox", p, "https://bb.example.com")
+	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/breadbox", p, "https://bb.example.com", "tk_secret")
 	if err != nil {
 		t.Fatalf("buildNtfyRequest: %v", err)
 	}
 	if req.Method != "POST" {
 		t.Errorf("method = %q, want POST", req.Method)
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer tk_secret" {
+		t.Errorf("Authorization = %q, want Bearer tk_secret", got)
+	}
+	if got := req.Header.Get("X-Actions"); got != "view, View report, https://bb.example.com/reports/xyz" {
+		t.Errorf("X-Actions = %q", got)
 	}
 	if got := req.Header.Get("X-Title"); got != "Large charge detected" {
 		t.Errorf("X-Title = %q", got)
@@ -181,18 +187,24 @@ func TestBuildNtfyRequest_RelativeClickDropped(t *testing.T) {
 	// Without a public base URL the deep link stays relative; ntfy needs an
 	// absolute URL for X-Click, so it must be omitted rather than sent broken.
 	p := NotificationPayload{Title: "Test", Body: "hi", Priority: "info", URL: "/reports/xyz"}
-	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "")
+	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "", "")
 	if err != nil {
 		t.Fatalf("buildNtfyRequest: %v", err)
 	}
 	if got := req.Header.Get("X-Click"); got != "" {
 		t.Errorf("X-Click = %q, want empty for relative URL", got)
 	}
+	if got := req.Header.Get("X-Actions"); got != "" {
+		t.Errorf("X-Actions = %q, want empty for relative URL", got)
+	}
+	if got := req.Header.Get("Authorization"); got != "" {
+		t.Errorf("Authorization = %q, want empty when no token", got)
+	}
 }
 
 func TestBuildNtfyRequest_EmptyBodyFallsBackToTitle(t *testing.T) {
 	p := NotificationPayload{Title: "Sync watchdog", Body: "", Priority: "info"}
-	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "")
+	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "", "")
 	if err != nil {
 		t.Fatalf("buildNtfyRequest: %v", err)
 	}

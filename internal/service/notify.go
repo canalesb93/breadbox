@@ -78,73 +78,111 @@ func truncateNotifyBody(body string) string {
 	return strings.TrimRight(string(r[:notifyBodyMaxLen]), " \t\n") + "…"
 }
 
-// WorkflowNotificationConfigured reports whether an outbound webhook URL is set.
+// WorkflowNotificationConfigured reports whether at least one enabled
+// notification channel is configured.
 func (s *Service) WorkflowNotificationConfigured(ctx context.Context) bool {
-	return strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyWebhookURL, "")) != ""
+	for _, c := range s.loadNotificationChannels(ctx) {
+		if c.Enabled {
+			return true
+		}
+	}
+	return false
 }
 
-// SendWorkflowNotification delivers the payload to the configured
-// notification webhook. It is a no-op (returns nil) when no URL is
-// configured, so callers can fire unconditionally. The URL must be http(s).
+// SendWorkflowNotification fans the payload out to every enabled notification
+// channel. It is a no-op (returns nil) when no channel is configured, so
+// callers can fire unconditionally.
 //
-// The wire shape depends on the configured format (notify.format):
+// Each channel is rendered in its own format and gated by its own priority
+// floor. The wire shape per channel:
 //   - ntfy    → a plain-text (markdown) body plus ntfy's publishing headers
-//     (Title / Priority / Click / Markdown / Tags), so the push renders as
-//     a real titled notification instead of a raw JSON blob.
+//     (Title / Priority / Click / Markdown / Tags / Actions), so the push
+//     renders as a real titled notification instead of a raw JSON blob.
 //   - slack   → a Slack incoming-webhook JSON ({"text": …}) with mrkdwn.
 //   - discord → a Discord webhook JSON ({"content": …}) with markdown.
-//   - json    → the generic NotificationPayload envelope (relays, bridges,
-//     custom consumers).
+//   - json    → the generic NotificationPayload envelope (relays, bridges).
 //   - auto    → the matching provider when the URL is recognizable, else json.
 //
-// Reports below the configured priority floor (notify.min_priority) are
-// dropped silently. Delivery is retried with backoff on transient failures.
+// Reports below a channel's priority floor are skipped for that channel.
+// Per-channel delivery is retried with backoff on transient failures, and the
+// outcome is recorded on the channel. Returns the first delivery error (if
+// any) after attempting every channel.
 func (s *Service) SendWorkflowNotification(ctx context.Context, p NotificationPayload) error {
-	raw := strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyWebhookURL, ""))
-	if raw == "" {
+	// A persisted channels array is the source of truth; an empty one means we
+	// synthesize an ephemeral legacy channel. We must NOT persist statuses back
+	// in the synth case — doing so would promote the legacy config into the
+	// channels array and make further legacy-webhook edits silently ignored.
+	persisted := strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyChannels, "")) != ""
+	chans := s.loadNotificationChannels(ctx)
+	if len(chans) == 0 {
 		return nil // notifications disabled — no-op
-	}
-	if err := validateNotifyURL(raw); err != nil {
-		return err
-	}
-
-	// Priority floor: drop reports below the configured minimum. Test
-	// notifications (Event == "test") always go through — the operator is
-	// explicitly checking the wiring.
-	floor := appconfig.String(ctx, s.Queries, appconfig.KeyNotifyMinPriority, appconfig.NotifyMinPriorityInfo)
-	if p.Event != "test" && priorityRank(p.Priority) < priorityRank(floor) {
-		return nil
 	}
 
 	if p.SentAt == "" {
-		p.SentAt = time.Now().UTC().Format(time.RFC3339)
+		p.SentAt = nowRFC3339()
 	}
-
-	// Absolutize the deep link so both JSON consumers and ntfy tap-through
-	// resolve to the real report rather than a bare path. No-op when the
-	// operator hasn't set a public base URL.
+	// Absolutize the deep link once so every channel (ntfy tap-through, JSON
+	// consumers) resolves to the real report rather than a bare path.
 	baseURL := normalizeBaseURL(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyPublicBaseURL, ""))
 	if baseURL != "" && strings.HasPrefix(p.URL, "/") {
 		p.URL = baseURL + p.URL
 	}
 
-	format := resolveNotifyFormat(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyFormat, appconfig.NotifyFormatAuto), raw)
+	var firstErr error
+	attempted := false
+	for i := range chans {
+		c := &chans[i]
+		if !c.Enabled {
+			continue
+		}
+		// Per-channel priority floor; test sends always go through.
+		if p.Event != "test" && priorityRank(p.Priority) < priorityRank(c.MinPriority) {
+			continue
+		}
+		attempted = true
+		if err := s.sendToChannel(ctx, c, p, baseURL); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if attempted && persisted {
+		// Persist the recorded per-channel statuses (best-effort — a status
+		// write failure must not mask a successful delivery). Skipped for the
+		// synthesized legacy channel so legacy config stays editable.
+		_ = s.persistNotificationChannels(ctx, chans)
+	}
+	return firstErr
+}
 
-	// build constructs a fresh request per attempt — the body is a reader
-	// that can't be rewound, so we can't reuse one *http.Request across retries.
+// sendToChannel delivers p to a single channel, recording the outcome on
+// c.LastStatus. The channel's URL is validated defensively (legacy/imported
+// data) and its format + token drive the wire shape.
+func (s *Service) sendToChannel(ctx context.Context, c *NotificationChannel, p NotificationPayload, baseURL string) error {
+	if err := validateNotifyURL(c.URL); err != nil {
+		c.LastStatus = &NotificationDeliveryStatus{OK: false, At: nowRFC3339(), Detail: "invalid URL"}
+		return err
+	}
+	format := resolveNotifyFormat(c.Format, c.URL)
+	// build constructs a fresh request per attempt — the body is a reader that
+	// can't be rewound, so we can't reuse one *http.Request across retries.
 	build := func() (*http.Request, error) {
 		switch format {
 		case appconfig.NotifyFormatNtfy:
-			return buildNtfyRequest(ctx, raw, p, baseURL)
+			return buildNtfyRequest(ctx, c.URL, p, baseURL, c.NtfyToken)
 		case appconfig.NotifyFormatSlack:
-			return buildSlackRequest(ctx, raw, p)
+			return buildSlackRequest(ctx, c.URL, p)
 		case appconfig.NotifyFormatDiscord:
-			return buildDiscordRequest(ctx, raw, p)
+			return buildDiscordRequest(ctx, c.URL, p)
 		default:
-			return buildJSONNotifyRequest(ctx, raw, p)
+			return buildJSONNotifyRequest(ctx, c.URL, p)
 		}
 	}
-	return sendNotifyWithRetry(ctx, build)
+	err := sendNotifyWithRetry(ctx, build)
+	status := NotificationDeliveryStatus{OK: err == nil, At: nowRFC3339(), Format: format, Detail: "delivered"}
+	if err != nil {
+		status.Detail = err.Error()
+	}
+	c.LastStatus = &status
+	return err
 }
 
 // resolveNotifyFormat maps the configured format to a concrete wire shape.
@@ -284,8 +322,9 @@ func buildJSONNotifyRequest(ctx context.Context, rawURL string, p NotificationPa
 
 // buildNtfyRequest POSTs to an ntfy topic using ntfy's native publishing
 // protocol: the request body is the message text and metadata rides in
-// headers. See https://docs.ntfy.sh/publish/.
-func buildNtfyRequest(ctx context.Context, rawURL string, p NotificationPayload, baseURL string) (*http.Request, error) {
+// headers. See https://docs.ntfy.sh/publish/. token, when non-empty, is sent
+// as a Bearer credential for protected topics on self-hosted servers.
+func buildNtfyRequest(ctx context.Context, rawURL string, p NotificationPayload, baseURL, token string) (*http.Request, error) {
 	message := p.Body
 	if baseURL != "" {
 		message = absolutizeMarkdownLinks(message, baseURL)
@@ -300,6 +339,9 @@ func buildNtfyRequest(ctx context.Context, rawURL string, p NotificationPayload,
 	}
 	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	req.Header.Set("User-Agent", "breadbox-workflows")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	if title := encodeNtfyHeader(p.Title); title != "" {
 		req.Header.Set("X-Title", title)
 	}
@@ -309,8 +351,10 @@ func buildNtfyRequest(ctx context.Context, rawURL string, p NotificationPayload,
 		req.Header.Set("X-Tags", tags)
 	}
 	// ntfy needs an absolute URL for tap-through; a relative path is dropped.
-	if strings.HasPrefix(p.URL, "http://") || strings.HasPrefix(p.URL, "https://") {
+	if isAbsoluteURL(p.URL) {
 		req.Header.Set("X-Click", p.URL)
+		// A tappable action button in addition to the whole-notification tap.
+		req.Header.Set("X-Actions", "view, View report, "+p.URL)
 	}
 	return req, nil
 }
@@ -501,14 +545,9 @@ func isAbsoluteURL(u string) bool {
 // webhook wiring from Settings. Returns ErrInvalidParameter when no URL is set.
 func (s *Service) SendTestNotification(ctx context.Context) error {
 	if !s.WorkflowNotificationConfigured(ctx) {
-		return fmt.Errorf("%w: no notification webhook URL configured", ErrInvalidParameter)
+		return fmt.Errorf("%w: no notification channel configured", ErrInvalidParameter)
 	}
-	return s.SendWorkflowNotification(ctx, NotificationPayload{
-		Event:    "test",
-		Title:    "Breadbox workflow notification test",
-		Body:     "If you can see this, your workflow notification webhook is wired up correctly.",
-		Priority: "info",
-	})
+	return s.SendWorkflowNotification(ctx, testNotificationPayload())
 }
 
 // validateNotifyURL rejects anything that isn't a well-formed http(s) URL.

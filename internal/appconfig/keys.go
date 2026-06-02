@@ -101,6 +101,15 @@ const (
 	// info | warning | critical; default "info" (everything). Lets a
 	// household silence routine info-level reports and keep only alerts.
 	KeyNotifyMinPriority = "notify.min_priority"
+
+	// KeyNotifyChannels holds the JSON array of configured notification
+	// channels (the multi-sink model). Each entry carries its own URL,
+	// format, priority floor, optional ntfy token, enabled flag, and last
+	// delivery status. When empty, a single legacy channel is synthesized
+	// from KeyNotifyWebhookURL / KeyNotifyFormat / KeyNotifyMinPriority so
+	// pre-multi-channel configs keep working. A workflow notification fans
+	// out to every enabled channel.
+	KeyNotifyChannels = "notify.channels"
 )
 
 // AuthMode values for KeyAgentAuthMode.
