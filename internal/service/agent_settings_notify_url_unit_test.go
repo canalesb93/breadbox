@@ -237,7 +237,7 @@ func TestT17ValidateNotifyURL_TrimmedInputs(t *testing.T) {
 			wantErr: false,
 		},
 		// Whitespace-only input collapses to empty after trim.
-		// UpdateAgentSettings skips validateNotifyURL when trimmed == "",
+		// UpdateNotificationSettings skips validateNotifyURL when trimmed == "",
 		// but the empty string itself must fail if accidentally passed through.
 		{
 			name:    "empty string (whitespace collapsed) fails",
