@@ -471,6 +471,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// one route above the surrounding editor group. Managing an
 			// already-instantiated workflow's run state stays editor.
 			r.With(RequireAdmin(sm)).Post("/workflow-presets/{slug}/enable", EnableWorkflowPresetAdminHandler(svc))
+			// On-demand (one-off) run: instantiates the manual-only workflow on
+			// first use, then dispatches a run. Admin-only for the same reason as
+			// enable — it authorizes AI spend over household data.
+			r.With(RequireAdmin(sm)).Post("/workflow-presets/{slug}/run", RunWorkflowPresetAdminHandler(a, svc))
 			r.Post("/agents/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/agents/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/agents/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))

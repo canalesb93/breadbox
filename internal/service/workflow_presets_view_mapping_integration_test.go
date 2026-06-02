@@ -258,13 +258,17 @@ func T19ListWorkflowPresets_OrderMatchesRegistry(t *testing.T) {
 		t.Fatalf("ListWorkflowPresets: %v", err)
 	}
 
-	// The first five presets in registry order are known at test time.
+	// The presets in registry order are known at test time. The two on-demand
+	// one-offs lead the gallery (the "Setup & Bulk" section), followed by the
+	// recurring presets.
 	want := []string{
+		"rule-foundation",
+		"bulk-catchup",
 		"routine-reviewer",
 		"weekly-money-digest",
-		"subscription-auditor",
 		"backlog-closer",
 		"monthly-close",
+		"large-charge-sentinel",
 	}
 	if len(views) < len(want) {
 		t.Fatalf("expected >=%d views, got %d", len(want), len(views))

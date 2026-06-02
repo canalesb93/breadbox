@@ -102,6 +102,9 @@ document.addEventListener('alpine:init', function () {
         slug: '',
         name: '',
         enabled: false, // run-state, driven by the header toggle (toggleWorkflow)
+        // oneOff hides the trigger picker + run-state toggle for on-demand
+        // workflows (they only ever run via Run now). Hydrated from /config.
+        oneOff: false,
         // triggerOnSync is a STRING ('true' | 'false') so the trigger radios
         // can bind via x-model and submit as the trigger_on_sync form field.
         triggerOnSync: 'false',
@@ -267,6 +270,81 @@ document.addEventListener('alpine:init', function () {
       },
       // -------------------------------------------------------------------
 
+      // --- One-off (on-demand) workflows ---------------------------------
+      // Run an on-demand workflow from its card's run button. The endpoint
+      // instantiates the manual-only workflow on first use, then dispatches
+      // the run, so this one call covers both first-run and re-run. On a
+      // CONSENT_REQUIRED refusal (first-ever workflow), route the user through
+      // the setup drawer, which carries the consent checkbox. A successful
+      // first run flips the card into its instantiated state, so reload after a
+      // beat to surface that (and any last-run status).
+      runOneOff: function (slug) {
+        var self = this;
+        self.toast('Starting run…', 'info');
+        self._post('/-/workflow-presets/' + encodeURIComponent(slug) + '/run')
+          .then(function (res) {
+            if (res.ok) {
+              self.toast('Workflow run started.', 'success');
+              setTimeout(function () { window.location.reload(); }, 1200);
+              return;
+            }
+            return res
+              .json()
+              .catch(function () { return null; })
+              .then(function (body) {
+                var code = body && body.error && body.error.code;
+                if (code === 'CONSENT_REQUIRED') {
+                  self.toast('Review and confirm setup first.', 'info');
+                  Alpine.store('drawers').open('wf-config-' + slug);
+                  return;
+                }
+                var msg = (body && body.error && body.error.message) || 'Could not start the run.';
+                self.toast(msg, 'error');
+              });
+          })
+          .catch(function (e) {
+            console.error('runOneOff failed', e);
+            self.toast('Network error — could not start the run.', 'error');
+            self.restorePageState();
+          });
+      },
+
+      // copyPromptDirect copies a workflow's composed base prompt straight to
+      // the clipboard (no modal), for the card's copy-prompt icon. Fetches the
+      // same /prompt endpoint the preview modal uses, then writes the markdown
+      // source. Reuses the _copyFallback used by the modal's Copy button.
+      copyPromptDirect: function (slug) {
+        var self = this;
+        fetch('/-/workflows/' + encodeURIComponent(slug) + '/prompt', {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            var text = (data && data.prompt) || '';
+            if (!text) {
+              self.toast('No prompt to copy.', 'error');
+              return;
+            }
+            var done = function () { self.toast('Prompt copied to clipboard.', 'success'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done).catch(function () {
+                self._copyFallback(text, done);
+              });
+            } else {
+              self._copyFallback(text, done);
+            }
+          })
+          .catch(function (e) {
+            console.error('copyPromptDirect failed', e);
+            self.toast('Could not copy the prompt.', 'error');
+          });
+      },
+      // -------------------------------------------------------------------
+
       // --- F3: reconfigure an enabled workflow ---------------------------
       // Open the shared reconfigure drawer prefilled with an enabled
       // workflow's live config (schedule, options, additional instructions),
@@ -277,6 +355,7 @@ document.addEventListener('alpine:init', function () {
         self.reconfigure.name = name || slug;
         self.reconfigure.enabled = !!enabled;
         self.reconfigure.loading = true;
+        self.reconfigure.oneOff = false;
         self.reconfigure.options = [];
         self.reconfigure.additionalInstructions = '';
         self.reconfigure.scheduleCron = '';
@@ -296,6 +375,7 @@ document.addEventListener('alpine:init', function () {
           })
           .then(function (data) {
             self.reconfigure.name = data.name || self.reconfigure.name;
+            self.reconfigure.oneOff = !!data.one_off;
             self.reconfigure.triggerOnSync = data.trigger_on_sync ? 'true' : 'false';
             self.reconfigure.scheduleCron = data.schedule_cron || '';
             self.reconfigure.model = data.model || '';

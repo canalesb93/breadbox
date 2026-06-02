@@ -8,8 +8,8 @@ import (
 )
 
 // This file (unit-prefixed F4*) covers the F4-presets-and-options expansion:
-// the new "Alerts & Anomalies" category, the three new presets, and the two
-// new reusable options (Lookback window, Report verbosity). It does NOT touch
+// the "Alerts & Anomalies" category, the large-charge sentinel, and the two
+// reusable options (Lookback window, Report verbosity). It does NOT touch
 // the DB — composition and option resolution are pure functions over the
 // embedded prompt-block FS.
 
@@ -17,6 +17,7 @@ import (
 // use. Adding a category here is deliberate — the gallery's category-icon and
 // ordering code must keep up (internal/admin/workflows_gallery_page.go).
 var f4ValidCategories = map[string]bool{
+	"Setup & Bulk":            true,
 	"Categorization & Review": true,
 	"Insights & Reports":      true,
 	"Hygiene & Maintenance":   true,
@@ -57,12 +58,20 @@ func TestF4AllPresetsComposeValid(t *testing.T) {
 			t.Errorf("preset %q has non-positive EstCostPerRunUSD %v", p.Slug, p.EstCostPerRunUSD)
 		}
 
-		// Trigger coherence: exactly one of post-sync OR a cron schedule.
-		if p.TriggerOnSyncComplete && p.ScheduleCron != "" {
-			t.Errorf("preset %q is both post-sync and cron-scheduled (%q)", p.Slug, p.ScheduleCron)
-		}
-		if !p.TriggerOnSyncComplete && p.ScheduleCron == "" {
-			t.Errorf("preset %q has no trigger (neither post-sync nor cron)", p.Slug)
+		// Trigger coherence. A one-off is manual-only: it MUST carry no
+		// recurring trigger (no post-sync, no cron). Every other preset must
+		// have exactly one of post-sync OR a cron schedule.
+		if p.OneOff {
+			if p.TriggerOnSyncComplete || p.ScheduleCron != "" {
+				t.Errorf("one-off preset %q must have no recurring trigger (post-sync=%v, cron=%q)", p.Slug, p.TriggerOnSyncComplete, p.ScheduleCron)
+			}
+		} else {
+			if p.TriggerOnSyncComplete && p.ScheduleCron != "" {
+				t.Errorf("preset %q is both post-sync and cron-scheduled (%q)", p.Slug, p.ScheduleCron)
+			}
+			if !p.TriggerOnSyncComplete && p.ScheduleCron == "" {
+				t.Errorf("preset %q has no trigger (neither post-sync nor cron)", p.Slug)
+			}
 		}
 
 		// Prompt composition from real blocks → non-empty.
@@ -81,19 +90,16 @@ func TestF4AllPresetsComposeValid(t *testing.T) {
 	}
 }
 
-// TestF4AlertsCategoryPresets pins the three new presets to their intended
-// shape so a future edit that drifts the trust spectrum / trigger model fails
-// loudly: large-charge sentinel (read_write, post-sync), new-merchant watch
-// (read_only, weekly), duplicate detector (read_write, post-sync).
+// TestF4AlertsCategoryPresets pins the Alerts & Anomalies preset(s) to their
+// intended shape so a future edit that drifts the trust spectrum / trigger
+// model fails loudly: large-charge sentinel (read_write, post-sync).
 func TestF4AlertsCategoryPresets(t *testing.T) {
 	want := map[string]struct {
 		scope    string
 		postSync bool
 		cron     string
 	}{
-		"large-charge-sentinel":     {scope: "read_write", postSync: true, cron: ""},
-		"new-merchant-watch":        {scope: "read_only", postSync: false, cron: "0 7 * * 1"},
-		"duplicate-charge-detector": {scope: "read_write", postSync: true, cron: ""},
+		"large-charge-sentinel": {scope: "read_write", postSync: true, cron: ""},
 	}
 	got := map[string]bool{}
 	for _, p := range workflowPresets {
@@ -203,9 +209,9 @@ func TestF4OptionsCombineOnAlertsPreset(t *testing.T) {
 	}
 }
 
-// TestF4NewPromptBlocksLoad proves the two new strategy blocks added for this
-// unit are present in the embedded library and carry non-empty content (so a
-// missing or empty file fails here, not at a household's run).
+// TestF4NewPromptBlocksLoad proves the alerts strategy block is present in the
+// embedded library and carries non-empty content (so a missing or empty file
+// fails here, not at a household's run).
 func TestF4NewPromptBlocksLoad(t *testing.T) {
 	blocks, err := loadPromptBlocks()
 	if err != nil {
@@ -215,7 +221,7 @@ func TestF4NewPromptBlocksLoad(t *testing.T) {
 	for _, b := range blocks {
 		byID[b.ID] = b
 	}
-	for _, id := range []string{"strategy-large-charge-sentinel", "strategy-duplicate-detection"} {
+	for _, id := range []string{"strategy-large-charge-sentinel"} {
 		b, ok := byID[id]
 		if !ok {
 			t.Errorf("new prompt block %q not loaded from prompts/agents/", id)

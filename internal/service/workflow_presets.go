@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -30,6 +31,14 @@ type WorkflowPreset struct {
 	MaxTurns              int    // 0 = DefaultAgentMaxTurns
 	ScheduleCron          string // empty = no cron
 	TriggerOnSyncComplete bool   // fire after each successful sync
+
+	// OneOff marks an on-demand workflow: it has no recurring trigger (no cron,
+	// no post-sync) and runs only when a human hits "Run now". The gallery
+	// renders these with copy/run/settings icon buttons instead of a run
+	// toggle, and instantiation forces a manual-only definition regardless of
+	// any trigger params. A one-off MUST leave both ScheduleCron and
+	// TriggerOnSyncComplete in their zero state.
+	OneOff bool
 
 	// EstCostPerRunUSD is a rough per-run Anthropic-cost estimate, surfaced
 	// as a "projected cost" hint in the configure drawer so a self-hoster
@@ -77,6 +86,25 @@ var applyModeOption = WorkflowPresetOption{
 			Value:     "flag_only",
 			Label:     "Flag only — don't categorize",
 			Directive: "APPLY MODE — FLAG ONLY: Do NOT set, change, or clear any transaction category, and do NOT call update_transactions to write a category. Your job in this mode is review-and-flag only: flag transactions that need a human's attention (and leave a brief comment explaining why), but leave all categorization decisions to the user.",
+		},
+	},
+}
+
+// ruleApplyModeOption is the "what to do with the rules it finds" choice for
+// the Rule Foundation one-off. The default creates and carefully applies the
+// vetted rules; draft-only suppresses every rule write so a human reviews the
+// proposed rules first.
+var ruleApplyModeOption = WorkflowPresetOption{
+	Key:     "rule_mode",
+	Label:   "Rule handling",
+	Help:    "What to do with the rules it identifies.",
+	Default: "create_apply",
+	Choices: []WorkflowPresetChoice{
+		{Value: "create_apply", Label: "Create & apply", Directive: ""},
+		{
+			Value:     "draft_only",
+			Label:     "Draft only — don't create",
+			Directive: "RULE MODE — DRAFT ONLY: Do NOT create or apply any transaction rules. Do NOT call create_transaction_rule, batch_create_rules, or apply_rules. Instead, produce a report listing each rule you would create — its conditions, target category, and the number of transactions in your sample it would match — so a human can review and create them.",
 		},
 	},
 }
@@ -154,10 +182,48 @@ func resolveOptionDirectives(preset WorkflowPreset, chosen map[string]string) st
 }
 
 // workflowPresets is the starter catalog. Order is the gallery display order.
-// Grouped by Category. More presets land in later iterations (the 13-preset
-// backlog); these three span the read↔write trust spectrum and all three
-// trigger models (post-sync, cron-weekly, cron-monthly).
+// Grouped by Category. The set spans the read↔write trust spectrum and all
+// three trigger models (post-sync, cron-weekly, cron-monthly).
 var workflowPresets = []WorkflowPreset{
+	// ── Setup & Bulk ────────────────────────────────────────────────────────
+	// On-demand one-offs (OneOff: true): no recurring trigger, run only when a
+	// human clicks "Run now". They lead the gallery because they're the
+	// get-started / catch-up actions — establish the rule foundation, then blitz
+	// the backlog — before settling into the recurring automations below.
+	{
+		Slug:        "rule-foundation",
+		Name:        "Rule Foundation",
+		Category:    "Setup & Bulk",
+		Icon:        "wand-sparkles",
+		Description: "A one-time pass over your recent history to draft and carefully apply auto-categorization rules — so new transactions categorize themselves going forward.",
+		PromptBlocks: []string{
+			"strategy-rule-foundation",
+			"category-system",
+		},
+		ToolScope:        "read_write", // creates + applies rules (dry-run first)
+		Model:            "claude-sonnet-4-6",
+		OneOff:           true,
+		EstCostPerRunUSD: 0.50, // analyzes 1000+ transactions on Sonnet + drafts rules
+		Options:          []WorkflowPresetOption{ruleApplyModeOption},
+	},
+	{
+		Slug:        "bulk-catchup",
+		Name:        "Bulk Catch-Up",
+		Category:    "Setup & Bulk",
+		Icon:        "layers",
+		Description: "Auto-categorizes a large backlog of needs-review transactions in one fast pass, clearing the ones it's sure about and flagging only the rest.",
+		PromptBlocks: []string{
+			"strategy-bulk-catchup",
+			"review-depth-efficient",
+			"category-system",
+		},
+		ToolScope:        "read_write", // categorizes + clears needs-review on resolved items
+		Model:            "claude-haiku-4-5",
+		OneOff:           true,
+		EstCostPerRunUSD: 0.20, // hundreds–thousands of transactions on Haiku
+		Options:          []WorkflowPresetOption{applyModeOption},
+	},
+
 	{
 		Slug:        "routine-reviewer",
 		Name:        "Routine Reviewer",
@@ -186,20 +252,6 @@ var workflowPresets = []WorkflowPreset{
 		ToolScope:        "read_only",
 		ScheduleCron:     "0 7 * * 1", // Mondays at 7:00
 		EstCostPerRunUSD: 0.05,        // reads a week of activity for the digest
-	},
-	{
-		Slug:        "subscription-auditor",
-		Name:        "Subscription Auditor",
-		Category:    "Insights & Reports",
-		Icon:        "repeat",
-		Description: "Finds recurring charges and subscriptions, flagging price hikes and likely-forgotten ones.",
-		PromptBlocks: []string{
-			"strategy-anomaly-detection",
-			"merchant-analysis",
-		},
-		ToolScope:        "read_write",
-		ScheduleCron:     "0 8 1 * *", // 1st of the month at 08:00
-		EstCostPerRunUSD: 0.04,        // monthly recurring-charge scan
 	},
 	{
 		Slug:        "backlog-closer",
@@ -233,11 +285,10 @@ var workflowPresets = []WorkflowPreset{
 	},
 
 	// ── Alerts & Anomalies ──────────────────────────────────────────────────
-	// Watchdogs that surface things worth a human's eyeballs. Each flags via a
-	// `needs-review` tag + a report and never recategorizes; the two read_write
-	// sentinels run after each sync for fast feedback, the read_only watch runs
-	// weekly. All three expose the shared Lookback window + Report verbosity
-	// options so a household can tune scan breadth and report detail.
+	// Watchdogs that surface things worth a human's eyeballs. The sentinel flags
+	// via a `needs-review` tag + a report and never recategorizes; it runs after
+	// each sync for fast feedback and exposes the shared Lookback window + Report
+	// verbosity options so a household can tune scan breadth and report detail.
 	{
 		Slug:        "large-charge-sentinel",
 		Name:        "Large Charge Sentinel",
@@ -251,35 +302,6 @@ var workflowPresets = []WorkflowPreset{
 		ToolScope:             "read_write", // tags flagged charges for human review
 		TriggerOnSyncComplete: true,
 		EstCostPerRunUSD:      0.03, // scans recent debits + a baseline pass per sync
-		Options:               []WorkflowPresetOption{lookbackWindowOption, reportVerbosityOption},
-	},
-	{
-		Slug:        "new-merchant-watch",
-		Name:        "New-Merchant Watch",
-		Category:    "Alerts & Anomalies",
-		Icon:        "store",
-		Description: "A weekly report of first-seen merchants — new subscriptions and one-off vendors you may not recognize.",
-		PromptBlocks: []string{
-			"strategy-anomaly-detection",
-			"merchant-analysis",
-		},
-		ToolScope:        "read_only", // reports only; never tags or recategorizes
-		ScheduleCron:     "0 7 * * 1", // Mondays at 07:00 (canonical "Weekly")
-		EstCostPerRunUSD: 0.04,        // a week of merchant-summary comparison
-		Options:          []WorkflowPresetOption{lookbackWindowOption, reportVerbosityOption},
-	},
-	{
-		Slug:        "duplicate-charge-detector",
-		Name:        "Duplicate Charge Detector",
-		Category:    "Alerts & Anomalies",
-		Icon:        "copy",
-		Description: "Flags likely double-bills and gateway-retry duplicates so you can dispute them, right after each sync.",
-		PromptBlocks: []string{
-			"strategy-duplicate-detection",
-		},
-		ToolScope:             "read_write", // tags suspected duplicates for review
-		TriggerOnSyncComplete: true,
-		EstCostPerRunUSD:      0.03, // pairwise scan over recent debits per sync
 		Options:               []WorkflowPresetOption{lookbackWindowOption, reportVerbosityOption},
 	},
 }
@@ -442,25 +464,59 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 		create.MaxBudgetUSD = params.MaxBudgetUSD
 	}
 
-	// Trigger is user-selectable at setup (custom schedule vs after-each-sync),
-	// not fixed by the preset. The two modes are mutually exclusive — only a
-	// custom schedule gets a cron, so a post-sync run never also fires on cron.
-	triggerOnSync := preset.TriggerOnSyncComplete
-	if params.TriggerOnSync != nil {
-		triggerOnSync = *params.TriggerOnSync
-	}
-	create.TriggerOnSyncComplete = triggerOnSync
-	if !triggerOnSync {
-		cron := strings.TrimSpace(preset.ScheduleCron)
-		if params.ScheduleCron != nil && strings.TrimSpace(*params.ScheduleCron) != "" {
-			cron = strings.TrimSpace(*params.ScheduleCron)
+	if preset.OneOff {
+		// One-off / on-demand: never scheduled, never post-sync. It runs only
+		// when explicitly triggered (Run now), so we force a manual-only
+		// definition and ignore any trigger/schedule overrides the form sent.
+		create.TriggerOnSyncComplete = false
+		create.ScheduleCron = nil
+	} else {
+		// Trigger is user-selectable at setup (custom schedule vs after-each-sync),
+		// not fixed by the preset. The two modes are mutually exclusive — only a
+		// custom schedule gets a cron, so a post-sync run never also fires on cron.
+		triggerOnSync := preset.TriggerOnSyncComplete
+		if params.TriggerOnSync != nil {
+			triggerOnSync = *params.TriggerOnSync
 		}
-		if cron == "" {
-			// A post-sync preset switched to a custom schedule has no preset
-			// cron — seed a sensible daily default the drawer can override.
-			cron = "0 8 * * *"
+		create.TriggerOnSyncComplete = triggerOnSync
+		if !triggerOnSync {
+			cron := strings.TrimSpace(preset.ScheduleCron)
+			if params.ScheduleCron != nil && strings.TrimSpace(*params.ScheduleCron) != "" {
+				cron = strings.TrimSpace(*params.ScheduleCron)
+			}
+			if cron == "" {
+				// A post-sync preset switched to a custom schedule has no preset
+				// cron — seed a sensible daily default the drawer can override.
+				cron = "0 8 * * *"
+			}
+			create.ScheduleCron = &cron
 		}
-		create.ScheduleCron = &cron
 	}
 	return s.CreateAgentDefinition(ctx, create)
+}
+
+// EnsureOneOffWorkflow returns the instantiated definition for a one-off
+// preset, instantiating it (manual-only, enabled) on first call and reusing it
+// thereafter. It's the backing step for the gallery's "Run now" button on
+// on-demand workflows: a one-off has no recurring trigger, so it must be
+// instantiated before the orchestrator can run it, but the household never
+// goes through an explicit "enable" first. Returns ErrNotFound for an unknown
+// slug and ErrInvalidParameter when the slug is a recurring (non-one-off)
+// preset.
+func (s *Service) EnsureOneOffWorkflow(ctx context.Context, slug string) (*AgentDefinitionResponse, error) {
+	preset, ok := presetBySlug(slug)
+	if !ok {
+		return nil, fmt.Errorf("%w: unknown workflow preset %q", ErrNotFound, slug)
+	}
+	if !preset.OneOff {
+		return nil, fmt.Errorf("%w: workflow preset %q is not an on-demand workflow", ErrInvalidParameter, slug)
+	}
+	// Already instantiated? Reuse it (the definition slug == the preset slug).
+	if def, err := s.GetAgentDefinition(ctx, slug); err == nil {
+		return def, nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+	// First run: instantiate with the preset defaults (manual-only, enabled).
+	return s.EnableWorkflowFromPreset(ctx, slug, EnableWorkflowFromPresetParams{Enabled: true})
 }

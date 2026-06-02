@@ -200,6 +200,71 @@ func RunAgentNowAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc 
 	}
 }
 
+// RunWorkflowPresetAdminHandler handles POST /-/workflow-presets/{slug}/run for
+// on-demand (one-off) workflows. Unlike a recurring preset — which is
+// explicitly "set up" once, then runs on its trigger — a one-off has no
+// recurring trigger, so this single endpoint does the whole gesture: enforce
+// the household consent gate, instantiate the manual-only workflow on first use
+// (reusing it thereafter), then dispatch a run via the orchestrator. Mirrors
+// RunAgentNowAdminHandler's async semantics and error envelope.
+func RunWorkflowPresetAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := chi.URLParam(r, "slug")
+
+		// First-use consent gate: instantiating a workflow authorizes AI spend
+		// over the household's ledger. Until acknowledged, refuse with a code
+		// the gallery catches to route the user through the setup drawer (which
+		// carries the consent checkbox). Mirrors EnableWorkflowPresetAdminHandler.
+		if !svc.WorkflowsConsentAcknowledged(r.Context()) {
+			writeError(w, http.StatusConflict, "CONSENT_REQUIRED",
+				"Acknowledge that workflows run Claude over your financial data before running.")
+			return
+		}
+
+		orchestrator := a.AgentOrchestrator
+		if orchestrator == nil {
+			writeError(w, http.StatusServiceUnavailable, "AGENTS_DISABLED", "Agent orchestrator not configured")
+			return
+		}
+
+		def, err := svc.EnsureOneOffWorkflow(r.Context(), slug)
+		if err != nil {
+			switch {
+			case errors.Is(err, service.ErrNotFound):
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Workflow preset not found")
+			case errors.Is(err, service.ErrInvalidParameter):
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			default:
+				writeError(w, http.StatusUnprocessableEntity, "WORKFLOW_ENABLE_FAILED", err.Error())
+			}
+			return
+		}
+
+		run, err := orchestrator.RunNowAsyncWith(r.Context(), def, service.RunOverrides{})
+		if err != nil {
+			if errors.Is(err, agent.ErrConcurrencyLocked) {
+				writeError(w, http.StatusServiceUnavailable, "CONCURRENCY_LOCKED", "Another run is in progress")
+				return
+			}
+			if errors.Is(err, service.ErrBudgetCeilingReached) {
+				writeError(w, http.StatusTooManyRequests, "BUDGET_CEILING_REACHED", err.Error())
+				return
+			}
+			if errors.Is(err, agent.ErrAuthNotConfigured) {
+				writeError(w, http.StatusUnprocessableEntity, "AUTH_NOT_CONFIGURED", err.Error())
+				return
+			}
+			if errors.Is(err, agent.ErrBinaryNotFound) {
+				writeError(w, http.StatusUnprocessableEntity, "BINARY_NOT_FOUND", err.Error())
+				return
+			}
+			writeError(w, http.StatusUnprocessableEntity, "RUN_FAILED", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusAccepted, run)
+	}
+}
+
 // UpdateAgentRunNoteAdminHandler handles POST /-/agents/runs/{shortID}/note —
 // form-data, redirects back to the run detail page.
 func UpdateAgentRunNoteAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {

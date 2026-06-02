@@ -48,16 +48,16 @@ func TestT14_ErrConflictDistinctPerPreset(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	// Enable subscription-auditor.
-	_, err := svc.EnableWorkflowFromPreset(ctx, "subscription-auditor", service.EnableWorkflowFromPresetParams{})
+	// Enable backlog-closer.
+	_, err := svc.EnableWorkflowFromPreset(ctx, "backlog-closer", service.EnableWorkflowFromPresetParams{})
 	if err != nil {
-		t.Fatalf("T14: enable subscription-auditor: %v", err)
+		t.Fatalf("T14: enable backlog-closer: %v", err)
 	}
 
-	// Second enable of subscription-auditor -> conflict.
-	_, err = svc.EnableWorkflowFromPreset(ctx, "subscription-auditor", service.EnableWorkflowFromPresetParams{})
+	// Second enable of backlog-closer -> conflict.
+	_, err = svc.EnableWorkflowFromPreset(ctx, "backlog-closer", service.EnableWorkflowFromPresetParams{})
 	if !errors.Is(err, service.ErrConflict) {
-		t.Fatalf("T14: expected ErrConflict for subscription-auditor second enable, got %v", err)
+		t.Fatalf("T14: expected ErrConflict for backlog-closer second enable, got %v", err)
 	}
 
 	// monthly-close has not been enabled yet -- must succeed.
@@ -67,6 +67,80 @@ func TestT14_ErrConflictDistinctPerPreset(t *testing.T) {
 	}
 	if mc.Slug != "monthly-close" {
 		t.Fatalf("T14: monthly-close slug = %q, want monthly-close", mc.Slug)
+	}
+}
+
+// TestT14_OneOffPresetInstantiatesManualOnly verifies that enabling a one-off
+// preset produces a manual-only workflow: no post-sync flag and no cron, even
+// when the caller passes trigger/schedule overrides. The one-off's model
+// default is also carried onto the definition.
+func TestT14_OneOffPresetInstantiatesManualOnly(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// Pass overrides that WOULD schedule a recurring preset — a one-off must
+	// ignore them and stay manual-only.
+	syncTrue := true
+	cron := "0 8 * * *"
+	wf, err := svc.EnableWorkflowFromPreset(ctx, "rule-foundation", service.EnableWorkflowFromPresetParams{
+		Enabled:       true,
+		TriggerOnSync: &syncTrue,
+		ScheduleCron:  &cron,
+	})
+	if err != nil {
+		t.Fatalf("T14: enable one-off rule-foundation: %v", err)
+	}
+	if wf.TriggerOnSyncComplete {
+		t.Errorf("T14: one-off must not trigger on sync complete")
+	}
+	if wf.ScheduleCron != nil {
+		t.Errorf("T14: one-off must have nil schedule_cron, got %q", *wf.ScheduleCron)
+	}
+	if wf.Model != "claude-sonnet-4-6" {
+		t.Errorf("T14: rule-foundation model = %q, want claude-sonnet-4-6", wf.Model)
+	}
+	if wf.SourceTemplate == nil || *wf.SourceTemplate != "rule-foundation" {
+		t.Errorf("T14: source_template = %v, want rule-foundation", wf.SourceTemplate)
+	}
+}
+
+// TestT14_EnsureOneOffWorkflow covers the Run-now backing path: it instantiates
+// a one-off on first call, reuses it on the second (no ErrConflict), rejects a
+// recurring preset slug, and 404s an unknown slug.
+func TestT14_EnsureOneOffWorkflow(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	first, err := svc.EnsureOneOffWorkflow(ctx, "bulk-catchup")
+	if err != nil {
+		t.Fatalf("T14: ensure bulk-catchup (first): %v", err)
+	}
+	if first.Slug != "bulk-catchup" {
+		t.Fatalf("T14: slug = %q, want bulk-catchup", first.Slug)
+	}
+	if first.TriggerOnSyncComplete || first.ScheduleCron != nil {
+		t.Errorf("T14: ensured one-off must be manual-only")
+	}
+
+	// Second call must reuse the same definition, not conflict.
+	second, err := svc.EnsureOneOffWorkflow(ctx, "bulk-catchup")
+	if err != nil {
+		t.Fatalf("T14: ensure bulk-catchup (second) should reuse, got: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Errorf("T14: second ensure returned a different definition (%s vs %s)", second.ID, first.ID)
+	}
+
+	// A recurring (non-one-off) preset is rejected.
+	_, err = svc.EnsureOneOffWorkflow(ctx, "routine-reviewer")
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("T14: ensure non-one-off err = %v, want ErrInvalidParameter", err)
+	}
+
+	// An unknown slug 404s.
+	_, err = svc.EnsureOneOffWorkflow(ctx, "does-not-exist")
+	if !errors.Is(err, service.ErrNotFound) {
+		t.Errorf("T14: ensure unknown err = %v, want ErrNotFound", err)
 	}
 }
 
@@ -169,12 +243,12 @@ func TestT14_NilScheduleOverrideKeepsPresetDefault(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	// subscription-auditor defaults to "0 8 1 * *".
-	wf, err := svc.EnableWorkflowFromPreset(ctx, "subscription-auditor", service.EnableWorkflowFromPresetParams{
+	// monthly-close defaults to "0 8 1 * *".
+	wf, err := svc.EnableWorkflowFromPreset(ctx, "monthly-close", service.EnableWorkflowFromPresetParams{
 		ScheduleCron: nil, // no override
 	})
 	if err != nil {
-		t.Fatalf("T14: enable subscription-auditor (no override): %v", err)
+		t.Fatalf("T14: enable monthly-close (no override): %v", err)
 	}
 	const presetDefault = "0 8 1 * *"
 	if wf.ScheduleCron == nil {

@@ -134,6 +134,7 @@ func groupWorkflowPresets(views []service.WorkflowPresetView, lastRuns map[strin
 			EstCostPerRunUSD: v.EstCostPerRunUSD,
 			Model:            model,
 			MaxTurns:         maxTurns,
+			OneOff:           v.OneOff,
 			Enabled:          v.Enabled,
 		}
 		if v.WorkflowSlug != nil {
@@ -172,6 +173,8 @@ func groupWorkflowPresets(views []service.WorkflowPresetView, lastRuns map[strin
 
 func workflowCategoryIcon(category string) string {
 	switch category {
+	case "Setup & Bulk":
+		return "rocket"
 	case "Categorization & Review":
 		return "sparkles"
 	case "Insights & Reports":
@@ -187,6 +190,9 @@ func workflowCategoryIcon(category string) string {
 
 // presetTriggerLabel renders a short human-readable trigger summary for a card.
 func presetTriggerLabel(v service.WorkflowPresetView) string {
+	if v.OneOff {
+		return "On demand"
+	}
 	if v.TriggerOnSyncComplete {
 		return "After each sync"
 	}
