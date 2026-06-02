@@ -1,0 +1,76 @@
+package components
+
+// OnboardingStats is the always-on 4-up metrics strip for the
+// /getting-started page: Connections / Accounts / Transactions /
+// Successful syncs. Unlike the legacy getting-started page (which hid
+// stats until at least one transaction existed), this strip renders at
+// all times — including the fresh, all-zero install — with a graceful
+// muted zero state so the metrics read as "nothing here yet" rather than
+// "broken".
+//
+// It composes the canonical StatTile + StatTileRow (no bespoke tiles):
+// each tile links to where the user would go to grow that metric. A zero
+// value renders StatToneNeutral (muted icon tile) plus a subtle "None
+// yet" description; a positive value switches to a lightly-tinted tone.
+
+type OnboardingStatsProps struct {
+	Connections  int64
+	Accounts     int64
+	Transactions int64
+	Syncs        int64
+}
+
+// onbStatsTone returns the muted neutral tone when v is zero, otherwise
+// the supplied non-zero tone. Keeps the zero-state styling in one place.
+func onbStatsTone(v int64, nonZero StatTileTone) StatTileTone {
+	if v <= 0 {
+		return StatToneNeutral
+	}
+	return nonZero
+}
+
+// onbStatsDesc returns a subtle "None yet" hint for empty tiles and an
+// empty string otherwise (StatTile omits the line when blank).
+func onbStatsDesc(v int64) string {
+	if v <= 0 {
+		return "None yet"
+	}
+	return ""
+}
+
+templ OnboardingStats(p OnboardingStatsProps) {
+	@StatTileRow() {
+		@StatTile(StatTileProps{
+			Icon:        "link-2",
+			Label:       "Connections",
+			Value:       CommaInt(p.Connections),
+			Description: onbStatsDesc(p.Connections),
+			Tone:        onbStatsTone(p.Connections, StatTonePrimary),
+			Href:        "/connections",
+		})
+		@StatTile(StatTileProps{
+			Icon:        "wallet",
+			Label:       "Accounts",
+			Value:       CommaInt(p.Accounts),
+			Description: onbStatsDesc(p.Accounts),
+			Tone:        onbStatsTone(p.Accounts, StatToneInfo),
+			Href:        "/connections",
+		})
+		@StatTile(StatTileProps{
+			Icon:        "receipt",
+			Label:       "Transactions",
+			Value:       CommaInt(p.Transactions),
+			Description: onbStatsDesc(p.Transactions),
+			Tone:        onbStatsTone(p.Transactions, StatToneSuccess),
+			Href:        "/transactions",
+		})
+		@StatTile(StatTileProps{
+			Icon:        "refresh-cw",
+			Label:       "Syncs",
+			Value:       CommaInt(p.Syncs),
+			Description: onbStatsDesc(p.Syncs),
+			Tone:        onbStatsTone(p.Syncs, StatToneSuccess),
+			Href:        "/logs",
+		})
+	}
+}

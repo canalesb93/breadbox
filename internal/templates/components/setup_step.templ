@@ -1,0 +1,240 @@
+package components
+
+import "fmt"
+
+// SetupStep is the rich, stateful row used for each step of the
+// /getting-started onboarding walkthrough. It is presentation-only — the
+// caller computes the State (and which step is "active") and supplies copy +
+// action routes; the component owns the per-state visual hierarchy.
+//
+// The whole point of the redesign is strong state hierarchy:
+//
+//   - Active     — the focal "you are here" step. ELEVATED: a primary ring +
+//     faint primary wash, the topical icon in a primary tile, the full
+//     description, a meta row (time estimate, optional badge, doc link), and a
+//     solid btn-primary CTA. This row dominates the stack.
+//   - InProgress — work is happening (e.g. the first sync is running). The tile
+//     swaps the icon for a spinner; never a daisy badge (badges are terminal /
+//     categorical only). Description + a quiet "In progress…" hint; a ghost
+//     "view" CTA.
+//   - Complete   — done and quiet. The tile goes success-green with a check; the
+//     row collapses to a one-line Summary; a ghost "view" CTA. It recedes.
+//   - Pending    — prerequisites unmet. Muted: the tile shows the step Number on
+//     base-200, the title + description are dimmed, and the CTA is a disabled
+//     span (when CTADisabled) or a quiet ghost link.
+//
+// One CTA that reflows: the row is `flex items-start gap-4 flex-wrap`, so the
+// trailing action wraps below the content column on narrow viewports rather
+// than being duplicated behind responsive visibility classes.
+//
+// Usage:
+//
+//	@components.SetupStep(components.SetupStepProps{
+//	  Number:       3,
+//	  Icon:         "link-2",
+//	  Title:        "Connect your first bank",
+//	  Description:  "Link a bank account to start syncing transactions.",
+//	  State:        components.SetupStepActive,
+//	  TimeEstimate: "~2 min",
+//	  DocHref:      templ.SafeURL("https://docs.breadbox.sh/connections"),
+//	  CTAHref:      templ.SafeURL("/connections/new"),
+//	  CTAIcon:      "plus",
+//	  CTALabel:     "Connect Bank",
+//	})
+
+type SetupStepState string
+
+const (
+	SetupStepComplete   SetupStepState = "complete"
+	SetupStepActive     SetupStepState = "active"      // the next actionable step — ELEVATED ("you are here")
+	SetupStepInProgress SetupStepState = "in_progress" // work happening (e.g. first sync running)
+	SetupStepPending    SetupStepState = "pending"     // prerequisites unmet — muted/locked
+)
+
+type SetupStepProps struct {
+	Number       int
+	Icon         string        // topical lucide name (e.g. "users","landmark","link-2","refresh-cw","bot")
+	Title        string
+	Description  string        // shown in active/in_progress/pending states
+	Summary      string        // shown when Complete (compact confirmation line)
+	State        SetupStepState
+	TimeEstimate string        // "~1 min" — shown in active/pending meta row; hide when ""
+	Optional     bool          // render an "Optional" badge
+	DocHref      templ.SafeURL // optional "Learn more" deep link; hide when ""
+	DocLabel     string        // defaults to "Learn more" when DocHref set and this is ""
+	CTAHref      templ.SafeURL // primary/secondary action target
+	CTAIcon      string
+	CTALabel     string
+	CTADisabled  bool // render as a disabled btn span (no link)
+}
+
+templ SetupStep(p SetupStepProps) {
+	<div class={ "bb-card p-4 sm:p-5 transition-colors", setupStepCardClass(p.State) }>
+		<div class="flex items-start gap-4 flex-wrap">
+			<!-- Status tile -->
+			<div class={ "shrink-0 w-10 h-10 flex items-center justify-center", setupStepTileClass(p.State) }>
+				switch p.State {
+					case SetupStepComplete:
+						@LucideIcon("check", "w-5 h-5")
+					case SetupStepInProgress:
+						<span class="loading loading-spinner loading-sm text-primary"></span>
+					case SetupStepActive:
+						if p.Icon != "" {
+							@LucideIcon(p.Icon, "w-5 h-5")
+						} else {
+							<span class="text-sm font-semibold tabular-nums">{ fmt.Sprintf("%d", p.Number) }</span>
+						}
+					default:
+						<span class="text-sm font-semibold tabular-nums">{ fmt.Sprintf("%d", p.Number) }</span>
+				}
+			</div>
+			<!-- Content column -->
+			<div class="flex-1 min-w-0 flex flex-col gap-1.5">
+				switch p.State {
+					case SetupStepComplete:
+						<h3 class="text-sm font-medium text-success leading-tight">{ p.Title }</h3>
+						if p.Summary != "" {
+							<p class="text-sm text-base-content/50">{ p.Summary }</p>
+						}
+					case SetupStepActive:
+						<h3 class="font-semibold leading-tight">{ p.Title }</h3>
+						if p.Description != "" {
+							<p class="text-sm text-base-content/60">{ p.Description }</p>
+						}
+						@setupStepMetaRow(p)
+					case SetupStepInProgress:
+						<h3 class="font-medium leading-tight">{ p.Title }</h3>
+						if p.Description != "" {
+							<p class="text-sm text-base-content/60">{ p.Description }</p>
+						}
+						<div class="flex items-center gap-1.5 text-xs text-primary">
+							<span class="loading loading-dots loading-xs"></span>
+							<span>In progress…</span>
+						</div>
+					default:
+						<h3 class="font-medium leading-tight text-base-content/60">{ p.Title }</h3>
+						if p.Description != "" {
+							<p class="text-sm text-base-content/40">{ p.Description }</p>
+						}
+						@setupStepMetaRow(p)
+				}
+			</div>
+			<!-- Trailing CTA — reflows below on narrow viewports via flex-wrap -->
+			if p.CTALabel != "" {
+				<div class="shrink-0 ml-auto">
+					@setupStepCTA(p)
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// setupStepMetaRow renders the secondary affordance line beneath the
+// description: time estimate, an Optional badge, and a "Learn more" doc link.
+// Shared by the active + pending states; it renders nothing when every slot is
+// empty so it never leaves an orphaned gap.
+templ setupStepMetaRow(p SetupStepProps) {
+	if p.TimeEstimate != "" || p.Optional || p.DocHref != "" {
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5 text-xs text-base-content/45">
+			if p.TimeEstimate != "" {
+				<span class="inline-flex items-center gap-1">
+					@LucideIcon("clock", "w-3 h-3")
+					<span>{ p.TimeEstimate }</span>
+				</span>
+			}
+			if p.Optional {
+				<span class="badge badge-soft badge-xs">Optional</span>
+			}
+			if p.DocHref != "" {
+				<a
+					href={ p.DocHref }
+					target="_blank"
+					rel="noopener noreferrer"
+					class="inline-flex items-center gap-1 link link-hover text-base-content/55 hover:text-primary"
+				>
+					<span>{ setupStepDocLabel(p.DocLabel) }</span>
+					@LucideIcon("arrow-up-right", "w-3 h-3")
+				</a>
+			}
+		</div>
+	}
+}
+
+// setupStepCTA renders the single trailing action. Its prominence tracks the
+// state: solid primary while active, ghost while complete / in-progress, and a
+// disabled span (or quiet ghost link) while pending.
+templ setupStepCTA(p SetupStepProps) {
+	switch p.State {
+		case SetupStepActive:
+			<a href={ p.CTAHref } class="btn btn-primary btn-sm gap-2">
+				if p.CTAIcon != "" {
+					@LucideIcon(p.CTAIcon, "w-4 h-4")
+				}
+				{ p.CTALabel }
+			</a>
+		case SetupStepPending:
+			if p.CTADisabled {
+				<span class="btn btn-sm btn-disabled gap-2" aria-disabled="true">
+					if p.CTAIcon != "" {
+						@LucideIcon(p.CTAIcon, "w-4 h-4")
+					}
+					{ p.CTALabel }
+				</span>
+			} else {
+				<a href={ p.CTAHref } class="btn btn-ghost btn-sm gap-2 text-base-content/60">
+					if p.CTAIcon != "" {
+						@LucideIcon(p.CTAIcon, "w-4 h-4")
+					}
+					{ p.CTALabel }
+				</a>
+			}
+		default:
+			<a href={ p.CTAHref } class="btn btn-ghost btn-sm gap-2">
+				if p.CTAIcon != "" {
+					@LucideIcon(p.CTAIcon, "w-4 h-4")
+				}
+				{ p.CTALabel }
+			</a>
+	}
+}
+
+// setupStepCardClass elevates the active step and dims the resolved ones. The
+// active card gets a primary ring + faint wash so it reads as the focal "you
+// are here" row; complete + pending recede.
+func setupStepCardClass(s SetupStepState) string {
+	switch s {
+	case SetupStepActive:
+		return "ring-2 ring-primary/30 bg-primary/[0.03]"
+	case SetupStepComplete:
+		return "opacity-90"
+	case SetupStepPending:
+		return "opacity-75"
+	default:
+		return ""
+	}
+}
+
+// setupStepTileClass returns the leading status-tile classes. Complete →
+// success-green circle; active/in-progress → primary tile; pending → muted
+// base-200 square holding the step number.
+func setupStepTileClass(s SetupStepState) string {
+	switch s {
+	case SetupStepComplete:
+		return "rounded-full bg-success/10 text-success"
+	case SetupStepActive:
+		return "rounded-xl bg-primary/10 text-primary"
+	case SetupStepInProgress:
+		return "rounded-xl bg-primary/10 text-primary"
+	default:
+		return "rounded-xl bg-base-200 text-base-content/30"
+	}
+}
+
+// setupStepDocLabel falls back to "Learn more" when the caller leaves DocLabel
+// empty but supplied a DocHref.
+func setupStepDocLabel(label string) string {
+	if label == "" {
+		return "Learn more"
+	}
+	return label
+}

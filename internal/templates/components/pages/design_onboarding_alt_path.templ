@@ -1,0 +1,40 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionOnboardingAltPath demonstrates components.OnboardingAltPath — the
+// calm "alternative path + resources" aside shown on /getting-started while
+// setup is still in progress. It shows both copy variants:
+//
+//   - HasProvider=false → "Don't use Plaid or Teller?" (lean into CSV)
+//   - HasProvider=true  → "Prefer to import manually?" (softened)
+//
+// In both variants the Resources list is identical (three external doc links).
+templ SectionOnboardingAltPath() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>A quiet aside on <code>/getting-started</code>, rendered ONLY while setup is in progress (<code>!AllComplete</code>) — it de-risks the "no supported bank / I'm stuck" drop-off.</li>
+				<li>It surfaces the CSV-import alternative and a few doc links; it must NOT compete with the active step, so it's a soft surface with ghost affordances.</li>
+				<li>Copy adapts to whether a provider is connected — pass <code>HasProvider</code> from the page's onboarding state.</li>
+			</ul>
+		</div>
+		@designExample("No provider yet (HasProvider: false)", "Leans into \"no bank? import CSV\" — the most common reason someone stalls on the connect step.") {
+			@doaltVariant(false)
+		}
+		@designExample("Provider connected (HasProvider: true)", "Softened to \"prefer to import manually?\" — CSV is now an addendum, not a rescue.") {
+			@doaltVariant(true)
+		}
+	</div>
+}
+
+// doaltVariant constrains the card to a readable width so the sandbox preview
+// matches how it sits in the onboarding column.
+templ doaltVariant(hasProvider bool) {
+	<div class="max-w-xl">
+		@components.OnboardingAltPath(components.OnboardingAltPathProps{
+			HasProvider: hasProvider,
+		})
+	</div>
+}

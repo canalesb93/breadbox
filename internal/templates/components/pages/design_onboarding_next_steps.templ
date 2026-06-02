@@ -1,0 +1,72 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionOnboardingNextSteps is the /design sandbox section for the
+// getting-started completion experience: the "what's next" reward grid
+// (components.OnboardingNextSteps) plus both states of the redesigned
+// dismiss/resume footer (components.OnboardingFooter).
+//
+// The grid sample uses the real routes + copy the live page should pass
+// once onboarding is complete; the footer demo uses a placeholder CSRF
+// token since the sandbox has no live form target.
+templ SectionOnboardingNextSteps() {
+	<div class="flex flex-col gap-6">
+		@designExample("What's next grid (OnboardingNextSteps)", "Shown once every onboarding step is complete — the checklist gives way to a 2-up grid of interactive destination cards. Tone drives the icon tile + CTA accent; hover lifts the card and nudges the arrow.") {
+			@components.OnboardingNextSteps(components.OnboardingNextStepsProps{
+				Steps: donextSampleSteps(),
+			})
+		}
+		@designExample("Footer — active (OnboardingFooter, !Dismissed)", "A calm hairline-separated row: muted helper text on the left, a real POST dismiss form on the right. The dismiss control is an actual submit button, not a hidden link.") {
+			@components.OnboardingFooter(components.OnboardingFooterProps{
+				Dismissed: false,
+				CSRFToken: "demo-csrf-token",
+			})
+		}
+		@designExample("Footer — dismissed (OnboardingFooter, Dismissed)", "After dismissal: a quiet, form-less note reassuring the user the guide stays reachable.") {
+			@components.OnboardingFooter(components.OnboardingFooterProps{
+				Dismissed: true,
+				CSRFToken: "demo-csrf-token",
+			})
+		}
+	</div>
+}
+
+// donextSampleSteps returns the four realistic next-step cards the live
+// getting-started page should pass once onboarding completes.
+func donextSampleSteps() []components.OnboardingNextStep {
+	return []components.OnboardingNextStep{
+		{
+			Icon:     "receipt",
+			Title:    "Review transactions",
+			Body:     "See everything Breadbox synced and categorize what matters.",
+			Href:     templ.SafeURL("/transactions"),
+			CTALabel: "View transactions",
+			Tone:     "primary",
+		},
+		{
+			Icon:     "list-filter",
+			Title:    "Create a rule",
+			Body:     "Auto-categorize and tag transactions as they sync.",
+			Href:     templ.SafeURL("/rules/new"),
+			CTALabel: "New rule",
+			Tone:     "info",
+		},
+		{
+			Icon:     "bot",
+			Title:    "Set up a workflow",
+			Body:     "Let an AI agent review and enrich your finances on a schedule.",
+			Href:     templ.SafeURL("/workflows"),
+			CTALabel: "Browse workflows",
+			Tone:     "accent",
+		},
+		{
+			Icon:     "users",
+			Title:    "Invite household",
+			Body:     "Add the people whose accounts you track.",
+			Href:     templ.SafeURL("/household/new"),
+			CTALabel: "Add member",
+			Tone:     "success",
+		},
+	}
+}

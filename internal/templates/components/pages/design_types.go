@@ -62,6 +62,7 @@ func DesignSectionGroups() []DesignSectionGroup {
 		{Slug: "data", Label: "Data display"},
 		{Slug: "feedback", Label: "Feedback"},
 		{Slug: "patterns", Label: "Patterns"},
+		{Slug: "onboarding", Label: "Onboarding"},
 	}
 }
 
@@ -426,6 +427,43 @@ func DesignSections() []DesignSection {
 			Description: "SettingsSection / SettingsRow / SettingsAutoSaveForm — the shared shape every /settings/* tab uses. See .claude/rules/settings.md for the design language (anatomy, width, auto-save vs single-Save-per-section, danger variant).",
 			Group:       "patterns",
 			Render:      func() templ.Component { return SectionSettings() },
+		},
+
+		// ── Onboarding ──────────────────────────────────────────────
+		{
+			Slug:        "onboarding-hero",
+			Title:       "Onboarding hero",
+			Description: "The /getting-started banner: a circular ProgressRing + a headline that warms up by progress toward an all-set celebration, with a time-remaining estimate. Use components.OnboardingHero + components.ProgressRing.",
+			Group:       "onboarding",
+			Render:      func() templ.Component { return SectionOnboardingHero() },
+		},
+		{
+			Slug:        "setup-step",
+			Title:       "Setup step",
+			Description: "The stateful onboarding step row: active (elevated, \"you are here\"), in_progress (spinner), complete (collapsed confirmation), and pending (muted). Topical icon, time estimate, optional badge, doc link, single reflowing CTA. Use components.SetupStep.",
+			Group:       "onboarding",
+			Render:      func() templ.Component { return SectionSetupStep() },
+		},
+		{
+			Slug:        "onboarding-stats",
+			Title:       "Onboarding stats",
+			Description: "Always-on Connections/Accounts/Transactions/Syncs strip for /getting-started, with a graceful muted zero state. Composes StatTile + StatTileRow. Use components.OnboardingStats.",
+			Group:       "onboarding",
+			Render:      func() templ.Component { return SectionOnboardingStats() },
+		},
+		{
+			Slug:        "onboarding-next-steps",
+			Title:       "Onboarding next steps + footer",
+			Description: "The celebratory \"what's next\" destination grid shown once onboarding completes, plus the redesigned dismiss/resume footer (both states). Use components.OnboardingNextSteps + components.OnboardingFooter.",
+			Group:       "onboarding",
+			Render:      func() templ.Component { return SectionOnboardingNextSteps() },
+		},
+		{
+			Slug:        "onboarding-alt-path",
+			Title:       "Onboarding alt path",
+			Description: "Calm CSV-import alternative + documentation resources aside, shown while setup is in progress. Copy adapts to whether a provider is configured. Use components.OnboardingAltPath.",
+			Group:       "onboarding",
+			Render:      func() templ.Component { return SectionOnboardingAltPath() },
 		},
 	}
 }

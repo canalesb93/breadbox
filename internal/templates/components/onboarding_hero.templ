@@ -1,0 +1,112 @@
+package components
+
+import "fmt"
+
+// OnboardingHero is the prominent banner at the top of /getting-started:
+// a ProgressRing on the left and a text column (headline + subhead +
+// optional time-remaining row) on the right. It's the page's emotional
+// anchor — confident copy, strong hierarchy, and the ring as the focal
+// point. Stacks vertically and centers on mobile, side-by-side from `sm`.
+//
+// Presentation only: the handler supplies CompletedSteps / TotalSteps /
+// AllComplete (and optionally TimeRemaining); copy is derived when the
+// caller leaves Headline / Subhead empty.
+//
+// When AllComplete, the shell picks up a soft `bg-success/5` tint and the
+// ring is forced to its success tone — celebratory but restrained.
+//
+// Props:
+//   - CompletedSteps, TotalSteps: progress fraction (drives the ring + %).
+//   - AllComplete:   true once every step is done; flips tone + copy.
+//   - Headline:      big title. Derived from progress when "".
+//   - Subhead:       supporting line. Derived from progress when "".
+//   - TimeRemaining: e.g. "~4 min left"; the row is hidden when "".
+
+type OnboardingHeroProps struct {
+	CompletedSteps, TotalSteps int
+	AllComplete                bool
+	Headline                   string
+	Subhead                    string
+	TimeRemaining              string
+}
+
+// onbHeroPercent returns the integer completion percentage, guarding /0.
+func onbHeroPercent(p OnboardingHeroProps) int {
+	if p.TotalSteps <= 0 {
+		return 0
+	}
+	pct := p.CompletedSteps * 100 / p.TotalSteps
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	return pct
+}
+
+// onbHeroHeadline resolves the headline, deriving from progress when the
+// caller passes "".
+func onbHeroHeadline(p OnboardingHeroProps) string {
+	if p.Headline != "" {
+		return p.Headline
+	}
+	switch {
+	case p.AllComplete:
+		return "You're all set 🎉"
+	case p.CompletedSteps <= 0:
+		return "Welcome to Breadbox"
+	default:
+		return fmt.Sprintf("You're %d%% set up", onbHeroPercent(p))
+	}
+}
+
+// onbHeroSubhead resolves the subhead, deriving from progress when "".
+func onbHeroSubhead(p OnboardingHeroProps) string {
+	if p.Subhead != "" {
+		return p.Subhead
+	}
+	switch {
+	case p.AllComplete:
+		return "Breadbox is fully configured and syncing your finances."
+	case p.CompletedSteps <= 0:
+		return "Let's get your finances set up — it only takes a few minutes."
+	default:
+		return "Nice progress — keep going to finish connecting your data."
+	}
+}
+
+// onbHeroShell returns the bb-card classes, adding a soft success tint when
+// everything's done.
+func onbHeroShell(p OnboardingHeroProps) string {
+	base := "bb-card p-6 sm:p-8 flex flex-col items-center text-center gap-5 sm:flex-row sm:text-left sm:gap-7"
+	if p.AllComplete {
+		base += " bg-success/5"
+	}
+	return base
+}
+
+templ OnboardingHero(p OnboardingHeroProps) {
+	<div class={ onbHeroShell(p) }>
+		@ProgressRing(ProgressRingProps{
+			Value:    p.CompletedSteps,
+			Max:      p.TotalSteps,
+			Sublabel: "steps",
+			Complete: p.AllComplete,
+		})
+		<div class="min-w-0 flex-1">
+			<h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
+				{ onbHeroHeadline(p) }
+			</h1>
+			<p class="mt-1.5 text-base-content/60">
+				{ onbHeroSubhead(p) }
+			</p>
+			if p.TimeRemaining != "" {
+				<div class="mt-3 inline-flex items-center gap-1.5 text-sm text-base-content/45">
+					@LucideIcon("clock", "w-3.5 h-3.5")
+					<span class="tabular-nums">{ p.TimeRemaining }</span>
+				</div>
+			}
+		</div>
+	</div>
+}
