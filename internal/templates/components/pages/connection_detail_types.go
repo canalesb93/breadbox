@@ -2,15 +2,12 @@
 
 package pages
 
-import "breadbox/internal/templates/components"
-
 // ConnectionDetailProps mirrors the data map the old connection_detail.html
 // read off the layout. Kept flat so admin/connections.go can copy fields
 // one-to-one.
 type ConnectionDetailProps struct {
 	ConnID      string
 	CSRFToken   string
-	Breadcrumbs []components.Breadcrumb
 
 	// Connection fields (flattened from db.GetBankConnectionRow)
 	Provider                          string

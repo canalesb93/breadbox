@@ -16,7 +16,6 @@ import (
 // DesignGalleryProps is the prop bag for the /design page — the full
 // component gallery rendered on one scrollable page with section anchors.
 type DesignGalleryProps struct {
-	Breadcrumbs []components.Breadcrumb
 	Sections    []DesignSection
 }
 
@@ -24,7 +23,6 @@ type DesignGalleryProps struct {
 // component rendered in isolation so agents (and humans) can focus
 // screenshots on one piece at a time.
 type DesignComponentProps struct {
-	Breadcrumbs []components.Breadcrumb
 	Section     DesignSection
 }
 

@@ -2,7 +2,6 @@
 
 package pages
 
-import "breadbox/internal/templates/components"
 
 // AccountLinkDetailProps is the flat view-model the account-link detail
 // page renders. Mirrors the data map the old account_link_detail.html
@@ -11,7 +10,6 @@ import "breadbox/internal/templates/components"
 // projecting *string merchant fields into Go strings for the templ
 // layer.
 type AccountLinkDetailProps struct {
-	Breadcrumbs []components.Breadcrumb
 	CSRFToken   string
 
 	LinkID                  string

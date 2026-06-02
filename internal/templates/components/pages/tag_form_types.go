@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 )
 
 // TagFormProps mirrors the data map the old tag_form.html read: the
@@ -15,7 +14,6 @@ import (
 type TagFormProps struct {
 	IsEdit      bool
 	Tag         *service.TagResponse
-	Breadcrumbs []components.Breadcrumb
 }
 
 // tagIDOr returns the tag ID or empty string when no tag is set.

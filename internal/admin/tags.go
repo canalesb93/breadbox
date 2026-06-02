@@ -54,12 +54,12 @@ func TagsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 func TagNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := BaseTemplateData(r, sm, "tags", "Add Tag")
+		data["Breadcrumbs"] = []components.Breadcrumb{
+			{Label: "Tags", Href: "/tags"},
+			{Label: "Add Tag"},
+		}
 		tr.RenderWithTempl(w, r, data, pages.TagForm(pages.TagFormProps{
 			IsEdit: false,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Tags", Href: "/tags"},
-				{Label: "Add Tag"},
-			},
 		}))
 	}
 }
@@ -79,13 +79,13 @@ func TagEditPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templa
 		}
 
 		data := BaseTemplateData(r, sm, "tags", "Edit "+tag.DisplayName)
+		data["Breadcrumbs"] = []components.Breadcrumb{
+			{Label: "Tags", Href: "/tags"},
+			{Label: tag.DisplayName},
+		}
 		tr.RenderWithTempl(w, r, data, pages.TagForm(pages.TagFormProps{
 			IsEdit: true,
 			Tag:    tag,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Tags", Href: "/tags"},
-				{Label: tag.DisplayName},
-			},
 		}))
 	}
 }

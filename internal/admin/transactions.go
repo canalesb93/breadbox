@@ -577,16 +577,12 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"Flash":       GetFlash(ctx, sm),
 		}
 
-		// Translate admin breadcrumbs to the components shape the templ
-		// component consumes. Same pattern as renderTransactionDetail.
-		componentBreadcrumbs := make([]components.Breadcrumb, 0, len(breadcrumbs))
-		for _, c := range breadcrumbs {
-			componentBreadcrumbs = append(componentBreadcrumbs, components.Breadcrumb{Label: c.Label, Href: c.Href})
-		}
+		// Breadcrumbs are chrome — feed the trail to the layout (topbar +
+		// mobile strip) instead of the page body.
+		data["Breadcrumbs"] = breadcrumbs
 
 		props := pages.AccountDetailProps{
 			CSRFToken:             GetCSRFToken(r),
-			Breadcrumbs:           componentBreadcrumbs,
 			AccountID:             idStr,
 			Account:               detail,
 			IsLiability:           isLiability,
@@ -782,10 +778,9 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		// shapes pages.TransactionDetail expects. The component owns its
 		// view-model so the handler is the only place that bridges between
 		// the admin and pages packages.
-		componentBreadcrumbs := make([]components.Breadcrumb, 0, len(breadcrumbs))
-		for _, c := range breadcrumbs {
-			componentBreadcrumbs = append(componentBreadcrumbs, components.Breadcrumb{Label: c.Label, Href: c.Href})
-		}
+		// Breadcrumbs are chrome — feed the trail to the layout (topbar +
+		// mobile strip) instead of the page body.
+		data["Breadcrumbs"] = breadcrumbs
 		componentActivityDays := make([]pages.ActivityDayGroup, 0, len(activityDays))
 		for _, day := range activityDays {
 			componentActivityDays = append(componentActivityDays, pages.ActivityDayGroup{
@@ -796,7 +791,6 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 
 		props := pages.TransactionDetailProps{
 			CSRFToken:        GetCSRFToken(r),
-			Breadcrumbs:      componentBreadcrumbs,
 			Transaction:      txn,
 			TransactionID:    idStr,
 			AccountID:        accountID,

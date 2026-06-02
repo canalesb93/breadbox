@@ -122,13 +122,12 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 		// titles can be full sentences; interpolating them into the breadcrumb
 		// overflows on mobile/tablet and visually competes with the header
 		// card below, which already shows the full title.
-		breadcrumbs := []components.Breadcrumb{
+		data["Breadcrumbs"] = []components.Breadcrumb{
 			{Label: "Reports", Href: "/reports"},
 			{Label: "Report"},
 		}
 		tr.RenderWithTempl(w, r, data, pages.ReportDetail(pages.ReportDetailProps{
-			Report:      detail,
-			Breadcrumbs: breadcrumbs,
+			Report: detail,
 		}))
 	}
 }

@@ -25,7 +25,6 @@ templ ReportDetail(p ReportDetailProps) {
 	<script src="/static/js/admin/markdown.js"></script>
 	<script src="/static/js/admin/components/report_detail.js"></script>
 	<div class="max-w-4xl mx-auto">
-		@components.BreadcrumbNav(p.Breadcrumbs)
 		<div
 			x-data="reportDetail"
 			data-report-id={ p.Report.ID }

@@ -4,7 +4,6 @@ package pages
 
 import (
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 )
 
 // AccountDetailProps is the full view model for the /admin/accounts/{id}
@@ -13,7 +12,6 @@ import (
 // TemplateRenderer.RenderWithTempl.
 type AccountDetailProps struct {
 	CSRFToken   string
-	Breadcrumbs []components.Breadcrumb
 
 	// Account context.
 	AccountID string

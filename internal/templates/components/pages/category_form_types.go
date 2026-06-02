@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 )
 
 // CategoryFormProps mirrors the data map the old category_form.html
@@ -18,7 +17,6 @@ type CategoryFormProps struct {
 	IsEdit      bool
 	Category    *service.CategoryResponse
 	Categories  []service.CategoryResponse
-	Breadcrumbs []components.Breadcrumb
 }
 
 // categoryColorOr returns the current color value or a sensible default

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 )
 
 // metadataKV is one rendered key/value row from a transaction's metadata blob.
@@ -68,7 +67,6 @@ type ActivityDayGroup struct {
 type TransactionDetailProps struct {
 	CSRFToken string
 
-	Breadcrumbs []components.Breadcrumb
 
 	Transaction   *service.TransactionResponse
 	TransactionID string

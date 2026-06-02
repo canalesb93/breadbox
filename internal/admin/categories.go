@@ -42,13 +42,13 @@ func CategoryNewPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Te
 			return
 		}
 		data := BaseTemplateData(r, sm, "categories", "Add Category")
+		data["Breadcrumbs"] = []components.Breadcrumb{
+			{Label: "Categories", Href: "/categories"},
+			{Label: "Add Category"},
+		}
 		tr.RenderWithTempl(w, r, data, pages.CategoryForm(pages.CategoryFormProps{
 			IsEdit:     false,
 			Categories: categories,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Categories", Href: "/categories"},
-				{Label: "Add Category"},
-			},
 		}))
 	}
 }
@@ -67,13 +67,13 @@ func CategoryEditPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			return
 		}
 		data := BaseTemplateData(r, sm, "categories", "Edit "+category.DisplayName)
+		data["Breadcrumbs"] = []components.Breadcrumb{
+			{Label: "Categories", Href: "/categories"},
+			{Label: category.DisplayName},
+		}
 		tr.RenderWithTempl(w, r, data, pages.CategoryForm(pages.CategoryFormProps{
 			IsEdit:   true,
 			Category: category,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Categories", Href: "/categories"},
-				{Label: category.DisplayName},
-			},
 		}))
 	}
 }

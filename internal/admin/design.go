@@ -5,7 +5,6 @@ package admin
 import (
 	"net/http"
 
-	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -21,9 +20,6 @@ func DesignGalleryHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 		data["Standalone"] = true
 		tr.RenderWithTempl(w, r, data, pages.DesignGallery(pages.DesignGalleryProps{
 			Sections: pages.DesignSections(),
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Design system"},
-			},
 		}))
 	}
 }
@@ -58,10 +54,6 @@ func DesignComponentHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.H
 		data["Standalone"] = true
 		tr.RenderWithTempl(w, r, data, pages.DesignComponent(pages.DesignComponentProps{
 			Section: section,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Design system", Href: "/design"},
-				{Label: section.Title},
-			},
 		}))
 	}
 }

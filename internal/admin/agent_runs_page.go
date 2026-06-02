@@ -280,6 +280,7 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 		// Run detail is part of the Workflows surface now (reached from the
 		// Workflows → Runs tab), so it highlights the Workflows nav item.
 		data := BaseTemplateData(r, sm, "workflows", title)
+		data["Breadcrumbs"] = pages.AgentRunDetailBreadcrumbs(props)
 		tr.RenderWithTempl(w, r, data, pages.AgentRunDetail(props))
 	}
 }

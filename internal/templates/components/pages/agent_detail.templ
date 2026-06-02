@@ -25,7 +25,6 @@ import (
 //  7. agentDetailRecentRuns — last 10 runs via AgentRunRow.
 templ AgentDetail(p AgentDetailProps) {
 	<div x-data x-init="$store.shortcuts.setScope('agent-detail')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	@components.BreadcrumbNav(agentDetailBreadcrumbs(p))
 	@components.PageHeader(components.PageHeaderProps{
 		Title:    p.Name,
 		Subtitle: agentDetailSubtitle(p),
@@ -252,8 +251,9 @@ templ agentDetailRecentRuns(p AgentDetailProps) {
 	@templ.Raw(agentDetailRunScriptHTML)
 }
 
-// agentDetailBreadcrumbs builds Agents › <agent name>.
-func agentDetailBreadcrumbs(p AgentDetailProps) []components.Breadcrumb {
+// AgentDetailBreadcrumbs builds Agents › <agent name>. Consumed by the
+// handler to populate the layout's topbar trail (data["Breadcrumbs"]).
+func AgentDetailBreadcrumbs(p AgentDetailProps) []components.Breadcrumb {
 	return []components.Breadcrumb{
 		{Label: "Agents", Href: "/agents/definitions"},
 		{Label: p.Name},

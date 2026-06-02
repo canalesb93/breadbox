@@ -67,11 +67,11 @@ func renderAccountLinkDetail(tr *TemplateRenderer, w http.ResponseWriter, r *htt
 			MatchedOn:              m.MatchedOn,
 		}
 	}
+	data["Breadcrumbs"] = []components.Breadcrumb{
+		{Label: "Account Links", Href: "/connections?tab=links"},
+		{Label: link.PrimaryAccountName + " → " + link.DependentAccountName},
+	}
 	props := pages.AccountLinkDetailProps{
-		Breadcrumbs: []components.Breadcrumb{
-			{Label: "Account Links", Href: "/connections?tab=links"},
-			{Label: link.PrimaryAccountName + " → " + link.DependentAccountName},
-		},
 		CSRFToken:               GetCSRFToken(r),
 		LinkID:                  link.ID,
 		MatchCount:              link.MatchCount,

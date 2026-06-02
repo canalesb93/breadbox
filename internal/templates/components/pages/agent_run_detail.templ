@@ -58,7 +58,6 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 		if effectiveRunPrompt(p) != "" {
 			<template x-ref="promptText">{ effectiveRunPrompt(p) }</template>
 		}
-		@components.BreadcrumbNav(agentRunDetailBreadcrumbs(p))
 		@agentRunDetailHeader(p)
 		@agentRunSummaryStats(p)
 		if p.Run.Status == "error" && p.Run.ErrorMessage != "" {
@@ -330,10 +329,11 @@ templ agentRunErrorAlert(run AgentRunRowProps) {
 	}
 }
 
-// agentRunDetailBreadcrumbs builds the breadcrumb trail. Agents › Agent
-// name › <short ID>. The agent crumb links to /agents?agent=<slug> (the
-// filtered feed) so consecutive runs stay in scope.
-func agentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
+// AgentRunDetailBreadcrumbs builds the breadcrumb trail: Runs › Agent
+// name › <short ID>. The agent crumb links to /workflows/runs?workflow=<slug>
+// (the filtered feed) so consecutive runs stay in scope. Consumed by the
+// handler to populate the layout's topbar trail (data["Breadcrumbs"]).
+func AgentRunDetailBreadcrumbs(p AgentRunDetailProps) []components.Breadcrumb {
 	out := []components.Breadcrumb{{Label: "Runs", Href: "/workflows/runs"}}
 	if p.Run.AgentSlug != "" {
 		out = append(out, components.Breadcrumb{

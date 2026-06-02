@@ -46,19 +46,15 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.Flash(f.Type, f.Message), nil
 	},
-	"Breadcrumb": func(data any) (templ.Component, error) {
-		crumbs, ok := data.([]Breadcrumb)
-		if !ok {
-			return nil, fmt.Errorf("want []admin.Breadcrumb, got %T", data)
-		}
-		if len(crumbs) == 0 {
-			return templ.NopComponent, nil
-		}
-		items := make([]components.Breadcrumb, len(crumbs))
-		for i, b := range crumbs {
-			items[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
-		}
-		return components.BreadcrumbNav(items), nil
+	// TopbarBreadcrumb renders the app's single location trail in the
+	// desktop topbar; TopbarBreadcrumbMobile is the scrollable mobile-strip
+	// variant. Both read the full layout data map (CurrentPage, PageTitle,
+	// Breadcrumbs) — see topbarBreadcrumbComponent.
+	"TopbarBreadcrumb": func(data any) (templ.Component, error) {
+		return topbarBreadcrumbComponent(data, false)
+	},
+	"TopbarBreadcrumbMobile": func(data any) (templ.Component, error) {
+		return topbarBreadcrumbComponent(data, true)
 	},
 	"CategoryPickerScript": func(_ any) (templ.Component, error) {
 		return components.CategoryPickerScript(), nil
@@ -143,6 +139,74 @@ func pageSectionLabel(currentPage string) string {
 	default:
 		return ""
 	}
+}
+
+// pageIDFromHref extracts the nav page id from a breadcrumb href so the
+// topbar can resolve the section group of the trail's root —
+// "/connections?tab=links" → "connections", "/workflows/runs" →
+// "workflows". Returns "" for the current-page crumb (empty href).
+func pageIDFromHref(href string) string {
+	if href == "" {
+		return ""
+	}
+	h := strings.TrimPrefix(href, "/")
+	if i := strings.IndexAny(h, "/?#"); i >= 0 {
+		h = h[:i]
+	}
+	return h
+}
+
+// topbarSectionLabel resolves the muted group label shown before the
+// trail. When a trail is present it derives the section from the trail's
+// root crumb so the section and the path can never contradict (e.g. an
+// account detail rooted at "Connections" reads "System / Connections / …"
+// regardless of which nav item is active). Falls back to the current
+// page's own section for trail-less list/top-level pages.
+func topbarSectionLabel(currentPage string, items []components.Breadcrumb) string {
+	if len(items) > 0 {
+		if s := pageSectionLabel(pageIDFromHref(items[0].Href)); s != "" {
+			return s
+		}
+	}
+	return pageSectionLabel(currentPage)
+}
+
+// breadcrumbItemsFromData normalises whatever a handler stashed under
+// data["Breadcrumbs"] into the component slice. Accepts the component
+// slice directly and the admin Breadcrumb slice (handlers that build the
+// admin shape for other uses). Anything else → nil (no trail).
+func breadcrumbItemsFromData(v any) []components.Breadcrumb {
+	switch s := v.(type) {
+	case []components.Breadcrumb:
+		return s
+	case []Breadcrumb:
+		out := make([]components.Breadcrumb, len(s))
+		for i, b := range s {
+			out[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+// topbarBreadcrumbComponent builds the topbar trail from the layout data
+// map. scrollable picks the mobile-strip variant. Shared by the
+// TopbarBreadcrumb / TopbarBreadcrumbMobile registry adapters.
+func topbarBreadcrumbComponent(data any, scrollable bool) (templ.Component, error) {
+	m, ok := data.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("TopbarBreadcrumb: want map[string]any, got %T", data)
+	}
+	currentPage, _ := m["CurrentPage"].(string)
+	pageTitle, _ := m["PageTitle"].(string)
+	items := breadcrumbItemsFromData(m["Breadcrumbs"])
+	return components.TopbarBreadcrumb(components.TopbarBreadcrumbProps{
+		Section:    topbarSectionLabel(currentPage, items),
+		Items:      items,
+		PageTitle:  pageTitle,
+		Scrollable: scrollable,
+	}), nil
 }
 
 // toStringSlice coerces the value passed via renderComponent into a
@@ -320,9 +384,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
 				"strs":            func(vals ...string) []string { return vals },
 				"renderComponent": renderTemplComponent,
-				// pageSection maps the current nav page id to its sidebar
-				// section, for the desktop topbar breadcrumb in base.html.
-				"pageSection": pageSectionLabel,
 				// userAvatarProps constructs a UserAvatarProps from the
 				// BaseTemplateData fields html/template partials carry,
 				// for use through renderComponent. Kept inline so the
@@ -360,7 +421,6 @@ var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
 	"partials/category_picker.html",
-	"partials/breadcrumb.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {

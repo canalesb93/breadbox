@@ -266,6 +266,10 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			"CurrentPage": "recurring",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
+			"Breadcrumbs": []components.Breadcrumb{
+				{Label: "Recurring", Href: "/recurring"},
+				{Label: s.Name},
+			},
 		}
 		tr.RenderWithTempl(w, r, data, pages.SubscriptionDetail(props))
 	}
@@ -563,8 +567,18 @@ func NewRecurringSeriesPageHandler(a *app.App, svc *service.Service, sm *scs.Ses
 			"PageTitle":   "New recurring series",
 			"CurrentPage": "recurring",
 			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": recurringFormBreadcrumbs(),
 		}
 		tr.RenderWithTempl(w, r, data, pages.RecurringSeriesForm(props))
+	}
+}
+
+// recurringFormBreadcrumbs is the topbar trail for the new-series form,
+// shared by the GET handler and its validation-error re-render.
+func recurringFormBreadcrumbs() []components.Breadcrumb {
+	return []components.Breadcrumb{
+		{Label: "Recurring", Href: "/recurring"},
+		{Label: "New series"},
 	}
 }
 
@@ -596,6 +610,7 @@ func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				"PageTitle":   "New recurring series",
 				"CurrentPage": "recurring",
 				"CSRFToken":   GetCSRFToken(r),
+				"Breadcrumbs": recurringFormBreadcrumbs(),
 			}, pages.RecurringSeriesForm(pages.RecurringSeriesFormProps{
 				CSRFToken: GetCSRFToken(r), Error: msg,
 				Name: name, Type: typ, Cadence: cadence, Currency: currency,

@@ -48,12 +48,12 @@ func SyncLogDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"Flash":       GetFlash(ctx, sm),
 		}
 
-		breadcrumbs := []components.Breadcrumb{
+		data["Breadcrumbs"] = []components.Breadcrumb{
 			{Label: "Logs", Href: "/logs?tab=syncs"},
 			{Label: syncLog.InstitutionName},
 		}
 
-		props := buildSyncLogDetailProps(syncLog, accounts, breadcrumbs)
+		props := buildSyncLogDetailProps(syncLog, accounts)
 		renderSyncLogDetail(w, r, tr, data, props)
 	}
 }
@@ -68,10 +68,8 @@ func renderSyncLogDetail(w http.ResponseWriter, r *http.Request, tr *TemplateRen
 // buildSyncLogDetailProps projects service-layer types into the flat
 // view-model the templ renders. Pre-renders relative time and rule
 // condition summaries so the templ stays free of funcMap helpers.
-func buildSyncLogDetailProps(log *service.SyncLogRow, accounts []service.SyncLogAccountRow, breadcrumbs []components.Breadcrumb) pages.SyncLogDetailProps {
-	out := pages.SyncLogDetailProps{
-		Breadcrumbs: breadcrumbs,
-	}
+func buildSyncLogDetailProps(log *service.SyncLogRow, accounts []service.SyncLogAccountRow) pages.SyncLogDetailProps {
+	out := pages.SyncLogDetailProps{}
 	if log != nil {
 		out.Log = pages.SyncLogDetailLog{
 			ID:                log.ID,

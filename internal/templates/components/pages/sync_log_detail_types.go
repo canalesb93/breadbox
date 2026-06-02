@@ -3,7 +3,6 @@
 package pages
 
 import (
-	"breadbox/internal/templates/components"
 )
 
 // SyncLogDetailProps mirrors the data the old sync_log_detail.html
@@ -16,7 +15,6 @@ import (
 type SyncLogDetailProps struct {
 	Log         SyncLogDetailLog
 	Accounts    []SyncLogDetailAccount
-	Breadcrumbs []components.Breadcrumb
 }
 
 // SyncLogDetailLog flattens service.SyncLogRow into the subset the

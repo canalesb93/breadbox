@@ -67,6 +67,7 @@ func AgentFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Temp
 
 		pageTitle := props.Title
 		data := BaseTemplateData(r, sm, "agents", pageTitle)
+		data["Breadcrumbs"] = pages.AgentFormBreadcrumbs(props)
 		tr.RenderWithTempl(w, r, data, pages.AgentForm(props))
 	}
 }

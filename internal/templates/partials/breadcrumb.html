@@ -1,8 +1,0 @@
-{{/*
-  Thin html/template facade around the templ component in
-  internal/templates/components/breadcrumb.templ. Pages still call
-  {{template "breadcrumb" .}} and pass the full layout data; we
-  forward the .Breadcrumbs slice to the component. Empty slice renders
-  nothing. See issue #462 for migration context.
-*/}}
-{{define "breadcrumb"}}{{renderComponent "Breadcrumb" .Breadcrumbs}}{{end}}

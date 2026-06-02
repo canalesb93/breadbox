@@ -33,7 +33,6 @@ templ RuleDetail(p RuleDetailProps) {
 	<script src="/static/js/admin/components/tx_row_helpers.js"></script>
 	<script src="/static/js/admin/components/rule_detail.js"></script>
 	@components.CategoryPickerScript()
-	@components.BreadcrumbNav(p.Breadcrumbs)
 	@templ.JSONScript("rule-detail-data", p.Categories)
 	<div
 		x-data="ruleDetail"

@@ -20,7 +20,6 @@ templ RuleForm(p RuleFormProps) {
 	     synchronously (no defer) so the Alpine.data() registration runs
 	     before Alpine — itself deferred from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/rule_form.js"></script>
-	@components.BreadcrumbNav(p.Breadcrumbs)
 	if p.Rule != nil {
 		@templ.JSONScript("rule-form-data", p.Rule)
 	}

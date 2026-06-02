@@ -24,7 +24,6 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 	     from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/connection_detail.js"></script>
 	<div class="max-w-full overflow-x-hidden" x-data="connectionDetail" data-conn-id={ p.ConnID }>
-		@components.BreadcrumbNav(p.Breadcrumbs)
 		if p.Status == "error" || p.Status == "pending_reauth" {
 			<div role="alert" class="alert alert-error rounded-xl mb-6">
 				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")

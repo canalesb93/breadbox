@@ -3,7 +3,6 @@
 package pages
 
 import (
-	"breadbox/internal/templates/components"
 )
 
 // ReportDetailProps mirrors the data the old report_detail.html read off
@@ -14,7 +13,6 @@ import (
 // keep the templ free of pgtype/funcMap helpers.
 type ReportDetailProps struct {
 	Report      ReportDetailReport
-	Breadcrumbs []components.Breadcrumb
 }
 
 // ReportDetailReport flattens the agent-report fields the detail page

@@ -29,7 +29,6 @@ type RuleDetailProps struct {
 	LastActiveTime time.Time
 	HasLastActive  bool
 	ConditionSummary string
-	Breadcrumbs      []components.Breadcrumb
 	// ConditionRows is the pre-formatted list of ConditionRowProps the handler
 	// computes for non-match-all rules. Empty when the rule matches everything
 	// or when no conditions are stored. Order mirrors the source tree (And, Or,

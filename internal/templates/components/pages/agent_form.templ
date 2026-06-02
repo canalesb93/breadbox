@@ -32,7 +32,6 @@ templ AgentForm(p AgentFormProps) {
 	<script src="/static/js/admin/slug.js"></script>
 	<script src="/static/js/admin/components/agent_form.js"></script>
 	@templ.JSONScript("agent-form-data", agentFormInitialJSON(p.Form))
-	@components.BreadcrumbNav(agentFormBreadcrumbs(p))
 	@components.PageHeader(components.PageHeaderProps{
 		Title:    p.Title,
 		Subtitle: "Configure when this agent runs, which tools it can use, and what prompt drives it.",
@@ -548,9 +547,9 @@ func agentFormSubmitAction(p AgentFormProps) string {
 	return "/-/agents"
 }
 
-// agentFormBreadcrumbs builds the breadcrumb trail. Last entry is the
-// current page label (rendered without a link by BreadcrumbNav).
-func agentFormBreadcrumbs(p AgentFormProps) []components.Breadcrumb {
+// AgentFormBreadcrumbs builds the breadcrumb trail. Consumed by the
+// handler to populate the layout's topbar trail (data["Breadcrumbs"]).
+func AgentFormBreadcrumbs(p AgentFormProps) []components.Breadcrumb {
 	last := "New"
 	if p.Mode == "edit" {
 		last = "Edit"
