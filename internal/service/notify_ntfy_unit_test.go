@@ -24,7 +24,7 @@ func TestResolveNotifyFormat(t *testing.T) {
 		{"explicit json wins", appconfig.NotifyFormatJSON, "https://ntfy.sh/topic", appconfig.NotifyFormatJSON},
 		{"auto detects ntfy.sh", appconfig.NotifyFormatAuto, "https://ntfy.sh/breadbox", appconfig.NotifyFormatNtfy},
 		{"auto detects self-hosted ntfy", appconfig.NotifyFormatAuto, "https://push.ntfy.example.com/t", appconfig.NotifyFormatNtfy},
-		{"auto falls back to json", appconfig.NotifyFormatAuto, "https://hooks.slack.com/services/x", appconfig.NotifyFormatJSON},
+		{"auto falls back to json", appconfig.NotifyFormatAuto, "https://example.com/generic-hook", appconfig.NotifyFormatJSON},
 		{"empty configured behaves as auto", "", "https://ntfy.sh/t", appconfig.NotifyFormatNtfy},
 		{"unknown configured behaves as auto", "garbage", "https://example.com/h", appconfig.NotifyFormatJSON},
 	}
@@ -203,12 +203,12 @@ func TestBuildNtfyRequest_EmptyBodyFallsBackToTitle(t *testing.T) {
 }
 
 func TestValidNotifyFormat(t *testing.T) {
-	for _, v := range []string{"auto", "ntfy", "json"} {
+	for _, v := range []string{"auto", "ntfy", "slack", "discord", "json"} {
 		if !validNotifyFormat(v) {
 			t.Errorf("validNotifyFormat(%q) = false, want true", v)
 		}
 	}
-	for _, v := range []string{"", "JSON", "slack", "Ntfy"} {
+	for _, v := range []string{"", "JSON", "Slack", "Ntfy", "webhook"} {
 		if validNotifyFormat(v) {
 			t.Errorf("validNotifyFormat(%q) = true, want false", v)
 		}

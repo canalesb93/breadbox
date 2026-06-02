@@ -66,13 +66,26 @@ templ notificationsWebhookSection(p NotificationsSettingsProps) {
 		}
 		@components.SettingsRow(components.SettingsRowProps{
 			Label:   "Format",
-			Caption: "ntfy sends a native title, priority, and tap-through; JSON suits Slack relays and bridges. Auto-detect picks ntfy for ntfy URLs.",
+			Caption: "Native ntfy, Slack, and Discord render a real titled message; JSON is the generic envelope for relays and bridges. Auto-detect picks the provider from the URL.",
 			For:     "format",
 		}) {
 			<select id="format" name="format" class="select select-sm bg-base-200 min-w-44">
 				<option value="auto" selected?={ p.Form.Format == "auto" }>Auto-detect</option>
 				<option value="ntfy" selected?={ p.Form.Format == "ntfy" }>ntfy</option>
+				<option value="slack" selected?={ p.Form.Format == "slack" }>Slack</option>
+				<option value="discord" selected?={ p.Form.Format == "discord" }>Discord</option>
 				<option value="json" selected?={ p.Form.Format == "json" }>Generic JSON</option>
+			</select>
+		}
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Minimum priority",
+			Caption: "Only deliver reports at or above this level. Raise it to silence routine info-level reports and keep only alerts.",
+			For:     "min_priority",
+		}) {
+			<select id="min_priority" name="min_priority" class="select select-sm bg-base-200 min-w-44">
+				<option value="info" selected?={ p.Form.MinPriority == "info" }>Info — everything</option>
+				<option value="warning" selected?={ p.Form.MinPriority == "warning" }>Warning &amp; above</option>
+				<option value="critical" selected?={ p.Form.MinPriority == "critical" }>Critical only</option>
 			</select>
 		}
 		@components.SettingsRow(components.SettingsRowProps{

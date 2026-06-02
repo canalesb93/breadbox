@@ -41,6 +41,7 @@ func NotificationsSettingsHandler(svc *service.Service, sm *scs.SessionManager, 
 				WebhookURL:    settings.WebhookURL,
 				Format:        settings.Format,
 				PublicBaseURL: settings.PublicBaseURL,
+				MinPriority:   settings.MinPriority,
 			},
 			FieldErrors: map[string]string{},
 			FormError:   formError,
@@ -56,9 +57,9 @@ func NotificationsSettingsHandler(svc *service.Service, sm *scs.SessionManager, 
 }
 
 // NotificationsSettingsPostHandler handles POST /settings/notifications —
-// the multi-input sink form. Saves webhook URL, format, and public base
-// URL together, then redirects back to the tab with a flash. The service
-// validates URLs (http(s)) and the format enum.
+// the multi-input sink form. Saves webhook URL, format, minimum priority,
+// and public base URL together, then redirects back to the tab with a flash.
+// The service validates URLs (http(s)) and the format / priority enums.
 func NotificationsSettingsPostHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -74,6 +75,10 @@ func NotificationsSettingsPostHandler(svc *service.Service, sm *scs.SessionManag
 		if r.Form.Has("format") {
 			v := strings.TrimSpace(r.FormValue("format"))
 			params.Format = &v
+		}
+		if r.Form.Has("min_priority") {
+			v := strings.TrimSpace(r.FormValue("min_priority"))
+			params.MinPriority = &v
 		}
 		if r.Form.Has("public_base_url") {
 			v := strings.TrimSpace(r.FormValue("public_base_url"))

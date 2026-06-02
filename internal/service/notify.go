@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -87,12 +88,17 @@ func (s *Service) WorkflowNotificationConfigured(ctx context.Context) bool {
 // configured, so callers can fire unconditionally. The URL must be http(s).
 //
 // The wire shape depends on the configured format (notify.format):
-//   - ntfy   → a plain-text (markdown) body plus ntfy's publishing headers
+//   - ntfy    → a plain-text (markdown) body plus ntfy's publishing headers
 //     (Title / Priority / Click / Markdown / Tags), so the push renders as
 //     a real titled notification instead of a raw JSON blob.
-//   - json   → the generic NotificationPayload envelope (Slack relays,
-//     Discord bridges, custom consumers).
-//   - auto   → ntfy when the URL looks like ntfy, else json.
+//   - slack   → a Slack incoming-webhook JSON ({"text": …}) with mrkdwn.
+//   - discord → a Discord webhook JSON ({"content": …}) with markdown.
+//   - json    → the generic NotificationPayload envelope (relays, bridges,
+//     custom consumers).
+//   - auto    → the matching provider when the URL is recognizable, else json.
+//
+// Reports below the configured priority floor (notify.min_priority) are
+// dropped silently. Delivery is retried with backoff on transient failures.
 func (s *Service) SendWorkflowNotification(ctx context.Context, p NotificationPayload) error {
 	raw := strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyWebhookURL, ""))
 	if raw == "" {
@@ -101,6 +107,15 @@ func (s *Service) SendWorkflowNotification(ctx context.Context, p NotificationPa
 	if err := validateNotifyURL(raw); err != nil {
 		return err
 	}
+
+	// Priority floor: drop reports below the configured minimum. Test
+	// notifications (Event == "test") always go through — the operator is
+	// explicitly checking the wiring.
+	floor := appconfig.String(ctx, s.Queries, appconfig.KeyNotifyMinPriority, appconfig.NotifyMinPriorityInfo)
+	if p.Event != "test" && priorityRank(p.Priority) < priorityRank(floor) {
+		return nil
+	}
+
 	if p.SentAt == "" {
 		p.SentAt = time.Now().UTC().Format(time.RFC3339)
 	}
@@ -115,41 +130,42 @@ func (s *Service) SendWorkflowNotification(ctx context.Context, p NotificationPa
 
 	format := resolveNotifyFormat(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyFormat, appconfig.NotifyFormatAuto), raw)
 
-	var req *http.Request
-	var err error
-	if format == appconfig.NotifyFormatNtfy {
-		req, err = buildNtfyRequest(ctx, raw, p, baseURL)
-	} else {
-		req, err = buildJSONNotifyRequest(ctx, raw, p)
+	// build constructs a fresh request per attempt — the body is a reader
+	// that can't be rewound, so we can't reuse one *http.Request across retries.
+	build := func() (*http.Request, error) {
+		switch format {
+		case appconfig.NotifyFormatNtfy:
+			return buildNtfyRequest(ctx, raw, p, baseURL)
+		case appconfig.NotifyFormatSlack:
+			return buildSlackRequest(ctx, raw, p)
+		case appconfig.NotifyFormatDiscord:
+			return buildDiscordRequest(ctx, raw, p)
+		default:
+			return buildJSONNotifyRequest(ctx, raw, p)
+		}
 	}
-	if err != nil {
-		return err
-	}
-
-	resp, err := notifyHTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("notification webhook: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("notification webhook returned HTTP %d", resp.StatusCode)
-	}
-	return nil
+	return sendNotifyWithRetry(ctx, build)
 }
 
 // resolveNotifyFormat maps the configured format to a concrete wire shape.
-// "auto" (the default, and any unknown value) sniffs the URL for ntfy.
+// "auto" (the default, and any unknown value) sniffs the URL for a known
+// provider (ntfy / Slack / Discord), falling back to the generic JSON shape.
 func resolveNotifyFormat(configured, rawURL string) string {
 	switch configured {
-	case appconfig.NotifyFormatNtfy:
-		return appconfig.NotifyFormatNtfy
-	case appconfig.NotifyFormatJSON:
-		return appconfig.NotifyFormatJSON
+	case appconfig.NotifyFormatNtfy, appconfig.NotifyFormatSlack,
+		appconfig.NotifyFormatDiscord, appconfig.NotifyFormatJSON:
+		return configured
 	default:
-		if looksLikeNtfy(rawURL) {
+		switch {
+		case looksLikeNtfy(rawURL):
 			return appconfig.NotifyFormatNtfy
+		case looksLikeSlack(rawURL):
+			return appconfig.NotifyFormatSlack
+		case looksLikeDiscord(rawURL):
+			return appconfig.NotifyFormatDiscord
+		default:
+			return appconfig.NotifyFormatJSON
 		}
-		return appconfig.NotifyFormatJSON
 	}
 }
 
@@ -157,12 +173,97 @@ func resolveNotifyFormat(configured, rawURL string) string {
 // Matches the public host and any self-hosted host carrying "ntfy" in its
 // name (push.ntfy.example.com, ntfy.lan, …).
 func looksLikeNtfy(raw string) bool {
+	host := urlHost(raw)
+	return host == "ntfy.sh" || strings.Contains(host, "ntfy")
+}
+
+// looksLikeSlack reports whether a URL is a Slack incoming webhook.
+func looksLikeSlack(raw string) bool {
+	return urlHost(raw) == "hooks.slack.com"
+}
+
+// looksLikeDiscord reports whether a URL is a Discord webhook.
+func looksLikeDiscord(raw string) bool {
+	host := urlHost(raw)
+	return (host == "discord.com" || host == "discordapp.com" || strings.HasSuffix(host, ".discord.com")) &&
+		strings.Contains(raw, "/webhooks/")
+}
+
+// urlHost returns the lower-cased host of a URL, or "" if unparsable.
+func urlHost(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return false
+		return ""
 	}
-	host := strings.ToLower(u.Hostname())
-	return host == "ntfy.sh" || strings.Contains(host, "ntfy")
+	return strings.ToLower(u.Hostname())
+}
+
+// priorityRank orders the canonical priorities for floor comparison.
+// Unknown values rank as "info" (the lowest) so they're never silently
+// filtered by a stricter floor.
+func priorityRank(priority string) int {
+	switch priority {
+	case "critical":
+		return 2
+	case "warning":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// notifyMaxAttempts bounds delivery retries (1 initial + retries).
+const notifyMaxAttempts = 3
+
+// sendNotifyWithRetry delivers a freshly-built request, retrying transient
+// failures (network errors, HTTP 429, and 5xx) with exponential backoff.
+// A 4xx other than 429 fails fast — retrying a malformed payload or a bad
+// topic won't help. Each attempt rebuilds the request because its body is a
+// one-shot reader.
+func sendNotifyWithRetry(ctx context.Context, build func() (*http.Request, error)) error {
+	var lastErr error
+	for attempt := 1; attempt <= notifyMaxAttempts; attempt++ {
+		req, err := build()
+		if err != nil {
+			return err // build errors are deterministic — don't retry
+		}
+		resp, err := notifyHTTPClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("notification webhook: %w", err)
+		} else {
+			func() {
+				defer resp.Body.Close()
+				if resp.StatusCode < 300 {
+					lastErr = nil
+				} else {
+					lastErr = fmt.Errorf("notification webhook returned HTTP %d", resp.StatusCode)
+				}
+			}()
+			if lastErr == nil {
+				return nil
+			}
+			if !notifyRetriableStatus(resp.StatusCode) {
+				return lastErr // permanent (4xx ≠ 429) — stop now
+			}
+		}
+		if attempt < notifyMaxAttempts {
+			// Exponential backoff: 200ms, 400ms, … bounded and ctx-aware.
+			backoff := time.Duration(200*(1<<(attempt-1))) * time.Millisecond
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+	}
+	return lastErr
+}
+
+// notifyRetriableStatus reports whether an HTTP status warrants a retry:
+// 429 (rate limited) and any 5xx (server-side transient). 4xx otherwise is
+// permanent.
+func notifyRetriableStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code >= 500
 }
 
 // buildJSONNotifyRequest POSTs the generic JSON envelope. This is the
@@ -280,6 +381,120 @@ func absolutizeMarkdownLinks(body, baseURL string) string {
 // callers can concatenate "/path" without doubling the separator.
 func normalizeBaseURL(raw string) string {
 	return strings.TrimRight(strings.TrimSpace(raw), "/")
+}
+
+// notifyMarkdownLink matches a markdown inline link: [label](url).
+var notifyMarkdownLink = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+
+// notifyBoldRun matches a **bold** run.
+var notifyBoldRun = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+
+// notifyEmojiShortcode returns an emoji shortcode (rendered by Slack and
+// Discord alike) for a priority — the same visual cue ntfy gets from tags.
+func notifyEmojiShortcode(priority string) string {
+	switch priority {
+	case "critical":
+		return ":rotating_light:"
+	case "warning":
+		return ":warning:"
+	default:
+		return ":information_source:"
+	}
+}
+
+// buildSlackRequest POSTs a Slack incoming-webhook payload ({"text": …}).
+// The body is converted from Markdown to Slack mrkdwn: **bold** → *bold*
+// and [label](url) → <url|label>. A leading priority emoji + bold title set
+// the headline; an absolute deep link is appended as a tappable link.
+func buildSlackRequest(ctx context.Context, rawURL string, p NotificationPayload) (*http.Request, error) {
+	var b strings.Builder
+	b.WriteString(notifyEmojiShortcode(p.Priority))
+	b.WriteString(" *")
+	b.WriteString(slackEscape(collapseToLine(p.Title)))
+	b.WriteString("*")
+	if body := strings.TrimSpace(p.Body); body != "" {
+		b.WriteString("\n")
+		b.WriteString(toSlackMrkdwn(body))
+	}
+	if isAbsoluteURL(p.URL) {
+		b.WriteString("\n<")
+		b.WriteString(p.URL)
+		b.WriteString("|View report →>")
+	}
+	return jsonNotifyRequest(ctx, rawURL, map[string]any{"text": b.String()})
+}
+
+// buildDiscordRequest POSTs a Discord webhook payload ({"content": …}).
+// Discord renders standard Markdown (bold, lists) in message content, so the
+// body passes through; an absolute deep link is appended on its own line
+// (Discord auto-links bare URLs). Content is capped at Discord's 2000-char
+// limit.
+func buildDiscordRequest(ctx context.Context, rawURL string, p NotificationPayload) (*http.Request, error) {
+	var b strings.Builder
+	b.WriteString(notifyEmojiShortcode(p.Priority))
+	b.WriteString(" **")
+	b.WriteString(collapseToLine(p.Title))
+	b.WriteString("**")
+	if body := strings.TrimSpace(p.Body); body != "" {
+		b.WriteString("\n")
+		b.WriteString(body)
+	}
+	if isAbsoluteURL(p.URL) {
+		b.WriteString("\n")
+		b.WriteString(p.URL)
+	}
+	content := b.String()
+	if r := []rune(content); len(r) > 1990 {
+		content = strings.TrimRight(string(r[:1990]), " \t\n") + "…"
+	}
+	return jsonNotifyRequest(ctx, rawURL, map[string]any{"content": content})
+}
+
+// jsonNotifyRequest marshals v and builds a JSON POST with the shared headers.
+func jsonNotifyRequest(ctx context.Context, rawURL string, v any) (*http.Request, error) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("marshal notification: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build notification request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "breadbox-workflows")
+	return req, nil
+}
+
+// toSlackMrkdwn converts the subset of Markdown our report bodies use into
+// Slack mrkdwn: [label](url) → <url|label>, then **bold** → *bold*.
+// Links are rewritten first so the bold pass can't touch a URL.
+func toSlackMrkdwn(s string) string {
+	s = notifyMarkdownLink.ReplaceAllString(s, "<$2|$1>")
+	s = notifyBoldRun.ReplaceAllString(s, "*$1*")
+	return s
+}
+
+// slackEscape escapes the three characters Slack reserves in mrkdwn text so a
+// stray <, >, or & in a title can't break link syntax. Applied to plain-text
+// fragments only — never to a fragment that already contains <url|label>.
+func slackEscape(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
+}
+
+// collapseToLine flattens newlines to spaces — used for titles that must
+// render on a single line.
+func collapseToLine(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return strings.TrimSpace(s)
+}
+
+// isAbsoluteURL reports whether u is an http(s) absolute URL.
+func isAbsoluteURL(u string) bool {
+	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")
 }
 
 // SendTestNotification fires a sample payload so an operator can verify their

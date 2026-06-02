@@ -18,6 +18,7 @@ type NotificationsSettingsProps struct {
 // service.UpdateNotificationSettings.
 type NotificationsSettingsFormFields struct {
 	WebhookURL    string // http(s) sink; empty = notifications off
-	Format        string // "auto" | "ntfy" | "json"
+	Format        string // "auto" | "ntfy" | "slack" | "discord" | "json"
 	PublicBaseURL string // absolute origin for deep links; empty = relative
+	MinPriority   string // "info" | "warning" | "critical" delivery floor
 }

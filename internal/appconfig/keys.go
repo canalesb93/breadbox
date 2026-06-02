@@ -84,10 +84,9 @@ const (
 
 	// KeyNotifyFormat selects how the outbound notification request is
 	// shaped. "auto" (default) sniffs the webhook URL and publishes
-	// natively to ntfy when it looks like ntfy, falling back to the
-	// generic JSON envelope otherwise; "ntfy" forces ntfy's
-	// header+body publishing; "json" forces the JSON envelope (for
-	// Slack-compatible relays, Discord bridges, custom consumers).
+	// natively to the matching provider (ntfy / Slack / Discord), falling
+	// back to the generic JSON envelope otherwise. The explicit values
+	// "ntfy" / "slack" / "discord" / "json" force a specific shape.
 	KeyNotifyFormat = "notify.format"
 
 	// KeyNotifyPublicBaseURL is the absolute origin (scheme+host, no
@@ -96,6 +95,12 @@ const (
 	// in the body) resolves to the real report instead of a bare path.
 	// Empty = deep links stay relative. http(s) only.
 	KeyNotifyPublicBaseURL = "notify.public_base_url"
+
+	// KeyNotifyMinPriority gates outbound notifications by report priority:
+	// only reports at or above this floor are delivered. One of
+	// info | warning | critical; default "info" (everything). Lets a
+	// household silence routine info-level reports and keep only alerts.
+	KeyNotifyMinPriority = "notify.min_priority"
 )
 
 // AuthMode values for KeyAgentAuthMode.
@@ -106,7 +111,16 @@ const (
 
 // NotifyFormat values for KeyNotifyFormat.
 const (
-	NotifyFormatAuto = "auto"
-	NotifyFormatNtfy = "ntfy"
-	NotifyFormatJSON = "json"
+	NotifyFormatAuto    = "auto"
+	NotifyFormatNtfy    = "ntfy"
+	NotifyFormatSlack   = "slack"
+	NotifyFormatDiscord = "discord"
+	NotifyFormatJSON    = "json"
+)
+
+// NotifyMinPriority values for KeyNotifyMinPriority (delivery floor).
+const (
+	NotifyMinPriorityInfo     = "info"
+	NotifyMinPriorityWarning  = "warning"
+	NotifyMinPriorityCritical = "critical"
 )

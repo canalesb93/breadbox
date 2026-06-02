@@ -15,17 +15,19 @@ import (
 // the webhook URL, format, and public base URL all surface in plaintext.
 type NotificationSettingsResponse struct {
 	WebhookURL    string `json:"webhook_url"`
-	Format        string `json:"format"` // auto | ntfy | json
+	Format        string `json:"format"`       // auto | ntfy | slack | discord | json
 	PublicBaseURL string `json:"public_base_url"`
+	MinPriority   string `json:"min_priority"` // info | warning | critical
 }
 
 // UpdateNotificationSettingsParams holds the writable notification settings.
 // Nil = leave untouched; an empty string clears the value (webhook/base URL)
-// or resets to the default (format → auto).
+// or resets to the default (format → auto, min_priority → info).
 type UpdateNotificationSettingsParams struct {
 	WebhookURL    *string
 	Format        *string
 	PublicBaseURL *string
+	MinPriority   *string
 }
 
 // GetNotificationSettings reads the notify.* keys from app_config.
@@ -34,6 +36,7 @@ func (s *Service) GetNotificationSettings(ctx context.Context) (*NotificationSet
 		WebhookURL:    appconfig.String(ctx, s.Queries, appconfig.KeyNotifyWebhookURL, ""),
 		Format:        notifyFormatOrDefault(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyFormat, appconfig.NotifyFormatAuto)),
 		PublicBaseURL: appconfig.String(ctx, s.Queries, appconfig.KeyNotifyPublicBaseURL, ""),
+		MinPriority:   notifyMinPriorityOrDefault(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyMinPriority, appconfig.NotifyMinPriorityInfo)),
 	}, nil
 }
 
@@ -58,10 +61,22 @@ func (s *Service) UpdateNotificationSettings(ctx context.Context, p UpdateNotifi
 			format = appconfig.NotifyFormatAuto
 		}
 		if !validNotifyFormat(format) {
-			return nil, fmt.Errorf("%w: notification format must be auto, ntfy, or json", ErrInvalidParameter)
+			return nil, fmt.Errorf("%w: notification format must be auto, ntfy, slack, discord, or json", ErrInvalidParameter)
 		}
 		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyNotifyFormat, format)); err != nil {
 			return nil, fmt.Errorf("set notify_format: %w", err)
+		}
+	}
+	if p.MinPriority != nil {
+		mp := strings.TrimSpace(*p.MinPriority)
+		if mp == "" {
+			mp = appconfig.NotifyMinPriorityInfo
+		}
+		if !validNotifyMinPriority(mp) {
+			return nil, fmt.Errorf("%w: minimum priority must be info, warning, or critical", ErrInvalidParameter)
+		}
+		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyNotifyMinPriority, mp)); err != nil {
+			return nil, fmt.Errorf("set notify_min_priority: %w", err)
 		}
 	}
 	if p.PublicBaseURL != nil {
@@ -81,7 +96,9 @@ func (s *Service) UpdateNotificationSettings(ctx context.Context, p UpdateNotifi
 // validNotifyFormat reports whether v is one of the canonical format values.
 func validNotifyFormat(v string) bool {
 	switch v {
-	case appconfig.NotifyFormatAuto, appconfig.NotifyFormatNtfy, appconfig.NotifyFormatJSON:
+	case appconfig.NotifyFormatAuto, appconfig.NotifyFormatNtfy,
+		appconfig.NotifyFormatSlack, appconfig.NotifyFormatDiscord,
+		appconfig.NotifyFormatJSON:
 		return true
 	default:
 		return false
@@ -95,4 +112,22 @@ func notifyFormatOrDefault(v string) string {
 		return v
 	}
 	return appconfig.NotifyFormatAuto
+}
+
+// validNotifyMinPriority reports whether v is a canonical priority floor.
+func validNotifyMinPriority(v string) bool {
+	switch v {
+	case appconfig.NotifyMinPriorityInfo, appconfig.NotifyMinPriorityWarning, appconfig.NotifyMinPriorityCritical:
+		return true
+	default:
+		return false
+	}
+}
+
+// notifyMinPriorityOrDefault coerces an unrecognized floor back to "info".
+func notifyMinPriorityOrDefault(v string) string {
+	if validNotifyMinPriority(v) {
+		return v
+	}
+	return appconfig.NotifyMinPriorityInfo
 }
