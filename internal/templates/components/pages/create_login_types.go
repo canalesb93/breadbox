@@ -5,7 +5,6 @@ package pages
 import (
 	"fmt"
 
-	"breadbox/internal/templates/components"
 )
 
 // CreateLoginProps mirrors the data map create_login.html consumed. The
@@ -31,7 +30,6 @@ type CreateLoginProps struct {
 	SetupURL          string // empty when no token / password already set
 
 	// Breadcrumb trail.
-	Breadcrumbs []components.Breadcrumb
 }
 
 // manageLoginRoleAlpine returns the inline x-data expression for the role

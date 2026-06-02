@@ -484,14 +484,9 @@
            mobile navbar below takes over). Left: breadcrumb of the current
            section/page. Right: ⌘K search, theme toggle, profile menu. -->
       <header class="bb-topbar">
-        <div class="bb-topbar-breadcrumb">
-          {{$section := pageSection .CurrentPage}}
-          {{if $section}}
-          <span class="text-base-content/40">{{$section}}</span>
-          <span class="text-base-content/25">/</span>
-          {{end}}
-          <span class="font-medium text-base-content truncate">{{.PageTitle}}</span>
-        </div>
+        {{/* Single location trail — Section / parent / … / current. The
+             layout owns this; pages no longer render their own breadcrumb. */}}
+        {{renderComponent "TopbarBreadcrumb" .}}
         <div class="flex items-center gap-1.5 shrink-0">
           <button type="button"
                   class="bb-topbar-search"
@@ -548,6 +543,14 @@
           {{end}}
         </div>
       </div>
+      {{/* Mobile location trail — the desktop topbar is hidden < lg, so the
+           breadcrumb rides below the mobile navbar (scrollable) on detail
+           pages. Only rendered when the page supplies a trail. */}}
+      {{if .Breadcrumbs}}
+      <div class="lg:hidden px-4 pt-3">
+        {{renderComponent "TopbarBreadcrumbMobile" .}}
+      </div>
+      {{end}}
       <!-- Page content -->
       <main class="p-4 sm:p-6 min-h-screen">
         {{template "flash" .}}

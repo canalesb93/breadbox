@@ -54,7 +54,6 @@ templ TransactionDetail(p TransactionDetailProps) {
 		'global' on Alpine teardown so other pages don't inherit the scope.
 	-->
 	<div x-data x-init="$store.shortcuts.setScope('transaction-detail')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	@components.BreadcrumbNav(p.Breadcrumbs)
 	@txdHero(p)
 	if p.AccountName != "" {
 		@txdAccountBanner(p)

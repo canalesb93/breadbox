@@ -172,13 +172,13 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 			IsEdit:         false,
 			FlatCategories: flattenCategories(categories),
 			Tags:           tags,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Rules", Href: "/rules"},
-				{Label: "New Rule"},
-			},
 		}
 
 		data := BaseTemplateData(r, sm, "rules", "New Rule")
+		data["Breadcrumbs"] = []components.Breadcrumb{
+			{Label: "Rules", Href: "/rules"},
+			{Label: "New Rule"},
+		}
 
 		// Edit mode: load existing rule
 		if id := chi.URLParam(r, "id"); id != "" {
@@ -193,7 +193,7 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 			}
 			props.Rule = rule
 			props.IsEdit = true
-			props.Breadcrumbs = []components.Breadcrumb{
+			data["Breadcrumbs"] = []components.Breadcrumb{
 				{Label: "Rules", Href: "/rules"},
 				{Label: rule.Name},
 			}
@@ -332,6 +332,10 @@ func renderRuleDetail(
 	actionCategoryName string,
 	categories []service.CategoryResponse,
 ) {
+	data["Breadcrumbs"] = []components.Breadcrumb{
+		{Label: "Rules", Href: "/rules"},
+		{Label: rule.Name},
+	}
 	props := pages.RuleDetailProps{
 		Rule:                rule,
 		Preview:             preview,
@@ -347,10 +351,6 @@ func renderRuleDetail(
 		ConditionSummary:    service.ConditionSummary(rule.Conditions),
 		TriggerLabel:        service.TriggerLabel(rule.Trigger),
 		ConditionRows:       buildRuleDetailConditionRows(rule.Conditions),
-		Breadcrumbs: []components.Breadcrumb{
-			{Label: "Rules", Href: "/rules"},
-			{Label: rule.Name},
-		},
 	}
 
 	// Parse last_hit_at for relative time display.

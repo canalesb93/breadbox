@@ -8,32 +8,60 @@ type Breadcrumb struct {
 	Href  string
 }
 
-// BreadcrumbNav renders a navigation breadcrumb trail. The last entry is
-// the current page (no link, bolder text).
+// TopbarBreadcrumbProps carries the resolved topbar location trail.
+type TopbarBreadcrumbProps struct {
+	// Section is the nav-section group shown before the trail
+	// (e.g. "Manage"). Muted, non-link. Empty for sectionless pages.
+	Section string
+	// Items is the navigable trail. Intermediate entries link; the last
+	// entry (Href == "") is the bold current page. Empty on list / top
+	// level pages, where PageTitle stands in as the current crumb.
+	Items []Breadcrumb
+	// PageTitle is the current-page label used when Items is empty.
+	PageTitle string
+	// Scrollable renders the trail for the mobile strip: crumbs keep their
+	// natural width and the container scrolls horizontally instead of
+	// truncating the current crumb (the desktop topbar truncates instead).
+	Scrollable bool
+}
+
+// TopbarBreadcrumb renders the app's single location trail in the topbar
+// slash style: `Section / parent / … / current`. It is the only
+// breadcrumb surface — the layout renders it in the desktop topbar and
+// the mobile strip (base.html); pages no longer carry their own.
 //
-// Built on daisy 5 `breadcrumbs` — daisy renders the chevron as a CSS-only
-// rotated border (no SVG), so we don't fight sub-pixel SVG row-height
-// mismatches and can drop the `overflow-y: clip` workaround the previous
-// hand-rolled `.bb-breadcrumb` carried.
-//
-// Three-tier colour ramp is preserved via Tailwind utilities:
-//   - chevron:        text-base-content/25  (set on the <li>, inherited by ::before)
-//   - link:           text-base-content/40 → hover text-base-content/70
-//   - current crumb:  text-base-content/70 font-medium
-templ BreadcrumbNav(items []Breadcrumb) {
-	if len(items) > 0 {
-		<nav aria-label="Breadcrumb" class="breadcrumbs text-sm mb-6 py-0">
-			<ul>
-				for _, crumb := range items {
-					<li class="text-base-content/25">
-						if crumb.Href != "" {
-							<a class="text-base-content/40 no-underline hover:no-underline hover:text-base-content/70 transition-colors duration-150" href={ templ.SafeURL(crumb.Href) }>{ crumb.Label }</a>
-						} else {
-							<span class="text-base-content/70 font-medium cursor-default">{ crumb.Label }</span>
-						}
-					</li>
+// Tiers (matching the legacy topbar ramp):
+//   - section:    text-base-content/40  (non-link group label)
+//   - separator:  text-base-content/25
+//   - link crumb: text-base-content/40 → hover text-base-content/70
+//   - current:    text-base-content     font-medium
+templ TopbarBreadcrumb(p TopbarBreadcrumbProps) {
+	<div class={ "bb-topbar-breadcrumb", templ.KV("overflow-x-auto", p.Scrollable) }>
+		{{ first := true }}
+		if p.Section != "" {
+			<span class="shrink-0 text-base-content/40">{ p.Section }</span>
+			{{ first = false }}
+		}
+		if len(p.Items) > 0 {
+			for i, crumb := range p.Items {
+				if !first {
+					<span class="shrink-0 text-base-content/25">/</span>
 				}
-			</ul>
-		</nav>
-	}
+				if crumb.Href != "" {
+					<a
+						href={ templ.SafeURL(crumb.Href) }
+						class="shrink-0 whitespace-nowrap text-base-content/40 no-underline hover:no-underline hover:text-base-content/70 transition-colors duration-150"
+					>{ crumb.Label }</a>
+				} else {
+					<span class={ "whitespace-nowrap font-medium text-base-content", templ.KV("min-w-0 truncate", !p.Scrollable && i == len(p.Items)-1) }>{ crumb.Label }</span>
+				}
+				{{ first = false }}
+			}
+		} else {
+			if !first {
+				<span class="shrink-0 text-base-content/25">/</span>
+			}
+			<span class={ "whitespace-nowrap font-medium text-base-content", templ.KV("min-w-0 truncate", !p.Scrollable) }>{ p.PageTitle }</span>
+		}
+	</div>
 }

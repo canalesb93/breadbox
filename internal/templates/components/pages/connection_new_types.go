@@ -2,7 +2,6 @@
 
 package pages
 
-import "breadbox/internal/templates/components"
 
 // ConnectionNewProps mirrors the data map the old connection_new.html read
 // off the layout's data map. The handler pre-resolves the user list into a
@@ -15,7 +14,6 @@ import "breadbox/internal/templates/components"
 // inline <script> so TellerConnect.setup picks up sandbox/development/
 // production from the running config.
 type ConnectionNewProps struct {
-	Breadcrumbs []components.Breadcrumb
 	Users       []ConnectionNewUser
 	CSRFToken   string
 	HasPlaid    bool

@@ -15,7 +15,6 @@ import (
 	"breadbox/internal/pgconv"
 	csvpkg "breadbox/internal/provider/csv"
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -125,11 +124,6 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		}
 		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: "Import CSV"})
 		data["Breadcrumbs"] = breadcrumbs
-
-		props.Breadcrumbs = make([]components.Breadcrumb, len(breadcrumbs))
-		for i, b := range breadcrumbs {
-			props.Breadcrumbs[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
-		}
 
 		renderCSVImport(w, r, tr, data, props)
 	}

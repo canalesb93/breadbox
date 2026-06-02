@@ -23,7 +23,6 @@ templ CSVImport(p CSVImportProps) {
 	     synchronously (no defer) so the Alpine.data() registration runs
 	     before Alpine — itself deferred from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/csv_import.js"></script>
-	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Import CSV</h1>

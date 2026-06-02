@@ -419,11 +419,11 @@ func renderConnectionNew(
 	hasPlaid, hasTeller bool,
 	tellerEnv string,
 ) {
+	data["Breadcrumbs"] = []components.Breadcrumb{
+		{Label: "Connections", Href: "/connections"},
+		{Label: "Connect New Bank"},
+	}
 	props := pages.ConnectionNewProps{
-		Breadcrumbs: []components.Breadcrumb{
-			{Label: "Connections", Href: "/connections"},
-			{Label: "Connect New Bank"},
-		},
 		CSRFToken: GetCSRFToken(r),
 		HasPlaid:  hasPlaid,
 		HasTeller: hasTeller,
@@ -760,9 +760,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			HasBalance:           hasBalance,
 			NextSync:             nextSync,
 		})
-		// Mirror the breadcrumbs as components.Breadcrumb so the templ
-		// component can render them via the shared BreadcrumbNav helper.
-		props.Breadcrumbs = []components.Breadcrumb{
+		data["Breadcrumbs"] = []components.Breadcrumb{
 			{Label: "Connections", Href: "/connections"},
 			{Label: conn.InstitutionName.String},
 		}
@@ -977,6 +975,11 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			"PageTitle":   "Re-authenticate " + conn.InstitutionName.String,
 			"CurrentPage": "connections",
 			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": []components.Breadcrumb{
+				{Label: "Connections", Href: "/connections"},
+				{Label: conn.InstitutionName.String, Href: "/connections/" + idStr},
+				{Label: "Re-authenticate"},
+			},
 		}
 		props := pages.ConnectionReauthProps{
 			ConnID:          idStr,
@@ -985,11 +988,6 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			UserName:        pgconv.TextOr(conn.UserName, ""),
 			TellerAppID:     a.Config.TellerAppID,
 			TellerEnv:       a.Config.TellerEnv,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Connections", Href: "/connections"},
-				{Label: conn.InstitutionName.String, Href: "/connections/" + idStr},
-				{Label: "Re-authenticate"},
-			},
 		}
 		renderConnectionReauth(w, r, tr, data, props)
 	}

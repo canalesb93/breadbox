@@ -2,7 +2,6 @@
 
 package pages
 
-import "breadbox/internal/templates/components"
 
 // CSVImportProps mirrors the data map the old csv_import.html read off the
 // layout's data map. The handler pre-resolves the user list into a flat
@@ -12,7 +11,6 @@ import "breadbox/internal/templates/components"
 // member + account-name fields are hidden and replaced by an info row that
 // shows the existing connection's name + owner.
 type CSVImportProps struct {
-	Breadcrumbs            []components.Breadcrumb
 	Users                  []CSVImportUser
 	CSRFToken              string
 	ConnectionID           string

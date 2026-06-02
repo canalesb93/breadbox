@@ -55,6 +55,7 @@ func AgentDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Te
 		props := buildAgentDetailProps(def, stats, runs, GetCSRFToken(r))
 
 		data := BaseTemplateData(r, sm, "agents", def.Name)
+		data["Breadcrumbs"] = pages.AgentDetailBreadcrumbs(props)
 		tr.RenderWithTempl(w, r, data, pages.AgentDetail(props))
 	}
 }

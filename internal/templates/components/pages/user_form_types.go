@@ -4,7 +4,6 @@ package pages
 
 import (
 	"breadbox/internal/db"
-	"breadbox/internal/templates/components"
 )
 
 // UserFormProps mirrors the data map the old user_form.html read: the
@@ -14,7 +13,6 @@ type UserFormProps struct {
 	IsEdit      bool
 	User        *db.User
 	UserID      string
-	Breadcrumbs []components.Breadcrumb
 }
 
 // userFormName returns the user's name or empty string.

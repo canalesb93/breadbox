@@ -172,6 +172,13 @@ func renderUserForm(sm *scs.SessionManager, tr *TemplateRenderer, w http.Respons
 		pageTitle = "Edit " + props.User.Name
 	}
 	data := BaseTemplateData(r, sm, "household", pageTitle)
+	crumbs := []components.Breadcrumb{{Label: "Household", Href: "/household"}}
+	if props.IsEdit && props.User != nil {
+		crumbs = append(crumbs, components.Breadcrumb{Label: props.User.Name})
+	} else {
+		crumbs = append(crumbs, components.Breadcrumb{Label: "Add Member"})
+	}
+	data["Breadcrumbs"] = crumbs
 	tr.RenderWithTempl(w, r, data, pages.UserForm(props))
 }
 
@@ -269,10 +276,6 @@ func NewUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 		renderUserForm(sm, tr, w, r, pages.UserFormProps{
 			IsEdit: false,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Household", Href: "/household"},
-				{Label: "Add Member"},
-			},
 		})
 	}
 }
@@ -298,10 +301,6 @@ func EditUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) h
 			IsEdit: true,
 			User:   &user,
 			UserID: idStr,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Household", Href: "/household"},
-				{Label: user.Name},
-			},
 		})
 	}
 }
@@ -546,7 +545,6 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				LoginRole:        loginAccount.Role,
 				LoginPasswordSet: len(loginAccount.HashedPassword) > 0,
 				SetupURL:         setupURL,
-				Breadcrumbs:      breadcrumbsToComponent(breadcrumbs),
 			})
 			return
 		}
@@ -571,7 +569,6 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			UserID:      idStr,
 			UserName:    user.Name,
 			UserEmail:   userEmail,
-			Breadcrumbs: breadcrumbsToComponent(breadcrumbs),
 		})
 	}
 }
@@ -580,16 +577,5 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 // sub-view of the top-level Household page.
 func renderCreateLogin(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.CreateLoginProps) {
 	tr.RenderWithTempl(w, r, data, pages.CreateLogin(props))
-}
-
-// breadcrumbsToComponent converts the admin Breadcrumb slice (used by the
-// legacy html/template breadcrumb partial) into the components.Breadcrumb
-// slice consumed by templ-based pages.
-func breadcrumbsToComponent(crumbs []Breadcrumb) []components.Breadcrumb {
-	out := make([]components.Breadcrumb, len(crumbs))
-	for i, b := range crumbs {
-		out[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
-	}
-	return out
 }
 

@@ -24,10 +24,6 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
 	<div x-data="seriesDetail" data-series-id={ p.Series.ShortID }>
-		@components.BreadcrumbNav([]components.Breadcrumb{
-			{Label: "Recurring", Href: "/recurring"},
-			{Label: p.Series.Name},
-		})
 		@components.EntityHeader(components.EntityHeaderProps{
 			Title:    p.Series.Name,
 			Icon:     seriesTypeIcon(p.Series.Type),

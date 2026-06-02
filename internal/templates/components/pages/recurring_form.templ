@@ -8,10 +8,6 @@ import "breadbox/internal/templates/components"
 // page. Plain POST form (no Alpine) → CreateRecurringSeriesHandler mints an
 // active, confirmed, user-authored series and redirects to its detail page.
 templ RecurringSeriesForm(p RecurringSeriesFormProps) {
-	@components.BreadcrumbNav([]components.Breadcrumb{
-		{Label: "Recurring", Href: "/recurring"},
-		{Label: "New series"},
-	})
 	@components.PageHeader(components.PageHeaderProps{
 		Title:                "New recurring series",
 		Subtitle:             "Add a recurring charge Breadbox hasn't detected yet. It starts active and confirmed.",

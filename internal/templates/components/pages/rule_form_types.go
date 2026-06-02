@@ -4,7 +4,6 @@ package pages
 
 import (
 	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
 )
 
 // RuleFormProps mirrors the data map the old rule_form.html read off the
@@ -14,7 +13,6 @@ type RuleFormProps struct {
 	Rule           *service.TransactionRuleResponse
 	FlatCategories []service.CategoryResponse
 	Tags           []service.TagResponse
-	Breadcrumbs    []components.Breadcrumb
 }
 
 // ruleFormIsEditAttr returns the literal string "true" or "false" for the

@@ -16,7 +16,6 @@ import (
 // DesignGalleryProps is the prop bag for the /design page — the full
 // component gallery rendered on one scrollable page with section anchors.
 type DesignGalleryProps struct {
-	Breadcrumbs []components.Breadcrumb
 	Sections    []DesignSection
 }
 
@@ -24,7 +23,6 @@ type DesignGalleryProps struct {
 // component rendered in isolation so agents (and humans) can focus
 // screenshots on one piece at a time.
 type DesignComponentProps struct {
-	Breadcrumbs []components.Breadcrumb
 	Section     DesignSection
 }
 
@@ -196,6 +194,13 @@ func DesignSections() []DesignSection {
 			Description: "Kebab dropdown for row actions. Use components.OverflowMenu.",
 			Group:       "navigation",
 			Render:      func() templ.Component { return SectionOverflowMenu() },
+		},
+		{
+			Slug:        "topbar-breadcrumb",
+			Title:       "Topbar breadcrumb",
+			Description: "The app's single location trail, rendered in the topbar (and a scrollable mobile strip). Section group + navigable parent crumbs + bold current page. Use components.TopbarBreadcrumb; the layout owns it — pages don't render their own breadcrumb.",
+			Group:       "navigation",
+			Render:      func() templ.Component { return SectionTopbarBreadcrumb() },
 		},
 		{
 			Slug:        "sidebar-user-menu",

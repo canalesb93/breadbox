@@ -15,7 +15,6 @@ import "breadbox/internal/templates/components"
 // newLoginBootstrap) so the templ template stays free of inline JS string
 // concatenation. The wrapping HTML mirrors create_login.html byte-for-byte.
 templ CreateLogin(p CreateLoginProps) {
-	@components.BreadcrumbNav(p.Breadcrumbs)
 	if p.IsManage {
 		@createLoginManage(p)
 	} else {

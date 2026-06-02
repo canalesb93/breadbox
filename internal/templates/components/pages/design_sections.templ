@@ -1353,6 +1353,58 @@ templ SectionOverflowMenu() {
 	</div>
 }
 
+// ─── Topbar breadcrumb ─────────────────────────────────────────────────
+
+templ SectionTopbarBreadcrumb() {
+	<div class="flex flex-col gap-6">
+		@designExample("Section + navigable trail", "The common detail-page shape. The section group (muted) is non-link; ancestor crumbs link; the last crumb is the bold current page.") {
+			@components.TopbarBreadcrumb(components.TopbarBreadcrumbProps{
+				Section: "Manage",
+				Items: []components.Breadcrumb{
+					{Label: "Rules", Href: "/rules"},
+					{Label: "My Rule"},
+				},
+			})
+		}
+		@designExample("Deep / cross-section trail", "The section is derived from the trail's root crumb, so it stays coherent even when the page's nav-active item differs (an account detail roots at Connections).") {
+			@components.TopbarBreadcrumb(components.TopbarBreadcrumbProps{
+				Section: "System",
+				Items: []components.Breadcrumb{
+					{Label: "Connections", Href: "/connections"},
+					{Label: "Chase", Href: "/connections/x"},
+					{Label: "Account"},
+				},
+			})
+		}
+		@designExample("List / top-level page", "No trail — PageTitle stands in as the current crumb. Every list page reads Section / Page.") {
+			@components.TopbarBreadcrumb(components.TopbarBreadcrumbProps{
+				Section:   "Overview",
+				PageTitle: "Transactions",
+			})
+		}
+		@designExample("Sectionless", "Pages with no nav section render the current crumb alone.") {
+			@components.TopbarBreadcrumb(components.TopbarBreadcrumbProps{
+				Items: []components.Breadcrumb{
+					{Label: "Design system"},
+				},
+			})
+		}
+		@designExample("Mobile strip (scrollable)", "The lg:hidden variant below the mobile navbar: crumbs keep their natural width and the row scrolls horizontally instead of truncating. Constrained here to show the scroll.") {
+			<div class="max-w-[16rem] rounded-lg border border-base-300 px-3 py-2">
+				@components.TopbarBreadcrumb(components.TopbarBreadcrumbProps{
+					Section: "System",
+					Items: []components.Breadcrumb{
+						{Label: "Connections", Href: "/connections"},
+						{Label: "Chase Sapphire Reserve", Href: "/connections/x"},
+						{Label: "Primary Checking Account"},
+					},
+					Scrollable: true,
+				})
+			</div>
+		}
+	</div>
+}
+
 // ─── Sidebar user menu ─────────────────────────────────────────────────
 
 templ SectionSidebarUserMenu() {

@@ -7,8 +7,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"breadbox/internal/templates/components"
 )
 
 // TestDesignGalleryRenders is a smoke test: every DesignSections() entry
@@ -58,8 +56,7 @@ func TestDesignGalleryRenders(t *testing.T) {
 	// Gallery render: must include the anchor for every section's slug.
 	var buf bytes.Buffer
 	props := DesignGalleryProps{
-		Sections:    sections,
-		Breadcrumbs: []components.Breadcrumb{{Label: "Design system"}},
+		Sections: sections,
 	}
 	if err := DesignGallery(props).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("gallery render error: %v", err)
@@ -100,10 +97,6 @@ func TestDesignComponentRenders(t *testing.T) {
 		var buf bytes.Buffer
 		props := DesignComponentProps{
 			Section: sec,
-			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Design system", Href: "/design"},
-				{Label: sec.Title},
-			},
 		}
 		if err := DesignComponent(props).Render(context.Background(), &buf); err != nil {
 			t.Errorf("section %q standalone render error: %v", sec.Slug, err)
