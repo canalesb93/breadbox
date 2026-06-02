@@ -64,6 +64,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
+		r.Use(DevModeMiddleware(a.Queries))
 
 		r.Get("/", FeedHandler(a, svc, tr))
 		// Old `/feed` URL retired — feed is now the root. Redirect any
@@ -407,6 +408,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/security", redirectGET("/settings/system"))
 		r.Get("/settings/system", SystemSettingsHandler(a, sm, tr))
 		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
+
+		// Developer tab — the always-on-top bug/task reporter config
+		// (enable toggle + GitHub repo/token/label). Admin-only: the token
+		// is sensitive and the flag exposes the reporter household-wide.
+		r.Get("/settings/developer", DeveloperSettingsHandler(a, svc, sm, tr))
+		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
+
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
@@ -427,6 +435,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Activity-timeline partial render — powers the optimistic-update
 		// flow on the detail page. Accessible to all roles (read-only).
 		r.Get("/transactions/{id}/timeline/rows", TimelineRowsHandler(a, sm, svc))
+
+		// Developer Mode reporter — file a bug/task issue and serve the
+		// durable screenshot / HTML-snapshot artifacts. All roles: the
+		// floating reporter renders for anyone once an admin enables
+		// developer mode, so anyone who sees it can file.
+		r.Post("/dev-reports", CreateDevReportAdminHandler(svc, sm, a.Config.EncryptionKey))
+		r.Get("/dev-reports/{shortId}/screenshot", DevReportScreenshotHandler(svc))
+		r.Get("/dev-reports/{shortId}/snapshot.html", DevReportSnapshotHandler(svc))
 
 		// Agent run live updates — JSON snapshot the run-detail page
 		// polls every 3 s while a run is in_progress. Read-only, all

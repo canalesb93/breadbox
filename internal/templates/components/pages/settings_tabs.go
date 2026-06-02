@@ -24,5 +24,6 @@ const (
 	SettingsTabMCP           = components.SettingsModalTabMCP
 	SettingsTabAccess        = components.SettingsModalTabAccess
 	SettingsTabBackups       = components.SettingsModalTabBackups
+	SettingsTabDeveloper     = components.SettingsModalTabDeveloper
 	SettingsTabHelp          = components.SettingsModalTabHelp
 )

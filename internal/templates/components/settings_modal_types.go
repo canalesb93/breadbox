@@ -18,5 +18,6 @@ const (
 	SettingsModalTabMCP           = "mcp"
 	SettingsModalTabAccess        = "api-keys"
 	SettingsModalTabBackups       = "backups"
+	SettingsModalTabDeveloper     = "developer"
 	SettingsModalTabHelp          = "help"
 )

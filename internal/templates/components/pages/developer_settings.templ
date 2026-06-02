@@ -1,0 +1,226 @@
+package pages
+
+import (
+	"fmt"
+	"strings"
+
+	"breadbox/internal/templates/components"
+)
+
+// DeveloperSettings renders the Settings → Developer tab. One multi-input
+// form owns developer mode (enable toggle + GitHub repo/token/label, saved
+// together); a second section lists the reports filed from this instance.
+// See .claude/rules/settings.md for the section/row vocabulary.
+templ DeveloperSettings(p DeveloperSettingsProps) {
+	<div>
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Developer",
+			Subtitle: "An always-on-top reporter for filing bugs and tasks straight to GitHub — internal tooling, off by default",
+		})
+		if p.FormError != "" {
+			<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">
+				@components.LucideIcon("circle-x", "w-4 h-4")
+				<span>{ p.FormError }</span>
+			</div>
+		}
+		if p.FormSuccess != "" {
+			<div role="alert" class="alert alert-success alert-soft mb-4 rounded-xl">
+				@components.LucideIcon("circle-check", "w-4 h-4")
+				<span>{ p.FormSuccess }</span>
+			</div>
+		}
+		if p.Form.Enabled && (!p.RepoConfigured || !p.TokenConfigured) {
+			<div role="alert" class="alert alert-warning alert-soft mb-4 rounded-xl">
+				@components.LucideIcon("triangle-alert", "w-4 h-4")
+				<span>Developer mode is on, but reports can't be filed yet — set a GitHub repository and token below.</span>
+			</div>
+		}
+		<div role="note" class="alert alert-info alert-soft mb-4 rounded-xl">
+			@components.LucideIcon("shield-check", "w-4 h-4")
+			<span>Reports redact financial data by default — amounts, names, and other values are masked in the screenshot and HTML snapshot before anything is sent to GitHub. Redaction can be turned off per-report from the reporter.</span>
+		</div>
+		<div class="space-y-6">
+			@developerModeSection(p)
+			@developerReportsSection(p)
+		</div>
+	</div>
+}
+
+// developerModeSection is the single multi-input form: the enable toggle and
+// the GitHub repo/token/label all save together via one Save button.
+templ developerModeSection(p DeveloperSettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "bug",
+		Title:   "Developer mode",
+		Caption: "Enable the floating reporter and point it at a GitHub repo",
+		Form: &components.SettingsSectionFormProps{
+			Action:    "/settings/developer",
+			CSRFToken: p.CSRFToken,
+		},
+		Footer: developerSettingsFooter(),
+	}) {
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Enable developer mode",
+			Caption: "Renders a floating reporter on every page that screenshots the screen and files an issue",
+			For:     "enabled",
+		}) {
+			<input
+				id="enabled"
+				type="checkbox"
+				name="enabled"
+				value="true"
+				class="toggle toggle-primary"
+				checked?={ p.Form.Enabled }
+			/>
+		}
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "GitHub repository",
+			Caption: "Where issues are filed, in owner/repo form",
+			For:     "github_repo",
+		}) {
+			<input
+				id="github_repo"
+				type="text"
+				name="github_repo"
+				value={ p.Form.GithubRepo }
+				placeholder="canalesb93/breadbox"
+				autocomplete="off"
+				spellcheck="false"
+				class="bb-form-input font-mono min-w-72"
+			/>
+			if p.FieldErrors["github_repo"] != "" {
+				<p class="text-xs text-error mt-1">{ p.FieldErrors["github_repo"] }</p>
+			}
+		}
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "GitHub token",
+			Caption: "Classic token with repo scope, or a fine-grained token with read+write Issues",
+			For:     "github_token",
+			Stack:   true,
+		}) {
+			<input
+				id="github_token"
+				type="password"
+				name="github_token"
+				autocomplete="off"
+				if p.Form.GithubTokenDisplay != "" {
+					placeholder={ "Current: " + p.Form.GithubTokenDisplay }
+				} else {
+					placeholder="ghp_… or github_pat_…"
+				}
+				class="bb-form-input font-mono w-full"
+			/>
+			<p class="text-xs text-base-content/50 mt-1">Leave blank to keep the current token.</p>
+			if p.TokenConfigured {
+				<label class="flex items-center gap-2 text-xs text-base-content/60 mt-2 cursor-pointer">
+					<input type="checkbox" name="clear_token" value="true" class="checkbox checkbox-xs"/>
+					Remove the saved token
+				</label>
+			}
+			if p.FieldErrors["github_token"] != "" {
+				<p class="text-xs text-error mt-1">{ p.FieldErrors["github_token"] }</p>
+			}
+		}
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Issue label",
+			Caption: "Applied to every filed issue — created on the repo automatically if missing",
+			For:     "issue_label",
+		}) {
+			<input
+				id="issue_label"
+				type="text"
+				name="issue_label"
+				value={ p.Form.IssueLabel }
+				placeholder="dev-report"
+				autocomplete="off"
+				class="bb-form-input font-mono min-w-56"
+			/>
+		}
+	}
+}
+
+templ developerSettingsFooter() {
+	<div class="bb-action-row">
+		<button type="submit" class="btn btn-primary btn-sm gap-2">
+			@components.LucideIcon("save", "w-4 h-4")
+			Save changes
+		</button>
+	</div>
+}
+
+// developerReportsSection lists the reports filed from this instance, with a
+// deep link to each GitHub issue. Bare so the list manages its own cards.
+templ developerReportsSection(p DeveloperSettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "history",
+		Title:   "Recent reports",
+		Caption: "Bugs and tasks filed from this instance",
+		Bare:    true,
+	}) {
+		if len(p.Reports) == 0 {
+			<div class="bb-card p-8 text-center">
+				@components.LucideIcon("inbox", "w-6 h-6 mx-auto mb-2 text-base-content opacity-40")
+				<p class="text-sm text-base-content/60">No reports filed yet.</p>
+				<p class="text-xs text-base-content/40 mt-1">Tap the floating reporter on any page to file your first one.</p>
+			</div>
+		} else {
+			<div class="space-y-2">
+				for _, rep := range p.Reports {
+					@developerReportItem(rep)
+				}
+			</div>
+		}
+	}
+}
+
+templ developerReportItem(rep DevReportRow) {
+	<div class="bb-card p-3 flex items-start gap-3">
+		<span class={ "badge badge-soft badge-sm shrink-0 mt-0.5 badge-" + devReportTypeTone(rep.Type) }>
+			{ devReportTypeLabel(rep.Type) }
+		</span>
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2 flex-wrap">
+				if rep.IssueURL != "" {
+					<a
+						href={ templ.SafeURL(rep.IssueURL) }
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-sm font-medium link link-hover truncate"
+					>{ rep.Title }</a>
+				} else {
+					<span class="text-sm font-medium truncate">{ rep.Title }</span>
+				}
+				<span class={ "badge badge-soft badge-xs shrink-0 badge-" + devReportStatusTone(rep.Status) }>
+					{ devReportStatusLabel(rep.Status) }
+				</span>
+			</div>
+			<p class="text-xs text-base-content/50 mt-0.5 truncate">{ developerReportMeta(rep) }</p>
+			if rep.Status == "failed" && rep.Error != "" {
+				<p class="text-xs text-error mt-1">{ rep.Error }</p>
+			}
+		</div>
+		if rep.IssueNumber > 0 && rep.IssueURL != "" {
+			<a
+				href={ templ.SafeURL(rep.IssueURL) }
+				target="_blank"
+				rel="noopener noreferrer"
+				class="text-xs font-mono text-base-content/50 hover:text-primary shrink-0 mt-0.5"
+			>{ fmt.Sprintf("#%d", rep.IssueNumber) }</a>
+		}
+	</div>
+}
+
+// developerReportMeta joins the non-empty context bits into one muted line.
+func developerReportMeta(rep DevReportRow) string {
+	parts := make([]string, 0, 3)
+	if rep.PagePath != "" {
+		parts = append(parts, rep.PagePath)
+	}
+	if rep.CreatedBy != "" {
+		parts = append(parts, rep.CreatedBy)
+	}
+	if rep.CreatedAt != "" {
+		parts = append(parts, rep.CreatedAt)
+	}
+	return strings.Join(parts, " · ")
+}

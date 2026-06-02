@@ -70,6 +70,7 @@ templ settingsPageRail(p SettingsPageProps) {
 			if p.IsAdmin {
 				<div class="bb-settings-rail__group-label">Maintenance</div>
 				@settingsRailItem(p, "backups", "hard-drive", "Backups")
+				@settingsRailItem(p, "developer", "bug", "Developer")
 				@settingsRailItem(p, "help", "life-buoy", "Help")
 			}
 		</div>

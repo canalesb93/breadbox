@@ -549,6 +549,12 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		if _, exists := m["AppVersion"]; !exists && tr.version != "" {
 			m["AppVersion"] = tr.version
 		}
+		// Auto-inject the developer-mode flag (gates the floating reporter in
+		// base.html) from DevModeMiddleware's request context, so every
+		// full-page render picks it up regardless of the handler.
+		if _, exists := m["DevModeEnabled"]; !exists {
+			m["DevModeEnabled"] = devModeEnabledFromContext(r.Context())
+		}
 		// Auto-inject version update status for nav footer.
 		if _, exists := m["NavUpdateAvailable"]; !exists && tr.versionChecker != nil {
 			if show, ver, url := updateCallout(r.Context(), tr.versionChecker, tr.appcfg); show {
@@ -652,6 +658,9 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 		"IsAdmin":       role == RoleAdmin,
 		"IsEditor":      role == RoleAdmin || role == RoleEditor,
 		"RoleDisplay":   RoleDisplayName(role),
+		// DevModeEnabled gates the floating bug/task reporter in base.html.
+		// Resolved per-request by DevModeMiddleware; false when absent.
+		"DevModeEnabled": devModeEnabledFromContext(r.Context()),
 	}
 }
 

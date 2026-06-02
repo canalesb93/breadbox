@@ -95,7 +95,32 @@ const (
 	// in the body) resolves to the real report instead of a bare path.
 	// Empty = deep links stay relative. http(s) only.
 	KeyNotifyPublicBaseURL = "notify.public_base_url"
+
+	// KeyDevModeEnabled gates the in-app Developer Mode reporter — a
+	// floating bug/task filer rendered on every page that captures a
+	// screenshot + HTML snapshot of the current screen and opens a
+	// labelled GitHub issue. "true" enables it; anything else (default)
+	// keeps it off. Internal/self-host tooling; off by default.
+	KeyDevModeEnabled = "devmode.enabled"
+
+	// KeyDevModeGithubRepo is the "owner/repo" the reporter files issues
+	// against (e.g. "canalesb93/breadbox"). Empty disables filing.
+	KeyDevModeGithubRepo = "devmode.github_repo"
+
+	// KeyDevModeGithubToken stores the encrypted GitHub token used to
+	// create issues. Needs the classic `repo` scope, or a fine-grained
+	// token with read+write "Issues" permission on the target repo.
+	KeyDevModeGithubToken = "devmode.github_token"
+
+	// KeyDevModeIssueLabel is the label applied to every filed issue. The
+	// reporter creates it on the repo if it doesn't exist yet. Default:
+	// DevModeDefaultLabel.
+	KeyDevModeIssueLabel = "devmode.issue_label"
 )
+
+// DevModeDefaultLabel is the label applied to filed Developer Mode issues
+// when KeyDevModeIssueLabel is unset.
+const DevModeDefaultLabel = "dev-report"
 
 // AuthMode values for KeyAgentAuthMode.
 const (
