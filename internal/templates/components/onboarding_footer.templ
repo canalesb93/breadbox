@@ -1,0 +1,45 @@
+package components
+
+// OnboardingFooter is the redesigned dismiss/resume footer for the
+// /getting-started page. It replaces today's tiny ghost-button-with-inline-
+// caption with a calm, hairline-separated footer row that reads as a
+// deliberate, respectful affordance — never a dark pattern, never a hidden
+// link.
+//
+// Two states:
+//
+//   - !Dismissed: a clean row with muted helper text on the left ("Done for
+//     now? You can reopen this guide anytime from Settings.") and a real POST
+//     form on the right submitting to /getting-started/dismiss with the CSRF
+//     token. The dismiss control is an actual <button type="submit"> inside
+//     the form (btn-ghost btn-sm), not a link — so dismissing is a genuine,
+//     accessible form action.
+//   - Dismissed: a quiet, form-less note row with an info icon reassuring the
+//     user the guide stays reachable.
+
+type OnboardingFooterProps struct {
+	Dismissed bool
+	CSRFToken string
+}
+
+templ OnboardingFooter(p OnboardingFooterProps) {
+	if !p.Dismissed {
+		<div class="mt-8 pt-6 border-t border-base-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+			<p class="text-sm text-base-content/50">
+				Done for now? You can reopen this guide anytime from Settings.
+			</p>
+			<form method="POST" action="/getting-started/dismiss" class="shrink-0">
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-ghost btn-sm gap-2 text-base-content/60">
+					@LucideIcon("x", "w-4 h-4")
+					Dismiss guide
+				</button>
+			</form>
+		</div>
+	} else {
+		<div class="mt-8 pt-6 border-t border-base-200 flex items-center gap-2 text-sm text-base-content/40">
+			@LucideIcon("info", "w-4 h-4 shrink-0")
+			<span>This guide stays available at /getting-started and from Settings.</span>
+		</div>
+	}
+}

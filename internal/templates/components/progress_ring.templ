@@ -1,0 +1,193 @@
+package components
+
+import (
+	"fmt"
+	"math"
+	"strconv"
+)
+
+// ProgressRing is a presentation-only circular progress atom: a faint
+// background track ring with a foreground arc that sweeps from 12 o'clock
+// clockwise to represent Value/Max. The arc animates on load via a CSS
+// transition on `stroke-dashoffset`, and a big tabular-nums count sits
+// centered over the SVG.
+//
+// It's the memorable moment of the onboarding hero — the proportions
+// (size, stroke, centered count) are deliberate. Pure inline SVG, no JS,
+// no keyframes; the only motion is the stroke-dashoffset transition.
+//
+// Color: foreground arc is `text-primary` (via stroke-current on a wrapping
+// class), flipping to `text-success` when Complete is true or Value >= Max.
+// The track is `text-base-200`. All colors are semantic daisy tokens so
+// dark mode and theming come for free.
+//
+// Props:
+//   - Value, Max: the fraction. Max <= 0 is treated as 1 to avoid /0.
+//   - Size:       px diameter. Defaults to 112 when 0.
+//   - Stroke:     px stroke width. Defaults to 9 when 0.
+//   - Centerline: big center text. Defaults to "Value/Max" when "".
+//   - Sublabel:   small muted text under the centerline (e.g. "steps").
+//   - Complete:   forces the success tone regardless of Value/Max.
+
+type ProgressRingProps struct {
+	Value, Max int
+	Size       int
+	Stroke     int
+	Centerline string
+	Sublabel   string
+	Complete   bool
+}
+
+// prGeom carries the resolved pixel geometry for one ring render.
+type prGeom struct {
+	size       int
+	stroke     int
+	radius     float64
+	center     float64
+	circumf    float64
+	dashOffset float64
+	frac       float64
+}
+
+// prResolve fills in defaults and computes the SVG geometry.
+func prResolve(p ProgressRingProps) prGeom {
+	size := p.Size
+	if size <= 0 {
+		size = 112
+	}
+	stroke := p.Stroke
+	if stroke <= 0 {
+		stroke = 9
+	}
+	max := p.Max
+	if max <= 0 {
+		max = 1
+	}
+	frac := float64(p.Value) / float64(max)
+	if frac < 0 {
+		frac = 0
+	}
+	if frac > 1 {
+		frac = 1
+	}
+	center := float64(size) / 2
+	// inset the radius by half the stroke so the arc stays inside the box
+	radius := center - float64(stroke)/2
+	circumf := 2 * math.Pi * radius
+	// dashoffset shrinks as the arc grows; full offset = empty ring
+	dashOffset := circumf * (1 - frac)
+	return prGeom{
+		size:       size,
+		stroke:     stroke,
+		radius:     radius,
+		center:     center,
+		circumf:    circumf,
+		dashOffset: dashOffset,
+		frac:       frac,
+	}
+}
+
+// prTone returns the Tailwind text-color class that drives the foreground
+// arc's stroke (via stroke-current). Success when complete or full.
+func prTone(p ProgressRingProps) string {
+	if p.Complete || (p.Max > 0 && p.Value >= p.Max) {
+		return "text-success"
+	}
+	return "text-primary"
+}
+
+// prCenterline picks the big center label, defaulting to "Value/Max".
+func prCenterline(p ProgressRingProps) string {
+	if p.Centerline != "" {
+		return p.Centerline
+	}
+	return fmt.Sprintf("%d/%d", p.Value, p.Max)
+}
+
+// prAriaLabel describes the ring for assistive tech, e.g.
+// "3 of 5 steps complete".
+func prAriaLabel(p ProgressRingProps) string {
+	if p.Complete {
+		return "All steps complete"
+	}
+	return fmt.Sprintf("%d of %d steps complete", p.Value, p.Max)
+}
+
+func prF(v float64) string {
+	return strconv.FormatFloat(v, 'f', 2, 64)
+}
+
+func prI(v int) string {
+	return strconv.Itoa(v)
+}
+
+// prCenterFontSize / prSubFontSize scale the center typography to the ring
+// diameter so the count stays proportionate at any Size (inline px so we
+// don't depend on a fixed Tailwind step that only fits the 112 default).
+func prCenterFontSize(size int) string {
+	px := float64(size) * 0.26
+	if px < 14 {
+		px = 14
+	}
+	return fmt.Sprintf("font-size:%spx", prF(px))
+}
+
+func prSubFontSize(size int) string {
+	px := float64(size) * 0.105
+	if px < 10 {
+		px = 10
+	}
+	return fmt.Sprintf("font-size:%spx;letter-spacing:.02em", prF(px))
+}
+
+templ ProgressRing(p ProgressRingProps) {
+	{{ g := prResolve(p) }}
+	<div
+		class="relative inline-grid place-items-center shrink-0"
+		style={ fmt.Sprintf("width:%dpx;height:%dpx", g.size, g.size) }
+	>
+		<svg
+			class={ prTone(p) }
+			width={ prI(g.size) }
+			height={ prI(g.size) }
+			viewBox={ fmt.Sprintf("0 0 %d %d", g.size, g.size) }
+			role="img"
+			aria-label={ prAriaLabel(p) }
+		>
+			<circle
+				cx={ prF(g.center) }
+				cy={ prF(g.center) }
+				r={ prF(g.radius) }
+				fill="none"
+				stroke="currentColor"
+				stroke-width={ prI(g.stroke) }
+				class="text-base-200"
+			></circle>
+			<circle
+				cx={ prF(g.center) }
+				cy={ prF(g.center) }
+				r={ prF(g.radius) }
+				fill="none"
+				stroke="currentColor"
+				stroke-width={ prI(g.stroke) }
+				stroke-linecap="round"
+				stroke-dasharray={ prF(g.circumf) }
+				stroke-dashoffset={ prF(g.dashOffset) }
+				transform={ fmt.Sprintf("rotate(-90 %s %s)", prF(g.center), prF(g.center)) }
+				style="transition: stroke-dashoffset .6s ease"
+			></circle>
+		</svg>
+		<div class="absolute inset-0 grid place-items-center text-center leading-none">
+			<div>
+				<div class="tabular-nums font-semibold text-base-content" style={ prCenterFontSize(g.size) }>
+					{ prCenterline(p) }
+				</div>
+				if p.Sublabel != "" {
+					<div class="text-base-content/45 mt-0.5" style={ prSubFontSize(g.size) }>
+						{ p.Sublabel }
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}

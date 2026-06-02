@@ -3,6 +3,7 @@
 package admin
 
 import (
+	"fmt"
 	"net/http"
 
 	"breadbox/internal/app"
@@ -80,6 +81,28 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 			completedSteps++
 		}
 
+		// Resolve the active step (first incomplete) and a rough time-to-finish
+		// estimate for the hero. Step order + per-step minutes are paired so the
+		// estimate sums only the steps still outstanding.
+		stepsDone := []bool{hasMember, hasProvider, hasConnection, hasSync, hasAPIKey}
+		stepMinutes := []int{1, 2, 2, 1, 3}
+		activeStep := 0
+		minutesLeft := 0
+		for i, done := range stepsDone {
+			if done {
+				continue
+			}
+			if activeStep == 0 {
+				activeStep = i + 1 // 1-based
+			}
+			minutesLeft += stepMinutes[i]
+		}
+		allComplete := completedSteps == len(stepsDone)
+		timeRemaining := ""
+		if !allComplete && minutesLeft > 0 {
+			timeRemaining = fmt.Sprintf("~%d min left", minutesLeft)
+		}
+
 		// Check if onboarding is dismissed (for the nav badge display).
 		dismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
 
@@ -91,7 +114,10 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 			HasSync:             hasSync,
 			HasAPIKey:           hasAPIKey,
 			CompletedSteps:      completedSteps,
-			TotalSteps:          5,
+			TotalSteps:          len(stepsDone),
+			AllComplete:         allComplete,
+			ActiveStep:          activeStep,
+			TimeRemaining:       timeRemaining,
 			ConnectionCount:     connCount,
 			AccountCount:        accountCount,
 			TransactionCount:    txCount,

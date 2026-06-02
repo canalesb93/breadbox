@@ -1,0 +1,154 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionSetupStep renders the /design gallery section for the SetupStep
+// onboarding row — one example of each state plus an Optional variant and a
+// variant carrying a DocHref. The states are stacked the way they appear on
+// the live /getting-started page (resolved steps on top, the active "you are
+// here" row in the middle, locked steps below) so the visual hierarchy reads
+// true: active dominates, complete recedes, pending reads as "not yet".
+templ SectionSetupStep() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>One step row per onboarding step on <code>/getting-started</code>. The caller computes <code>State</code> — the first incomplete step is <code>active</code>, every later incomplete step is <code>pending</code>, completed steps are <code>complete</code>, and a running first sync is <code>in_progress</code>.</li>
+				<li>The <code>active</code> row is the focal "you are here" surface — a primary ring + faint wash, the topical icon, the full description, a meta row, and a solid primary CTA. Exactly one row should be <code>active</code> at a time.</li>
+				<li>Never put the running state inside a daisy badge — the <code>in_progress</code> tile uses a spinner, badges are reserved for terminal / categorical state.</li>
+			</ul>
+		</div>
+		@designExample("State hierarchy (the full cascade)", "How the five onboarding steps read top-to-bottom: two complete steps recede, the active step dominates, and the remaining steps wait muted. Note the disabled CTA on the locked step.") {
+			<div class="grid gap-3">
+				@components.SetupStep(components.SetupStepProps{
+					Number:   1,
+					Icon:     "users",
+					Title:    "Add a family member",
+					Summary:  "Jordan added — connections link to household members.",
+					State:    components.SetupStepComplete,
+					CTAHref:  templ.SafeURL("/household"),
+					CTALabel: "View members",
+				})
+				@components.SetupStep(components.SetupStepProps{
+					Number:   2,
+					Icon:     "landmark",
+					Title:    "Configure a bank provider",
+					Summary:  "Plaid configured.",
+					State:    components.SetupStepComplete,
+					CTAHref:  templ.SafeURL("/settings/providers"),
+					CTALabel: "View providers",
+				})
+				@components.SetupStep(components.SetupStepProps{
+					Number:       3,
+					Icon:         "link-2",
+					Title:        "Connect your first bank",
+					Description:  "Link a bank account to start syncing transactions.",
+					State:        components.SetupStepActive,
+					TimeEstimate: "~2 min",
+					CTAHref:      templ.SafeURL("/connections/new"),
+					CTAIcon:      "plus",
+					CTALabel:     "Connect Bank",
+				})
+				@components.SetupStep(components.SetupStepProps{
+					Number:       4,
+					Icon:         "refresh-cw",
+					Title:        "Complete first sync",
+					Description:  "Connect a bank first, then transactions will sync automatically.",
+					State:        components.SetupStepPending,
+					TimeEstimate: "~1 min",
+					CTAIcon:      "scroll-text",
+					CTALabel:     "View logs",
+					CTADisabled:  true,
+				})
+				@components.SetupStep(components.SetupStepProps{
+					Number:      5,
+					Icon:        "bot",
+					Title:       "Set up AI agents",
+					Description: "Create an API key so AI agents can query your data via the MCP server.",
+					State:       components.SetupStepPending,
+					Optional:    true,
+					CTAHref:     templ.SafeURL("/workflows"),
+					CTAIcon:     "arrow-right",
+					CTALabel:    "Set up workflows",
+				})
+			</div>
+		}
+		@designExample("Active — the elevated focal step", "Primary ring + faint wash, topical icon tile, full description, meta row, and a solid primary CTA. The visually dominant row.") {
+			@components.SetupStep(components.SetupStepProps{
+				Number:       3,
+				Icon:         "link-2",
+				Title:        "Connect your first bank",
+				Description:  "Link a bank account to start syncing transactions.",
+				State:        components.SetupStepActive,
+				TimeEstimate: "~2 min",
+				CTAHref:      templ.SafeURL("/connections/new"),
+				CTAIcon:      "plus",
+				CTALabel:     "Connect Bank",
+			})
+		}
+		@designExample("Active — Optional + Learn more", "The meta row carries an Optional badge and a doc deep-link alongside the time estimate. DocLabel defaults to \"Learn more\" when left empty.") {
+			@components.SetupStep(components.SetupStepProps{
+				Number:       5,
+				Icon:         "bot",
+				Title:        "Set up AI agents",
+				Description:  "Create an API key so AI agents can query your financial data via the MCP server.",
+				State:        components.SetupStepActive,
+				TimeEstimate: "~3 min",
+				Optional:     true,
+				DocHref:      templ.SafeURL("https://docs.breadbox.sh/guides/multi-agent-reviewer"),
+				CTAHref:      templ.SafeURL("/workflows"),
+				CTAIcon:      "sparkles",
+				CTALabel:     "Set up workflows",
+			})
+		}
+		@designExample("In progress — work happening", "The tile swaps the icon for a spinner (never a badge). A quiet \"In progress…\" hint and a ghost CTA to follow along.") {
+			@components.SetupStep(components.SetupStepProps{
+				Number:      4,
+				Icon:        "refresh-cw",
+				Title:       "Complete first sync",
+				Description: "Your first sync is running — accounts and transactions are landing now.",
+				State:       components.SetupStepInProgress,
+				CTAHref:     templ.SafeURL("/logs"),
+				CTAIcon:     "scroll-text",
+				CTALabel:    "View logs",
+			})
+		}
+		@designExample("Complete — done and quiet", "Success-green check tile, a one-line Summary, and a ghost \"view\" affordance. The whole row recedes.") {
+			@components.SetupStep(components.SetupStepProps{
+				Number:   3,
+				Icon:     "link-2",
+				Title:    "Connect your first bank",
+				Summary:  "Chase connected — 2 accounts, syncing automatically.",
+				State:    components.SetupStepComplete,
+				CTAHref:  templ.SafeURL("/connections"),
+				CTALabel: "View connections",
+			})
+		}
+		@designExample("Pending — prerequisites unmet", "Muted: the tile shows the step number, the copy dims, and the CTA renders as a disabled span when CTADisabled (left) or a quiet ghost link otherwise (right).") {
+			<div class="grid gap-3">
+				@components.SetupStep(components.SetupStepProps{
+					Number:       4,
+					Icon:         "refresh-cw",
+					Title:        "Complete first sync",
+					Description:  "Connect a bank first, then transactions will sync automatically.",
+					State:        components.SetupStepPending,
+					TimeEstimate: "~1 min",
+					CTAIcon:      "scroll-text",
+					CTALabel:     "View logs",
+					CTADisabled:  true,
+				})
+				@components.SetupStep(components.SetupStepProps{
+					Number:      5,
+					Icon:        "bot",
+					Title:       "Set up AI agents",
+					Description: "Create an API key so AI agents can query your data via the MCP server.",
+					State:       components.SetupStepPending,
+					Optional:    true,
+					CTAHref:     templ.SafeURL("/workflows"),
+					CTAIcon:     "arrow-right",
+					CTALabel:    "Set up workflows",
+				})
+			</div>
+		}
+	</div>
+}

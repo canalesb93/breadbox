@@ -1,0 +1,97 @@
+package components
+
+// OnboardingNextSteps renders the celebratory "what's next" grid shown on
+// the /getting-started page once every onboarding step is complete. The
+// checklist gives way to a reward: a responsive 2-up grid of confident,
+// interactive destination cards that point the freshly-onboarded user at
+// the highest-value next actions (review transactions, write a rule, wire
+// up a workflow, invite the household).
+//
+// Each card is a real <a> link wrapped in the canonical
+// `bb-card bb-card--interactive` shell (the same hover-lift affordance the
+// StatTile link variant uses), so it's keyboard-focusable and behaves like
+// a navigation target rather than a button. A tinted rounded icon tile,
+// title, supporting body, and a trailing CTA affordance row anchor each
+// card; the per-card Tone drives the icon-tile color and the CTA accent.
+//
+// Tones are semantic daisy tokens only (primary / success / info / accent)
+// so the grid adapts cleanly across light and dark themes. Unknown tones
+// fall back to primary.
+
+type OnboardingNextStep struct {
+	Icon     string // Lucide name
+	Title    string
+	Body     string
+	Href     templ.SafeURL
+	CTALabel string
+	Tone     string // "primary" | "success" | "info" | "accent"
+}
+
+type OnboardingNextStepsProps struct {
+	Steps []OnboardingNextStep
+}
+
+// onbNextToneBg returns the tinted icon-tile background + icon color for a
+// next-step card. Mirrors the StatTile tone helper shape — bg-{tone}/10
+// behind a text-{tone} glyph.
+func onbNextToneBg(tone string) string {
+	switch tone {
+	case "success":
+		return "bg-success/10 text-success"
+	case "info":
+		return "bg-info/10 text-info"
+	case "accent":
+		return "bg-accent/10 text-accent"
+	default: // primary
+		return "bg-primary/10 text-primary"
+	}
+}
+
+// onbNextToneText returns the accent color used on the trailing CTA row
+// (label + arrow) so the affordance picks up the card's tone.
+func onbNextToneText(tone string) string {
+	switch tone {
+	case "success":
+		return "text-success"
+	case "info":
+		return "text-info"
+	case "accent":
+		return "text-accent"
+	default: // primary
+		return "text-primary"
+	}
+}
+
+templ OnboardingNextSteps(p OnboardingNextStepsProps) {
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+		for _, s := range p.Steps {
+			@onbNextStepCard(s)
+		}
+	</div>
+}
+
+// onbNextStepCard renders a single interactive destination card.
+templ onbNextStepCard(s OnboardingNextStep) {
+	<a
+		href={ s.Href }
+		class="bb-card bb-card--interactive p-5 no-underline block group"
+	>
+		<div class="flex flex-col gap-3 h-full">
+			<div class={ "w-10 h-10 rounded-xl flex items-center justify-center shrink-0", onbNextToneBg(s.Tone) }>
+				@LucideIcon(s.Icon, "w-5 h-5")
+			</div>
+			<div class="flex flex-col gap-1 flex-1">
+				<h3 class="font-semibold text-base-content">{ s.Title }</h3>
+				if s.Body != "" {
+					<p class="text-sm text-base-content/60 leading-relaxed">{ s.Body }</p>
+				}
+			</div>
+			if s.CTALabel != "" {
+				<div class={ "flex items-center gap-1.5 text-sm font-medium mt-1", onbNextToneText(s.Tone) }>
+					<span>{ s.CTALabel }</span>
+					@LucideIcon("arrow-right", "w-4 h-4 transition-transform group-hover:translate-x-0.5")
+				</div>
+			}
+		</div>
+	</a>
+}

@@ -6,344 +6,230 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// GettingStarted renders the onboarding setup walkthrough page. Hosts inside
-// the base layout via TemplateRenderer.RenderWithTempl. Step states cascade
-// in the order: complete (success), in-progress (primary, the next pending
-// step), and pending (muted base-200) — the per-step circle/icon switch is
-// the visible signal.
+// GettingStarted renders the redesigned onboarding walkthrough — the "setup
+// journey". It composes the shared onboarding components:
+//
+//   - OnboardingHero — a progress ring + a headline that warms up toward a
+//     completion celebration, plus a time-remaining estimate.
+//   - OnboardingStats — an always-on Connections/Accounts/Transactions/Syncs
+//     strip with a graceful zero state.
+//   - SetupStep ×5 — the guided checklist. The next actionable step is
+//     elevated ("you are here"); completed steps collapse to quiet
+//     confirmations; pending steps wait, muted.
+//   - OnboardingAltPath — a calm CSV-alternative + resources aside, shown
+//     only while setup is in progress.
+//   - OnboardingNextSteps — the celebratory "what's next" grid, shown once
+//     every step is complete.
+//   - OnboardingFooter — the redesigned dismiss/resume affordance.
+//
+// State per step is computed in the handler (ActiveStep = first incomplete
+// step) and resolved here via gsStepState; the sync step is special-cased to
+// "in_progress" while a connection exists but no sync has landed.
 templ GettingStarted(p GettingStartedProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title flex items-center gap-2">
-				@components.LucideIcon("compass", "w-6 h-6 text-primary")
-				Getting Started
-			</h1>
-			<p class="text-sm text-base-content/50 mt-1">Set up Breadbox step by step. Complete each step to start tracking your finances.</p>
-		</div>
-	</div>
-	<!-- Progress summary -->
-	<div class="bb-card p-4 sm:p-5 mb-6">
-		<div class="flex flex-col sm:flex-row sm:items-center gap-4">
-			<div class="flex-1">
-				<div class="flex items-center gap-2 mb-2">
-					<span class="text-sm font-semibold">Setup Progress</span>
-					<span class={ "badge badge-sm", gsProgressBadgeClass(p) }>{ fmt.Sprintf("%d / %d", p.CompletedSteps, p.TotalSteps) }</span>
-				</div>
-				<progress class={ "progress w-full", gsProgressBarClass(p) } value={ fmt.Sprintf("%d", p.CompletedSteps) } max={ fmt.Sprintf("%d", p.TotalSteps) }></progress>
-			</div>
-			if p.TransactionCount > 0 {
-				<div class="flex flex-wrap gap-4 text-sm tabular-nums">
-					<div class="flex items-center gap-1.5">
-						@components.LucideIcon("link", "w-3.5 h-3.5 text-base-content opacity-40")
-						<span class="text-base-content/50">Connections</span>
-						<span class="font-semibold">{ components.CommaInt(p.ConnectionCount) }</span>
-					</div>
-					<div class="flex items-center gap-1.5">
-						@components.LucideIcon("wallet", "w-3.5 h-3.5 text-base-content opacity-40")
-						<span class="text-base-content/50">Accounts</span>
-						<span class="font-semibold">{ components.CommaInt(p.AccountCount) }</span>
-					</div>
-					<div class="flex items-center gap-1.5">
-						@components.LucideIcon("receipt", "w-3.5 h-3.5 text-base-content opacity-40")
-						<span class="text-base-content/50">Transactions</span>
-						<span class="font-semibold">{ components.CommaInt(p.TransactionCount) }</span>
-					</div>
-					<div class="flex items-center gap-1.5">
-						@components.LucideIcon("refresh-cw", "w-3.5 h-3.5 text-base-content opacity-40")
-						<span class="text-base-content/50">Syncs</span>
-						<span class="font-semibold">{ components.CommaInt(p.SuccessfulSyncs) }</span>
-					</div>
-				</div>
-			}
-		</div>
-	</div>
-	<!-- Steps -->
-	<div class="grid gap-4">
-		<!-- Step 1: Create a family member -->
-		@gsStep1(p)
-		<!-- Step 2: Configure a provider -->
-		@gsStep2(p)
-		<!-- Step 3: Connect a bank -->
-		@gsStep3(p)
-		<!-- Step 4: First sync -->
-		@gsStep4(p)
-		<!-- Step 5: Configure agents -->
-		@gsStep5(p)
-	</div>
-	<!-- Dismiss section -->
-	<div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-		if !p.OnboardingDismissed {
-			<form method="POST" action="/getting-started/dismiss">
-				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				<button type="submit" class="btn btn-ghost btn-sm text-base-content/50">
-					@components.LucideIcon("x", "w-3.5 h-3.5")
-					Dismiss guide
-					<span class="text-xs text-base-content/30 ml-1 hidden sm:inline">-- you can always find it at /getting-started or in Settings</span>
-				</button>
-			</form>
+	<div class="flex flex-col gap-6">
+		@components.OnboardingHero(components.OnboardingHeroProps{
+			CompletedSteps: p.CompletedSteps,
+			TotalSteps:     p.TotalSteps,
+			AllComplete:    p.AllComplete,
+			TimeRemaining:  p.TimeRemaining,
+		})
+		@components.OnboardingStats(components.OnboardingStatsProps{
+			Connections:  p.ConnectionCount,
+			Accounts:     p.AccountCount,
+			Transactions: p.TransactionCount,
+			Syncs:        p.SuccessfulSyncs,
+		})
+		if p.AllComplete {
+			@gsWhatsNext()
 		} else {
-			<div class="text-xs text-base-content/30 flex items-center gap-1.5">
-				@components.LucideIcon("info", "w-3 h-3")
-				This guide is always available at /getting-started or from Settings.
+			<div class="flex flex-col gap-3">
+				@gsStep1(p)
+				@gsStep2(p)
+				@gsStep3(p)
+				@gsStep4(p)
+				@gsStep5(p)
 			</div>
+			@components.OnboardingAltPath(components.OnboardingAltPathProps{HasProvider: p.HasProvider})
 		}
+		@components.OnboardingFooter(components.OnboardingFooterProps{
+			Dismissed: p.OnboardingDismissed,
+			CSRFToken: p.CSRFToken,
+		})
 	</div>
 }
 
-// gsStep1 — Add a family member. Always reachable (the entry point of the
-// flow), so the circle is primary on the pending state.
+// gsWhatsNext renders the celebratory completion grid: a small section header
+// followed by the OnboardingNextSteps destination cards.
+templ gsWhatsNext() {
+	<div>
+		@components.SectionHeader(components.SectionHeaderProps{
+			Icon:  "sparkles",
+			Title: "What's next",
+		})
+		@components.OnboardingNextSteps(components.OnboardingNextStepsProps{
+			Steps: []components.OnboardingNextStep{
+				{Icon: "receipt", Title: "Review transactions", Body: "See everything Breadbox synced and categorize what matters.", Href: "/transactions", CTALabel: "View transactions", Tone: "primary"},
+				{Icon: "list-filter", Title: "Create a rule", Body: "Auto-categorize and tag transactions as they sync.", Href: "/rules/new", CTALabel: "New rule", Tone: "info"},
+				{Icon: "bot", Title: "Set up a workflow", Body: "Let an AI agent review and enrich your finances on a schedule.", Href: "/workflows", CTALabel: "Browse workflows", Tone: "accent"},
+				{Icon: "users", Title: "Invite household", Body: "Add the people whose accounts you track.", Href: "/household/new", CTALabel: "Add member", Tone: "success"},
+			},
+		})
+	</div>
+}
+
+// ── Steps ────────────────────────────────────────────────────────────────
+
+// gsStep1 — Add a household member.
 templ gsStep1(p GettingStartedProps) {
-	<div class="bb-card p-0 overflow-hidden">
-		<div class="flex items-start gap-4 p-4 sm:p-5">
-			<div class={ "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center", gsCircleClass(p.HasMember, true) }>
-				if p.HasMember {
-					@components.LucideIcon("check", "w-4 h-4")
-				} else {
-					<span class="text-sm font-bold">1</span>
-				}
-			</div>
-			<div class="flex-1 min-w-0 flex flex-col gap-2">
-				<div>
-					<h3 class={ "font-semibold", templ.KV("text-success", p.HasMember) }>Add a family member</h3>
-					<p class="text-sm text-base-content/50 mt-0.5">
-						if p.HasMember {
-							Family member added. Bank connections are linked to household members.
-						} else {
-							Create a household member to link bank connections to. Each member represents a person in your household.
-						}
-					</p>
-				</div>
-				<div class="flex items-center gap-2 sm:hidden">
-					if p.HasMember {
-						<a href="/household" class="btn btn-ghost btn-sm">View Members</a>
-					} else {
-						<a href="/household/new" class="btn btn-primary btn-sm">Add Member</a>
-					}
-				</div>
-			</div>
-			<div class="hidden sm:flex flex-shrink-0">
-				if p.HasMember {
-					<a href="/household" class="btn btn-ghost btn-sm">View Members</a>
-				} else {
-					<a href="/household/new" class="btn btn-primary btn-sm">Add Member</a>
-				}
-			</div>
-		</div>
-	</div>
+	@components.SetupStep(components.SetupStepProps{
+		Number:       1,
+		Icon:         "users",
+		Title:        "Add a household member",
+		Description:  "Create a household member so bank connections have someone to belong to.",
+		Summary:      "Household member added.",
+		State:        gsStepState(p.HasMember, 1, p.ActiveStep),
+		TimeEstimate: "~1 min",
+		CTAHref:      gsStepCTAHref(p.HasMember, "/household", "/household/new"),
+		CTAIcon:      gsStepCTAIcon(p.HasMember, "plus"),
+		CTALabel:     gsStepCTALabel(p.HasMember, "View members", "Add member"),
+	})
 }
 
-// gsStep2 — Configure a bank provider. Becomes in-progress only after the
-// member step is complete; otherwise it renders muted to telegraph the
-// dependency chain.
+// gsStep2 — Configure a bank provider.
 templ gsStep2(p GettingStartedProps) {
-	<div class="bb-card p-0 overflow-hidden">
-		<div class="flex items-start gap-4 p-4 sm:p-5">
-			<div class={ "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center", gsCircleClass(p.HasProvider, p.HasMember) }>
-				if p.HasProvider {
-					@components.LucideIcon("check", "w-4 h-4")
-				} else {
-					<span class="text-sm font-bold">2</span>
-				}
-			</div>
-			<div class="flex-1 min-w-0 flex flex-col gap-2">
-				<div>
-					<h3 class={ "font-semibold", templ.KV("text-success", p.HasProvider) }>Configure a bank provider</h3>
-					<p class="text-sm text-base-content/50 mt-0.5">
-						if p.HasProvider {
-							Provider configured. You can connect bank accounts through Plaid or Teller.
-						} else {
-							Set up Plaid or Teller to connect bank accounts. You can also import transactions via CSV.
-						}
-					</p>
-				</div>
-				<div class="flex items-center gap-2 sm:hidden">
-					if p.HasProvider {
-						<a href="/settings/providers" class="btn btn-ghost btn-sm">View Providers</a>
-					} else {
-						<a href="/settings/providers" class="btn btn-primary btn-sm">Configure</a>
-					}
-				</div>
-			</div>
-			<div class="hidden sm:flex flex-shrink-0">
-				if p.HasProvider {
-					<a href="/settings/providers" class="btn btn-ghost btn-sm">View Providers</a>
-				} else {
-					<a href="/settings/providers" class="btn btn-primary btn-sm">Configure</a>
-				}
-			</div>
-		</div>
-	</div>
+	@components.SetupStep(components.SetupStepProps{
+		Number:       2,
+		Icon:         "landmark",
+		Title:        "Configure a bank provider",
+		Description:  "Set up Plaid or Teller to link bank accounts — or import a CSV instead.",
+		Summary:      "Provider configured — ready to connect banks.",
+		State:        gsStepState(p.HasProvider, 2, p.ActiveStep),
+		TimeEstimate: "~2 min",
+		DocHref:      "https://docs.breadbox.sh",
+		DocLabel:     "How providers work",
+		CTAHref:      "/settings/providers",
+		CTAIcon:      gsStepCTAIcon(p.HasProvider, "settings"),
+		CTALabel:     gsStepCTALabel(p.HasProvider, "View providers", "Configure"),
+		CTADisabled:  gsStepPendingDisabled(p.HasProvider, 2, p.ActiveStep),
+	})
 }
 
-// gsStep3 — Connect a bank. Becomes in-progress once both the member and
-// provider exist; the disabled CTA on the no-provider branch matches the
-// pre-templ markup exactly (no link, span styled as a btn-disabled).
+// gsStep3 — Connect the first bank.
 templ gsStep3(p GettingStartedProps) {
-	<div class="bb-card p-0 overflow-hidden">
-		<div class="flex items-start gap-4 p-4 sm:p-5">
-			<div class={ "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center", gsCircleClass(p.HasConnection, p.HasMember && p.HasProvider) }>
-				if p.HasConnection {
-					@components.LucideIcon("check", "w-4 h-4")
-				} else {
-					<span class="text-sm font-bold">3</span>
-				}
-			</div>
-			<div class="flex-1 min-w-0 flex flex-col gap-2">
-				<div>
-					<h3 class={ "font-semibold", templ.KV("text-success", p.HasConnection) }>Connect your first bank</h3>
-					<p class="text-sm text-base-content/50 mt-0.5">
-						if p.HasConnection {
-							Bank connected. Accounts and transactions will sync automatically.
-						} else if p.HasProvider {
-							Link a bank account to start syncing transactions.
-						} else {
-							Configure a provider first, then connect a bank account.
-						}
-					</p>
-				</div>
-				<div class="flex items-center gap-2 sm:hidden">
-					if p.HasConnection {
-						<a href="/connections" class="btn btn-ghost btn-sm">View Connections</a>
-					} else if p.HasProvider {
-						<a href="/connections/new" class="btn btn-primary btn-sm">Connect Bank</a>
-					} else {
-						<span class="btn btn-sm btn-disabled">Connect Bank</span>
-					}
-				</div>
-			</div>
-			<div class="hidden sm:flex flex-shrink-0">
-				if p.HasConnection {
-					<a href="/connections" class="btn btn-ghost btn-sm">View Connections</a>
-				} else if p.HasProvider {
-					<a href="/connections/new" class="btn btn-primary btn-sm">Connect Bank</a>
-				} else {
-					<span class="btn btn-sm btn-disabled">Connect Bank</span>
-				}
-			</div>
-		</div>
-	</div>
+	@components.SetupStep(components.SetupStepProps{
+		Number:       3,
+		Icon:         "link-2",
+		Title:        "Connect your first bank",
+		Description:  "Link a bank account to start syncing accounts and transactions.",
+		Summary:      "Bank connected and syncing.",
+		State:        gsStepState(p.HasConnection, 3, p.ActiveStep),
+		TimeEstimate: "~2 min",
+		DocHref:      "https://docs.breadbox.sh",
+		DocLabel:     "Connecting a bank",
+		CTAHref:      gsStepCTAHref(p.HasConnection, "/connections", "/connections/new"),
+		CTAIcon:      gsStepCTAIcon(p.HasConnection, "plus"),
+		CTALabel:     gsStepCTALabel(p.HasConnection, "View connections", "Connect bank"),
+		CTADisabled:  gsStepPendingDisabled(p.HasConnection, 3, p.ActiveStep),
+	})
 }
 
-// gsStep4 — First sync. The complete state surfaces transaction + account
-// counters so the user gets a concrete confirmation of the data that landed.
+// gsStep4 — First sync. Renders "in_progress" while a connection exists but no
+// sync has landed yet (the first sync runs automatically), surfacing the logs.
 templ gsStep4(p GettingStartedProps) {
-	<div class="bb-card p-0 overflow-hidden">
-		<div class="flex items-start gap-4 p-4 sm:p-5">
-			<div class={ "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center", gsCircleClass(p.HasSync, p.HasConnection) }>
-				if p.HasSync {
-					@components.LucideIcon("check", "w-4 h-4")
-				} else {
-					<span class="text-sm font-bold">4</span>
-				}
-			</div>
-			<div class="flex-1 min-w-0 flex flex-col gap-2">
-				<div>
-					<h3 class={ "font-semibold", templ.KV("text-success", p.HasSync) }>Complete first sync</h3>
-					<p class="text-sm text-base-content/50 mt-0.5">
-						if p.HasSync {
-							{ fmt.Sprintf("Sync complete. %s transactions synced across %s accounts.", components.CommaInt(p.TransactionCount), components.CommaInt(p.AccountCount)) }
-						} else if p.HasConnection {
-							Your first sync should start automatically. Check the sync logs if it hasn't started.
-						} else {
-							Connect a bank first, then transactions will sync automatically.
-						}
-					</p>
-				</div>
-				<div class="flex items-center gap-2 sm:hidden">
-					if p.HasSync {
-						<a href="/transactions" class="btn btn-ghost btn-sm">View Transactions</a>
-					} else if p.HasConnection {
-						<a href="/logs" class="btn btn-ghost btn-sm">View Logs</a>
-					} else {
-						<span class="btn btn-sm btn-disabled">View Logs</span>
-					}
-				</div>
-			</div>
-			<div class="hidden sm:flex flex-shrink-0">
-				if p.HasSync {
-					<a href="/transactions" class="btn btn-ghost btn-sm">View Transactions</a>
-				} else if p.HasConnection {
-					<a href="/logs" class="btn btn-ghost btn-sm">View Logs</a>
-				} else {
-					<span class="btn btn-sm btn-disabled">View Logs</span>
-				}
-			</div>
-		</div>
-	</div>
+	@components.SetupStep(components.SetupStepProps{
+		Number:       4,
+		Icon:         "refresh-cw",
+		Title:        "Complete the first sync",
+		Description:  "Your first sync runs automatically. Check the logs if it doesn't start.",
+		Summary:      fmt.Sprintf("%s transactions across %s accounts.", components.CommaInt(p.TransactionCount), components.CommaInt(p.AccountCount)),
+		State:        gsSyncState(p),
+		TimeEstimate: "~1 min",
+		CTAHref:      gsStepCTAHref(p.HasSync, "/transactions", "/logs"),
+		CTAIcon:      "",
+		CTALabel:     gsStepCTALabel(p.HasSync, "View transactions", "View logs"),
+		CTADisabled:  gsStepPendingDisabled(p.HasSync, 4, p.ActiveStep),
+	})
 }
 
-// gsStep5 — Set up AI agents. Becomes in-progress once a sync has landed —
-// keying off HasSync (not HasConnection) ensures the user sees real data
-// before being prompted to wire up agents.
+// gsStep5 — Set up AI agents (optional). The badge tells users they can stop
+// before it; completing it is the final flourish.
 templ gsStep5(p GettingStartedProps) {
-	<div class="bb-card p-0 overflow-hidden">
-		<div class="flex items-start gap-4 p-4 sm:p-5">
-			<div class={ "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center", gsCircleClass(p.HasAPIKey, p.HasSync) }>
-				if p.HasAPIKey {
-					@components.LucideIcon("check", "w-4 h-4")
-				} else {
-					<span class="text-sm font-bold">5</span>
-				}
-			</div>
-			<div class="flex-1 min-w-0 flex flex-col gap-2">
-				<div>
-					<h3 class={ "font-semibold", templ.KV("text-success", p.HasAPIKey) }>Set up AI agents</h3>
-					<p class="text-sm text-base-content/50 mt-0.5">
-						if p.HasAPIKey {
-							API key created. AI agents can access Breadbox via the MCP server or REST API.
-						} else {
-							Create an API key so AI agents can query your financial data via the MCP server.
-						}
-					</p>
-				</div>
-				<div class="flex items-center gap-2 sm:hidden">
-					if p.HasAPIKey {
-						<a href="/workflows" class="btn btn-ghost btn-sm">View workflows</a>
-					} else {
-						<a href="/workflows" class="btn btn-primary btn-sm">Set up workflows</a>
-					}
-				</div>
-			</div>
-			<div class="hidden sm:flex flex-shrink-0">
-				if p.HasAPIKey {
-					<a href="/workflows" class="btn btn-ghost btn-sm">View workflows</a>
-				} else {
-					<a href="/workflows" class="btn btn-primary btn-sm">Set up workflows</a>
-				}
-			</div>
-		</div>
-	</div>
+	@components.SetupStep(components.SetupStepProps{
+		Number:       5,
+		Icon:         "bot",
+		Title:        "Set up AI agents",
+		Description:  "Create an API key so AI agents can query your finances via the MCP server.",
+		Summary:      "API key created — agents can reach your data.",
+		State:        gsStepState(p.HasAPIKey, 5, p.ActiveStep),
+		TimeEstimate: "~3 min",
+		Optional:     true,
+		DocHref:      "https://docs.breadbox.sh/guides/multi-agent-reviewer",
+		DocLabel:     "Multi-agent reviewer",
+		CTAHref:      "/workflows",
+		CTAIcon:      gsStepCTAIcon(p.HasAPIKey, "sparkles"),
+		CTALabel:     gsStepCTALabel(p.HasAPIKey, "View workflows", "Set up workflows"),
+		CTADisabled:  gsStepPendingDisabled(p.HasAPIKey, 5, p.ActiveStep),
+	})
 }
 
-// gsCircleClass returns the per-step badge classes for the round step
-// indicator. complete → success, in-progress → primary, pending → muted.
-// `inProgress` should be true when all prerequisites for this step are
-// met (the next actionable step in the flow).
-func gsCircleClass(complete, inProgress bool) string {
+// ── State + CTA helpers ────────────────────────────────────────────────────
+
+// gsStepState resolves a step to complete / active / pending. The first
+// incomplete step (== ActiveStep) is the elevated "you are here" row; all
+// later incomplete steps are pending.
+func gsStepState(complete bool, stepNum, activeStep int) components.SetupStepState {
 	switch {
 	case complete:
-		return "bg-success/10 text-success"
-	case inProgress:
-		return "bg-primary/10 text-primary"
+		return components.SetupStepComplete
+	case stepNum == activeStep:
+		return components.SetupStepActive
 	default:
-		return "bg-base-200 text-base-content/30"
+		return components.SetupStepPending
 	}
 }
 
-// gsProgressBadgeClass returns the badge variant for the "X / Y" pill: green
-// when every step is complete, ghost otherwise.
-func gsProgressBadgeClass(p GettingStartedProps) string {
-	if p.CompletedSteps == p.TotalSteps {
-		return "badge-success"
+// gsSyncState special-cases the sync step: once it's the active step a
+// connection already exists (steps 1–3 are done), so the first sync is
+// running — render it in_progress (spinner + "check the logs") rather than a
+// plain active CTA.
+func gsSyncState(p GettingStartedProps) components.SetupStepState {
+	if p.HasSync {
+		return components.SetupStepComplete
 	}
-	return "badge-ghost"
+	if p.ActiveStep == 4 {
+		return components.SetupStepInProgress
+	}
+	return components.SetupStepPending
 }
 
-// gsProgressBarClass returns the daisyUI progress variant — green at 100%,
-// primary while in flight.
-func gsProgressBarClass(p GettingStartedProps) string {
-	if p.CompletedSteps == p.TotalSteps {
-		return "progress-success"
+// gsStepPendingDisabled returns true for a step that is pending (incomplete and
+// not yet the active step) — its action target isn't reachable yet, so the CTA
+// renders as a disabled span.
+func gsStepPendingDisabled(complete bool, stepNum, activeStep int) bool {
+	return !complete && stepNum != activeStep
+}
+
+// gsStepCTAHref picks the "view" target when complete, else the "do it" target.
+func gsStepCTAHref(complete bool, doneHref, todoHref string) templ.SafeURL {
+	if complete {
+		return templ.SafeURL(doneHref)
 	}
-	return "progress-primary"
+	return templ.SafeURL(todoHref)
+}
+
+// gsStepCTALabel picks the "view" label when complete, else the "do it" label.
+func gsStepCTALabel(complete bool, doneLabel, todoLabel string) string {
+	if complete {
+		return doneLabel
+	}
+	return todoLabel
+}
+
+// gsStepCTAIcon drops the icon on the ghost "view" CTA (complete state) and
+// keeps the action icon on the primary CTA otherwise.
+func gsStepCTAIcon(complete bool, todoIcon string) string {
+	if complete {
+		return ""
+	}
+	return todoIcon
 }

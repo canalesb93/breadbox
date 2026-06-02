@@ -1,0 +1,88 @@
+package components
+
+// OnboardingAltPath is the calm "alternative path + resources" aside shown on
+// the /getting-started page WHILE setup is still in progress (i.e. not yet
+// AllComplete). It de-risks the "I don't have a supported bank / I'm stuck"
+// drop-off by:
+//
+//   1. surfacing the CSV-import alternative for people without Plaid/Teller, and
+//   2. listing a few documentation resources.
+//
+// It is deliberately QUIET — a helpful aside, not a primary CTA — so it sits
+// below the active step without competing with it. Use a soft surface and ghost
+// affordances; the external resource links carry an arrow-up-right so they
+// clearly read as leaving the app.
+//
+// Copy adapts to whether a provider is already connected:
+//
+//   - HasProvider=false → lean into "no bank? import CSV".
+//   - HasProvider=true  → soften to "prefer to import manually?".
+//
+// Usage:
+//
+//	@components.OnboardingAltPath(components.OnboardingAltPathProps{
+//	  HasProvider: false,
+//	})
+type OnboardingAltPathProps struct {
+	HasProvider bool // tweak copy: if false, lean into "no bank? import CSV"; if true, soften
+}
+
+templ OnboardingAltPath(p OnboardingAltPathProps) {
+	<div class="bb-card p-5 sm:p-6">
+		@onbAltCSV(p)
+		<div class="border-t border-base-200 mt-5 pt-5">
+			@onbAltResources()
+		</div>
+	</div>
+}
+
+// onbAltCSV is the CSV-import alternative: an icon tile, an adaptive heading +
+// body, and a quiet ghost button to /import-csv.
+templ onbAltCSV(p OnboardingAltPathProps) {
+	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
+		<div class="w-10 h-10 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
+			@LucideIcon("file-spreadsheet", "w-5 h-5 text-base-content/50")
+		</div>
+		<div class="min-w-0 flex-1">
+			<h3 class="text-sm font-semibold">
+				if p.HasProvider {
+					Prefer to import manually?
+				} else {
+					Don't use Plaid or Teller?
+				}
+			</h3>
+			<p class="text-sm text-base-content/60 mt-0.5">
+				Import transactions directly from a CSV file — no bank connection required.
+			</p>
+		</div>
+		<a href="/connections/import-csv" class="btn btn-ghost btn-sm gap-2 shrink-0">
+			@LucideIcon("upload", "w-4 h-4")
+			Import CSV
+		</a>
+	</div>
+}
+
+// onbAltResources is the quiet, menu-like list of three external doc links.
+// Each row reads as external via the trailing arrow-up-right glyph.
+templ onbAltResources() {
+	<div class="text-xs uppercase tracking-wider text-base-content/40 mb-1">Resources</div>
+	@onbAltResourceLink("link-2", "How connections work", "https://docs.breadbox.sh")
+	@onbAltResourceLink("file-spreadsheet", "Import a CSV", "https://docs.breadbox.sh")
+	@onbAltResourceLink("bot", "Set up AI agents", "https://docs.breadbox.sh/guides/multi-agent-reviewer")
+}
+
+// onbAltResourceLink renders one external resource row: a small leading lucide
+// icon, the label, and a trailing arrow-up-right that signals "opens
+// externally". Styled like a quiet menu item.
+templ onbAltResourceLink(icon, label, href string) {
+	<a
+		href={ templ.SafeURL(href) }
+		target="_blank"
+		rel="noopener noreferrer"
+		class="flex items-center gap-2 py-1.5 text-sm hover:text-base-content text-base-content/70 transition-colors"
+	>
+		@LucideIcon(icon, "w-4 h-4 opacity-60 shrink-0")
+		<span class="flex-1 min-w-0 truncate">{ label }</span>
+		@LucideIcon("arrow-up-right", "w-3.5 h-3.5 opacity-40 shrink-0")
+	</a>
+}

@@ -1,0 +1,44 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionOnboardingHero renders the /getting-started onboarding hero and its
+// ProgressRing atom across the states the live page cycles through: empty,
+// partway, and fully complete. The ring is shown standalone first (0/5,
+// 3/5, 5/5) so its proportions and tone shift read on their own, then the
+// full hero is shown in the three copy-derivation cases.
+//
+// All copy here is derived (Headline/Subhead left empty) to exercise the
+// progress-based defaults; the handler passes TimeRemaining from its own
+// estimate.
+templ SectionOnboardingHero() {
+	<div class="flex flex-col gap-6">
+		@designExample("Progress ring — tone + fill", "The atom on its own. 0/5 and 3/5 use text-primary; 5/5 flips to text-success. The arc animates on load via a stroke-dashoffset transition; the centered count is tabular-nums.") {
+			<div class="flex flex-wrap items-center gap-8">
+				@components.ProgressRing(components.ProgressRingProps{Value: 0, Max: 5, Sublabel: "steps"})
+				@components.ProgressRing(components.ProgressRingProps{Value: 3, Max: 5, Sublabel: "steps"})
+				@components.ProgressRing(components.ProgressRingProps{Value: 5, Max: 5, Sublabel: "steps"})
+			</div>
+		}
+		@designExample("Onboarding hero — fresh", "0 of 5 complete, no time estimate. Derived welcome copy; primary-tone ring.") {
+			@components.OnboardingHero(components.OnboardingHeroProps{
+				CompletedSteps: 0,
+				TotalSteps:     5,
+			})
+		}
+		@designExample("Onboarding hero — in progress", "3 of 5 complete with a time-remaining row. Headline derives the percentage; the clock row only renders when TimeRemaining is set.") {
+			@components.OnboardingHero(components.OnboardingHeroProps{
+				CompletedSteps: 3,
+				TotalSteps:     5,
+				TimeRemaining:  "~4 min left",
+			})
+		}
+		@designExample("Onboarding hero — all set", "AllComplete tints the shell bg-success/5 and forces the ring to its success tone. Celebratory but soft.") {
+			@components.OnboardingHero(components.OnboardingHeroProps{
+				CompletedSteps: 5,
+				TotalSteps:     5,
+				AllComplete:    true,
+			})
+		}
+	</div>
+}

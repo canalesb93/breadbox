@@ -1,0 +1,36 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionOnboardingStats showcases the always-on getting-started metrics
+// strip (components.OnboardingStats) in its two load-bearing states: the
+// fresh, all-zero install (every tile muted with a subtle "None yet"
+// hint) and a populated household (tinted tones, comma-formatted values).
+// The strip renders at all times on /getting-started — there is no
+// "hide until first transaction" gate — so the zero state must read as
+// intentional, not broken.
+templ SectionOnboardingStats() {
+	<div class="flex flex-col gap-6">
+		@designExample("Fresh install (all zero)", "Always shown — never hidden behind a first-transaction gate. Every tile is muted neutral with a subtle \"None yet\" line so the empty state reads intentional.") {
+			@components.OnboardingStats(dostatsEmpty())
+		}
+		@designExample("Populated household", "Once data flows in, each tile picks up a light tone (connections primary, accounts info, transactions + syncs success) and comma-formats its value.") {
+			@components.OnboardingStats(dostatsPopulated())
+		}
+	</div>
+}
+
+// dostatsEmpty is the fresh-install fixture: nothing connected yet.
+func dostatsEmpty() components.OnboardingStatsProps {
+	return components.OnboardingStatsProps{}
+}
+
+// dostatsPopulated is a representative active-household fixture.
+func dostatsPopulated() components.OnboardingStatsProps {
+	return components.OnboardingStatsProps{
+		Connections:  3,
+		Accounts:     8,
+		Transactions: 1240,
+		Syncs:        57,
+	}
+}
