@@ -342,22 +342,28 @@ templ settingsResourcesSection(p SettingsProps) {
 }
 
 // Getting Started doesn't fit SettingsRowLink because the trailing
-// affordance is either a button or a form (re-open vs. open).
+// affordance is either a button or a form (re-open vs. open), so the
+// row is composed by hand. The leading compass icon mirrors the
+// sibling Documentation row's leading book-open icon — this Resources
+// section is an action list where the leading icon is the affordance.
 templ settingsGettingStartedRow(p SettingsProps) {
-	@components.SettingsRow(components.SettingsRowProps{
-		Label:   "Getting started",
-		Caption: "Step-by-step setup walkthrough",
-	}) {
-		@components.LucideIcon("compass", "w-4 h-4 text-base-content/40 mr-3 hidden")
-		if p.OnboardingDismissed {
-			<form method="POST" action="/getting-started/reopen">
-				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
-			</form>
-		} else {
-			<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
-		}
-	}
+	<div class="bb-settings-row">
+		@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50 shrink-0")
+		<div class="bb-settings-row__main">
+			<div class="bb-settings-row__label">Getting started</div>
+			<p class="bb-settings-row__caption">Step-by-step setup walkthrough</p>
+		</div>
+		<div class="bb-settings-row__control">
+			if p.OnboardingDismissed {
+				<form method="POST" action="/getting-started/reopen">
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+					<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
+				</form>
+			} else {
+				<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
+			}
+		</div>
+	</div>
 }
 
 templ settingsDeveloperSection() {
