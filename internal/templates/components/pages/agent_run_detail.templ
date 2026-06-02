@@ -59,7 +59,6 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 			<template x-ref="promptText">{ effectiveRunPrompt(p) }</template>
 		}
 		@agentRunDetailHeader(p)
-		@agentRunSummaryStats(p)
 		if p.Run.Status == "error" && p.Run.ErrorMessage != "" {
 			@agentRunErrorAlert(p.Run)
 		}
@@ -95,9 +94,6 @@ templ AgentRunDetail(p AgentRunDetailProps) {
 templ agentRunDetailHeader(p AgentRunDetailProps) {
 	<div class="bb-run-header">
 		<div class="bb-run-header__lead">
-			<a href={ templ.SafeURL(agentRunHeaderBackHref(p)) } class="btn btn-ghost btn-sm btn-square" title="Back to runs">
-				@components.LucideIcon("arrow-left", "w-4 h-4")
-			</a>
 			@components.UserAvatar(components.UserAvatarProps{
 				ID:         p.Run.AgentSlug,
 				Name:       p.Run.AgentName,
@@ -123,21 +119,10 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 						<i data-lucide="clipboard" class="w-3 h-3" x-show="!copiedRunId"></i>
 						<i data-lucide="check" class="w-3 h-3" x-show="copiedRunId" x-cloak></i>
 					</button>
-					<!-- Status badge for terminal states only. in_progress
-					     stays empty here — the "live" indicator in the meta
-					     line below already announces the running state, and
-					     loading states shouldn't sit inside a badge. -->
-					<span x-ref="status">
-						switch p.Run.Status {
-							case "success":
-								<span class="badge badge-soft badge-success badge-xs">success</span>
-							case "error":
-								<span class="badge badge-soft badge-error badge-xs">error</span>
-							case "skipped":
-								<span class="badge badge-ghost badge-xs">skipped</span>
-							case "timeout":
-								<span class="badge badge-soft badge-error badge-xs">timeout</span>
-						}
+					<!-- The single run-status indicator. x-ref so the live poll
+					     swaps running → terminal in place, persisting for the run. -->
+					<span x-ref="summaryStatus">
+						@agentRunSummaryStatus(p.Run.Status)
 					</span>
 				</div>
 				<div class="text-xs text-base-content/50 mt-0.5 flex items-center gap-1.5 flex-wrap">
@@ -155,25 +140,10 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 							{ AgentModelShortLabel(p.Run.Model) }
 						</span>
 					}
-					<span x-show="status==='in_progress'" x-cloak class="inline-flex items-center gap-1 text-primary">
-						<span class="loading loading-spinner loading-xs"></span>
-						<span class="text-[0.65rem] uppercase tracking-wider">live</span>
-					</span>
 				</div>
 			</div>
 		</div>
 		<div class="bb-run-header__actions">
-			if TranscriptHasResultEvent(p.Transcript) {
-				<button
-					type="button"
-					class="btn btn-sm btn-ghost gap-2"
-					title="Jump to the run's final result bubble"
-					@click="jumpToResult()"
-				>
-					@components.LucideIcon("flag-triangle-right", "w-4 h-4")
-					Jump to result
-				</button>
-			}
 			if effectiveRunPrompt(p) != "" {
 				<button
 					type="button"
@@ -205,52 +175,6 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 					</span>
 				</button>
 			}
-		</div>
-	</div>
-}
-
-// agentRunSummaryStats is the compact at-a-glance strip directly under
-// the sticky header — status, duration, trigger, model, and cost in a
-// daisy `stats` block. It restates the facts an operator scans for first
-// without making them hunt through the Usage card in the side panel.
-// The Model tile is omitted for runs predating the per-run model
-// snapshot (empty model). daisy `stats` is the canonical home for these
-// tiles per .claude/rules/daisyui.md (the rule explicitly nominates
-// `stats stats-horizontal` for dashboard-tile clusters); cost reuses the
-// same canonical Amount renderer as the rest of the page.
-templ agentRunSummaryStats(p AgentRunDetailProps) {
-	<div class="stats stats-horizontal bb-card w-full overflow-x-auto mb-4">
-		<div class="stat px-4 py-3">
-			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Status</div>
-			<div class="stat-value text-base font-semibold">
-				@agentRunSummaryStatus(p.Run.Status)
-			</div>
-		</div>
-		<div class="stat px-4 py-3">
-			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Duration</div>
-			<div class="stat-value text-base font-semibold tabular-nums">{ formatAgentRunDuration(p.Run.DurationMs) }</div>
-		</div>
-		<div class="stat px-4 py-3">
-			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Trigger</div>
-			<div class="stat-value text-base font-semibold capitalize">
-				if p.Run.Trigger != "" {
-					{ p.Run.Trigger }
-				} else {
-					<span class="text-base-content/40">—</span>
-				}
-			</div>
-		</div>
-		if AgentModelShortLabel(p.Run.Model) != "" {
-			<div class="stat px-4 py-3">
-				<div class="stat-title text-[0.65rem] uppercase tracking-wider">Model</div>
-				<div class="stat-value text-base font-semibold" title={ p.Run.Model }>{ AgentModelShortLabel(p.Run.Model) }</div>
-			</div>
-		}
-		<div class="stat px-4 py-3">
-			<div class="stat-title text-[0.65rem] uppercase tracking-wider">Cost</div>
-			<div class="stat-value text-base font-semibold">
-				@agentRunCost(p.Run.CostUSD, "font-semibold tabular-nums")
-			</div>
 		</div>
 	</div>
 }
@@ -295,16 +219,6 @@ func effectiveRunPrompt(p AgentRunDetailProps) string {
 	default:
 		return body
 	}
-}
-
-// agentRunHeaderBackHref returns the "back" target for the sticky header.
-// Prefers the per-agent filter so consecutive runs of the same agent
-// stay in scope; falls back to the global feed.
-func agentRunHeaderBackHref(p AgentRunDetailProps) string {
-	if p.Run.AgentSlug != "" {
-		return "/agents?agent=" + p.Run.AgentSlug
-	}
-	return "/agents"
 }
 
 // agentRunErrorAlert renders the run's error_message in a soft warning/

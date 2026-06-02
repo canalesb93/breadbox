@@ -31,9 +31,9 @@ import (
 // transcript is capped at 500 events, so a few KB of HTML on a 3 s
 // cadence is cheaper than maintaining a JS-side renderer.
 type AgentRunLivePayload struct {
-	Status          string `json:"status"`
-	StatusBadgeHTML string `json:"statusBadgeHTML"`
-	TranscriptHTML  string `json:"transcriptHTML"`
+	Status            string `json:"status"`
+	SummaryStatusHTML string `json:"summaryStatusHTML"`
+	TranscriptHTML    string `json:"transcriptHTML"`
 	StatsHTML       string `json:"statsHTML"`
 	EventCount      int    `json:"eventCount"`
 	DurationMs      int64  `json:"durationMs,omitempty"`
@@ -124,12 +124,12 @@ func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		}
 		payload.TranscriptHTML = buf.String()
 
-		// Status badge for terminal states only, inlined here so we
-		// stay on plain daisy `badge` markup. in_progress sends an
-		// empty fragment — the "live" indicator on the header meta
-		// line carries that state, and loading shouldn't sit inside
-		// a badge.
-		payload.StatusBadgeHTML = agentRunLiveStatusBadgeHTML(run.Status)
+		// Status markup for the summary STATUS card — the single run-status
+		// indicator. in_progress renders a "running" spinner so it persists for
+		// the whole run; terminal states render a soft daisy badge. Mirrors the
+		// agentRunSummaryStatus templ so the patched HTML matches the initial
+		// server render exactly.
+		payload.SummaryStatusHTML = agentRunLiveSummaryStatusHTML(run.Status)
 
 		if row.DurationMs > 0 {
 			payload.DurationMs = row.DurationMs
@@ -164,22 +164,25 @@ func writeAdminError(w http.ResponseWriter, status int, code, message string) {
 	writeAdminJSON(w, status, b)
 }
 
-// agentRunLiveStatusBadgeHTML returns the inline daisy badge markup
-// the live-update endpoint patches into the header. Terminal states
-// get a soft daisy badge; in_progress returns "" because the "live"
-// indicator below the header already carries that state.
-func agentRunLiveStatusBadgeHTML(status string) string {
+// agentRunLiveSummaryStatusHTML returns the STATUS-card markup the live-update
+// endpoint patches into the summary stats. It must stay byte-for-byte in step
+// with the agentRunSummaryStatus templ so a live swap is visually seamless:
+// terminal states get a soft daisy badge, in_progress a "running" spinner so
+// the indicator persists for the whole run.
+func agentRunLiveSummaryStatusHTML(status string) string {
 	switch status {
 	case "success":
-		return `<span class="badge badge-soft badge-success badge-xs">success</span>`
+		return `<span class="badge badge-soft badge-success badge-sm">success</span>`
 	case "error":
-		return `<span class="badge badge-soft badge-error badge-xs">error</span>`
-	case "skipped":
-		return `<span class="badge badge-ghost badge-xs">skipped</span>`
+		return `<span class="badge badge-soft badge-error badge-sm">error</span>`
 	case "timeout":
-		return `<span class="badge badge-soft badge-error badge-xs">timeout</span>`
+		return `<span class="badge badge-soft badge-error badge-sm">timeout</span>`
+	case "skipped":
+		return `<span class="badge badge-ghost badge-sm">skipped</span>`
+	case "in_progress":
+		return `<span class="inline-flex items-center gap-1.5 text-primary text-sm"><span class="loading loading-spinner loading-xs"></span>running</span>`
 	default:
-		return ""
+		return `<span class="text-base-content/40 text-sm">` + status + `</span>`
 	}
 }
 
