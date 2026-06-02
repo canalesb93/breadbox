@@ -32,6 +32,19 @@ func workflowConfigDrawerData(p WorkflowPresetCardProps) string {
 	)
 }
 
+// serverUTCOffsetMin returns the server's current UTC offset in minutes (east
+// of UTC, matching time.Zone's sign), as a decimal string for a data-* attr.
+// The workflows gallery embeds it on its root element so the cron shortcut
+// pills can translate a friendly hour in the VIEWER's timezone (e.g. 9 AM
+// "your time") into the SERVER-local cron the scheduler actually fires — the
+// inverse of the shift service.DescribeCronInTZ applies for the live preview,
+// so a pill round-trips. Read at the current instant, so it tracks the active
+// DST offset for the near-term schedule being edited.
+func serverUTCOffsetMin() string {
+	_, off := time.Now().Zone()
+	return fmt.Sprintf("%d", off/60)
+}
+
 // workflowBoolJS renders a Go bool as a JS boolean literal, for inline
 // Alpine @click expressions (e.g. the reconfigure gear passing run-state).
 func workflowBoolJS(b bool) string {

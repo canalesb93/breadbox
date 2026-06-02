@@ -17,6 +17,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 	<div
 		x-data="workflowsGallery"
 		data-csrf={ p.CSRFToken }
+		data-server-utc-offset-min={ serverUTCOffsetMin() }
 		x-init="$store.shortcuts.setScope('workflows')"
 		x-destroy="$store.shortcuts.setScope('global')"
 	>
@@ -350,10 +351,10 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 		<div x-show={ triggerVar + " === 'false'" } x-cloak class="mt-3 space-y-2">
 			<div class="text-xs font-medium text-base-content/70">Schedule</div>
 			<div class="flex flex-wrap gap-1.5">
-				@workflowCronPill(cronVar, "0 8 * * *", "Daily")
-				@workflowCronPill(cronVar, "0 7 * * 1", "Every Monday")
-				@workflowCronPill(cronVar, "0 7 * * 5", "Every Friday")
-				@workflowCronPill(cronVar, "0 8 1 * *", "Monthly")
+				@workflowCronPill(cronVar, "0 9 * * *", "Daily")
+				@workflowCronPill(cronVar, "0 9 * * 1", "Every Monday")
+				@workflowCronPill(cronVar, "0 9 * * 5", "Every Friday")
+				@workflowCronPill(cronVar, "0 9 1 * *", "Monthly")
 			</div>
 			<input
 				type="text"
@@ -373,14 +374,19 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 	</div>
 }
 
-// workflowCronPill is one schedule shortcut. Sets cronVar to a known cron and
-// refreshes the preview; highlights when it matches the current value.
+// workflowCronPill is one schedule shortcut. `value` is the cron in the
+// VIEWER's local timezone (e.g. "0 9 * * *" = 9 AM their time); on click it's
+// converted to the SERVER-local cron the scheduler stores via
+// localCronToServer(), then the preview refreshes. The pill highlights when
+// the current (server-local) cron equals this shortcut's local intent, so it
+// stays lit across timezones whether clicked, typed, or hydrated from a saved
+// workflow.
 templ workflowCronPill(cronVar, value, label string) {
 	<button
 		type="button"
 		class="btn btn-sm"
-		x-bind:class={ cronVar + " === '" + value + "' ? 'btn-primary' : 'btn-soft'" }
-		@click={ cronVar + " = '" + value + "'; describeCron(" + cronVar + ")" }
+		x-bind:class={ "cronPillActive('" + value + "', " + cronVar + ") ? 'btn-primary' : 'btn-soft'" }
+		@click={ cronVar + " = localCronToServer('" + value + "'); describeCron(" + cronVar + ")" }
 	>
 		{ label }
 	</button>
