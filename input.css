@@ -3386,6 +3386,16 @@
    * tile vertically. */
   padding-top: 0.125rem;
 }
+/* …EXCEPT comment/report CARDS. A card's body is a bordered, rounded
+ * box whose header band must sit flush against the top border. The 2px
+ * nudge above shoves the header DOWN off that border, exposing a strip
+ * of the darker card body under the rounded top edge — the seam. The
+ * card re-centers its own first line via the header band's own padding,
+ * so it neither needs nor wants the row nudge. The extra :has() class
+ * outweighs the rule above, so this wins. */
+.bb-timeline-prominent .bb-timeline > li:has(.bb-comment-bubble) > div.flex-1.text-sm.leading-6 {
+  padding-top: 0;
+}
 
 /* Rail mask. The 28px tile bg + ring are painted with base-100
  * (card-surface) classes by the shared row markup, and the rail seam is
