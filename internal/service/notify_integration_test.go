@@ -31,7 +31,7 @@ func TestSendWorkflowNotification(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, err := svc.UpdateAgentSettings(ctx, service.UpdateAgentSettingsParams{NotifyWebhookURL: &srv.URL}, devEncKey, ""); err != nil {
+	if _, err := svc.UpdateNotificationSettings(ctx, service.UpdateNotificationSettingsParams{WebhookURL: &srv.URL}); err != nil {
 		t.Fatalf("set webhook: %v", err)
 	}
 	if !svc.WorkflowNotificationConfigured(ctx) {

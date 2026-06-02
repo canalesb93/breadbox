@@ -271,7 +271,7 @@ document.addEventListener('alpine:init', function () {
 // response URL as inside the settings space.
 var BB_SETTINGS_PAGE_TABS = {
   account: 1, general: 1, system: 1, providers: 1, workflows: 1,
-  mcp: 1, 'api-keys': 1, backups: 1, help: 1,
+  notifications: 1, mcp: 1, 'api-keys': 1, backups: 1, help: 1,
 };
 
 // Sibling URL prefixes that render under an existing rail tab.
@@ -361,6 +361,7 @@ var BB_SETTINGS_SKELETONS = {
   backups: { sections: [3, 2, 2] },
   providers: { sections: [3, 3, 2] },
   workflows: { sections: [3, 4, 2] },
+  notifications: { sections: [3, 1] },
   mcp: { sections: [2, 2, 2, 3] },
   _default: { sections: [3, 3] },
 };

@@ -407,11 +407,17 @@ The sidecar receives the minted run key as `BREADBOX_API_KEY`. `runMCPStdio` (`i
 
 ## 8. Notification Sink
 
-Workflows can fire an outbound JSON webhook when noteworthy events occur (typically when a run submits a report via `submit_report`).
+Workflows can fire an outbound webhook when noteworthy events occur (typically when a run submits a report via `submit_report`).
 
 ### Configuration
 
-The webhook URL is stored in `app_config[notify.webhook_url]` (plaintext, http(s) only). It is set from Settings -> Agents (the `POST /-/workflows/settings` handler writes `NotifyWebhookURL`). A "Send test" button (`POST /-/workflows/notify-test`) fires a sample payload to verify the wiring.
+The sink lives on its own **Settings → Notifications** page (`/settings/notifications`, admin-only) and is stored across three `app_config` keys (all plaintext):
+
+- `notify.webhook_url` — the http(s) sink. Empty = notifications off.
+- `notify.format` — `auto` (default) | `ntfy` | `json`. Selects the wire shape (see Delivery).
+- `notify.public_base_url` — optional absolute origin (e.g. `https://breadbox.example.com`) used to build absolute deep links so an ntfy tap-through (and relative links in a report body) resolve to the real report.
+
+The `POST /settings/notifications` handler writes all three together; a "Send test" button (`POST /-/notifications/test`) fires a sample payload to verify the wiring. The legacy `POST /-/workflows/notify-test` route remains as a back-compat alias.
 
 ### NotificationPayload
 
@@ -429,9 +435,11 @@ type NotificationPayload struct {
 
 ### Delivery
 
-`SendWorkflowNotification` is a no-op when no URL is configured — callers fire unconditionally without a nil-check. The request uses a 10-second timeout (`notifyHTTPClient`) and sets `Content-Type: application/json` and `User-Agent: breadbox-workflows`. Any HTTP 3xx+ response is treated as an error.
+`SendWorkflowNotification` is a no-op when no URL is configured — callers fire unconditionally without a nil-check. The request uses a 10-second timeout (`notifyHTTPClient`) and `User-Agent: breadbox-workflows`. Any HTTP 3xx+ response is treated as an error. The wire shape depends on `notify.format`:
 
-The sink is generic by design: it works with ntfy, Slack-compatible relay bridges, Discord webhooks (via a formatter), and email bridges without per-provider formatting in Breadbox.
+- **`json`** — POSTs the `NotificationPayload` envelope above as `application/json`. Suits Slack-compatible relay bridges, Discord webhooks (via a formatter), and email bridges.
+- **`ntfy`** — publishes natively to [ntfy](https://docs.ntfy.sh/publish/): the request body is the (markdown) message and metadata rides in headers — `X-Title`, `X-Priority` (info→3 / warning→4 / critical→5), `X-Markdown: yes`, `X-Tags` (an emoji per priority), and `X-Click` (the absolute deep link, when a public base URL is set). Non-ASCII header values are RFC 2047-encoded. This is what makes an ntfy push render as a real titled, tap-through notification instead of a raw JSON blob.
+- **`auto`** (default) — picks `ntfy` when the webhook host looks like ntfy (`ntfy.sh` or any host containing `ntfy`), else `json`.
 
 ---
 

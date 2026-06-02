@@ -394,6 +394,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/backups", BackupsPageHandler(a, sm, tr))
 		r.Get("/backups", redirectGET("/settings/backups"))
 
+		// Notifications tab — the outbound notification sink (webhook URL,
+		// wire format, public base URL). Admin-only: the sink config governs
+		// where household report data egresses. The "Send test" button posts
+		// to /-/notifications/test (registered below).
+		r.Get("/settings/notifications", NotificationsSettingsHandler(svc, sm, tr))
+		r.Post("/settings/notifications", NotificationsSettingsPostHandler(svc, sm))
+
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Get("/settings/general", SettingsGetHandler(a, sm, tr))
 		r.Get("/settings/sync", redirectGET("/settings/general"))
@@ -603,6 +610,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/test", SmokeTestAgentAdminHandler(a, svc))
 			r.Post("/workflows/notify-test", NotifyTestAdminHandler(svc))
 			r.Post("/workflows/cleanup", AgentCleanupAdminHandler(a, svc))
+
+			// Notifications tab "Send test" button. Canonical home for the
+			// test-delivery endpoint now that the sink lives on its own page;
+			// /-/workflows/notify-test stays as a back-compat alias.
+			r.Post("/notifications/test", NotifyTestAdminHandler(svc))
 		})
 	})
 

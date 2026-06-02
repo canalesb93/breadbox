@@ -9,13 +9,14 @@ package components
 // top-level page). Security folds into System; the legacy Sync tab became
 // General (schedule, retention, avatars).
 const (
-	SettingsModalTabAccount   = "account"
-	SettingsModalTabGeneral   = "general"
-	SettingsModalTabSystem    = "system"
-	SettingsModalTabProviders = "providers"
-	SettingsModalTabWorkflows = "workflows"
-	SettingsModalTabMCP       = "mcp"
-	SettingsModalTabAccess    = "api-keys"
-	SettingsModalTabBackups   = "backups"
-	SettingsModalTabHelp      = "help"
+	SettingsModalTabAccount       = "account"
+	SettingsModalTabGeneral       = "general"
+	SettingsModalTabSystem        = "system"
+	SettingsModalTabProviders     = "providers"
+	SettingsModalTabWorkflows     = "workflows"
+	SettingsModalTabNotifications = "notifications"
+	SettingsModalTabMCP           = "mcp"
+	SettingsModalTabAccess        = "api-keys"
+	SettingsModalTabBackups       = "backups"
+	SettingsModalTabHelp          = "help"
 )
