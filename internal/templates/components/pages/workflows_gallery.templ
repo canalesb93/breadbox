@@ -466,26 +466,63 @@ templ workflowModelField(modelVar string) {
 	</div>
 }
 
-// workflowAdvancedFields is the collapsible Advanced section: the per-run cost
-// cap (max_budget_usd) and turn cap (max_turns). Collapsed by default. Bound to
-// budgetVar / turnsVar (the corresponding form fields).
+// workflowAdvancedFields is the collapsible Advanced section: the per-run
+// turn cap (max_turns) and cost cap (max_budget_usd). Collapsed by default —
+// the header carries a live summary ("10 turns · $1.00") so the limits stay
+// visible without expanding, which keeps the narrow drawer short. Bound to
+// turnsVar / budgetVar (the matching form fields). Both named inputs always
+// render (x-collapse only hides them visually), so the server's FormValue
+// parse path sees them whether or not the section is open.
 templ workflowAdvancedFields(turnsVar, budgetVar string) {
-	<div class="border-t border-base-200 pt-3">
-		<div class="flex items-center gap-1.5 text-sm font-medium text-base-content/70 mb-2">
-			@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
-			Advanced
-		</div>
-		<div class="grid grid-cols-2 gap-3">
-			<div>
-				<div class="text-sm font-medium mb-1.5">Max cost / run (USD)</div>
-				<input type="number" name="max_budget_usd" x-model={ budgetVar } min="0" max="1000" step="0.5" class="input input-sm w-full" placeholder="1.00"/>
+	<div class="border-t border-base-200 pt-3" x-data="{ advOpen: false }">
+		<button
+			type="button"
+			class="group w-full flex items-center justify-between gap-2 text-left cursor-pointer -mx-2 px-2 py-1.5 rounded-lg hover:bg-base-200/60 transition-colors"
+			@click="advOpen = !advOpen"
+			:aria-expanded="advOpen"
+		>
+			<span class="flex items-center gap-1.5 text-sm font-medium text-base-content/70 group-hover:text-base-content/90 transition-colors">
+				@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
+				Advanced
+			</span>
+			<span class="flex items-center gap-2 min-w-0">
+				<span class="text-xs text-base-content/45 tabular-nums truncate group-hover:text-base-content/60 transition-colors" x-show="!advOpen" x-text={ workflowAdvancedSummaryExpr(turnsVar, budgetVar) }></span>
+				<span class="inline-flex shrink-0 text-base-content/40 group-hover:text-base-content/70 transition" :class="advOpen ? 'rotate-180' : ''">
+					@components.LucideIcon("chevron-down", "w-3.5 h-3.5")
+				</span>
+			</span>
+		</button>
+		<div x-show="advOpen" x-collapse x-cloak>
+			<div class="grid grid-cols-2 gap-3 pt-3">
+				<div>
+					<div class="text-xs font-medium text-base-content/60 mb-1.5">Max turns</div>
+					<label class="input input-sm flex items-center gap-1.5 w-full">
+						<input type="number" name="max_turns" x-model={ turnsVar } min="0" max="100" step="1" class="grow tabular-nums" placeholder="10"/>
+						<span class="text-[11px] text-base-content/35 font-medium">turns</span>
+					</label>
+				</div>
+				<div>
+					<div class="text-xs font-medium text-base-content/60 mb-1.5">Max cost / run</div>
+					<label class="input input-sm flex items-center gap-1.5 w-full">
+						<span class="text-base-content/40 font-medium">$</span>
+						<input type="number" name="max_budget_usd" x-model={ budgetVar } min="0" max="1000" step="0.5" class="grow tabular-nums" placeholder="1.00"/>
+						<span class="text-[11px] text-base-content/35 font-medium">USD</span>
+					</label>
+				</div>
 			</div>
-			<div>
-				<div class="text-sm font-medium mb-1.5">Max turns</div>
-				<input type="number" name="max_turns" x-model={ turnsVar } min="0" max="100" step="1" class="input input-sm w-full" placeholder="10"/>
-			</div>
+			<p class="text-[11px] text-base-content/40 mt-2">A run stops at whichever limit it reaches first. Leave blank for the workflow's defaults.</p>
 		</div>
 	</div>
+}
+
+// workflowAdvancedSummaryExpr builds the Alpine x-text expression for the
+// collapsed Advanced summary ("10 turns · $1.00"). An empty field falls back
+// to the workflow default (10 turns / $1.00); an explicit 0 is preserved
+// (0 = no cap), so the ternaries test for empty/null rather than falsiness.
+func workflowAdvancedSummaryExpr(turnsVar, budgetVar string) string {
+	turns := "(" + turnsVar + " === '' || " + turnsVar + " == null ? '10' : " + turnsVar + ")"
+	budget := "(" + budgetVar + " === '' || " + budgetVar + " == null ? '1.00' : Number(" + budgetVar + ").toFixed(2))"
+	return turns + " + ' turns · $' + " + budget
 }
 
 // workflowActivateToggle is the setup drawer's header toggle (Mintlify-style):
