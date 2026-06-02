@@ -3,7 +3,7 @@
 //
 // The package tracks two DiceBear styles — one for human users
 // (avatar.dicebear_style_user, default "shapes") and one for AI
-// agents (avatar.dicebear_style_agent, default "icons") — so a
+// agents (avatar.dicebear_style_agent, default "glyphs") — so a
 // human-authored activity row reads unambiguously against an
 // agent-authored one. Both values live in app_config and are pushed
 // into the package via SetUserStyle / SetAgentStyle at server
@@ -41,17 +41,17 @@ const (
 	// symmetrical with DefaultAgentStyle.
 	DefaultUserStyle = "shapes"
 
-	// DefaultAgentStyle is the fallback for agent identicons. "icons"
-	// is DiceBear's glyph style — a pictographic icon on a colored
-	// rounded tile (surfaced in the settings picker as "Glyphs"). Agents
-	// read as obviously non-human, and each workflow gets a distinct,
-	// recognisable mark that pairs with the lucide icon language used on
-	// the Workflows gallery cards.
-	DefaultAgentStyle = "icons"
+	// DefaultAgentStyle is the fallback for agent identicons. "glyphs"
+	// is DiceBear's glyph style (added in v10) — a clean monochrome glyph
+	// on a soft tinted tile. Agents read as obviously non-human, and each
+	// workflow gets a distinct, recognisable mark that pairs with the
+	// lucide icon language used on the Workflows gallery cards.
+	DefaultAgentStyle = "glyphs"
 
-	// DefaultAPIBaseURL is the DiceBear v9 HTTP API root. Tests
-	// override this via SetAPIBaseURL.
-	DefaultAPIBaseURL = "https://api.dicebear.com/9.x"
+	// DefaultAPIBaseURL is the DiceBear v10 HTTP API root (v10 is the
+	// first major to ship the "glyphs" style). Tests override this via
+	// SetAPIBaseURL.
+	DefaultAPIBaseURL = "https://api.dicebear.com/10.x"
 
 	httpTimeout      = 5 * time.Second
 	maxResponseBytes = 1 << 20 // 1 MiB — DiceBear SVGs are < 50 KiB
@@ -294,14 +294,14 @@ func fallbackSVG(seed string, size int) []byte {
 }
 
 // StyleOption is one entry in AvailableStyles. ID matches DiceBear's
-// URL slug (https://api.dicebear.com/9.x/<id>/svg); Label is the
+// URL slug (https://api.dicebear.com/10.x/<id>/svg); Label is the
 // human-readable name shown in the settings dropdown.
 type StyleOption struct {
 	ID    string
 	Label string
 }
 
-// AvailableStyles is the catalog of DiceBear v9 styles surfaced in
+// AvailableStyles is the catalog of DiceBear v10 styles surfaced in
 // the settings UI. Ordered roughly from abstract (top) to character-
 // based (bottom) so the selector reads naturally.
 var AvailableStyles = []StyleOption{
@@ -309,9 +309,10 @@ var AvailableStyles = []StyleOption{
 	{ID: "rings", Label: "Rings"},
 	{ID: "identicon", Label: "Identicon (GitHub-style)"},
 	{ID: "glass", Label: "Glass"},
+	{ID: "glyphs", Label: "Glyphs"},
 	{ID: "initials", Label: "Initials"},
 	{ID: "thumbs", Label: "Thumbs"},
-	{ID: "icons", Label: "Glyphs"},
+	{ID: "icons", Label: "Icons"},
 	{ID: "bottts", Label: "Bottts (robots)"},
 	{ID: "bottts-neutral", Label: "Bottts neutral"},
 	{ID: "fun-emoji", Label: "Fun emoji"},

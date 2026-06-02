@@ -300,6 +300,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionUserAvatar() },
 		},
 		{
+			Slug:        "editable-avatar",
+			Title:       "Editable avatar",
+			Description: "components.EditableAvatar — a live avatar with a shuffle/regenerate button overlaid on its corner. The \"change this identity's picture\" affordance used by the Workflows reconfigure-drawer header. SrcExpr/OnShuffle are Alpine expressions so it drops into any seed-owning scope; the button tints primary + spins its glyph on hover.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionEditableAvatar() },
+		},
+		{
 			Slug:        "transaction-rows",
 			Title:       "Transaction rows",
 			Description: "TxRow / TxRowCompact / TxRowFeed and their building blocks (bb-tx-avatar, bb-tx-owner-badge, bb-tx-amount). The same avatar + amount shapes carry across every surface that lists transactions.",

@@ -2836,7 +2836,7 @@ templ SectionUserAvatar() {
 				@components.UserAvatar(components.UserAvatarProps{ID: "drew-uuid", Name: "Drew Dawson", Size: components.UserAvatarLg, Version: "1735776000"})
 			</div>
 		}
-		@designExample("Agents — dual style + bot fallback", "IsAgent has two render paths. With an ID set, the URL routes through ?type=agent and the server picks the configured agent DiceBear style (default \"bottts-neutral\") — distinct from the user style so agent activity reads as obviously non-human. With no ID, the bot-tile fallback fires.") {
+		@designExample("Agents — dual style + bot fallback", "IsAgent has two render paths. With an ID set, the URL routes through ?type=agent and the server picks the configured agent DiceBear style (default \"glyphs\") — distinct from the user style so agent activity reads as obviously non-human. With no ID, the bot-tile fallback fires.") {
 			<div class="flex flex-col gap-4">
 				<div class="flex flex-wrap items-center gap-4">
 					<span class="text-xs text-base-content/40 w-32">Agent identicon (ID + IsAgent)</span>
@@ -3026,8 +3026,44 @@ templ SectionUserAvatar() {
 				<div class="flex items-center gap-2">
 					<span class="text-xs text-base-content/40 w-24">Agent seeds</span>
 					for _, seed := range []string{"categorizer", "auditor", "reviewer", "scout"} {
-						<img class="w-10 h-10 rounded-full bg-base-200" alt={ "Preview " + seed } src={ "/avatars/preview/" + seed + "?style=bottts-neutral" }/>
+						<img class="w-10 h-10 rounded-full bg-base-200" alt={ "Preview " + seed } src={ "/avatars/preview/" + seed + "?style=glyphs" }/>
 					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// SectionEditableAvatar showcases components.EditableAvatar — the avatar +
+// shuffle/regenerate affordance from the Workflows reconfigure-drawer header.
+// Each example wraps the component in a tiny Alpine scope so the shuffle button
+// is live: clicking it mints a new seed and the avatar reseeds. SrcExpr /
+// OnShuffle are Alpine expressions, so the component is state-agnostic.
+templ SectionEditableAvatar() {
+	<div class="flex flex-col gap-6">
+		@designExample("Shuffle to reseed — hover the button", "An avatar with a shuffle/regenerate button pinned to its lower-right. The button shows a pointer cursor, tints primary, and spins its glyph on hover so it reads as an actionable \"give me another\" control. Click it: the seed changes and the avatar reseeds live (the chip shows the current seed).") {
+			<div x-data="{ s: 'editable-demo' }" class="flex items-center gap-4">
+				@components.EditableAvatar(components.EditableAvatarProps{
+					SrcExpr:   "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'",
+					OnShuffle: "s = 'sb-' + Math.floor(Math.random() * 1e9).toString(36)",
+					Alt:       "Demo workflow avatar",
+				})
+				<code class="text-xs text-base-content/50 px-2 py-1 rounded bg-base-200" x-text="s"></code>
+			</div>
+		}
+		@designExample("Sizes", "SizeClass overrides the tile dimensions; the 20px shuffle button keeps its hit target across sizes. Default is w-11 h-11 (44px) — the reconfigure-drawer header size. All three share one seed here, so a shuffle reseeds them together.") {
+			<div x-data="{ s: 'editable-sizes' }" class="flex items-end gap-6">
+				<div class="flex flex-col items-center gap-2">
+					<span class="text-xs text-base-content/40">40px</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=80'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-10 h-10"})
+				</div>
+				<div class="flex flex-col items-center gap-2">
+					<span class="text-xs text-base-content/40">44px · default</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar"})
+				</div>
+				<div class="flex flex-col items-center gap-2">
+					<span class="text-xs text-base-content/40">56px</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=112'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-14 h-14"})
 				</div>
 			</div>
 		}

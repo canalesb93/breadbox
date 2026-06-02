@@ -1,0 +1,61 @@
+package components
+
+// EditableAvatarProps configures EditableAvatar — a circular avatar with a
+// small shuffle/regenerate button overlaid on its lower-right corner. It's the
+// "change this identity's picture" affordance used by the Workflows
+// reconfigure-drawer header. The image source and the shuffle action are
+// Alpine expressions so the caller owns the seed state (the component is
+// state-agnostic and reusable across any x-data scope).
+type EditableAvatarProps struct {
+	// SrcExpr is the Alpine expression bound to the <img> via x-bind:src,
+	// e.g. "reconfigureAvatarSrc()". Required — the avatar is always live.
+	SrcExpr string
+	// OnShuffle is the Alpine @click expression for the shuffle button,
+	// e.g. "shuffleAvatar()". Required.
+	OnShuffle string
+	// Alt is the image alt text. Pass a meaningful label (e.g. "Workflow
+	// avatar"); empty renders alt="".
+	Alt string
+	// SizeClass overrides the avatar's width/height utilities. Empty defaults
+	// to "w-11 h-11" (44px) — the drawer-header size.
+	SizeClass string
+}
+
+// EditableAvatar renders a live avatar with a shuffle/regenerate overlay
+// button. The button reveals a primary tint and spins its glyph on hover
+// (and shows a pointer cursor) so it reads as an actionable "give me another"
+// control rather than decoration. Drop it inside any Alpine scope that owns a
+// seed value; wire SrcExpr/OnShuffle to that scope.
+//
+//	@components.EditableAvatar(components.EditableAvatarProps{
+//		SrcExpr:   "reconfigureAvatarSrc()",
+//		OnShuffle: "shuffleAvatar()",
+//		Alt:       "Workflow avatar",
+//	})
+templ EditableAvatar(p EditableAvatarProps) {
+	<div class={ "relative shrink-0 " + editableAvatarSizeClass(p.SizeClass) }>
+		<img
+			x-bind:src={ p.SrcExpr }
+			alt={ p.Alt }
+			class="w-full h-full rounded-full bg-base-200 ring-1 ring-base-300"
+		/>
+		<button
+			type="button"
+			@click={ p.OnShuffle }
+			title="Shuffle avatar"
+			aria-label="Shuffle avatar"
+			class="group absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-base-100 border border-base-300 shadow-sm flex items-center justify-center text-base-content/60 cursor-pointer transition-colors hover:bg-primary hover:text-primary-content hover:border-primary focus-visible:bg-primary focus-visible:text-primary-content focus-visible:outline-none"
+		>
+			@LucideIcon("shuffle", "w-3 h-3 transition-transform duration-300 group-hover:rotate-180")
+		</button>
+	</div>
+}
+
+// editableAvatarSizeClass returns the avatar's w/h utilities, defaulting to the
+// 44px drawer-header size when the caller doesn't override it.
+func editableAvatarSizeClass(s string) string {
+	if s == "" {
+		return "w-11 h-11"
+	}
+	return s
+}
