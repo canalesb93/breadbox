@@ -163,20 +163,9 @@ func (o *Orchestrator) RunNowWith(ctx context.Context, def *AgentDefinitionRespo
 }
 
 // FireSyncCompleteAgents dispatches a webhook-triggered run for every
-// agent definition with trigger_on_sync_complete=true. Called by the sync
-// engine's OnSyncComplete hook after a successful sync. Each agent fires
-// through RunOrSkip with trigger="webhook" so a busy semaphore leaves a
-// skipped row in the history rather than dropping the event silently.
-//
-// Runs each agent in its own goroutine so the sync engine returns
-// immediately. Concurrency is bounded by the orchestrator's existing
-// semaphore (iter-29 default: 3) — excess fires roll into skipped rows.
-//
-// Post-sync debounce: a definition that already ran (non-skipped) within
-// PostSyncDebounceWindow is skipped silently here, so N rapid syncs
-// coalesce to one run instead of fanning out (the design-doc §4
-// cost-amplification trap). The debounce is intentionally row-less — a
-// coalesced trigger isn't a "missed" run worth a skipped row.
+// agent with trigger_on_sync_complete=true. A definition that already ran
+// (non-skipped) within PostSyncDebounceWindow is silently skipped here —
+// row-less, since a coalesced trigger isn't a "missed" run.
 func (o *Orchestrator) FireSyncCompleteAgents(ctx context.Context) {
 	// Use a fresh context for the lookup — the incoming ctx is the sync
 	// engine's, and a cancelled webhook request or timed-out sync would
@@ -414,8 +403,7 @@ func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionRespo
 		// Mirrors the runLocked path; same reasoning as the deferred revoke.
 		persistCtx, persistCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer persistCancel()
-		completedRow, completeErr := o.svc.CompleteAgentRunDB(persistCtx, runRow.ID, result, def.MaxTurns)
-		if completeErr != nil {
+		if _, completeErr := o.svc.CompleteAgentRunDB(persistCtx, runRow.ID, result, def.MaxTurns); completeErr != nil {
 			o.logger.Error("orchestrator: persist completed run failed",
 				"agent", def.Slug, "run", runResp.ShortID, "error", completeErr)
 			return
@@ -426,7 +414,6 @@ func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionRespo
 					"agent", def.Slug, "run", runResp.ShortID, "cap", cap, "error", err)
 			}
 		}
-		_ = completedRow
 		if runErr != nil {
 			o.logger.Warn("orchestrator: run finished with error",
 				"agent", def.Slug, "run", runResp.ShortID,

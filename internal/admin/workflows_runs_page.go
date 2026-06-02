@@ -93,7 +93,7 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			Offset:         offset,
 			HasMore:        result.HasMore,
 			CSRFToken:      GetCSRFToken(r),
-			SubsystemReady: buildAgentsListStatus(subStatus).Ready,
+			SubsystemReady: subStatus != nil && subStatus.Ready,
 			Counts: pages.WorkflowRunStatusCounts{
 				All:        all,
 				Success:    counts["success"],

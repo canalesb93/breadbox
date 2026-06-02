@@ -413,20 +413,9 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 		}
 	}
 
-	prompt, err := composePresetPrompt(preset.PromptBlocks)
+	prompt, err := composeWorkflowPrompt(preset, params.Options, params.AdditionalInstructions)
 	if err != nil {
 		return nil, err
-	}
-	// Apply the preset's specialized options: each chosen choice's directive
-	// is appended to the base prompt (auto/default choices have no directive).
-	prompt += resolveOptionDirectives(preset, params.Options)
-	// Append the household's per-workflow tuning to the base prompt.
-	instr := strings.TrimSpace(params.AdditionalInstructions)
-	if len(instr) > maxAdditionalInstructions {
-		return nil, fmt.Errorf("%w: additional instructions exceed %d chars", ErrInvalidParameter, maxAdditionalInstructions)
-	}
-	if instr != "" {
-		prompt = prompt + "\n\n## Additional instructions\n\n" + instr
 	}
 
 	create := CreateAgentDefinitionParams{

@@ -99,13 +99,18 @@ func (s *Service) ListWorkflowsForMCP(ctx context.Context) (*WorkflowsMCPResult,
 	}
 	presets := make([]WorkflowPresetMCPView, 0, len(views))
 	for _, v := range views {
+		var cron *string
+		if v.ScheduleCron != "" {
+			c := v.ScheduleCron
+			cron = &c
+		}
 		presets = append(presets, WorkflowPresetMCPView{
 			Slug:         v.Slug,
 			Name:         v.Name,
 			Category:     v.Category,
 			Description:  v.Description,
 			ToolScope:    v.ToolScope,
-			Trigger:      workflowTriggerLabel(v.TriggerOnSyncComplete, ptrIfNotEmptyStr(v.ScheduleCron)),
+			Trigger:      workflowTriggerLabel(v.TriggerOnSyncComplete, cron),
 			ScheduleCron: v.ScheduleCron,
 			Enabled:      v.Enabled,
 		})
@@ -126,14 +131,4 @@ func workflowTriggerLabel(onSync bool, cron *string) string {
 	default:
 		return "manual"
 	}
-}
-
-// ptrIfNotEmptyStr returns a pointer to s when non-empty, else nil. Local to
-// this file so the preset's plain-string ScheduleCron can reuse the shared
-// trigger-label helper.
-func ptrIfNotEmptyStr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

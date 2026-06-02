@@ -194,19 +194,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/oauth-clients/new", redirectGET("/settings/api-keys"))
 		r.Get("/settings/oauth-clients/{id}/created", redirectGET("/settings/api-keys"))
 
-		// Agents — Claude Agent SDK admin pages.
-		//
-		// IA: /agents is the **runs landing** (the most interesting
-		// surface; what happened, when, with what outcome). The Agents
-		// list (the definitions table) moves to /agents/definitions and
-		// both share a 2-tab nav rendered immediately below the
-		// PageHeader. /agents?agent=<slug> filters the runs feed to one
-		// agent, which subsumes the old /agents/{slug}/runs route.
-		// Legacy /agents/runs and /agents/{slug}/runs 301-redirect.
-		// Legacy /agents page surface is retired — Workflows is the single
-		// automation home. The entry points 301-redirect to their Workflows
-		// equivalents (the hand-authored form pages below stay reachable by
-		// direct URL until the custom-workflow builder lands).
+		// Legacy /agents → Workflows redirects + hand-authored agent form
+		// pages (kept reachable by direct URL until the custom-workflow
+		// builder lands).
 		r.Get("/agents", redirectGET("/workflows/runs"))
 		r.Get("/agents/definitions", redirectGET("/workflows"))
 		r.Get("/workflows", WorkflowsGalleryPageHandler(svc, sm, tr))
