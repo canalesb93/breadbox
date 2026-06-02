@@ -3,7 +3,7 @@
 //
 // The package tracks two DiceBear styles — one for human users
 // (avatar.dicebear_style_user, default "shapes") and one for AI
-// agents (avatar.dicebear_style_agent, default "bottts-neutral") — so a
+// agents (avatar.dicebear_style_agent, default "icons") — so a
 // human-authored activity row reads unambiguously against an
 // agent-authored one. Both values live in app_config and are pushed
 // into the package via SetUserStyle / SetAgentStyle at server
@@ -41,12 +41,13 @@ const (
 	// symmetrical with DefaultAgentStyle.
 	DefaultUserStyle = "shapes"
 
-	// DefaultAgentStyle is the fallback for agent identicons.
-	// "bottts-neutral" is DiceBear's robot style on a flat, transparent
-	// background (no per-avatar colored tile) — agents read as obviously
-	// non-human while sitting cleanly on our own surfaces/rings instead
-	// of carrying their own background swatch.
-	DefaultAgentStyle = "bottts-neutral"
+	// DefaultAgentStyle is the fallback for agent identicons. "icons"
+	// is DiceBear's glyph style — a pictographic icon on a colored
+	// rounded tile (surfaced in the settings picker as "Glyphs"). Agents
+	// read as obviously non-human, and each workflow gets a distinct,
+	// recognisable mark that pairs with the lucide icon language used on
+	// the Workflows gallery cards.
+	DefaultAgentStyle = "icons"
 
 	// DefaultAPIBaseURL is the DiceBear v9 HTTP API root. Tests
 	// override this via SetAPIBaseURL.
@@ -310,7 +311,7 @@ var AvailableStyles = []StyleOption{
 	{ID: "glass", Label: "Glass"},
 	{ID: "initials", Label: "Initials"},
 	{ID: "thumbs", Label: "Thumbs"},
-	{ID: "icons", Label: "Icons"},
+	{ID: "icons", Label: "Glyphs"},
 	{ID: "bottts", Label: "Bottts (robots)"},
 	{ID: "bottts-neutral", Label: "Bottts neutral"},
 	{ID: "fun-emoji", Label: "Fun emoji"},

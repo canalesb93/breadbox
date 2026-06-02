@@ -41,6 +41,10 @@ type WorkflowConfig struct {
 	Slug string `json:"slug"`
 	// Name is the workflow's display name.
 	Name string `json:"name"`
+	// AvatarSeed is the workflow's custom DiceBear avatar seed (empty when
+	// it falls back to seeding on the slug). Drives the drawer's avatar
+	// preview.
+	AvatarSeed string `json:"avatar_seed"`
 	// TriggerOnSync is true when the workflow fires after each sync (vs a
 	// custom cron). The drawer's trigger radio is seeded from this; it's
 	// now user-switchable per workflow, not fixed by the preset.
@@ -90,6 +94,13 @@ type UpdateWorkflowConfigParams struct {
 	// (keyed by WorkflowPresetOption.Key). Unknown/missing keys fall back to
 	// the option's Default, matching enable-time semantics.
 	Options map[string]string
+	// Name, when non-nil and non-blank, renames the workflow. A blank value
+	// is ignored (the name is required), leaving the current name in place.
+	Name *string
+	// AvatarSeed, when non-nil, replaces the workflow's DiceBear avatar seed
+	// (empty string clears it back to slug-seeded). The slug itself is never
+	// touched — it's the stable identity baked into run keys and routes.
+	AvatarSeed *string
 }
 
 // presetForEnabledWorkflow resolves an enabled workflow by slug and returns
@@ -170,6 +181,9 @@ func (s *Service) GetWorkflowConfig(ctx context.Context, slug string) (*Workflow
 		MaxTurns:               def.MaxTurns,
 		AdditionalInstructions: instructions,
 	}
+	if def.AvatarSeed != nil {
+		cfg.AvatarSeed = *def.AvatarSeed
+	}
 	if def.ScheduleCron != nil {
 		cfg.ScheduleCron = *def.ScheduleCron
 	}
@@ -229,6 +243,19 @@ func (s *Service) UpdateWorkflowConfig(ctx context.Context, slug string, params 
 	}
 
 	update := UpdateAgentDefinitionParams{Prompt: &prompt}
+
+	// Identity: name (rename) + avatar seed. The slug stays put — it's the
+	// stable identity baked into run keys and routes. A blank name is ignored
+	// (name is required); the avatar seed passes through verbatim (empty =
+	// clear back to slug-seeded).
+	if params.Name != nil {
+		if n := strings.TrimSpace(*params.Name); n != "" {
+			update.Name = &n
+		}
+	}
+	if params.AvatarSeed != nil {
+		update.AvatarSeed = params.AvatarSeed
+	}
 
 	// Trigger + schedule. The trigger is now user-switchable per workflow
 	// (not fixed by the preset). The two modes are mutually exclusive — see

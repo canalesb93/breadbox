@@ -16,6 +16,12 @@ SELECT * FROM workflows WHERE short_id = $1;
 -- name: GetAgentDefinitionBySlug :one
 SELECT * FROM workflows WHERE slug = $1;
 
+-- name: GetWorkflowAvatarSeedBySlug :one
+-- Resolves a workflow's custom DiceBear avatar seed from its stable slug.
+-- NULL/absent means the avatar falls back to seeding on the slug itself.
+-- Used by the avatar handler to render agent identicons.
+SELECT avatar_seed FROM workflows WHERE slug = $1;
+
 -- name: ListAgentDefinitions :many
 SELECT * FROM workflows
 ORDER BY created_at DESC;
@@ -41,6 +47,7 @@ SET name                     = $2,
     quiet_hours_start        = $13,
     quiet_hours_end          = $14,
     trigger_on_sync_complete = $15,
+    avatar_seed              = $16,
     updated_at               = NOW()
 WHERE id = $1
 RETURNING *;

@@ -63,8 +63,8 @@ const (
 	// KeyAvatarAgentStyle is the DiceBear style slug used for agent
 	// identicons. Agents render distinct avatars from users so an
 	// AI-authored activity row reads unambiguously against a human
-	// one. Default: "bottts-neutral" (robot identicons on a flat
-	// transparent background).
+	// one. Default: "icons" (DiceBear glyph identicons, surfaced as
+	// "Glyphs" in the picker).
 	KeyAvatarAgentStyle = "avatar.dicebear_style_agent"
 
 	// KeyWorkflowsConsentAckAt records when the household first

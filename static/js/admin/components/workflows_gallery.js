@@ -35,6 +35,9 @@ document.addEventListener('alpine:init', function () {
         loading: false,
         slug: '',
         name: '',
+        // avatarSeed drives the header DiceBear preview + posts as the hidden
+        // avatar_seed field. Empty = seed on the slug (the historical default).
+        avatarSeed: '',
         enabled: false, // run-state, driven by the header toggle (toggleWorkflow)
         // triggerOnSync is a STRING ('true' | 'false') so the trigger radios
         // can bind via x-model and submit as the trigger_on_sync form field.
@@ -191,6 +194,7 @@ document.addEventListener('alpine:init', function () {
         self.reconfigure.model = '';
         self.reconfigure.maxTurns = '';
         self.reconfigure.maxBudget = '';
+        self.reconfigure.avatarSeed = '';
         self.cronPreview = '';
         Alpine.store('drawers').open('wf-reconfigure');
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/config', {
@@ -209,6 +213,7 @@ document.addEventListener('alpine:init', function () {
             self.reconfigure.maxTurns = data.max_turns ? String(data.max_turns) : '';
             self.reconfigure.maxBudget = data.max_budget_usd ? String(data.max_budget_usd) : '';
             self.reconfigure.additionalInstructions = data.additional_instructions || '';
+            self.reconfigure.avatarSeed = data.avatar_seed || '';
             self.reconfigure.options = Array.isArray(data.options) ? data.options : [];
             if (self.reconfigure.triggerOnSync === 'false') self.describeCron(self.reconfigure.scheduleCron);
           })
@@ -220,6 +225,31 @@ document.addEventListener('alpine:init', function () {
           .finally(function () {
             self.reconfigure.loading = false;
           });
+      },
+
+      // reconfigureAvatarSrc builds the header avatar URL for the workflow's
+      // current seed, falling back to the slug when no custom seed is set. The
+      // ?type=agent param picks the agent DiceBear style server-side; the server
+      // also maps a slug to its stored avatar_seed, so the live preview (raw
+      // seed) and the saved render (slug-keyed) resolve to the same image.
+      reconfigureAvatarSrc: function () {
+        var seed = this.reconfigure.avatarSeed || this.reconfigure.slug || 'workflow';
+        return '/avatars/' + encodeURIComponent(seed) + '?type=agent&size=88';
+      },
+
+      // shuffleAvatar mints a fresh random seed so the operator can cycle to a
+      // different DiceBear mark. The preview updates reactively; the seed posts
+      // with the form (hidden avatar_seed) on Save.
+      shuffleAvatar: function () {
+        var bytes = new Uint8Array(8);
+        if (window.crypto && window.crypto.getRandomValues) {
+          window.crypto.getRandomValues(bytes);
+        } else {
+          for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+        }
+        var hex = '';
+        for (var j = 0; j < bytes.length; j++) hex += ('0' + bytes[j].toString(16)).slice(-2);
+        this.reconfigure.avatarSeed = hex;
       },
 
       // describeCron fetches a human-readable rendering of a cron expression
