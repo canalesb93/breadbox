@@ -118,10 +118,12 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 			AllComplete:         allComplete,
 			ActiveStep:          activeStep,
 			TimeRemaining:       timeRemaining,
+			MemberCount:         userCount,
 			ConnectionCount:     connCount,
 			AccountCount:        accountCount,
 			TransactionCount:    txCount,
 			SuccessfulSyncs:     successfulSyncs,
+			ApiKeyCount:         activeAPIKeys,
 			OnboardingDismissed: dismissed,
 			CSRFToken:           GetCSRFToken(r),
 		}

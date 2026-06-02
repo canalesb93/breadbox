@@ -16,18 +16,21 @@ templ SectionSetupStep() {
 				<li>One step row per onboarding step on <code>/getting-started</code>. The caller computes <code>State</code> — the first incomplete step is <code>active</code>, every later incomplete step is <code>pending</code>, completed steps are <code>complete</code>, and a running first sync is <code>in_progress</code>.</li>
 				<li>The <code>active</code> row is the focal "you are here" surface — a primary ring + faint wash, the topical icon, the full description, a meta row, and a solid primary CTA. Exactly one row should be <code>active</code> at a time.</li>
 				<li>Never put the running state inside a daisy badge — the <code>in_progress</code> tile uses a spinner, badges are reserved for terminal / categorical state.</li>
+				<li>An optional inline <code>Stat</code> + <code>StatLabel</code> surfaces the count a step produced (members, connections, transactions). It sits left of the CTA and is vertically centered with it.</li>
 			</ul>
 		</div>
 		@designExample("State hierarchy (the full cascade)", "How the five onboarding steps read top-to-bottom: two complete steps recede, the active step dominates, and the remaining steps wait muted. Note the disabled CTA on the locked step.") {
 			<div class="grid gap-3">
 				@components.SetupStep(components.SetupStepProps{
-					Number:   1,
-					Icon:     "users",
-					Title:    "Add a family member",
-					Summary:  "Jordan added — connections link to household members.",
-					State:    components.SetupStepComplete,
-					CTAHref:  templ.SafeURL("/household"),
-					CTALabel: "View members",
+					Number:    1,
+					Icon:      "users",
+					Title:     "Add a family member",
+					Summary:   "Jordan added — connections link to household members.",
+					State:     components.SetupStepComplete,
+					Stat:      "1",
+					StatLabel: "member",
+					CTAHref:   templ.SafeURL("/household"),
+					CTALabel:  "View members",
 				})
 				@components.SetupStep(components.SetupStepProps{
 					Number:   2,
@@ -113,15 +116,17 @@ templ SectionSetupStep() {
 				CTALabel:    "View logs",
 			})
 		}
-		@designExample("Complete — done and quiet", "Success-green check tile, a one-line Summary, and a ghost \"view\" affordance. The whole row recedes.") {
+		@designExample("Complete — done and quiet", "Success-green check tile, a one-line Summary, an optional inline Stat (value + label, vertically centered with the CTA), and a ghost \"view\" affordance. The whole row recedes.") {
 			@components.SetupStep(components.SetupStepProps{
-				Number:   3,
-				Icon:     "link-2",
-				Title:    "Connect your first bank",
-				Summary:  "Chase connected — 2 accounts, syncing automatically.",
-				State:    components.SetupStepComplete,
-				CTAHref:  templ.SafeURL("/connections"),
-				CTALabel: "View connections",
+				Number:    3,
+				Icon:      "link-2",
+				Title:     "Connect your first bank",
+				Summary:   "Chase connected, syncing automatically.",
+				State:     components.SetupStepComplete,
+				Stat:      "2",
+				StatLabel: "accounts",
+				CTAHref:   templ.SafeURL("/connections"),
+				CTALabel:  "View connections",
 			})
 		}
 		@designExample("Pending — prerequisites unmet", "Muted: the tile shows the step number, the copy dims, and the CTA renders as a disabled span when CTADisabled (left) or a quiet ghost link otherwise (right).") {
