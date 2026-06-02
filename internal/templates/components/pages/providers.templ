@@ -7,298 +7,456 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// Providers renders the Providers tab — Plaid, Teller, CSV. Each
-// provider is one SettingsSection with the status badge pinned to the
-// header right slot; stats, configuration, and the test/webhook
-// blocks render as rows inside. See .claude/rules/settings.md.
+// Providers renders the Providers tab as a compact directory: one row
+// per provider inside a single section. Each row opens that provider's
+// configuration drawer — the credential forms, test-connection, and
+// webhook reference all live in the slide-over (components.Drawer),
+// keyed `provider-<name>` on the global $store.drawers store. The page
+// itself stays a clean list that scales to new providers by adding one
+// providerRow + one drawer. See .claude/rules/settings.md.
 //
-// The Alpine factory `providerCard` (in static/js/admin/components/providers.js)
-// drives the test-connection request and the in-place result toast.
-// Each section binds it via `x-data="providerCard" data-provider="..."`.
+// The Alpine factory `providerCard` (static/js/admin/components/providers.js)
+// drives the in-drawer test-connection request and its result line; each
+// drawer scopes it via `x-data="providerCard" data-provider="..."`.
 templ Providers(p ProvidersProps) {
 	<script src="/static/js/admin/components/providers.js"></script>
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "Providers",
-			Subtitle: "Configure bank data providers for syncing accounts and transactions",
+			Subtitle: "Connect bank-data providers to sync accounts and transactions",
 		})
-		<div class="space-y-6">
-			@providersPlaidSection(p, p.ProviderHealth["plaid"])
-			@providersTellerSection(p, p.ProviderHealth["teller"])
-			@providersCSVSection(p.ProviderHealth["csv"])
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "plug",
+			Title:   "Connections",
+			Caption: "Configure each provider — credentials open in a side panel",
+		}) {
+			@providerRow(providerRowData{
+				ID:         "plaid",
+				Brand:      "plaid",
+				Name:       "Plaid",
+				Desc:       "Thousands of financial institutions",
+				Configured: p.PlaidConfigured,
+				Health:     p.ProviderHealth["plaid"],
+			})
+			@providerRow(providerRowData{
+				ID:         "teller",
+				Brand:      "teller",
+				Name:       "Teller",
+				Desc:       "mTLS certificate authentication",
+				Configured: p.TellerConfigured,
+				Health:     p.ProviderHealth["teller"],
+			})
+			@providerRow(providerRowData{
+				ID:         "csv",
+				Icon:       "file-spreadsheet",
+				Name:       "CSV Import",
+				Desc:       "Bank-exported files — no credentials required",
+				Configured: true,
+				Health:     p.ProviderHealth["csv"],
+			})
+		}
+		// Per-provider drawers. Position-independent (fixed), so rendering
+		// them after the section is fine; only the one matching the open id
+		// (plus its scrim) shows.
+		@providersPlaidDrawer(p, p.ProviderHealth["plaid"])
+		@providersTellerDrawer(p, p.ProviderHealth["teller"])
+		@providersCSVDrawer(p.ProviderHealth["csv"])
+	</div>
+}
+
+// ---------------------------------------------------------------------
+// Directory row
+// ---------------------------------------------------------------------
+
+// providerRowData is one entry in the provider directory. The whole row
+// is the affordance — it opens `provider-<ID>` — so a brand mark on the
+// left is legitimate (the action-list exception in settings.md).
+type providerRowData struct {
+	ID         string // drawer suffix → opens "provider-<ID>"
+	Brand      string // brand slug for BrandIcon; empty → use Icon
+	Icon       string // lucide fallback (CSV has no brand mark)
+	Name       string
+	Desc       string
+	Configured bool
+	Health     *service.ProviderHealthSummary
+}
+
+templ providerRow(d providerRowData) {
+	<button
+		type="button"
+		class="bb-settings-row bb-settings-row--link w-full text-left"
+		@click={ "$store.drawers.open('provider-" + d.ID + "')" }
+	>
+		if d.Brand != "" {
+			@components.BrandIcon(d.Brand, "w-5 h-5 shrink-0")
+		} else if d.Icon != "" {
+			@components.LucideIcon(d.Icon, "w-5 h-5 text-base-content opacity-60 shrink-0")
+		}
+		<div class="bb-settings-row__main">
+			<div class="bb-settings-row__label">{ d.Name }</div>
+			<p class="bb-settings-row__caption">{ d.Desc }</p>
 		</div>
-	</div>
+		<div class="bb-settings-row__control">
+			<div class="flex items-center gap-2.5">
+				@providerRowStatus(d.Configured, d.Health)
+				@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content opacity-40 shrink-0")
+			</div>
+		</div>
+	</button>
 }
 
-// ---------------------------------------------------------------------
-// Plaid
-// ---------------------------------------------------------------------
-
-templ providersPlaidSection(p ProvidersProps, h *service.ProviderHealthSummary) {
-	<div x-data="providerCard" data-provider="plaid">
-		@components.SettingsSection(components.SettingsSectionProps{
-			BrandIcon: "plaid",
-			Title:     "Plaid",
-			Caption:   "Thousands of financial institutions",
-		}) {
-			@providersStatsRow(h, p.PlaidConfigured)
-			if p.PlaidFromEnv {
-				@providersPlaidEnvRows(p)
-			} else {
-				@providersPlaidFormRows(p)
-			}
-			if p.PlaidConfigured {
-				@providersTestRow("Plaid", "test-plaid")
-				@providersPlaidWebhookRow()
-			}
-		}
-	</div>
-}
-
-templ providersPlaidEnvRows(p ProvidersProps) {
-	@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-		<p class="text-xs text-base-content/50 flex items-center gap-1.5">
-			@components.LucideIcon("lock", "w-3.5 h-3.5")
-			Configured via environment variables (read-only)
-		</p>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Client ID"}) {
-		<code class="font-mono text-xs break-all">{ p.PlaidClientID }</code>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Secret"}) {
-		<code class="font-mono text-xs">********</code>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Environment"}) {
-		<span class="text-sm">{ p.PlaidEnv }</span>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Webhook URL"}) {
-		if p.WebhookURL != "" {
-			<code class="font-mono text-xs break-all">{ p.WebhookURL }</code>
-		} else {
-			<span class="text-base-content/40 text-sm">Not set</span>
-		}
-	}
-}
-
-// providersPlaidFormRows renders the inline configuration form. The
-// form wraps just the inputs and the Save button at the bottom — it
-// sits inside SettingsRows so the visual rhythm matches the rest of
-// the section. Save is the only button inside the form, so the test
-// connection / webhook blocks below it stay outside.
-templ providersPlaidFormRows(p ProvidersProps) {
-	@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-		<form method="POST" action="/settings/providers/plaid" autocomplete="off" class="space-y-4" @submit="saving = true">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="plaid_client_id">
-					Client ID
-					@configSourceBadge(p.ConfigSources, "plaid_client_id")
-				</label>
-				<input type="text" id="plaid_client_id" name="plaid_client_id" value={ p.PlaidClientID } placeholder="Plaid Client ID" autocomplete="off" class="bb-form-input"/>
-			</div>
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="plaid_secret">Secret</label>
-				<input
-					type="password"
-					id="plaid_secret"
-					name="plaid_secret"
-					value=""
-					placeholder={ plaidSecretPlaceholder(p.PlaidConfigured) }
-					autocomplete="new-password"
-					class="bb-form-input"
-				/>
-			</div>
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="plaid_env">
-					Environment
-					@configSourceBadge(p.ConfigSources, "plaid_env")
-				</label>
-				<select id="plaid_env" name="plaid_env" class="select select-sm w-full sm:max-w-xs bg-base-200">
-					@plaidEnvOption("sandbox", p.PlaidEnv, "Sandbox")
-					@plaidEnvOption("development", p.PlaidEnv, "Development")
-					@plaidEnvOption("production", p.PlaidEnv, "Production")
-				</select>
-				<p class="text-xs text-base-content/40 mt-1.5">Credentials will be validated before saving.</p>
-			</div>
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="webhook_url">
-					Webhook URL
-					@configSourceBadge(p.ConfigSources, "webhook_url")
-				</label>
-				<input type="url" id="webhook_url" name="webhook_url" value={ p.WebhookURL } placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="bb-form-input"/>
-				<p class="text-xs text-base-content/40 mt-1.5">Plaid will send transaction updates to this URL. Must use HTTPS.</p>
-			</div>
-			<div class="pt-1">
-				<button type="submit" class="btn btn-primary btn-sm" :disabled="saving">
-					<span x-show="!saving">Save Plaid settings</span>
-					<span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving...</span>
-				</button>
-			</div>
-		</form>
-	}
-}
-
-templ plaidEnvOption(value, current, label string) {
-	if value == current {
-		<option value={ value } selected>{ label }</option>
+// providerRowStatus is the compact right-side connection indicator. Detail
+// (accounts, last-sync time) lives in the drawer; the row shows just the
+// categorical state so the directory stays scannable.
+templ providerRowStatus(configured bool, h *service.ProviderHealthSummary) {
+	if !configured {
+		<span class="text-xs text-base-content/40 whitespace-nowrap">Not connected</span>
 	} else {
-		<option value={ value }>{ label }</option>
+		<span class="inline-flex items-center gap-1.5 text-xs text-base-content/60 whitespace-nowrap">
+			<span class={ "status status-sm " + providerStatusDot(h) }></span>
+			{ providerStatusLabel(h) }
+		</span>
 	}
+}
+
+func providerStatusDot(h *service.ProviderHealthSummary) string {
+	if h != nil && h.LastSyncTime != nil {
+		switch h.LastSyncStatus {
+		case "error":
+			return "status-error"
+		case "in_progress":
+			return "status-warning"
+		}
+	}
+	return "status-success"
+}
+
+func providerStatusLabel(h *service.ProviderHealthSummary) string {
+	if h != nil && h.LastSyncTime != nil {
+		switch h.LastSyncStatus {
+		case "error":
+			return "Sync error"
+		case "in_progress":
+			return "Syncing"
+		}
+	}
+	return "Connected"
 }
 
 // ---------------------------------------------------------------------
-// Teller
+// Plaid drawer
 // ---------------------------------------------------------------------
 
-templ providersTellerSection(p ProvidersProps, h *service.ProviderHealthSummary) {
-	<div x-data="providerCard" data-provider="teller">
-		@components.SettingsSection(components.SettingsSectionProps{
-			BrandIcon: "teller",
-			Title:     "Teller",
-			Caption:   "mTLS certificate authentication",
-		}) {
-			@providersStatsRow(h, p.TellerConfigured)
-			if p.TellerFromEnv {
-				@providersTellerEnvRows(p)
-			} else {
-				@providersTellerFormRows(p)
-			}
-			if p.TellerConfigured {
-				@providersTestRow("Teller", "test-teller")
-				@providersTellerWebhookRow(p)
-			}
-		}
-	</div>
-}
-
-templ providersTellerEnvRows(p ProvidersProps) {
-	@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-		<p class="text-xs text-base-content/50 flex items-center gap-1.5">
-			@components.LucideIcon("lock", "w-3.5 h-3.5")
-			Configured via environment variables (read-only)
-		</p>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "App ID"}) {
-		<code class="font-mono text-xs break-all">{ p.TellerAppID }</code>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Certificate"}) {
-		if p.TellerCertConfigured {
-			<span class="badge badge-soft badge-success badge-sm">Configured</span>
-		} else {
-			<span class="badge badge-soft badge-error badge-sm">Not configured</span>
-		}
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Environment"}) {
-		<span class="text-sm">{ p.TellerEnv }</span>
-	}
-	@components.SettingsRow(components.SettingsRowProps{Label: "Webhook Secret"}) {
-		if p.TellerWebhookConfigured {
-			<span class="badge badge-soft badge-success badge-sm">Configured</span>
-		} else {
-			<span class="badge badge-ghost badge-sm">Not configured</span>
-		}
-	}
-}
-
-templ providersTellerFormRows(p ProvidersProps) {
-	@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-		<form method="POST" action="/settings/providers/teller" enctype="multipart/form-data" autocomplete="off" class="space-y-4" @submit="saving = true">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_app_id">App ID</label>
-				<input type="text" id="teller_app_id" name="teller_app_id" value={ p.TellerAppID } placeholder="Teller App ID" autocomplete="off" class="bb-form-input"/>
-			</div>
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_env">Environment</label>
-				<select id="teller_env" name="teller_env" class="select select-sm w-full sm:max-w-xs bg-base-200">
-					@plaidEnvOption("sandbox", p.TellerEnv, "Sandbox")
-					@plaidEnvOption("development", p.TellerEnv, "Development")
-					@plaidEnvOption("production", p.TellerEnv, "Production")
-				</select>
-			</div>
-			if !p.TellerCertFromEnv {
-				<div class="border-t border-base-300 pt-4">
-					<h3 class="text-sm font-medium mb-3 text-base-content/60">mTLS Certificate</h3>
-					if p.TellerCertConfigured {
-						<p class="text-sm text-success mb-3 flex items-center gap-1.5">
-							@components.LucideIcon("check-circle", "w-4 h-4") Certificate and private key are configured.
-						</p>
+templ providersPlaidDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
+	@components.Drawer(components.DrawerProps{
+		ID:    "provider-plaid",
+		Title: "Configure Plaid",
+		Size:  "lg",
+	}) {
+		if p.PlaidFromEnv {
+			<div x-data="providerCard" data-provider="plaid" class="flex flex-col h-full">
+				@providersPlaidDrawerHeader()
+				<div class="flex-1 overflow-y-auto p-5 space-y-5">
+					@providerEnvNotice()
+					@providerHealthBlock(h, p.PlaidConfigured)
+					@providerReadonlyField("Client ID") {
+						<code class="font-mono text-xs break-all">{ p.PlaidClientID }</code>
 					}
-					<div class="mb-3">
-						<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_cert_file">Certificate file (.pem)</label>
-						<input type="file" id="teller_cert_file" name="teller_cert_file" accept=".pem,.crt,.cert" class="file-input file-input-sm w-full"/>
-					</div>
-					<div>
-						<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_key_file">Private key file (.pem)</label>
-						<input type="file" id="teller_key_file" name="teller_key_file" accept=".pem,.key" class="file-input file-input-sm w-full"/>
-					</div>
-					if !p.HasEncryptionKey {
-						<p class="text-xs text-warning mt-3 flex items-center gap-1.5">
-							@components.LucideIcon("alert-triangle", "w-3.5 h-3.5") ENCRYPTION_KEY must be set to store certificates.
-						</p>
+					@providerReadonlyField("Secret") {
+						<code class="font-mono text-xs">********</code>
+					}
+					@providerReadonlyField("Environment") {
+						<span class="text-sm">{ p.PlaidEnv }</span>
+					}
+					@providerDrawerDivider()
+					@providerTestBlock("Plaid")
+					@providerPlaidWebhookRef()
+				</div>
+				@providerDrawerCloseFooter()
+			</div>
+		} else {
+			<form
+				method="POST"
+				action="/settings/providers/plaid"
+				autocomplete="off"
+				class="flex flex-col h-full"
+				x-data="providerCard"
+				data-provider="plaid"
+				@submit="saving = true"
+			>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				@providersPlaidDrawerHeader()
+				<div class="flex-1 overflow-y-auto p-5 space-y-5">
+					if p.PlaidConfigured {
+						@providerHealthBlock(h, true)
+					}
+					@providerField(providerFieldProps{Label: "Client ID", For: "plaid_client_id", Badge: configSourceBadge(p.ConfigSources, "plaid_client_id")}) {
+						<input type="text" id="plaid_client_id" name="plaid_client_id" value={ p.PlaidClientID } placeholder="Plaid Client ID" autocomplete="off" class="bb-form-input"/>
+					}
+					@providerField(providerFieldProps{Label: "Secret", For: "plaid_secret"}) {
+						<input
+							type="password"
+							id="plaid_secret"
+							name="plaid_secret"
+							value=""
+							placeholder={ plaidSecretPlaceholder(p.PlaidConfigured) }
+							autocomplete="new-password"
+							class="bb-form-input"
+						/>
+					}
+					@providerField(providerFieldProps{Label: "Environment", For: "plaid_env", Badge: configSourceBadge(p.ConfigSources, "plaid_env"), Hint: "Credentials are validated before saving."}) {
+						<select id="plaid_env" name="plaid_env" class="select select-sm w-full sm:max-w-xs bg-base-200">
+							@providerEnvOption("sandbox", p.PlaidEnv, "Sandbox")
+							@providerEnvOption("development", p.PlaidEnv, "Development")
+							@providerEnvOption("production", p.PlaidEnv, "Production")
+						</select>
+					}
+					@providerField(providerFieldProps{Label: "Webhook URL", For: "webhook_url", Badge: configSourceBadge(p.ConfigSources, "webhook_url"), Hint: "Plaid sends transaction updates here. Must use HTTPS."}) {
+						<input type="url" id="webhook_url" name="webhook_url" value={ p.WebhookURL } placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="bb-form-input"/>
+					}
+					if p.PlaidConfigured {
+						@providerDrawerDivider()
+						@providerTestBlock("Plaid")
+						@providerPlaidWebhookRef()
 					}
 				</div>
-			} else {
-				<p class="text-xs text-base-content/40">Certificate configured via environment file paths.</p>
+				@providerDrawerSaveFooter()
+			</form>
+		}
+	}
+}
+
+templ providersPlaidDrawerHeader() {
+	@components.DrawerHeader(components.DrawerHeaderProps{
+		BrandIcon: "plaid",
+		Title:     "Plaid",
+		Subtitle:  "Thousands of financial institutions",
+	})
+}
+
+templ providerPlaidWebhookRef() {
+	<div>
+		<div class="text-sm font-medium mb-1.5">Webhook URL</div>
+		<code class="text-xs bg-base-200 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
+		<p class="text-xs text-base-content/40 mt-1.5">Plaid sends real-time transaction updates here once you set the URL during link-token creation.</p>
+	</div>
+}
+
+// ---------------------------------------------------------------------
+// Teller drawer
+// ---------------------------------------------------------------------
+
+templ providersTellerDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
+	@components.Drawer(components.DrawerProps{
+		ID:    "provider-teller",
+		Title: "Configure Teller",
+		Size:  "lg",
+	}) {
+		if p.TellerFromEnv {
+			<div x-data="providerCard" data-provider="teller" class="flex flex-col h-full">
+				@providersTellerDrawerHeader()
+				<div class="flex-1 overflow-y-auto p-5 space-y-5">
+					@providerEnvNotice()
+					@providerHealthBlock(h, p.TellerConfigured)
+					@providerReadonlyField("App ID") {
+						<code class="font-mono text-xs break-all">{ p.TellerAppID }</code>
+					}
+					@providerReadonlyField("Certificate") {
+						if p.TellerCertConfigured {
+							<span class="badge badge-soft badge-success badge-sm">Configured</span>
+						} else {
+							<span class="badge badge-soft badge-error badge-sm">Not configured</span>
+						}
+					}
+					@providerReadonlyField("Environment") {
+						<span class="text-sm">{ p.TellerEnv }</span>
+					}
+					@providerReadonlyField("Webhook secret") {
+						if p.TellerWebhookConfigured {
+							<span class="badge badge-soft badge-success badge-sm">Configured</span>
+						} else {
+							<span class="badge badge-ghost badge-sm">Not configured</span>
+						}
+					}
+					@providerDrawerDivider()
+					@providerTestBlock("Teller")
+					@providerTellerWebhookRef(p)
+				</div>
+				@providerDrawerCloseFooter()
+			</div>
+		} else {
+			<form
+				method="POST"
+				action="/settings/providers/teller"
+				enctype="multipart/form-data"
+				autocomplete="off"
+				class="flex flex-col h-full"
+				x-data="providerCard"
+				data-provider="teller"
+				@submit="saving = true"
+			>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				@providersTellerDrawerHeader()
+				<div class="flex-1 overflow-y-auto p-5 space-y-5">
+					if p.TellerConfigured {
+						@providerHealthBlock(h, true)
+					}
+					@providerField(providerFieldProps{Label: "App ID", For: "teller_app_id"}) {
+						<input type="text" id="teller_app_id" name="teller_app_id" value={ p.TellerAppID } placeholder="Teller App ID" autocomplete="off" class="bb-form-input"/>
+					}
+					@providerField(providerFieldProps{Label: "Environment", For: "teller_env"}) {
+						<select id="teller_env" name="teller_env" class="select select-sm w-full sm:max-w-xs bg-base-200">
+							@providerEnvOption("sandbox", p.TellerEnv, "Sandbox")
+							@providerEnvOption("development", p.TellerEnv, "Development")
+							@providerEnvOption("production", p.TellerEnv, "Production")
+						</select>
+					}
+					if !p.TellerCertFromEnv {
+						@providerTellerCertFields(p)
+					} else {
+						<p class="text-xs text-base-content/40">Certificate configured via environment file paths.</p>
+					}
+					@providerField(providerFieldProps{Label: "Webhook secret", For: "teller_webhook_secret"}) {
+						<input
+							type="password"
+							id="teller_webhook_secret"
+							name="teller_webhook_secret"
+							value=""
+							placeholder={ tellerWebhookPlaceholder(p.TellerWebhookConfigured) }
+							autocomplete="new-password"
+							class="bb-form-input"
+						/>
+					}
+					if p.TellerConfigured {
+						@providerDrawerDivider()
+						@providerTestBlock("Teller")
+						@providerTellerWebhookRef(p)
+					}
+				</div>
+				@providerDrawerSaveFooter()
+			</form>
+		}
+	}
+}
+
+templ providersTellerDrawerHeader() {
+	@components.DrawerHeader(components.DrawerHeaderProps{
+		BrandIcon: "teller",
+		Title:     "Teller",
+		Subtitle:  "mTLS certificate authentication",
+	})
+}
+
+// providerTellerCertFields renders the mTLS certificate upload block —
+// only shown when the cert isn't supplied via env file paths.
+templ providerTellerCertFields(p ProvidersProps) {
+	<div class="rounded-xl border border-base-300 p-4 space-y-3">
+		<div class="text-sm font-medium text-base-content/70">mTLS certificate</div>
+		if p.TellerCertConfigured {
+			<p class="text-xs text-success flex items-center gap-1.5">
+				@components.LucideIcon("check-circle", "w-3.5 h-3.5") Certificate and private key are configured.
+			</p>
+		}
+		<div>
+			<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_cert_file">Certificate file (.pem)</label>
+			<input type="file" id="teller_cert_file" name="teller_cert_file" accept=".pem,.crt,.cert" class="file-input file-input-sm w-full"/>
+		</div>
+		<div>
+			<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_key_file">Private key file (.pem)</label>
+			<input type="file" id="teller_key_file" name="teller_key_file" accept=".pem,.key" class="file-input file-input-sm w-full"/>
+		</div>
+		if !p.HasEncryptionKey {
+			<p class="text-xs text-warning flex items-center gap-1.5">
+				@components.LucideIcon("alert-triangle", "w-3.5 h-3.5") ENCRYPTION_KEY must be set to store certificates.
+			</p>
+		}
+	</div>
+}
+
+templ providerTellerWebhookRef(p ProvidersProps) {
+	<div>
+		<div class="text-sm font-medium mb-1.5">Webhook URL</div>
+		<code class="text-xs bg-base-200 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/teller</code>
+		<p class="text-xs text-base-content/40 mt-1.5">
+			Set this in the Teller dashboard, then paste the signing secret above. Without webhooks, Breadbox polls every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) } via cron.
+		</p>
+	</div>
+}
+
+// ---------------------------------------------------------------------
+// CSV drawer
+// ---------------------------------------------------------------------
+
+templ providersCSVDrawer(h *service.ProviderHealthSummary) {
+	@components.Drawer(components.DrawerProps{
+		ID:    "provider-csv",
+		Title: "CSV Import",
+		Size:  "md",
+	}) {
+		<div class="flex flex-col h-full">
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "file-spreadsheet",
+				Title:    "CSV Import",
+				Subtitle: "Import transactions from bank-exported files",
+			})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				@providerHealthBlock(h, true)
+				<p class="text-sm text-base-content/70 leading-relaxed">
+					No API credentials required. Upload a CSV exported from your bank or
+					financial institution and map its columns to Breadbox fields.
+				</p>
+				<a href="/connections/import-csv" class="btn btn-primary btn-sm w-full gap-2">
+					@components.LucideIcon("upload", "w-4 h-4") Import CSV file
+				</a>
+			</div>
+			@providerDrawerCloseFooter()
+		</div>
+	}
+}
+
+// ---------------------------------------------------------------------
+// Shared drawer pieces
+// ---------------------------------------------------------------------
+
+// providerFieldProps configures one labeled input block inside a drawer
+// form. Badge (optional) sits beside the label — the env/db/default
+// source chip; Hint (optional) renders muted help below the control.
+type providerFieldProps struct {
+	Label string
+	For   string
+	Badge templ.Component
+	Hint  string
+}
+
+templ providerField(p providerFieldProps) {
+	<div>
+		<label class="text-xs font-medium text-base-content/60 mb-1.5 flex items-center gap-1.5" for={ p.For }>
+			{ p.Label }
+			if p.Badge != nil {
+				@p.Badge
 			}
-			<div>
-				<label class="text-xs font-medium text-base-content/60 mb-1.5 block" for="teller_webhook_secret">Webhook Secret</label>
-				<input
-					type="password"
-					id="teller_webhook_secret"
-					name="teller_webhook_secret"
-					value=""
-					placeholder={ tellerWebhookPlaceholder(p.TellerWebhookConfigured) }
-					autocomplete="new-password"
-					class="bb-form-input"
-				/>
-			</div>
-			<div class="pt-1">
-				<button type="submit" class="btn btn-primary btn-sm" :disabled="saving">
-					<span x-show="!saving">Save Teller settings</span>
-					<span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving...</span>
-				</button>
-			</div>
-		</form>
-	}
+		</label>
+		{ children... }
+		if p.Hint != "" {
+			<p class="text-xs text-base-content/40 mt-1.5">{ p.Hint }</p>
+		}
+	</div>
 }
 
-// ---------------------------------------------------------------------
-// CSV
-// ---------------------------------------------------------------------
-
-templ providersCSVSection(h *service.ProviderHealthSummary) {
-	@components.SettingsSection(components.SettingsSectionProps{
-		Icon:    "file-spreadsheet",
-		Title:   "CSV Import",
-		Caption: "Import transactions from bank-exported files — no API credentials required",
-	}) {
-		@providersStatsRow(h, true)
-		@components.SettingsRowLink(components.SettingsRowLinkProps{
-			Href:    "/connections/import-csv",
-			Icon:    "upload",
-			Label:   "Import CSV file",
-			Caption: "Upload a CSV exported from your bank or financial institution",
-		})
-	}
+// providerReadonlyField is the read-only counterpart used in env-managed
+// drawers — a label above a static value.
+templ providerReadonlyField(label string) {
+	<div>
+		<div class="text-xs font-medium text-base-content/60 mb-1">{ label }</div>
+		{ children... }
+	</div>
 }
 
-// ---------------------------------------------------------------------
-// Shared rows
-// ---------------------------------------------------------------------
-
-// providersStatsRow renders the single "Status" row: a plain
-// connections / accounts / last-sync summary. No status badge — the
-// last-sync line already carries health (green "Last sync …" vs red
-// "Last sync failed …"), so a "Healthy"/"Sync Error" chip would just
-// duplicate it. A short text status covers the cases with no sync line
-// (configured-but-no-data, not configured). Always rendered so every
-// provider shows a Status line.
-templ providersStatsRow(h *service.ProviderHealthSummary, configured bool) {
-	@components.SettingsRow(components.SettingsRowProps{
-		Label: "Status",
-	}) {
-		<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs items-center">
+// providerHealthBlock surfaces the connection/account/last-sync summary
+// at the top of a provider drawer.
+templ providerHealthBlock(h *service.ProviderHealthSummary, configured bool) {
+	<div class="rounded-xl bg-base-200/60 px-3.5 py-2.5">
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
 			if h != nil {
 				<span class="text-base-content/60 tabular-nums">{ fmt.Sprintf("%d connections", h.ConnectionCount) }</span>
 				<span class="text-base-content/30">·</span>
@@ -325,53 +483,73 @@ templ providersStatsRow(h *service.ProviderHealthSummary, configured bool) {
 				<span class="text-base-content/40">Not configured</span>
 			}
 		</div>
-	}
+	</div>
 }
 
-// providersTestRow renders the Test Connection action as one row. The
-// providerCard Alpine factory drives the click + result state.
-templ providersTestRow(name, testID string) {
-	@components.SettingsRow(components.SettingsRowProps{
-		Label:   "Test connection",
-		Caption: "Verify credentials with a live request to " + name,
-	}) {
-		<div class="flex items-center gap-3">
+// providerEnvNotice flags an env-managed (read-only) provider drawer.
+templ providerEnvNotice() {
+	<div class="flex items-center gap-1.5 text-xs text-base-content/50">
+		@components.LucideIcon("lock", "w-3.5 h-3.5")
+		Configured via environment variables (read-only)
+	</div>
+}
+
+// providerTestBlock is the in-drawer test-connection action. Driven by
+// the providerCard Alpine scope on the enclosing form/div.
+templ providerTestBlock(name string) {
+	<div class="flex items-center justify-between gap-3">
+		<div class="min-w-0">
+			<div class="text-sm font-medium">Test connection</div>
+			<p class="text-xs text-base-content/50 mt-0.5">Verify credentials with a live request to { name }</p>
+		</div>
+		<div class="flex items-center gap-3 shrink-0">
 			<span x-show="testResult" x-cloak class="text-xs" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
-			<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing" data-test-id={ testID }>
+			<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing">
 				<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5") Test</span>
 				<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing…</span>
 			</button>
 		</div>
+	</div>
+}
+
+templ providerDrawerDivider() {
+	<div class="border-t border-base-200"></div>
+}
+
+// providerDrawerSaveFooter is the footer for an editable provider form —
+// Cancel + a Save button bound to the providerCard saving state.
+templ providerDrawerSaveFooter() {
+	@components.DrawerFooter() {
+		<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+		<button type="submit" class="btn btn-primary btn-sm" :disabled="saving">
+			<span x-show="!saving">Save changes</span>
+			<span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving…</span>
+		</button>
 	}
 }
 
-templ providersPlaidWebhookRow() {
-	@components.SettingsRow(components.SettingsRowProps{
-		Label:   "Webhook URL",
-		Caption: "Plaid sends real-time transaction updates here once you set the URL during link token creation",
-		Stack:   true,
-	}) {
-		<code class="text-xs bg-base-300/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
+// providerDrawerCloseFooter is the footer for read-only drawers (env-managed
+// providers, CSV) — just a Close button.
+templ providerDrawerCloseFooter() {
+	@components.DrawerFooter() {
+		<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Close</button>
 	}
 }
 
-templ providersTellerWebhookRow(p ProvidersProps) {
-	@components.SettingsRow(components.SettingsRowProps{
-		Label:   "Webhook URL",
-		Caption: "Set this in the Teller dashboard, then paste the signing secret above",
-		Stack:   true,
-	}) {
-		<div class="space-y-2">
-			<code class="text-xs bg-base-300/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/teller</code>
-			<p class="text-xs text-base-content/40">
-				Without webhooks, Breadbox polls every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) } via cron to detect changes.
-			</p>
-		</div>
+// ---------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------
+
+templ providerEnvOption(value, current, label string) {
+	if value == current {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
 	}
 }
 
-// plaidSecretPlaceholder mirrors the inline {{if .PlaidConfigured}} ternary
-// in the original placeholder attribute.
+// plaidSecretPlaceholder swaps the placeholder once a secret is stored so
+// the masked field reads "leave blank to keep" rather than prompting fresh.
 func plaidSecretPlaceholder(configured bool) string {
 	if configured {
 		return "Unchanged (enter to update)"
@@ -379,8 +557,8 @@ func plaidSecretPlaceholder(configured bool) string {
 	return "Plaid Secret"
 }
 
-// tellerWebhookPlaceholder mirrors the inline ternary used by the Teller
-// webhook secret input's placeholder.
+// tellerWebhookPlaceholder mirrors plaidSecretPlaceholder for the Teller
+// webhook signing secret.
 func tellerWebhookPlaceholder(configured bool) string {
 	if configured {
 		return "Unchanged (enter to update)"
