@@ -117,7 +117,12 @@ func drawerSizeClass(size string) string {
 // (a drawer hydrated by JS), pass TitleExpr / SubtitleExpr — Alpine
 // x-text expressions that take precedence over the static strings.
 type DrawerHeaderProps struct {
-	Icon         string
+	Icon string
+	// BrandIcon, when set, replaces Icon with a vendored brand SVG (see
+	// brand.templ) — used by brand-marked drawers (provider config, etc.).
+	// Multi-color marks render in their brand colors; monochrome marks
+	// inherit the muted icon treatment.
+	BrandIcon    string
 	Title        string
 	TitleExpr    string // Alpine x-text expression; overrides Title
 	Subtitle     string
@@ -131,7 +136,9 @@ type DrawerHeaderProps struct {
 templ DrawerHeader(p DrawerHeaderProps) {
 	<div class="flex items-start justify-between gap-3 p-5 border-b border-base-300 shrink-0">
 		<div class="flex items-start gap-3 min-w-0">
-			if p.Icon != "" {
+			if p.BrandIcon != "" {
+				@BrandIcon(p.BrandIcon, "w-5 h-5 mt-0.5 shrink-0")
+			} else if p.Icon != "" {
 				@LucideIcon(p.Icon, "w-5 h-5 mt-0.5 text-base-content/60 shrink-0")
 			}
 			<div class="min-w-0">

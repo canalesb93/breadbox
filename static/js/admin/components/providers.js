@@ -11,7 +11,6 @@ document.addEventListener('alpine:init', function () {
   Alpine.data('providerCard', function () {
     return {
       provider: '',
-      showConfig: false,
       saving: false,
       testing: false,
       testResult: '',
