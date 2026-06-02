@@ -28,7 +28,7 @@ templ Providers(p ProvidersProps) {
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:    "plug",
 			Title:   "Connections",
-			Caption: "Configure each provider — credentials open in a side panel",
+			Caption: "Live bank providers — credentials open in a side panel",
 		}) {
 			@providerRow(providerRowData{
 				ID:         "plaid",
@@ -46,6 +46,12 @@ templ Providers(p ProvidersProps) {
 				Configured: p.TellerConfigured,
 				Health:     p.ProviderHealth["teller"],
 			})
+		}
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "upload",
+			Title:   "Manual import",
+			Caption: "Bring in transactions from a file when there's no API connection",
+		}) {
 			@providerRow(providerRowData{
 				ID:         "csv",
 				Icon:       "file-spreadsheet",
@@ -146,7 +152,6 @@ func providerStatusLabel(h *service.ProviderHealthSummary) string {
 // ---------------------------------------------------------------------
 // Plaid drawer
 // ---------------------------------------------------------------------
-
 templ providersPlaidDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
 	@components.Drawer(components.DrawerProps{
 		ID:    "provider-plaid",
@@ -169,10 +174,9 @@ templ providersPlaidDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
 						<span class="text-sm">{ p.PlaidEnv }</span>
 					}
 					@providerDrawerDivider()
-					@providerTestBlock("Plaid")
 					@providerPlaidWebhookRef()
 				</div>
-				@providerDrawerCloseFooter()
+				@providerDrawerCloseFooter(true)
 			</div>
 		} else {
 			<form
@@ -216,11 +220,10 @@ templ providersPlaidDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
 					}
 					if p.PlaidConfigured {
 						@providerDrawerDivider()
-						@providerTestBlock("Plaid")
 						@providerPlaidWebhookRef()
 					}
 				</div>
-				@providerDrawerSaveFooter()
+				@providerDrawerSaveFooter(p.PlaidConfigured)
 			</form>
 		}
 	}
@@ -245,7 +248,6 @@ templ providerPlaidWebhookRef() {
 // ---------------------------------------------------------------------
 // Teller drawer
 // ---------------------------------------------------------------------
-
 templ providersTellerDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
 	@components.Drawer(components.DrawerProps{
 		ID:    "provider-teller",
@@ -279,10 +281,9 @@ templ providersTellerDrawer(p ProvidersProps, h *service.ProviderHealthSummary) 
 						}
 					}
 					@providerDrawerDivider()
-					@providerTestBlock("Teller")
 					@providerTellerWebhookRef(p)
 				</div>
-				@providerDrawerCloseFooter()
+				@providerDrawerCloseFooter(true)
 			</div>
 		} else {
 			<form
@@ -329,11 +330,10 @@ templ providersTellerDrawer(p ProvidersProps, h *service.ProviderHealthSummary) 
 					}
 					if p.TellerConfigured {
 						@providerDrawerDivider()
-						@providerTestBlock("Teller")
 						@providerTellerWebhookRef(p)
 					}
 				</div>
-				@providerDrawerSaveFooter()
+				@providerDrawerSaveFooter(p.TellerConfigured)
 			</form>
 		}
 	}
@@ -354,7 +354,8 @@ templ providerTellerCertFields(p ProvidersProps) {
 		<div class="text-sm font-medium text-base-content/70">mTLS certificate</div>
 		if p.TellerCertConfigured {
 			<p class="text-xs text-success flex items-center gap-1.5">
-				@components.LucideIcon("check-circle", "w-3.5 h-3.5") Certificate and private key are configured.
+				@components.LucideIcon("check-circle", "w-3.5 h-3.5")
+				Certificate and private key are configured.
 			</p>
 		}
 		<div>
@@ -367,7 +368,8 @@ templ providerTellerCertFields(p ProvidersProps) {
 		</div>
 		if !p.HasEncryptionKey {
 			<p class="text-xs text-warning flex items-center gap-1.5">
-				@components.LucideIcon("alert-triangle", "w-3.5 h-3.5") ENCRYPTION_KEY must be set to store certificates.
+				@components.LucideIcon("alert-triangle", "w-3.5 h-3.5")
+				ENCRYPTION_KEY must be set to store certificates.
 			</p>
 		}
 	</div>
@@ -386,7 +388,6 @@ templ providerTellerWebhookRef(p ProvidersProps) {
 // ---------------------------------------------------------------------
 // CSV drawer
 // ---------------------------------------------------------------------
-
 templ providersCSVDrawer(h *service.ProviderHealthSummary) {
 	@components.Drawer(components.DrawerProps{
 		ID:    "provider-csv",
@@ -406,10 +407,11 @@ templ providersCSVDrawer(h *service.ProviderHealthSummary) {
 					financial institution and map its columns to Breadbox fields.
 				</p>
 				<a href="/connections/import-csv" class="btn btn-primary btn-sm w-full gap-2">
-					@components.LucideIcon("upload", "w-4 h-4") Import CSV file
+					@components.LucideIcon("upload", "w-4 h-4")
+					Import CSV file
 				</a>
 			</div>
-			@providerDrawerCloseFooter()
+			@providerDrawerCloseFooter(false)
 		</div>
 	}
 }
@@ -494,21 +496,17 @@ templ providerEnvNotice() {
 	</div>
 }
 
-// providerTestBlock is the in-drawer test-connection action. Driven by
-// the providerCard Alpine scope on the enclosing form/div.
-templ providerTestBlock(name string) {
-	<div class="flex items-center justify-between gap-3">
-		<div class="min-w-0">
-			<div class="text-sm font-medium">Test connection</div>
-			<p class="text-xs text-base-content/50 mt-0.5">Verify credentials with a live request to { name }</p>
-		</div>
-		<div class="flex items-center gap-3 shrink-0">
-			<span x-show="testResult" x-cloak class="text-xs" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
-			<button type="button" class="btn btn-sm btn-ghost" @click="testConnection()" :disabled="testing">
-				<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5") Test</span>
-				<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing…</span>
-			</button>
-		</div>
+// providerTestFooterButton is the test-connection action pinned to the
+// drawer footer's left edge (mr-auto). Driven by the providerCard Alpine
+// scope on the enclosing form/div; the result message sits to its right.
+templ providerTestFooterButton() {
+	<div class="flex items-center gap-3 mr-auto min-w-0">
+		<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="testConnection()" :disabled="testing">
+			<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5")
+Test connection</span>
+			<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing…</span>
+		</button>
+		<span x-show="testResult" x-cloak class="text-xs truncate" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
 	</div>
 }
 
@@ -517,9 +515,13 @@ templ providerDrawerDivider() {
 }
 
 // providerDrawerSaveFooter is the footer for an editable provider form —
-// Cancel + a Save button bound to the providerCard saving state.
-templ providerDrawerSaveFooter() {
+// Cancel + a Save button bound to the providerCard saving state. When
+// showTest is set, a Test-connection button is pinned to the left edge.
+templ providerDrawerSaveFooter(showTest bool) {
 	@components.DrawerFooter() {
+		if showTest {
+			@providerTestFooterButton()
+		}
 		<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
 		<button type="submit" class="btn btn-primary btn-sm" :disabled="saving">
 			<span x-show="!saving">Save changes</span>
@@ -529,9 +531,13 @@ templ providerDrawerSaveFooter() {
 }
 
 // providerDrawerCloseFooter is the footer for read-only drawers (env-managed
-// providers, CSV) — just a Close button.
-templ providerDrawerCloseFooter() {
+// providers, CSV) — a Close button, optionally with a left-pinned
+// Test-connection button when showTest is set.
+templ providerDrawerCloseFooter(showTest bool) {
 	@components.DrawerFooter() {
+		if showTest {
+			@providerTestFooterButton()
+		}
 		<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Close</button>
 	}
 }
@@ -539,7 +545,6 @@ templ providerDrawerCloseFooter() {
 // ---------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------
-
 templ providerEnvOption(value, current, label string) {
 	if value == current {
 		<option value={ value } selected>{ label }</option>
