@@ -80,7 +80,11 @@ type AgentDefinitionResponse struct {
 	// SourceTemplate is the workflow-preset slug this definition was
 	// instantiated from, or nil if it was hand-authored.
 	SourceTemplate *string          `json:"source_template,omitempty"`
-	LastRun        *AgentRunSummary `json:"last_run,omitempty"`
+	// AvatarSeed is the per-workflow DiceBear seed for this definition's
+	// identicon. nil/empty means the avatar seeds on the slug instead (the
+	// historical default). Editable from the Workflows reconfigure drawer.
+	AvatarSeed *string          `json:"avatar_seed,omitempty"`
+	LastRun    *AgentRunSummary `json:"last_run,omitempty"`
 	// CostStats30d is populated only by ListAgentDefinitions (the surface
 	// where users want to compare spend at a glance). Single-row
 	// GetAgentDefinition leaves it nil so the edit-page hot path doesn't
@@ -238,6 +242,10 @@ type UpdateAgentDefinitionParams struct {
 	QuietHoursStart       *string
 	QuietHoursEnd         *string
 	TriggerOnSyncComplete *bool
+	// AvatarSeed sets the per-workflow DiceBear avatar seed. nil leaves it
+	// untouched; a non-empty value replaces it; an empty string clears it
+	// back to slug-seeded.
+	AvatarSeed *string
 }
 
 // RecentErroredAgentRun is one entry in the admin run-failed banner
@@ -525,6 +533,9 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 	if p.TriggerOnSyncComplete != nil {
 		merged.TriggerOnSyncComplete = *p.TriggerOnSyncComplete
 	}
+	if p.AvatarSeed != nil {
+		merged.AvatarSeed = emptyToNil(strings.TrimSpace(*p.AvatarSeed))
+	}
 
 	if err := validateAgentDefinitionFields(merged.Name, merged.Slug, merged.Prompt, merged.ToolScope, merged.Model, merged.MaxTurns, merged.MaxBudgetUSD, merged.ScheduleCron); err != nil {
 		return nil, err
@@ -558,6 +569,7 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		QuietHoursStart:       pgconv.TextPtrIfNotEmpty(merged.QuietHoursStart),
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(merged.QuietHoursEnd),
 		TriggerOnSyncComplete: merged.TriggerOnSyncComplete,
+		AvatarSeed:            pgconv.TextPtrIfNotEmpty(merged.AvatarSeed),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update agent definition: %w", err)
@@ -1433,6 +1445,7 @@ func agentDefinitionFromRow(row db.Workflow, lastRun *AgentRunSummary) AgentDefi
 		QuietHoursEnd:         pgconv.TextPtr(row.QuietHoursEnd),
 		TriggerOnSyncComplete: row.TriggerOnSyncComplete,
 		SourceTemplate:        pgconv.TextPtr(row.SourceTemplate),
+		AvatarSeed:            pgconv.TextPtr(row.AvatarSeed),
 		LastRun:               lastRun,
 		CreatedAt:             pgconv.TimestampStr(row.CreatedAt),
 		UpdatedAt:             pgconv.TimestampStr(row.UpdatedAt),

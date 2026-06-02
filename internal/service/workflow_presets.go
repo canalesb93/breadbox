@@ -373,6 +373,12 @@ func (s *Service) ListWorkflowPresets(ctx context.Context) ([]WorkflowPresetView
 			en := d.Enabled
 			view.WorkflowSlug = &slug
 			view.WorkflowEnabled = &en
+			// An instantiated workflow can be renamed from the reconfigure
+			// drawer; surface the live name on the card instead of the preset's
+			// static label so the gallery matches the activity feed.
+			if strings.TrimSpace(d.Name) != "" {
+				view.Name = d.Name
+			}
 		}
 		out = append(out, view)
 	}

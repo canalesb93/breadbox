@@ -5,7 +5,9 @@ package admin
 import (
 	"errors"
 	"net/http"
+	"strings"
 
+	"breadbox/internal/avatar"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -53,6 +55,22 @@ func ReconfigureWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 			MaxTurns:               cfg.MaxTurns,
 			MaxBudgetUSD:           cfg.MaxBudgetUSD,
 		}
+		// Identity edits from the drawer header. Both are optional — an absent
+		// field leaves the current value untouched. The service ignores a blank
+		// name (it's required); the avatar seed is validated to a URL/cache-safe
+		// charset here, and an empty value clears it back to slug-seeded.
+		if _, ok := r.Form["name"]; ok {
+			n := r.FormValue("name")
+			params.Name = &n
+		}
+		if _, ok := r.Form["avatar_seed"]; ok {
+			seed := strings.TrimSpace(r.FormValue("avatar_seed"))
+			if seed != "" && !avatar.IsValidSeed(seed) {
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "Invalid avatar seed")
+				return
+			}
+			params.AvatarSeed = &seed
+		}
 		// Any non-control form field is a preset-specialized option (e.g.
 		// apply_mode); the service validates each against the preset's
 		// declared options and falls back to the default for unknown keys.
@@ -60,6 +78,8 @@ func ReconfigureWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 		// fields (enabled/consent) that don't apply to a reconfigure.
 		control := map[string]bool{
 			"additional_instructions": true,
+			"name":                    true,
+			"avatar_seed":             true,
 			"_csrf":                   true,
 		}
 		for k := range cfgControl {

@@ -3,6 +3,7 @@
 package admin
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -36,7 +37,7 @@ const maxAvatarUploadSize = 5 << 20 // 5 MB
 //
 //	?type=user|agent — picks which configured DiceBear style to use.
 //	                   Default "user". Agent identicons use a separate
-//	                   style (default "bottts-neutral") so agent activity reads
+//	                   style (default "glyphs") so agent activity reads
 //	                   as obviously non-human. When the id resolves to
 //	                   an api_keys row with actor_type='agent', the
 //	                   handler upgrades the style to "agent" regardless
@@ -52,7 +53,15 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 
 		uid, err := resolveUUID(idStr)
 		if err != nil {
-			serveGeneratedAvatarForActor(w, r, idStr, actor, size)
+			// Non-UUID id. Agent avatar URLs are built from the workflow's
+			// stable slug (/avatars/<slug>?type=agent), so resolve any
+			// per-workflow custom seed before generating — keeping the slug-
+			// keyed render and the api_keys-keyed render (below) consistent.
+			seed := idStr
+			if actor == avatar.ActorAgent {
+				seed = agentAvatarSeed(r.Context(), a.Queries, idStr)
+			}
+			serveGeneratedAvatarForActor(w, r, seed, actor, size)
 			return
 		}
 
@@ -88,7 +97,9 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 			if key.ActorType == "agent" {
 				actor = avatar.ActorAgent
 				if slug, ok := service.ParseAgentKeySlug(key.Name); ok {
-					seed = slug
+					// Recovered the agent's stable slug; prefer its per-workflow
+					// custom avatar seed when one is set, else seed on the slug.
+					seed = agentAvatarSeed(r.Context(), a.Queries, slug)
 				}
 			}
 			serveGeneratedAvatarForActor(w, r, seed, actor, size)
@@ -98,6 +109,19 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 		// Unknown id — generate a stable pattern from the raw string.
 		serveGeneratedAvatarForActor(w, r, idStr, actor, size)
 	}
+}
+
+// agentAvatarSeed resolves a workflow's DiceBear avatar seed from its stable
+// slug: the per-workflow custom seed when one is set, otherwise the slug
+// itself (the historical default). Workflows seed every render off the slug —
+// either passed literally in the URL or recovered from the run key — so this
+// single lookup keeps both render paths consistent. Soft-fails to the slug on
+// any DB error so a hiccup never breaks avatar rendering.
+func agentAvatarSeed(ctx context.Context, q *db.Queries, slug string) string {
+	if as, err := q.GetWorkflowAvatarSeedBySlug(ctx, slug); err == nil && as.Valid && as.String != "" {
+		return as.String
+	}
+	return slug
 }
 
 // parseActorType reads the `?type=` query param and normalises it
