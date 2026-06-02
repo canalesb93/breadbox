@@ -125,6 +125,13 @@ document.addEventListener('alpine:init', function () {
       cronPreviewLoading: false,
       // -------------------------------------------------------------------
 
+      // runningOneOff[slug] is true while a one-off's Run-now request is in
+      // flight, so each card's inline Run button can show a spinner + disable
+      // itself (preventing a double-dispatch). Keyed by preset slug since two
+      // one-off cards can be on screen at once.
+      runningOneOff: {},
+      // -------------------------------------------------------------------
+
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
         var off = parseInt(this.$el.dataset.serverUtcOffsetMin || '0', 10);
@@ -231,36 +238,81 @@ document.addEventListener('alpine:init', function () {
       },
 
       // --- F1: run an enabled workflow now -------------------------------
-      // toast dispatches the global bb-toast event (handled in base.html).
-      toast: function (message, type) {
+      // toast dispatches the global bb-toast event (handled in base.html). opts
+      // may carry { href, linkLabel, duration } so a run toast can deep-link to
+      // the run it just started and linger long enough to click.
+      toast: function (message, type, opts) {
+        opts = opts || {};
         window.dispatchEvent(
-          new CustomEvent('bb-toast', { detail: { message: message, type: type || 'info' } })
+          new CustomEvent('bb-toast', {
+            detail: {
+              message: message,
+              type: type || 'info',
+              href: opts.href || '',
+              linkLabel: opts.linkLabel || 'View',
+              duration: opts.duration || 0,
+            },
+          })
         );
       },
 
-      // Run an enabled workflow on demand. The run is async server-side
-      // (202 Accepted returns the in_progress row immediately), so we show an
-      // optimistic "started" toast the instant the request is accepted rather
-      // than waiting on the run. Concurrency/budget/auth refusals come back as
-      // error envelopes — surface their message instead of the optimistic toast.
+      // runStartedToast turns a 202 run row into a success toast that deep-links
+      // to the run detail page (/workflows/runs/{short_id}). Falls back to a
+      // plain toast when the row has no short_id.
+      runStartedToast: function (run) {
+        var sid = run && run.short_id;
+        if (sid) {
+          this.toast('Run started.', 'success', {
+            href: '/workflows/runs/' + encodeURIComponent(sid),
+            linkLabel: 'View run',
+            duration: 6000,
+          });
+        } else {
+          this.toast('Run started.', 'success', { duration: 4000 });
+        }
+      },
+
+      // runErrorToast maps a run error envelope to a toast, attaching a helpful
+      // action link where one exists (settings for auth/budget, the runs list
+      // when another run holds the lock). Returns false for CONSENT_REQUIRED so
+      // the caller can route to the setup drawer instead of toasting.
+      runErrorToast: function (body) {
+        var code = body && body.error && body.error.code;
+        var msg = (body && body.error && body.error.message) || 'Could not start the run.';
+        if (code === 'CONSENT_REQUIRED') return false;
+        if (code === 'CONCURRENCY_LOCKED') {
+          this.toast('A run is already in progress.', 'warning', {
+            href: '/workflows/runs', linkLabel: 'View runs', duration: 6000,
+          });
+          return true;
+        }
+        if (code === 'AUTH_NOT_CONFIGURED' || code === 'BINARY_NOT_FOUND' || code === 'AGENTS_DISABLED') {
+          this.toast(msg, 'error', { href: '/settings/workflows', linkLabel: 'Configure', duration: 7000 });
+          return true;
+        }
+        if (code === 'BUDGET_CEILING_REACHED') {
+          this.toast(msg, 'error', { href: '/settings/workflows', linkLabel: 'Adjust', duration: 7000 });
+          return true;
+        }
+        this.toast(msg, 'error', { duration: 5000 });
+        return true;
+      },
+
+      // Run an enabled workflow on demand (the reconfigure drawer's Run now).
+      // The run is async server-side (202 returns the in_progress row), so the
+      // success toast deep-links to that run rather than waiting on completion.
       runWorkflow: function (workflowSlug) {
         var self = this;
-        self.toast('Starting run…', 'info');
         self._post('/-/workflows/' + encodeURIComponent(workflowSlug) + '/run')
           .then(function (res) {
-            if (res.ok) {
-              self.toast('Workflow run started.', 'success');
-              return;
-            }
-            return res
-              .json()
-              .catch(function () {
-                return null;
-              })
-              .then(function (body) {
-                var msg = (body && body.error && body.error.message) || 'Could not start the run.';
-                self.toast(msg, 'error');
+            if (res.ok || res.status === 202) {
+              return res.json().catch(function () { return null; }).then(function (run) {
+                self.runStartedToast(run);
               });
+            }
+            return res.json().catch(function () { return null; }).then(function (body) {
+              self.runErrorToast(body);
+            });
           })
           .catch(function (e) {
             console.error('runWorkflow failed', e);
@@ -271,42 +323,101 @@ document.addEventListener('alpine:init', function () {
       // -------------------------------------------------------------------
 
       // --- One-off (on-demand) workflows ---------------------------------
-      // Run an on-demand workflow from its card's run button. The endpoint
-      // instantiates the manual-only workflow on first use, then dispatches
-      // the run, so this one call covers both first-run and re-run. On a
-      // CONSENT_REQUIRED refusal (first-ever workflow), route the user through
-      // the setup drawer, which carries the consent checkbox. A successful
-      // first run flips the card into its instantiated state, so reload after a
-      // beat to surface that (and any last-run status).
+      // Run an on-demand workflow from its card's Run button. The endpoint
+      // instantiates the manual-only workflow on first use, then dispatches the
+      // run, so this one call covers first-run and re-run alike. CONSENT_REQUIRED
+      // (first-ever workflow) routes to the setup drawer instead of erroring. No
+      // full-page reload — the deep-link is the post-run affordance.
+      //
+      // The run is async server-side (the 202 returns the in_progress row in an
+      // instant, then a goroutine does the actual work). So we hold the spinner
+      // up (runningOneOff[slug]) through the whole run by polling the run's
+      // status until it reaches a terminal state — not just for the dispatch.
       runOneOff: function (slug) {
         var self = this;
-        self.toast('Starting run…', 'info');
+        if (self.runningOneOff[slug]) return; // guard against a double-click
+        self.runningOneOff[slug] = true;
         self._post('/-/workflow-presets/' + encodeURIComponent(slug) + '/run')
           .then(function (res) {
-            if (res.ok) {
-              self.toast('Workflow run started.', 'success');
-              setTimeout(function () { window.location.reload(); }, 1200);
-              return;
-            }
-            return res
-              .json()
-              .catch(function () { return null; })
-              .then(function (body) {
-                var code = body && body.error && body.error.code;
-                if (code === 'CONSENT_REQUIRED') {
-                  self.toast('Review and confirm setup first.', 'info');
-                  Alpine.store('drawers').open('wf-config-' + slug);
-                  return;
+            if (res.ok || res.status === 202) {
+              return res.json().catch(function () { return null; }).then(function (run) {
+                self.runStartedToast(run);
+                if (run && run.short_id) {
+                  // Keep the spinner up and follow the run to completion.
+                  self._pollOneOffRun(slug, run.short_id);
+                } else {
+                  self.runningOneOff[slug] = false; // can't track it — release the button
                 }
-                var msg = (body && body.error && body.error.message) || 'Could not start the run.';
-                self.toast(msg, 'error');
               });
+            }
+            return res.json().catch(function () { return null; }).then(function (body) {
+              self.runningOneOff[slug] = false;
+              if (!self.runErrorToast(body)) {
+                // CONSENT_REQUIRED — send them through the setup drawer, which
+                // carries the consent checkbox, rather than a dead-end toast.
+                self.toast('Confirm setup to run this workflow.', 'info');
+                Alpine.store('drawers').open('wf-config-' + slug);
+              }
+            });
           })
           .catch(function (e) {
             console.error('runOneOff failed', e);
+            self.runningOneOff[slug] = false;
             self.toast('Network error — could not start the run.', 'error');
             self.restorePageState();
           });
+      },
+
+      // _pollOneOffRun polls a run's status (short_id + status) every few
+      // seconds, holding runningOneOff[slug] true until the run reaches a
+      // terminal state, then clears the spinner and toasts the outcome. Caps the
+      // poll so a stuck run can't spin forever, and releases the button on a
+      // poll error rather than leaving it disabled.
+      _pollOneOffRun: function (slug, shortId) {
+        var self = this;
+        var attempts = 0;
+        var maxAttempts = 200; // ~200 × 3s ≈ 10 min ceiling
+        var tick = function () {
+          fetch('/-/workflows/runs/' + encodeURIComponent(shortId) + '/status', {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          })
+            .then(function (res) {
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              return res.json();
+            })
+            .then(function (data) {
+              var status = data && data.status;
+              if (status && status !== 'in_progress') {
+                self.runningOneOff[slug] = false;
+                self._oneOffDoneToast(status, shortId);
+                return;
+              }
+              attempts++;
+              if (attempts >= maxAttempts) {
+                self.runningOneOff[slug] = false; // give up tracking; run may still finish
+                return;
+              }
+              setTimeout(tick, 3000);
+            })
+            .catch(function () {
+              // Can't confirm status — stop spinning so the button isn't stuck.
+              self.runningOneOff[slug] = false;
+            });
+        };
+        setTimeout(tick, 3000);
+      },
+
+      // _oneOffDoneToast announces a finished one-off run, deep-linking to it.
+      _oneOffDoneToast: function (status, shortId) {
+        var href = '/workflows/runs/' + encodeURIComponent(shortId);
+        if (status === 'success') {
+          this.toast('Run finished.', 'success', { href: href, linkLabel: 'View run', duration: 6000 });
+        } else if (status === 'error') {
+          this.toast('Run failed.', 'error', { href: href, linkLabel: 'View run', duration: 8000 });
+        } else {
+          this.toast('Run ' + status + '.', 'warning', { href: href, linkLabel: 'View run', duration: 6000 });
+        }
       },
 
       // copyPromptDirect copies a workflow's composed base prompt straight to

@@ -335,14 +335,22 @@ templ workflowOneOffControls(preset WorkflowPresetCardProps, isAdmin bool) {
 		@components.LucideIcon("copy", "w-4 h-4")
 	</button>
 	if isAdmin {
+		// Run is the always-present action on a one-off — a subtle icon button
+		// (matching copy/settings), shown even before any setup. While a run is
+		// in progress it swaps the play glyph for a spinner and disables itself
+		// (runningOneOff[slug], held true for the whole run, not just dispatch).
 		<button
 			type="button"
 			class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
 			data-tip="Run now"
 			@click={ "runOneOff('" + preset.Slug + "')" }
+			x-bind:disabled={ "runningOneOff['" + preset.Slug + "']" }
 			aria-label={ "Run " + preset.Name + " now" }
 		>
-			@components.LucideIcon("play", "w-4 h-4")
+			<span x-show={ "!runningOneOff['" + preset.Slug + "']" }>
+				@components.LucideIcon("play", "w-4 h-4")
+			</span>
+			<span class="loading loading-spinner loading-xs" x-show={ "runningOneOff['" + preset.Slug + "']" } x-cloak></span>
 		</button>
 		if preset.Enabled {
 			<button

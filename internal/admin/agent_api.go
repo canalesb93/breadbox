@@ -265,6 +265,30 @@ func RunWorkflowPresetAdminHandler(a *app.App, svc *service.Service) http.Handle
 	}
 }
 
+// WorkflowRunStatusAdminHandler handles GET /-/workflows/runs/{shortId}/status —
+// a lightweight JSON status poll for the gallery's one-off Run button, which
+// keeps its spinner up for the whole run (not just the async dispatch). Returns
+// just short_id + status so the poll stays cheap (no transcript parsing, unlike
+// the run-detail /live fragment).
+func WorkflowRunStatusAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		shortID := chi.URLParam(r, "shortId")
+		run, err := svc.GetAgentRun(r.Context(), shortID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Run not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load run")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"short_id": run.ShortID,
+			"status":   run.Status,
+		})
+	}
+}
+
 // UpdateAgentRunNoteAdminHandler handles POST /-/agents/runs/{shortID}/note —
 // form-data, redirects back to the run detail page.
 func UpdateAgentRunNoteAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {

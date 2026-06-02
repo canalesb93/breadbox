@@ -495,6 +495,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/workflows/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/workflows/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
+			// Lightweight JSON status poll (short_id + status) for the gallery's
+			// one-off Run button spinner. Static "runs" segment never shadows
+			// the {slug}/* routes above.
+			r.Get("/workflows/runs/{shortId}/status", WorkflowRunStatusAdminHandler(svc))
 
 			// Preview the composed internal base prompt for a preset (read-only JSON).
 			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
