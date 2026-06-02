@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -34,7 +33,6 @@ type AgentSettingsResponse struct {
 	GlobalMaxBudgetUSD *float64 `json:"global_max_budget_usd,omitempty"`
 	RuntimePath        string   `json:"runtime_path"`
 	TranscriptDir      string   `json:"transcript_dir"`
-	NotifyWebhookURL   string   `json:"notify_webhook_url"`
 }
 
 // UpdateAgentSettingsParams holds writable settings. Nil = don't touch;
@@ -47,7 +45,6 @@ type UpdateAgentSettingsParams struct {
 	GlobalMaxBudgetUSD *float64
 	RuntimePath        *string
 	TranscriptDir      *string
-	NotifyWebhookURL   *string
 }
 
 // GetAgentSettings reads agent.* keys from app_config, decrypts tokens,
@@ -71,7 +68,6 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte, dataDir s
 	// form showing the active path on a fresh install rather than blank.
 	transcriptDir := appconfig.String(ctx, s.Queries, appconfig.KeyAgentTranscriptDir, agent.DefaultTranscriptDir(dataDir))
 	globalBudget := readOptionalFloat(ctx, s.Queries, appconfig.KeyAgentGlobalMaxBudgetUSD)
-	notifyURL := appconfig.String(ctx, s.Queries, appconfig.KeyNotifyWebhookURL, "")
 
 	return &AgentSettingsResponse{
 		AuthMode:           authMode,
@@ -81,7 +77,6 @@ func (s *Service) GetAgentSettings(ctx context.Context, encKey []byte, dataDir s
 		GlobalMaxBudgetUSD: globalBudget,
 		RuntimePath:        runtimePath,
 		TranscriptDir:      transcriptDir,
-		NotifyWebhookURL:   notifyURL,
 	}, nil
 }
 
@@ -130,19 +125,6 @@ func (s *Service) UpdateAgentSettings(ctx context.Context, p UpdateAgentSettings
 	if p.TranscriptDir != nil {
 		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyAgentTranscriptDir, *p.TranscriptDir)); err != nil {
 			return nil, fmt.Errorf("set transcript_dir: %w", err)
-		}
-	}
-	if p.NotifyWebhookURL != nil {
-		// Empty clears the webhook (notifications off); a non-empty value
-		// must be a valid http(s) URL.
-		trimmed := strings.TrimSpace(*p.NotifyWebhookURL)
-		if trimmed != "" {
-			if err := validateNotifyURL(trimmed); err != nil {
-				return nil, err
-			}
-		}
-		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyNotifyWebhookURL, trimmed)); err != nil {
-			return nil, fmt.Errorf("set notify_webhook_url: %w", err)
 		}
 	}
 	return s.GetAgentSettings(ctx, encKey, dataDir)

@@ -2,9 +2,10 @@
 
 package service
 
-// T17-settings-notify-url: unit tests for the pure (no-DB) logic in
-// agent_settings.go that handles NotifyWebhookURL -- validation, masking,
-// trimming -- and the related helpers maskToken / lastN / readOptionalFloat.
+// T17-settings-notify-url: unit tests for the pure (no-DB) logic shared by
+// the settings layer -- the notify-URL validator (validateNotifyURL, also
+// used by UpdateNotificationSettings) plus the agent-settings helpers
+// maskToken / lastN / readOptionalFloat.
 //
 // No DB is required: every function under test is either pure or accepts
 // an appconfig.Reader that we satisfy with a lightweight stub.
@@ -218,7 +219,7 @@ func TestT17ValidateNotifyURL_Invalid(t *testing.T) {
 
 // The settings path trims whitespace before validating. Verify that the
 // already-trimmed URL is what gets validated (mirrors the
-// trimmed := strings.TrimSpace(*p.NotifyWebhookURL) path in UpdateAgentSettings).
+// trimmed := strings.TrimSpace(*p.WebhookURL) path in UpdateNotificationSettings).
 func TestT17ValidateNotifyURL_TrimmedInputs(t *testing.T) {
 	cases := []struct {
 		name    string

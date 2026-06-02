@@ -66,10 +66,10 @@ func TestT16NotifyPostsJSONWhenConfigured(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Configure the webhook URL via UpdateAgentSettings (the canonical write path).
-	if _, err := svc.UpdateAgentSettings(ctx, service.UpdateAgentSettingsParams{
-		NotifyWebhookURL: &srv.URL,
-	}, devEncKey, ""); err != nil {
+	// Configure the webhook URL via UpdateNotificationSettings (the canonical write path).
+	if _, err := svc.UpdateNotificationSettings(ctx, service.UpdateNotificationSettingsParams{
+		WebhookURL: &srv.URL,
+	}); err != nil {
 		t.Fatalf("T16: set webhook URL: %v", err)
 	}
 
@@ -148,9 +148,9 @@ func TestT16NotifyErrorOnNon2xx(t *testing.T) {
 			defer srv.Close()
 
 			// (Re-)configure the webhook URL for each sub-test.
-			if _, err := svc.UpdateAgentSettings(ctx, service.UpdateAgentSettingsParams{
-				NotifyWebhookURL: &srv.URL,
-			}, devEncKey, ""); err != nil {
+			if _, err := svc.UpdateNotificationSettings(ctx, service.UpdateNotificationSettingsParams{
+				WebhookURL: &srv.URL,
+			}); err != nil {
 				t.Fatalf("T16: set webhook URL: %v", err)
 			}
 

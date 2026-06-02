@@ -77,7 +77,7 @@ func TestF5NotifyOnReport_WorkflowReportFires(t *testing.T) {
 	ctx := context.Background()
 
 	rec := f5newNotifyRecorder(t)
-	if _, err := svc.UpdateAgentSettings(ctx, service.UpdateAgentSettingsParams{NotifyWebhookURL: &rec.srv.URL}, devEncKey, ""); err != nil {
+	if _, err := svc.UpdateNotificationSettings(ctx, service.UpdateNotificationSettingsParams{WebhookURL: &rec.srv.URL}); err != nil {
 		t.Fatalf("set webhook: %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestF5NotifyOnReport_OperatorReportNoFire(t *testing.T) {
 	ctx := context.Background()
 
 	rec := f5newNotifyRecorder(t)
-	if _, err := svc.UpdateAgentSettings(ctx, service.UpdateAgentSettingsParams{NotifyWebhookURL: &rec.srv.URL}, devEncKey, ""); err != nil {
+	if _, err := svc.UpdateNotificationSettings(ctx, service.UpdateNotificationSettingsParams{WebhookURL: &rec.srv.URL}); err != nil {
 		t.Fatalf("set webhook: %v", err)
 	}
 

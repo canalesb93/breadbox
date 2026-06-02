@@ -76,15 +76,37 @@ const (
 	KeyWorkflowsConsentAckAt = "workflows.consent_acknowledged_at"
 
 	// KeyNotifyWebhookURL is an optional outbound webhook URL. When set,
-	// Breadbox POSTs a JSON payload to it for workflow notifications (e.g.
+	// Breadbox POSTs a payload to it for workflow notifications (e.g.
 	// a report a workflow flagged). Empty = notifications disabled. The
 	// self-hoster controls the URL (point it at ntfy / Slack / Discord /
 	// an email bridge). http(s) only.
 	KeyNotifyWebhookURL = "notify.webhook_url"
+
+	// KeyNotifyFormat selects how the outbound notification request is
+	// shaped. "auto" (default) sniffs the webhook URL and publishes
+	// natively to ntfy when it looks like ntfy, falling back to the
+	// generic JSON envelope otherwise; "ntfy" forces ntfy's
+	// header+body publishing; "json" forces the JSON envelope (for
+	// Slack-compatible relays, Discord bridges, custom consumers).
+	KeyNotifyFormat = "notify.format"
+
+	// KeyNotifyPublicBaseURL is the absolute origin (scheme+host, no
+	// trailing slash) Breadbox prepends to report deep links carried in
+	// a notification — so an ntfy "tap to open" (and any relative link
+	// in the body) resolves to the real report instead of a bare path.
+	// Empty = deep links stay relative. http(s) only.
+	KeyNotifyPublicBaseURL = "notify.public_base_url"
 )
 
 // AuthMode values for KeyAgentAuthMode.
 const (
 	AuthModeSubscription = "subscription"
 	AuthModeAPIKey       = "api_key"
+)
+
+// NotifyFormat values for KeyNotifyFormat.
+const (
+	NotifyFormatAuto = "auto"
+	NotifyFormatNtfy = "ntfy"
+	NotifyFormatJSON = "json"
 )

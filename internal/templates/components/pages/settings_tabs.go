@@ -15,13 +15,14 @@ import "breadbox/internal/templates/components"
 //   - SettingsTabHousehold — promoted to its own top-level /household
 //     page, hung off the sidebar's System section.
 const (
-	SettingsTabAccount   = components.SettingsModalTabAccount
-	SettingsTabGeneral   = components.SettingsModalTabGeneral
-	SettingsTabSystem    = components.SettingsModalTabSystem
-	SettingsTabProviders = components.SettingsModalTabProviders
-	SettingsTabWorkflows = components.SettingsModalTabWorkflows
-	SettingsTabMCP       = components.SettingsModalTabMCP
-	SettingsTabAccess    = components.SettingsModalTabAccess
-	SettingsTabBackups   = components.SettingsModalTabBackups
-	SettingsTabHelp      = components.SettingsModalTabHelp
+	SettingsTabAccount       = components.SettingsModalTabAccount
+	SettingsTabGeneral       = components.SettingsModalTabGeneral
+	SettingsTabSystem        = components.SettingsModalTabSystem
+	SettingsTabProviders     = components.SettingsModalTabProviders
+	SettingsTabWorkflows     = components.SettingsModalTabWorkflows
+	SettingsTabNotifications = components.SettingsModalTabNotifications
+	SettingsTabMCP           = components.SettingsModalTabMCP
+	SettingsTabAccess        = components.SettingsModalTabAccess
+	SettingsTabBackups       = components.SettingsModalTabBackups
+	SettingsTabHelp          = components.SettingsModalTabHelp
 )

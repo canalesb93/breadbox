@@ -279,11 +279,6 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 			zero := 0.0
 			params.GlobalMaxBudgetUSD = &zero
 		}
-		if r.Form.Has("notify_webhook_url") {
-			v := strings.TrimSpace(r.FormValue("notify_webhook_url"))
-			params.NotifyWebhookURL = &v // empty clears; service validates http(s)
-		}
-
 		if _, err := svc.UpdateAgentSettings(r.Context(), params, a.Config.EncryptionKey, a.Config.DataDir); err != nil {
 			FlashRedirect(w, r, sm, "error", "Failed to save settings: "+err.Error(), "/settings/workflows")
 			return
