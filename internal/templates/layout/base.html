@@ -659,15 +659,21 @@
            const id = (typeof crypto !== 'undefined' && crypto.randomUUID)
              ? crypto.randomUUID()
              : ('t-' + (++this.nextId) + '-' + Math.random().toString(36).slice(2));
-           const toast = { message: detail.message, type: detail.type || 'success', id: id };
+           // Optional action link (href + linkLabel) and a per-toast duration so
+           // a toast carrying something to click stays long enough to act on.
+           const duration = detail.duration || 3000;
+           const toast = {
+             message: detail.message, type: detail.type || 'success', id: id,
+             href: detail.href || '', linkLabel: detail.linkLabel || 'View', duration: duration,
+           };
            this.toasts.push(toast);
-           setTimeout(() => { this.toasts = this.toasts.filter(t2 => t2.id !== id); }, 3500);
+           setTimeout(() => { this.toasts = this.toasts.filter(t2 => t2.id !== id); }, duration + 500);
          },
          dismiss(id) { this.toasts = this.toasts.filter(t2 => t2.id !== id); },
        }"
        @bb-toast.window="add($event.detail)">
     <template x-for="t in toasts" :key="t.id">
-      <div x-data="{ show: false }" x-init="$nextTick(() => { show = true; lucide.createIcons({nodes:[$el]}); setTimeout(() => show = false, 3000) })"
+      <div x-data="{ show: false }" x-init="$nextTick(() => { show = true; lucide.createIcons({nodes:[$el]}); setTimeout(() => show = false, t.duration) })"
            x-show="show"
            :role="t.type === 'error' ? 'alert' : 'status'"
            x-transition:enter="transition ease-out duration-200"
@@ -682,6 +688,11 @@
         <template x-if="t.type === 'warning'">{{ lucide "alert-triangle" "w-4 h-4 text-warning shrink-0" }}</template>
         <template x-if="t.type === 'info'">{{ lucide "info" "w-4 h-4 text-info shrink-0" }}</template>
         <span class="text-sm font-medium" x-text="t.message"></span>
+        <template x-if="t.href">
+          <a :href="t.href"
+             x-text="t.linkLabel"
+             class="text-sm font-semibold link link-primary no-underline hover:underline shrink-0"></a>
+        </template>
         <button type="button"
                 class="ml-1 -mr-1 p-1 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors shrink-0"
                 aria-label="Dismiss notification"
