@@ -20,8 +20,13 @@ import (
 //   - Trigger (sm, default): `btn btn-ghost btn-sm btn-square` + icon `w-5 h-5`
 //   - Trigger (xs):          `btn btn-ghost btn-xs btn-square` + icon `w-4 h-4`
 //   - Menu (sm, default):    `dropdown dropdown-end menu bg-base-100 rounded-xl`
-//                            `shadow-lg border border-base-300 w-44 p-1`
-//   - Menu (xs):             same shape, `w-40` instead of `w-44`
+//                            `shadow-lg border border-base-300 min-w-44 p-1`
+//   - Menu (xs):             same shape, `min-w-40` instead of `min-w-44`
+//
+// The menu width is a *minimum*, not a fixed cap: items are
+// `whitespace-nowrap`, so a long label (e.g. "Re-run workflow") widens
+// the menu to fit on one line instead of wrapping. Short menus still
+// render at the comfortable `min-w-40`/`min-w-44` floor.
 //   - Item icon: `w-3.5 h-3.5`
 //   - Destructive items: `text-error` on the inner element
 //   - Disabled items: `disabled` class on the <li>
@@ -94,7 +99,7 @@ templ OverflowMenu(p OverflowMenuProps) {
 templ overflowMenuItem(it OverflowMenuItem) {
 	if it.Disabled {
 		<li class="disabled">
-			<span class="text-base-content/40 cursor-not-allowed" aria-label={ overflowAria(it) }>
+			<span class="whitespace-nowrap text-base-content/40 cursor-not-allowed" aria-label={ overflowAria(it) }>
 				if it.Icon != "" {
 					@LucideIcon(it.Icon, "w-3.5 h-3.5")
 				}
@@ -164,9 +169,9 @@ func overflowMenuListClass(pos, size string) string {
 	if pos == "start" {
 		side = "dropdown-start"
 	}
-	width := "w-44"
+	width := "min-w-44"
 	if size == "xs" {
-		width = "w-40"
+		width = "min-w-40"
 	}
 	return "dropdown " + side + " menu bg-base-100 rounded-xl shadow-lg border border-base-300 " + width + " p-1"
 }
@@ -181,9 +186,9 @@ func overflowMenuListStyle(anchorName, _ string) string {
 
 func overflowItemClass(destructive bool) string {
 	if destructive {
-		return "text-error"
+		return "whitespace-nowrap text-error"
 	}
-	return ""
+	return "whitespace-nowrap"
 }
 
 // overflowItemClickHandler chains the caller's Alpine handler (if any)
