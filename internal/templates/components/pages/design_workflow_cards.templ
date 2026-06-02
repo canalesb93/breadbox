@@ -36,6 +36,11 @@ templ SectionWorkflowPresetCard() {
 				@workflowPresetCard(designWFCardNeverRun(), true)
 			</div>
 		}
+		@designExample("On-demand (one-off)", "An on-demand workflow has no recurring trigger, so the right side is three icon buttons — copy prompt, run now, settings — instead of a run toggle. The tile stays neutral (there's no persistent on-state); each icon carries a tooltip.") {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				@workflowPresetCard(designWFCardOneOff(), true)
+			</div>
+		}
 		@designExample("Non-admin", "Viewers can't instantiate a workflow: the toggle is disabled with a tooltip and no gear renders.") {
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
 				@workflowPresetCard(designWFCardNotSetUp(), false)

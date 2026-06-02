@@ -14,6 +14,7 @@ import (
 // knownPresetCategories is the authoritative set of gallery category strings.
 // Update this list whenever a new category is added to workflow_presets.go.
 var knownPresetCategories = map[string]bool{
+	"Setup & Bulk":            true,
 	"Categorization & Review": true,
 	"Insights & Reports":      true,
 	"Alerts & Anomalies":      true,
@@ -66,11 +67,18 @@ func TestT1CategoryValid(t *testing.T) {
 	}
 }
 
-// TestT1TriggerValid asserts that every preset has at least one trigger defined
-// (TriggerOnSyncComplete=true OR a non-empty ScheduleCron). A preset with
-// neither trigger is registered but can never fire.
+// TestT1TriggerValid asserts that every recurring preset has at least one
+// trigger defined (TriggerOnSyncComplete=true OR a non-empty ScheduleCron). A
+// one-off (OneOff=true) is exempt — it deliberately has neither and fires only
+// via Run now; conversely it must NOT carry a recurring trigger.
 func TestT1TriggerValid(t *testing.T) {
 	for _, p := range workflowPresets {
+		if p.OneOff {
+			if p.TriggerOnSyncComplete || strings.TrimSpace(p.ScheduleCron) != "" {
+				t.Errorf("T1: one-off preset %q must have no recurring trigger (TriggerOnSyncComplete=%v, ScheduleCron=%q)", p.Slug, p.TriggerOnSyncComplete, p.ScheduleCron)
+			}
+			continue
+		}
 		hasTrigger := p.TriggerOnSyncComplete || strings.TrimSpace(p.ScheduleCron) != ""
 		if !hasTrigger {
 			t.Errorf("T1: preset %q has no trigger (TriggerOnSyncComplete=false and ScheduleCron=%q)", p.Slug, p.ScheduleCron)

@@ -16,13 +16,13 @@ func designWFAgo(d time.Duration) time.Time { return designWFNow().Add(-d) }
 // gray tile, trigger summary on the left, "Set up" on the right, no kebab.
 func designWFCardNotSetUp() WorkflowPresetCardProps {
 	return WorkflowPresetCardProps{
-		Slug:             "subscription-auditor",
-		Name:             "Subscription Auditor",
-		Description:      "Finds recurring charges and subscriptions, flagging price hikes and likely-forgotten ones.",
-		Icon:             "repeat",
-		TriggerLabel:     "Monthly",
-		ScheduleCron:     "0 8 1 * *",
-		EstCostPerRunUSD: 0.08,
+		Slug:             "weekly-money-digest",
+		Name:             "Weekly Money Digest",
+		Description:      "A Monday-morning summary of last week's spending by category and top merchants.",
+		Icon:             "bar-chart-3",
+		TriggerLabel:     "Weekly",
+		ScheduleCron:     "0 7 * * 1",
+		EstCostPerRunUSD: 0.05,
 		Enabled:          false,
 	}
 }
@@ -31,10 +31,10 @@ func designWFCardNotSetUp() WorkflowPresetCardProps {
 // trigger label reads "After each sync". Still gray / not set up.
 func designWFCardNotSetUpSync() WorkflowPresetCardProps {
 	return WorkflowPresetCardProps{
-		Slug:             "duplicate-charge-detector",
-		Name:             "Duplicate Charge Detector",
-		Description:      "Flags likely double-bills and gateway-retry duplicates so you can dispute them, right after each sync.",
-		Icon:             "copy",
+		Slug:             "large-charge-sentinel",
+		Name:             "Large Charge Sentinel",
+		Description:      "Flags unusually large individual charges relative to your normal spending, right after each sync.",
+		Icon:             "trending-up",
 		TriggerLabel:     "After each sync",
 		TriggerOnSync:    true,
 		EstCostPerRunUSD: 0.03,
@@ -98,6 +98,21 @@ func designWFCardError() WorkflowPresetCardProps {
 		FinishedAt: designWFAgo(20 * time.Minute),
 	}
 	return c
+}
+
+// designWFCardOneOff — an on-demand (one-off) workflow: no run toggle, just
+// copy / run / settings icon buttons. Neutral tile (no persistent on-state).
+func designWFCardOneOff() WorkflowPresetCardProps {
+	return WorkflowPresetCardProps{
+		Slug:             "rule-foundation",
+		Name:             "Rule Foundation",
+		Description:      "A one-time pass over your recent history to draft and carefully apply auto-categorization rules — so new transactions categorize themselves going forward.",
+		Icon:             "wand-sparkles",
+		TriggerLabel:     "On demand",
+		OneOff:           true,
+		EstCostPerRunUSD: 0.50,
+		Enabled:          false,
+	}
 }
 
 // designWFCardNeverRun — set up but never run: green tile, muted

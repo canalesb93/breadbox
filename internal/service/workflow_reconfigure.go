@@ -45,6 +45,10 @@ type WorkflowConfig struct {
 	// custom cron). The drawer's trigger radio is seeded from this; it's
 	// now user-switchable per workflow, not fixed by the preset.
 	TriggerOnSync bool `json:"trigger_on_sync"`
+	// OneOff is true for on-demand workflows (no recurring trigger). The
+	// reconfigure drawer hides the trigger/schedule picker and run-state
+	// toggle for these — they only ever run via "Run now".
+	OneOff bool `json:"one_off"`
 	// ScheduleCron is the live cron when on a custom schedule (empty when
 	// trigger_on_sync). The drawer's schedule field is seeded from this.
 	ScheduleCron string `json:"schedule_cron"`
@@ -166,6 +170,7 @@ func (s *Service) GetWorkflowConfig(ctx context.Context, slug string) (*Workflow
 		Slug:                   def.Slug,
 		Name:                   def.Name,
 		TriggerOnSync:          def.TriggerOnSyncComplete,
+		OneOff:                 preset.OneOff,
 		Model:                  def.Model,
 		MaxTurns:               def.MaxTurns,
 		AdditionalInstructions: instructions,

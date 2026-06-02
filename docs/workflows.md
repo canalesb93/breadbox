@@ -101,21 +101,28 @@ The starter catalog (order = gallery display order):
 
 | Slug | Category | Trigger | Tool scope | Est. cost/run |
 |---|---|---|---|---|
+| `rule-foundation` | Setup & Bulk | On demand (one-off) | `read_write` | $0.50 |
+| `bulk-catchup` | Setup & Bulk | On demand (one-off) | `read_write` | $0.20 |
 | `routine-reviewer` | Categorization & Review | After each sync | `read_write` | $0.02 |
 | `weekly-money-digest` | Insights & Reports | Weekly (Mon 07:00) | `read_only` | $0.05 |
-| `subscription-auditor` | Insights & Reports | Monthly (1st, 08:00) | `read_write` | $0.04 |
 | `backlog-closer` | Categorization & Review | Weekly (Mon 07:00) | `read_write` | $0.08 |
 | `monthly-close` | Insights & Reports | Monthly (1st, 08:00) | `read_only` | $0.07 |
+| `large-charge-sentinel` | Alerts & Anomalies | After each sync | `read_write` | $0.03 |
+
+**On-demand (one-off) workflows** (`OneOff: true`) have no recurring trigger: the scheduler and post-sync hook both skip them, and they run only when a human clicks **Run now**. The gallery renders them with copy/run/settings icon buttons instead of a run toggle. The first Run (or an explicit Settings → save) instantiates a manual-only `agent_definition` (enabled, no cron, no `trigger_on_sync_complete`); `POST /-/workflow-presets/{slug}/run` does the instantiate-on-first-use + dispatch in one call (admin-only, consent-gated). `rule-foundation` defaults to Sonnet, `bulk-catchup` to Haiku.
 
 ### Preset options
 
-The shared `applyModeOption` is currently the only option type, used by the two `read_write` categorization presets:
+Options are per-preset single-selects rendered in the configure drawer; the chosen choice's directive (if any) is appended to the composed prompt. The default choice carries an empty directive, so the base prompt is unchanged unless the household picks a non-default. The service validates submitted choices against the declared set; unknown values fall back to the option's `Default`.
 
-| Key | Choices | Default |
-|---|---|---|
-| `apply_mode` | `auto` (apply categories), `flag_only` (review only, no writes) | `auto` |
+| Key | Used by | Choices | Default |
+|---|---|---|---|
+| `apply_mode` | `routine-reviewer`, `backlog-closer`, `bulk-catchup` | `auto` (apply categories), `flag_only` (review only, no writes) | `auto` |
+| `rule_mode` | `rule-foundation` | `create_apply` (create & apply rules), `draft_only` (propose only, no writes) | `create_apply` |
+| `lookback_window` | `large-charge-sentinel` | `7` / `30` / `90` days | `7` |
+| `report_verbosity` | `large-charge-sentinel` | `concise` (headline findings), `detailed` (full evidence) | `concise` |
 
-When `flag_only` is chosen, a directive is appended to the prompt that explicitly prohibits calling `update_transactions` to write a category. The service validates submitted choices against the declared set; unknown values fall back to the option's `Default`.
+When `flag_only` is chosen, a directive is appended to the prompt that explicitly prohibits calling `update_transactions` to write a category. The `lookback_window` and `report_verbosity` directives are defined as the shared `lookbackWindowOption` / `reportVerbosityOption` in `internal/service/workflow_presets.go`.
 
 ---
 

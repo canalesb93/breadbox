@@ -122,7 +122,9 @@ templ workflowReconfigureDrawer() {
 				Loading configuration…
 			</div>
 			<div x-show="!reconfigure.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
-				@workflowTriggerFields("reconfigure.triggerOnSync", "reconfigure.scheduleCron")
+				<div x-show="!reconfigure.oneOff" x-cloak>
+					@workflowTriggerFields("reconfigure.triggerOnSync", "reconfigure.scheduleCron")
+				</div>
 				@workflowModelField("reconfigure.model")
 				<template x-for="opt in reconfigure.options" :key="opt.key">
 					<div>
@@ -245,7 +247,7 @@ templ workflowPromptPreviewModal() {
 // drawer the gear opens, so the row itself stays uncluttered.
 templ workflowPresetCard(preset WorkflowPresetCardProps, isAdmin bool) {
 	<div class="bb-card px-4 py-3 h-full flex items-center gap-3">
-		<div class={ presetTileClasses(preset.Enabled) }>
+		<div class={ presetTileClasses(preset.Enabled && !preset.OneOff) }>
 			@components.LucideIcon(preset.Icon, "w-5 h-5")
 			if preset.LastRun != nil && preset.LastRun.Status == "error" {
 				<span
@@ -271,7 +273,9 @@ templ workflowPresetCard(preset WorkflowPresetCardProps, isAdmin bool) {
 // without choosing a schedule + acknowledging cost); non-admins get a
 // disabled toggle with a tooltip.
 templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
-	if preset.Enabled {
+	if preset.OneOff {
+		@workflowOneOffControls(preset, isAdmin)
+	} else if preset.Enabled {
 		<input
 			type="checkbox"
 			class="toggle toggle-sm"
@@ -309,6 +313,63 @@ templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 	} else {
 		<span class="tooltip tooltip-left" data-tip="Only admins can enable workflows">
 			<input type="checkbox" class="toggle toggle-sm" disabled aria-label={ "Toggle " + preset.Name }/>
+		</span>
+	}
+}
+
+// workflowOneOffControls is the right-side cluster for an on-demand (one-off)
+// workflow: three icon buttons — copy prompt, run now, settings — instead of a
+// run toggle, since a one-off has no recurring on/off state. Copy is available
+// to everyone (read-only); Run + Settings are admin-only (running instantiates
+// the workflow on first use). The settings gear opens the setup drawer before
+// first run and the reconfigure drawer once instantiated, mirroring the
+// toggle-card behavior. Each button carries a tooltip for its bare icon.
+templ workflowOneOffControls(preset WorkflowPresetCardProps, isAdmin bool) {
+	<button
+		type="button"
+		class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+		data-tip="Copy prompt"
+		@click={ "copyPromptDirect('" + preset.Slug + "')" }
+		aria-label={ "Copy the " + preset.Name + " prompt" }
+	>
+		@components.LucideIcon("copy", "w-4 h-4")
+	</button>
+	if isAdmin {
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+			data-tip="Run now"
+			@click={ "runOneOff('" + preset.Slug + "')" }
+			aria-label={ "Run " + preset.Name + " now" }
+		>
+			@components.LucideIcon("play", "w-4 h-4")
+		</button>
+		if preset.Enabled {
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+				data-tip="Settings"
+				@click={ "openReconfigure('" + preset.WorkflowSlug + "', '" + preset.Name + "', " + workflowBoolJS(preset.WorkflowEnabled) + ")" }
+				aria-label={ "Configure " + preset.Name }
+			>
+				@components.LucideIcon("settings", "w-4 h-4")
+			</button>
+		} else {
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+				data-tip="Settings"
+				@click={ "$store.drawers.open('wf-config-" + preset.Slug + "')" }
+				aria-label={ "Configure " + preset.Name }
+			>
+				@components.LucideIcon("settings", "w-4 h-4")
+			</button>
+		}
+	} else {
+		<span class="tooltip tooltip-left" data-tip="Only admins can run workflows">
+			<button type="button" class="btn btn-ghost btn-sm btn-square" disabled aria-label={ "Run " + preset.Name }>
+				@components.LucideIcon("play", "w-4 h-4")
+			</button>
 		</span>
 	}
 }
@@ -437,11 +498,20 @@ templ workflowActivateToggle() {
 	</label>
 }
 
+// workflowSetupActivate gates the setup drawer's header toggle: a recurring
+// preset shows the Activate toggle; a one-off has no on/off state (it only runs
+// via Run now), so its header carries no toggle and it instantiates enabled.
+templ workflowSetupActivate(oneOff bool) {
+	if !oneOff {
+		@workflowActivateToggle()
+	}
+}
+
 // workflowReconfigureToggle is the reconfigure drawer's header toggle: the
 // workflow's live run state. Unlike the setup toggle it isn't a form field —
 // it flips run-state immediately via toggleWorkflow (separate from Save).
 templ workflowReconfigureToggle() {
-	<label class="flex items-center gap-2 cursor-pointer">
+	<label class="flex items-center gap-2 cursor-pointer" x-show="!reconfigure.oneOff" x-cloak>
 		<span class="text-xs text-base-content/55 hidden sm:inline" x-text="reconfigure.enabled ? 'On' : 'Off'"></span>
 		<input
 			type="checkbox"
@@ -470,10 +540,12 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 				Icon:     preset.Icon,
 				Title:    preset.Name,
 				Subtitle: preset.Description,
-				Right:    workflowActivateToggle(),
+				Right:    workflowSetupActivate(preset.OneOff),
 			})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
-				@workflowTriggerFields("triggerOnSync", "cron")
+				if !preset.OneOff {
+					@workflowTriggerFields("triggerOnSync", "cron")
+				}
 				@workflowModelField("model")
 				for _, opt := range preset.Options {
 					<div>
@@ -527,13 +599,13 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
 				if consentAck {
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-						@components.LucideIcon("zap", "w-4 h-4")
-						Set up workflow
+						@components.LucideIcon(workflowSetupCTAIcon(preset.OneOff), "w-4 h-4")
+						{ workflowSetupCTALabel(preset.OneOff) }
 					</button>
 				} else {
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="!consent">
-						@components.LucideIcon("zap", "w-4 h-4")
-						Set up workflow
+						@components.LucideIcon(workflowSetupCTAIcon(preset.OneOff), "w-4 h-4")
+						{ workflowSetupCTALabel(preset.OneOff) }
 					</button>
 				}
 			}

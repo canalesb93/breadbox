@@ -45,6 +45,23 @@ func serverUTCOffsetMin() string {
 	return fmt.Sprintf("%d", off/60)
 }
 
+// workflowSetupCTALabel / workflowSetupCTAIcon pick the setup drawer's submit
+// button copy. A one-off saves run defaults (it's triggered separately via Run
+// now), so "Save" + a save icon reads truer than "Set up workflow" + a zap.
+func workflowSetupCTALabel(oneOff bool) string {
+	if oneOff {
+		return "Save"
+	}
+	return "Set up workflow"
+}
+
+func workflowSetupCTAIcon(oneOff bool) string {
+	if oneOff {
+		return "save"
+	}
+	return "zap"
+}
+
 // workflowBoolJS renders a Go bool as a JS boolean literal, for inline
 // Alpine @click expressions (e.g. the reconfigure gear passing run-state).
 func workflowBoolJS(b bool) string {
@@ -137,6 +154,11 @@ type WorkflowPresetCardProps struct {
 	// section. Resolved to non-empty/non-zero defaults by the page handler.
 	Model    string
 	MaxTurns int
+
+	// OneOff marks an on-demand workflow: the card renders copy/run/settings
+	// icon buttons instead of a run toggle, and the setup drawer drops the
+	// trigger picker (a one-off only ever runs via "Run now").
+	OneOff bool
 
 	// Options are the preset's specialized configuration selects, rendered
 	// in the configure drawer (e.g. apply-mode for categorization presets).
