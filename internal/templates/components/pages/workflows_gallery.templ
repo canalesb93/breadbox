@@ -183,7 +183,7 @@ templ workflowReconfigureDrawer() {
 // slug is never touched — it's the stable identity behind run keys + routes.
 // Bound to the gallery factory's reconfigure.* state.
 templ workflowReconfigureIdentityHeader() {
-	<div class="flex items-center justify-between gap-4 p-5 pb-4 border-b border-base-300 shrink-0">
+	<div class="flex items-center justify-between gap-4 p-5 border-b border-base-300 shrink-0">
 		<div class="flex items-center gap-3.5 min-w-0 flex-1">
 			<!-- reconfigureAvatarSrc() reseeds live as the hidden avatar_seed
 			     changes; tapping the avatar (shuffleAvatar()) mints a new seed. -->
@@ -193,18 +193,17 @@ templ workflowReconfigureIdentityHeader() {
 				Alt:       "Workflow avatar",
 				SizeClass: "w-12 h-12",
 			})
-			<div class="min-w-0 flex-1">
-				<input
-					type="text"
-					name="name"
-					x-model="reconfigure.name"
-					maxlength="80"
-					placeholder="Workflow name"
-					aria-label="Workflow name"
-					class="input input-ghost !text-lg font-semibold leading-tight w-full h-auto py-0.5 px-1.5 -ml-1.5"
-				/>
-				<div class="text-xs text-base-content/55 mt-0.5 px-1.5">Shown across activity &amp; run history. Tap the avatar to reshuffle.</div>
-			</div>
+			<!-- Editable title. A subtle bg appears on hover so it reads as a
+			     field; daisy input-ghost handles the focus state. -->
+			<input
+				type="text"
+				name="name"
+				x-model="reconfigure.name"
+				maxlength="80"
+				placeholder="Workflow name"
+				aria-label="Workflow name"
+				class="input input-ghost !text-lg font-semibold leading-tight flex-1 min-w-0 h-auto py-1.5 px-1.5 -ml-1.5 rounded-lg transition-colors hover:bg-base-200/70"
+			/>
 		</div>
 		<div class="flex items-center gap-2 shrink-0">
 			@workflowReconfigureToggle()

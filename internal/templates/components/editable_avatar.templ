@@ -23,11 +23,13 @@ type EditableAvatarProps struct {
 }
 
 // EditableAvatar renders a live avatar whose entire surface is the
-// shuffle/regenerate control. The whole circle is one button (pointer cursor,
-// primary focus ring); on hover the ring + corner badge tint primary and the
-// badge glyph spins, so it reads as an actionable "give me another" target
-// rather than decoration. Drop it inside any Alpine scope that owns a seed
-// value; wire SrcExpr/OnShuffle to that scope.
+// shuffle/regenerate control, with a deliberate animated state change: on tap
+// the current avatar dims, scales down and blurs while a spinner overlays it
+// and the corner badge tints primary; when the freshly-seeded image finishes
+// loading it springs back in (overshoot ease) and the spinner fades. The whole
+// circle is one button (pointer cursor, primary focus ring, press feedback).
+// Local Alpine state (imgLoading) drives the loading animation, cleared by the
+// <img>'s load/error events — so it works inside any caller x-data scope.
 //
 //	@components.EditableAvatar(components.EditableAvatarProps{
 //		SrcExpr:   "reconfigureAvatarSrc()",
@@ -37,21 +39,47 @@ type EditableAvatarProps struct {
 templ EditableAvatar(p EditableAvatarProps) {
 	<button
 		type="button"
-		@click={ p.OnShuffle }
+		x-data="{ imgLoading: false }"
+		@click={ "imgLoading = true; " + p.OnShuffle }
+		x-bind:aria-busy="imgLoading"
 		title="Shuffle avatar"
 		aria-label="Shuffle avatar"
-		class={ "group relative shrink-0 rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 " + editableAvatarSizeClass(p.SizeClass) }
+		class={ "group relative shrink-0 rounded-full cursor-pointer transition-transform duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 " + editableAvatarSizeClass(p.SizeClass) }
 	>
 		<img
 			x-bind:src={ p.SrcExpr }
+			@load="imgLoading = false"
+			@error="imgLoading = false"
 			alt={ p.Alt }
-			class="w-full h-full rounded-full bg-base-200 ring-1 ring-base-300 transition group-hover:ring-primary/60"
+			x-bind:class="imgLoading ? 'scale-90 opacity-40 blur-[2px]' : 'scale-100 opacity-100 blur-none'"
+			class="w-full h-full rounded-full bg-base-200 ring-1 ring-base-300 transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:ring-primary/60"
 		/>
+		<!-- Loading overlay: a spinner sits over the dimmed avatar while the
+		     new DiceBear SVG fetches. Fades in/out with the loading state. -->
+		<span
+			x-show="imgLoading"
+			x-cloak
+			x-transition:enter="transition-opacity ease-out duration-200"
+			x-transition:enter-start="opacity-0"
+			x-transition:enter-end="opacity-100"
+			x-transition:leave="transition-opacity ease-in duration-150"
+			x-transition:leave-start="opacity-100"
+			x-transition:leave-end="opacity-0"
+			class="absolute inset-0 flex items-center justify-center"
+			aria-hidden="true"
+		>
+			<span class="loading loading-spinner loading-sm text-primary"></span>
+		</span>
+		<!-- Corner badge: the shuffle cue. Tints primary on hover/loading; the
+		     glyph spins continuously while loading and rotates 180° on hover. -->
 		<span
 			aria-hidden="true"
+			x-bind:class="imgLoading ? 'bg-primary text-primary-content border-primary' : ''"
 			class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-base-100 border border-base-300 shadow-sm flex items-center justify-center text-base-content/60 transition-colors group-hover:bg-primary group-hover:text-primary-content group-hover:border-primary"
 		>
-			@LucideIcon("shuffle", "w-3 h-3 transition-transform duration-300 group-hover:rotate-180")
+			<span x-bind:class="imgLoading ? 'animate-spin' : 'transition-transform duration-300 group-hover:rotate-180'" class="inline-flex">
+				@LucideIcon("shuffle", "w-3 h-3")
+			</span>
 		</span>
 	</button>
 }
