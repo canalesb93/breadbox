@@ -43,6 +43,7 @@ func TestResolveNotifyFormat_Providers(t *testing.T) {
 	}{
 		{appconfig.NotifyFormatAuto, "https://hooks.slack.com/services/x", appconfig.NotifyFormatSlack},
 		{appconfig.NotifyFormatAuto, "https://discord.com/api/webhooks/1/a", appconfig.NotifyFormatDiscord},
+		{appconfig.NotifyFormatAuto, "https://chat.googleapis.com/v1/spaces/AAA/messages?key=k&token=t", appconfig.NotifyFormatGoogleChat},
 		{appconfig.NotifyFormatAuto, "https://ntfy.sh/t", appconfig.NotifyFormatNtfy},
 		{appconfig.NotifyFormatAuto, "https://example.com/h", appconfig.NotifyFormatJSON},
 		{appconfig.NotifyFormatSlack, "https://ntfy.sh/t", appconfig.NotifyFormatSlack},     // explicit overrides sniff
@@ -110,6 +111,43 @@ func TestBuildSlackRequest(t *testing.T) {
 		if !strings.Contains(text, w) {
 			t.Errorf("slack text missing %q\ngot: %q", w, text)
 		}
+	}
+}
+
+func TestBuildGoogleChatRequest(t *testing.T) {
+	p := NotificationPayload{
+		Title:    "Sync watchdog",
+		Body:     "Last sync **failed**. See [logs](https://bb/logs).",
+		Priority: "critical",
+		URL:      "https://bb/reports/xyz",
+	}
+	req, err := buildGoogleChatRequest(t.Context(), "https://chat.googleapis.com/v1/spaces/A/messages?key=k", p)
+	if err != nil {
+		t.Fatalf("buildGoogleChatRequest: %v", err)
+	}
+	if ct := req.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("content-type = %q", ct)
+	}
+	text := decodeJSONField(t, req, "text")
+	// Single-asterisk bold title, mrkdwn link conversion, unicode emoji (not a
+	// :shortcode:), and the view-report link.
+	wants := []string{"\U0001F6A8", "*Sync watchdog*", "*failed*", "<https://bb/logs|logs>", "<https://bb/reports/xyz|View report →>"}
+	for _, w := range wants {
+		if !strings.Contains(text, w) {
+			t.Errorf("googlechat text missing %q\ngot: %q", w, text)
+		}
+	}
+	if strings.Contains(text, ":rotating_light:") {
+		t.Errorf("googlechat should use unicode emoji, not a shortcode: %q", text)
+	}
+}
+
+func TestLooksLikeGoogleChat(t *testing.T) {
+	if !looksLikeGoogleChat("https://chat.googleapis.com/v1/spaces/A/messages?key=k&token=t") {
+		t.Error("google chat webhook not detected")
+	}
+	if looksLikeGoogleChat("https://hooks.slack.com/services/x") {
+		t.Error("slack detected as google chat")
 	}
 }
 

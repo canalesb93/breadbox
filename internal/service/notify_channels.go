@@ -107,7 +107,7 @@ func (s *Service) AddNotificationChannel(ctx context.Context, p AddNotificationC
 		format = appconfig.NotifyFormatAuto
 	}
 	if !validNotifyFormat(format) {
-		return nil, fmt.Errorf("%w: notification format must be auto, ntfy, slack, discord, or json", ErrInvalidParameter)
+		return nil, fmt.Errorf("%w: notification format must be auto, ntfy, slack, discord, googlechat, or json", ErrInvalidParameter)
 	}
 	minPriority := strings.TrimSpace(p.MinPriority)
 	if minPriority == "" {

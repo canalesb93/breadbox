@@ -9,9 +9,35 @@ document.addEventListener('alpine:init', function () {
     return {
       csrfToken: '',
       testState: {},
+      allState: 'idle',
 
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
+      },
+
+      testAll: function () {
+        var self = this;
+        this.allState = 'loading';
+        fetch('/-/notifications/test', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-CSRF-Token': this.csrfToken, Accept: 'application/json' },
+        })
+          .then(function (res) {
+            return res.json().then(function (body) {
+              return { ok: res.ok, status: res.status, body: body };
+            });
+          })
+          .then(function (r) {
+            if (!r.ok || (r.body && r.body.ok === false)) {
+              self.allState = 'err:' + ((r.body && r.body.error) || ('HTTP ' + r.status));
+              return;
+            }
+            self.allState = 'ok';
+          })
+          .catch(function (e) {
+            self.allState = 'err:' + ((e && e.message) || 'Request failed');
+          });
       },
 
       _set: function (id, val) {

@@ -120,11 +120,12 @@ const (
 
 // NotifyFormat values for KeyNotifyFormat.
 const (
-	NotifyFormatAuto    = "auto"
-	NotifyFormatNtfy    = "ntfy"
-	NotifyFormatSlack   = "slack"
-	NotifyFormatDiscord = "discord"
-	NotifyFormatJSON    = "json"
+	NotifyFormatAuto       = "auto"
+	NotifyFormatNtfy       = "ntfy"
+	NotifyFormatSlack      = "slack"
+	NotifyFormatDiscord    = "discord"
+	NotifyFormatGoogleChat = "googlechat"
+	NotifyFormatJSON       = "json"
 )
 
 // NotifyMinPriority values for KeyNotifyMinPriority (delivery floor).

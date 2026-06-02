@@ -61,7 +61,7 @@ func (s *Service) UpdateNotificationSettings(ctx context.Context, p UpdateNotifi
 			format = appconfig.NotifyFormatAuto
 		}
 		if !validNotifyFormat(format) {
-			return nil, fmt.Errorf("%w: notification format must be auto, ntfy, slack, discord, or json", ErrInvalidParameter)
+			return nil, fmt.Errorf("%w: notification format must be auto, ntfy, slack, discord, googlechat, or json", ErrInvalidParameter)
 		}
 		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyNotifyFormat, format)); err != nil {
 			return nil, fmt.Errorf("set notify_format: %w", err)
@@ -98,7 +98,7 @@ func validNotifyFormat(v string) bool {
 	switch v {
 	case appconfig.NotifyFormatAuto, appconfig.NotifyFormatNtfy,
 		appconfig.NotifyFormatSlack, appconfig.NotifyFormatDiscord,
-		appconfig.NotifyFormatJSON:
+		appconfig.NotifyFormatGoogleChat, appconfig.NotifyFormatJSON:
 		return true
 	default:
 		return false

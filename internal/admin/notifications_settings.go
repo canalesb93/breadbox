@@ -154,7 +154,7 @@ func notificationChannelViews(channels []service.NotificationChannel) []pages.No
 			ID:          c.ID,
 			Name:        c.Name,
 			Format:      c.Format,
-			FormatLabel: notifyFormatLabel(c.Format),
+			FormatLabel: channelFormatLabel(c.Format, c.URL),
 			URLMasked:   maskNotifyURL(c.URL),
 			MinPriority: c.MinPriority,
 			Enabled:     c.Enabled,
@@ -180,11 +180,28 @@ func notifyFormatLabel(format string) string {
 		return "Slack"
 	case "discord":
 		return "Discord"
+	case "googlechat":
+		return "Google Chat"
 	case "json":
 		return "Generic JSON"
 	default:
 		return "Auto-detect"
 	}
+}
+
+// channelFormatLabel labels a channel's format for the list. For an
+// "auto" channel it shows what the URL actually resolves to (e.g.
+// "Auto · ntfy") so the operator sees the effective provider; for a
+// generic URL it stays "Auto-detect".
+func channelFormatLabel(format, rawURL string) string {
+	if format != "auto" && format != "" {
+		return notifyFormatLabel(format)
+	}
+	resolved := service.ResolveNotifyFormat("auto", rawURL)
+	if resolved == "json" {
+		return "Auto-detect"
+	}
+	return "Auto · " + notifyFormatLabel(resolved)
 }
 
 // maskNotifyURL renders a webhook URL with its secret path obscured —

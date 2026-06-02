@@ -40,15 +40,48 @@ templ notificationsChannelsSection(p NotificationsSettingsProps) {
 		Icon:    "bell",
 		Title:   "Channels",
 		Caption: "Every enabled channel receives each workflow notification",
+		Right:   notificationsChannelsHeaderRight(p),
 	}) {
 		if len(p.Channels) == 0 {
 			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
 				<p class="text-sm text-base-content/60">No channels yet — add one below to start receiving workflow notifications.</p>
 			}
 		}
+		<template x-if="allState === 'ok'">
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div role="alert" class="alert alert-success alert-soft rounded-xl">
+					@components.LucideIcon("circle-check", "w-4 h-4")
+					<span>Test sent to all enabled channels.</span>
+				</div>
+			}
+		</template>
+		<template x-if="allState && allState.startsWith('err:')">
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div role="alert" class="alert alert-error alert-soft rounded-xl">
+					@components.LucideIcon("circle-x", "w-4 h-4")
+					<span x-text="allState.slice(4)"></span>
+				</div>
+			}
+		</template>
 		for _, c := range p.Channels {
 			@notificationChannelRow(c, p.CSRFToken)
 		}
+	}
+}
+
+// notificationsChannelsHeaderRight renders the "Test all" header action,
+// shown only when at least one channel exists.
+templ notificationsChannelsHeaderRight(p NotificationsSettingsProps) {
+	if len(p.Channels) > 0 {
+		<button type="button" class="btn btn-ghost btn-sm gap-1.5" @click="testAll()" :disabled="allState === 'loading'">
+			<span x-show="allState !== 'loading'" class="flex items-center gap-1.5">
+				@components.LucideIcon("send", "w-4 h-4")
+				Test all
+			</span>
+			<span x-show="allState === 'loading'" x-cloak class="flex items-center gap-1.5">
+				<span class="loading loading-spinner loading-xs"></span> Sending…
+			</span>
+		</button>
 	}
 }
 
@@ -132,6 +165,7 @@ templ notificationsAddChannelSection(p NotificationsSettingsProps) {
 				<option value="ntfy">ntfy</option>
 				<option value="slack">Slack</option>
 				<option value="discord">Discord</option>
+				<option value="googlechat">Google Chat</option>
 				<option value="json">Generic JSON</option>
 			</select>
 		}

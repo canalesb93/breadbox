@@ -172,6 +172,8 @@ func (s *Service) sendToChannel(ctx context.Context, c *NotificationChannel, p N
 			return buildSlackRequest(ctx, c.URL, p)
 		case appconfig.NotifyFormatDiscord:
 			return buildDiscordRequest(ctx, c.URL, p)
+		case appconfig.NotifyFormatGoogleChat:
+			return buildGoogleChatRequest(ctx, c.URL, p)
 		default:
 			return buildJSONNotifyRequest(ctx, c.URL, p)
 		}
@@ -185,13 +187,21 @@ func (s *Service) sendToChannel(ctx context.Context, c *NotificationChannel, p N
 	return err
 }
 
+// ResolveNotifyFormat is the exported view of format resolution — used by the
+// admin UI to show what a channel's "auto" format actually resolved to.
+func ResolveNotifyFormat(configured, rawURL string) string {
+	return resolveNotifyFormat(configured, rawURL)
+}
+
 // resolveNotifyFormat maps the configured format to a concrete wire shape.
 // "auto" (the default, and any unknown value) sniffs the URL for a known
-// provider (ntfy / Slack / Discord), falling back to the generic JSON shape.
+// provider (ntfy / Slack / Discord / Google Chat), falling back to the
+// generic JSON shape.
 func resolveNotifyFormat(configured, rawURL string) string {
 	switch configured {
 	case appconfig.NotifyFormatNtfy, appconfig.NotifyFormatSlack,
-		appconfig.NotifyFormatDiscord, appconfig.NotifyFormatJSON:
+		appconfig.NotifyFormatDiscord, appconfig.NotifyFormatGoogleChat,
+		appconfig.NotifyFormatJSON:
 		return configured
 	default:
 		switch {
@@ -201,10 +211,17 @@ func resolveNotifyFormat(configured, rawURL string) string {
 			return appconfig.NotifyFormatSlack
 		case looksLikeDiscord(rawURL):
 			return appconfig.NotifyFormatDiscord
+		case looksLikeGoogleChat(rawURL):
+			return appconfig.NotifyFormatGoogleChat
 		default:
 			return appconfig.NotifyFormatJSON
 		}
 	}
+}
+
+// looksLikeGoogleChat reports whether a URL is a Google Chat incoming webhook.
+func looksLikeGoogleChat(raw string) bool {
+	return urlHost(raw) == "chat.googleapis.com"
 }
 
 // looksLikeNtfy reports whether a webhook URL points at an ntfy server.
@@ -466,6 +483,41 @@ func buildSlackRequest(ctx context.Context, rawURL string, p NotificationPayload
 		b.WriteString("|View report →>")
 	}
 	return jsonNotifyRequest(ctx, rawURL, map[string]any{"text": b.String()})
+}
+
+// buildGoogleChatRequest POSTs a Google Chat incoming-webhook payload
+// ({"text": …}). Google Chat uses the same single-asterisk bold + <url|label>
+// link syntax as Slack mrkdwn, but renders unicode emoji rather than
+// :shortcode: names — so the priority cue is a unicode glyph.
+func buildGoogleChatRequest(ctx context.Context, rawURL string, p NotificationPayload) (*http.Request, error) {
+	var b strings.Builder
+	b.WriteString(notifyEmojiUnicode(p.Priority))
+	b.WriteString(" *")
+	b.WriteString(slackEscape(collapseToLine(p.Title)))
+	b.WriteString("*")
+	if body := strings.TrimSpace(p.Body); body != "" {
+		b.WriteString("\n")
+		b.WriteString(toSlackMrkdwn(body))
+	}
+	if isAbsoluteURL(p.URL) {
+		b.WriteString("\n<")
+		b.WriteString(p.URL)
+		b.WriteString("|View report →>")
+	}
+	return jsonNotifyRequest(ctx, rawURL, map[string]any{"text": b.String()})
+}
+
+// notifyEmojiUnicode returns a unicode emoji for a priority — used where
+// :shortcode: names aren't rendered (Google Chat).
+func notifyEmojiUnicode(priority string) string {
+	switch priority {
+	case "critical":
+		return "\U0001F6A8" // 🚨
+	case "warning":
+		return "⚠️" // ⚠️
+	default:
+		return "ℹ️" // ℹ️
+	}
 }
 
 // buildDiscordRequest POSTs a Discord webhook payload ({"content": …}).
