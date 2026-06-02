@@ -196,6 +196,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionOverflowMenu() },
 		},
 		{
+			Slug:        "topbar-breadcrumb",
+			Title:       "Topbar breadcrumb",
+			Description: "The app's single location trail, rendered in the topbar (and a scrollable mobile strip). Section group + navigable parent crumbs + bold current page. Use components.TopbarBreadcrumb; the layout owns it — pages don't render their own breadcrumb.",
+			Group:       "navigation",
+			Render:      func() templ.Component { return SectionTopbarBreadcrumb() },
+		},
+		{
 			Slug:        "sidebar-user-menu",
 			Title:       "Sidebar user menu",
 			Description: "Consolidated identity + actions popover at the bottom of the sidebar. Trigger shows avatar + display name + role; popover holds Documentation, GitHub, an editor-only /design shortcut, and a destructive Sign out below an <hr> separator. (Settings lives in the sidebar System section, not here.) Use components.SidebarUserMenu.",
