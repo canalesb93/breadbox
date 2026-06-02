@@ -66,6 +66,13 @@ type SetupStepProps struct {
 	CTAIcon      string
 	CTALabel     string
 	CTADisabled  bool // render as a disabled btn span (no link)
+
+	// Stat is an optional inline metric shown in the trailing area, left of
+	// the CTA and vertically centered with it — e.g. "3" + StatLabel
+	// "connections". Hidden when "". Use for the count a step produced (the
+	// members it created, the connections/transactions it synced).
+	Stat      string
+	StatLabel string // small uppercase label under Stat (e.g. "connections")
 }
 
 templ SetupStep(p SetupStepProps) {
@@ -119,10 +126,16 @@ templ SetupStep(p SetupStepProps) {
 						@setupStepMetaRow(p)
 				}
 			</div>
-			<!-- Trailing CTA — reflows below on narrow viewports via flex-wrap -->
-			if p.CTALabel != "" {
-				<div class="shrink-0 ml-auto">
-					@setupStepCTA(p)
+			<!-- Trailing area: optional inline stat + CTA, vertically centered
+			     against the content column. Reflows below on narrow viewports. -->
+			if p.CTALabel != "" || p.Stat != "" {
+				<div class="shrink-0 ml-auto self-center flex items-center gap-4 sm:gap-5">
+					if p.Stat != "" {
+						@setupStepStat(p)
+					}
+					if p.CTALabel != "" {
+						@setupStepCTA(p)
+					}
 				</div>
 			}
 		</div>
@@ -196,6 +209,18 @@ templ setupStepCTA(p SetupStepProps) {
 				{ p.CTALabel }
 			</a>
 	}
+}
+
+// setupStepStat renders the optional inline metric in the trailing area: a
+// tabular-nums value with a small uppercase label beneath. Kept quiet (it sits
+// next to the CTA) and right-aligned so the value and label share an edge.
+templ setupStepStat(p SetupStepProps) {
+	<div class="text-right leading-tight">
+		<div class="text-base sm:text-lg font-semibold tabular-nums text-base-content/80">{ p.Stat }</div>
+		if p.StatLabel != "" {
+			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">{ p.StatLabel }</div>
+		}
+	</div>
 }
 
 // setupStepCardClass elevates the active step and dims the resolved ones. The

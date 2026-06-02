@@ -89,6 +89,8 @@ templ gsStep1(p GettingStartedProps) {
 		Summary:      "Household member added.",
 		State:        gsStepState(p.HasMember, 1, p.ActiveStep),
 		TimeEstimate: "~1 min",
+		Stat:         gsStat(p.MemberCount),
+		StatLabel:    gsPlural(p.MemberCount, "member", "members"),
 		CTAHref:      gsStepCTAHref(p.HasMember, "/household", "/household/new"),
 		CTAIcon:      gsStepCTAIcon(p.HasMember, "plus"),
 		CTALabel:     gsStepCTALabel(p.HasMember, "View members", "Add member"),
@@ -124,6 +126,8 @@ templ gsStep3(p GettingStartedProps) {
 		Summary:      "Bank connected and syncing.",
 		State:        gsStepState(p.HasConnection, 3, p.ActiveStep),
 		TimeEstimate: "~2 min",
+		Stat:         gsStat(p.ConnectionCount),
+		StatLabel:    gsPlural(p.ConnectionCount, "connection", "connections"),
 		DocHref:      "https://docs.breadbox.sh",
 		DocLabel:     "Connecting a bank",
 		CTAHref:      gsStepCTAHref(p.HasConnection, "/connections", "/connections/new"),
@@ -141,9 +145,11 @@ templ gsStep4(p GettingStartedProps) {
 		Icon:         "refresh-cw",
 		Title:        "Complete the first sync",
 		Description:  "Your first sync runs automatically. Check the logs if it doesn't start.",
-		Summary:      fmt.Sprintf("%s transactions across %s accounts.", components.CommaInt(p.TransactionCount), components.CommaInt(p.AccountCount)),
+		Summary:      fmt.Sprintf("Synced across %s.", gsPluralCount(p.AccountCount, "account", "accounts")),
 		State:        gsSyncState(p),
 		TimeEstimate: "~1 min",
+		Stat:         gsStat(p.TransactionCount),
+		StatLabel:    gsPlural(p.TransactionCount, "transaction", "transactions"),
 		CTAHref:      gsStepCTAHref(p.HasSync, "/transactions", "/logs"),
 		CTAIcon:      "",
 		CTALabel:     gsStepCTALabel(p.HasSync, "View transactions", "View logs"),
@@ -163,6 +169,8 @@ templ gsStep5(p GettingStartedProps) {
 		State:        gsStepState(p.HasAPIKey, 5, p.ActiveStep),
 		TimeEstimate: "~3 min",
 		Optional:     true,
+		Stat:         gsStat(p.ApiKeyCount),
+		StatLabel:    gsPlural(p.ApiKeyCount, "API key", "API keys"),
 		DocHref:      "https://docs.breadbox.sh/guides/multi-agent-reviewer",
 		DocLabel:     "Multi-agent reviewer",
 		CTAHref:      "/workflows",
@@ -232,4 +240,29 @@ func gsStepCTAIcon(complete bool, todoIcon string) string {
 		return ""
 	}
 	return todoIcon
+}
+
+// gsStat formats a step's inline metric value, returning "" for zero/empty so
+// SetupStep hides the stat block entirely (a step only shows a count once it
+// has produced one — which in practice means it's complete).
+func gsStat(n int64) string {
+	if n <= 0 {
+		return ""
+	}
+	return components.CommaInt(n)
+}
+
+// gsPlural returns the singular or plural label for a count — the small label
+// under a step's inline stat (e.g. "member" vs "members").
+func gsPlural(n int64, singular, plural string) string {
+	if n == 1 {
+		return singular
+	}
+	return plural
+}
+
+// gsPluralCount renders "N <unit>" with correct pluralization for inline prose
+// (e.g. the sync step summary "Synced across 8 accounts.").
+func gsPluralCount(n int64, singular, plural string) string {
+	return components.CommaInt(n) + " " + gsPlural(n, singular, plural)
 }

@@ -41,11 +41,13 @@ type GettingStartedProps struct {
 	// "~5 min left". Empty hides the hero's time row (also empty when done).
 	TimeRemaining string
 
-	// Counters for the always-on stats strip.
+	// Counters for the always-on stats strip + per-step inline stats.
+	MemberCount      int64
 	ConnectionCount  int64
 	AccountCount     int64
 	TransactionCount int64
 	SuccessfulSyncs  int64
+	ApiKeyCount      int64
 
 	// Whether the onboarding guide has been dismissed (controls the footer's
 	// dismiss form vs. the always-available note).
