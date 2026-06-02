@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# ui-validate — one command to validate a Breadbox admin UI change:
+# rebuild, (re)start this worktree's managed dev server, and screenshot one or
+# more routes. Prints the saved JPEG paths, ready to upload (img402.dev) and
+# embed in a PR.
+#
+#   scripts/ui-validate /transactions
+#   scripts/ui-validate /transactions /reviews --mobile
+#   scripts/ui-validate /transactions:tx --wait '.join button' --desktop --mobile
+#
+# Routes are positional (`path[:slug]`). Flags:
+#   --desktop / --mobile / --tablet / --wide   viewport(s); repeatable; default --desktop
+#   --wait <css>     wait for a selector before capture
+#   --full           full-page capture
+#   --no-rebuild     reuse the running server as-is (skip rebuild+restart)
+#   --base <url>     override base URL (default: this worktree's managed server)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=scripts/dev-lib.sh
+. "$SCRIPT_DIR/dev-lib.sh"
+
+ROOT="$(bb_worktree_root)"
+ROUTES=""
+VIEWPORTS=""
+WAIT=""
+FULL="false"
+REBUILD=1
+BASE_OVERRIDE=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --desktop) VIEWPORTS="$VIEWPORTS desktop";;
+    --mobile)  VIEWPORTS="$VIEWPORTS mobile";;
+    --tablet)  VIEWPORTS="$VIEWPORTS tablet";;
+    --wide)    VIEWPORTS="$VIEWPORTS wide";;
+    --wait)    shift; WAIT="${1:-}";;
+    --full)    FULL="true";;
+    --no-rebuild) REBUILD=0;;
+    --base)    shift; BASE_OVERRIDE="${1:-}";;
+    -*) bb_log "unknown flag: $1"; exit 2;;
+    *)  ROUTES="$ROUTES $1";;
+  esac
+  shift || true
+done
+
+ROUTES="$(printf '%s' "$ROUTES" | sed 's/^ *//')"
+[ -n "$ROUTES" ] || ROUTES="/transactions"
+[ -n "$VIEWPORTS" ] || VIEWPORTS="desktop"
+
+# Resolve the server (rebuild + restart unless overridden / --no-rebuild).
+if [ -n "$BASE_OVERRIDE" ]; then
+  BASE="$BASE_OVERRIDE"
+else
+  if [ "$REBUILD" -eq 1 ]; then
+    URL="$("$SCRIPT_DIR/dev-server" restart)"
+  else
+    URL="$("$SCRIPT_DIR/dev-server" ensure)"
+  fi
+  BASE="$(printf '%s' "$URL" | grep -oE 'http://localhost:[0-9]+' | tail -1)"
+fi
+[ -n "$BASE" ] || { bb_log "ERROR: could not resolve a server URL"; exit 1; }
+bb_log "==> validating against $BASE"
+
+# Comma-join routes for ui-shot.
+ROUTES_CSV="$(printf '%s' "$ROUTES" | tr -s ' ' ',' | sed 's/^,//;s/,$//')"
+
+# Per-run output dir so concurrent ui-validate runs (sibling worktrees) don't
+# overwrite each other's fixed-name JPEGs. Honors an explicit OUTDIR if set.
+OUTDIR="${OUTDIR:-$(mktemp -d "${TMPDIR:-/tmp}/bb-shots-XXXXXX")}"
+UDD="$(mktemp -d "${TMPDIR:-/tmp}/bb-chrome-XXXXXX")"
+bb_load_env "$ROOT"   # picks up BB_USER/BB_PASS if present in .local.env
+
+for vp in $VIEWPORTS; do
+  BASE="$BASE" ROUTES="$ROUTES_CSV" OUTDIR="$OUTDIR" VIEWPORT="$vp" \
+    WAIT="$WAIT" FULL="$FULL" UDD="$UDD" \
+    BB_USER="${BB_USER:-admin@example.com}" BB_PASS="${BB_PASS:-password}" \
+    node "$SCRIPT_DIR/ui-shot.mjs"
+done
+
+rm -rf "$UDD" 2>/dev/null || true

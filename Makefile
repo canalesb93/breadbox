@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-install-user agent-sidecar-typecheck
+.PHONY: dev dev-watch dev-stop dev-stop-all dev-bg dev-ps dev-reap dev-shot build build-headless build-lite test test-integration lint lint-headless lint-lite generate migrate-up migrate-down migrate-create sqlc sqlc-install sqlc-tag seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check openapi-validate agent-sidecar agent-sidecar-install agent-sidecar-install-user agent-sidecar-typecheck
 
 PORT ?= 8080
 
@@ -68,14 +68,16 @@ dev: generate css
 		echo "  Or add it to .local.env (auto-loaded by Make)"; \
 		exit 1; \
 	fi
-	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
-		echo "Error: port $(PORT) is already in use."; \
-		echo "  - Run on another port:  make dev PORT=8081"; \
-		echo "  - Or kill the existing process:  kill $$(lsof -ti:$(PORT))"; \
+	@port=$$(PORT='$(PORT)' ./scripts/dev-port) || exit 1; \
+	if lsof -ti:$$port >/dev/null 2>&1; then \
+		echo "Error: port $$port is already in use."; \
+		echo "  - Run on another port:  make dev PORT=8085"; \
+		echo "  - Or kill the existing process:  kill $$(lsof -ti:$$port)"; \
 		exit 1; \
-	fi
-	@echo $(PORT) > .breadbox-port
-	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve; rm -f .breadbox-port
+	fi; \
+	echo $$port > .breadbox-port; \
+	echo "==> dev server: http://localhost:$$port"; \
+	SERVER_PORT=$$port go run ./cmd/breadbox serve; rm -f .breadbox-port
 
 # dev-watch: hot-reload everything — Go rebuilds via air, CSS rebuilds via
 # tailwind --watch, and BREADBOX_DEV_RELOAD=1 makes the running binary read
@@ -88,16 +90,18 @@ dev-watch: generate air-install
 		echo "  Or add it to .local.env (auto-loaded by Make)"; \
 		exit 1; \
 	fi
-	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
-		echo "Error: port $(PORT) is already in use."; \
-		echo "  - Run on another port:  make dev-watch PORT=8081"; \
-		echo "  - Or kill the existing process:  kill $$(lsof -ti:$(PORT))"; \
+	@port=$$(PORT='$(PORT)' ./scripts/dev-port) || exit 1; \
+	if lsof -ti:$$port >/dev/null 2>&1; then \
+		echo "Error: port $$port is already in use."; \
+		echo "  - Run on another port:  make dev-watch PORT=8085"; \
+		echo "  - Or kill the existing process:  kill $$(lsof -ti:$$port)"; \
 		exit 1; \
-	fi
-	@echo $(PORT) > .breadbox-port
-	@trap 'rm -f .breadbox-port; kill 0' EXIT INT TERM; \
+	fi; \
+	echo $$port > .breadbox-port; \
+	echo "==> dev-watch server: http://localhost:$$port"; \
+	trap 'rm -f .breadbox-port; kill 0' EXIT INT TERM; \
 		$(TAILWIND_BIN) -i input.css -o static/css/styles.css --watch & \
-		BREADBOX_DEV_RELOAD=1 SERVER_PORT=$(PORT) air -c .air.toml; \
+		BREADBOX_DEV_RELOAD=1 SERVER_PORT=$$port air -c .air.toml; \
 		wait
 
 air-install:
@@ -106,7 +110,41 @@ air-install:
 		go install github.com/air-verse/air@latest; \
 	fi
 
+# dev-bg: start (or reuse) a managed background dev server for THIS worktree.
+# Idempotent — reuses a healthy server if one is already up. Prints the URL.
+# This is the validation/pre-warm entrypoint: no port fishing, tracked for
+# cleanup, and reaped automatically when the session ends or the worktree is
+# removed. For interactive hot-reload instead, use `make dev-watch`.
+dev-bg:
+	@./scripts/dev-server ensure
+
+# dev-shot: rebuild, (re)start the managed server, and screenshot routes.
+# Pass routes + flags via ARGS, e.g.:
+#   make dev-shot ARGS="/transactions --mobile --wait '.join button'"
+# Prints the saved JPEG paths (upload via the github-image-hosting skill).
+dev-shot:
+	@./scripts/ui-validate $(ARGS)
+
+# dev-stop: stop ONLY this worktree's managed server (safe to run while other
+# worktrees keep theirs). Use dev-stop-all for the blunt range kill.
 dev-stop:
+	@./scripts/dev-server stop
+	@echo "Stopped this worktree's managed dev server (if any)."
+	@echo "To stop every breadbox on 8080-8099, run: make dev-stop-all"
+
+# dev-ps: list every managed dev server (port, pid, branch, worktree, alive).
+dev-ps:
+	@./scripts/dev-server ps
+
+# dev-reap: kill orphaned servers — dead pids and servers whose worktree was
+# removed. Leaves healthy, actively-owned servers alone.
+dev-reap:
+	@./scripts/dev-server reap
+	@echo "Reaped orphaned dev servers."
+
+# dev-stop-all: blunt instrument — kill every process listening on 8080-8099,
+# including OTHER active worktrees. Also clears the managed-server registry.
+dev-stop-all:
 	@pids=$$(lsof -ti:8080-8099 2>/dev/null | sort -u || true); \
 	if [ -z "$$pids" ]; then \
 		echo "No dev instances running."; \
@@ -114,6 +152,7 @@ dev-stop:
 		echo "$$pids" | xargs kill 2>/dev/null; \
 		echo "Stopped dev instances on ports 8080-8099: $$pids"; \
 	fi
+	@rm -f "$${BB_STATE_DIR:-$$HOME/.local/share/breadbox}"/dev-servers/* 2>/dev/null || true
 
 build: generate
 	go build -o breadbox ./cmd/breadbox

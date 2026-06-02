@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# dev-port — print a port the current worktree can bind a dev server to.
+#
+# Resolution order:
+#   1. SERVER_PORT / PORT (if explicitly set, and not the main-repo default 8080)
+#   2. this worktree's last port (.breadbox-port), if currently free
+#   3. the first free, unclaimed port in BB_PORT_MIN..BB_PORT_MAX
+#
+# Used by `make dev` / `make dev-watch` so they land on a free port instead of
+# hard-failing when their default is taken. Unlike `dev-server ensure`, this
+# does NOT boot anything and does NOT write the server registry — it resolves a
+# port, records it in .breadbox-port for stability, and prints it.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=scripts/dev-lib.sh
+. "$SCRIPT_DIR/dev-lib.sh"
+
+ROOT="$(bb_worktree_root)"
+DIR="$(bb_servers_dir)"; mkdir -p "$DIR"
+
+claimed_by_other() { # <port> -> 0 if a *different* live worktree holds it
+  local port="$1" owner opid
+  [ -f "$DIR/$port" ] || return 1
+  owner="$(bb_meta_get "$DIR/$port" worktree)"
+  [ "$owner" = "$ROOT" ] && return 1
+  opid="$(bb_meta_get "$DIR/$port" pid)"
+  { [ "$opid" = RESERVED ] || [ "$opid" = PENDING ] || bb_pid_alive "$opid"; }
+}
+
+usable() { # <port> -> bindable now and not held by another worktree
+  local port="$1"
+  bb_port_in_use "$port" && return 1
+  claimed_by_other "$port" && return 1
+  return 0
+}
+
+candidate=""
+if [ -n "${SERVER_PORT:-}" ]; then candidate="$SERVER_PORT"
+elif [ -n "${PORT:-}" ] && [ "$PORT" != "8080" ]; then candidate="$PORT"
+elif [ -f "$ROOT/.breadbox-port" ]; then
+  candidate="$(head -1 "$ROOT/.breadbox-port" 2>/dev/null | tr -dc '0-9')"
+fi
+
+# An explicitly-set env port is honored as-is (the user/Makefile asked for it).
+if [ -n "${SERVER_PORT:-}" ] || { [ -n "${PORT:-}" ] && [ "$PORT" != "8080" ]; }; then
+  printf '%s\n' "$candidate"; exit 0
+fi
+
+# The main checkout keeps its conventional 8080 — only linked worktrees get an
+# auto-assigned 8081-8099 port. (A worktree that already recorded a port in
+# .breadbox-port still reuses it, handled below.)
+if ! bb_is_linked_worktree "$ROOT" && [ -z "$candidate" ]; then
+  printf '%s\n' "${PORT:-8080}"; exit 0
+fi
+
+port=""
+if [ -n "$candidate" ] && usable "$candidate"; then
+  port="$candidate"
+else
+  for p in $(seq "$BB_PORT_MIN" "$BB_PORT_MAX"); do
+    if usable "$p"; then port="$p"; break; fi
+  done
+fi
+
+if [ -z "$port" ]; then
+  bb_log "ERROR: no free port in $BB_PORT_MIN-$BB_PORT_MAX (try: make dev-reap)"
+  exit 1
+fi
+
+# Record the choice in .breadbox-port for per-worktree stability, but do NOT
+# write a registry entry: `make dev` runs the server in the foreground and never
+# clears such an entry on exit, which would leak a stale RESERVED claim. The
+# registry is owned exclusively by managed background servers (scripts/dev-server),
+# whose actual port-bind already protects the port from concurrent pickers.
+printf '%s\n' "$port" > "$ROOT/.breadbox-port" 2>/dev/null || true
+printf '%s\n' "$port"

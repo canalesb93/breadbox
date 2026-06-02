@@ -12,6 +12,17 @@ description: >
 
 # Validate UI
 
+> **Fastest path — try this first:** `make dev-shot ARGS="/transactions --mobile"`.
+> It rebuilds, (re)starts this worktree's tracked background server (resolving a
+> port for you — no fishing), and screenshots the route(s) via puppeteer + system
+> Chrome with a fresh profile, printing the JPEG paths. It never collides with a
+> locked Chrome DevTools MCP profile and is auto-cleaned when the session ends.
+> Flags: `--desktop|--mobile|--tablet|--wide` (repeatable), `--wait <css>`,
+> `--full`, `--no-rebuild`. Then upload via the `github-image-hosting` skill and
+> embed per the rules below. The two backends below are for **interactive
+> multi-step** flows (filling forms, JS evaluation across turns) — for a straight
+> capture, `make dev-shot` is fewer moving parts. See `scripts/README.md`.
+
 Validate a Breadbox admin UI change in the running app, then attach a screenshot to the PR as evidence. Two backends, picked in this order:
 
 1. **Chrome DevTools MCP** (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`) — preferred when available. Drives a real Chrome you can also see; supports interactive flows (forms, snapshots, JS evaluation).
