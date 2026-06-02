@@ -302,7 +302,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "editable-avatar",
 			Title:       "Editable avatar",
-			Description: "components.EditableAvatar — a live avatar with a shuffle/regenerate button overlaid on its corner. The \"change this identity's picture\" affordance used by the Workflows reconfigure-drawer header. SrcExpr/OnShuffle are Alpine expressions so it drops into any seed-owning scope; the button tints primary + spins its glyph on hover.",
+			Description: "components.EditableAvatar — a live avatar whose entire surface is a shuffle/regenerate control (corner badge as the cue). The \"change this identity's picture\" affordance used by the Workflows reconfigure-drawer header. SrcExpr/OnShuffle are Alpine expressions so it drops into any seed-owning scope; the ring + badge tint primary and the glyph spins on hover.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionEditableAvatar() },
 		},

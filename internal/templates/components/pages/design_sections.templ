@@ -3041,7 +3041,7 @@ templ SectionUserAvatar() {
 // OnShuffle are Alpine expressions, so the component is state-agnostic.
 templ SectionEditableAvatar() {
 	<div class="flex flex-col gap-6">
-		@designExample("Shuffle to reseed — hover the button", "An avatar with a shuffle/regenerate button pinned to its lower-right. The button shows a pointer cursor, tints primary, and spins its glyph on hover so it reads as an actionable \"give me another\" control. Click it: the seed changes and the avatar reseeds live (the chip shows the current seed).") {
+		@designExample("Shuffle to reseed — tap the avatar", "The entire avatar is the shuffle control (one button): it shows a pointer cursor, and on hover the ring + corner badge tint primary and the badge glyph spins so it reads as an actionable \"give me another\" target. Tap anywhere on it and the seed changes — the avatar reseeds live (the chip shows the current seed).") {
 			<div x-data="{ s: 'editable-demo' }" class="flex items-center gap-4">
 				@components.EditableAvatar(components.EditableAvatarProps{
 					SrcExpr:   "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'",
@@ -3051,7 +3051,7 @@ templ SectionEditableAvatar() {
 				<code class="text-xs text-base-content/50 px-2 py-1 rounded bg-base-200" x-text="s"></code>
 			</div>
 		}
-		@designExample("Sizes", "SizeClass overrides the tile dimensions; the 20px shuffle button keeps its hit target across sizes. Default is w-11 h-11 (44px) — the reconfigure-drawer header size. All three share one seed here, so a shuffle reseeds them together.") {
+		@designExample("Sizes", "SizeClass overrides the tile dimensions; the whole avatar stays the tap target at every size, with a 20px corner badge as the cue. Default is w-11 h-11 (44px) — the reconfigure-drawer header size. All three share one seed here, so a shuffle reseeds them together.") {
 			<div x-data="{ s: 'editable-sizes' }" class="flex items-end gap-6">
 				<div class="flex flex-col items-center gap-2">
 					<span class="text-xs text-base-content/40">40px</span>
