@@ -410,8 +410,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
 
 		// Developer tab — the always-on-top bug/task reporter config
-		// (enable toggle + GitHub repo/token/label). Admin-only: the token
-		// is sensitive and the flag exposes the reporter household-wide.
+		// (enable toggle + GitHub repo + issue label). Admin-only: the flag
+		// exposes the reporter household-wide.
 		r.Get("/settings/developer", DeveloperSettingsHandler(a, svc, sm, tr))
 		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
 

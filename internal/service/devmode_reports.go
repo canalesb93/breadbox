@@ -22,13 +22,12 @@ type CreateDevReportInput struct {
 	Type                  string         // "bug" | "task"
 	Title                 string         // required
 	Description           string         // free-form; may be empty
-	PageURL               string         // absolute URL (query stripped client-side when redacting)
-	PagePath              string         // path-only, for compact display
-	ScreenshotData        []byte         // decoded image bytes (may be empty)
-	ScreenshotContentType string         // e.g. "image/jpeg"
-	HTMLSnapshot          string         // outerHTML of the page (may be empty)
-	Metadata              map[string]any // browser/page context (viewport, UA, theme, redacted, …)
-	CreatedBy             string         // admin session username
+	PageURL        string         // absolute URL (query stripped client-side when redacting)
+	PagePath       string         // path-only, for compact display
+	ScreenshotData []byte         // decoded image bytes (may be empty)
+	HTMLSnapshot   string         // outerHTML of the page (may be empty)
+	Metadata       map[string]any // browser/page context (viewport, UA, theme, …)
+	CreatedBy      string         // admin session username
 }
 
 // DevReportResult is what the reporter shows the user after filing.
@@ -132,7 +131,10 @@ func buildDraftURL(repo, title, body string, labels []string) string {
 		if keep < 0 {
 			keep = 0
 		}
-		out = build(body[:keep] + "\n\n…(truncated)")
+		// Trim to a rune boundary so the cut doesn't split a multibyte char
+		// (the body carries `×`, emoji, etc.).
+		trimmed := strings.ToValidUTF8(body[:keep], "")
+		out = build(trimmed + "\n\n…(truncated)")
 	}
 	return out
 }

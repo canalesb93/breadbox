@@ -73,19 +73,18 @@ func CreateDevReportAdminHandler(svc *service.Service, sm *scs.SessionManager) h
 			return
 		}
 
-		imgData, imgCT := decodeDataURL(req.Screenshot)
+		imgData, _ := decodeDataURL(req.Screenshot)
 
 		res, err := svc.CreateDevReport(r.Context(), service.CreateDevReportInput{
-			Type:                  req.Type,
-			Title:                 title,
-			Description:           req.Description,
-			PageURL:               req.PageURL,
-			PagePath:              req.PagePath,
-			ScreenshotData:        imgData,
-			ScreenshotContentType: imgCT,
-			HTMLSnapshot:          req.HTML,
-			Metadata:              req.Metadata,
-			CreatedBy:             sm.GetString(r.Context(), sessionKeyAccountUsername),
+			Type:           req.Type,
+			Title:          title,
+			Description:    req.Description,
+			PageURL:        req.PageURL,
+			PagePath:       req.PagePath,
+			ScreenshotData: imgData,
+			HTMLSnapshot:   req.HTML,
+			Metadata:       req.Metadata,
+			CreatedBy:      sm.GetString(r.Context(), sessionKeyAccountUsername),
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
