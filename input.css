@@ -177,7 +177,7 @@
    prefer this over chasing arbitrary-value scanner bugs. */
 @source inline("max-w-[768px] max-w-[390px]");
 /* Developer Mode reporter — arbitrary z-index/size only present in base.html. */
-@source inline("z-[9998] z-[9999] w-[min(92vw,24rem)] max-h-[85vh]");
+@source inline("z-[9998] z-[9999] w-[min(92vw,24rem)] max-h-[85vh] max-h-32");
 
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }

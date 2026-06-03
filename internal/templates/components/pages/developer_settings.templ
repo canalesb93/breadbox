@@ -27,7 +27,11 @@ templ DeveloperSettings(p DeveloperSettingsProps) {
 		if p.Form.Enabled {
 			<div role="note" class="alert alert-info alert-soft mb-4 rounded-xl">
 				@components.LucideIcon("external-link", "w-4 h-4")
-				<span>No token needed — filing opens a <strong>prefilled GitHub draft</strong> (title, description, and context pre-populated) that you review and submit, using your existing GitHub session.</span>
+				<span>No token needed — filing opens a <strong>prefilled GitHub draft</strong> (description, screenshot, and context pre-populated) that you review and submit, using your existing GitHub session.</span>
+			</div>
+			<div role="note" class="alert alert-success alert-soft mb-4 rounded-xl">
+				@components.LucideIcon("shield-check", "w-4 h-4")
+				<span>Reports redact financial data by default — amounts, names, and other values are masked in the screenshot and HTML snapshot before they're uploaded to the artifact store and linked in the issue. Redaction can be turned off per-report from the reporter.</span>
 			</div>
 		}
 		<div class="space-y-6">

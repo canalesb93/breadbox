@@ -16,30 +16,34 @@ const (
 	devReportTypeTask = "task"
 )
 
-// CreateDevReportInput is the decoded payload from the floating reporter.
+// CreateDevReportInput is the decoded payload from the floating reporter. The
+// screenshot + HTML snapshot arrive already redacted client-side.
 type CreateDevReportInput struct {
-	Type        string         // "bug" | "task"
-	Title       string         // required
-	Description string         // free-form; may be empty
-	PageURL     string         // absolute URL the report was filed from (query stripped client-side)
-	PagePath    string         // path-only, for compact display
-	Metadata    map[string]any // browser/page context (viewport, UA, theme, …)
-	CreatedBy   string         // admin session username
+	Type                  string         // "bug" | "task"
+	Title                 string         // required
+	Description           string         // free-form; may be empty
+	PageURL               string         // absolute URL (query stripped client-side when redacting)
+	PagePath              string         // path-only, for compact display
+	ScreenshotData        []byte         // decoded image bytes (may be empty)
+	ScreenshotContentType string         // e.g. "image/jpeg"
+	HTMLSnapshot          string         // outerHTML of the page (may be empty)
+	Metadata              map[string]any // browser/page context (viewport, UA, theme, redacted, …)
+	CreatedBy             string         // admin session username
 }
 
 // DevReportResult is what the reporter shows the user after filing.
 type DevReportResult struct {
-	Status   string `json:"status"`             // always "draft"
+	Status   string `json:"status"`              // always "draft"
 	DraftURL string `json:"draft_url,omitempty"` // prefilled GitHub new-issue URL
 }
 
-// CreateDevReport builds a prefilled GitHub "new issue" draft URL from the
-// report. No token, no persistence, no artifact hosting — the draft rides the
-// user's existing GitHub session, and they review + submit it.
+// CreateDevReport hosts the (redacted) screenshot + HTML snapshot on the
+// artifact store and builds a prefilled GitHub "new issue" draft URL with the
+// image embedded and the snapshot linked. No token, no DB — the draft rides
+// the user's GitHub session and they review + submit it.
 //
-// Screenshot + HTML-snapshot hosting is intentionally absent here: those move
-// to a remote storage backend (TBD) rather than the local DB. When that lands,
-// the artifacts upload there and their URLs get embedded in the body.
+// Artifacts are public-read, so the client redacts financial data before
+// upload; uploads here are best-effort (a failure just omits that artifact).
 func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput) (*DevReportResult, error) {
 	rtype := normalizeReportType(in.Type)
 	title := strings.TrimSpace(in.Title)
@@ -50,7 +54,19 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput) 
 	repo := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo)
 	label := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeIssueLabel, appconfig.DevModeDefaultLabel)
 
-	body := buildDevReportIssueBody(rtype, in)
+	var imageURL, htmlURL string
+	if len(in.ScreenshotData) > 0 {
+		if u, err := uploadArtifact(ctx, in.ScreenshotData, "screenshot.jpg"); err == nil {
+			imageURL = u
+		}
+	}
+	if strings.TrimSpace(in.HTMLSnapshot) != "" {
+		if u, err := uploadArtifact(ctx, []byte(in.HTMLSnapshot), "snapshot.html"); err == nil {
+			htmlURL = u
+		}
+	}
+
+	body := buildDevReportIssueBody(rtype, in, imageURL, htmlURL)
 	draftURL := buildDraftURL(repo, issueTitle(rtype, title), body, dedupeLabels(label, rtype))
 	if draftURL == "" {
 		return nil, fmt.Errorf("%w: invalid GitHub repository", ErrInvalidParameter)
@@ -90,8 +106,8 @@ func dedupeLabels(flow, rtype string) []string {
 }
 
 // draftURLMaxLen bounds the prefilled new-issue URL. GitHub accepts long
-// prefills, but browsers cap URL length — keep it comfortably under common
-// limits, trimming the body (never the title) if needed.
+// prefills, but browsers cap URL length — keep it under common limits,
+// trimming the body (never the title) if needed.
 const draftURLMaxLen = 7000
 
 // buildDraftURL returns a prefilled GitHub "new issue" URL. No token needed —
@@ -121,10 +137,10 @@ func buildDraftURL(repo, title, body string, labels []string) string {
 	return out
 }
 
-// buildDevReportIssueBody renders the GitHub issue markdown: the report
-// description plus a context table. (Screenshot + HTML links return once a
-// remote storage backend is wired in.)
-func buildDevReportIssueBody(rtype string, in CreateDevReportInput) string {
+// buildDevReportIssueBody renders the GitHub issue markdown: the description,
+// the embedded (redacted) screenshot, a context table, and a link to the
+// (redacted) HTML snapshot — all hosted on the artifact store.
+func buildDevReportIssueBody(rtype string, in CreateDevReportInput, imageURL, htmlURL string) string {
 	var b strings.Builder
 
 	typeLabel := "Bug"
@@ -139,6 +155,15 @@ func buildDevReportIssueBody(rtype string, in CreateDevReportInput) string {
 	}
 	b.WriteString(desc)
 	b.WriteString("\n\n")
+
+	b.WriteString("### Screenshot\n\n")
+	if imageURL != "" {
+		fmt.Fprintf(&b, "<img src=%q width=\"900\" alt=\"screenshot\">\n\n", imageURL)
+	} else if len(in.ScreenshotData) > 0 {
+		b.WriteString("_Screenshot capture couldn't be hosted._\n\n")
+	} else {
+		b.WriteString("_No screenshot captured._\n\n")
+	}
 
 	b.WriteString("### Context\n\n")
 	b.WriteString("| Field | Value |\n| --- | --- |\n")
@@ -159,12 +184,29 @@ func buildDevReportIssueBody(rtype string, in CreateDevReportInput) string {
 	tableRow(&b, "Theme", metaStr(in.Metadata, "theme"))
 	tableRow(&b, "App version", metaStr(in.Metadata, "app_version"))
 	tableRow(&b, "Browser", code(metaStr(in.Metadata, "user_agent")))
+	tableRow(&b, "Redacted", redactedLabel(metaStr(in.Metadata, "redacted")))
 	tableRow(&b, "Filed at", metaStr(in.Metadata, "client_time"))
 	b.WriteString("\n")
+
+	if htmlURL != "" {
+		fmt.Fprintf(&b, "🔎 [HTML snapshot](%s) — the rendered page at capture time.\n\n", htmlURL)
+	}
 
 	b.WriteString("---\n")
 	b.WriteString("<sub>Filed via Breadbox Developer Mode.</sub>\n")
 	return b.String()
+}
+
+// redactedLabel renders the privacy state of the capture for the issue body.
+func redactedLabel(v string) string {
+	switch v {
+	case "true":
+		return "Yes — financial data masked"
+	case "false":
+		return "⚠️ No — raw data included"
+	default:
+		return ""
+	}
 }
 
 func tableRow(b *strings.Builder, field, value string) {

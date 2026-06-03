@@ -106,33 +106,38 @@ func TestMetaStr(t *testing.T) {
 
 func TestBuildDevReportIssueBody(t *testing.T) {
 	in := CreateDevReportInput{
-		Type:        "bug",
-		Title:       "Broken",
-		Description: "It broke when I clicked.",
-		PageURL:     "https://bb.example.com/transactions",
-		PagePath:    "/transactions",
-		Metadata:    map[string]any{"viewport": "1280×800", "theme": "dark", "user_agent": "Mozilla/5.0"},
-		CreatedBy:   "admin@example.com",
+		Type:           "bug",
+		Title:          "Broken",
+		Description:    "It broke when I clicked.",
+		PageURL:        "https://bb.example.com/transactions",
+		PagePath:       "/transactions",
+		ScreenshotData: []byte("nonempty-bytes"),
+		Metadata:       map[string]any{"viewport": "1280×800", "theme": "dark", "user_agent": "Mozilla/5.0", "redacted": true},
+		CreatedBy:      "admin@example.com",
 	}
-	body := buildDevReportIssueBody("bug", in)
+	// With hosted artifact URLs → embeds the <img> + links the snapshot.
+	body := buildDevReportIssueBody("bug", in,
+		"https://bb-artifacts.exe.xyz/f/abc.jpg", "https://bb-artifacts.exe.xyz/f/def.html")
 	for _, want := range []string{
 		"**Type:** Bug",
 		"It broke when I clicked.",
+		`<img src="https://bb-artifacts.exe.xyz/f/abc.jpg"`,
+		"[HTML snapshot](https://bb-artifacts.exe.xyz/f/def.html)",
 		"| Page | `/transactions` |",
 		"| Reported by | admin@example.com |",
-		"| Theme | dark |",
+		"| Redacted | Yes — financial data masked |",
 		"Developer Mode",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("issue body missing %q\n---\n%s", want, body)
 		}
 	}
-	// No screenshot/artifact sections in the lean draft body.
-	if strings.Contains(body, "Screenshot") || strings.Contains(body, "<img") || strings.Contains(body, "Artifacts") {
-		t.Errorf("unexpected screenshot/artifact content:\n%s", body)
-	}
 
-	body2 := buildDevReportIssueBody("task", in)
+	// Without hosted URLs but with screenshot bytes → notes the hosting failure.
+	body2 := buildDevReportIssueBody("task", in, "", "")
+	if strings.Contains(body2, "<img") {
+		t.Error("expected no <img> when image URL is empty")
+	}
 	if !strings.Contains(body2, "**Type:** Task") {
 		t.Error("expected Task type label")
 	}
