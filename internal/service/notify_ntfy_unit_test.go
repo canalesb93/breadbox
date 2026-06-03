@@ -24,7 +24,7 @@ func TestResolveNotifyFormat(t *testing.T) {
 		{"explicit json wins", appconfig.NotifyFormatJSON, "https://ntfy.sh/topic", appconfig.NotifyFormatJSON},
 		{"auto detects ntfy.sh", appconfig.NotifyFormatAuto, "https://ntfy.sh/breadbox", appconfig.NotifyFormatNtfy},
 		{"auto detects self-hosted ntfy", appconfig.NotifyFormatAuto, "https://push.ntfy.example.com/t", appconfig.NotifyFormatNtfy},
-		{"auto falls back to json", appconfig.NotifyFormatAuto, "https://hooks.slack.com/services/x", appconfig.NotifyFormatJSON},
+		{"auto falls back to json", appconfig.NotifyFormatAuto, "https://example.com/generic-hook", appconfig.NotifyFormatJSON},
 		{"empty configured behaves as auto", "", "https://ntfy.sh/t", appconfig.NotifyFormatNtfy},
 		{"unknown configured behaves as auto", "garbage", "https://example.com/h", appconfig.NotifyFormatJSON},
 	}
@@ -148,12 +148,18 @@ func TestBuildNtfyRequest(t *testing.T) {
 		Priority: "warning",
 		URL:      "https://bb.example.com/reports/xyz",
 	}
-	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/breadbox", p, "https://bb.example.com")
+	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/breadbox", p, "https://bb.example.com", "tk_secret")
 	if err != nil {
 		t.Fatalf("buildNtfyRequest: %v", err)
 	}
 	if req.Method != "POST" {
 		t.Errorf("method = %q, want POST", req.Method)
+	}
+	if got := req.Header.Get("Authorization"); got != "Bearer tk_secret" {
+		t.Errorf("Authorization = %q, want Bearer tk_secret", got)
+	}
+	if got := req.Header.Get("X-Actions"); got != "view, View report, https://bb.example.com/reports/xyz" {
+		t.Errorf("X-Actions = %q", got)
 	}
 	if got := req.Header.Get("X-Title"); got != "Large charge detected" {
 		t.Errorf("X-Title = %q", got)
@@ -181,18 +187,24 @@ func TestBuildNtfyRequest_RelativeClickDropped(t *testing.T) {
 	// Without a public base URL the deep link stays relative; ntfy needs an
 	// absolute URL for X-Click, so it must be omitted rather than sent broken.
 	p := NotificationPayload{Title: "Test", Body: "hi", Priority: "info", URL: "/reports/xyz"}
-	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "")
+	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "", "")
 	if err != nil {
 		t.Fatalf("buildNtfyRequest: %v", err)
 	}
 	if got := req.Header.Get("X-Click"); got != "" {
 		t.Errorf("X-Click = %q, want empty for relative URL", got)
 	}
+	if got := req.Header.Get("X-Actions"); got != "" {
+		t.Errorf("X-Actions = %q, want empty for relative URL", got)
+	}
+	if got := req.Header.Get("Authorization"); got != "" {
+		t.Errorf("Authorization = %q, want empty when no token", got)
+	}
 }
 
 func TestBuildNtfyRequest_EmptyBodyFallsBackToTitle(t *testing.T) {
 	p := NotificationPayload{Title: "Sync watchdog", Body: "", Priority: "info"}
-	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "")
+	req, err := buildNtfyRequest(t.Context(), "https://ntfy.sh/t", p, "", "")
 	if err != nil {
 		t.Fatalf("buildNtfyRequest: %v", err)
 	}
@@ -203,12 +215,12 @@ func TestBuildNtfyRequest_EmptyBodyFallsBackToTitle(t *testing.T) {
 }
 
 func TestValidNotifyFormat(t *testing.T) {
-	for _, v := range []string{"auto", "ntfy", "json"} {
+	for _, v := range []string{"auto", "ntfy", "slack", "discord", "json"} {
 		if !validNotifyFormat(v) {
 			t.Errorf("validNotifyFormat(%q) = false, want true", v)
 		}
 	}
-	for _, v := range []string{"", "JSON", "slack", "Ntfy"} {
+	for _, v := range []string{"", "JSON", "Slack", "Ntfy", "webhook"} {
 		if validNotifyFormat(v) {
 			t.Errorf("validNotifyFormat(%q) = true, want false", v)
 		}

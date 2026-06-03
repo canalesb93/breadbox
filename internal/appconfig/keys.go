@@ -83,18 +83,44 @@ const (
 
 	// KeyNotifyFormat selects how the outbound notification request is
 	// shaped. "auto" (default) sniffs the webhook URL and publishes
-	// natively to ntfy when it looks like ntfy, falling back to the
-	// generic JSON envelope otherwise; "ntfy" forces ntfy's
-	// header+body publishing; "json" forces the JSON envelope (for
-	// Slack-compatible relays, Discord bridges, custom consumers).
+	// natively to the matching provider (ntfy / Slack / Discord), falling
+	// back to the generic JSON envelope otherwise. The explicit values
+	// "ntfy" / "slack" / "discord" / "json" force a specific shape.
 	KeyNotifyFormat = "notify.format"
 
-	// KeyNotifyPublicBaseURL is the absolute origin (scheme+host, no
-	// trailing slash) Breadbox prepends to report deep links carried in
-	// a notification — so an ntfy "tap to open" (and any relative link
-	// in the body) resolves to the real report instead of a bare path.
-	// Empty = deep links stay relative. http(s) only.
+	// KeyNotifyPublicBaseURL is an OPTIONAL manual override for the
+	// absolute origin (scheme+host, no trailing slash) Breadbox prepends
+	// to report deep links carried in a notification — so an ntfy "tap to
+	// open" (and any relative link in the body) resolves to the real
+	// report instead of a bare path. Empty (the default) means "use the
+	// auto-detected origin" (KeyNotifyDetectedBaseURL). Set this only when
+	// Breadbox is reached at a different public URL than the admin browses
+	// from. http(s) only.
 	KeyNotifyPublicBaseURL = "notify.public_base_url"
+
+	// KeyNotifyDetectedBaseURL is the origin auto-captured from the admin's
+	// own request (X-Forwarded-Proto/Host → Host) whenever the Notifications
+	// settings page is loaded. Notifications fire from background jobs with
+	// no HTTP request in scope, so we persist the last-seen browsing origin
+	// here and read it at send time. The manual override
+	// (KeyNotifyPublicBaseURL) wins when set; otherwise this is used. Empty
+	// until the settings page has been visited at least once.
+	KeyNotifyDetectedBaseURL = "notify.detected_base_url"
+
+	// KeyNotifyMinPriority gates outbound notifications by report priority:
+	// only reports at or above this floor are delivered. One of
+	// info | warning | critical; default "info" (everything). Lets a
+	// household silence routine info-level reports and keep only alerts.
+	KeyNotifyMinPriority = "notify.min_priority"
+
+	// KeyNotifyChannels holds the JSON array of configured notification
+	// channels (the multi-sink model). Each entry carries its own URL,
+	// format, priority floor, optional ntfy token, enabled flag, and last
+	// delivery status. When empty, a single legacy channel is synthesized
+	// from KeyNotifyWebhookURL / KeyNotifyFormat / KeyNotifyMinPriority so
+	// pre-multi-channel configs keep working. A workflow notification fans
+	// out to every enabled channel.
+	KeyNotifyChannels = "notify.channels"
 )
 
 // AuthMode values for KeyAgentAuthMode.
@@ -105,7 +131,17 @@ const (
 
 // NotifyFormat values for KeyNotifyFormat.
 const (
-	NotifyFormatAuto = "auto"
-	NotifyFormatNtfy = "ntfy"
-	NotifyFormatJSON = "json"
+	NotifyFormatAuto       = "auto"
+	NotifyFormatNtfy       = "ntfy"
+	NotifyFormatSlack      = "slack"
+	NotifyFormatDiscord    = "discord"
+	NotifyFormatGoogleChat = "googlechat"
+	NotifyFormatJSON       = "json"
+)
+
+// NotifyMinPriority values for KeyNotifyMinPriority (delivery floor).
+const (
+	NotifyMinPriorityInfo     = "info"
+	NotifyMinPriorityWarning  = "warning"
+	NotifyMinPriorityCritical = "critical"
 )
