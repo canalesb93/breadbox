@@ -188,13 +188,15 @@
           this.error = '';
           this.captureNote = '';
           this.screenshot = '';
+          this.capturing = true; // show the "Preparing…" spinner immediately
           this.pagePath = location.pathname + location.search;
+          // Open the panel right away so there's instant feedback, then run the
+          // (heavier) capture after a paint so the spinner is actually visible.
+          this.panelOpen = true;
           var self = this;
-          this.recapture().finally(function () {
-            self.panelOpen = true;
-            self.$nextTick(function () {
-              if (self.$refs.titleInput) self.$refs.titleInput.focus();
-            });
+          this.$nextTick(function () {
+            if (self.$refs.titleInput) self.$refs.titleInput.focus();
+            setTimeout(function () { self.recapture(); }, 60);
           });
         },
 

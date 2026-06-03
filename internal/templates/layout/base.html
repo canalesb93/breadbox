@@ -793,10 +793,12 @@
             {{ lucide "triangle-alert" "w-3.5 h-3.5 shrink-0 mt-px" }}
             <span>Real financial data will be included in what's sent to GitHub.</span>
           </p>
-          <div x-show="capturing" x-cloak class="flex items-center gap-2 text-xs text-base-content/50">
-            <span class="loading loading-spinner loading-xs"></span> Capturing screen…
+          <div x-show="capturing"
+               class="rounded-lg border border-base-300 bg-base-200/40 h-24 flex flex-col items-center justify-center gap-2 text-xs text-base-content/50">
+            <span class="loading loading-spinner loading-sm"></span>
+            <span>Preparing screenshot…</span>
           </div>
-          <template x-if="screenshot">
+          <template x-if="screenshot && !capturing">
             <div>
               <div class="relative rounded-lg overflow-hidden border border-base-300">
                 <img :src="screenshot" alt="Screenshot preview"
@@ -808,7 +810,7 @@
               </label>
             </div>
           </template>
-          <p x-show="captureNote" x-text="captureNote" x-cloak
+          <p x-show="captureNote && !capturing" x-text="captureNote" x-cloak
              class="text-xs text-warning"></p>
         </div>
 
@@ -827,10 +829,13 @@
       <div class="flex items-center justify-end gap-2 px-4 py-3 border-t border-base-200">
         <button type="button" @click="close()" class="btn btn-ghost btn-sm">Cancel</button>
         <button type="button" @click="submit()"
-                :disabled="!title.trim() || submitting"
+                :disabled="!title.trim() || submitting || capturing"
                 class="btn btn-primary btn-sm gap-2">
-          <span x-show="!submitting" class="flex items-center gap-1.5">
+          <span x-show="!submitting && !capturing" class="flex items-center gap-1.5">
             {{ lucide "send" "w-3.5 h-3.5" }} File issue
+          </span>
+          <span x-show="capturing && !submitting" x-cloak class="flex items-center gap-1.5">
+            <span class="loading loading-spinner loading-xs"></span> Preparing…
           </span>
           <span x-show="submitting" x-cloak class="flex items-center gap-1.5">
             <span class="loading loading-spinner loading-xs"></span> Filing…
