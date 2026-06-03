@@ -411,6 +411,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/security", redirectGET("/settings/system"))
 		r.Get("/settings/system", SystemSettingsHandler(a, sm, tr))
 		r.Get("/settings/help", HelpSettingsHandler(a, sm, tr))
+
+		// Developer tab — the always-on-top bug/task reporter config
+		// (enable toggle + GitHub repo + issue label). Admin-only: the flag
+		// exposes the reporter household-wide.
+		r.Get("/settings/developer", DeveloperSettingsHandler(a, svc, sm, tr))
+		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
+
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
@@ -431,6 +438,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Activity-timeline partial render — powers the optimistic-update
 		// flow on the detail page. Accessible to all roles (read-only).
 		r.Get("/transactions/{id}/timeline/rows", TimelineRowsHandler(a, sm, svc))
+
+		// Developer Mode reporter — build a prefilled GitHub issue-draft URL.
+		// All roles: the floating reporter renders for anyone once an admin
+		// enables developer mode, so anyone who sees it can file.
+		r.Post("/dev-reports", CreateDevReportAdminHandler(svc, sm))
 
 		// Agent run live updates — JSON snapshot the run-detail page
 		// polls every 3 s while a run is in_progress. Read-only, all

@@ -121,7 +121,34 @@ const (
 	// pre-multi-channel configs keep working. A workflow notification fans
 	// out to every enabled channel.
 	KeyNotifyChannels = "notify.channels"
+
+	// KeyDevModeEnabled gates the in-app Developer Mode reporter — a
+	// floating bug/task filer rendered on every page that captures a
+	// screenshot + HTML snapshot of the current screen and opens a
+	// labelled GitHub issue. "true" enables it; anything else (default)
+	// keeps it off. Internal/self-host tooling; off by default.
+	KeyDevModeEnabled = "devmode.enabled"
+
+	// KeyDevModeGithubRepo is the "owner/repo" the reporter opens issue
+	// drafts against (e.g. "canalesb93/breadbox"). Defaults to
+	// DevModeDefaultRepo when unset.
+	KeyDevModeGithubRepo = "devmode.github_repo"
+
+	// KeyDevModeIssueLabel is the label applied to every filed issue. The
+	// reporter creates it on the repo if it doesn't exist yet. Default:
+	// DevModeDefaultLabel.
+	KeyDevModeIssueLabel = "devmode.issue_label"
 )
+
+// DevModeDefaultLabel is the label applied to filed Developer Mode issues
+// when KeyDevModeIssueLabel is unset.
+const DevModeDefaultLabel = "dev-report"
+
+// DevModeDefaultRepo is the repository Developer Mode files against when
+// KeyDevModeGithubRepo is unset — the upstream Breadbox repo, so a fresh
+// instance can file dogfooding reports with zero configuration. Override it
+// in Settings → Developer to point at a fork or a private tracker.
+const DevModeDefaultRepo = "canalesb93/breadbox"
 
 // AuthMode values for KeyAgentAuthMode.
 const (

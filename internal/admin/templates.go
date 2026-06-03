@@ -549,6 +549,13 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		if _, exists := m["AppVersion"]; !exists && tr.version != "" {
 			m["AppVersion"] = tr.version
 		}
+		// Developer-mode flag gates the floating reporter in base.html. Read
+		// it straight from app_config here — Render is the single chokepoint
+		// every full page passes through (RenderWithTempl delegates to it), so
+		// the flag is correct regardless of which handler/middleware ran.
+		if tr.appcfg != nil {
+			m["DevModeEnabled"] = appconfig.Bool(r.Context(), tr.appcfg, appconfig.KeyDevModeEnabled, false)
+		}
 		// Auto-inject version update status for nav footer.
 		if _, exists := m["NavUpdateAvailable"]; !exists && tr.versionChecker != nil {
 			if show, ver, url := updateCallout(r.Context(), tr.versionChecker, tr.appcfg); show {
@@ -652,6 +659,8 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 		"IsAdmin":       role == RoleAdmin,
 		"IsEditor":      role == RoleAdmin || role == RoleEditor,
 		"RoleDisplay":   RoleDisplayName(role),
+		// DevModeEnabled (gates the floating reporter) is injected at the
+		// render chokepoint in Render(), so every full page gets it.
 	}
 }
 
