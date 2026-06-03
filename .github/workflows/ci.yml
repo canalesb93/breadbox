@@ -47,7 +47,14 @@ jobs:
             run_unit: true
     services:
       postgres:
-        image: postgres:16-alpine
+        # Pull the official image from AWS ECR Public's mirror rather than
+        # Docker Hub. Docker Hub throttles anonymous pulls from shared GitHub
+        # runner IPs, which surfaces as `context deadline exceeded` on the
+        # service-container pull; the runner's built-in 3-retry isn't enough and
+        # the whole shard fails, gating Build & Push + Deploy on a flake (the
+        # post-merge run for #1699 went red this way). ECR Public mirrors the
+        # Docker Official Images byte-for-byte with no anonymous rate limit.
+        image: public.ecr.aws/docker/library/postgres:16-alpine
         env:
           POSTGRES_USER: breadbox
           POSTGRES_PASSWORD: breadbox
