@@ -2,7 +2,9 @@
 # dev-port — print a port the current worktree can bind a dev server to.
 #
 # Resolution order:
-#   1. SERVER_PORT / PORT (if explicitly set, and not the main-repo default 8080)
+#   0. an EXPLICIT `make dev PORT=N` (BB_PORT_EXPLICIT=1) — wins over everything,
+#      including a SERVER_PORT a worktree session exported into the environment
+#   1. SERVER_PORT / PORT (if set in the env, and not the main-repo default 8080)
 #   2. this worktree's last port (.breadbox-port), if currently free
 #   3. the first free, unclaimed port in BB_PORT_MIN..BB_PORT_MAX
 #
@@ -35,6 +37,13 @@ usable() { # <port> -> bindable now and not held by another worktree
   return 0
 }
 
+# An explicit `make dev PORT=N` (set on the command line; the Makefile forwards
+# BB_PORT_EXPLICIT=1) is the user's deliberate override and wins over the ambient
+# SERVER_PORT a worktree session exports. Honored verbatim, even if it's 8080.
+if [ "${BB_PORT_EXPLICIT:-}" = "1" ] && [ -n "${PORT:-}" ]; then
+  printf '%s\n' "$PORT"; exit 0
+fi
+
 candidate=""
 if [ -n "${SERVER_PORT:-}" ]; then candidate="$SERVER_PORT"
 elif [ -n "${PORT:-}" ] && [ "$PORT" != "8080" ]; then candidate="$PORT"
@@ -42,7 +51,7 @@ elif [ -f "$ROOT/.breadbox-port" ]; then
   candidate="$(head -1 "$ROOT/.breadbox-port" 2>/dev/null | tr -dc '0-9')"
 fi
 
-# An explicitly-set env port is honored as-is (the user/Makefile asked for it).
+# An ambient env port (SERVER_PORT, or a non-default PORT) is honored as-is.
 if [ -n "${SERVER_PORT:-}" ] || { [ -n "${PORT:-}" ] && [ "$PORT" != "8080" ]; }; then
   printf '%s\n' "$candidate"; exit 0
 fi

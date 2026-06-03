@@ -31,8 +31,14 @@ except Exception: pass" 2>/dev/null || true)"
 }
 CWD="$(bb_json_field cwd)"
 REASON="$(bb_json_field reason)"
-SESSION="$(bb_json_field session_id)"
 [ -n "$CWD" ] || CWD="$PWD"
+# Registry entries are tagged with the ENV session id (bb_session_id). Read the
+# session from the SAME source here so a same-session comparison is identical by
+# construction; only fall back to the stdin JSON id if the env var is absent.
+# (Using a different source than the writer could make the owner check think a
+# sibling owns the server and skip cleanup — a leak. Same source avoids that.)
+SESSION="${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
+[ -n "$SESSION" ] || SESSION="$(bb_json_field session_id)"
 
 # Locate the lib relative to the active worktree if the project-dir copy is absent.
 LIB="$PROJECT_DIR/scripts/dev-lib.sh"

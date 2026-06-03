@@ -68,7 +68,7 @@ dev: generate css
 		echo "  Or add it to .local.env (auto-loaded by Make)"; \
 		exit 1; \
 	fi
-	@port=$$(PORT='$(PORT)' ./scripts/dev-port) || exit 1; \
+	@port=$$(BB_PORT_EXPLICIT='$(if $(filter command line,$(origin PORT)),1,)' PORT='$(PORT)' ./scripts/dev-port) || exit 1; \
 	if lsof -ti:$$port >/dev/null 2>&1; then \
 		echo "Error: port $$port is already in use."; \
 		echo "  - Run on another port:  make dev PORT=8085"; \
@@ -90,7 +90,7 @@ dev-watch: generate air-install
 		echo "  Or add it to .local.env (auto-loaded by Make)"; \
 		exit 1; \
 	fi
-	@port=$$(PORT='$(PORT)' ./scripts/dev-port) || exit 1; \
+	@port=$$(BB_PORT_EXPLICIT='$(if $(filter command line,$(origin PORT)),1,)' PORT='$(PORT)' ./scripts/dev-port) || exit 1; \
 	if lsof -ti:$$port >/dev/null 2>&1; then \
 		echo "Error: port $$port is already in use."; \
 		echo "  - Run on another port:  make dev-watch PORT=8085"; \
@@ -143,16 +143,11 @@ dev-reap:
 	@echo "Reaped orphaned dev servers."
 
 # dev-stop-all: blunt instrument — kill every process listening on 8080-8099,
-# including OTHER active worktrees. Also clears the managed-server registry.
+# including OTHER active worktrees. SIGTERM then SIGKILL survivors, then clears
+# the registry of entries whose process is actually gone (a survivor stays
+# tracked so dev-ps/dev-reap can still find it).
 dev-stop-all:
-	@pids=$$(lsof -ti:8080-8099 2>/dev/null | sort -u || true); \
-	if [ -z "$$pids" ]; then \
-		echo "No dev instances running."; \
-	else \
-		echo "$$pids" | xargs kill 2>/dev/null; \
-		echo "Stopped dev instances on ports 8080-8099: $$pids"; \
-	fi
-	@rm -f "$${BB_STATE_DIR:-$$HOME/.local/share/breadbox}"/dev-servers/* 2>/dev/null || true
+	@./scripts/dev-server stop-all
 
 build: generate
 	go build -o breadbox ./cmd/breadbox

@@ -4,6 +4,7 @@
 #   scripts/dev-server ensure   [--rebuild]   boot if needed (reuse if up); print URL
 #   scripts/dev-server restart                rebuild + relaunch (used by ui-validate)
 #   scripts/dev-server stop                   stop this worktree's server
+#   scripts/dev-server stop-all               stop EVERY breadbox on 8080-8099 (blunt)
 #   scripts/dev-server status                 print this worktree's server, if any
 #   scripts/dev-server ps                     list all managed servers
 #   scripts/dev-server reap                   kill orphans (dead pid / worktree gone)
@@ -127,6 +128,7 @@ case "${1:-ensure}" in
   ensure)  shift || true; cmd_ensure "${1:-}";;
   restart) cmd_ensure --rebuild;;
   stop)    bb_stop_worktree "$ROOT";;
+  stop-all) bb_stop_all 8080 8099;;
   status)
     port="$(bb_server_for_worktree "$ROOT" || true)"
     if [ -n "$port" ]; then
@@ -152,5 +154,5 @@ case "${1:-ensure}" in
     fi
     ;;
   reap)  bb_reap;;
-  *) bb_log "usage: dev-server {ensure [--rebuild]|restart|stop|status|ps|reap}"; exit 2;;
+  *) bb_log "usage: dev-server {ensure [--rebuild]|restart|stop|stop-all|status|ps|reap}"; exit 2;;
 esac

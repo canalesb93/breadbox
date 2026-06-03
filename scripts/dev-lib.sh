@@ -53,6 +53,12 @@ bb_now()         { date +%s; }
 bb_mtime()       { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
 bb_health()      { curl -fsS -o /dev/null --max-time 2 "http://localhost:$1/health/live" 2>/dev/null; }
 
+# Claude Code exposes the session id to hooks (stdin JSON) and to the session
+# environment as CLAUDE_CODE_SESSION_ID. Older builds used CLAUDE_SESSION_ID, so
+# accept both. Used to tag registry entries with their creating session so
+# session-end won't kill a server another live session in the same worktree owns.
+bb_session_id()  { printf '%s' "${CLAUDE_CODE_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"; }
+
 # meta files are simple key=value lines. pid is a number, or RESERVED (a port
 # held by session-start before any server is booted).
 bb_meta_get() { # <file> <key>
@@ -71,9 +77,9 @@ bb_load_env() { # <root>
     _opts="$-"
     set -a; set +eu
     . "$root/.local.env" || true
-    set +a
     case "$_opts" in *e*) set -e;; esac
     case "$_opts" in *u*) set -u;; esac
+    case "$_opts" in *a*) ;; *) set +a;; esac   # only disable allexport if caller had it off
   fi
   export DATABASE_URL="${DATABASE_URL:-postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable}"
   if [ -z "${ENCRYPTION_KEY:-}" ]; then
@@ -133,8 +139,8 @@ bb_claim_port() { # <root> <state>
     fi
     bb_port_in_use "$port" && continue
     if ( set -o noclobber
-         printf 'port=%s\npid=%s\nworktree=%s\nbranch=%s\nstarted=%s\n' \
-           "$port" "$state" "$root" "$(bb_current_branch "$root")" "$(bb_now)" \
+         printf 'port=%s\npid=%s\nworktree=%s\nbranch=%s\nstarted=%s\nsession=%s\n' \
+           "$port" "$state" "$root" "$(bb_current_branch "$root")" "$(bb_now)" "$(bb_session_id)" \
            > "$dir/$port" ) 2>/dev/null; then
       printf '%s\n' "$port"; return 0
     fi
@@ -146,7 +152,7 @@ bb_meta_write() { # <port> <pid> <root> <log>
   local port="$1" pid="$2" root="$3" log="$4"
   printf 'port=%s\npid=%s\nworktree=%s\nbranch=%s\nstarted=%s\nlog=%s\nsession=%s\n' \
     "$port" "$pid" "$root" "$(bb_current_branch "$root")" "$(bb_now)" "$log" \
-    "${CLAUDE_SESSION_ID:-}" > "$(bb_servers_dir)/$port"
+    "$(bb_session_id)" > "$(bb_servers_dir)/$port"
 }
 
 # Stop the server registered on <port> and clear its entry.
@@ -230,5 +236,39 @@ bb_reap() {
     esac
   done
   [ "$killed" -gt 0 ] && bb_log "==> reaped $killed orphaned dev server(s)"
+  return 0
+}
+
+# Blunt instrument: stop EVERY process listening on the dev range (including
+# other worktrees') and clear the registry. SIGTERM first, wait, then SIGKILL
+# survivors — a process that ignores TERM (e.g. an `air` supervisor) would
+# otherwise live on untracked. Only registry entries whose process is actually
+# gone are removed, so a true survivor stays findable via dev-ps/dev-reap.
+bb_stop_all() { # [lo] [hi]
+  local lo="${1:-8080}" hi="${2:-8099}" pids pid i dir f epid
+  pids="$(lsof -ti:"$lo"-"$hi" 2>/dev/null | sort -u || true)"
+  if [ -n "$pids" ]; then
+    for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      pids="$(lsof -ti:"$lo"-"$hi" 2>/dev/null | sort -u || true)"
+      [ -n "$pids" ] || break
+      sleep 0.3
+    done
+    pids="$(lsof -ti:"$lo"-"$hi" 2>/dev/null | sort -u || true)"
+    for pid in $pids; do kill -9 "$pid" 2>/dev/null || true; done
+    bb_log "==> stopped dev instances on $lo-$hi"
+  else
+    bb_log "No dev instances running on $lo-$hi."
+  fi
+  dir="$(bb_servers_dir)"
+  [ -d "$dir" ] || return 0
+  for f in "$dir"/*; do
+    [ -f "$f" ] || continue
+    epid="$(bb_meta_get "$f" pid)"
+    case "$epid" in
+      ''|RESERVED|PENDING) rm -f "$f" ;;          # no live process behind these
+      *) bb_pid_alive "$epid" || rm -f "$f" ;;    # keep tracking a survivor
+    esac
+  done
   return 0
 }
