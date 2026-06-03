@@ -623,6 +623,19 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 				Right:    workflowSetupActivate(preset.OneOff),
 			})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				<div>
+					<div class="text-sm font-medium mb-1.5">Name</div>
+					<input
+						type="text"
+						name="name"
+						value={ preset.Name }
+						maxlength="80"
+						placeholder={ preset.Name }
+						aria-label="Workflow name"
+						class="input input-bordered input-sm w-full"
+					/>
+					<div class="text-xs text-base-content/40 mt-1">What this workflow is called in your gallery and activity feed.</div>
+				</div>
 				if !preset.OneOff {
 					@workflowTriggerFields("triggerOnSync", "cron")
 				}

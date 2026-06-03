@@ -425,3 +425,44 @@ func TestT14_SourceTemplateStampedOnInstantiation(t *testing.T) {
 		t.Errorf("T14: hand-authored definition must have nil SourceTemplate, got %q", *plain.SourceTemplate)
 	}
 }
+
+// TestEnableWorkflowFromPreset_CustomName verifies a name supplied at setup
+// (the new setup-drawer Name field) is applied to the instantiated workflow
+// instead of the preset's static name, while the slug stays the preset slug.
+func TestEnableWorkflowFromPreset_CustomName(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	custom := "Monthly Rule Tune-Up"
+	def, err := svc.EnableWorkflowFromPreset(ctx, "rule-foundation", service.EnableWorkflowFromPresetParams{
+		Name: &custom,
+	})
+	if err != nil {
+		t.Fatalf("enable with custom name: %v", err)
+	}
+	if def.Name != custom {
+		t.Errorf("Name = %q, want %q", def.Name, custom)
+	}
+	if def.Slug != "rule-foundation" {
+		t.Errorf("Slug = %q, want rule-foundation (slug must not change with a custom name)", def.Slug)
+	}
+}
+
+// TestEnableWorkflowFromPreset_BlankNameFallsBackToPreset verifies that a
+// present-but-blank name (e.g. the user cleared the field) falls back to the
+// preset's name rather than instantiating an empty-named workflow.
+func TestEnableWorkflowFromPreset_BlankNameFallsBackToPreset(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	blank := "   "
+	def, err := svc.EnableWorkflowFromPreset(ctx, "rule-foundation", service.EnableWorkflowFromPresetParams{
+		Name: &blank,
+	})
+	if err != nil {
+		t.Fatalf("enable with blank name: %v", err)
+	}
+	if def.Name != "Rule Foundation" {
+		t.Errorf("Name = %q, want preset fallback %q", def.Name, "Rule Foundation")
+	}
+}

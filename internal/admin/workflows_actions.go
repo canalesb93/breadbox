@@ -44,11 +44,19 @@ func EnableWorkflowPresetAdminHandler(svc *service.Service) http.HandlerFunc {
 			MaxTurns:               cfg.MaxTurns,
 			MaxBudgetUSD:           cfg.MaxBudgetUSD,
 		}
+		// Optional custom name from the setup drawer. Present-but-blank falls
+		// back to the preset name in the service.
+		if _, ok := r.Form["name"]; ok {
+			n := r.FormValue("name")
+			params.Name = &n
+		}
 		// Any non-control form field is a preset-specialized option (e.g.
 		// apply_mode); the service validates each against the preset's
-		// declared options and ignores unknown keys.
+		// declared options and ignores unknown keys. "name" is a control key
+		// (consumed above), not an option.
 		control := map[string]bool{
 			"enabled": true, "additional_instructions": true, "consent": true, "_csrf": true,
+			"name": true,
 		}
 		for k := range cfgControl {
 			control[k] = true

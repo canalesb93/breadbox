@@ -392,6 +392,11 @@ type EnableWorkflowFromPresetParams struct {
 	// Enabled controls whether the instantiated workflow runs immediately.
 	// Defaults to false (instantiated but paused) so a household can review it.
 	Enabled bool
+	// Name, when non-nil and non-blank, names the workflow at setup. A blank
+	// value falls back to the preset's name. Mirrors the rename available in
+	// the reconfigure drawer (UpdateWorkflowConfigParams.Name) so a household
+	// can name the workflow up front instead of only after the first save.
+	Name *string
 	// TriggerOnSync, when non-nil, overrides the preset's default trigger:
 	// true = after each sync; false = custom schedule (uses ScheduleCron).
 	// nil = use the preset's default. The trigger is user-selectable at
@@ -457,6 +462,12 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 		Enabled:               params.Enabled,
 		TriggerOnSyncComplete: preset.TriggerOnSyncComplete,
 		SourceTemplate:        &preset.Slug,
+	}
+	// Custom name from the setup drawer. Blank falls back to the preset name.
+	if params.Name != nil {
+		if n := strings.TrimSpace(*params.Name); n != "" {
+			create.Name = n
+		}
 	}
 	// Model override (Advanced / model select). Blank falls back to the preset.
 	if params.Model != nil {
