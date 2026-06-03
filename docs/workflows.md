@@ -418,7 +418,7 @@ Workflows fire outbound notifications when noteworthy events occur (typically wh
 
 ### Channels
 
-The sink is managed on its own **Settings → Notifications** page (`/settings/notifications`, admin-only). Channels are stored as a JSON array under `app_config[notify.channels]` (plaintext); one global key, `notify.public_base_url`, is shared across all channels.
+The sink is managed on its own **Settings → Notifications** page (`/settings/notifications`, admin-only). The add-channel form opens in a right-side **Drawer** (`components.Drawer`). Channels are stored as a JSON array under `app_config[notify.channels]` (plaintext); the deep-link origin shared across all channels is **derived** (see below).
 
 Each channel carries:
 
@@ -446,7 +446,9 @@ The per-channel `format` (or what `auto` sniffs it to, from the URL host) select
 - **`json`** — the generic `NotificationPayload` envelope as `application/json` (relays, bridges, custom consumers).
 - **`auto`** (default) — resolves to the matching provider above when the URL is recognizable, else `json`.
 
-**Reliability.** Delivery is retried up to 3 times with exponential backoff (200ms → 400ms) on transient failures (network error, HTTP 429, 5xx); a non-429 4xx fails fast. The deep link is absolutized with `notify.public_base_url` so ntfy tap-through and relative body links resolve to the real report.
+**Reliability.** Delivery is retried up to 3 times with exponential backoff (200ms → 400ms) on transient failures (network error, HTTP 429, 5xx); a non-429 4xx fails fast. The deep link is absolutized with the resolved deep-link origin so ntfy tap-through and relative body links resolve to the real report.
+
+**Deep-link origin (derived).** Notifications fire from background jobs, so there's no HTTP request to read the public origin from at send time. Instead, every visit to the Notifications page captures the admin's own request origin (`X-Forwarded-Proto` / `X-Forwarded-Host` → `Host`, same derivation as the MCP endpoint / OAuth issuer / setup links) into `notify.detected_base_url`. `Service.ResolveNotifyBaseURL` returns the manual override `notify.public_base_url` when set, otherwise the detected origin — so deep links "just work" without the operator typing a URL. The override is only needed for split-horizon setups (Breadbox reached at a different public URL than the admin browses from, e.g. behind a tunnel).
 
 ### NotificationPayload (the `json` envelope)
 
@@ -520,7 +522,8 @@ All keys are stored in the `app_config` table and read at runtime via `appconfig
 | `agent.run_retention_days` | int | `30` | Days to keep completed `workflow_runs` rows; 0 = disabled |
 | `workflows.consent_acknowledged_at` | RFC3339 | — | Non-empty = household has given first-enable consent |
 | `notify.channels` | JSON array | — | Notification channels (multi-sink): per-channel url/format/min_priority/ntfy_token/enabled/last_status |
-| `notify.public_base_url` | string | — | Absolute origin prepended to notification deep links; empty = relative |
+| `notify.public_base_url` | string | — | **Optional** manual override for the deep-link origin; empty = use the auto-detected origin |
+| `notify.detected_base_url` | string | — | Deep-link origin auto-captured from the admin's request on each Notifications-page load; used when no override is set |
 | `notify.webhook_url` | string | — | Legacy single webhook; synthesized into a "Default" channel when `notify.channels` is empty |
 | `notify.format` | string | `"auto"` | Legacy single-webhook format (back-compat seed for the synthesized channel) |
 | `notify.min_priority` | string | `"info"` | Legacy single-webhook priority floor (back-compat seed) |

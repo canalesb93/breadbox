@@ -2,17 +2,49 @@
 
 package pages
 
+import "strings"
+
 // NotificationsSettingsProps drives the Settings → Notifications tab. The
 // page manages a list of outbound notification channels (the multi-sink
-// model) plus the global public base URL used for deep links. Nothing here is
-// secret beyond the channel URLs/tokens, which are masked for display.
+// model) plus the global deep-link origin. Nothing here is secret beyond the
+// channel URLs/tokens, which are masked for display.
 type NotificationsSettingsProps struct {
-	Channels      []NotificationChannelView
+	Channels []NotificationChannelView
+	// PublicBaseURL is the manual deep-link origin override (empty = use
+	// the auto-detected origin).
 	PublicBaseURL string
-	FieldErrors   map[string]string
-	FormError     string
-	FormSuccess   string
-	CSRFToken     string
+	// DetectedBaseURL is the origin Breadbox auto-captured from the admin's
+	// current request — the effective deep-link origin when no override is
+	// set.
+	DetectedBaseURL string
+	FieldErrors     map[string]string
+	FormError       string
+	FormSuccess     string
+	CSRFToken       string
+}
+
+// UsingDetectedBaseURL reports whether deep links fall back to the
+// auto-detected origin (no manual override set).
+func (p NotificationsSettingsProps) UsingDetectedBaseURL() bool {
+	return strings.TrimSpace(p.PublicBaseURL) == ""
+}
+
+// EffectiveBaseURL is the origin notifications actually prepend to report
+// deep links: the override when set, otherwise the auto-detected origin.
+func (p NotificationsSettingsProps) EffectiveBaseURL() string {
+	if v := strings.TrimSpace(p.PublicBaseURL); v != "" {
+		return v
+	}
+	return strings.TrimSpace(p.DetectedBaseURL)
+}
+
+// OverridePlaceholder is the example shown in the override input — the
+// detected origin when known, else a generic example.
+func (p NotificationsSettingsProps) OverridePlaceholder() string {
+	if v := strings.TrimSpace(p.DetectedBaseURL); v != "" {
+		return v
+	}
+	return "https://breadbox.example.com"
 }
 
 // NotificationChannelView is one channel rendered in the list. Display fields

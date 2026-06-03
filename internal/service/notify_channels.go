@@ -190,7 +190,7 @@ func (s *Service) SendTestToChannel(ctx context.Context, id string) error {
 	if idx == -1 {
 		return fmt.Errorf("%w: notification channel not found", ErrNotFound)
 	}
-	baseURL := normalizeBaseURL(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyPublicBaseURL, ""))
+	baseURL := s.ResolveNotifyBaseURL(ctx)
 	p := testNotificationPayload()
 	err := s.sendToChannel(ctx, &chans[idx], p, baseURL)
 	// Best-effort persist of the recorded status.

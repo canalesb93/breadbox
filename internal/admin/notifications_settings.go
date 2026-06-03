@@ -26,6 +26,10 @@ func NotificationsSettingsHandler(svc *service.Service, sm *scs.SessionManager, 
 			http.Error(w, "Failed to load notification channels: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Capture the origin the admin is reaching Breadbox from so background
+		// notification sends can build absolute deep links without the admin
+		// typing one. Best-effort: a write failure must not block the page.
+		_ = svc.SetDetectedNotifyBaseURL(r.Context(), requestOrigin(r))
 		settings, err := svc.GetNotificationSettings(r.Context())
 		if err != nil {
 			http.Error(w, "Failed to load notification settings: "+err.Error(), http.StatusInternalServerError)
@@ -44,12 +48,13 @@ func NotificationsSettingsHandler(svc *service.Service, sm *scs.SessionManager, 
 		}
 
 		props := pages.NotificationsSettingsProps{
-			Channels:      notificationChannelViews(channels),
-			PublicBaseURL: settings.PublicBaseURL,
-			FieldErrors:   map[string]string{},
-			FormError:     formError,
-			FormSuccess:   formSuccess,
-			CSRFToken:     GetCSRFToken(r),
+			Channels:        notificationChannelViews(channels),
+			PublicBaseURL:   settings.PublicBaseURL,
+			DetectedBaseURL: settings.DetectedBaseURL,
+			FieldErrors:     map[string]string{},
+			FormError:       formError,
+			FormSuccess:     formSuccess,
+			CSRFToken:       GetCSRFToken(r),
 		}
 
 		data := BaseTemplateData(r, sm, "notifications-settings", "Notifications")
@@ -144,6 +149,28 @@ func NotificationsTestChannelHandler(svc *service.Service) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	}
+}
+
+// requestOrigin derives the public origin (scheme://host, no path) from the
+// incoming request, honoring X-Forwarded-Proto / X-Forwarded-Host when set by
+// a reverse proxy. Mirrors mcpServerURL so deep-link origins match the MCP
+// endpoint, OAuth issuer, and setup links — all derived the same way.
+func requestOrigin(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	if host == "" {
+		return ""
+	}
+	return scheme + "://" + host
 }
 
 // notificationChannelViews maps service channels to the display shape.

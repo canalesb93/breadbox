@@ -89,12 +89,24 @@ const (
 	// "ntfy" / "slack" / "discord" / "json" force a specific shape.
 	KeyNotifyFormat = "notify.format"
 
-	// KeyNotifyPublicBaseURL is the absolute origin (scheme+host, no
-	// trailing slash) Breadbox prepends to report deep links carried in
-	// a notification — so an ntfy "tap to open" (and any relative link
-	// in the body) resolves to the real report instead of a bare path.
-	// Empty = deep links stay relative. http(s) only.
+	// KeyNotifyPublicBaseURL is an OPTIONAL manual override for the
+	// absolute origin (scheme+host, no trailing slash) Breadbox prepends
+	// to report deep links carried in a notification — so an ntfy "tap to
+	// open" (and any relative link in the body) resolves to the real
+	// report instead of a bare path. Empty (the default) means "use the
+	// auto-detected origin" (KeyNotifyDetectedBaseURL). Set this only when
+	// Breadbox is reached at a different public URL than the admin browses
+	// from. http(s) only.
 	KeyNotifyPublicBaseURL = "notify.public_base_url"
+
+	// KeyNotifyDetectedBaseURL is the origin auto-captured from the admin's
+	// own request (X-Forwarded-Proto/Host → Host) whenever the Notifications
+	// settings page is loaded. Notifications fire from background jobs with
+	// no HTTP request in scope, so we persist the last-seen browsing origin
+	// here and read it at send time. The manual override
+	// (KeyNotifyPublicBaseURL) wins when set; otherwise this is used. Empty
+	// until the settings page has been visited at least once.
+	KeyNotifyDetectedBaseURL = "notify.detected_base_url"
 
 	// KeyNotifyMinPriority gates outbound notifications by report priority:
 	// only reports at or above this floor are delivered. One of

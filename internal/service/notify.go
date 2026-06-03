@@ -123,7 +123,7 @@ func (s *Service) SendWorkflowNotification(ctx context.Context, p NotificationPa
 	}
 	// Absolutize the deep link once so every channel (ntfy tap-through, JSON
 	// consumers) resolves to the real report rather than a bare path.
-	baseURL := normalizeBaseURL(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyPublicBaseURL, ""))
+	baseURL := s.ResolveNotifyBaseURL(ctx)
 	if baseURL != "" && strings.HasPrefix(p.URL, "/") {
 		p.URL = baseURL + p.URL
 	}
