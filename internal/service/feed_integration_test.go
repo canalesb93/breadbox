@@ -29,10 +29,10 @@ import (
 // subtest gets a fresh, truncated DB via newService → testutil.Pool, so
 // helpers populate this struct top-down.
 type feedSeed struct {
-	UserID  pgtype.UUID
-	ConnID  pgtype.UUID
-	AcctID  pgtype.UUID
-	TxnIDs  []pgtype.UUID
+	UserID pgtype.UUID
+	ConnID pgtype.UUID
+	AcctID pgtype.UUID
+	TxnIDs []pgtype.UUID
 }
 
 // seedFeedFixture creates one user/connection/account plus `txnCount`
@@ -729,11 +729,12 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		})
 	})
 
-	t.Run("ReportFoldsIntoBulkAction", func(t *testing.T) {
+	t.Run("ReportRendersStandaloneAlongsideBulkAction", func(t *testing.T) {
 		// A reporting agent run: 8 same-actor annotations in a 5-minute
 		// span plus an agent report at the bucket center (same actor).
-		// The report folds into the bulk_action card; only ONE event
-		// surfaces, with the report title in the headline.
+		// Reports are no longer folded into the bulk_action card — the
+		// bulk_action surfaces as its own event and the report is returned
+		// verbatim so the handler renders it as its own comment-bubble row.
 		svc, queries, pool := newService(t)
 		ctx := context.Background()
 		seed := seedFeedFixture(t, queries, "reportfold", 8)
@@ -749,7 +750,7 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 			)
 		}
 
-		// Report from the same agent created in the middle of the bucket.
+		// Report from the same agent created in the middle of the run.
 		actor := service.Actor{Type: "agent", ID: actorID, Name: "ReportingAgent"}
 		report, err := svc.CreateAgentReport(ctx, "Reviewed and cleared 8 transactions",
 			"All 8 looked clean.",
@@ -757,21 +758,18 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CreateAgentReport: %v", err)
 		}
-		// Backdate the report into the middle of the bulk_action's
-		// time window so the actor+window fold check passes.
 		if _, err := pool.Exec(ctx,
 			"UPDATE agent_reports SET created_at = $1 WHERE id::text = $2",
 			anchor.Add(10*time.Second), report.ID,
 		); err != nil {
 			t.Fatalf("backdate report: %v", err)
 		}
-		// Re-fetch the report so the SessionID/CreatedAt round-trip.
 		fetched, err := svc.GetAgentReport(ctx, report.ID)
 		if err != nil {
 			t.Fatalf("GetAgentReport: %v", err)
 		}
 
-		events, leftover, err := svc.ListFeedEventsWithReports(ctx,
+		events, standalone, err := svc.ListFeedEventsWithReports(ctx,
 			service.FeedEventsParams{},
 			[]service.AgentReportResponse{fetched},
 		)
@@ -781,15 +779,13 @@ func TestListFeedEvents_GroupingBehaviors(t *testing.T) {
 		if got := countEventsByType(events, "bulk_action"); got != 1 {
 			t.Fatalf("expected 1 bulk_action event, got %d", got)
 		}
-		if len(leftover) != 0 {
-			t.Errorf("expected 0 leftover reports (folded into bulk), got %d (%+v)", len(leftover), leftover)
+		// The report is passed straight back as a standalone card — never
+		// folded into the bulk_action event.
+		if len(standalone) != 1 {
+			t.Fatalf("expected 1 standalone report, got %d (%+v)", len(standalone), standalone)
 		}
-		ev := findEventByType(events, "bulk_action").BulkAction
-		if ev.Report == nil {
-			t.Fatalf("BulkAction.Report = nil, want non-nil with title %q", "Reviewed and cleared 8 transactions")
-		}
-		if ev.Report.Title != "Reviewed and cleared 8 transactions" {
-			t.Errorf("BulkAction.Report.Title = %q, want %q", ev.Report.Title, "Reviewed and cleared 8 transactions")
+		if standalone[0].Title != "Reviewed and cleared 8 transactions" {
+			t.Errorf("standalone report Title = %q, want %q", standalone[0].Title, "Reviewed and cleared 8 transactions")
 		}
 	})
 

@@ -107,15 +107,15 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 2. Grouped events from the service. Run after the report fetch so
-		// the service can fold matching reports into bulk_action /
-		// agent_session events. Reports that don't fold into anything come
-		// back via `leftoverReports` for standalone-card rendering. We also
-		// decide here whether the (relatively expensive) tag + category
-		// lookups are needed — they only feed bulk_action subject rendering.
-		// Skipping them on the common no-bulk path saves 5-10ms per request.
+		// 2. Grouped events from the service. The windowed report list is
+		// returned straight back as `standaloneReports` — every report
+		// renders as its own comment-bubble row, never folded into the
+		// session/bulk card it came from. We also decide here whether the
+		// (relatively expensive) tag + category lookups are needed — they
+		// only feed bulk_action subject rendering. Skipping them on the
+		// common no-bulk path saves 5-10ms per request.
 		t0 := time.Now()
-		events, leftoverReports, err := svc.ListFeedEventsWithReports(ctx, service.FeedEventsParams{
+		events, standaloneReports, err := svc.ListFeedEventsWithReports(ctx, service.FeedEventsParams{
 			Window:        window,
 			BulkThreshold: 3,
 			SampleLimit:   5,
@@ -219,16 +219,16 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 5. Append leftover (un-folded) reports as their own feed items.
-		// Reports that the service folded into a bulk_action / agent_session
-		// card are NOT in `leftoverReports` — they render as part of that
-		// card's headline.
+		// 5. Append every report as its own comment-bubble feed item. A
+		// report that came from an agent session / bulk action sorts next to
+		// that card on the timeline (same actor + timeframe) but renders as
+		// its own row — reports are no longer folded into a card headline.
 		//
 		// agentSeedCache memoizes the report-author → avatar-seed resolution
 		// across the loop so repeat agents don't re-query; "" is cached too
 		// (a miss is a decision, not a retry).
 		agentSeedCache := map[string]string{}
-		for _, rep := range leftoverReports {
+		for _, rep := range standaloneReports {
 			if rep.CreatedAt == "" {
 				continue
 			}
@@ -525,13 +525,6 @@ func projectFeedAgentSession(s *service.FeedAgentSessionEvent) *pages.FeedAgentS
 		Commented:          s.KindCounts["comment"],
 		RuleApplied:        s.KindCounts["rule_applied"],
 	}
-	if s.Report != nil {
-		out.ReportID = s.Report.ID
-		out.ReportShortID = s.Report.ShortID
-		out.ReportTitle = s.Report.Title
-		out.ReportPriority = s.Report.Priority
-		out.ReportIsUnread = s.Report.IsUnread
-	}
 	out.SampleTransactions = make([]pages.FeedTransactionRef, 0, len(s.SampleTransactions))
 	for _, tx := range s.SampleTransactions {
 		out.SampleTransactions = append(out.SampleTransactions, projectSampleTx(tx))
@@ -554,13 +547,6 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 		KindCounts:         kindCounts,
 		StartedAt:          b.StartedAt,
 		EndedAt:            b.EndedAt,
-	}
-	if b.Report != nil {
-		out.ReportID = b.Report.ID
-		out.ReportShortID = b.Report.ShortID
-		out.ReportTitle = b.Report.Title
-		out.ReportPriority = b.Report.Priority
-		out.ReportIsUnread = b.Report.IsUnread
 	}
 	for _, sub := range b.Subjects {
 		display := pages.FeedBulkSubject{

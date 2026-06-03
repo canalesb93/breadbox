@@ -155,8 +155,8 @@ type FeedSyncEvent struct {
 	// RetryCount counts the additional same-error sync attempts that
 	// were folded into this card. 0 = single attempt; N = total attempts
 	// is RetryCount + 1. Only populated for failed syncs.
-	RetryCount      int
-	FirstFailureAt  time.Time
+	RetryCount     int
+	FirstFailureAt time.Time
 
 	SampleTransactions []FeedSampleTx
 	AdditionalCount    int
@@ -190,13 +190,6 @@ type FeedAgentSessionEvent struct {
 	KindCounts map[string]int
 
 	SampleTransactions []FeedSampleTx
-
-	// Report, when non-nil, is an agent_report whose session_id matches
-	// this session. Populated by ListFeedEvents so a reporting agent run
-	// surfaces as a single feed row headlined by the report's title — the
-	// alternative (a separate report card adjacent to the session card) is
-	// noisy on the timeline.
-	Report *FeedReportRef
 }
 
 // FeedBulkActionEvent represents ≥ N annotations from the same actor
@@ -239,26 +232,6 @@ type FeedBulkActionEvent struct {
 	EndedAt   time.Time
 
 	SampleTransactions []FeedSampleTx
-
-	// Report, when non-nil, is an agent_report whose actor + window
-	// matches this bucket. Folding the report in lets a reporting agent
-	// run render as a single card headlined by the report title rather
-	// than the generic "X categorised, Y tagged" line.
-	Report *FeedReportRef
-}
-
-// FeedReportRef is the slim projection of an agent report folded into a
-// bulk_action / agent_session card. The handler still owns the canonical
-// report card (rendered when the report wasn't folded into anything) — this
-// shape only carries enough to display the title + priority + tags inline
-// and a link to the full report.
-type FeedReportRef struct {
-	ID       string
-	ShortID  string
-	Title    string
-	Priority string
-	Tags     []string
-	IsUnread bool
 }
 
 // FeedBulkSubject is one (subject, count) pair inside a bulk-action card.
@@ -411,9 +384,10 @@ func (s *Service) ListFeedEvents(ctx context.Context, params FeedEventsParams) (
 }
 
 // ListFeedEventsWithReports is the report-aware variant the home Feed
-// handler uses. It folds matching reports into bulk_action / agent_session
-// events and returns the leftover (un-folded) reports separately so the
-// handler can render them as standalone report cards.
+// handler uses. The windowed report list is returned straight back as the
+// second result so the handler can render each report as its own
+// standalone comment-bubble row — reports are no longer folded into the
+// bulk_action / agent_session card they came from.
 //
 // Splitting this from `ListFeedEvents` keeps the report-free entry-point
 // available for callers that don't have a windowed report list handy
@@ -467,9 +441,12 @@ func (s *Service) listFeedEventsWithReports(ctx context.Context, params FeedEven
 
 	groupedEvents := groupAnnotationsIntoEvents(annotationRows, sessionMeta, params)
 
-	// Fold matching reports into bulk_action / agent_session events. The
-	// remainder is the standalone-card list returned to the handler.
-	leftoverReports := foldReportsIntoEvents(groupedEvents, reports)
+	// Every report renders as its own comment-bubble row on the timeline
+	// (see feedReportBody in feed.templ) — we no longer fold reports into
+	// the bulk_action / agent_session card they came from. The full report
+	// list passes straight through to the handler as standalone cards; the
+	// paired session/bulk card renders on its own adjacent row.
+	standaloneReports := reports
 
 	out := make([]FeedEvent, 0, len(syncEvents)+len(groupedEvents))
 	out = append(out, syncEvents...)
@@ -480,7 +457,7 @@ func (s *Service) listFeedEventsWithReports(ctx context.Context, params FeedEven
 	})
 
 	out = filterFeedEvents(out, params.Filter, params.ActorID)
-	return out, leftoverReports, nil
+	return out, standaloneReports, nil
 }
 
 // filterFeedEvents narrows a feed-event slice to the subset matching the
@@ -494,12 +471,12 @@ func (s *Service) listFeedEventsWithReports(ctx context.Context, params FeedEven
 //   - "comments"   → only comment events
 //   - "sessions"   → only agent_session events
 //   - "reports"    → reports come from the handler, so ListFeedEvents
-//                    contributes nothing in this mode
+//     contributes nothing in this mode
 //   - "me"         → events authored by the supplied actorID; bulk-action
-//                    rows match on the bucket actor as well. If actorID is
-//                    empty (e.g. the initial admin without a linked user)
-//                    the filter is treated as "no filter" so the page
-//                    keeps rendering instead of going blank.
+//     rows match on the bucket actor as well. If actorID is
+//     empty (e.g. the initial admin without a linked user)
+//     the filter is treated as "no filter" so the page
+//     keeps rendering instead of going blank.
 func filterFeedEvents(events []FeedEvent, filter, actorID string) []FeedEvent {
 	switch filter {
 	case "":
@@ -767,7 +744,6 @@ func enrichFeedActivityRows(in []FeedActivityRow) []FeedActivityRow {
 	}
 	return out
 }
-
 
 // ── Sync events ───────────────────────────────────────────────────────────
 
@@ -1409,118 +1385,6 @@ func buildBulkActionEvent(rows []FeedActivityRow, params FeedEventsParams) FeedB
 	}
 	ev.SampleTransactions = samples
 	return ev
-}
-
-// foldReportsIntoEvents pairs each report with a matching bulk_action or
-// agent_session event in `events` so the report renders as part of that
-// card's headline instead of as its own row. Matching is:
-//
-//   - SessionID equality with an agent_session event, OR
-//   - actor (id, type+name fallback) equality plus the report's timestamp
-//     falling inside the bulk_action's [StartedAt-15m, EndedAt+15m] window.
-//
-// Mutates the matched events in place (sets `ev.BulkAction.Report` /
-// `ev.AgentSession.Report`) and returns the un-folded reports for the
-// handler to render as standalone report cards.
-func foldReportsIntoEvents(events []FeedEvent, reports []AgentReportResponse) []AgentReportResponse {
-	if len(events) == 0 || len(reports) == 0 {
-		return reports
-	}
-
-	leftover := make([]AgentReportResponse, 0, len(reports))
-	for _, rep := range reports {
-		if folded := tryFoldReport(events, rep); !folded {
-			leftover = append(leftover, rep)
-		}
-	}
-	return leftover
-}
-
-// tryFoldReport attempts to attach `rep` to a matching event in `events`.
-// Returns true if a match was found and the event was mutated.
-func tryFoldReport(events []FeedEvent, rep AgentReportResponse) bool {
-	ref := reportRefFromResponse(rep)
-
-	// 1. Session match wins. If the report's session_id lines up with an
-	//    agent_session event, fold there regardless of timestamps.
-	if rep.SessionID != nil && *rep.SessionID != "" {
-		for i := range events {
-			if events[i].Type != "agent_session" {
-				continue
-			}
-			if events[i].AgentSession == nil {
-				continue
-			}
-			if events[i].AgentSession.SessionID == *rep.SessionID {
-				if events[i].AgentSession.Report == nil {
-					events[i].AgentSession.Report = &ref
-				}
-				return true
-			}
-		}
-	}
-
-	// 2. Actor + window match into a bulk_action event. The report's
-	//    `created_at` must fall inside the bucket window (with a slack
-	//    of feedSoftBucketWindow on either side so a report written
-	//    seconds after the last annotation still anchors).
-	repTime, err := time.Parse(time.RFC3339, rep.CreatedAt)
-	if err != nil {
-		return false
-	}
-	repActorID := ""
-	if rep.CreatedByID != nil {
-		repActorID = *rep.CreatedByID
-	}
-	repActorKey := repActorID
-	if repActorKey == "" {
-		repActorKey = rep.CreatedByType + ":" + rep.CreatedByName
-	}
-
-	for i := range events {
-		if events[i].Type != "bulk_action" {
-			continue
-		}
-		ba := events[i].BulkAction
-		if ba == nil {
-			continue
-		}
-		baKey := ba.ActorID
-		if baKey == "" {
-			baKey = ba.ActorType + ":" + ba.ActorName
-		}
-		if baKey != repActorKey {
-			continue
-		}
-		windowStart := ba.StartedAt.Add(-feedSoftBucketWindow)
-		windowEnd := ba.EndedAt.Add(feedSoftBucketWindow)
-		if repTime.Before(windowStart) || repTime.After(windowEnd) {
-			continue
-		}
-		if ba.Report == nil {
-			ba.Report = &ref
-		}
-		// Take the report's timestamp as the event timestamp so the row
-		// sorts at the report's wall-clock position (typically the run's
-		// last action). Prevents the row drifting earlier than the
-		// report itself.
-		if repTime.After(events[i].Timestamp) {
-			events[i].Timestamp = repTime
-		}
-		return true
-	}
-	return false
-}
-
-func reportRefFromResponse(r AgentReportResponse) FeedReportRef {
-	return FeedReportRef{
-		ID:       r.ID,
-		ShortID:  r.ShortID,
-		Title:    r.Title,
-		Priority: r.Priority,
-		Tags:     r.Tags,
-		IsUnread: r.ReadAt == nil,
-	}
 }
 
 func bulkSubjectKey(a Annotation) string {

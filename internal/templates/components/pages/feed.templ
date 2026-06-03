@@ -525,13 +525,17 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 // feedReportBody renders a report row as a chat-bubble shape that mirrors
 // the per-tx activity-timeline comment row: an inline actor on the meta
 // line, then the report title in a `bb-comment-bubble`. The whole bubble
-// is the click target into /reports/{id}. Priority badges still live on
-// the meta line; the unread "New" pill is intentionally dropped — the
-// report tile's tint already carries that signal.
+// is the click target into /reports/{id}. This is the single rendering
+// path for every agent report on the feed — reports are never folded into
+// the session / bulk-action card they came from. The unread "New" pill and
+// priority badges live on the meta line.
 templ feedReportBody(it FeedItem, r *FeedReport, now time.Time) {
 	<div class="flex items-center gap-1.5 px-1 flex-wrap text-sm leading-6 min-w-0">
 		@components.TimelineActorInline(feedReportActor(r))
 		<span class="text-base-content/55 shrink-0">filed a report</span>
+		if r.IsUnread {
+			<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
+		}
 		if r.Priority == "critical" {
 			<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
 		} else if r.Priority == "warning" {
@@ -561,146 +565,81 @@ func feedReportActor(r *FeedReport) components.TimelineActor {
 	}
 }
 
+// feedAgentSessionBody renders an MCP agent session as a plain system row
+// ("Agent ran a session · N transactions touched"). Any report the session
+// produced renders as its own adjacent comment-bubble row (feedReportBody),
+// not folded into this card.
 templ feedAgentSessionBody(it FeedItem, s *FeedAgentSession, now time.Time) {
-	if s.ReportTitle != "" {
-		// Report folded into this session — use the report title as the
-		// headline and the session description sinks beneath it. Mirrors
-		// how the bulk_action card folds a report (see feedBulkActionBody).
-		<div class="flex items-baseline gap-1.5 flex-wrap">
-			<a href={ templ.SafeURL("/reports/" + s.ReportID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline">
-				{ s.ReportTitle }
-			</a>
-			if s.ReportIsUnread {
-				<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
-			}
-			if s.ReportPriority == "critical" {
-				<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
-			} else if s.ReportPriority == "warning" {
-				<span class="badge badge-warning badge-xs uppercase tracking-wide">Warning</span>
-			}
-			@feedRowTimestamp(it.TimestampStr, now)
-		</div>
+	<div class="flex items-baseline gap-1.5 flex-wrap">
+		<strong class="font-semibold text-base-content">{ feedSessionActorName(s) }</strong>
+		<span class="text-base-content/65 font-normal">ran a session</span>
+		<span class="text-base-content/30">·</span>
+		<span class="text-base-content/75 font-normal tabular-nums">{ fmt.Sprintf("%d transaction%s touched", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+	if breakdown := feedSessionBreakdown(s); breakdown != "" {
 		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-			@components.LucideIcon("bot", "w-3 h-3")
-			<span class="font-medium text-base-content/75">{ feedSessionActorName(s) }</span>
-			<span class="text-base-content/30">·</span>
-			<span class="tabular-nums">{ fmt.Sprintf("%d transaction%s", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
-			if breakdown := feedSessionBreakdown(s); breakdown != "" {
-				<span class="text-base-content/30">·</span>
-				<span>{ breakdown }</span>
+			@components.LucideIcon("sparkles", "w-3 h-3 text-primary opacity-70")
+			<span>{ breakdown }</span>
+			if dur := feedSessionDuration(s); dur != "" {
+				<span class="text-base-content/30 mx-1">·</span>
+				@components.LucideIcon("clock", "w-3 h-3")
+				<span>{ dur }</span>
 			}
 		</div>
-	} else {
-		<div class="flex items-baseline gap-1.5 flex-wrap">
-			<strong class="font-semibold text-base-content">{ feedSessionActorName(s) }</strong>
-			<span class="text-base-content/65 font-normal">ran a session</span>
-			<span class="text-base-content/30">·</span>
-			<span class="text-base-content/75 font-normal tabular-nums">{ fmt.Sprintf("%d transaction%s touched", s.UniqueTransactions, pluralFeedS(s.UniqueTransactions)) }</span>
-			@feedRowTimestamp(it.TimestampStr, now)
-		</div>
-		if breakdown := feedSessionBreakdown(s); breakdown != "" {
-			<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-				@components.LucideIcon("sparkles", "w-3 h-3 text-primary opacity-70")
-				<span>{ breakdown }</span>
-				if dur := feedSessionDuration(s); dur != "" {
-					<span class="text-base-content/30 mx-1">·</span>
-					@components.LucideIcon("clock", "w-3 h-3")
-					<span>{ dur }</span>
-				}
-			</div>
-		}
 	}
 	if len(s.SampleTransactions) > 0 {
 		<div class="mt-1.5">
 			@feedTxRefList(s.SampleTransactions, max0(s.UniqueTransactions-len(s.SampleTransactions)))
 		</div>
 	}
-	<div class="mt-1 flex items-center gap-3 flex-wrap">
-		if s.ReportTitle != "" && s.ReportID != "" {
-			<a href={ templ.SafeURL("/reports/" + s.ReportID) } class="text-primary/70 hover:text-primary hover:underline underline-offset-2 decoration-primary/30 transition-colors inline-flex items-center gap-1 no-underline">
-				Read the full report
-				@components.LucideIcon("arrow-right", "w-3 h-3")
-			</a>
-		}
-		if s.SessionShortID != "" {
-			<a href={ templ.SafeURL("/logs/sessions/" + s.SessionShortID) } class="text-primary/70 hover:text-primary hover:underline underline-offset-2 decoration-primary/30 transition-colors inline-flex items-center gap-1 no-underline">
-				Open session log
-				@components.LucideIcon("arrow-right", "w-3 h-3")
-			</a>
-		}
-	</div>
+	if s.SessionShortID != "" {
+		<a href={ templ.SafeURL("/logs/sessions/" + s.SessionShortID) } class="text-primary/70 hover:text-primary hover:underline underline-offset-2 decoration-primary/30 transition-colors mt-1 inline-flex items-center gap-1 no-underline">
+			Open session log
+			@components.LucideIcon("arrow-right", "w-3 h-3")
+		</a>
+	}
 }
 
+// feedBulkActionBody renders a soft-bucket of same-actor annotations as a
+// plain system row ("Alice categorised N transactions"). Any report the
+// actor filed in the same window renders as its own adjacent comment-bubble
+// row (feedReportBody), not folded into this card.
 templ feedBulkActionBody(it FeedItem, b *FeedBulkAction, now time.Time) {
-	if b.ReportTitle != "" {
-		// Report folded into this bucket — use the report title as the
-		// headline. Mirrors the agent_session card's report-folded layout.
-		<div class="flex items-baseline gap-1.5 flex-wrap">
-			<a href={ templ.SafeURL("/reports/" + b.ReportID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline">
-				{ b.ReportTitle }
-			</a>
-			if b.ReportIsUnread {
-				<span class="badge badge-primary badge-xs uppercase tracking-wide">New</span>
-			}
-			if b.ReportPriority == "critical" {
-				<span class="badge badge-error badge-xs uppercase tracking-wide">Critical</span>
-			} else if b.ReportPriority == "warning" {
-				<span class="badge badge-warning badge-xs uppercase tracking-wide">Warning</span>
-			}
-			@feedRowTimestamp(it.TimestampStr, now)
-		</div>
-		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-			@components.LucideIcon("bot", "w-3 h-3")
-			<span class="font-medium text-base-content/75">{ feedActorDisplay(b.ActorName, b.ActorType) }</span>
-			<span class="text-base-content/30">·</span>
-			<span class="tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
-			if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
-				<span class="text-base-content/30">·</span>
-				<span>{ breakdown }</span>
-			}
-		</div>
-	} else {
-		<div class="flex items-baseline gap-1.5 flex-wrap">
-			<strong class="font-semibold text-base-content">{ feedActorDisplay(b.ActorName, b.ActorType) }</strong>
-			<span class="text-base-content/75 font-normal">{ feedBulkVerb(b.Kind) }</span>
-			<span class="text-base-content/75 font-normal tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
-			if subjectLabel := feedBulkSubjectLabel(b); subjectLabel != "" {
-				<span class="text-base-content/65 font-normal">{ subjectLabel }</span>
-			}
-			@feedRowTimestamp(it.TimestampStr, now)
-		</div>
-		if b.Kind == "mixed" {
-			if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
-				<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-					@components.LucideIcon("sparkles", "w-3 h-3 text-primary opacity-70")
-					<span>{ breakdown }</span>
-				</div>
-			}
-		} else if len(b.Subjects) > 1 {
+	<div class="flex items-baseline gap-1.5 flex-wrap">
+		<strong class="font-semibold text-base-content">{ feedActorDisplay(b.ActorName, b.ActorType) }</strong>
+		<span class="text-base-content/75 font-normal">{ feedBulkVerb(b.Kind) }</span>
+		<span class="text-base-content/75 font-normal tabular-nums">{ fmt.Sprintf("%d transaction%s", b.Count, pluralFeedS(b.Count)) }</span>
+		if subjectLabel := feedBulkSubjectLabel(b); subjectLabel != "" {
+			<span class="text-base-content/65 font-normal">{ subjectLabel }</span>
+		}
+		@feedRowTimestamp(it.TimestampStr, now)
+	</div>
+	if b.Kind == "mixed" {
+		if breakdown := feedBulkKindBreakdown(b); breakdown != "" {
 			<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
-				for i, sub := range b.Subjects {
-					if i >= 4 {
-						<span class="text-base-content/40">+ { fmt.Sprintf("%d more", len(b.Subjects)-4) }</span>
-						break
-					}
-					<span class="inline-flex items-center gap-1 bg-base-200 px-1.5 py-0.5 rounded-md">
-						<span class="font-medium text-base-content/85">{ sub.Name }</span>
-						<span class="text-base-content/55 tabular-nums">&times;{ fmt.Sprintf("%d", sub.Count) }</span>
-					</span>
-				}
+				@components.LucideIcon("sparkles", "w-3 h-3 text-primary opacity-70")
+				<span>{ breakdown }</span>
 			</div>
 		}
+	} else if len(b.Subjects) > 1 {
+		<div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-base-content/55">
+			for i, sub := range b.Subjects {
+				if i >= 4 {
+					<span class="text-base-content/40">+ { fmt.Sprintf("%d more", len(b.Subjects)-4) }</span>
+					break
+				}
+				<span class="inline-flex items-center gap-1 bg-base-200 px-1.5 py-0.5 rounded-md">
+					<span class="font-medium text-base-content/85">{ sub.Name }</span>
+					<span class="text-base-content/55 tabular-nums">&times;{ fmt.Sprintf("%d", sub.Count) }</span>
+				</span>
+			}
+		</div>
 	}
 	if len(b.SampleTransactions) > 0 {
 		<div class="mt-1.5">
 			@feedTxRefList(b.SampleTransactions, max0(b.Count-len(b.SampleTransactions)))
 		</div>
-	}
-	if b.ReportTitle != "" && b.ReportID != "" {
-		<a href={ templ.SafeURL("/reports/" + b.ReportID) } class="text-primary/70 hover:text-primary hover:underline underline-offset-2 decoration-primary/30 transition-colors mt-1 inline-flex items-center gap-1 no-underline">
-			Read the full report
-			@components.LucideIcon("arrow-right", "w-3 h-3")
-		</a>
 	}
 }
 
