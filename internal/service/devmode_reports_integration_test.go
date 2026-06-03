@@ -5,6 +5,7 @@ package service_test
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"breadbox/internal/service"
@@ -85,13 +86,13 @@ func TestCreateDevReport_PersistsAndServesArtifacts(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	// Ensure no GitHub config so the call takes the "saved locally" path.
-	emptyRepo := ""
+	// A repo but no token → the call takes the prefilled-draft path.
+	repo := "acme/widgets"
 	if _, err := svc.UpdateDevModeSettings(ctx, service.UpdateDevModeSettingsParams{
-		GithubRepo:       &emptyRepo,
+		GithubRepo:       &repo,
 		ClearGithubToken: true,
 	}, devModeTestKey); err != nil {
-		t.Fatalf("clear config: %v", err)
+		t.Fatalf("set config: %v", err)
 	}
 
 	png := []byte("\x89PNG\r\n\x1a\n-fake-bytes")
@@ -115,11 +116,11 @@ func TestCreateDevReport_PersistsAndServesArtifacts(t *testing.T) {
 	if res.ShortID == "" {
 		t.Fatal("expected a short id")
 	}
-	if res.Status != "saved" {
-		t.Errorf("status = %q, want saved (no GitHub config)", res.Status)
+	if res.Status != "draft" {
+		t.Errorf("status = %q, want draft (no token)", res.Status)
 	}
-	if res.Error == "" {
-		t.Error("expected a non-empty note explaining the local-only save")
+	if res.DraftURL == "" || !strings.Contains(res.DraftURL, "github.com/acme/widgets/issues/new") {
+		t.Errorf("expected a prefilled draft URL, got %q", res.DraftURL)
 	}
 
 	// Screenshot artifact round-trips.
@@ -158,7 +159,7 @@ func TestCreateDevReport_PersistsAndServesArtifacts(t *testing.T) {
 	if found == nil {
 		t.Fatal("created report not present in ListDevReports")
 	}
-	if found.Type != "task" || found.Title != in.Title || found.Status != "saved" {
+	if found.Type != "task" || found.Title != in.Title || found.Status != "draft" {
 		t.Errorf("unexpected summary: %+v", found)
 	}
 }

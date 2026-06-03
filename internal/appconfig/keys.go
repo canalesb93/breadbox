@@ -122,6 +122,12 @@ const (
 // when KeyDevModeIssueLabel is unset.
 const DevModeDefaultLabel = "dev-report"
 
+// DevModeDefaultRepo is the repository Developer Mode files against when
+// KeyDevModeGithubRepo is unset — the upstream Breadbox repo, so a fresh
+// instance can file dogfooding reports with zero configuration. Override it
+// in Settings → Developer to point at a fork or a private tracker.
+const DevModeDefaultRepo = "canalesb93/breadbox"
+
 // AuthMode values for KeyAgentAuthMode.
 const (
 	AuthModeSubscription = "subscription"

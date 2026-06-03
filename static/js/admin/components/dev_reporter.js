@@ -371,6 +371,17 @@
                 linkLabel: 'Open issue',
                 duration: 6000,
               } }));
+            } else if (data.status === 'draft' && data.draft_url) {
+              // Open the prefilled GitHub draft. window.open can be blocked
+              // after an async fetch, so always surface a toast link too.
+              try { window.open(data.draft_url, '_blank', 'noopener'); } catch (e) {}
+              window.dispatchEvent(new CustomEvent('bb-toast', { detail: {
+                message: 'GitHub draft ready — review & submit',
+                type: 'info',
+                href: data.draft_url,
+                linkLabel: 'Open draft',
+                duration: 8000,
+              } }));
             } else if (data.status === 'saved') {
               window.dispatchEvent(new CustomEvent('bb-toast', { detail: {
                 message: 'Report saved to Breadbox (GitHub not configured)',

@@ -42,7 +42,7 @@ func (s *Service) GetDevModeSettings(ctx context.Context, encKey []byte) (*DevMo
 	}
 	return &DevModeSettingsResponse{
 		Enabled:    appconfig.Bool(ctx, s.Queries, appconfig.KeyDevModeEnabled, false),
-		GithubRepo: appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, ""),
+		GithubRepo: appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo),
 		IssueLabel: appconfig.String(ctx, s.Queries, appconfig.KeyDevModeIssueLabel, appconfig.DevModeDefaultLabel),
 		HasToken:   token != "",
 		TokenMask:  maskToken(token),

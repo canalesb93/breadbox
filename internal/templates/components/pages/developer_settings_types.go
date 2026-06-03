@@ -64,12 +64,14 @@ func devReportStatusTone(s string) string {
 	switch s {
 	case "open":
 		return "success"
+	case "draft":
+		return "info"
 	case "failed":
 		return "error"
 	case "saved":
-		return "info"
-	default:
 		return "warning"
+	default:
+		return "neutral"
 	}
 }
 
@@ -78,6 +80,8 @@ func devReportStatusLabel(s string) string {
 	switch s {
 	case "open":
 		return "Filed"
+	case "draft":
+		return "Draft"
 	case "failed":
 		return "Failed"
 	case "saved":

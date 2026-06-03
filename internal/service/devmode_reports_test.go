@@ -75,6 +75,27 @@ func TestMetaStr(t *testing.T) {
 	}
 }
 
+func TestBuildDraftURL(t *testing.T) {
+	u := buildDraftURL("acme/widgets", "[Bug] X", "some body", []string{"dev-report", "bug"})
+	if !strings.HasPrefix(u, "https://github.com/acme/widgets/issues/new?") {
+		t.Errorf("unexpected prefix: %q", u)
+	}
+	for _, want := range []string{"title=", "body=", "labels="} {
+		if !strings.Contains(u, want) {
+			t.Errorf("draft URL missing %q: %s", want, u)
+		}
+	}
+	// Malformed repo yields an empty URL (caller falls back to "saved").
+	if got := buildDraftURL("not-a-repo", "t", "b", nil); got != "" {
+		t.Errorf("expected empty URL for bad repo, got %q", got)
+	}
+	// An oversized body is trimmed so the URL stays under the browser cap.
+	long := buildDraftURL("a/b", "t", strings.Repeat("x", 30000), nil)
+	if len(long) > draftURLMaxLen+200 {
+		t.Errorf("draft URL not capped: %d chars", len(long))
+	}
+}
+
 func TestArtifactURL(t *testing.T) {
 	if got := artifactURL("", "abc123", "screenshot"); got != "/-/dev-reports/abc123/screenshot" {
 		t.Errorf("relative = %q", got)

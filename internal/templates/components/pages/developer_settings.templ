@@ -29,11 +29,18 @@ templ DeveloperSettings(p DeveloperSettingsProps) {
 				<span>{ p.FormSuccess }</span>
 			</div>
 		}
-		if p.Form.Enabled && (!p.RepoConfigured || !p.TokenConfigured) {
-			<div role="alert" class="alert alert-warning alert-soft mb-4 rounded-xl">
-				@components.LucideIcon("triangle-alert", "w-4 h-4")
-				<span>Developer mode is on, but reports can't be filed yet — set a GitHub repository and token below.</span>
-			</div>
+		if p.Form.Enabled {
+			if p.TokenConfigured {
+				<div role="note" class="alert alert-success alert-soft mb-4 rounded-xl">
+					@components.LucideIcon("zap", "w-4 h-4")
+					<span>One-click filing is on — reports post directly to <span class="font-mono">{ p.Form.GithubRepo }</span> as GitHub issues.</span>
+				</div>
+			} else {
+				<div role="note" class="alert alert-info alert-soft mb-4 rounded-xl">
+					@components.LucideIcon("external-link", "w-4 h-4")
+					<span>No token needed — reports open a <strong>prefilled GitHub draft</strong> (with the screenshot + context) that you review and submit. Add a token below to file in one click instead.</span>
+				</div>
+			}
 		}
 		<div role="note" class="alert alert-info alert-soft mb-4 rounded-xl">
 			@components.LucideIcon("shield-check", "w-4 h-4")
@@ -75,7 +82,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 		}
 		@components.SettingsRow(components.SettingsRowProps{
 			Label:   "GitHub repository",
-			Caption: "Where issues are filed, in owner/repo form",
+			Caption: "Where issues are filed. Defaults to the upstream Breadbox repo — point it at a fork or your own tracker.",
 			For:     "github_repo",
 		}) {
 			<input
@@ -93,8 +100,8 @@ templ developerModeSection(p DeveloperSettingsProps) {
 			}
 		}
 		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "GitHub token",
-			Caption: "Classic token with repo scope, or a fine-grained token with read+write Issues",
+			Label:   "GitHub token (optional)",
+			Caption: "Add one to file issues in one click. Classic token with repo scope, or a fine-grained token with read+write Issues. Without a token, reports open a prefilled draft instead.",
 			For:     "github_token",
 			Stack:   true,
 		}) {
@@ -199,7 +206,14 @@ templ developerReportItem(rep DevReportRow) {
 				<p class="text-xs text-error mt-1">{ rep.Error }</p>
 			}
 		</div>
-		if rep.IssueNumber > 0 && rep.IssueURL != "" {
+		if rep.Status == "draft" && rep.IssueURL != "" {
+			<a
+				href={ templ.SafeURL(rep.IssueURL) }
+				target="_blank"
+				rel="noopener noreferrer"
+				class="text-xs text-base-content/50 hover:text-primary shrink-0 mt-0.5 whitespace-nowrap"
+			>Open draft</a>
+		} else if rep.IssueNumber > 0 && rep.IssueURL != "" {
 			<a
 				href={ templ.SafeURL(rep.IssueURL) }
 				target="_blank"

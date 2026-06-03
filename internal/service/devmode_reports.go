@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -40,10 +41,13 @@ type CreateDevReportInput struct {
 // DevReportResult is what the reporter shows the user after filing.
 type DevReportResult struct {
 	ShortID           string `json:"short_id"`
-	Status            string `json:"status"` // pending | open | failed
+	Status            string `json:"status"` // pending | open | draft | saved | failed
 	GithubIssueNumber int    `json:"github_issue_number,omitempty"`
 	GithubIssueURL    string `json:"github_issue_url,omitempty"`
-	Error             string `json:"error,omitempty"` // non-fatal reason when status=failed
+	// DraftURL is a prefilled GitHub new-issue URL — set when no token is
+	// configured so the client can open a draft for the user to submit.
+	DraftURL string `json:"draft_url,omitempty"`
+	Error    string `json:"error,omitempty"` // non-fatal reason when status=failed
 }
 
 // DevReportSummary is one row of the Settings → Developer history list.
@@ -73,7 +77,7 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput, 
 		return nil, fmt.Errorf("%w: title is required", ErrInvalidParameter)
 	}
 
-	repo := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, "")
+	repo := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo)
 	label := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeIssueLabel, appconfig.DevModeDefaultLabel)
 	publicBase := strings.TrimRight(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyPublicBaseURL, ""), "/")
 	token, _, err := appconfig.ReadEncrypted(ctx, s.Queries, appconfig.KeyDevModeGithubToken, encKey)
@@ -120,17 +124,13 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput, 
 		return result, nil
 	}
 
-	if repo == "" || token == "" {
-		return saved("GitHub isn’t configured — the report was saved to Breadbox but no issue was filed.")
+	if repo == "" {
+		return saved("No GitHub repository is configured — the report was saved to Breadbox.")
 	}
 
-	gh, err := newGithubIssueClient(token, repo)
-	if err != nil {
-		return fail(err.Error())
-	}
-
-	// Best-effort: upload the screenshot for a public, GitHub-renderable
-	// image. The durable copy in Breadbox is always linked in the body.
+	// Best-effort: upload the screenshot for a public, renderable image URL.
+	// The durable copy in Breadbox is always linked in the body. Used by both
+	// the API and draft paths.
 	var imageURL string
 	if len(in.ScreenshotData) > 0 && len(in.ScreenshotData) <= img402MaxBytes {
 		if u, uerr := uploadToImg402(ctx, in.ScreenshotData, "screenshot.jpg"); uerr == nil {
@@ -138,12 +138,37 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput, 
 		}
 	}
 
+	issueTitleStr := issueTitle(rtype, title)
+	body := buildDevReportIssueBody(rtype, in, shortID, imageURL, publicBase)
+	labels := dedupeLabels(label, rtype)
+
+	// No token → open a prefilled GitHub draft the user submits themselves.
+	// Zero-config path: rides the user's existing GitHub session, no PAT.
+	if token == "" {
+		draftURL := buildDraftURL(repo, issueTitleStr, body, labels)
+		if draftURL == "" {
+			return saved("Couldn’t build a GitHub draft — check the repository setting.")
+		}
+		if uerr := s.Queries.SetDevReportDraft(ctx, db.SetDevReportDraftParams{ShortID: shortID, GithubIssueUrl: draftURL}); uerr != nil {
+			return nil, fmt.Errorf("record draft: %w", uerr)
+		}
+		result.Status = "draft"
+		result.DraftURL = draftURL
+		result.GithubIssueURL = draftURL
+		return result, nil
+	}
+
+	// Token → file via the API in one click.
+	gh, err := newGithubIssueClient(token, repo)
+	if err != nil {
+		return fail(err.Error())
+	}
+
 	// Best-effort: make sure the labels exist before referencing them.
 	_ = gh.ensureLabel(ctx, label, devReportFlowLabelColor, "Filed via Breadbox Developer Mode")
 	_ = gh.ensureLabel(ctx, rtype, typeLabelColor(rtype), "Breadbox Developer Mode report type")
 
-	body := buildDevReportIssueBody(rtype, in, shortID, imageURL, publicBase)
-	number, htmlURL, err := gh.createIssue(ctx, issueTitle(rtype, title), body, dedupeLabels(label, rtype))
+	number, htmlURL, err := gh.createIssue(ctx, issueTitleStr, body, labels)
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -248,6 +273,40 @@ func dedupeLabels(flow, rtype string) []string {
 		}
 		seen[l] = true
 		out = append(out, l)
+	}
+	return out
+}
+
+// draftURLMaxLen bounds the prefilled new-issue URL. GitHub accepts long
+// prefills, but browsers cap URL length — keep it comfortably under common
+// limits, trimming the body (never the title) if needed.
+const draftURLMaxLen = 7000
+
+// buildDraftURL returns a prefilled GitHub "new issue" URL. No token needed —
+// the user's browser session authorizes the submit. The body is trimmed if
+// the URL would get too long for the browser.
+func buildDraftURL(repo, title, body string, labels []string) string {
+	owner, name, err := splitOwnerRepo(repo)
+	if err != nil {
+		return ""
+	}
+	build := func(b string) string {
+		q := url.Values{}
+		q.Set("title", title)
+		q.Set("body", b)
+		if len(labels) > 0 {
+			q.Set("labels", strings.Join(labels, ","))
+		}
+		return fmt.Sprintf("https://github.com/%s/%s/issues/new?%s", owner, name, q.Encode())
+	}
+	out := build(body)
+	if len(out) > draftURLMaxLen {
+		// Trim the body to fit, leaving room for the rest of the URL.
+		keep := len(body) - (len(out) - draftURLMaxLen) - 64
+		if keep < 0 {
+			keep = 0
+		}
+		out = build(body[:keep] + "\n\n…(truncated — full context in the linked Breadbox artifacts)")
 	}
 	return out
 }

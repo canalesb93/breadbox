@@ -28,6 +28,16 @@ SET status = 'saved',
     error_message = $2
 WHERE short_id = $1;
 
+-- name: SetDevReportDraft :exec
+-- Marks a report as a prefilled GitHub draft (no token configured). The
+-- draft new-issue URL is stored in github_issue_url so the history can
+-- re-open it.
+UPDATE dev_reports
+SET status = 'draft',
+    github_issue_url = $2,
+    error_message = ''
+WHERE short_id = $1;
+
 -- name: GetDevReportByShortID :one
 SELECT * FROM dev_reports WHERE short_id = $1;
 
