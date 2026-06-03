@@ -141,6 +141,79 @@ func (s *Service) AddNotificationChannel(ctx context.Context, p AddNotificationC
 	return &ch, nil
 }
 
+// UpdateNotificationChannelParams holds the editable fields of a channel. URL
+// and NtfyToken are pointers so the edit form can leave a secret blank to keep
+// the current value (nil = keep, non-nil = replace) — neither is rendered back
+// into the page, so a blank submit must not wipe them.
+type UpdateNotificationChannelParams struct {
+	Name        string
+	URL         *string
+	Format      string
+	MinPriority string
+	NtfyToken   *string
+	Enabled     bool
+}
+
+// UpdateNotificationChannel edits an existing channel in place. A nil URL or
+// NtfyToken keeps the stored value; the format/priority are normalized and
+// validated like Add. Returns ErrNotFound if no channel matches id.
+func (s *Service) UpdateNotificationChannel(ctx context.Context, id string, p UpdateNotificationChannelParams) (*NotificationChannel, error) {
+	chans := s.persistedOrMigratedChannels(ctx)
+	idx := -1
+	for i := range chans {
+		if chans[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return nil, fmt.Errorf("%w: notification channel not found", ErrNotFound)
+	}
+
+	url := chans[idx].URL
+	if p.URL != nil {
+		if u := strings.TrimSpace(*p.URL); u != "" {
+			if err := validateNotifyURL(u); err != nil {
+				return nil, err
+			}
+			url = u
+		}
+	}
+	format := strings.TrimSpace(p.Format)
+	if format == "" {
+		format = appconfig.NotifyFormatAuto
+	}
+	if !validNotifyFormat(format) {
+		return nil, fmt.Errorf("%w: notification format must be auto, ntfy, slack, discord, googlechat, or json", ErrInvalidParameter)
+	}
+	minPriority := strings.TrimSpace(p.MinPriority)
+	if minPriority == "" {
+		minPriority = appconfig.NotifyMinPriorityInfo
+	}
+	if !validNotifyMinPriority(minPriority) {
+		return nil, fmt.Errorf("%w: minimum priority must be info, warning, or critical", ErrInvalidParameter)
+	}
+	name := strings.TrimSpace(p.Name)
+	if name == "" {
+		name = defaultChannelName(url)
+	}
+	token := chans[idx].NtfyToken
+	if p.NtfyToken != nil {
+		token = strings.TrimSpace(*p.NtfyToken)
+	}
+
+	chans[idx].Name = name
+	chans[idx].URL = url
+	chans[idx].Format = format
+	chans[idx].MinPriority = minPriority
+	chans[idx].NtfyToken = token
+	chans[idx].Enabled = p.Enabled
+	if err := s.persistNotificationChannels(ctx, chans); err != nil {
+		return nil, err
+	}
+	return &chans[idx], nil
+}
+
 // SetNotificationChannelEnabled flips a channel's enabled flag.
 func (s *Service) SetNotificationChannelEnabled(ctx context.Context, id string, enabled bool) error {
 	chans := s.persistedOrMigratedChannels(ctx)

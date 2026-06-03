@@ -109,6 +109,38 @@ func NotificationsAddChannelHandler(svc *service.Service, sm *scs.SessionManager
 	}
 }
 
+// NotificationsUpdateChannelHandler handles
+// POST /settings/notifications/channels/{id} — the edit-channel drawer. The
+// URL and ntfy token are kept when their fields are submitted blank (the form
+// never echoes secrets back), so only non-empty values replace them.
+func NotificationsUpdateChannelHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			FlashRedirect(w, r, sm, "error", "Could not read the submitted form.", "/settings/notifications")
+			return
+		}
+		id := chi.URLParam(r, "id")
+		params := service.UpdateNotificationChannelParams{
+			Name:        strings.TrimSpace(r.FormValue("name")),
+			Format:      strings.TrimSpace(r.FormValue("format")),
+			MinPriority: strings.TrimSpace(r.FormValue("min_priority")),
+			Enabled:     r.FormValue("enabled") == "true",
+		}
+		if v := strings.TrimSpace(r.FormValue("url")); v != "" {
+			params.URL = &v
+		}
+		if v := strings.TrimSpace(r.FormValue("ntfy_token")); v != "" {
+			params.NtfyToken = &v
+		}
+		if _, err := svc.UpdateNotificationChannel(r.Context(), id, params); err != nil {
+			FlashRedirect(w, r, sm, "error", "Couldn't update channel: "+err.Error(), "/settings/notifications")
+			return
+		}
+		SetFlash(r.Context(), sm, "success", "Channel updated.")
+		http.Redirect(w, r, "/settings/notifications", http.StatusSeeOther)
+	}
+}
+
 // NotificationsToggleChannelHandler handles
 // POST /settings/notifications/channels/{id}/toggle.
 func NotificationsToggleChannelHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
@@ -185,6 +217,7 @@ func notificationChannelViews(channels []service.NotificationChannel) []pages.No
 			URLMasked:   maskNotifyURL(c.URL),
 			MinPriority: c.MinPriority,
 			Enabled:     c.Enabled,
+			EditURL:     "/settings/notifications/channels/" + c.ID,
 			ToggleURL:   "/settings/notifications/channels/" + c.ID + "/toggle",
 			DeleteURL:   "/settings/notifications/channels/" + c.ID + "/delete",
 		}

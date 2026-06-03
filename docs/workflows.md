@@ -418,7 +418,7 @@ Workflows fire outbound notifications when noteworthy events occur (typically wh
 
 ### Channels
 
-The sink is managed on its own **Settings → Notifications** page (`/settings/notifications`, admin-only). The add-channel form opens in a right-side **Drawer** (`components.Drawer`). Channels are stored as a JSON array under `app_config[notify.channels]` (plaintext); the deep-link origin shared across all channels is **derived** (see below).
+The sink is managed on its own **Settings → Notifications** page (`/settings/notifications`, admin-only). Each channel renders as one quiet row (name · masked URL · format + a single status badge) with a gear button that opens its **edit Drawer** (`components.Drawer`); the **Add channel** button opens the same drawer empty. Channels are stored as a JSON array under `app_config[notify.channels]` (plaintext); the deep-link origin shared across all channels is **derived** (see below).
 
 Each channel carries:
 
@@ -431,7 +431,7 @@ Each channel carries:
 - `enabled` — disabled channels are skipped.
 - `last_status` — `{ok, at, format, detail}`, the most recent delivery attempt (surfaced inline on the page).
 
-`A workflow notification fans out to every enabled channel`, each delivered + retried independently; `SendWorkflowNotification` returns the first delivery error after attempting all of them. CRUD is handled by `AddNotificationChannel` / `SetNotificationChannelEnabled` / `DeleteNotificationChannel`; `SendTestToChannel` backs the per-channel **Test** button, and `POST /-/notifications/test` tests all enabled channels.
+`A workflow notification fans out to every enabled channel`, each delivered + retried independently; `SendWorkflowNotification` returns the first delivery error after attempting all of them. CRUD is handled by `AddNotificationChannel` / `UpdateNotificationChannel` / `SetNotificationChannelEnabled` / `DeleteNotificationChannel`; the edit drawer never echoes secrets, so `UpdateNotificationChannel` treats a blank URL/token as "keep current". `SendTestToChannel` backs the per-channel **Test** button, and `POST /-/notifications/test` tests all enabled channels.
 
 **Back-compat.** When `notify.channels` is empty but the legacy `notify.webhook_url` (+ `notify.format` / `notify.min_priority`) keys are set, a single "Default" channel is synthesized so pre-multi-channel configs keep delivering. The synth channel is never silently persisted by a send (which would freeze the legacy keys) — it's migrated into the array only when the operator first mutates a channel.
 

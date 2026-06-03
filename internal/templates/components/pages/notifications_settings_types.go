@@ -47,6 +47,40 @@ func (p NotificationsSettingsProps) OverridePlaceholder() string {
 	return "https://breadbox.example.com"
 }
 
+// ChannelFormValues drives the shared add/edit channel form rendered inside a
+// Drawer. The add drawer passes a zero value (IDSuffix "new"); an edit drawer
+// passes the channel's current non-secret values plus IsEdit=true. Secrets
+// (URL, ntfy token) are never prefilled — every edit drawer lives in the page
+// DOM, so echoing them would reprint every channel's secrets; the edit form
+// treats a blank URL/token as "keep current" instead.
+type ChannelFormValues struct {
+	IDSuffix     string // unique per drawer: "new" for add, the channel id for edit
+	Action       string // form POST endpoint
+	IsEdit       bool
+	Name         string // prefilled on edit (not secret)
+	Format       string // selected option
+	MinPriority  string // selected option
+	Enabled      bool   // edit toggle state
+	URLMasked    string // placeholder on edit (full URL never rendered)
+	HasURL       bool   // edit: a URL already exists → field is optional ("keep current")
+	DeleteAction string // edit: formaction for the Remove button
+}
+
+// FieldID namespaces an input id/for so add + N edit drawers don't collide.
+func (f ChannelFormValues) FieldID(field string) string {
+	return "ch-" + field + "-" + f.IDSuffix
+}
+
+// URLPlaceholder is the webhook-URL field's placeholder: on edit it shows the
+// masked current URL (so the operator knows which sink they're editing without
+// the full secret being printed); on add it's a worked example.
+func (f ChannelFormValues) URLPlaceholder() string {
+	if f.IsEdit && strings.TrimSpace(f.URLMasked) != "" {
+		return f.URLMasked
+	}
+	return "https://ntfy.sh/my-breadbox-topic"
+}
+
 // NotificationChannelView is one channel rendered in the list. Display fields
 // (masked URL, format label, status line) are precomputed by the handler so
 // the template stays declarative.
@@ -61,6 +95,7 @@ type NotificationChannelView struct {
 	// Action endpoints, precomputed so the template passes them to
 	// templ.SafeURL as variables (not string literals — keeps the
 	// route-drift guard from treating these POST endpoints as GET hrefs).
+	EditURL   string
 	ToggleURL string
 	DeleteURL string
 	// Status line: HasStatus=false → never delivered. Otherwise StatusOK
