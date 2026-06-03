@@ -124,12 +124,17 @@ func TestBuildDevReportIssueBody(t *testing.T) {
 		`<img src="https://bb-artifacts.exe.xyz/f/abc.jpg"`,
 		"[HTML snapshot](https://bb-artifacts.exe.xyz/f/def.html)",
 		"| Page | `/transactions` |",
-		"| Reported by | admin@example.com |",
-		"| Redacted | Yes — financial data masked |",
+		"| Theme | dark |",
 		"Developer Mode",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("issue body missing %q\n---\n%s", want, body)
+		}
+	}
+	// Removed fields stay out of the body.
+	for _, gone := range []string{"Reported by", "| URL ", "Redacted"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("issue body should not contain %q\n---\n%s", gone, body)
 		}
 	}
 

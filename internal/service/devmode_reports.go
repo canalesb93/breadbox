@@ -172,19 +172,10 @@ func buildDevReportIssueBody(rtype string, in CreateDevReportInput, imageURL, ht
 		page = in.PageURL
 	}
 	tableRow(&b, "Page", code(page))
-	if in.PageURL != "" {
-		tableRow(&b, "URL", code(in.PageURL))
-	}
-	reporter := in.CreatedBy
-	if reporter == "" {
-		reporter = metaStr(in.Metadata, "reported_by")
-	}
-	tableRow(&b, "Reported by", reporter)
 	tableRow(&b, "Viewport", metaStr(in.Metadata, "viewport"))
 	tableRow(&b, "Theme", metaStr(in.Metadata, "theme"))
 	tableRow(&b, "App version", metaStr(in.Metadata, "app_version"))
 	tableRow(&b, "Browser", code(metaStr(in.Metadata, "user_agent")))
-	tableRow(&b, "Redacted", redactedLabel(metaStr(in.Metadata, "redacted")))
 	tableRow(&b, "Filed at", metaStr(in.Metadata, "client_time"))
 	b.WriteString("\n")
 
@@ -195,18 +186,6 @@ func buildDevReportIssueBody(rtype string, in CreateDevReportInput, imageURL, ht
 	b.WriteString("---\n")
 	b.WriteString("<sub>Filed via Breadbox Developer Mode.</sub>\n")
 	return b.String()
-}
-
-// redactedLabel renders the privacy state of the capture for the issue body.
-func redactedLabel(v string) string {
-	switch v {
-	case "true":
-		return "Yes — financial data masked"
-	case "false":
-		return "⚠️ No — raw data included"
-	default:
-		return ""
-	}
 }
 
 func tableRow(b *strings.Builder, field, value string) {
