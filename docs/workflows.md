@@ -118,7 +118,7 @@ Options are per-preset single-selects rendered in the configure drawer; the chos
 | Key | Used by | Choices | Default |
 |---|---|---|---|
 | `apply_mode` | `routine-reviewer`, `backlog-closer`, `bulk-catchup` | `auto` (apply categories), `flag_only` (review only, no writes) | `auto` |
-| `rule_mode` | `rule-foundation` | `create_apply` (create & apply rules), `draft_only` (propose only, no writes) | `create_apply` |
+| `rule_mode` | `rule-foundation` | `create_apply` (create rules & backfill history), `create_only` (create rules, skip retroactive backfill) | `create_apply` |
 | `lookback_window` | `large-charge-sentinel` | `7` / `30` / `90` days | `7` |
 | `report_verbosity` | `large-charge-sentinel` | `concise` (headline findings), `detailed` (full evidence) | `concise` |
 
