@@ -403,7 +403,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Multi-channel management (form POSTs → redirect back to the tab).
 		r.Post("/settings/notifications/channels", NotificationsAddChannelHandler(svc, sm))
 		r.Post("/settings/notifications/channels/{id}", NotificationsUpdateChannelHandler(svc, sm))
-		r.Post("/settings/notifications/channels/{id}/toggle", NotificationsToggleChannelHandler(svc, sm))
 		r.Post("/settings/notifications/channels/{id}/delete", NotificationsDeleteChannelHandler(svc, sm))
 
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))

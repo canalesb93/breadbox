@@ -58,9 +58,3 @@ func TestChannelFormatLabel(t *testing.T) {
 		t.Errorf("auto generic = %q, want 'Auto-detect'", got)
 	}
 }
-
-func TestRelTimeRFC3339_BadInput(t *testing.T) {
-	if got := relTimeRFC3339("not-a-time"); got != "" {
-		t.Errorf("relTimeRFC3339(bad) = %q, want empty", got)
-	}
-}

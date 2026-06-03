@@ -5,12 +5,11 @@ package admin
 import (
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -141,21 +140,6 @@ func NotificationsUpdateChannelHandler(svc *service.Service, sm *scs.SessionMana
 	}
 }
 
-// NotificationsToggleChannelHandler handles
-// POST /settings/notifications/channels/{id}/toggle.
-func NotificationsToggleChannelHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		_ = r.ParseForm()
-		id := chi.URLParam(r, "id")
-		enabled := r.FormValue("enabled") == "true"
-		if err := svc.SetNotificationChannelEnabled(r.Context(), id, enabled); err != nil {
-			FlashRedirect(w, r, sm, "error", "Couldn't update channel: "+err.Error(), "/settings/notifications")
-			return
-		}
-		http.Redirect(w, r, "/settings/notifications", http.StatusSeeOther)
-	}
-}
-
 // NotificationsDeleteChannelHandler handles
 // POST /settings/notifications/channels/{id}/delete.
 func NotificationsDeleteChannelHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
@@ -218,7 +202,6 @@ func notificationChannelViews(channels []service.NotificationChannel) []pages.No
 			MinPriority: c.MinPriority,
 			Enabled:     c.Enabled,
 			EditURL:     "/settings/notifications/channels/" + c.ID,
-			ToggleURL:   "/settings/notifications/channels/" + c.ID + "/toggle",
 			DeleteURL:   "/settings/notifications/channels/" + c.ID + "/delete",
 		}
 		if c.LastStatus != nil {
@@ -287,7 +270,7 @@ func maskNotifyURL(raw string) string {
 
 // notifyStatusText renders a per-channel delivery status line.
 func notifyStatusText(s *service.NotificationDeliveryStatus) string {
-	when := relTimeRFC3339(s.At)
+	when := timefmt.RelativeRFC3339(s.At)
 	if s.OK {
 		if when != "" {
 			return "Delivered · " + when
@@ -302,23 +285,4 @@ func notifyStatusText(s *service.NotificationDeliveryStatus) string {
 		return "Failed (" + when + "): " + detail
 	}
 	return "Failed: " + detail
-}
-
-// relTimeRFC3339 turns an RFC3339 timestamp into a coarse relative string.
-func relTimeRFC3339(ts string) string {
-	t, err := time.Parse(time.RFC3339, ts)
-	if err != nil {
-		return ""
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return strconv.Itoa(int(d.Minutes())) + "m ago"
-	case d < 24*time.Hour:
-		return strconv.Itoa(int(d.Hours())) + "h ago"
-	default:
-		return t.Local().Format("Jan 2")
-	}
 }

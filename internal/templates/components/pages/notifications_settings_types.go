@@ -96,7 +96,6 @@ type NotificationChannelView struct {
 	// templ.SafeURL as variables (not string literals — keeps the
 	// route-drift guard from treating these POST endpoints as GET hrefs).
 	EditURL   string
-	ToggleURL string
 	DeleteURL string
 	// Status line: HasStatus=false → never delivered. Otherwise StatusOK
 	// drives the tone and StatusText is the message ("Delivered · 14:02" /

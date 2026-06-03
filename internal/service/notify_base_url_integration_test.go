@@ -39,6 +39,17 @@ func TestResolveNotifyBaseURL(t *testing.T) {
 		t.Fatalf("invalid detect should be a no-op, base URL = %q", got)
 	}
 
+	// A loopback origin (dev/tunnel visit) must NOT clobber the real detected
+	// origin — it can never be a valid deep-link target for an external client.
+	for _, loop := range []string{"http://localhost:8080", "http://127.0.0.1:9000", "http://[::1]:8080"} {
+		if err := svc.SetDetectedNotifyBaseURL(ctx, loop); err != nil {
+			t.Fatalf("set detected (loopback %s): %v", loop, err)
+		}
+		if got := svc.ResolveNotifyBaseURL(ctx); got != "https://bb.detected.example" {
+			t.Fatalf("loopback %s should be a no-op, base URL = %q", loop, got)
+		}
+	}
+
 	// Manual override wins over detected.
 	override := "https://override.example.com"
 	if _, err := svc.UpdateNotificationSettings(ctx, service.UpdateNotificationSettingsParams{PublicBaseURL: &override}); err != nil {

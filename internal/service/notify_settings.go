@@ -69,6 +69,13 @@ func (s *Service) SetDetectedNotifyBaseURL(ctx context.Context, origin string) e
 	if normalized == "" || validateNotifyURL(normalized) != nil {
 		return nil
 	}
+	// A loopback origin (localhost/127.0.0.1) is only reachable from the server
+	// itself — persisting it would bake dead deep links into every background
+	// notification. So a dev/tunnel visit to the settings page doesn't clobber
+	// a real public (or LAN) origin captured from a normal visit.
+	if isLoopbackOrigin(normalized) {
+		return nil
+	}
 	if normalized == normalizeBaseURL(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyDetectedBaseURL, "")) {
 		return nil
 	}

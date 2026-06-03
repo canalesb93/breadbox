@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -442,6 +443,26 @@ func absolutizeMarkdownLinks(body, baseURL string) string {
 // callers can concatenate "/path" without doubling the separator.
 func normalizeBaseURL(raw string) string {
 	return strings.TrimRight(strings.TrimSpace(raw), "/")
+}
+
+// isLoopbackOrigin reports whether an origin's host is loopback
+// (localhost / 127.0.0.0/8 / ::1). Such an origin only resolves on the server
+// itself, so it's never a valid deep-link target for an external notification
+// client — auto-detection must not persist it (a private LAN IP, by contrast,
+// IS reachable by other devices on the network and is kept).
+func isLoopbackOrigin(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 // notifyMarkdownLink matches a markdown inline link: [label](url).
