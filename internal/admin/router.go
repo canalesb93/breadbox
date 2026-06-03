@@ -64,7 +64,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
-		r.Use(DevModeMiddleware(a.Queries))
 
 		r.Get("/", FeedHandler(a, svc, tr))
 		// Old `/feed` URL retired — feed is now the root. Redirect any

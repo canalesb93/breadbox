@@ -3,42 +3,15 @@
 package admin
 
 import (
-	"context"
 	"encoding/base64"
 	"errors"
 	"net/http"
 	"strings"
 
-	"breadbox/internal/appconfig"
-	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 )
-
-// devModeCtxKey carries the per-request "is developer mode on" flag from the
-// middleware to BaseTemplateData, which gates the floating reporter in
-// base.html. A dedicated type avoids collisions with other context keys.
-type devModeCtxKey struct{}
-
-// DevModeMiddleware reads the developer-mode flag once per request and stashes
-// it in context so the base layout can decide whether to render the reporter.
-func DevModeMiddleware(queries *db.Queries) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			enabled := appconfig.Bool(r.Context(), queries, appconfig.KeyDevModeEnabled, false)
-			ctx := context.WithValue(r.Context(), devModeCtxKey{}, enabled)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-// devModeEnabledFromContext reports whether developer mode was on for this
-// request. Defaults to false when the middleware didn't run.
-func devModeEnabledFromContext(ctx context.Context) bool {
-	v, _ := ctx.Value(devModeCtxKey{}).(bool)
-	return v
-}
 
 // devReportMaxBody bounds the JSON payload (a redacted screenshot + HTML
 // snapshot can be a few MB together).
