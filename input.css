@@ -596,15 +596,23 @@
   }
 
   /* === Settings shell: the rail is a true extension of the app sidebar ===
-     On lg+ the rail is a FIXED, full-height base-200 column pinned flush
+     On lg+ the rail is a STICKY, full-height base-200 column sitting flush
      against the app sidebar's right edge — same recessed surface + link
      language as .bb-sidebar, so Settings reads as the sidebar's own
-     sub-navigation rather than page content. It sits above the sticky
-     topbar and pushes the topbar + page body to its right (the :has()
-     offsets at the end of this block). Below lg it collapses to an in-flow
-     horizontal scroll strip at the top of the tab. */
+     sub-navigation rather than page content. It's in flow (a sticky peer of
+     the sidebar, not a fixed overlay) so it rides the page's overscroll the
+     SAME way .bb-sidebar does — the two never drift apart on a rubber-band
+     bounce. The topbar is offset to its right (the :has() offset at the end
+     of this block). Below lg it collapses to an in-flow horizontal scroll
+     strip at the top of the tab. */
   .bb-settings-layout {
-    @apply flex flex-col lg:flex-row lg:min-h-[calc(100vh-3rem)];
+    /* lg:gap-x-6 restores the 1.5rem gutter between the rail and the content
+       column. The rail's -1.5rem left margin (below) makes it flush against
+       the sidebar, which also pulls the content flush against the rail's
+       right edge; the column-gap puts the breathing room back. It's a
+       column-gap, so it only applies to the lg+ row layout — on the mobile
+       flex-col stack it's the cross axis and has no effect. */
+    @apply flex flex-col lg:flex-row lg:gap-x-6 lg:min-h-[calc(100vh-3rem)];
   }
   /* Mobile default: an in-flow strip above the content. The lg+ block
      below lifts it out into the fixed sidebar-extension column. */
@@ -647,34 +655,40 @@
     @apply flex-1 min-w-0 lg:max-w-5xl;
   }
 
-  /* lg+: lift the rail into a fixed, full-height column and push the
-     topbar + body to its right. */
+  /* lg+: the rail is a sticky, full-height column — the in-flow peer of the
+     app sidebar (which is itself a sticky .drawer-side). Being in flow, not
+     fixed, is the whole point: it rides the page's overscroll exactly like
+     .bb-sidebar, so a rubber-band bounce moves them together instead of
+     freezing the rail against a bouncing page. */
   @media (min-width: 1024px) {
     .bb-settings-rail {
-      position: fixed;
+      position: sticky;
       top: 0;
-      bottom: 0;
-      /* Pinned to the app sidebar's right edge. `left` tracks the sidebar
-         width (16rem expanded / 4rem collapsed — same hardcoded geometry as
-         the collapsible-sidebar block near the bottom of this file); the
-         body offset below is the constant rail width. */
-      left: 16rem;
+      align-self: flex-start;
+      /* Pull flush to the viewport top — cancel the 3.5rem topbar (.bb-topbar
+         is h-14) + main's 1.5rem (sm:p-6) top padding so the rail's first tab
+         lines up with the sidebar's brand row — and flush against the
+         sidebar's right edge — cancel main's 1.5rem left padding. Lands
+         exactly where the old fixed rail sat, but now in normal flow.
+         The -1.5rem BOTTOM margin is the symmetric counterpart: the rail's
+         sticky-constraint rect is its containing block (.bb-settings-layout),
+         whose bottom edge sits 1.5rem above the document bottom because of
+         main's sm:p-6 bottom padding. Pulling the margin box up by 1.5rem lets
+         the border box extend through that padding to the document edge, so at
+         full scroll the rail reaches the bottom in lockstep with .drawer-side
+         (whose constraint rect IS the whole document) instead of leaving a
+         1.5rem strip of page background below it. */
+      margin: calc((3.5rem + 1.5rem) * -1) 0 -1.5rem -1.5rem;
+      height: 100dvh;
       width: 14rem;
-      margin: 0;
+      flex: none;
       z-index: 31; /* above the sticky topbar (z-30) */
       display: flex;
       flex-direction: column;
-      /* Same vertical + horizontal rhythm as .bb-sidebar (py-5 / px-3) so the
-         rail's first tab top-aligns with the sidebar's brand row. No topbar
-         clearance is needed — the topbar is offset to the rail's right, not
-         stacked above it, so there's nothing overhead to avoid. */
+      /* Same vertical + horizontal rhythm as .bb-sidebar (py-5 / px-3). */
       padding: 1.25rem 0.75rem;
       background-color: var(--color-base-200);
       border-right: 1px solid var(--color-base-300);
-      transition: left 0.22s ease; /* lockstep with the sidebar collapse */
-    }
-    html[data-sidebar="collapsed"] .bb-settings-rail {
-      left: 4rem; /* --bb-rail-collapsed-w */
     }
     /* The list fills the rail and scrolls on its own if the sections ever
        overflow a short viewport. */
@@ -687,11 +701,13 @@
       overflow-y: auto;
       padding-bottom: 0;
     }
-    /* Offset the topbar + body by the rail width so they begin to its
-       right. Scoped to Settings via :has() — the rail only exists there,
-       so every other page keeps its full-width topbar. */
-    .drawer-content:has(.bb-settings-layout) .bb-topbar,
-    .drawer-content:has(.bb-settings-layout) > main {
+    /* Offset only the topbar by the rail width so it begins to the rail's
+       right. <main> is NOT offset — the rail now lives inside it in flow, and
+       the daisy drawer grid already starts <main> at the sidebar's right
+       edge, so the rail lands flush against the sidebar and the
+       sidebar-collapse shift is handled for free (no manual `left` tracking).
+       Scoped to Settings via :has() — the rail only exists there. */
+    .drawer-content:has(.bb-settings-layout) .bb-topbar {
       margin-left: 14rem;
     }
   }
