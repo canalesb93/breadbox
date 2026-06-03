@@ -262,17 +262,6 @@ type FeedAgentSession struct {
 	RuleApplied     int
 
 	SampleTransactions []FeedTransactionRef
-
-	// Report fields are populated when the service folded an agent_report
-	// whose `session_id` matches this session into the card. The templ
-	// uses ReportTitle as the headline (instead of the generic "ran a
-	// session" line) and renders priority badges + tags inline. Empty
-	// when no report was folded — render the plain session card.
-	ReportID       string
-	ReportShortID  string
-	ReportTitle    string
-	ReportPriority string
-	ReportIsUnread bool
 }
 
 // FeedBulkAction is the rich card that collapses ≥3 same-actor
@@ -306,17 +295,6 @@ type FeedBulkAction struct {
 	EndedAt   time.Time
 
 	SampleTransactions []FeedTransactionRef
-
-	// Report fields are populated when the service folded a matching
-	// agent_report into the card (see service.foldReportsIntoEvents). The
-	// templ uses ReportTitle as the bold headline instead of the generic
-	// "Alice updated N transactions" line and renders priority badges +
-	// tags inline. Empty when no report was folded.
-	ReportID       string
-	ReportShortID  string
-	ReportTitle    string
-	ReportPriority string
-	ReportIsUnread bool
 }
 
 // FeedBulkSubject is one (subject, count) chip inside a bulk-action card.
