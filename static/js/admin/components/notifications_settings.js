@@ -15,10 +15,9 @@ document.addEventListener('alpine:init', function () {
         this.csrfToken = this.$el.dataset.csrf || '';
       },
 
-      testAll: function () {
-        var self = this;
-        this.allState = 'loading';
-        fetch('/-/notifications/test', {
+      _runTest: function (url, set) {
+        set('loading');
+        fetch(url, {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'X-CSRF-Token': this.csrfToken, Accept: 'application/json' },
@@ -30,14 +29,21 @@ document.addEventListener('alpine:init', function () {
           })
           .then(function (r) {
             if (!r.ok || (r.body && r.body.ok === false)) {
-              self.allState = 'err:' + ((r.body && r.body.error) || ('HTTP ' + r.status));
+              set('err:' + ((r.body && r.body.error) || ('HTTP ' + r.status)));
               return;
             }
-            self.allState = 'ok';
+            set('ok');
           })
           .catch(function (e) {
-            self.allState = 'err:' + ((e && e.message) || 'Request failed');
+            set('err:' + ((e && e.message) || 'Request failed'));
           });
+      },
+
+      testAll: function () {
+        var self = this;
+        this._runTest('/-/notifications/test', function (v) {
+          self.allState = v;
+        });
       },
 
       _set: function (id, val) {
@@ -49,27 +55,9 @@ document.addEventListener('alpine:init', function () {
 
       testChannel: function (id) {
         var self = this;
-        this._set(id, 'loading');
-        fetch('/-/notifications/channels/' + encodeURIComponent(id) + '/test', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'X-CSRF-Token': this.csrfToken, Accept: 'application/json' },
-        })
-          .then(function (res) {
-            return res.json().then(function (body) {
-              return { ok: res.ok, status: res.status, body: body };
-            });
-          })
-          .then(function (r) {
-            if (!r.ok || (r.body && r.body.ok === false)) {
-              self._set(id, 'err:' + ((r.body && r.body.error) || ('HTTP ' + r.status)));
-              return;
-            }
-            self._set(id, 'ok');
-          })
-          .catch(function (e) {
-            self._set(id, 'err:' + ((e && e.message) || 'Request failed'));
-          });
+        this._runTest('/-/notifications/channels/' + encodeURIComponent(id) + '/test', function (v) {
+          self._set(id, v);
+        });
       },
     };
   });

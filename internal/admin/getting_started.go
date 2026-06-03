@@ -63,33 +63,18 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 			a.Logger.Error("getting started: count transactions", "error", err)
 		}
 
-		// Count completed steps.
-		completedSteps := 0
-		if hasMember {
-			completedSteps++
-		}
-		if hasProvider {
-			completedSteps++
-		}
-		if hasConnection {
-			completedSteps++
-		}
-		if hasSync {
-			completedSteps++
-		}
-		if hasAPIKey {
-			completedSteps++
-		}
-
-		// Resolve the active step (first incomplete) and a rough time-to-finish
-		// estimate for the hero. Step order + per-step minutes are paired so the
-		// estimate sums only the steps still outstanding.
+		// Resolve the active step (first incomplete), completion count, and a
+		// rough time-to-finish estimate for the hero. Step order + per-step
+		// minutes are paired so the estimate sums only the steps still
+		// outstanding.
 		stepsDone := []bool{hasMember, hasProvider, hasConnection, hasSync, hasAPIKey}
 		stepMinutes := []int{1, 2, 2, 1, 3}
+		completedSteps := 0
 		activeStep := 0
 		minutesLeft := 0
 		for i, done := range stepsDone {
 			if done {
+				completedSteps++
 				continue
 			}
 			if activeStep == 0 {
