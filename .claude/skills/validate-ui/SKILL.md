@@ -178,7 +178,22 @@ If over 1MB: retake at `quality: 70` or drop `fullPage`.
 
 ### 7. Upload
 
-Use `gh` (already sandbox-exempt — no network allowlist required) to upload to a dedicated
+**Preferred (local sessions): self-hosted bb-artifacts.exe.xyz.** If the upload
+token is present in `.local.env`, push there — public read, ~180-day auto-expiry,
+no release clutter. See the `github-image-hosting` skill for full details.
+
+```bash
+IMGHOST_TOKEN=$(grep -E '^IMGHOST_TOKEN=' .local.env | cut -d= -f2- 2>/dev/null)
+if [ -n "$IMGHOST_TOKEN" ]; then
+  URL=$(curl -sf -H "Authorization: Bearer $IMGHOST_TOKEN" \
+            -F file=@/tmp/app-<PAGE>.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
+  echo "$URL"
+fi
+```
+
+**Fallback (cloud sessions, or token absent): GitHub release CDN.** In cloud
+sessions `.local.env` isn't checked out, so `IMGHOST_TOKEN` is empty — use `gh`
+(already sandbox-exempt — no network allowlist required) to upload to a dedicated
 GitHub prerelease. This gives a permanent, GitHub-native URL.
 
 ```bash
