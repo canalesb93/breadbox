@@ -58,7 +58,11 @@ type DrawerProps struct {
 
 templ Drawer(p DrawerProps) {
 	<div x-data class="contents">
-		<!-- scrim -->
+		<!-- scrim — z-[45] sits above the sidebar's .drawer-side
+		     (z-40 !important in input.css) so the scrim dims the rail
+		     too, while staying below the panel (z-50). At plain z-40 it
+		     tied the sidebar and, being earlier in the DOM, lost — the
+		     rail stayed undimmed. -->
 		<div
 			x-show={ "$store.drawers.is('" + p.ID + "')" }
 			x-cloak
@@ -68,7 +72,7 @@ templ Drawer(p DrawerProps) {
 			x-transition:leave="transition-opacity ease-in duration-150"
 			x-transition:leave-start="opacity-100"
 			x-transition:leave-end="opacity-0"
-			class="fixed inset-0 bg-black/40 z-40"
+			class="fixed inset-0 bg-black/40 z-[45]"
 			@click="$store.drawers.close()"
 			aria-hidden="true"
 		></div>
