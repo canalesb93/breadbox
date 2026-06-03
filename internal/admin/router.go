@@ -436,13 +436,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// flow on the detail page. Accessible to all roles (read-only).
 		r.Get("/transactions/{id}/timeline/rows", TimelineRowsHandler(a, sm, svc))
 
-		// Developer Mode reporter — file a bug/task issue and serve the
-		// durable screenshot / HTML-snapshot artifacts. All roles: the
-		// floating reporter renders for anyone once an admin enables
-		// developer mode, so anyone who sees it can file.
-		r.Post("/dev-reports", CreateDevReportAdminHandler(svc, sm, a.Config.EncryptionKey))
-		r.Get("/dev-reports/{shortId}/screenshot", DevReportScreenshotHandler(svc))
-		r.Get("/dev-reports/{shortId}/snapshot.html", DevReportSnapshotHandler(svc))
+		// Developer Mode reporter — build a prefilled GitHub issue-draft URL.
+		// All roles: the floating reporter renders for anyone once an admin
+		// enables developer mode, so anyone who sees it can file.
+		r.Post("/dev-reports", CreateDevReportAdminHandler(svc, sm))
 
 		// Agent run live updates — JSON snapshot the run-detail page
 		// polls every 3 s while a run is in_progress. Read-only, all
