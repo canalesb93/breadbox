@@ -166,9 +166,26 @@ Output is `<svg aria-hidden="true" class="lucide lucide-{name} ...">` with the `
 
 ## Validation / PR evidence
 
-UI changes must be validated in a real browser before the task is reported done, and the PR must include a screenshot. Use the `validate-ui` skill — it picks the right backend for your session. **Never** fall back to `screencapture` / AppleScript.
+UI changes must be validated in a real browser before the task is reported done, and the PR must include a screenshot. **Never** fall back to `screencapture` / AppleScript.
 
-**Backend selection** — pick once, up front:
+**Fast path (preferred for agents): `make dev-shot`.** One command rebuilds,
+(re)starts this worktree's tracked background server, and screenshots routes —
+no port fishing, no Chrome-MCP profile lock, auto-cleaned on session end:
+
+```sh
+make dev-shot ARGS="/transactions --mobile --wait '.join'"   # → prints JPEG paths
+```
+
+Routes are positional (`path[:slug]`); flags: `--desktop|--mobile|--tablet|--wide`
+(repeatable), `--wait <css>`, `--full`, `--no-rebuild`. Under the hood it uses
+puppeteer + system Chrome with a fresh profile (`scripts/ui-validate` →
+`scripts/ui-shot.mjs`), so it never collides with a Chrome DevTools MCP session.
+Upload the JPEGs via the `github-image-hosting` skill (img402.dev). See
+`scripts/README.md` for the full lifecycle. Use the `validate-ui` skill / the
+backends below when you need an interactive multi-step browser flow instead of a
+straight capture.
+
+**Backend selection** (interactive flows) — pick once, up front:
 
 - **Local sessions**: prefer the **Chrome DevTools MCP** (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`). Real Chrome you can see, scriptable across multiple turns.
 - **Cloud sessions** (`CLAUDE_CODE_REMOTE=true` is set): the Chrome DevTools MCP is typically not loaded. Fall back to **headless Chromium via Playwright** — pre-installed on the cloud image at `/opt/node22/lib/node_modules/playwright` with bundled Chromium at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. The skill ships a copy-pasteable Node script under "Step 5b — headless Chromium fallback".

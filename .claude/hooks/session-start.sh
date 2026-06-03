@@ -13,10 +13,20 @@ cd "$PROJECT_DIR"
 
 # --- Local sessions ---
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
+  # Reap orphaned dev servers left by previously-closed sessions (dead pids,
+  # removed worktrees). Cheap + safe; runs for both main-repo and worktree
+  # sessions so cleanup happens regardless of where you start. The shared lib
+  # is a committed file, so it's present in every checkout/worktree.
+  if [ -f "$PROJECT_DIR/scripts/dev-lib.sh" ]; then
+    # shellcheck source=scripts/dev-lib.sh
+    . "$PROJECT_DIR/scripts/dev-lib.sh"
+    bb_reap 2>/dev/null || true
+  fi
+
   # Check if we're in a git worktree
   GIT_COMMON="$(git rev-parse --git-common-dir 2>/dev/null || echo ".git")"
   if [ "$GIT_COMMON" = ".git" ]; then
-    # Main repo — nothing to do
+    # Main repo — nothing else to do
     exit 0
   fi
 
@@ -136,47 +146,25 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
       fi
     fi
 
-    # PORT — find next available port starting from 8081
-    # Uses lock files under main repo's .claude/ to prevent races between
-    # concurrent worktree sessions that haven't started their server yet.
-    if [ -z "${PORT:-}" ]; then
-      MAIN_REPO="$(dirname "$GIT_COMMON")"
-      PORT_LOCKS="$MAIN_REPO/.claude/port-locks"
-      mkdir -p "$PORT_LOCKS"
-
-      # Clean up stale lock files (port not in use AND lock older than 5 min)
-      for lockfile in "$PORT_LOCKS"/*; do
-        [ -f "$lockfile" ] || continue
-        LOCK_PORT="$(basename "$lockfile")"
-        if ! lsof -i :"$LOCK_PORT" >/dev/null 2>&1; then
-          LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$lockfile" 2>/dev/null || echo 0) ))
-          if [ "$LOCK_AGE" -gt 300 ]; then
-            rm -f "$lockfile"
-          fi
-        fi
-      done
-
-      PORT=8081
-      while [ "$PORT" -le 8099 ]; do
-        if ! lsof -i :"$PORT" >/dev/null 2>&1 && ! [ -f "$PORT_LOCKS/$PORT" ]; then
-          # Claim it atomically
-          if (set -o noclobber; echo "$$" > "$PORT_LOCKS/$PORT") 2>/dev/null; then
-            break
-          fi
-        fi
-        PORT=$((PORT + 1))
-      done
-
-      if [ "$PORT" -le 8099 ]; then
-        # Export both: PORT is consumed by the Makefile (which maps it to
-        # SERVER_PORT when invoking `go run`), and SERVER_PORT is what the
-        # binary itself reads — so direct `go run ./cmd/breadbox serve`
-        # also picks up the right port.
-        echo "PORT=$PORT" >> "$CLAUDE_ENV_FILE"
-        echo "SERVER_PORT=$PORT" >> "$CLAUDE_ENV_FILE"
-        echo "    Assigned port $PORT (PORT + SERVER_PORT exported)"
+    # PORT — reserve a deterministic port via the shared dev-server registry
+    # (scripts/dev-lib.sh, sourced above). One registry — keyed by worktree,
+    # reaped automatically — replaces the old ad-hoc .claude/port-locks files.
+    # `make dev`, `make dev-bg`, and the validation scripts all resolve the
+    # same port, so nothing has to fish for a free one.
+    if [ -z "${PORT:-}" ] && command -v bb_claim_port >/dev/null 2>&1; then
+      # Key the reservation by the git worktree root (canonicalized) so it
+      # matches what dev-server / dev-port / session-end resolve — keying by a
+      # raw CLAUDE_PROJECT_DIR that differs (trailing slash, /private symlink)
+      # would orphan the reservation.
+      ASSIGNED_PORT="$(bb_claim_port "$(bb_worktree_root "$PROJECT_DIR")" RESERVED || true)"
+      if [ -n "$ASSIGNED_PORT" ]; then
+        # Export both: PORT is consumed by the Makefile, SERVER_PORT by the
+        # binary — so `make dev` and a direct `breadbox serve` both land here.
+        echo "PORT=$ASSIGNED_PORT" >> "$CLAUDE_ENV_FILE"
+        echo "SERVER_PORT=$ASSIGNED_PORT" >> "$CLAUDE_ENV_FILE"
+        echo "    Reserved port $ASSIGNED_PORT (PORT + SERVER_PORT exported)"
       else
-        echo "WARN: no available port in 8081-8099"
+        echo "WARN: no available port in 8081-8099 (try: make dev-reap)"
       fi
     fi
 

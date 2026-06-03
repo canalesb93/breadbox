@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# dev-server — manage a background Breadbox dev server for the current worktree.
+#
+#   scripts/dev-server ensure   [--rebuild]   boot if needed (reuse if up); print URL
+#   scripts/dev-server restart                rebuild + relaunch (used by ui-validate)
+#   scripts/dev-server stop                   stop this worktree's server
+#   scripts/dev-server stop-all               stop EVERY breadbox on 8080-8099 (blunt)
+#   scripts/dev-server status                 print this worktree's server, if any
+#   scripts/dev-server ps                     list all managed servers
+#   scripts/dev-server reap                   kill orphans (dead pid / worktree gone)
+#
+# The managed server runs a single `breadbox serve` with BREADBOX_DEV_RELOAD=1
+# (templates + static served from disk). It is intentionally NOT `air`: one
+# process means a trivial, reliable lifecycle. Code changes are picked up by
+# `restart` (which rebuilds). For interactive hot-reload, use `make dev-watch`.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=scripts/dev-lib.sh
+. "$SCRIPT_DIR/dev-lib.sh"
+
+ROOT="$(bb_worktree_root)"
+BIN_DIR="$ROOT/.breadbox-dev"
+BIN="$BIN_DIR/breadbox"
+LOG="$BIN_DIR/server.log"
+
+build_binary() { # regenerate templ + css so the server reflects edits, then build
+  mkdir -p "$BIN_DIR"
+  bb_log "==> generating templ + css..."
+  ( cd "$ROOT" && make generate >/dev/null 2>&1 ) || true
+  bb_log "==> building server binary..."
+  if ( cd "$ROOT" && go build -o "$BIN" ./cmd/breadbox ) 2>"$BIN_DIR/build.err"; then
+    return 0
+  fi
+  # Stale gitignored generated code is the usual culprit on a fresh checkout or
+  # branch switch: `make generate` only reruns sqlc when models.go is *missing*,
+  # so an existing-but-stale internal/db breaks the build (e.g. a column added
+  # on main). Force a full sqlc + templ regen and retry once.
+  bb_log "==> build failed — forcing sqlc + templ regen and retrying..."
+  ( cd "$ROOT" && make sqlc >/dev/null 2>&1 ) || true
+  ( cd "$ROOT" && make templ >/dev/null 2>&1 ) || true
+  if ( cd "$ROOT" && go build -o "$BIN" ./cmd/breadbox ) 2>"$BIN_DIR/build.err"; then
+    return 0
+  fi
+  bb_log "ERROR: go build still failing. Last errors:"
+  tail -n 20 "$BIN_DIR/build.err" >&2 || true
+  return 1
+}
+
+launch() { # <port> — boot the server, record it, wait for health
+  local port="$1" pid i
+  bb_load_env "$ROOT"
+  mkdir -p "$BIN_DIR"
+  bb_log "==> launching breadbox serve on :$port ..."
+  # `exec` so the backgrounded subshell BECOMES the server: $! is then the real
+  # breadbox pid, not a wrapping subshell whose death would orphan the server.
+  ( cd "$ROOT" && exec nohup env \
+      DATABASE_URL="$DATABASE_URL" \
+      ENCRYPTION_KEY="${ENCRYPTION_KEY:-}" \
+      SERVER_PORT="$port" \
+      BREADBOX_DEV_RELOAD=1 \
+      "$BIN" serve >"$LOG" 2>&1 ) &
+  pid=$!
+  # disown takes a jobspec, not a PID; bare `disown` drops the just-backgrounded
+  # job so the script's exit can't SIGHUP it (nohup is belt-and-suspenders).
+  disown 2>/dev/null || true
+  bb_meta_write "$port" "$pid" "$ROOT" "$LOG"
+  printf '%s\n' "$port" > "$ROOT/.breadbox-port"
+
+  for i in $(seq 1 40); do
+    if bb_health "$port"; then
+      bb_log "==> up: http://localhost:$port (pid $pid)"
+      printf '%s\n' "$port"
+      return 0
+    fi
+    if ! bb_pid_alive "$pid"; then
+      bb_log "ERROR: server exited during startup. Last log lines:"
+      tail -n 15 "$LOG" >&2 || true
+      bb_stop_port "$port"
+      return 1
+    fi
+    sleep 0.5
+  done
+  bb_log "ERROR: server did not become healthy on :$port within 20s. Log tail:"
+  tail -n 15 "$LOG" >&2 || true
+  bb_stop_port "$port"
+  return 1
+}
+
+cmd_ensure() {
+  local rebuild=0
+  [ "${1:-}" = "--rebuild" ] && rebuild=1
+
+  local existing pid
+  existing="$(bb_server_for_worktree "$ROOT" || true)"
+  if [ -n "$existing" ]; then
+    pid="$(bb_meta_get "$(bb_servers_dir)/$existing" pid)"
+    if [ "$pid" != RESERVED ] && [ "$pid" != PENDING ] && bb_pid_alive "$pid" && bb_health "$existing"; then
+      if [ "$rebuild" -eq 1 ]; then
+        bb_log "==> rebuilding + restarting healthy server on :$existing"
+        bb_stop_port "$existing"
+      else
+        bb_log "==> reusing healthy server on :$existing"
+        printf '%s\n' "http://localhost:$existing"
+        return 0
+      fi
+    else
+      bb_stop_port "$existing"   # stale / unhealthy — clear it
+    fi
+  fi
+
+  local port
+  port="$(bb_claim_port "$ROOT" PENDING)" || {
+    bb_log "ERROR: no free port in $BB_PORT_MIN-$BB_PORT_MAX. Try: scripts/dev-server reap"
+    return 1
+  }
+  if ! build_binary; then
+    bb_stop_port "$port"   # release the claim we just made
+    return 1
+  fi
+  if ! port="$(launch "$port")"; then
+    return 1               # launch() already released the claim on failure
+  fi
+  printf '%s\n' "http://localhost:$port"
+}
+
+case "${1:-ensure}" in
+  ensure)  shift || true; cmd_ensure "${1:-}";;
+  restart) cmd_ensure --rebuild;;
+  stop)    bb_stop_worktree "$ROOT";;
+  stop-all) bb_stop_all 8080 8099;;
+  status)
+    port="$(bb_server_for_worktree "$ROOT" || true)"
+    if [ -n "$port" ]; then
+      pid="$(bb_meta_get "$(bb_servers_dir)/$port" pid)"
+      alive="no"; bb_pid_alive "$pid" && alive="yes"
+      printf 'port=%s pid=%s alive=%s url=http://localhost:%s\n' "$port" "$pid" "$alive" "$port"
+    else
+      echo "no managed server for $ROOT"
+    fi
+    ;;
+  ps)
+    dir="$(bb_servers_dir)"
+    printf '%-6s %-8s %-6s %-28s %s\n' PORT PID ALIVE BRANCH WORKTREE
+    if [ -d "$dir" ]; then
+      for f in "$dir"/*; do
+        [ -f "$f" ] || continue
+        p="$(bb_meta_get "$f" port)"; pid="$(bb_meta_get "$f" pid)"
+        br="$(bb_meta_get "$f" branch)"; wt="$(bb_meta_get "$f" worktree)"
+        alive="no"; { [ "$pid" = RESERVED ] || [ "$pid" = PENDING ]; } && alive="$pid"
+        bb_pid_alive "$pid" && alive="yes"
+        printf '%-6s %-8s %-6s %-28s %s\n' "$p" "$pid" "$alive" "${br:-?}" "${wt:-?}"
+      done
+    fi
+    ;;
+  reap)  bb_reap;;
+  *) bb_log "usage: dev-server {ensure [--rebuild]|restart|stop|stop-all|status|ps|reap}"; exit 2;;
+esac
