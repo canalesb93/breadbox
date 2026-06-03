@@ -2,17 +2,16 @@ package pages
 
 import "breadbox/internal/templates/components"
 
-// NotificationsSettings renders the Settings → Notifications tab — the
-// outbound notification sink that workflow runs push reports to. One
-// section configures the webhook (URL + wire format + public base URL,
-// saved together); a second fires a test delivery. See
-// .claude/rules/settings.md for the section/row vocabulary.
+// NotificationsSettings renders the Settings → Notifications tab — a list of
+// outbound notification channels (ntfy / Slack / Discord / JSON), an add form,
+// and the global public base URL used for deep links. A workflow notification
+// fans out to every enabled channel. See .claude/rules/settings.md.
 templ NotificationsSettings(p NotificationsSettingsProps) {
 	<script src="/static/js/admin/components/notifications_settings.js"></script>
-	<div>
+	<div x-data="notificationsSettings" data-csrf={ p.CSRFToken }>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "Notifications",
-			Subtitle: "Push workflow reports and alerts to ntfy, Slack, or any webhook",
+			Subtitle: "Fan workflow reports and alerts out to ntfy, Slack, Discord, or any webhook",
 		})
 		if p.FormError != "" {
 			<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">
@@ -27,128 +26,352 @@ templ NotificationsSettings(p NotificationsSettingsProps) {
 			</div>
 		}
 		<div class="space-y-6">
-			@notificationsWebhookSection(p)
-			@notificationsTestSection(p.CSRFToken)
+			@notificationsChannelsSection(p)
+			@notificationsGlobalSection(p)
 		</div>
+		@notificationsAddChannelDrawer(p)
 	</div>
 }
 
-// notificationsWebhookSection is the single multi-input form that owns the
-// sink: URL, format, and public base URL save together via one Save button.
-templ notificationsWebhookSection(p NotificationsSettingsProps) {
+// notificationsChannelsSection lists the configured channels with per-channel
+// enable/disable, test, and remove actions.
+templ notificationsChannelsSection(p NotificationsSettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "bell",
-		Title:   "Notification sink",
-		Caption: "Where Breadbox POSTs each workflow report",
-		Form: &components.SettingsSectionFormProps{
-			Action:    "/settings/notifications",
-			CSRFToken: p.CSRFToken,
-		},
-		Footer: notificationsSettingsFooter(),
+		Title:   "Channels",
+		Caption: "Every enabled channel receives each workflow notification",
+		Right:   notificationsChannelsHeaderRight(p),
 	}) {
-		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "Webhook URL",
-			Caption: "http(s) only. Empty turns notifications off.",
-			For:     "webhook_url",
-			Stack:   true,
-		}) {
-			<input
-				id="webhook_url"
-				type="url"
-				name="webhook_url"
-				value={ p.Form.WebhookURL }
-				placeholder="https://ntfy.sh/my-breadbox-topic"
-				class="bb-form-input font-mono w-full"
-			/>
-			if p.FieldErrors["webhook_url"] != "" {
-				<p class="text-xs text-error mt-1">{ p.FieldErrors["webhook_url"] }</p>
+		if len(p.Channels) == 0 {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div class="flex flex-col items-start gap-3 py-2">
+					<p class="text-sm text-base-content/60">No channels yet. Add one to start fanning workflow reports out to ntfy, Slack, Discord, Google Chat, or any webhook.</p>
+					<button type="button" class="btn btn-primary btn-sm gap-1.5" @click="$store.drawers.open('add-channel')">
+						@components.LucideIcon("plus", "w-4 h-4")
+						Add your first channel
+					</button>
+				</div>
 			}
 		}
-		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "Format",
-			Caption: "ntfy sends a native title, priority, and tap-through; JSON suits Slack relays and bridges. Auto-detect picks ntfy for ntfy URLs.",
-			For:     "format",
-		}) {
-			<select id="format" name="format" class="select select-sm bg-base-200 min-w-44">
-				<option value="auto" selected?={ p.Form.Format == "auto" }>Auto-detect</option>
-				<option value="ntfy" selected?={ p.Form.Format == "ntfy" }>ntfy</option>
-				<option value="json" selected?={ p.Form.Format == "json" }>Generic JSON</option>
-			</select>
-		}
-		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "Public URL",
-			Caption: "Absolute origin for tap-through deep links (e.g. https://breadbox.example.com). Optional.",
-			For:     "public_base_url",
-			Stack:   true,
-		}) {
-			<input
-				id="public_base_url"
-				type="url"
-				name="public_base_url"
-				value={ p.Form.PublicBaseURL }
-				placeholder="https://breadbox.example.com"
-				class="bb-form-input font-mono w-full"
-			/>
-			if p.FieldErrors["public_base_url"] != "" {
-				<p class="text-xs text-error mt-1">{ p.FieldErrors["public_base_url"] }</p>
+		<template x-if="allState === 'ok'">
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div role="alert" class="alert alert-success alert-soft rounded-xl">
+					@components.LucideIcon("circle-check", "w-4 h-4")
+					<span>Test sent to all enabled channels.</span>
+				</div>
 			}
+		</template>
+		<template x-if="allState && allState.startsWith('err:')">
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<div role="alert" class="alert alert-error alert-soft rounded-xl">
+					@components.LucideIcon("circle-x", "w-4 h-4")
+					<span x-text="allState.slice(4)"></span>
+				</div>
+			}
+		</template>
+		for _, c := range p.Channels {
+			@notificationChannelRow(c, p.CSRFToken)
 		}
 	}
 }
 
-templ notificationsSettingsFooter() {
-	<div class="bb-action-row">
-		<button type="submit" class="btn btn-primary btn-sm gap-2">
-			@components.LucideIcon("save", "w-4 h-4")
-			Save changes
+// notificationsChannelsHeaderRight renders the section header actions:
+// "Test all" (only when at least one channel exists) and the primary
+// "Add channel" button that opens the create drawer.
+templ notificationsChannelsHeaderRight(p NotificationsSettingsProps) {
+	<div class="flex items-center gap-2">
+		if len(p.Channels) > 0 {
+			<button type="button" class="btn btn-ghost btn-sm gap-1.5" @click="testAll()" :disabled="allState === 'loading'">
+				<span x-show="allState !== 'loading'" class="flex items-center gap-1.5">
+					@components.LucideIcon("send", "w-4 h-4")
+					Test all
+				</span>
+				<span x-show="allState === 'loading'" x-cloak class="flex items-center gap-1.5">
+					<span class="loading loading-spinner loading-xs"></span> Sending…
+				</span>
+			</button>
+		}
+		<button type="button" class="btn btn-primary btn-sm gap-1.5" @click="$store.drawers.open('add-channel')">
+			@components.LucideIcon("plus", "w-4 h-4")
+			Add channel
 		</button>
 	</div>
 }
 
-// notificationsTestSection fires a sample delivery to the configured sink so
-// the operator can confirm the wiring without waiting for a real run.
-templ notificationsTestSection(csrfToken string) {
-	<div x-data="notificationsSettings" data-csrf={ csrfToken }>
-		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:    "send",
-			Title:   "Test delivery",
-			Caption: "Fires a sample notification to the URL above",
-		}) {
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Send a test",
-				Caption: "Confirms the webhook is reachable and renders as expected",
-			}) {
-				<button
-					type="button"
-					class="btn btn-secondary btn-sm gap-2"
-					@click="runTest()"
-					:disabled="state === 'loading'"
-				>
-					<span x-show="state !== 'loading'" class="flex items-center gap-1.5">
-						@components.LucideIcon("bell-ring", "w-4 h-4")
-						Send test
-					</span>
-					<span x-show="state === 'loading'" x-cloak class="flex items-center gap-1.5">
-						<span class="loading loading-spinner loading-xs"></span> Sending…
-					</span>
+// notificationChannelRow renders one channel as a single clean line: name +
+// (masked URL · format) on the left, one status badge + a gear button that
+// opens its edit drawer on the right. Test / edit / remove all live in the
+// drawer — the same row-opens-a-drawer pattern the Workflows gallery uses.
+templ notificationChannelRow(c NotificationChannelView, csrf string) {
+	@components.SettingsRow(components.SettingsRowProps{
+		Label:   c.Name,
+		Caption: c.URLMasked + " · " + c.FormatLabel,
+	}) {
+		<div class="flex items-center gap-2">
+			@notificationChannelStatusBadge(c)
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square"
+				@click={ "$store.drawers.open('edit-channel-" + c.ID + "')" }
+				aria-label={ "Edit " + c.Name }
+			>
+				@components.LucideIcon("settings-2", "w-4 h-4")
+			</button>
+		</div>
+	}
+	@notificationsEditChannelDrawer(c, csrf)
+}
+
+// notificationChannelStatusBadge collapses enabled state + last-delivery health
+// into one badge so the row stays quiet: Disabled (neutral), Delivery failed
+// (error) when the last send failed, otherwise Enabled (success).
+templ notificationChannelStatusBadge(c NotificationChannelView) {
+	if !c.Enabled {
+		<span class="badge badge-soft badge-neutral badge-sm">Disabled</span>
+	} else if c.HasStatus && !c.StatusOK {
+		<span class="badge badge-soft badge-error badge-sm">Delivery failed</span>
+	} else {
+		<span class="badge badge-soft badge-success badge-sm">Enabled</span>
+	}
+}
+
+// notificationChannelFields is the shared add/edit form body. The add drawer
+// passes IsEdit=false; each edit drawer passes the channel's non-secret values
+// + IsEdit=true. Secrets (URL, ntfy token) are never prefilled — every edit
+// drawer lives in the page DOM, so echoing them would reprint every channel's
+// secrets; on edit a blank URL/token means "keep current".
+templ notificationChannelFields(f ChannelFormValues) {
+	<div>
+		<label for={ f.FieldID("url") } class="block text-sm font-medium mb-1.5">
+			Webhook URL
+			if f.IsEdit && f.HasURL {
+				<span class="text-base-content/50 font-normal">· leave blank to keep current</span>
+			} else {
+				<span class="text-base-content/50 font-normal">· http(s) only</span>
+			}
+		</label>
+		<input
+			id={ f.FieldID("url") }
+			type="url"
+			name="url"
+			required?={ !f.IsEdit }
+			placeholder={ f.URLPlaceholder() }
+			class="bb-form-input font-mono w-full"
+		/>
+		<p class="text-xs text-base-content/60 mt-1.5">ntfy, Slack, Discord, and Google Chat webhooks are recognized automatically.</p>
+	</div>
+	<div>
+		<label for={ f.FieldID("name") } class="block text-sm font-medium mb-1.5">
+			Name
+			<span class="text-base-content/50 font-normal">· optional</span>
+		</label>
+		<input id={ f.FieldID("name") } type="text" name="name" maxlength="60" value={ f.Name } placeholder="Family ntfy" class="bb-form-input w-full"/>
+		<p class="text-xs text-base-content/60 mt-1.5">Defaults to the host if left blank.</p>
+	</div>
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+		<div>
+			<label for={ f.FieldID("format") } class="block text-sm font-medium mb-1.5">Format</label>
+			<select id={ f.FieldID("format") } name="format" class="select select-sm bg-base-200 w-full">
+				<option value="auto" selected?={ f.Format == "" || f.Format == "auto" }>Auto-detect</option>
+				<option value="ntfy" selected?={ f.Format == "ntfy" }>ntfy</option>
+				<option value="slack" selected?={ f.Format == "slack" }>Slack</option>
+				<option value="discord" selected?={ f.Format == "discord" }>Discord</option>
+				<option value="googlechat" selected?={ f.Format == "googlechat" }>Google Chat</option>
+				<option value="json" selected?={ f.Format == "json" }>Generic JSON</option>
+			</select>
+		</div>
+		<div>
+			<label for={ f.FieldID("min-priority") } class="block text-sm font-medium mb-1.5">Minimum priority</label>
+			<select id={ f.FieldID("min-priority") } name="min_priority" class="select select-sm bg-base-200 w-full">
+				<option value="info" selected?={ f.MinPriority == "" || f.MinPriority == "info" }>Info — everything</option>
+				<option value="warning" selected?={ f.MinPriority == "warning" }>Warning &amp; above</option>
+				<option value="critical" selected?={ f.MinPriority == "critical" }>Critical only</option>
+			</select>
+		</div>
+	</div>
+	<p class="text-xs text-base-content/60 -mt-2">Auto-detect picks the native shape from the URL; JSON is the generic envelope. Priority floors this channel to reports at or above the chosen level.</p>
+	<div>
+		<label for={ f.FieldID("ntfy-token") } class="block text-sm font-medium mb-1.5">
+			ntfy token
+			if f.IsEdit {
+				<span class="text-base-content/50 font-normal">· leave blank to keep current</span>
+			} else {
+				<span class="text-base-content/50 font-normal">· optional</span>
+			}
+		</label>
+		<input id={ f.FieldID("ntfy-token") } type="text" name="ntfy_token" placeholder="tk_…" class="bb-form-input font-mono w-full"/>
+		<p class="text-xs text-base-content/60 mt-1.5">Bearer token for a protected ntfy topic. Ignored by other providers.</p>
+	</div>
+	if f.IsEdit {
+		<label for={ f.FieldID("enabled") } class="flex items-center justify-between gap-3 cursor-pointer pt-1">
+			<span class="min-w-0">
+				<span class="block text-sm font-medium">Enabled</span>
+				<span class="block text-xs text-base-content/60">Disabled channels are skipped during fan-out.</span>
+			</span>
+			<input id={ f.FieldID("enabled") } type="checkbox" name="enabled" value="true" class="toggle toggle-sm" checked?={ f.Enabled }/>
+		</label>
+	}
+}
+
+// notificationsAddChannelDrawer is the create form, rendered as a right-side
+// slide-over (components.Drawer) opened from the "Add channel" buttons. It's a
+// plain POST form — on submit the page redirects back with a flash, which
+// closes the drawer.
+templ notificationsAddChannelDrawer(p NotificationsSettingsProps) {
+	@components.Drawer(components.DrawerProps{ID: "add-channel", Title: "Add a channel", Size: "md"}) {
+		<form method="POST" action="/settings/notifications/channels" class="flex flex-col h-full">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "bell-plus",
+				Title:    "Add a channel",
+				Subtitle: "Paste a webhook URL — the provider is auto-detected",
+			})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				@notificationChannelFields(ChannelFormValues{IDSuffix: "new"})
+			</div>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm gap-2">
+					@components.LucideIcon("plus", "w-4 h-4")
+					Add channel
 				</button>
 			}
-			<template x-if="state === 'ok'">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div role="alert" class="alert alert-success alert-soft rounded-xl">
-						@components.LucideIcon("circle-check", "w-4 h-4")
-						<span>Test notification sent — check your destination.</span>
-					</div>
-				}
-			</template>
-			<template x-if="state === 'error' && error">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div role="alert" class="alert alert-error alert-soft rounded-xl">
-						@components.LucideIcon("circle-x", "w-4 h-4")
-						<span x-text="'Test failed: ' + error"></span>
-					</div>
-				}
-			</template>
+		</form>
+	}
+}
+
+// notificationsEditChannelDrawer is the per-channel edit slide-over opened from
+// the row's gear button. The main edit form (fields + enabled toggle) lives in
+// the scrollable body; the footer carries Remove (its own delete form, pushed
+// left), an inline Test, and Save (wired to the body form via the `form`
+// attribute so the two POST forms never nest).
+templ notificationsEditChannelDrawer(c NotificationChannelView, csrf string) {
+	@components.Drawer(components.DrawerProps{ID: "edit-channel-" + c.ID, Title: "Edit channel", Size: "md"}) {
+		<div class="flex flex-col h-full">
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "settings-2",
+				Title:    c.Name,
+				Subtitle: c.FormatLabel,
+			})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				<form id={ "edit-ch-form-" + c.ID } method="POST" action={ templ.SafeURL(c.EditURL) } class="space-y-5">
+					<input type="hidden" name="_csrf" value={ csrf }/>
+					@notificationChannelFields(ChannelFormValues{
+						IDSuffix:    c.ID,
+						IsEdit:      true,
+						Name:        c.Name,
+						Format:      c.Format,
+						MinPriority: c.MinPriority,
+						Enabled:     c.Enabled,
+						URLMasked:   c.URLMasked,
+						HasURL:      c.URLMasked != "",
+					})
+				</form>
+				@notificationChannelDrawerStatus(c)
+			</div>
+			@components.DrawerFooter() {
+				<form method="POST" action={ templ.SafeURL(c.DeleteURL) } class="mr-auto">
+					<input type="hidden" name="_csrf" value={ csrf }/>
+					<button type="submit" class="btn btn-ghost btn-sm gap-1.5 text-error/80 hover:text-error">
+						@components.LucideIcon("trash-2", "w-4 h-4")
+						Remove
+					</button>
+				</form>
+				<button type="button" class="btn btn-ghost btn-sm gap-1.5" @click={ "testChannel('" + c.ID + "')" } :disabled={ "testState['" + c.ID + "'] === 'loading'" }>
+					@components.LucideIcon("send", "w-4 h-4")
+					Test
+				</button>
+				<button type="submit" form={ "edit-ch-form-" + c.ID } class="btn btn-primary btn-sm gap-2">
+					@components.LucideIcon("save", "w-4 h-4")
+					Save
+				</button>
+			}
+		</div>
+	}
+}
+
+// notificationChannelDrawerStatus shows the last-delivery line plus live Test
+// feedback inside the edit drawer.
+templ notificationChannelDrawerStatus(c NotificationChannelView) {
+	<div class="space-y-1.5 border-t border-base-200 pt-4">
+		if c.HasStatus {
+			if c.StatusOK {
+				<p class="text-xs text-success/80 inline-flex items-center gap-1.5">@components.LucideIcon("circle-check", "w-3.5 h-3.5") Last delivery: { c.StatusText }</p>
+			} else {
+				<p class="text-xs text-error/80 inline-flex items-center gap-1.5">@components.LucideIcon("circle-x", "w-3.5 h-3.5") Last delivery: { c.StatusText }</p>
+			}
+		} else {
+			<p class="text-xs text-base-content/50">No delivery yet — use Test to send a sample.</p>
 		}
+		<template x-if={ "testState['" + c.ID + "'] === 'loading'" }>
+			<p class="text-xs text-base-content/60 inline-flex items-center gap-1.5"><span class="loading loading-spinner loading-xs"></span> Sending test…</p>
+		</template>
+		<template x-if={ "testState['" + c.ID + "'] === 'ok'" }>
+			<p class="text-xs text-success/80">Test sent — check this channel.</p>
+		</template>
+		<template x-if={ "testState['" + c.ID + "'] && testState['" + c.ID + "'].startsWith('err:')" }>
+			<p class="text-xs text-error/80" x-text={ "testState['" + c.ID + "'].slice(4)" }></p>
+		</template>
 	</div>
+}
+
+// notificationsGlobalSection holds the deep-link origin shared across every
+// channel. The origin is derived (auto-detected from the address you reach
+// Breadbox at); the input is an optional override for split-horizon setups.
+templ notificationsGlobalSection(p NotificationsSettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "link",
+		Title:   "Deep links",
+		Caption: "Where “tap to open” links resolve",
+		Form: &components.SettingsSectionFormProps{
+			Action:    "/settings/notifications",
+			CSRFToken: p.CSRFToken,
+		},
+		Footer: notificationsGlobalFooter(),
+	}) {
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Origin",
+			Caption: "Notifications prepend this to report links so “tap to open” reaches the real report.",
+			Stack:   true,
+		}) {
+			<div class="w-full">
+				<div class="flex items-center flex-wrap gap-2 mb-3 rounded-lg bg-base-200/60 px-3 py-2">
+					if p.UsingDetectedBaseURL() {
+						<span class="badge badge-soft badge-success badge-sm">Auto-detected</span>
+					} else {
+						<span class="badge badge-soft badge-info badge-sm">Custom override</span>
+					}
+					if p.EffectiveBaseURL() != "" {
+						<code class="text-xs font-mono text-base-content/80 break-all">{ p.EffectiveBaseURL() }</code>
+					} else {
+						<span class="text-xs text-base-content/60">Unknown yet — links stay relative until the page is loaded over its public URL.</span>
+					}
+				</div>
+				<label for="public_base_url" class="block text-xs font-medium text-base-content/70 mb-1.5">Override</label>
+				<input
+					id="public_base_url"
+					type="url"
+					name="public_base_url"
+					value={ p.PublicBaseURL }
+					placeholder={ p.OverridePlaceholder() }
+					class="bb-form-input font-mono w-full"
+				/>
+				<p class="text-xs text-base-content/60 mt-1.5">Leave blank to keep auto-detecting. Set this only if Breadbox is reached at a different public URL than the one you administer from (e.g. behind a tunnel).</p>
+				if p.FieldErrors["public_base_url"] != "" {
+					<p class="text-xs text-error mt-1">{ p.FieldErrors["public_base_url"] }</p>
+				}
+			</div>
+		}
+	}
+}
+
+// notificationsGlobalFooter is the section's Save button. SettingsSection
+// renders the Footer slot inside bb-settings-card__footer, which already
+// supplies the bordered, right-aligned action row — so this passes the button
+// alone (wrapping it in bb-action-row would double the divider).
+templ notificationsGlobalFooter() {
+	<button type="submit" class="btn btn-primary btn-sm gap-2">
+		@components.LucideIcon("save", "w-4 h-4")
+		Save changes
+	</button>
 }

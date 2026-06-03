@@ -246,9 +246,7 @@ func setupStepTileClass(s SetupStepState) string {
 	switch s {
 	case SetupStepComplete:
 		return "rounded-full bg-success/10 text-success"
-	case SetupStepActive:
-		return "rounded-xl bg-primary/10 text-primary"
-	case SetupStepInProgress:
+	case SetupStepActive, SetupStepInProgress:
 		return "rounded-xl bg-primary/10 text-primary"
 	default:
 		return "rounded-xl bg-base-200 text-base-content/30"

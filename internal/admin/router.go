@@ -400,6 +400,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// to /-/notifications/test (registered below).
 		r.Get("/settings/notifications", NotificationsSettingsHandler(svc, sm, tr))
 		r.Post("/settings/notifications", NotificationsSettingsPostHandler(svc, sm))
+		// Multi-channel management (form POSTs → redirect back to the tab).
+		r.Post("/settings/notifications/channels", NotificationsAddChannelHandler(svc, sm))
+		r.Post("/settings/notifications/channels/{id}", NotificationsUpdateChannelHandler(svc, sm))
+		r.Post("/settings/notifications/channels/{id}/delete", NotificationsDeleteChannelHandler(svc, sm))
 
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Get("/settings/general", SettingsGetHandler(a, sm, tr))
@@ -635,6 +639,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// test-delivery endpoint now that the sink lives on its own page;
 			// /-/workflows/notify-test stays as a back-compat alias.
 			r.Post("/notifications/test", NotifyTestAdminHandler(svc))
+			// Per-channel test delivery (JSON; driven by the channel row's
+			// "Test" button).
+			r.Post("/notifications/channels/{id}/test", NotificationsTestChannelHandler(svc))
 		})
 	})
 

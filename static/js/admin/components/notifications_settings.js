@@ -1,31 +1,26 @@
-// Settings → Notifications — test-delivery button factory.
+// Settings → Notifications — per-channel test-delivery factory.
 //
-// Powers the "Send test" button on /settings/notifications. Reads its CSRF
-// token from a sibling data-* attribute on the x-data root so the factory
-// itself takes no arguments (per docs/design-system.md → "Alpine page
-// components").
+// Powers the "Test" button on each channel row. testState maps a channel id
+// to 'loading' | 'ok' | 'err:<message>'; the template reads it to show inline
+// feedback. CSRF token comes from a sibling data-* attribute (per
+// docs/design-system.md → "Alpine page components").
 document.addEventListener('alpine:init', function () {
   Alpine.data('notificationsSettings', function () {
     return {
       csrfToken: '',
-      state: 'idle',
-      error: null,
+      testState: {},
+      allState: 'idle',
 
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
       },
 
-      runTest: function () {
-        var self = this;
-        this.state = 'loading';
-        this.error = null;
-        fetch('/-/notifications/test', {
+      _runTest: function (url, set) {
+        set('loading');
+        fetch(url, {
           method: 'POST',
           credentials: 'same-origin',
-          headers: {
-            'X-CSRF-Token': this.csrfToken,
-            Accept: 'application/json',
-          },
+          headers: { 'X-CSRF-Token': this.csrfToken, Accept: 'application/json' },
         })
           .then(function (res) {
             return res.json().then(function (body) {
@@ -34,16 +29,35 @@ document.addEventListener('alpine:init', function () {
           })
           .then(function (r) {
             if (!r.ok || (r.body && r.body.ok === false)) {
-              self.error = (r.body && r.body.error) || ('HTTP ' + r.status);
-              self.state = 'error';
+              set('err:' + ((r.body && r.body.error) || ('HTTP ' + r.status)));
               return;
             }
-            self.state = 'ok';
+            set('ok');
           })
           .catch(function (e) {
-            self.error = (e && e.message) || 'Request failed';
-            self.state = 'error';
+            set('err:' + ((e && e.message) || 'Request failed'));
           });
+      },
+
+      testAll: function () {
+        var self = this;
+        this._runTest('/-/notifications/test', function (v) {
+          self.allState = v;
+        });
+      },
+
+      _set: function (id, val) {
+        // Reassign so Alpine picks up the new key reactively.
+        var next = Object.assign({}, this.testState);
+        next[id] = val;
+        this.testState = next;
+      },
+
+      testChannel: function (id) {
+        var self = this;
+        this._runTest('/-/notifications/channels/' + encodeURIComponent(id) + '/test', function (v) {
+          self._set(id, v);
+        });
       },
     };
   });

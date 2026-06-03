@@ -249,7 +249,7 @@
               useCORS: true,
               allowTaint: false,
               logging: false,
-              scale: Math.min(window.devicePixelRatio || 1, 2),
+              scale: Math.min(Math.max(window.devicePixelRatio || 1, 2), 3),
               x: window.scrollX,
               y: window.scrollY,
               width: window.innerWidth,
@@ -263,7 +263,7 @@
                 }
               },
             }).then(function (canvas) {
-              self.screenshot = self.canvasToJpeg(canvas, 1600, 0.82);
+              self.screenshot = self.canvasToJpeg(canvas, 2560, 0.92);
             });
           }).catch(function () {
             self.captureNote = 'Could not capture a screenshot — filing without one.';
@@ -271,8 +271,11 @@
           });
         },
 
-        // canvasToJpeg downscales to maxW and steps quality down until the data
-        // URL clears img402's ~1MB upload ceiling server-side.
+        // canvasToJpeg downscales only when the capture is wider than maxW (a
+        // guard against 3×+ displays), then encodes at the given JPEG quality.
+        // The artifact store accepts up to 25 MB and we capture the viewport
+        // only, so a single high-quality encode stays well within limits — no
+        // need for the old aggressive shrink-to-1 MB loop.
         canvasToJpeg: function (canvas, maxW, quality) {
           var c = canvas;
           if (canvas.width > maxW) {
@@ -283,13 +286,7 @@
             out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
             c = out;
           }
-          var q = quality;
-          var data = c.toDataURL('image/jpeg', q);
-          while (data.length > 1300000 && q > 0.4) {
-            q -= 0.15;
-            data = c.toDataURL('image/jpeg', q);
-          }
-          return data;
+          return c.toDataURL('image/jpeg', quality);
         },
 
         // Loads html2canvas-pro — a maintained fork of html2canvas that

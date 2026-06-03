@@ -118,7 +118,7 @@ Options are per-preset single-selects rendered in the configure drawer; the chos
 | Key | Used by | Choices | Default |
 |---|---|---|---|
 | `apply_mode` | `routine-reviewer`, `backlog-closer`, `bulk-catchup` | `auto` (apply categories), `flag_only` (review only, no writes) | `auto` |
-| `rule_mode` | `rule-foundation` | `create_apply` (create & apply rules), `draft_only` (propose only, no writes) | `create_apply` |
+| `rule_mode` | `rule-foundation` | `create_apply` (create rules & backfill history), `create_only` (create rules, skip retroactive backfill) | `create_apply` |
 | `lookback_window` | `large-charge-sentinel` | `7` / `30` / `90` days | `7` |
 | `report_verbosity` | `large-charge-sentinel` | `concise` (headline findings), `detailed` (full evidence) | `concise` |
 
@@ -414,19 +414,43 @@ The sidecar receives the minted run key as `BREADBOX_API_KEY`. `runMCPStdio` (`i
 
 ## 8. Notification Sink
 
-Workflows can fire an outbound webhook when noteworthy events occur (typically when a run submits a report via `submit_report`).
+Workflows fire outbound notifications when noteworthy events occur (typically when a run submits a report via `submit_report`). Delivery fans out to a list of **channels** — each its own sink in its own format.
 
-### Configuration
+### Channels
 
-The sink lives on its own **Settings → Notifications** page (`/settings/notifications`, admin-only) and is stored across three `app_config` keys (all plaintext):
+The sink is managed on its own **Settings → Notifications** page (`/settings/notifications`, admin-only). Each channel renders as one quiet row (name · masked URL · format + a single status badge) with a gear button that opens its **edit Drawer** (`components.Drawer`); the **Add channel** button opens the same drawer empty. Channels are stored as a JSON array under `app_config[notify.channels]` (plaintext); the deep-link origin shared across all channels is **derived** (see below).
 
-- `notify.webhook_url` — the http(s) sink. Empty = notifications off.
-- `notify.format` — `auto` (default) | `ntfy` | `json`. Selects the wire shape (see Delivery).
-- `notify.public_base_url` — optional absolute origin (e.g. `https://breadbox.example.com`) used to build absolute deep links so an ntfy tap-through (and relative links in a report body) resolve to the real report.
+Each channel carries:
 
-The `POST /settings/notifications` handler writes all three together; a "Send test" button (`POST /-/notifications/test`) fires a sample payload to verify the wiring. The legacy `POST /-/workflows/notify-test` route remains as a back-compat alias.
+- `id` — 8-char short id.
+- `name` — operator label.
+- `url` — the http(s) sink.
+- `format` — `auto` (default) | `ntfy` | `slack` | `discord` | `googlechat` | `json`.
+- `min_priority` — `info` (default) | `warning` | `critical`; this channel only receives reports at or above the floor.
+- `ntfy_token` — optional Bearer token for a protected ntfy topic (ntfy only).
+- `enabled` — disabled channels are skipped.
+- `last_status` — `{ok, at, format, detail}`, the most recent delivery attempt (surfaced inline on the page).
 
-### NotificationPayload
+`A workflow notification fans out to every enabled channel`, each delivered + retried independently; `SendWorkflowNotification` returns the first delivery error after attempting all of them. CRUD is handled by `AddNotificationChannel` / `UpdateNotificationChannel` / `SetNotificationChannelEnabled` / `DeleteNotificationChannel`; the edit drawer never echoes secrets, so `UpdateNotificationChannel` treats a blank URL/token as "keep current". `SendTestToChannel` backs the per-channel **Test** button, and `POST /-/notifications/test` tests all enabled channels.
+
+**Back-compat.** When `notify.channels` is empty but the legacy `notify.webhook_url` (+ `notify.format` / `notify.min_priority`) keys are set, a single "Default" channel is synthesized so pre-multi-channel configs keep delivering. The synth channel is never silently persisted by a send (which would freeze the legacy keys) — it's migrated into the array only when the operator first mutates a channel.
+
+### Wire formats
+
+The per-channel `format` (or what `auto` sniffs it to, from the URL host) selects the shape. All requests use a 10-second timeout (`notifyHTTPClient`) and `User-Agent: breadbox-workflows`.
+
+- **`ntfy`** ([docs](https://docs.ntfy.sh/publish/)) — body is the markdown message; metadata rides in headers: `X-Title`, `X-Priority` (info→3 / warning→4 / critical→5), `X-Markdown: yes`, `X-Tags` (priority emoji), `X-Click` + `X-Actions` (a "View report" button, when an absolute deep link is available), and `Authorization: Bearer` when a channel token is set. Non-ASCII headers are RFC 2047-encoded.
+- **`slack`** — Slack incoming-webhook JSON `{"text": …}` in mrkdwn (`**bold**`→`*bold*`, `[label](url)`→`<url|label>`), with a priority emoji + "View report →" link. Auto-detected for `hooks.slack.com`.
+- **`discord`** — Discord webhook JSON `{"content": …}` (markdown, 2000-char cap) + a bare deep link. Auto-detected for `discord.com` / `discordapp.com` webhooks.
+- **`googlechat`** — Google Chat incoming-webhook JSON `{"text": …}` (Slack-style markup but unicode emoji, since Google Chat doesn't render `:shortcode:` names). Auto-detected for `chat.googleapis.com`.
+- **`json`** — the generic `NotificationPayload` envelope as `application/json` (relays, bridges, custom consumers).
+- **`auto`** (default) — resolves to the matching provider above when the URL is recognizable, else `json`.
+
+**Reliability.** Delivery is retried up to 3 times with exponential backoff (200ms → 400ms) on transient failures (network error, HTTP 429, 5xx); a non-429 4xx fails fast. The deep link is absolutized with the resolved deep-link origin so ntfy tap-through and relative body links resolve to the real report.
+
+**Deep-link origin (derived).** Notifications fire from background jobs, so there's no HTTP request to read the public origin from at send time. Instead, every visit to the Notifications page captures the admin's own request origin (`X-Forwarded-Proto` / `X-Forwarded-Host` → `Host`, same derivation as the MCP endpoint / OAuth issuer / setup links) into `notify.detected_base_url`. `Service.ResolveNotifyBaseURL` returns the manual override `notify.public_base_url` when set, otherwise the detected origin — so deep links "just work" without the operator typing a URL. The override is only needed for split-horizon setups (Breadbox reached at a different public URL than the admin browses from, e.g. behind a tunnel).
+
+### NotificationPayload (the `json` envelope)
 
 ```go
 type NotificationPayload struct {
@@ -439,14 +463,6 @@ type NotificationPayload struct {
     SentAt   string `json:"sent_at"`            // RFC3339
 }
 ```
-
-### Delivery
-
-`SendWorkflowNotification` is a no-op when no URL is configured — callers fire unconditionally without a nil-check. The request uses a 10-second timeout (`notifyHTTPClient`) and `User-Agent: breadbox-workflows`. Any HTTP 3xx+ response is treated as an error. The wire shape depends on `notify.format`:
-
-- **`json`** — POSTs the `NotificationPayload` envelope above as `application/json`. Suits Slack-compatible relay bridges, Discord webhooks (via a formatter), and email bridges.
-- **`ntfy`** — publishes natively to [ntfy](https://docs.ntfy.sh/publish/): the request body is the (markdown) message and metadata rides in headers — `X-Title`, `X-Priority` (info→3 / warning→4 / critical→5), `X-Markdown: yes`, `X-Tags` (an emoji per priority), and `X-Click` (the absolute deep link, when a public base URL is set). Non-ASCII header values are RFC 2047-encoded. This is what makes an ntfy push render as a real titled, tap-through notification instead of a raw JSON blob.
-- **`auto`** (default) — picks `ntfy` when the webhook host looks like ntfy (`ntfy.sh` or any host containing `ntfy`), else `json`.
 
 ---
 
@@ -505,7 +521,12 @@ All keys are stored in the `app_config` table and read at runtime via `appconfig
 | `agent.transcript_dir` | string | — | Directory for per-run NDJSON transcripts; falls back to `agent.DefaultTranscriptDir()` |
 | `agent.run_retention_days` | int | `30` | Days to keep completed `workflow_runs` rows; 0 = disabled |
 | `workflows.consent_acknowledged_at` | RFC3339 | — | Non-empty = household has given first-enable consent |
-| `notify.webhook_url` | string | — | Outbound webhook URL for workflow notifications; empty = disabled |
+| `notify.channels` | JSON array | — | Notification channels (multi-sink): per-channel url/format/min_priority/ntfy_token/enabled/last_status |
+| `notify.public_base_url` | string | — | **Optional** manual override for the deep-link origin; empty = use the auto-detected origin |
+| `notify.detected_base_url` | string | — | Deep-link origin auto-captured from the admin's request on each Notifications-page load; used when no override is set |
+| `notify.webhook_url` | string | — | Legacy single webhook; synthesized into a "Default" channel when `notify.channels` is empty |
+| `notify.format` | string | `"auto"` | Legacy single-webhook format (back-compat seed for the synthesized channel) |
+| `notify.min_priority` | string | `"info"` | Legacy single-webhook priority floor (back-compat seed) |
 
 Token values (`agent.subscription_token`, `agent.anthropic_api_key`) are AES-256-GCM encrypted at rest via `appconfig.ReadEncrypted` / `appconfig.WriteEncrypted`, using the server's `ENCRYPTION_KEY`.
 

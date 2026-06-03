@@ -36,9 +36,6 @@ func onbHeroPercent(p OnboardingHeroProps) int {
 		return 0
 	}
 	pct := p.CompletedSteps * 100 / p.TotalSteps
-	if pct < 0 {
-		pct = 0
-	}
 	if pct > 100 {
 		pct = 100
 	}

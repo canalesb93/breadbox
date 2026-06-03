@@ -13,8 +13,10 @@ static/css/styles.css
 # Environment files
 .local.env
 
-# Dev server port marker (written by make dev)
+# Dev server port marker (written by make dev / scripts/dev-port)
 .breadbox-port
+# Managed background dev server: per-worktree binary + logs (scripts/dev-server)
+.breadbox-dev/
 .docker.env
 
 # air (hot-reload) build output — used by `make dev-watch`
@@ -59,9 +61,8 @@ transcripts/
 # OS
 .DS_Store
 
-# Claude Code worktrees, port locks, and task locks
+# Claude Code worktrees and task locks
 .claude/worktrees/
-.claude/port-locks/
 .claude/scheduled_tasks.lock
 
 # MCP config (contains API key)

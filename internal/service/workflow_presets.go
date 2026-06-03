@@ -91,20 +91,21 @@ var applyModeOption = WorkflowPresetOption{
 }
 
 // ruleApplyModeOption is the "what to do with the rules it finds" choice for
-// the Rule Foundation one-off. The default creates and carefully applies the
-// vetted rules; draft-only suppresses every rule write so a human reviews the
-// proposed rules first.
+// the Rule Foundation one-off. Both choices create the vetted rules (so future
+// syncs auto-categorize); they differ only on the retroactive backfill. The
+// default also applies each rule to the matching history; create-only suppresses
+// the apply_rules sweep and leaves already-synced transactions untouched.
 var ruleApplyModeOption = WorkflowPresetOption{
 	Key:     "rule_mode",
 	Label:   "Rule handling",
-	Help:    "What to do with the rules it identifies.",
+	Help:    "Both create the rules — choose whether to also backfill existing transactions.",
 	Default: "create_apply",
 	Choices: []WorkflowPresetChoice{
-		{Value: "create_apply", Label: "Create & apply", Directive: ""},
+		{Value: "create_apply", Label: "Create rules & backfill history", Directive: ""},
 		{
-			Value:     "draft_only",
-			Label:     "Draft only — don't create",
-			Directive: "RULE MODE — DRAFT ONLY: Do NOT create or apply any transaction rules. Do NOT call create_transaction_rule, batch_create_rules, or apply_rules. Instead, produce a report listing each rule you would create — its conditions, target category, and the number of transactions in your sample it would match — so a human can review and create them.",
+			Value:     "create_only",
+			Label:     "Create rules only — skip backfill",
+			Directive: "RULE HANDLING — CREATE ONLY: Create the vetted rules as usual (dry-run each first), but do NOT call apply_rules — skip the backfill. Rules take effect on the next sync; leave existing transactions untouched. In your report, give each rule's dry-run match count and note that nothing was backfilled.",
 		},
 	},
 }

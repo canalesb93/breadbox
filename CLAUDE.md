@@ -76,16 +76,18 @@ Prereqs: Go 1.24+, PostgreSQL.
 make db         # start Postgres via Docker (skip if local Postgres)
 make dev        # starts server with embedded assets (prod-like; restart on any UI edit)
 make dev-watch  # hot-reload: air rebuilds Go on *.go changes; HTML/CSS served from disk — no restart for UI edits
+make dev-bg     # start/reuse a BACKGROUND server for this worktree; prints the URL (no port fishing, auto-cleaned)
+make dev-shot ARGS="/transactions --mobile"   # rebuild + restart + screenshot route(s) → JPEG paths
 ```
 
-Prefer `make dev-watch` for UI work. See `.claude/rules/ui.md` for the hot-reload loop and when to fall back to `make dev`.
+Prefer `make dev-watch` for interactive UI work. For **agent/automated validation** prefer `make dev-bg` (a tracked background server) + `make dev-shot` (one-shot screenshots) — these resolve the port for you and are reaped automatically. See `.claude/rules/ui.md` for the loop and `scripts/README.md` for the full lifecycle.
 
 - Dev DB: `postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable`
 - Test DB: `postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable`
 - Required env when any provider configured: `DATABASE_URL` (set explicitly — pgx's Unix-socket fallback often breaks in worktrees), `ENCRYPTION_KEY` (the session-start hook resolves this with precedence `.local.env` → running `breadbox serve` env → `~/.local/share/breadbox/dev-encryption-key` cache, and seeds the cache whenever the running-process path succeeds; if all three miss, recover manually via `ps eww -p $(pgrep -f 'breadbox serve' | head -1) | tr ' ' '\n' | grep ENCRYPTION_KEY`).
-- Worktrees (`claude -w`): `.worktreeinclude` copies build artifacts; `.claude/hooks/session-start.sh` assigns a port from 8081–8099 and injects env via `CLAUDE_ENV_FILE`, exporting both `PORT` (read by the Makefile) and `SERVER_PORT` (read by the binary) so `make dev` *and* direct `go run ./cmd/breadbox serve` both land on the assigned port. Main repo uses 8080.
+- Worktrees (`claude -w`): `.worktreeinclude` copies build artifacts; `.claude/hooks/session-start.sh` reserves a port from 8081–8099 (via the shared `scripts/dev-lib.sh` registry under `~/.local/share/breadbox/dev-servers/`, keyed by worktree) and injects env via `CLAUDE_ENV_FILE`, exporting both `PORT` (read by the Makefile) and `SERVER_PORT` (read by the binary) so `make dev` *and* direct `go run ./cmd/breadbox serve` both land on the assigned port. Main repo uses 8080. If the hook didn't run for a worktree (e.g. created mid-session via the worktree tool), `make dev-bg` / `make dev` resolve a port lazily anyway — nothing has to fish.
 - Cloud sessions (Claude Code on the web): the same hook brings up Postgres, creates `breadbox` + `breadbox_test`, mints + caches `ENCRYPTION_KEY` at `~/.local/share/breadbox/dev-encryption-key`, builds `bin/breadbox`, applies migrations, seeds an admin (`admin@example.com` / `password`), and exports `DATABASE_URL` / `ENCRYPTION_KEY` / `SERVER_PORT=8081` / `BB_USER` / `BB_PASS` via `CLAUDE_ENV_FILE`. `bin/breadbox serve` works in one command; the validate-ui skill picks up `BB_USER`/`BB_PASS` automatically.
-- Stop all dev servers: `make dev-stop`.
+- Stop **this worktree's** managed server: `make dev-stop` (safe — leaves sibling worktrees running). Kill orphans (dead pid / removed worktree): `make dev-reap`. List all: `make dev-ps`. Nuke everything on 8080–8099: `make dev-stop-all`. Sessions also auto-stop their own server on exit (`.claude/hooks/session-end.sh`) and reap orphans on start, so stale instances no longer pile up.
 
 ## Browser automation
 
