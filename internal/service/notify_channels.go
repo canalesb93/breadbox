@@ -133,7 +133,7 @@ func (s *Service) AddNotificationChannel(ctx context.Context, p AddNotificationC
 		NtfyToken:   strings.TrimSpace(p.NtfyToken),
 		Enabled:     true,
 	}
-	chans := s.persistedOrMigratedChannels(ctx)
+	chans := s.loadNotificationChannels(ctx)
 	chans = append(chans, ch)
 	if err := s.persistNotificationChannels(ctx, chans); err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ type UpdateNotificationChannelParams struct {
 // NtfyToken keeps the stored value; the format/priority are normalized and
 // validated like Add. Returns ErrNotFound if no channel matches id.
 func (s *Service) UpdateNotificationChannel(ctx context.Context, id string, p UpdateNotificationChannelParams) (*NotificationChannel, error) {
-	chans := s.persistedOrMigratedChannels(ctx)
+	chans := s.loadNotificationChannels(ctx)
 	idx := -1
 	for i := range chans {
 		if chans[i].ID == id {
@@ -216,7 +216,7 @@ func (s *Service) UpdateNotificationChannel(ctx context.Context, id string, p Up
 
 // SetNotificationChannelEnabled flips a channel's enabled flag.
 func (s *Service) SetNotificationChannelEnabled(ctx context.Context, id string, enabled bool) error {
-	chans := s.persistedOrMigratedChannels(ctx)
+	chans := s.loadNotificationChannels(ctx)
 	found := false
 	for i := range chans {
 		if chans[i].ID == id {
@@ -233,7 +233,7 @@ func (s *Service) SetNotificationChannelEnabled(ctx context.Context, id string, 
 
 // DeleteNotificationChannel removes a channel by id.
 func (s *Service) DeleteNotificationChannel(ctx context.Context, id string) error {
-	chans := s.persistedOrMigratedChannels(ctx)
+	chans := s.loadNotificationChannels(ctx)
 	out := chans[:0]
 	found := false
 	for _, c := range chans {
@@ -252,7 +252,7 @@ func (s *Service) DeleteNotificationChannel(ctx context.Context, id string) erro
 // SendTestToChannel delivers a sample notification to a single channel and
 // records its status — backs the per-channel "Send test" button.
 func (s *Service) SendTestToChannel(ctx context.Context, id string) error {
-	chans := s.persistedOrMigratedChannels(ctx)
+	chans := s.loadNotificationChannels(ctx)
 	idx := -1
 	for i := range chans {
 		if chans[i].ID == id {
@@ -269,20 +269,6 @@ func (s *Service) SendTestToChannel(ctx context.Context, id string) error {
 	// Best-effort persist of the recorded status.
 	_ = s.persistNotificationChannels(ctx, chans)
 	return err
-}
-
-// persistedOrMigratedChannels returns the persisted channel array, first
-// migrating a synthesized legacy channel into storage if that's all there is.
-// This guarantees a mutation (add/toggle/delete) operates on a real array.
-func (s *Service) persistedOrMigratedChannels(ctx context.Context) []NotificationChannel {
-	raw := strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyChannels, ""))
-	if raw != "" {
-		var chans []NotificationChannel
-		if err := json.Unmarshal([]byte(raw), &chans); err == nil {
-			return chans
-		}
-	}
-	return s.loadNotificationChannels(ctx) // legacy-synth (or nil)
 }
 
 // defaultChannelName derives a friendly label from a URL host when the

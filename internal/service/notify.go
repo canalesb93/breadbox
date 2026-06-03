@@ -109,15 +109,16 @@ func (s *Service) WorkflowNotificationConfigured(ctx context.Context) bool {
 // outcome is recorded on the channel. Returns the first delivery error (if
 // any) after attempting every channel.
 func (s *Service) SendWorkflowNotification(ctx context.Context, p NotificationPayload) error {
-	// A persisted channels array is the source of truth; an empty one means we
-	// synthesize an ephemeral legacy channel. We must NOT persist statuses back
-	// in the synth case — doing so would promote the legacy config into the
-	// channels array and make further legacy-webhook edits silently ignored.
-	persisted := strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyNotifyChannels, "")) != ""
 	chans := s.loadNotificationChannels(ctx)
 	if len(chans) == 0 {
 		return nil // notifications disabled — no-op
 	}
+	// A persisted channels array is the source of truth; an empty one means we
+	// synthesize an ephemeral legacy channel (identified by ID "legacy"). We
+	// must NOT persist statuses back in the synth case — doing so would promote
+	// the legacy config into the channels array and make further legacy-webhook
+	// edits silently ignored.
+	persisted := chans[0].ID != "legacy"
 
 	if p.SentAt == "" {
 		p.SentAt = nowRFC3339()
@@ -489,21 +490,7 @@ func notifyEmojiShortcode(priority string) string {
 // and [label](url) → <url|label>. A leading priority emoji + bold title set
 // the headline; an absolute deep link is appended as a tappable link.
 func buildSlackRequest(ctx context.Context, rawURL string, p NotificationPayload) (*http.Request, error) {
-	var b strings.Builder
-	b.WriteString(notifyEmojiShortcode(p.Priority))
-	b.WriteString(" *")
-	b.WriteString(slackEscape(collapseToLine(p.Title)))
-	b.WriteString("*")
-	if body := strings.TrimSpace(p.Body); body != "" {
-		b.WriteString("\n")
-		b.WriteString(toSlackMrkdwn(body))
-	}
-	if isAbsoluteURL(p.URL) {
-		b.WriteString("\n<")
-		b.WriteString(p.URL)
-		b.WriteString("|View report →>")
-	}
-	return jsonNotifyRequest(ctx, rawURL, map[string]any{"text": b.String()})
+	return buildSlackMrkdwnRequest(ctx, rawURL, p, notifyEmojiShortcode(p.Priority))
 }
 
 // buildGoogleChatRequest POSTs a Google Chat incoming-webhook payload
@@ -511,8 +498,15 @@ func buildSlackRequest(ctx context.Context, rawURL string, p NotificationPayload
 // link syntax as Slack mrkdwn, but renders unicode emoji rather than
 // :shortcode: names — so the priority cue is a unicode glyph.
 func buildGoogleChatRequest(ctx context.Context, rawURL string, p NotificationPayload) (*http.Request, error) {
+	return buildSlackMrkdwnRequest(ctx, rawURL, p, notifyEmojiUnicode(p.Priority))
+}
+
+// buildSlackMrkdwnRequest builds the shared "{text: ...}" payload used by
+// Slack and Google Chat: a priority emoji + bold title, optional body in
+// Slack-flavored mrkdwn, and a "View report →" link.
+func buildSlackMrkdwnRequest(ctx context.Context, rawURL string, p NotificationPayload, emoji string) (*http.Request, error) {
 	var b strings.Builder
-	b.WriteString(notifyEmojiUnicode(p.Priority))
+	b.WriteString(emoji)
 	b.WriteString(" *")
 	b.WriteString(slackEscape(collapseToLine(p.Title)))
 	b.WriteString("*")
