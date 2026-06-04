@@ -117,5 +117,13 @@ func agentFormFieldsFromResponse(def *service.AgentDefinitionResponse) pages.Age
 	if def.MaxBudgetUSD != nil {
 		f.MaxBudgetUSD = *def.MaxBudgetUSD
 	}
+	for _, c := range def.Connectors {
+		f.Connectors = append(f.Connectors, pages.AgentFormConnector{
+			Name:       c.Name,
+			URL:        c.URL,
+			HeaderName: c.HeaderName,
+			HasSecret:  c.HasSecret,
+		})
+	}
 	return f
 }

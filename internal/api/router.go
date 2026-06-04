@@ -41,6 +41,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 
 	// REST API v1 — API key authenticated.
 	svc := service.New(a.Queries, a.DB, a.SyncEngine, a.Logger)
+	svc.EncryptionKey = a.Config.EncryptionKey
 	apiLimiter := mw.NewRateLimiter(mw.RateLimitConfig{
 		RequestsPerMinute: a.Config.APIRateLimitRPM,
 		Burst:             a.Config.APIRateLimitBurst,

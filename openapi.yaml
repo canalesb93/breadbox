@@ -2779,7 +2779,16 @@ paths:
         `name`, `slug`, `prompt`, `model`, `max_turns`, `max_budget_usd`,
         `tool_scope`, `allowed_tools`, `schedule_cron`, and the iter-30
         `trigger_on_sync_complete` flag (fire after every successful
-        sync, in addition to any cron schedule). **Requires `full_access` scope.**
+        sync, in addition to any cron schedule).
+
+
+        Optionally includes `connectors`: an array of custom HTTP MCP
+        servers this workflow mounts alongside the built-in breadbox MCP
+        (e.g. a remote Gmail MCP). Each entry is
+        `{name, url, header_name, secret}` — `secret` is the plaintext
+        header value, stored AES-256-GCM-encrypted at rest and never
+        returned (responses report `has_secret` only). **Requires
+        `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -2904,7 +2913,12 @@ paths:
     patch:
       tags: [Workflows]
       summary: Partial update of an agent definition
-      description: Omitted fields are unchanged. **Requires `full_access` scope.**
+      description: |
+        Omitted fields are unchanged. Omitting `connectors` leaves the
+        stored connectors untouched; sending the key replaces the full
+        set. A connector whose `secret` is blank keeps its previously
+        stored encrypted value (matched by `name`). **Requires
+        `full_access` scope.**
       requestBody:
         required: true
         content:

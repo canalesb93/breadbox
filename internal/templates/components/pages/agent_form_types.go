@@ -74,6 +74,19 @@ type AgentFormFields struct {
 	MaxBudgetUSD          float64
 	Enabled               bool
 	TriggerOnSyncComplete bool
+	// Connectors are the custom MCP servers configured on this workflow.
+	// Populated in edit mode from the stored definition; empty in new mode.
+	Connectors []AgentFormConnector
+}
+
+// AgentFormConnector is the form view of one custom MCP connector. The secret
+// is never sent to the browser — HasSecret only signals whether one is stored,
+// so the edit form can show a "leave blank to keep" affordance.
+type AgentFormConnector struct {
+	Name       string
+	URL        string
+	HeaderName string
+	HasSecret  bool
 }
 
 // AgentModelOption is one entry in the model <select>.

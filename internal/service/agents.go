@@ -68,8 +68,12 @@ type AgentDefinitionResponse struct {
 	ScheduleCron    *string  `json:"schedule_cron,omitempty"`
 	ToolScope       string   `json:"tool_scope"`
 	AllowedTools    []string `json:"allowed_tools"`
-	Model           string   `json:"model"`
-	MaxTurns        int      `json:"max_turns"`
+	// Connectors are custom MCP servers this workflow mounts alongside the
+	// built-in breadbox MCP. Secrets are never serialized — each view only
+	// reports has_secret.
+	Connectors      []ConnectorView `json:"connectors"`
+	Model           string          `json:"model"`
+	MaxTurns        int             `json:"max_turns"`
 	MaxBudgetUSD    *float64 `json:"max_budget_usd,omitempty"`
 	Enabled         bool     `json:"enabled"`
 	QuietHoursStart *string  `json:"quiet_hours_start,omitempty"`
@@ -222,6 +226,10 @@ type CreateAgentDefinitionParams struct {
 	QuietHoursEnd         *string
 	TriggerOnSyncComplete bool    // fire after each successful sync completes
 	SourceTemplate        *string // preset slug this was instantiated from; nil = hand-authored
+	// Connectors are custom MCP servers to mount. Secrets must already be
+	// encrypted (SecretCiphertext) by the caller; the service never sees
+	// plaintext. nil/empty = no connectors.
+	Connectors []ConnectorInput
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
@@ -246,6 +254,10 @@ type UpdateAgentDefinitionParams struct {
 	// untouched; a non-empty value replaces it; an empty string clears it
 	// back to slug-seeded.
 	AvatarSeed *string
+	// Connectors replaces the full connector set when non-nil; nil leaves the
+	// existing connectors untouched. A connector whose SecretCiphertext is
+	// empty keeps its previously-stored secret (matched by name).
+	Connectors *[]ConnectorInput
 }
 
 // RecentErroredAgentRun is one entry in the admin run-failed banner
@@ -457,6 +469,10 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 	if err := validateQuietHours(p.QuietHoursStart, p.QuietHoursEnd); err != nil {
 		return nil, err
 	}
+	connectorsJSON, err := buildStoredConnectors(p.Connectors, nil, s.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
 	row, err := s.Queries.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
 		Name:                  p.Name,
 		Slug:                  p.Slug,
@@ -473,6 +489,7 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
 		TriggerOnSyncComplete: p.TriggerOnSyncComplete,
 		SourceTemplate:        pgconv.TextPtrIfNotEmpty(p.SourceTemplate),
+		Connectors:            connectorsJSON,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
@@ -560,6 +577,19 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		merged.MaxTurns = DefaultAgentMaxTurns
 	}
 
+	// Connectors are handled outside `merged` deliberately: the merged response
+	// carries ConnectorView (no ciphertext), so writing it back would wipe the
+	// stored secrets. When the patch omits connectors we persist the existing
+	// JSONB verbatim; when it sets them we rebuild against the RAW existing
+	// bytes so blank-secret edits carry the prior ciphertext forward.
+	connectorsJSON := existing.Connectors
+	if p.Connectors != nil {
+		connectorsJSON, err = buildStoredConnectors(*p.Connectors, existing.Connectors, s.EncryptionKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	row, err := s.Queries.UpdateAgentDefinition(ctx, db.UpdateAgentDefinitionParams{
 		ID:                    existing.ID,
 		Name:                  merged.Name,
@@ -577,6 +607,7 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(merged.QuietHoursEnd),
 		TriggerOnSyncComplete: merged.TriggerOnSyncComplete,
 		AvatarSeed:            pgconv.TextPtrIfNotEmpty(merged.AvatarSeed),
+		Connectors:            connectorsJSON,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update agent definition: %w", err)
@@ -1225,6 +1256,26 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		},
 	}
 
+	// Merge custom connectors (Phase 1: HTTP MCP servers the operator added,
+	// e.g. a remote Gmail MCP for receipt lookups). def carries only
+	// ConnectorView (has_secret), never the ciphertext, so refetch the raw row
+	// to decrypt the per-connector header secrets here, where encKey is in hand.
+	var connectorTools []string
+	if len(def.Connectors) > 0 {
+		row, rErr := s.resolveAgentDefinition(ctx, def.ID)
+		if rErr != nil {
+			return nil, fmt.Errorf("resolve connectors for run: %w", rErr)
+		}
+		servers, tools, cErr := connectorServersFromBytes(row.Connectors, encKey)
+		if cErr != nil {
+			return nil, fmt.Errorf("assemble connectors: %w", cErr)
+		}
+		for name, cfg := range servers {
+			mcpServers[name] = cfg
+		}
+		connectorTools = tools
+	}
+
 	// The TS sidecar runs with permissionMode: "dontAsk", which auto-denies
 	// any tool call NOT in allowedTools. An empty allowedTools therefore
 	// disables every breadbox MCP tool — i.e. the whole point of the
@@ -1244,6 +1295,10 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	if !hasBreadbox {
 		allowedTools = append([]string{"mcp__breadbox"}, allowedTools...)
 	}
+	// Each custom connector "<name>" is mounted above; allow its whole tool
+	// surface via the "mcp__<name>" wildcard so the agent can actually call it.
+	// (The connector itself enforces its own scopes server-side.)
+	allowedTools = append(allowedTools, connectorTools...)
 
 	maxBudget := 1.0
 	if def.MaxBudgetUSD != nil {
@@ -1455,6 +1510,7 @@ func agentDefinitionFromRow(row db.Workflow, lastRun *AgentRunSummary) AgentDefi
 		ScheduleCron:          pgconv.TextPtr(row.ScheduleCron),
 		ToolScope:             row.ToolScope,
 		AllowedTools:          agentAllowedToolsFromBytes(row.AllowedTools),
+		Connectors:            connectorViewsFromBytes(row.Connectors),
 		Model:                 row.Model,
 		MaxTurns:              int(row.MaxTurns),
 		MaxBudgetUSD:          agentFloatFromNumeric(row.MaxBudgetUsd),

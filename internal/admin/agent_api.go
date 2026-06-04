@@ -478,6 +478,8 @@ func parseAgentDefinitionForm(r *http.Request) (service.CreateAgentDefinitionPar
 		return p, fmt.Errorf("prompt is required")
 	}
 
+	p.Connectors = parseConnectorInputs(r)
+
 	return p, nil
 }
 
@@ -546,7 +548,47 @@ func parseAgentDefinitionUpdateForm(r *http.Request) (service.UpdateAgentDefinit
 	triggerOnSync := r.FormValue("trigger_on_sync_complete") == "on" || r.FormValue("trigger_on_sync_complete") == "true"
 	p.TriggerOnSyncComplete = &triggerOnSync
 
+	// The edit form always renders the connectors section and posts a marker so
+	// we can distinguish "no connectors submitted" (leave untouched) from "all
+	// connectors removed" (replace with empty).
+	if r.Form.Has("connectors_present") {
+		conns := parseConnectorInputs(r)
+		p.Connectors = &conns
+	}
+
 	return p, nil
+}
+
+// parseConnectorInputs reads the repeated connector form fields into service
+// inputs. The form posts parallel arrays — connector_name[], connector_url[],
+// connector_header[], connector_secret[] — one entry per row. Rows with a blank
+// name are dropped (the trailing empty "add a connector" row). A blank secret
+// on an existing row is left empty so the service carries the stored value
+// forward; service-side validation handles names/URLs.
+func parseConnectorInputs(r *http.Request) []service.ConnectorInput {
+	names := r.Form["connector_name"]
+	urls := r.Form["connector_url"]
+	headers := r.Form["connector_header"]
+	secrets := r.Form["connector_secret"]
+	out := make([]service.ConnectorInput, 0, len(names))
+	for i, name := range names {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		at := func(s []string) string {
+			if i < len(s) {
+				return s[i]
+			}
+			return ""
+		}
+		out = append(out, service.ConnectorInput{
+			Name:       strings.TrimSpace(name),
+			URL:        strings.TrimSpace(at(urls)),
+			HeaderName: strings.TrimSpace(at(headers)),
+			Secret:     strings.TrimSpace(at(secrets)),
+		})
+	}
+	return out
 }
 
 func splitAllowedTools(raw string) []string {

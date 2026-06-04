@@ -37,6 +37,40 @@ type createAgentRequest struct {
 	QuietHoursStart       *string  `json:"quiet_hours_start"`
 	QuietHoursEnd         *string  `json:"quiet_hours_end"`
 	TriggerOnSyncComplete bool     `json:"trigger_on_sync_complete"`
+	Connectors            []connectorRequest `json:"connectors"`
+}
+
+// connectorRequest is one custom MCP connector on a create/update payload.
+// Secret is the plaintext header value; the service encrypts it at rest. On
+// update, an empty Secret keeps the previously-stored value (matched by name).
+type connectorRequest struct {
+	Name       string `json:"name"`
+	URL        string `json:"url"`
+	HeaderName string `json:"header_name"`
+	Secret     string `json:"secret"`
+}
+
+func toConnectorInputs(reqs []connectorRequest) []service.ConnectorInput {
+	out := make([]service.ConnectorInput, 0, len(reqs))
+	for _, c := range reqs {
+		out = append(out, service.ConnectorInput{
+			Name:       c.Name,
+			URL:        c.URL,
+			HeaderName: c.HeaderName,
+			Secret:     c.Secret,
+		})
+	}
+	return out
+}
+
+// updateConnectorInputs preserves PATCH semantics: a nil request (key absent)
+// leaves connectors untouched; a present (even empty) array replaces them.
+func updateConnectorInputs(reqs *[]connectorRequest) *[]service.ConnectorInput {
+	if reqs == nil {
+		return nil
+	}
+	out := toConnectorInputs(*reqs)
+	return &out
 }
 
 type updateAgentRequest struct {
@@ -54,6 +88,9 @@ type updateAgentRequest struct {
 	QuietHoursStart       *string   `json:"quiet_hours_start"`
 	QuietHoursEnd         *string   `json:"quiet_hours_end"`
 	TriggerOnSyncComplete *bool     `json:"trigger_on_sync_complete"`
+	// Connectors replaces the full connector set when present; omit the key to
+	// leave existing connectors untouched.
+	Connectors *[]connectorRequest `json:"connectors"`
 }
 
 type updateAgentSettingsRequest struct {
@@ -115,6 +152,7 @@ func CreateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			QuietHoursStart:       req.QuietHoursStart,
 			QuietHoursEnd:         req.QuietHoursEnd,
 			TriggerOnSyncComplete: req.TriggerOnSyncComplete,
+			Connectors:            toConnectorInputs(req.Connectors),
 		})
 		if err != nil {
 			if writeAgentDefinitionMutationError(w, err, "Failed to create agent") {
@@ -149,6 +187,7 @@ func UpdateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			QuietHoursStart:       req.QuietHoursStart,
 			QuietHoursEnd:         req.QuietHoursEnd,
 			TriggerOnSyncComplete: req.TriggerOnSyncComplete,
+			Connectors:            updateConnectorInputs(req.Connectors),
 		})
 		if err != nil {
 			// Try not-found / validation first, then mutation-shaped errors

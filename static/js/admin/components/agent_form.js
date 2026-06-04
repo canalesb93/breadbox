@@ -229,6 +229,12 @@ document.addEventListener('alpine:init', function () {
       runOnSync: false,
       agentEnabled: false,
 
+      // Custom MCP connectors. Each row: {name, url, header_name, secret,
+      // has_secret}. secret is the plaintext the user types this session;
+      // has_secret reflects whether one is already stored (so we can show a
+      // "leave blank to keep" hint and never echo the stored value back).
+      connectors: [],
+
       init: function () {
         // Pull initial state from the @templ.JSONScript("agent-form-data", ...)
         // tag. Missing tag (create mode with no defaults) → use zero values.
@@ -257,11 +263,22 @@ document.addEventListener('alpine:init', function () {
         // canonical default (service.DefaultAgentMaxTurns = 10), so any
         // numeric comparison would force-open Advanced for every agent
         // created via the REST API.
+        this.connectors = (Array.isArray(data.connectors) ? data.connectors : []).map(function (c) {
+          return {
+            name: c.name || '',
+            url: c.url || '',
+            header_name: c.header_name || '',
+            secret: '',
+            has_secret: !!c.has_secret,
+          };
+        });
+
         this.advancedOpen =
           !!(data.system_prompt && data.system_prompt.length) ||
           !!(data.quiet_hours_start && data.quiet_hours_start.length) ||
           !!(data.quiet_hours_end && data.quiet_hours_end.length) ||
-          !!(data.allowed_tools && data.allowed_tools.length);
+          !!(data.allowed_tools && data.allowed_tools.length) ||
+          this.connectors.length > 0;
 
         // Browser-local timezone label — surfaced next to the preview so the
         // user knows the times below are in their tz, even though the server
@@ -289,6 +306,14 @@ document.addEventListener('alpine:init', function () {
       agentAvatarPreviewSrc: function (slug) {
         var seed = (slug || '').trim() || 'new-agent';
         return '/avatars/' + encodeURIComponent(seed) + '?type=agent&size=80';
+      },
+
+      // ---- custom connectors --------------------------------------------
+      addConnector: function () {
+        this.connectors.push({ name: '', url: '', header_name: 'Authorization', secret: '', has_secret: false });
+      },
+      removeConnector: function (i) {
+        this.connectors.splice(i, 1);
       },
 
       // ---- cron picker ---------------------------------------------------

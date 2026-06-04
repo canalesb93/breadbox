@@ -17,6 +17,12 @@ type Service struct {
 	SyncEngine *sync.Engine
 	Logger     *slog.Logger
 
+	// EncryptionKey is the 32-byte AES key (ENCRYPTION_KEY) used to encrypt
+	// at-rest secrets the service owns — currently custom-connector header
+	// secrets. Set by the app/router wiring after New; nil when no providers
+	// are configured, in which case storing a connector secret is rejected.
+	EncryptionKey []byte
+
 	// OnDefinitionChanged is invoked after any agent_definition CRUD mutation.
 	// Set at startup (in serve.go) to the agent scheduler's Reload trigger so
 	// new/edited/deleted definitions are picked up immediately. Nil = no-op.

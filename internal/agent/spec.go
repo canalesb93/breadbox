@@ -7,11 +7,28 @@
 package agent
 
 // MCPServerConfig describes one MCP server the sidecar should connect to.
-// breadbox itself is always present, pointing at the local `breadbox mcp` stdio.
+// It models BOTH transports the TS sidecar's zod union accepts (see
+// agent/sidecar/spec.ts::McpServerConfigSchema):
+//
+//   - stdio: Command (+ Args/Env). breadbox itself is always present this way,
+//     pointing at the local `breadbox mcp` stdio.
+//   - http:  Type="http" + URL (+ Headers). Used by custom connectors, e.g. a
+//     remote Gmail MCP reached with an Authorization bearer header.
+//
+// Command is `omitempty` deliberately: an HTTP entry must NOT serialize an
+// empty "command", or the TS union would match it against the stdio variant
+// (whose command is just z.string(), which "" satisfies) instead of falling
+// through to the HTTP variant.
 type MCPServerConfig struct {
-	Command string            `json:"command"`
+	// stdio transport
+	Command string            `json:"command,omitempty"`
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+
+	// http transport
+	Type    string            `json:"type,omitempty"` // "http" when set
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
 // AuthConfig carries credentials for one run. Mode picks which env var the

@@ -80,6 +80,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
 	svc := service.New(queries, pool, syncEngine, logger)
+	svc.EncryptionKey = cfg.EncryptionKey
 
 	return &App{
 		DB:         pool,

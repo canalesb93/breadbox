@@ -441,6 +441,82 @@ templ AgentForm(p AgentFormProps) {
 							<p class="text-xs text-base-content/40 mt-1.5">Comma-separated MCP tool names. Leave blank to allow all tools in scope.</p>
 							@agentFormFieldError(p.FieldErr("allowed_tools"))
 						</div>
+						<div>
+							<div class="flex items-center justify-between">
+								@agentFormLabelOptional("agent-connectors", "Custom MCP connectors")
+								<button type="button" class="btn btn-xs btn-ghost gap-1.5" @click="addConnector()">
+									@components.LucideIcon("plus", "w-3.5 h-3.5")
+									Add connector
+								</button>
+							</div>
+							<p class="text-xs text-base-content/40 mt-1 mb-2">
+								Extra MCP servers this agent can reach in addition to breadbox — e.g. a remote Gmail MCP for receipt lookups. HTTP transport; the header secret is stored encrypted.
+							</p>
+							<!-- Marker so the update handler distinguishes "connectors omitted"
+							     (leave untouched) from "all connectors removed". -->
+							<input type="hidden" name="connectors_present" value="1"/>
+							<template x-if="connectors.length === 0">
+								<p class="text-xs text-base-content/40 italic">No connectors — the agent uses only the breadbox MCP.</p>
+							</template>
+							<div class="space-y-3">
+								<template x-for="(c, i) in connectors" :key="i">
+									<div class="rounded-xl border border-base-300 p-3 space-y-2">
+										<div class="flex items-center gap-2">
+											<input
+												type="text"
+												name="connector_name"
+												x-model="c.name"
+												placeholder="gmail"
+												class="bb-form-input font-mono text-sm flex-1"
+												autocorrect="off"
+												autocapitalize="none"
+												spellcheck="false"
+												maxlength="31"
+											/>
+											<button type="button" class="btn btn-xs btn-ghost text-error" @click="removeConnector(i)" title="Remove connector">
+												@components.LucideIcon("trash-2", "w-3.5 h-3.5")
+											</button>
+										</div>
+										<input
+											type="url"
+											name="connector_url"
+											x-model="c.url"
+											placeholder="https://gmail-mcp.example.com/mcp"
+											class="bb-form-input font-mono text-sm w-full"
+											autocorrect="off"
+											autocapitalize="none"
+											spellcheck="false"
+											maxlength="2000"
+										/>
+										<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+											<input
+												type="text"
+												name="connector_header"
+												x-model="c.header_name"
+												placeholder="Authorization"
+												class="bb-form-input font-mono text-sm"
+												autocorrect="off"
+												autocapitalize="none"
+												spellcheck="false"
+												maxlength="120"
+											/>
+											<input
+												type="password"
+												name="connector_secret"
+												x-model="c.secret"
+												:placeholder="c.has_secret ? '•••• stored (blank = keep)' : 'Header value, e.g. Bearer …'"
+												class="bb-form-input font-mono text-sm"
+												autocomplete="off"
+												autocorrect="off"
+												autocapitalize="none"
+												spellcheck="false"
+												maxlength="4000"
+											/>
+										</div>
+									</div>
+								</template>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -600,5 +676,22 @@ func agentFormInitialJSON(f AgentFormFields) map[string]any {
 		"max_budget_usd":            f.MaxBudgetUSD,
 		"enabled":                   f.Enabled,
 		"trigger_on_sync_complete":  f.TriggerOnSyncComplete,
+		"connectors":                agentFormConnectorsJSON(f.Connectors),
 	}
+}
+
+// agentFormConnectorsJSON shapes the connector rows for the Alpine factory.
+// Secrets are never included — only has_secret, so the edit form can render a
+// "leave blank to keep" hint without ever exposing the stored value.
+func agentFormConnectorsJSON(cs []AgentFormConnector) []map[string]any {
+	out := make([]map[string]any, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, map[string]any{
+			"name":        c.Name,
+			"url":         c.URL,
+			"header_name": c.HeaderName,
+			"has_secret":  c.HasSecret,
+		})
+	}
+	return out
 }
