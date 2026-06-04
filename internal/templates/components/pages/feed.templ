@@ -16,6 +16,10 @@ import (
 // transaction activity log on /transactions/{id}. The home feed is just a
 // global, grouped view of the same shape.
 templ Feed(p FeedProps) {
+	<!-- Feed Alpine factories (inline rail pagination + the empty-state sync
+	     button) live in feed.js. Loaded here, no defer, so the alpine:init
+	     listeners register before Alpine processes the x-data bindings below. -->
+	<script src="/static/js/admin/components/feed.js"></script>
 	<!-- Comment rows on the home feed render as a single-line system event:
 	     "<actor> commented on <merchant>". A tooltip on the "commented on"
 	     verb surfaces the first line of the comment body for a quick peek;
@@ -169,26 +173,39 @@ templ feedTimeline(p FeedProps) {
 	if len(p.Days) == 0 {
 		@feedEmptyState(p)
 	} else {
-		@components.Timeline(components.TimelineProps{
-			Heading:     "Activity",
-			HeadingIcon: "rss",
-			EventCount:  p.TotalItems,
-			AriaLabel:   "Household feed",
-			Variant:     "prominent",
-		}) {
-			for _, day := range p.Days {
-				@components.TimelineDay(day.Label, day.First)
-				for _, item := range day.Items {
-					@feedRow(item, p.Now)
+		<!-- feedPagination scope: the footer button fetches the next window's
+		     rows from /-/feed/rows and appends them into this rail's <ol> in
+		     place, so the timeline continues instead of reloading the page from
+		     the top. data-* attrs seed the cursor + dedup anchor; the inner
+		     <a href> is the no-JS fallback. -->
+		<div
+			x-data="feedPagination"
+			data-feed-before={ feedPaginationCursor(p) }
+			data-feed-filter={ p.Filter }
+			data-feed-last-day={ feedPaginationLastDay(p) }
+			data-feed-at-max={ feedBoolAttr(p.AtMaxLookback) }
+		>
+			@components.Timeline(components.TimelineProps{
+				Heading:     "Activity",
+				HeadingIcon: "rss",
+				EventCount:  p.TotalItems,
+				AriaLabel:   "Household feed",
+				Variant:     "prominent",
+			}) {
+				for _, day := range p.Days {
+					@components.TimelineDay(day.Label, day.First)
+					for _, item := range day.Items {
+						@feedRow(item, p.Now)
+					}
 				}
 			}
-		}
-		if p.WindowDays > 0 {
-			<p class="text-xs text-base-content/40 text-center mt-6">
-				Showing the last { fmt.Sprintf("%d days", p.WindowDays) }.
-			</p>
-		}
-		@feedLoadOlder(p)
+			if p.WindowDays > 0 {
+				<p class="text-xs text-base-content/40 text-center mt-6" x-show="!expanded">
+					Showing the last { fmt.Sprintf("%d days", p.WindowDays) }.
+				</p>
+			}
+			@feedLoadOlder(p)
+		</div>
 	}
 }
 
@@ -197,21 +214,51 @@ templ feedTimeline(p FeedProps) {
 // don't get a "load older" since the user has no anchor). When the
 // earliest visible event is past the 30-day lookback ceiling we render
 // "End of feed" instead so users have a clear stop signal.
+//
+// Inside the feedPagination scope, the button's click is intercepted: JS
+// fetches the next window's rows and appends them to the rail in place,
+// then swaps the footer to "End of feed" once the cap is reached. The
+// plain href is the no-JS fallback (full-page roll-back to ?before=…).
 templ feedLoadOlder(p FeedProps) {
 	if !p.OldestVisible.IsZero() {
-		<div class="flex items-center justify-center mt-3">
+		<div class="flex items-center justify-center mt-3" x-ref="paginator">
 			if p.AtMaxLookback {
 				<p class="text-xs text-base-content/40">End of feed</p>
 			} else {
 				<a
 					href={ templ.SafeURL(feedLoadOlderHRef(p)) }
 					class="btn btn-sm btn-ghost border border-base-300 text-base-content/65"
+					x-on:click.prevent="loadOlder()"
+					x-bind:class="loading && 'pointer-events-none opacity-60'"
+					x-bind:aria-busy="loading"
 				>
-					@components.LucideIcon("arrow-down", "w-3.5 h-3.5")
-					Load older activity
+					<span class="loading loading-spinner loading-xs" x-show="loading" x-cloak></span>
+					<span x-show="!loading">
+						@components.LucideIcon("arrow-down", "w-3.5 h-3.5")
+					</span>
+					<span x-text="loading ? 'Loading…' : 'Load older activity'">Load older activity</span>
 				</a>
 			}
 		</div>
+	}
+}
+
+// FeedRows renders the rail rows for one older feed window as a bare fragment
+// of <li> elements (day separators + feed rows) — no <ol> wrapper, since the
+// client appends them into the existing timeline list. Served by
+// FeedRowsHandler and grafted on by the feedPagination Alpine factory. The
+// leading day separator is suppressed when its day key matches
+// OmitLeadingDayKey (the tail day already on the client) so appended rows
+// continue under the existing heading. Mirrors the transaction-detail
+// TimelineRows partial-render contract.
+templ FeedRows(p FeedRowsProps) {
+	for i, day := range p.Days {
+		if !(i == 0 && day.Key == p.OmitLeadingDayKey) {
+			@components.TimelineDay(day.Label, false)
+		}
+		for _, item := range day.Items {
+			@feedRow(item, p.Now)
+		}
 	}
 }
 
@@ -276,7 +323,6 @@ templ feedEmptyFiltered(filter string) {
 // browse-history link, since sync-all is admin-only.
 templ feedEmptyNoRecent(p FeedProps) {
 	if p.IsAdmin {
-		<script src="/static/js/admin/components/feed.js"></script>
 		<div class="bb-card p-10 sm:p-12 text-center" x-data="feedSyncNow">
 			@components.LucideIcon("moon", "w-10 h-10 mx-auto mb-3 text-base-content opacity-20")
 			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
@@ -1201,6 +1247,36 @@ func feedLoadOlderHRef(p FeedProps) string {
 		q = "filter=" + p.Filter + "&" + q
 	}
 	return "/?" + q
+}
+
+// feedPaginationCursor is the RFC3339 cursor the inline pagination starts
+// from — the oldest event currently on the rail. Mirrors the `before` value
+// the no-JS load-older link carries; seeds data-feed-before. Empty when the
+// rail has no events (the load-older affordance isn't rendered then).
+func feedPaginationCursor(p FeedProps) string {
+	if p.OldestVisible.IsZero() {
+		return ""
+	}
+	return p.OldestVisible.UTC().Format(time.RFC3339)
+}
+
+// feedPaginationLastDay is the calendar-day key (YYYY-MM-DD) of the oldest day
+// bucket currently rendered. The rows endpoint compares the next chunk's first
+// day against it to decide whether to repeat a day separator on append.
+func feedPaginationLastDay(p FeedProps) string {
+	if len(p.Days) == 0 {
+		return ""
+	}
+	return p.Days[len(p.Days)-1].Key
+}
+
+// feedBoolAttr renders a boolean as "1"/"0" for a data-* attribute the
+// feedPagination Alpine factory parses on init.
+func feedBoolAttr(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }
 
 // feedFilterLabel renders the chip-name string used in the active-filter

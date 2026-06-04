@@ -50,29 +50,17 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 
 		// Per-query timings, emitted as a single structured slog line at the
 		// end of the request so we can spot regressions in production logs.
-		// Zero-value durations indicate "skipped" — e.g. q_categories=0 when
-		// there are no bulk_action events to resolve.
+		// The reports/events/category/tag timings come back from
+		// feedWindowItems; the alerts query is timed inline below.
 		reqStart := time.Now()
-		var qCategories, qTags, qEvents, qReports, qAlerts time.Duration
+		var qAlerts time.Duration
 
-		// `?before=<rfc3339>` lets the user roll the 3-day window backward
-		// in chunks via the "Load older activity" footer button. Cap at
-		// 30 days back from now — the service layer enforces the same
-		// ceiling, but clamping here keeps the rendered window/footer
-		// consistent and makes the cap discoverable from a single layer.
-		var beforeTime time.Time
-		if rawBefore := strings.TrimSpace(r.URL.Query().Get("before")); rawBefore != "" {
-			if parsed, err := time.Parse(time.RFC3339, rawBefore); err == nil {
-				beforeTime = parsed
-				minBefore := now.Add(-service.FeedMaxLookback)
-				if beforeTime.Before(minBefore) {
-					beforeTime = minBefore
-				}
-				if beforeTime.After(now) {
-					beforeTime = time.Time{}
-				}
-			}
-		}
+		// `?before=<rfc3339>` lets the user roll the 3-day window backward in
+		// chunks via the "Load older activity" footer. Parsed + clamped to the
+		// 30-day lookback ceiling here and again in the service layer (defence
+		// in depth). The home feed's inline pagination (FeedRowsHandler) shares
+		// the same parse helper so its cursor honours the identical bounds.
+		beforeTime := parseFeedBefore(r.URL.Query().Get("before"), now)
 
 		// Resolve the session actor for the "me" chip. Prefer the linked
 		// household user_id; fall back to the auth_account id for the
@@ -90,197 +78,45 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
-		// 1. Reports — windowed to match the feed bound. Fetched ahead of
-		// the events call so the service can fold matching reports into
-		// bulk_action / agent_session events (one card per agent run
-		// instead of two adjacent cards). Skipped under the
-		// syncs/comments/sessions/me chips, which scope the page to events
-		// the service layer produces.
-		var reports []service.AgentReportResponse
-		if filter == "" || filter == "reports" {
-			t0 := time.Now()
-			var rerr error
-			reports, rerr = svc.ListAgentReports(ctx, 50)
-			qReports = time.Since(t0)
-			if rerr != nil {
-				a.Logger.Error("feed: list agent reports", "error", rerr)
-			}
-		}
-
-		// 2. Grouped events from the service. The windowed report list is
-		// returned straight back as `standaloneReports` — every report
-		// renders as its own comment-bubble row, never folded into the
-		// session/bulk card it came from. We also decide here whether the
-		// (relatively expensive) tag + category lookups are needed — they
-		// only feed bulk_action subject rendering. Skipping them on the
-		// common no-bulk path saves 5-10ms per request.
-		t0 := time.Now()
-		events, standaloneReports, err := svc.ListFeedEventsWithReports(ctx, service.FeedEventsParams{
-			Window:        window,
-			BulkThreshold: 3,
-			SampleLimit:   5,
-			Filter:        filter,
-			ActorID:       sessionActorID,
-			Before:        beforeTime,
-		}, reports)
-		qEvents = time.Since(t0)
+		// Aggregate the window: agent reports + grouped events projected onto
+		// FeedItems, newest-first. FeedRowsHandler runs the same helper so the
+		// inline "Load older activity" rows are byte-identical to a full page
+		// render. `reports` is the windowed report list, kept here only for the
+		// unread-count hero tile below.
+		items, reports, timings, err := feedWindowItems(ctx, a, svc, feedQuery{
+			now:            now,
+			window:         window,
+			before:         beforeTime,
+			filter:         filter,
+			sessionActorID: sessionActorID,
+		})
 		if err != nil {
-			a.Logger.Error("feed: list events", "error", err)
+			// Already logged inside the helper. Render with whatever items came
+			// back (nil → empty state) rather than 500-ing the home page.
+			items = nil
 		}
 
-		// Display lookups so bulk-action subjects render with friendly tag
-		// and category display names instead of raw slugs. Only fetched when
-		// at least one bulk_action event is present — the common case (sync
-		// + comment + agent_session events only) skips both queries.
-		hasBulkAction := false
-		for _, ev := range events {
-			if ev.Type == "bulk_action" {
-				hasBulkAction = true
-				break
-			}
-		}
-		var categoryDetail func(string) categoryDisplay
-		var tagDisplayFn func(string) tagDisplay
-		if hasBulkAction {
-			t0 = time.Now()
-			categoryTree, cerr := svc.ListCategories(ctx)
-			qCategories = time.Since(t0)
-			if cerr != nil {
-				a.Logger.Error("feed: list categories", "error", cerr)
-			}
-			categoryDetail = categoryDetailLookup(categoryTree)
-			t0 = time.Now()
-			tags, terr := svc.ListTags(ctx)
-			qTags = time.Since(t0)
-			if terr != nil {
-				a.Logger.Error("feed: list tags", "error", terr)
-			}
-			tagDisplayFn = tagDisplayLookup(tags)
-		} else {
-			// projectFeedBulkAction won't fire on this path, but
-			// projectFeedEvent unconditionally accepts the lookups. Provide
-			// no-op stubs so the call site stays simple.
-			categoryDetail = func(string) categoryDisplay { return categoryDisplay{} }
-			tagDisplayFn = func(string) tagDisplay { return tagDisplay{} }
-		}
-
-		// 3. Connection alerts + empty-state meta — current state, not
-		// windowed. Alerts hide under any active chip so the filtered view
-		// is exclusively the chip's scope; the alerts re-appear on the
-		// unfiltered "All" page. The meta (hasConnections + global last-
-		// sync-at) is always collected so the empty-state branch can pick
-		// the right copy regardless of filter.
-		t0 = time.Now()
+		// Connection alerts + empty-state meta — current state, not windowed.
+		// Alerts hide under any active chip so the filtered view is exclusively
+		// the chip's scope; they re-appear on the unfiltered "All" page. The
+		// meta (hasConnections + global last-sync-at) is always collected so the
+		// empty-state branch can pick the right copy regardless of filter.
+		t0 := time.Now()
 		alerts, hasConnections, globalLastSyncAt := buildFeedConnectionMeta(ctx, a)
 		qAlerts = time.Since(t0)
 		if filter != "" {
 			alerts = nil
 		}
 
-		// 4. Project FeedEvents onto templ-side FeedItems. The window is
-		// anchored at `windowEnd` (now, or the `?before=` timestamp when
-		// paginating); `windowStart` is `windowEnd - window`.
-		windowEnd := now
-		if !beforeTime.IsZero() {
-			windowEnd = beforeTime
-		}
-		windowStart := windowEnd.Add(-window)
-
-		items := make([]pages.FeedItem, 0, len(events)+len(reports))
+		// Hero-stat collection over the projected items. Sync items carry the
+		// same AddedCount / RuleOutcomes / Status / StartedAt the raw events do,
+		// so the hero tiles derive entirely from `items`; reports drive the
+		// unread count below.
+		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 		var lastSyncAt time.Time
 		var lastSyncStatus, lastSyncInstitution string
 		var totalNewTransactionsToday, ruleHitsToday int
-		startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-
-		for _, ev := range events {
-			if ev.Timestamp.Before(windowStart) || ev.Timestamp.After(windowEnd) {
-				continue
-			}
-			it := projectFeedEvent(ev, tagDisplayFn, categoryDetail)
-			if it == nil {
-				continue
-			}
-			items = append(items, *it)
-
-			// Hero-stat collection over the same loop.
-			switch ev.Type {
-			case "sync":
-				if ev.Sync != nil && ev.Sync.StartedAt.After(lastSyncAt) {
-					lastSyncAt = ev.Sync.StartedAt
-					lastSyncStatus = ev.Sync.Status
-					lastSyncInstitution = ev.Sync.InstitutionName
-				}
-				if ev.Sync != nil && ev.Timestamp.After(startOfDay) {
-					totalNewTransactionsToday += ev.Sync.AddedCount
-					for _, ro := range ev.Sync.RuleOutcomes {
-						ruleHitsToday += ro.Count
-					}
-				}
-			}
-		}
-
-		// 5. Append every report as its own comment-bubble feed item. A
-		// report that came from an agent session / bulk action sorts next to
-		// that card on the timeline (same actor + timeframe) but renders as
-		// its own row — reports are no longer folded into a card headline.
-		//
-		// agentSeedCache memoizes the report-author → avatar-seed resolution
-		// across the loop so repeat agents don't re-query; "" is cached too
-		// (a miss is a decision, not a retry).
-		agentSeedCache := map[string]string{}
-		for _, rep := range standaloneReports {
-			if rep.CreatedAt == "" {
-				continue
-			}
-			ts, err := time.Parse(time.RFC3339, rep.CreatedAt)
-			if err != nil {
-				continue
-			}
-			if ts.Before(windowStart) || ts.After(windowEnd) {
-				continue
-			}
-			// Seed the report's avatar from the agent it ran under so the
-			// row shows the same robot as the agent's other activity,
-			// instead of the generic bot tile. Only agent-authored reports
-			// can resolve — the actor_type guard skips a DB query for
-			// operator/system reports, and the cache dedups repeat agents.
-			reportAvatarSeed := ""
-			if rep.CreatedByType == "agent" && rep.CreatedByID != nil {
-				id := *rep.CreatedByID
-				seed, cached := agentSeedCache[id]
-				if !cached {
-					if slug, ok := svc.ResolveAgentSlugForActor(ctx, id); ok {
-						seed = slug
-					}
-					agentSeedCache[id] = seed
-				}
-				reportAvatarSeed = seed
-			}
-			items = append(items, pages.FeedItem{
-				Type:         "report",
-				Timestamp:    ts,
-				TimestampStr: ts.UTC().Format(time.RFC3339),
-				Report: &pages.FeedReport{
-					ID:            rep.ID,
-					ShortID:       rep.ShortID,
-					Title:         rep.Title,
-					BodyExcerpt:   excerpt(rep.Body, 220),
-					Priority:      rep.Priority,
-					DisplayAuthor: reportDisplayAuthor(rep.CreatedByName, rep.Author),
-					IsUnread:      rep.ReadAt == nil,
-					AvatarSeed:    reportAvatarSeed,
-				},
-			})
-		}
-
-		// 6. Sort + day-bucket.
-		sort.Slice(items, func(i, j int) bool {
-			return items[i].Timestamp.After(items[j].Timestamp)
-		})
-		days := groupFeedByDay(items, now, loc)
-
-		// 7. Hero band.
-		var commentsToday, eventsToday, unreadReports int
+		var eventsToday, commentsToday int
 		for _, it := range items {
 			if it.Timestamp.After(startOfDay) {
 				eventsToday++
@@ -288,9 +124,25 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 					commentsToday++
 				}
 			}
+			if it.Type == "sync" && it.Sync != nil {
+				if it.Sync.StartedAt.After(lastSyncAt) {
+					lastSyncAt = it.Sync.StartedAt
+					lastSyncStatus = it.Sync.Status
+					lastSyncInstitution = it.Sync.InstitutionName
+				}
+				if it.Timestamp.After(startOfDay) {
+					totalNewTransactionsToday += it.Sync.AddedCount
+					for _, ro := range it.Sync.RuleOutcomes {
+						ruleHitsToday += ro.Count
+					}
+				}
+			}
 		}
-		for _, r := range reports {
-			if r.ReadAt == nil {
+		days := groupFeedByDay(items, now, loc)
+
+		var unreadReports int
+		for _, rep := range reports {
+			if rep.ReadAt == nil {
 				unreadReports++
 			}
 		}
@@ -364,14 +216,328 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			"duration_ms", time.Since(reqStart).Milliseconds(),
 			"events", len(items),
 			"reports", len(reports),
-			"q_categories_ms", qCategories.Milliseconds(),
-			"q_tags_ms", qTags.Milliseconds(),
-			"q_events_total_ms", qEvents.Milliseconds(),
-			"q_reports_ms", qReports.Milliseconds(),
+			"q_categories_ms", timings.Categories.Milliseconds(),
+			"q_tags_ms", timings.Tags.Milliseconds(),
+			"q_events_total_ms", timings.Events.Milliseconds(),
+			"q_reports_ms", timings.Reports.Milliseconds(),
 			"q_alerts_ms", qAlerts.Milliseconds(),
 		)
 
 		tr.RenderWithTempl(w, r, data, body)
+	}
+}
+
+// feedQuery carries the windowing inputs shared by the full-page feed handler
+// and the inline-pagination rows endpoint.
+type feedQuery struct {
+	now            time.Time
+	window         time.Duration
+	before         time.Time // zero → window anchored at now
+	filter         string
+	sessionActorID string
+}
+
+// feedQueryTimings reports the per-query durations feedWindowItems spent, so
+// the page handler can keep emitting its structured timing log. Zero values
+// mean "skipped" (e.g. category/tag lookups only run when a bulk_action event
+// is present).
+type feedQueryTimings struct {
+	Reports    time.Duration
+	Events     time.Duration
+	Categories time.Duration
+	Tags       time.Duration
+}
+
+// parseFeedBefore parses the `?before=` pagination cursor (RFC3339) and clamps
+// it into the valid (now-FeedMaxLookback, now] range. Returns the zero time
+// when absent, unparseable, or in the future — callers treat that as "no
+// cursor, anchor the window at now". The service layer re-clamps, so this is
+// defence in depth that also keeps the rendered window/footer consistent.
+func parseFeedBefore(raw string, now time.Time) time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}
+	}
+	if parsed.After(now) {
+		return time.Time{}
+	}
+	if minBefore := now.Add(-service.FeedMaxLookback); parsed.Before(minBefore) {
+		parsed = minBefore
+	}
+	return parsed
+}
+
+// feedWindowItems runs the feed aggregation pipeline for a single window and
+// returns the projected, newest-first items plus the agent reports fetched for
+// the window. Both FeedHandler (initial page) and FeedRowsHandler (inline
+// "Load older activity") call this so the rendered rows + windowing stay
+// byte-identical — the rows endpoint grafts onto the same rail the page drew.
+//
+// The returned reports slice is the full windowed report set (the page uses it
+// for the unread-count hero tile; the rows endpoint ignores it). All errors are
+// logged here and surfaced to the caller, which degrades to an empty render
+// rather than failing the request.
+func feedWindowItems(ctx context.Context, a *app.App, svc *service.Service, q feedQuery) ([]pages.FeedItem, []service.AgentReportResponse, feedQueryTimings, error) {
+	var timings feedQueryTimings
+
+	// Reports — windowed; gated to the chips that actually surface them.
+	var reports []service.AgentReportResponse
+	if q.filter == "" || q.filter == "reports" {
+		t0 := time.Now()
+		var rerr error
+		reports, rerr = svc.ListAgentReports(ctx, 50)
+		timings.Reports = time.Since(t0)
+		if rerr != nil {
+			a.Logger.Error("feed: list agent reports", "error", rerr)
+		}
+	}
+
+	// Grouped events. The windowed report list comes straight back as
+	// `standaloneReports` — every report renders as its own comment-bubble row.
+	t0 := time.Now()
+	events, standaloneReports, err := svc.ListFeedEventsWithReports(ctx, service.FeedEventsParams{
+		Window:        q.window,
+		BulkThreshold: 3,
+		SampleLimit:   5,
+		Filter:        q.filter,
+		ActorID:       q.sessionActorID,
+		Before:        q.before,
+	}, reports)
+	timings.Events = time.Since(t0)
+	if err != nil {
+		a.Logger.Error("feed: list events", "error", err)
+		return nil, reports, timings, err
+	}
+
+	// Display lookups for bulk-action subjects — only fetched when at least one
+	// bulk_action event is present (the common sync/comment/session path skips
+	// both queries).
+	hasBulkAction := false
+	for _, ev := range events {
+		if ev.Type == "bulk_action" {
+			hasBulkAction = true
+			break
+		}
+	}
+	var categoryDetail func(string) categoryDisplay
+	var tagDisplayFn func(string) tagDisplay
+	if hasBulkAction {
+		t0 = time.Now()
+		categoryTree, cerr := svc.ListCategories(ctx)
+		timings.Categories = time.Since(t0)
+		if cerr != nil {
+			a.Logger.Error("feed: list categories", "error", cerr)
+		}
+		categoryDetail = categoryDetailLookup(categoryTree)
+		t0 = time.Now()
+		tags, terr := svc.ListTags(ctx)
+		timings.Tags = time.Since(t0)
+		if terr != nil {
+			a.Logger.Error("feed: list tags", "error", terr)
+		}
+		tagDisplayFn = tagDisplayLookup(tags)
+	} else {
+		categoryDetail = func(string) categoryDisplay { return categoryDisplay{} }
+		tagDisplayFn = func(string) tagDisplay { return tagDisplay{} }
+	}
+
+	// Window bounds — anchored at now, or at `before` when paginating.
+	windowEnd := q.now
+	if !q.before.IsZero() {
+		windowEnd = q.before
+	}
+	windowStart := windowEnd.Add(-q.window)
+
+	items := make([]pages.FeedItem, 0, len(events)+len(reports))
+	for _, ev := range events {
+		if ev.Timestamp.Before(windowStart) || ev.Timestamp.After(windowEnd) {
+			continue
+		}
+		it := projectFeedEvent(ev, tagDisplayFn, categoryDetail)
+		if it == nil {
+			continue
+		}
+		items = append(items, *it)
+	}
+
+	// Every report renders as its own comment-bubble feed item. agentSeedCache
+	// memoizes the report-author → avatar-seed resolution so repeat agents
+	// don't re-query ("" is cached too — a miss is a decision, not a retry).
+	agentSeedCache := map[string]string{}
+	for _, rep := range standaloneReports {
+		if rep.CreatedAt == "" {
+			continue
+		}
+		ts, perr := time.Parse(time.RFC3339, rep.CreatedAt)
+		if perr != nil {
+			continue
+		}
+		if ts.Before(windowStart) || ts.After(windowEnd) {
+			continue
+		}
+		reportAvatarSeed := ""
+		if rep.CreatedByType == "agent" && rep.CreatedByID != nil {
+			id := *rep.CreatedByID
+			seed, cached := agentSeedCache[id]
+			if !cached {
+				if slug, ok := svc.ResolveAgentSlugForActor(ctx, id); ok {
+					seed = slug
+				}
+				agentSeedCache[id] = seed
+			}
+			reportAvatarSeed = seed
+		}
+		items = append(items, pages.FeedItem{
+			Type:         "report",
+			Timestamp:    ts,
+			TimestampStr: ts.UTC().Format(time.RFC3339),
+			Report: &pages.FeedReport{
+				ID:            rep.ID,
+				ShortID:       rep.ShortID,
+				Title:         rep.Title,
+				BodyExcerpt:   excerpt(rep.Body, 220),
+				Priority:      rep.Priority,
+				DisplayAuthor: reportDisplayAuthor(rep.CreatedByName, rep.Author),
+				IsUnread:      rep.ReadAt == nil,
+				AvatarSeed:    reportAvatarSeed,
+			},
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Timestamp.After(items[j].Timestamp)
+	})
+	return items, reports, timings, nil
+}
+
+// FeedRowsHandler serves GET /-/feed/rows?before=<rfc3339>[&filter=<slug>][&last_day=<YYYY-MM-DD>].
+//
+// Powers the inline "Load older activity" pagination on the home Feed: the
+// feedPagination Alpine factory GETs this endpoint, appends the returned rail
+// <li> rows to the existing <ol class="bb-timeline">, and advances its cursor
+// from the response headers — so the timeline continues in place instead of
+// reloading the whole page from the top.
+//
+// It reuses feedWindowItems (the same aggregation the page handler runs) so the
+// appended rows are byte-identical to a full render. Empty 3-day windows are
+// skipped server-side (walking `before` backward by the window up to the 30-day
+// lookback cap) so a single tap always lands on content while older events
+// remain.
+//
+// Response:
+//   - Body: rendered <li> rows for the next non-empty window (day separators +
+//     feed rows). The leading day separator is omitted when its calendar day
+//     equals `last_day` (the tail day already on the client) so the rows
+//     continue under the existing heading instead of repeating it.
+//   - X-Feed-Next-Before: RFC3339 cursor to pass as `before` on the next tap
+//     (the oldest item just rendered).
+//   - X-Feed-Last-Day: the oldest day key just rendered (the client's new
+//     dedup anchor).
+//   - X-Feed-At-Max: "1" once the lookback cap is reached (the client swaps the
+//     button for "End of feed"); "0" otherwise.
+//
+// An empty body with X-Feed-At-Max:1 means no older events remain.
+func FeedRowsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		loc := UserLocation(r)
+		now := time.Now().In(loc)
+		window := time.Duration(feedWindowDays) * 24 * time.Hour
+		filter := strings.TrimSpace(r.URL.Query().Get("filter"))
+		lastDay := strings.TrimSpace(r.URL.Query().Get("last_day"))
+
+		// A rows request with no usable cursor has nothing to page from.
+		before := parseFeedBefore(r.URL.Query().Get("before"), now)
+		if before.IsZero() {
+			w.Header().Set("X-Feed-At-Max", "1")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Resolve the "me" actor the same way the page does.
+		var sessionActorID string
+		if filter == "me" {
+			sessionActorID = SessionUserID(tr.sm, r)
+			if sessionActorID == "" {
+				sessionActorID = SessionAccountID(tr.sm, r)
+			}
+			if sessionActorID == "" {
+				filter = ""
+			}
+		}
+
+		// Skip empty windows so a tap always lands on content. Bounded by the
+		// lookback span (≤ FeedMaxLookback/window iterations) — once the cursor
+		// reaches the cap we do one final clamped fetch and stop.
+		minBefore := now.Add(-service.FeedMaxLookback)
+		var items []pages.FeedItem
+		cursor := before
+		for {
+			winItems, _, _, err := feedWindowItems(ctx, a, svc, feedQuery{
+				now:            now,
+				window:         window,
+				before:         cursor,
+				filter:         filter,
+				sessionActorID: sessionActorID,
+			})
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load feed")
+				return
+			}
+			if len(winItems) > 0 {
+				items = winItems
+				break
+			}
+			cursor = cursor.Add(-window)
+			if !cursor.After(minBefore) {
+				break
+			}
+		}
+
+		if len(items) == 0 {
+			// No older events remain within the lookback window.
+			w.Header().Set("X-Feed-At-Max", "1")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		var oldest time.Time
+		for _, it := range items {
+			if oldest.IsZero() || it.Timestamp.Before(oldest) {
+				oldest = it.Timestamp
+			}
+		}
+
+		days := groupFeedByDay(items, now, loc)
+		omitLeading := ""
+		if len(days) > 0 && days[0].Key == lastDay {
+			omitLeading = lastDay
+		}
+		lastRenderedDay := ""
+		if len(days) > 0 {
+			lastRenderedDay = days[len(days)-1].Key
+		}
+
+		w.Header().Set("X-Feed-Next-Before", oldest.UTC().Format(time.RFC3339))
+		w.Header().Set("X-Feed-Last-Day", lastRenderedDay)
+		if oldest.Before(minBefore) {
+			w.Header().Set("X-Feed-At-Max", "1")
+		} else {
+			w.Header().Set("X-Feed-At-Max", "0")
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		comp := pages.FeedRows(pages.FeedRowsProps{
+			Days:              days,
+			Now:               now,
+			OmitLeadingDayKey: omitLeading,
+		})
+		if err := comp.Render(ctx, w); err != nil {
+			a.Logger.Error("feed rows: render", "error", err)
+		}
 	}
 }
 

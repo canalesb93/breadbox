@@ -424,6 +424,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Quick search — accessible to all roles.
 		r.Get("/search/transactions", QuickSearchTransactionsHandler(svc))
 
+		// Home-feed inline pagination — returns just the next window's rail
+		// rows so "Load older activity" appends in place instead of reloading
+		// the whole page. Read-only, all roles. See FeedRowsHandler.
+		r.Get("/feed/rows", FeedRowsHandler(a, svc, tr))
+
 		// Transaction comments — accessible to all roles.
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
