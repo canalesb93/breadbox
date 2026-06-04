@@ -17,9 +17,10 @@ templ TopbarUserMenu(p SidebarUserMenuProps) {
 	<button
 		type="button"
 		popovertarget={ popoverID }
-		class="btn btn-ghost btn-sm btn-circle p-0"
+		class="btn btn-ghost btn-sm btn-circle p-0 relative"
 		aria-label="Open user menu"
 		style={ "anchor-name:" + anchorName }
+		x-data
 	>
 		if p.HasLinkedUser {
 			@UserAvatar(UserAvatarProps{
@@ -33,6 +34,15 @@ templ TopbarUserMenu(p SidebarUserMenuProps) {
 		} else {
 			@LucideIcon("user-circle", "w-6 h-6 text-base-content/50")
 		}
+		<!-- Privacy-mode active dot: signals the page is showing
+		     obfuscated/blurred values so glitched figures aren't mistaken for
+		     real data. Driven by the global $store.privacy. -->
+		<span
+			x-show="$store.privacy && $store.privacy.active"
+			x-cloak
+			class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-warning border-2 border-base-100"
+			:title="'Privacy mode: ' + ($store.privacy ? $store.privacy.mode : '')"
+		></span>
 	</button>
 	<ul
 		id={ popoverID }

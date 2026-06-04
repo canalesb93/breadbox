@@ -59,7 +59,7 @@ templ TxRow(tx service.AdminTransactionRow) {
 			<!-- Description + meta line -->
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2">
-					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{ tx.Name }</a>
+					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop data-private="merchant" class="font-medium text-sm hover:text-primary transition-colors truncate">{ tx.Name }</a>
 				</div>
 				<!-- Meta line (sm+). Canonical order across every breakpoint:
 				     [Lead] · {Merchant | Category} · Tags · Comments.
@@ -68,13 +68,13 @@ templ TxRow(tx service.AdminTransactionRow) {
 				     the viewport shrinks. Mobile (<sm) uses the same order in
 				     its dedicated sub-line below, with Date in the lead. -->
 				<div class="hidden sm:flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 min-w-0">
-					<span class="truncate min-w-0">{ tx.AccountName }</span>
+					<span data-private="account" class="truncate min-w-0">{ tx.AccountName }</span>
 					<!-- Slot 2 — Merchant (xl+) | Category (sub-xl). Both render
 					     a leading separator inside their conditional so the row
 					     stays clean when neither piece is present. -->
 					if tx.MerchantName != nil && !strings.EqualFold(tx.Name, deref(tx.MerchantName)) {
 						<span class="text-base-content/20 hidden xl:inline">&middot;</span>
-						<span class="text-base-content/40 truncate hidden xl:inline">{ titleCase(deref(tx.MerchantName)) }</span>
+						<span data-private="merchant" class="text-base-content/40 truncate hidden xl:inline">{ titleCase(deref(tx.MerchantName)) }</span>
 					}
 					if tx.CategoryDisplayName != nil {
 						<span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
@@ -248,17 +248,17 @@ templ TxRow(tx service.AdminTransactionRow) {
 							     on sm+ the date column in the row header already shows it. -->
 							<div class="sm:hidden">
 								<span class="text-base-content/30">Account</span>
-								<span class="text-base-content/60 ml-1.5">{ tx.AccountName }</span>
+								<span data-private="account" class="text-base-content/60 ml-1.5">{ tx.AccountName }</span>
 							</div>
 							if tx.MerchantName != nil {
 								<div>
 									<span class="text-base-content/30">Merchant</span>
-									<span class="text-base-content/60 ml-1.5">{ titleCase(deref(tx.MerchantName)) }</span>
+									<span data-private="merchant" class="text-base-content/60 ml-1.5">{ titleCase(deref(tx.MerchantName)) }</span>
 								</div>
 							}
 							<div class="hidden sm:block">
 								<span class="text-base-content/30">Account</span>
-								<span class="text-base-content/60 ml-1.5">{ tx.AccountName } ({ tx.InstitutionName })</span>
+								<span data-private="account" class="text-base-content/60 ml-1.5">{ tx.AccountName } ({ tx.InstitutionName })</span>
 							</div>
 							<div>
 								<span class="text-base-content/30">Member</span>

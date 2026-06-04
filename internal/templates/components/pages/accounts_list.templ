@@ -183,7 +183,7 @@ templ accountsListRow(a AccountsListRow, csrfToken string) {
 				</div>
 				<div class="min-w-0">
 					<div class="flex items-center gap-1.5 flex-wrap">
-						<span class="text-sm font-medium truncate text-base-content">{ a.DisplayName }</span>
+						<span data-private="account" class="text-sm font-medium truncate text-base-content">{ a.DisplayName }</span>
 						if a.IsDependentLinked {
 							<span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance attributed to a linked user">Linked</span>
 						}
@@ -192,10 +192,10 @@ templ accountsListRow(a AccountsListRow, csrfToken string) {
 						}
 					</div>
 					<div class="text-xs text-base-content/40 md:hidden">
-						{ a.InstitutionName }
+						@components.Private("institution", a.InstitutionName)
 						if a.MaskValid {
 							<span class="text-base-content/25">&middot;</span>
-							{ " ····" + a.Mask }
+							@components.Private("mask", " ····"+a.Mask)
 						}
 					</div>
 				</div>
@@ -204,9 +204,9 @@ templ accountsListRow(a AccountsListRow, csrfToken string) {
 		<!-- Institution (md+) -->
 		<td class="hidden md:table-cell text-sm text-base-content/70">
 			<div class="flex items-center gap-2 min-w-0">
-				<span class="truncate">{ a.InstitutionName }</span>
+				<span data-private="institution" class="truncate">{ a.InstitutionName }</span>
 				if a.MaskValid {
-					<span class="text-xs text-base-content/40">&middot; ····{ a.Mask }</span>
+					<span data-private="mask" class="text-xs text-base-content/40">&middot; ····{ a.Mask }</span>
 				}
 				if a.ConnectionStatus == "error" || a.ConnectionStatus == "pending_reauth" {
 					<span class="badge badge-soft badge-warning badge-xs" title="Connection needs attention">Reauth</span>

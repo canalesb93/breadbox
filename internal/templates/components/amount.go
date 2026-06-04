@@ -53,6 +53,13 @@ type AmountProps struct {
 	Precision int          // decimals for AmountCost; ignored for other intents (defaults to 2)
 	Pending   bool
 	Class     string
+	// Public opts this amount out of privacy mode. Every Amount is treated as
+	// private user data by default (marked data-private="amount" so the
+	// client-side privacy toggle can obfuscate/blur it). Set Public for the
+	// rare monetary value that isn't household-sensitive — e.g. a documented
+	// example figure. Real balances, transaction amounts, costs, and totals
+	// must stay private (the default).
+	Public bool
 }
 
 // amountClasses returns the space-separated class list for an Amount
