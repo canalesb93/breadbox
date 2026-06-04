@@ -684,3 +684,53 @@ func TestRunOrSkip_HouseholdCeiling(t *testing.T) {
 		t.Fatalf("want a skipped row, got %+v", resp)
 	}
 }
+
+// TestAssembleJobSpec_ClampsNonPositiveMaxTurns is the defense-in-depth half
+// of the max_turns=0 fix: even if a definition somehow holds 0 (a pre-fix prod
+// row, a future code path that skips normalization), spec assembly must clamp
+// it to DefaultAgentMaxTurns rather than forward maxTurns:0 — which the
+// sidecar's z.number().int().positive() schema rejects with spec_invalid.
+// The def is hand-constructed because create/update now both normalize 0 away,
+// so this exercises the spec-assembly clamp in isolation.
+func TestAssembleJobSpec_ClampsNonPositiveMaxTurns(t *testing.T) {
+	svc, _, _ := newService(t)
+	encKey := seedSubscriptionAuth(t, svc)
+
+	def := &service.AgentDefinitionResponse{
+		ID:           "00000000-0000-0000-0000-000000000000",
+		Prompt:       "review transactions",
+		ToolScope:    "read_write",
+		AllowedTools: []string{"mcp__breadbox__*"},
+		Model:        "claude-opus-4-7",
+		MaxTurns:     0,
+	}
+	run := &service.AgentRunResponse{ID: "11111111-1111-1111-1111-111111111111"}
+
+	spec, err := svc.AssembleJobSpec(context.Background(), def, run, "fake-run-key", encKey)
+	if err != nil {
+		t.Fatalf("AssembleJobSpec: %v", err)
+	}
+	if spec.MaxTurns != service.DefaultAgentMaxTurns {
+		t.Errorf("spec.MaxTurns = %d, want %d (clamped from 0)", spec.MaxTurns, service.DefaultAgentMaxTurns)
+	}
+
+	// A negative value clamps too.
+	def.MaxTurns = -5
+	spec, err = svc.AssembleJobSpec(context.Background(), def, run, "fake-run-key", encKey)
+	if err != nil {
+		t.Fatalf("AssembleJobSpec (negative): %v", err)
+	}
+	if spec.MaxTurns != service.DefaultAgentMaxTurns {
+		t.Errorf("spec.MaxTurns = %d, want %d (clamped from -5)", spec.MaxTurns, service.DefaultAgentMaxTurns)
+	}
+
+	// A positive value is preserved.
+	def.MaxTurns = 42
+	spec, err = svc.AssembleJobSpec(context.Background(), def, run, "fake-run-key", encKey)
+	if err != nil {
+		t.Fatalf("AssembleJobSpec (positive): %v", err)
+	}
+	if spec.MaxTurns != 42 {
+		t.Errorf("spec.MaxTurns = %d, want 42 (unchanged)", spec.MaxTurns)
+	}
+}
