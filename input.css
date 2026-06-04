@@ -333,6 +333,21 @@
   [data-theme="dark"] svg.brand-github path,
   [data-theme="dark"] svg.brand-anthropic path { fill: #fff; }
 
+  /* `brand-onbtn`: the GitHub mark sitting on a solid-tone button
+   * (btn-primary) must track the *button's* text color, not the page
+   * background. primary inverts against the surface in both themes
+   * (dark button / light text in light mode, and the reverse in dark),
+   * while the baked-fill flip above keys off the page theme — so the
+   * unmodified mark renders black-on-black in light mode and
+   * white-on-white in dark. Opt into currentColor to follow
+   * primary-content instead. Mirrors the base / media / data-theme
+   * shape above so it wins on specificity + source order, no !important. */
+  svg.brand-github.brand-onbtn path { fill: currentColor; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) svg.brand-github.brand-onbtn path { fill: currentColor; }
+  }
+  [data-theme="dark"] svg.brand-github.brand-onbtn path { fill: currentColor; }
+
   /*
    * Pre-hydration size for Lucide placeholders.
    *
