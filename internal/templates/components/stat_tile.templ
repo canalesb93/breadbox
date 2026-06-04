@@ -40,6 +40,13 @@ type StatTileProps struct {
 	Description string
 	Tone        StatTileTone
 	Href        templ.SafeURL // optional; if set, tile becomes a link
+	// ValuePrivateKind / DescriptionPrivateKind opt the tile into the
+	// client-side privacy mode: when non-empty, the value / description is
+	// marked with `data-private="<kind>"` (typically "amount" for money
+	// tiles) so it obfuscates/blurs alongside the rest. Leave empty for
+	// non-sensitive tiles (counts, labels) — they stay visible by design.
+	ValuePrivateKind       string
+	DescriptionPrivateKind string
 }
 
 func statTileBg(t StatTileTone) string {
@@ -96,10 +103,20 @@ templ statTileBody(p StatTileProps) {
 			</div>
 		}
 		<div class="min-w-0 flex-1">
-			<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate">{ p.Value }</div>
+			<div
+				class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate"
+				if p.ValuePrivateKind != "" {
+					data-private={ p.ValuePrivateKind }
+				}
+			>{ p.Value }</div>
 			<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">{ p.Label }</div>
 			if p.Description != "" {
-				<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">{ p.Description }</div>
+				<div
+					class="text-[0.65rem] text-base-content/45 mt-0.5 truncate"
+					if p.DescriptionPrivateKind != "" {
+						data-private={ p.DescriptionPrivateKind }
+					}
+				>{ p.Description }</div>
 			}
 		</div>
 	</div>

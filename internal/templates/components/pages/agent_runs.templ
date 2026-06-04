@@ -75,11 +75,12 @@ templ agentRunsStats(s AgentRunsStatsProps) {
 			Tone:        agentRunsErrorTone(s),
 		})
 		@components.StatTile(components.StatTileProps{
-			Icon:        "dollar-sign",
-			Label:       "Cost · 30d",
-			Value:       agentRunsFormatMoney(s.TotalCostUSD30d),
-			Description: "Across every completed run",
-			Tone:        components.StatToneNeutral,
+			Icon:             "dollar-sign",
+			Label:            "Cost · 30d",
+			Value:            agentRunsFormatMoney(s.TotalCostUSD30d),
+			Description:      "Across every completed run",
+			Tone:             components.StatToneNeutral,
+			ValuePrivateKind: "amount",
 		})
 		@components.StatTile(components.StatTileProps{
 			Icon:        "timer",

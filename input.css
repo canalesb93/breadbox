@@ -1294,6 +1294,18 @@
     opacity: 0.92;
   }
 
+  /* Once the initial reveal is done, privacy.js adds `.privacy-anim` to <html>
+   * so mode switches ease the hide blur in/out (and the obfuscate opacity
+   * shift) instead of snapping. Deliberately off during `.privacy-pending` /
+   * first paint so the pre-paint blur→content swap on load stays instant. The
+   * text-decode "scramble" is animated in JS; this only smooths the
+   * CSS-driven properties. Respect reduced-motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    html.privacy-anim:not(.privacy-pending) [data-private] {
+      transition: filter 0.24s ease, opacity 0.24s ease;
+    }
+  }
+
   /* ── Sparkline (inline mini charts in summary pills) ── */
   svg.bb-sparkline {
     width: 64px;

@@ -35,18 +35,21 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 					Description: "tracked",
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:        "calendar",
-					Label:       "Monthly equivalent",
-					Value:       subTileMoney(p.MonthlyTotals),
-					Description: subTileMoneyExtra(p.MonthlyTotals),
-					Tone:        components.StatTonePrimary,
+					Icon:                   "calendar",
+					Label:                  "Monthly equivalent",
+					Value:                  subTileMoney(p.MonthlyTotals),
+					Description:            subTileMoneyExtra(p.MonthlyTotals),
+					Tone:                   components.StatTonePrimary,
+					ValuePrivateKind:       "amount",
+					DescriptionPrivateKind: "amount", // extra-currency totals are money too
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:        "clock",
-					Label:       "Due in 30 days",
-					Value:       subTileMoney(p.UpcomingTotals),
-					Description: subUpcomingDesc(p.UpcomingCount),
-					Tone:        components.StatToneInfo,
+					Icon:             "clock",
+					Label:            "Due in 30 days",
+					Value:            subTileMoney(p.UpcomingTotals),
+					Description:      subUpcomingDesc(p.UpcomingCount), // "N charges" — a count, stays visible
+					Tone:             components.StatToneInfo,
+					ValuePrivateKind: "amount",
 				})
 				@components.StatTile(components.StatTileProps{
 					Icon:        "inbox",
