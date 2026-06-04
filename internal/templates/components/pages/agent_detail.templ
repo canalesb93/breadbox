@@ -112,11 +112,12 @@ templ agentDetailStats(s AgentDetailStatsProps) {
 				Tone:        agentDetailErrorTone(s),
 			})
 			@components.StatTile(components.StatTileProps{
-				Icon:        "dollar-sign",
-				Label:       "Total cost",
-				Value:       agentRunsFormatMoney(s.TotalCostUSD),
-				Description: "Across every non-skipped run",
-				Tone:        components.StatToneNeutral,
+				Icon:             "dollar-sign",
+				Label:            "Total cost",
+				Value:            agentRunsFormatMoney(s.TotalCostUSD),
+				Description:      "Across every non-skipped run",
+				Tone:             components.StatToneNeutral,
+				ValuePrivateKind: "amount",
 			})
 			@components.StatTile(components.StatTileProps{
 				Icon:        "timer",
