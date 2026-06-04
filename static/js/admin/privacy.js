@@ -281,6 +281,28 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  // Bake the obfuscation glitch into a DETACHED / cloned subtree's
+  // [data-private] values, in place, without touching live page state,
+  // animations, the persisted mode, or the DONE/__bbReal bookkeeping the
+  // live path relies on. Walks `root` once and glitches any text node that
+  // has a [data-private] ancestor (so nested marks and the root itself are
+  // covered; the glitch of an already-glitched value is still obfuscated, so
+  // it stays safe no matter the caller's current mode). The dev-mode reporter
+  // uses this to redact financial values in a screenshot / HTML-snapshot clone.
+  function glitchTree(root) {
+    if (!root) return;
+    var doc = root.ownerDocument || document;
+    var walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (!node.nodeValue || !node.nodeValue.trim()) continue;
+      var p = node.parentElement;
+      if (p && p.closest && p.closest('[data-private]')) node.nodeValue = glitch(node.nodeValue);
+    }
+  }
+
   // ----- public API -----
 
   function setMode(mode, animate) {
@@ -306,6 +328,9 @@
       var order = { real: 'obfuscate', obfuscate: 'hide', hide: 'real' };
       setMode(order[state] || 'real', true);
     },
+    // Obfuscate a detached/cloned subtree's financial values in place. Does
+    // NOT change the live page or the persisted mode — see glitchTree above.
+    glitchTree: glitchTree,
   };
 
   // ----- init: run the first pass once the body exists, then reveal -----

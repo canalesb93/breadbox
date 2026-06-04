@@ -41,8 +41,12 @@
 
   // Walk every text node under root. Content text (not app chrome) is fully
   // masked; chrome text (nav labels, buttons) stays readable but still has PII
-  // like emails scrubbed.
-  function bbMaskTextNodes(root) {
+  // like emails scrubbed. When skipPrivate is true, text inside a
+  // [data-private] element is left alone here — those financial values are
+  // obfuscated separately with the privacy-mode glitch (legible, same-shape)
+  // rather than blanked to dots. skipPrivate is only set when the glitch pass
+  // actually ran, so a missing privacy engine safely falls back to dot-masking.
+  function bbMaskTextNodes(root, skipPrivate) {
     var doc = root.ownerDocument || document;
     var walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
@@ -51,6 +55,7 @@
         if (!p) return NodeFilter.FILTER_REJECT;
         var tag = p.nodeName;
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TITLE' || tag === 'NOSCRIPT') return NodeFilter.FILTER_REJECT;
+        if (skipPrivate && p.closest && p.closest('[data-private]')) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       },
     });
@@ -106,10 +111,29 @@
     });
   }
 
-  // Redact a cloned document/element in place: mask data text, hide media,
-  // strip data-bearing attributes, and scrub PII from attributes.
+  // Obfuscate the financial values (everything tagged data-private — amounts,
+  // accounts, merchants, balances) with the shared privacy-mode glitch, on the
+  // CLONE only. Returns true when it ran so the dot-masker can skip those nodes
+  // and leave the legible same-shape glitch in place. Reads the real value off
+  // the clone regardless of the user's live privacy mode, so it never leaks.
+  function bbGlitchPrivate(root) {
+    try {
+      if (window.bbPrivacy && typeof window.bbPrivacy.glitchTree === 'function') {
+        window.bbPrivacy.glitchTree(root);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  // Redact a cloned document/element in place: glitch financial values, mask
+  // the remaining data text, hide media, strip data-bearing attributes, and
+  // scrub PII from attributes. The glitch must run BEFORE bbStripDataAttrs
+  // (which removes data-private) and before bbMaskTextNodes (which would
+  // otherwise dot-mask the glitched values back into •).
   function bbRedactClone(root) {
-    bbMaskTextNodes(root);
+    var glitched = bbGlitchPrivate(root);
+    bbMaskTextNodes(root, glitched);
     bbHideMedia(root);
     bbStripDataAttrs(root);
     bbScrubAttrPII(root);
@@ -301,12 +325,18 @@
               allowTaint: false,
               logging: false,
               scale: Math.min(Math.max(window.devicePixelRatio || 1, 2), 3),
+              // Capture exactly the on-screen viewport at the user's current
+              // scroll. windowWidth/Height MUST be the viewport size, not the
+              // full document size: passing scrollWidth/scrollHeight makes
+              // html2canvas lay the clone out as a full-height window scrolled
+              // to the top, so the (x,y) crop never reaches the visible region
+              // and every capture comes out scrolled to the top of the page.
               x: window.scrollX,
               y: window.scrollY,
               width: window.innerWidth,
               height: window.innerHeight,
-              windowWidth: document.documentElement.scrollWidth,
-              windowHeight: document.documentElement.scrollHeight,
+              windowWidth: window.innerWidth,
+              windowHeight: window.innerHeight,
               ignoreElements: function (el) { return el.id === 'bb-dev-reporter'; },
               onclone: function (clonedDoc) {
                 if (redact && clonedDoc && clonedDoc.body) {
