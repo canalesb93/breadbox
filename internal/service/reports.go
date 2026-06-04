@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf16"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -82,6 +84,17 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 	if body == "" {
 		return AgentReportResponse{}, fmt.Errorf("%w: body is required", ErrInvalidParameter)
 	}
+	// Repair over-escaped Unicode in the agent-authored prose. Models
+	// occasionally emit a literal backslash-u escape (the six ASCII
+	// characters backslash, u, 2, 0, 1, 4) inside the submit_report tool
+	// argument instead of the em-dash rune it names. The JSON layer hands us
+	// those bytes verbatim, so without this they get stored and then rendered
+	// as that raw escape across every surface that shows the report: the runs
+	// page, the report table, the activity feed, and notification payloads.
+	// Decode here, at the single ingestion chokepoint, so the stored value is
+	// clean everywhere.
+	title = decodeStrayUnicodeEscapes(title)
+	body = decodeStrayUnicodeEscapes(body)
 	if priority == "" {
 		priority = "info"
 	}
@@ -337,4 +350,89 @@ func (s *Service) DeleteAgentReport(ctx context.Context, reportID string) error 
 		return ErrNotFound
 	}
 	return nil
+}
+
+// decodeStrayUnicodeEscapes repairs a string in which a model over-escaped a
+// Unicode character: it emitted the literal text of a backslash-u escape (a
+// backslash, the letter u, and four hex digits) rather than the rune that
+// escape denotes. We see this in agent-authored report titles, where an
+// em-dash arrives as the six characters backslash u 2 0 1 4. Decode any such
+// sequence, combining a UTF-16 surrogate pair when present, back into the rune
+// it names. A string with no backslash-u marker takes a fast path unchanged.
+//
+// Only backslash-u escapes are touched. Other escapes (newline, tab, quote)
+// are left alone: they are either intentional or harmless in markdown, and
+// rewriting them risks mangling legitimate content. The reported breakage is
+// purely Unicode escapes.
+func decodeStrayUnicodeEscapes(s string) string {
+	if !strings.Contains(s, `\u`) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if r, size, ok := readUnicodeEscapeAt(s, i); ok {
+			b.WriteRune(r)
+			i += size
+			continue
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
+}
+
+// readUnicodeEscapeAt tries to decode a backslash-u escape beginning at byte
+// offset i, combining a following low surrogate when the first code unit is a
+// high surrogate. It returns the decoded rune, the number of source bytes
+// consumed, and whether a valid escape was found. A malformed or partial
+// escape — a non-hex tail, an unpaired surrogate — reports ok=false so the
+// caller copies the bytes through untouched.
+func readUnicodeEscapeAt(s string, i int) (rune, int, bool) {
+	if i+6 > len(s) || !strings.HasPrefix(s[i:], `\u`) {
+		return 0, 0, false
+	}
+	hi, ok := parseHex4(s[i+2 : i+6])
+	if !ok {
+		return 0, 0, false
+	}
+	switch {
+	case hi >= 0xD800 && hi <= 0xDBFF:
+		// High surrogate: only valid when paired with a trailing low surrogate.
+		if i+12 <= len(s) && strings.HasPrefix(s[i+6:], `\u`) {
+			if lo, ok := parseHex4(s[i+8 : i+12]); ok && lo >= 0xDC00 && lo <= 0xDFFF {
+				return utf16.DecodeRune(rune(hi), rune(lo)), 12, true
+			}
+		}
+		return 0, 0, false
+	case hi >= 0xDC00 && hi <= 0xDFFF:
+		// Lone low surrogate: invalid on its own.
+		return 0, 0, false
+	default:
+		return rune(hi), 6, true
+	}
+}
+
+// parseHex4 parses exactly four hex digits into their integer value.
+func parseHex4(s string) (uint32, bool) {
+	if len(s) != 4 {
+		return 0, false
+	}
+	var v uint32
+	for i := 0; i < 4; i++ {
+		c := s[i]
+		var d uint32
+		switch {
+		case c >= '0' && c <= '9':
+			d = uint32(c - '0')
+		case c >= 'a' && c <= 'f':
+			d = uint32(c-'a') + 10
+		case c >= 'A' && c <= 'F':
+			d = uint32(c-'A') + 10
+		default:
+			return 0, false
+		}
+		v = v<<4 | d
+	}
+	return v, true
 }
