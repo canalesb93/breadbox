@@ -179,6 +179,8 @@ func agentRunLiveSummaryStatusHTML(status string) string {
 		return `<span class="badge badge-soft badge-error badge-sm">timeout</span>`
 	case "skipped":
 		return `<span class="badge badge-ghost badge-sm">skipped</span>`
+	case "cancelled":
+		return `<span class="badge badge-soft badge-warning badge-sm">cancelled</span>`
 	case "in_progress":
 		return `<span class="inline-flex items-center gap-1.5 text-primary text-sm"><span class="loading loading-spinner loading-xs"></span>running</span>`
 	default:

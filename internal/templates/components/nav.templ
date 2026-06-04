@@ -21,6 +21,9 @@ type NavProps struct {
 	ConnectionsAttention int64
 	PendingReviews       int64
 	SeriesCandidates     int64
+	// WorkflowFailures is the count of workflows whose most recent run errored;
+	// > 0 lights a red badge on the Workflows link (mirrors the gallery red dot).
+	WorkflowFailures int64
 
 	// Profile footer
 	HasLinkedUser        bool
@@ -63,7 +66,7 @@ templ Nav(p NavProps) {
 		}
 		<div class="bb-sidebar-section">Manage</div>
 		if p.IsEditor {
-			@navLink("/workflows", "workflow", "Workflows", navActive(p.CurrentPage, "workflows"))
+			@navLinkBadge("/workflows", "workflow", "Workflows", navActive(p.CurrentPage, "workflows"), p.WorkflowFailures, "bb-nav-badge--error", workflowFailureTitle(p.WorkflowFailures))
 		}
 		if p.IsAdmin {
 			@navLink("/rules", "zap", "Rules", navActive(p.CurrentPage, "rules"))
@@ -235,4 +238,13 @@ func badgeCount(n int64) string {
 		return "99+"
 	}
 	return strconv.FormatInt(n, 10)
+}
+
+// workflowFailureTitle is the hover/collapsed-rail tooltip for the Workflows
+// failure badge, pluralized so "1 workflow" doesn't read as "1 workflows".
+func workflowFailureTitle(n int64) string {
+	if n == 1 {
+		return "1 workflow has a failed run"
+	}
+	return fmt.Sprintf("%d workflows have a failed run", n)
 }

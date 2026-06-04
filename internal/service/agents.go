@@ -46,7 +46,29 @@ var defaultAgentSystemPrompt = func() string {
 }()
 
 // DefaultAgentMaxTurns is the per-run turn cap when a definition omits one.
-const DefaultAgentMaxTurns = 10
+// 0 means UNLIMITED — the per-run cost budget (max_budget_usd) and the run
+// timeout are the real ceilings. A turn cap that bites before the budget just
+// abandons a half-finished run with money still on the table (the next run
+// redoes the setup work), so we don't impose one by default; an operator can
+// still set an explicit 1-100 cap in Advanced as a belt-and-suspenders backstop.
+const DefaultAgentMaxTurns = 0
+
+// sidecarMaxTurnsCap is the positive turn value handed to the sidecar when a
+// definition's cap is "unlimited" (0). The Claude Agent SDK / sidecar schema
+// requires a positive integer, so unlimited is expressed as a ceiling high
+// enough that the budget + 30-minute run timeout always bind first. Resolved
+// via sidecarMaxTurns() at spec-assembly time only — the DB still stores 0.
+const sidecarMaxTurnsCap = 1000
+
+// sidecarMaxTurns maps a definition's stored cap to the value the sidecar runs
+// with: an explicit positive cap passes through; 0/unlimited becomes the high
+// sidecarMaxTurnsCap so the budget is the practical ceiling.
+func sidecarMaxTurns(n int) int {
+	if n <= 0 {
+		return sidecarMaxTurnsCap
+	}
+	return n
+}
 
 // DefaultAgentMaxBudgetUSD mirrors the workflows migration default.
 // The column is NOT NULL, so we always send a value to sqlc.
@@ -1258,7 +1280,7 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		Prompt:            def.Prompt,
 		SystemPrompt:      systemPrompt,
 		Model:             def.Model,
-		MaxTurns:          def.MaxTurns,
+		MaxTurns:          sidecarMaxTurns(def.MaxTurns),
 		MaxBudgetUsd:      maxBudget,
 		ToolScope:         def.ToolScope,
 		AllowedTools:      allowedTools,

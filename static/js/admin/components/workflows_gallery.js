@@ -336,7 +336,30 @@ document.addEventListener('alpine:init', function () {
       // instant, then a goroutine does the actual work). So we hold the spinner
       // up (runningOneOff[slug]) through the whole run by polling the run's
       // status until it reaches a terminal state — not just for the dispatch.
-      runOneOff: function (slug) {
+      runOneOff: function (slug, name) {
+        var self = this;
+        if (self.runningOneOff[slug]) return; // guard against a double-click
+        name = name || slug;
+        var go = function () { self._dispatchOneOff(slug); };
+        // Confirm before spending: a one-off runs Claude over the household's
+        // ledger and bills the Anthropic account, so gate the click behind the
+        // shared confirm overlay (amber/cost tone, not destructive-red).
+        if (typeof window.bbConfirm !== 'function') {
+          if (window.confirm('Run "' + name + '" now? This runs Claude over your financial data and incurs API cost.')) go();
+          return;
+        }
+        window.bbConfirm({
+          title: 'Run workflow now?',
+          message: 'Run "' + name + '" now? It runs Claude over your household’s financial data and incurs Anthropic API cost.',
+          confirmLabel: 'Run now',
+          variant: 'warning',
+        }).then(function (ok) { if (ok) go(); });
+      },
+
+      // _dispatchOneOff performs the actual run dispatch (instantiate-on-first-use
+      // + async run + spinner poll). Split out of runOneOff so the confirm gate
+      // wraps it without duplicating the dispatch logic.
+      _dispatchOneOff: function (slug) {
         var self = this;
         if (self.runningOneOff[slug]) return; // guard against a double-click
         self.runningOneOff[slug] = true;
@@ -588,6 +611,44 @@ document.addEventListener('alpine:init', function () {
           .catch(function (e) {
             console.error('submitReconfigure failed', e);
             if (btn) btn.disabled = false;
+            self.restorePageState();
+          });
+      },
+
+      // Remove a configured workflow — deletes its agent_definition, resetting
+      // the preset card back to "Set up". Confirms first via the shared
+      // bbConfirm overlay (the schedule stops; run history survives the
+      // SET NULL FK), then POSTs to /-/workflows/{slug}/delete and reloads.
+      // Falls back to a native confirm only if bbConfirm hasn't loaded.
+      removeWorkflow: function (slug, name) {
+        var self = this;
+        slug = slug || self.reconfigure.slug;
+        if (!slug) return;
+        name = name || self.reconfigure.name || 'this workflow';
+        var doRemove = function () { self._doRemoveWorkflow(slug); };
+        if (typeof window.bbConfirm !== 'function') {
+          if (window.confirm('Remove "' + name + '"? This resets it back to a preset. Run history is kept.')) doRemove();
+          return;
+        }
+        window.bbConfirm({
+          title: 'Remove workflow?',
+          message: 'Remove "' + name + '"? It resets back to a preset you can set up again. The schedule stops and run history is kept.',
+          confirmLabel: 'Remove workflow',
+          variant: 'danger',
+        }).then(function (ok) { if (ok) doRemove(); });
+      },
+
+      _doRemoveWorkflow: function (slug) {
+        var self = this;
+        self._post('/-/workflows/' + encodeURIComponent(slug) + '/delete')
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            self.toast('Workflow removed.', 'success');
+            setTimeout(function () { window.location.reload(); }, 500);
+          })
+          .catch(function (e) {
+            console.error('removeWorkflow failed', e);
+            self.toast('Could not remove the workflow.', 'error');
             self.restorePageState();
           });
       },

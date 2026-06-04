@@ -22,13 +22,20 @@ func workflowConfigDrawerData(p WorkflowPresetCardProps) string {
 	if cron == "" {
 		cron = "0 8 * * *"
 	}
-	turns := p.MaxTurns
-	if turns <= 0 {
-		turns = 10
+	// max_turns: 0/unset means unlimited (budget is the ceiling), so seed the
+	// field BLANK rather than a number — the Advanced summary + placeholder then
+	// render it as ∞ / unlimited.
+	turnsStr := ""
+	if p.MaxTurns > 0 {
+		turnsStr = fmt.Sprintf("%d", p.MaxTurns)
+	}
+	budget := p.MaxBudgetUSD
+	if budget <= 0 {
+		budget = 1.0
 	}
 	return fmt.Sprintf(
-		"{ triggerOnSync: '%s', cron: '%s', model: '%s', maxTurns: '%d', maxBudget: '%s', consent: false }",
-		trigger, cron, p.Model, turns, "1",
+		"{ triggerOnSync: '%s', cron: '%s', model: '%s', maxTurns: '%s', maxBudget: '%.2f', consent: false }",
+		trigger, cron, p.Model, turnsStr, budget,
 	)
 }
 
@@ -150,10 +157,12 @@ type WorkflowPresetCardProps struct {
 	TriggerOnSync    bool    // default trigger: true = post-sync; user-switchable in the drawer
 	EstCostPerRunUSD float64 // rough per-run cost estimate for the projected-cost hint
 
-	// Model / MaxTurns seed the setup drawer's model select + Advanced
-	// section. Resolved to non-empty/non-zero defaults by the page handler.
-	Model    string
-	MaxTurns int
+	// Model / MaxTurns / MaxBudgetUSD seed the setup drawer's model select +
+	// Advanced section. Resolved to non-empty/non-zero defaults by the page
+	// handler (a preset may carry a more forgiving budget for larger tasks).
+	Model        string
+	MaxTurns     int
+	MaxBudgetUSD float64
 
 	// OneOff marks an on-demand workflow: the card renders copy/run/settings
 	// icon buttons instead of a run toggle, and the setup drawer drops the
