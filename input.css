@@ -1288,6 +1288,18 @@
     user-select: none;
   }
 
+  /* Let the hide blur's halo feather out softly instead of being clipped to a
+   * hard rectangular edge by a tight line-box / `truncate` wrapper. `filter:
+   * blur()` paints a halo beyond the element box; an `overflow: hidden` value
+   * cell (or the value's own `truncate`) was cropping that halo to a crisp
+   * rectangle. Scoped to hide mode and only to a private value + its direct
+   * wrapper, so real-mode truncation/ellipsis is untouched. `!important` beats
+   * the Tailwind `.truncate` utility, which sits in a later cascade layer. */
+  html[data-privacy="hide"] [data-private],
+  html[data-privacy="hide"] :has(> [data-private]) {
+    overflow: visible !important;
+  }
+
   html[data-privacy="obfuscate"]:not(.privacy-pending) [data-private] {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     letter-spacing: 0.02em;

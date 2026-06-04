@@ -62,30 +62,54 @@
     return h >>> 0;
   }
 
-  var HEX = '0123456789abcdef';
+  var DIGITS = '0123456789';
+  var HEXL = 'abcdef';            // the occasional "matrix" hex letter
   var LOWER = 'abcdefghijklmnopqrstuvwxyz';
   var UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  // Glitch a string in place: digits → hex (the "matrix" read), letters →
-  // scrambled same-case letters, everything else (spaces, $ , . - · / etc.)
-  // verbatim. Length, grouping, currency symbols, and word boundaries survive,
-  // so layout and tabular-nums alignment hold.
+  // Glitch a string in place: digits stay MOSTLY numeric with the occasional
+  // hex letter (a-f) for the matrix read, letters → scrambled same-case
+  // letters, everything else (spaces, $ , . - · / etc.) verbatim. Length,
+  // grouping, currency symbols, and word boundaries survive, so layout and
+  // tabular-nums alignment hold.
+  //
+  // Numbers are kept reading as numbers: the first and last digit of the value
+  // are always numeric, two letters never land adjacent, and a letter only
+  // appears on a ~35% roll — so a glitched amount is always <50% letters and
+  // never collapses into "$ab,cd.ef". Deterministic per value (no shimmer).
   function glitch(text) {
     if (!text) return text;
     var seed = hash32(text);
+    // Locate the first/last digit so a number always begins and ends numeric.
+    var firstD = -1, lastD = -1;
+    for (var p = 0; p < text.length; p++) {
+      var cc = text.charCodeAt(p);
+      if (cc >= 48 && cc <= 57) { if (firstD < 0) firstD = p; lastD = p; }
+    }
     var out = '';
+    var prevLetter = false; // did the previous digit position become a letter?
     for (var i = 0; i < text.length; i++) {
       var c = text.charCodeAt(i);
       // advance an LCG per position so adjacent same-class chars differ
       seed = (Math.imul(seed, 1664525) + 1013904223 + i) >>> 0;
-      if (c >= 48 && c <= 57) {            // 0-9
-        out += HEX[seed % 16];
+      if (c >= 48 && c <= 57) {            // 0-9 → stay mostly numeric
+        var canLetter = i !== firstD && i !== lastD && !prevLetter;
+        if (canLetter && ((seed >>> 8) % 100) < 35) {
+          out += HEXL[(seed >>> 3) % 6];
+          prevLetter = true;
+        } else {
+          out += DIGITS[seed % 10];
+          prevLetter = false;
+        }
       } else if (c >= 97 && c <= 122) {    // a-z
         out += LOWER[seed % 26];
+        prevLetter = false;
       } else if (c >= 65 && c <= 90) {     // A-Z
         out += UPPER[seed % 26];
+        prevLetter = false;
       } else {
         out += text[i];                    // punctuation / whitespace verbatim
+        prevLetter = false;
       }
     }
     return out;
@@ -99,8 +123,12 @@
 
   // A random same-class glyph for the decode flicker (non-deterministic — the
   // flicker is meant to churn; only the locked, settled value is deterministic).
+  // Digits churn mostly through 0-9 (with the occasional hex letter) so the
+  // flicker matches the mostly-numeric settled value instead of going letter-heavy.
   function randGlyph(code) {
-    if (code >= 48 && code <= 57) return HEX[(Math.random() * 16) | 0];
+    if (code >= 48 && code <= 57) {
+      return Math.random() < 0.72 ? DIGITS[(Math.random() * 10) | 0] : HEXL[(Math.random() * 6) | 0];
+    }
     if (code >= 97 && code <= 122) return LOWER[(Math.random() * 26) | 0];
     return UPPER[(Math.random() * 26) | 0];
   }
