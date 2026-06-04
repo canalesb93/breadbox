@@ -82,7 +82,11 @@ templ Nav(p NavProps) {
 			@navLinkBadge("/connections", "link", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
 			if p.IsAdmin {
 				@navLink("/household", "users", "Household", navActive(p.CurrentPage, "household"))
-				@navLink("/logs", "scroll-text", "Logs", navActive(p.CurrentPage, "logs"))
+				// Logs is intentionally hidden from the rail for now while we decide
+				// whether it stays a top-level page. The /logs route + handler remain
+				// live (still reachable via deep links from the activity feed); restore
+				// this @navLink — plus the command-palette entry and g-chord in
+				// base.html — to bring it back.
 			}
 		}
 		@navLink("/settings/account", "settings", "Settings", navSettingsActive(p.CurrentPage))
