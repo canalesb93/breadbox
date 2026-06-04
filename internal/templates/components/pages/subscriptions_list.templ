@@ -22,7 +22,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			Title:                "Recurring",
 			Subtitle:             "Recurring charges Breadbox has detected — subscriptions, bills, and more — plus the candidates waiting on your call.",
 			SubtitleHideOnMobile: true,
-			SecondaryAction:      subscriptionsBetaBadge(),
+			TitleBadge:           subscriptionsBetaBadge(),
 			Action:               components.PageHeaderAction(templ.SafeURL("/recurring/new"), "plus", "New series"),
 		})
 		<!-- Stat row: Active · Monthly-equivalent · Due in 30 days · Needs review -->
@@ -352,7 +352,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 
 // subscriptionsBetaBadge marks Recurring as a v1/beta feature.
 templ subscriptionsBetaBadge() {
-	<span class="badge badge-soft badge-info badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
+	<span class="badge badge-soft badge-warning badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
 }
 
 func intPtr(n int) *int { return &n }
