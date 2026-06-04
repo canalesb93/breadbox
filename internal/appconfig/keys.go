@@ -133,16 +133,7 @@ const (
 	// drafts against (e.g. "canalesb93/breadbox"). Defaults to
 	// DevModeDefaultRepo when unset.
 	KeyDevModeGithubRepo = "devmode.github_repo"
-
-	// KeyDevModeIssueLabel is the label applied to every filed issue. The
-	// reporter creates it on the repo if it doesn't exist yet. Default:
-	// DevModeDefaultLabel.
-	KeyDevModeIssueLabel = "devmode.issue_label"
 )
-
-// DevModeDefaultLabel is the label applied to filed Developer Mode issues
-// when KeyDevModeIssueLabel is unset.
-const DevModeDefaultLabel = "dev-report"
 
 // DevModeDefaultRepo is the repository Developer Mode files against when
 // KeyDevModeGithubRepo is unset — the upstream Breadbox repo, so a fresh

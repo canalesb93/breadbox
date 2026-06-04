@@ -15,8 +15,8 @@ import (
 )
 
 // DeveloperSettingsHandler serves GET /settings/developer — the Developer Mode
-// configuration tab: an enable toggle plus the GitHub repo + issue label the
-// floating reporter opens issue drafts against.
+// configuration tab: an enable toggle plus the GitHub repo the floating
+// reporter opens issue drafts against.
 func DeveloperSettingsHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings, err := svc.GetDevModeSettings(r.Context())
@@ -40,7 +40,6 @@ func DeveloperSettingsHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 			Form: pages.DeveloperSettingsFormFields{
 				Enabled:    settings.Enabled,
 				GithubRepo: settings.GithubRepo,
-				IssueLabel: settings.IssueLabel,
 			},
 			FieldErrors: map[string]string{},
 			FormError:   formError,
@@ -56,7 +55,7 @@ func DeveloperSettingsHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 }
 
 // DeveloperSettingsPostHandler handles POST /settings/developer — the enable
-// toggle, repo, and label save together.
+// toggle and repo save together.
 func DeveloperSettingsPostHandler(a *app.App, svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -66,12 +65,10 @@ func DeveloperSettingsPostHandler(a *app.App, svc *service.Service, sm *scs.Sess
 
 		enabled := r.FormValue("enabled") == "true"
 		repo := strings.TrimSpace(r.FormValue("github_repo"))
-		label := strings.TrimSpace(r.FormValue("issue_label"))
 
 		params := service.UpdateDevModeSettingsParams{
 			Enabled:    &enabled,
 			GithubRepo: &repo,
-			IssueLabel: &label,
 		}
 
 		if _, err := svc.UpdateDevModeSettings(r.Context(), params); err != nil {

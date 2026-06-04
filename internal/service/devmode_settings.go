@@ -15,16 +15,14 @@ import (
 type DevModeSettingsResponse struct {
 	Enabled    bool   `json:"enabled"`
 	GithubRepo string `json:"github_repo"`
-	IssueLabel string `json:"issue_label"`
 }
 
 // UpdateDevModeSettingsParams holds the writable Developer-Mode settings.
 // Nil = leave untouched. An empty GithubRepo clears it (falls back to the
-// default); an empty IssueLabel resets to the default.
+// default).
 type UpdateDevModeSettingsParams struct {
 	Enabled    *bool
 	GithubRepo *string
-	IssueLabel *string
 }
 
 // GetDevModeSettings reads the devmode.* keys from app_config.
@@ -32,7 +30,6 @@ func (s *Service) GetDevModeSettings(ctx context.Context) (*DevModeSettingsRespo
 	return &DevModeSettingsResponse{
 		Enabled:    appconfig.Bool(ctx, s.Queries, appconfig.KeyDevModeEnabled, false),
 		GithubRepo: appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo),
-		IssueLabel: appconfig.String(ctx, s.Queries, appconfig.KeyDevModeIssueLabel, appconfig.DevModeDefaultLabel),
 	}, nil
 }
 
@@ -59,15 +56,6 @@ func (s *Service) UpdateDevModeSettings(ctx context.Context, p UpdateDevModeSett
 		}
 		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyDevModeGithubRepo, repo)); err != nil {
 			return nil, fmt.Errorf("set devmode_github_repo: %w", err)
-		}
-	}
-	if p.IssueLabel != nil {
-		label := strings.TrimSpace(*p.IssueLabel)
-		if label == "" {
-			label = appconfig.DevModeDefaultLabel
-		}
-		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyDevModeIssueLabel, label)); err != nil {
-			return nil, fmt.Errorf("set devmode_issue_label: %w", err)
 		}
 	}
 	return s.GetDevModeSettings(ctx)

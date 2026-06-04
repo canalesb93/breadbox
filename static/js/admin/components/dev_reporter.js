@@ -115,10 +115,55 @@
     bbScrubAttrPII(root);
   }
 
+  // Fetch every same-origin stylesheet's text once and cache it. Two call sites
+  // need the raw CSS:
+  //   1. The screenshot — html2canvas clones the page into an iframe that
+  //      re-fetches the external <link href="/static/css/styles.css">. On a cold
+  //      run those rules can still be unapplied when it rasterizes, producing an
+  //      UNSTYLED capture (default margins, blue underlined links). Injecting the
+  //      CSS as an inline <style> in the clone removes that race entirely.
+  //   2. The HTML snapshot — opened standalone from the artifact store, its
+  //      /static/* <link> resolves off-origin and 404s, so the page renders
+  //      unstyled. Inlining the CSS makes the snapshot self-contained.
+  var _bbCssPromise = null;
+  function bbFetchAppCss() {
+    if (_bbCssPromise) return _bbCssPromise;
+    _bbCssPromise = (function () {
+      var links = Array.prototype.slice.call(
+        document.querySelectorAll('link[rel="stylesheet"]')
+      ).filter(function (l) {
+        try { return new URL(l.href, location.href).origin === location.origin; }
+        catch (e) { return false; }
+      });
+      return Promise.all(links.map(function (l) {
+        return fetch(l.href).then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; });
+      })).then(function (parts) { return parts.join('\n'); }).catch(function () { return ''; });
+    })();
+    return _bbCssPromise;
+  }
+
+  // Replace the same-origin stylesheet <link>s on a cloned document with a single
+  // inline <style> carrying the fetched CSS, so the clone renders styled with no
+  // external fetch. No-op when css is empty (keeps the original <link> fallback).
+  function bbInlineCss(root, css) {
+    if (!css) return;
+    try {
+      root.querySelectorAll('link[rel="stylesheet"]').forEach(function (el) {
+        try { if (new URL(el.href, location.href).origin === location.origin) el.remove(); } catch (e) {}
+      });
+      var doc = root.ownerDocument || document;
+      var head = root.querySelector ? (root.querySelector('head') || root) : root;
+      var st = doc.createElement('style');
+      st.textContent = css;
+      head.appendChild(st);
+    } catch (e) {}
+  }
+
   // Build the HTML snapshot string. ALWAYS strips scripts, the CSRF meta, the
-  // reporter widget, and input values (code/secrets). When redact=true it also
-  // masks visible data text, hides media, and clears image sources.
-  function bbBuildSnapshot(redact) {
+  // reporter widget, and input values (code/secrets). Inlines the app CSS (css)
+  // so the snapshot renders styled standalone. When redact=true it also masks
+  // visible data text, hides media, and clears image sources.
+  function bbBuildSnapshot(redact, css) {
     try {
       var clone = document.documentElement.cloneNode(true);
       // Always strip code + secrets.
@@ -132,8 +177,10 @@
         bbRedactClone(clone);
         clone.querySelectorAll('img').forEach(function (el) { el.removeAttribute('src'); el.removeAttribute('srcset'); });
       }
+      // Inline CSS after redaction so the stylesheet text is never masked.
+      bbInlineCss(clone, css);
       var html = '<!DOCTYPE html>\n' + clone.outerHTML;
-      var cap = 1500000;
+      var cap = 3000000;
       return html.length > cap ? html.slice(0, cap) : html;
     } catch (e) {
       return '';
@@ -222,18 +269,22 @@
         },
 
         // recapture builds both artifacts (screenshot + HTML snapshot) honoring
-        // the current redact setting.
+        // the current redact setting. It resolves the app CSS once up front so
+        // both the capture and the snapshot render with the page's real styles.
         recapture: function () {
           var self = this;
           this.capturing = true;
-          this._snapshot = bbBuildSnapshot(this.redact);
-          return this.capture().finally(function () { self.capturing = false; });
+          return bbFetchAppCss().then(function (css) {
+            self._snapshot = bbBuildSnapshot(self.redact, css);
+            return self.capture(css);
+          }).finally(function () { self.capturing = false; });
         },
 
         // capture renders the current viewport to a JPEG data URL. Redaction
-        // (when on) runs in html2canvas's onclone hook so the live page is
-        // never mutated. Best-effort: any failure leaves screenshot empty.
-        capture: function () {
+        // (when on) and CSS inlining both run in html2canvas's onclone hook so
+        // the live page is never mutated. Best-effort: any failure leaves
+        // screenshot empty.
+        capture: function (css) {
           var self = this;
           var redact = this.redact;
           return this.loadHtml2Canvas().then(function (h2c) {
@@ -261,6 +312,10 @@
                 if (redact && clonedDoc && clonedDoc.body) {
                   try { bbRedactClone(clonedDoc.body); } catch (e) {}
                 }
+                // Inline the app CSS so styling is deterministic — the clone
+                // iframe otherwise re-fetches the external stylesheet and can
+                // rasterize before it applies, yielding an unstyled capture.
+                bbInlineCss(clonedDoc.documentElement || clonedDoc, css);
               },
             }).then(function (canvas) {
               self.screenshot = self.canvasToJpeg(canvas, 2560, 0.92);

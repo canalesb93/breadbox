@@ -3,9 +3,10 @@ package pages
 import "breadbox/internal/templates/components"
 
 // DeveloperSettings renders the Settings → Developer tab. One multi-input form
-// owns developer mode (enable toggle + GitHub repo/label, saved together).
-// Filing opens a prefilled GitHub issue draft the user submits — no token.
-// See .claude/rules/settings.md for the section/row vocabulary.
+// owns developer mode (enable toggle + GitHub repo, saved together). Filing
+// opens a prefilled GitHub issue draft the user submits — no token. Every
+// draft is pre-labelled with its type (bug/task) plus a fixed filed-via-bug
+// marker. See .claude/rules/settings.md for the section/row vocabulary.
 templ DeveloperSettings(p DeveloperSettingsProps) {
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
@@ -41,7 +42,7 @@ templ DeveloperSettings(p DeveloperSettingsProps) {
 }
 
 // developerModeSection is the single multi-input form: the enable toggle and
-// the GitHub repo/label all save together via one Save button.
+// the GitHub repo save together via one Save button.
 templ developerModeSection(p DeveloperSettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "bug",
@@ -87,19 +88,16 @@ templ developerModeSection(p DeveloperSettingsProps) {
 			}
 		}
 		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "Issue label",
-			Caption: "Pre-selected on every draft (add it to the repo once so GitHub applies it).",
-			For:     "issue_label",
+			Label:   "Issue labels",
+			Caption: "Applied automatically — add these to the repo so GitHub keeps them.",
 		}) {
-			<input
-				id="issue_label"
-				type="text"
-				name="issue_label"
-				value={ p.Form.IssueLabel }
-				placeholder="dev-report"
-				autocomplete="off"
-				class="bb-form-input font-mono min-w-56"
-			/>
+			<div class="flex items-center gap-1.5">
+				<span class="badge badge-soft badge-neutral badge-sm font-mono">bug</span>
+				<span class="text-base-content/40">/</span>
+				<span class="badge badge-soft badge-neutral badge-sm font-mono">task</span>
+				<span class="text-base-content/40">+</span>
+				<span class="badge badge-soft badge-primary badge-sm font-mono">filed-via-bug</span>
+			</div>
 		}
 	}
 }
