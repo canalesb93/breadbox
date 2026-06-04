@@ -1,0 +1,21 @@
+package components
+
+// Private wraps a sensitive financial value (a bare string) so the
+// client-side privacy mode can obfuscate or blur it. The `kind` records what
+// the value is — amount | merchant | account | institution | mask — and is
+// emitted as `data-private="<kind>"`. privacy.js (loaded from base.html) reads
+// every `[data-private]` element; the kind is advisory today (one glitch
+// preserves each character class) but keeps the door open for per-kind
+// strategies later.
+//
+// Use Private for values rendered as a standalone string. When a value already
+// has its own wrapping element (an <a>, <h1>, <span class="truncate">…), prefer
+// adding the `data-private="<kind>"` attribute to that element directly rather
+// than nesting another span — fewer nodes, same effect.
+//
+// See `docs/design-system.md` (privacy mode) and the catalog in
+// `.claude/rules/` for which fields count as private (scope: money + accounts &
+// merchants).
+templ Private(kind, s string) {
+	<span data-private={ kind }>{ s }</span>
+}

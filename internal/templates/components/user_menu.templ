@@ -49,12 +49,55 @@ templ userMenuItems(p SidebarUserMenuProps, logoutFormID string) {
 		</li>
 	}
 	<hr class="border-base-300 my-1 mx-2"/>
+	@privacyControlRow()
+	<hr class="border-base-300 my-1 mx-2"/>
 	<li>
 		<button type="submit" form={ logoutFormID } class="text-error">
 			@LucideIcon("log-out", "w-3.5 h-3.5")
 			<span class="flex-1">Sign out</span>
 		</button>
 	</li>
+}
+
+// privacyControlRow is the in-menu segmented control for the client-side
+// privacy mode (real / obfuscate / hide). It binds to the global
+// `$store.privacy` (registered in base.html) — the same store the topbar
+// avatar indicator and the Shift+P shortcut drive — so the active segment
+// stays in sync everywhere. Rendered as a non-link menu row (a <li> wrapping a
+// div, mirroring the identity-header row) so daisy's menu hover/active
+// treatment doesn't fight the join control. Selecting a mode deliberately does
+// NOT close the popover, so members can flip modes and compare.
+templ privacyControlRow() {
+	<li x-data>
+		<div class="flex flex-col items-stretch gap-1.5 px-3 py-1.5 hover:bg-transparent cursor-default">
+			<span class="flex items-center gap-1.5 text-[0.65rem] uppercase tracking-wide text-base-content/40 font-medium">
+				@LucideIcon("eye-off", "w-3 h-3")
+				<span class="flex-1">Privacy</span>
+				<span class="normal-case tracking-normal text-base-content/30" x-show="$store.privacy.active" x-cloak>on</span>
+			</span>
+			<div class="join w-full" role="group" aria-label="Privacy mode">
+				@privacyControlButton("real", "eye", "Real")
+				@privacyControlButton("obfuscate", "venetian-mask", "Fake")
+				@privacyControlButton("hide", "eye-off", "Hide")
+			</div>
+		</div>
+	</li>
+}
+
+// Inactive segments are plain (neutral) btns so the unselected states keep a
+// surface and the control reads as a group; the active one is btn-primary —
+// same shape as ThemeControl. Compact btn-xs to fit the 224px popover.
+templ privacyControlButton(value, icon, label string) {
+	<button
+		type="button"
+		class="join-item btn btn-xs flex-1 gap-1 px-1.5"
+		:class={ "$store.privacy.mode === '" + value + "' ? 'btn-primary' : ''" }
+		:aria-pressed={ "$store.privacy.mode === '" + value + "'" }
+		@click={ "$store.privacy.set('" + value + "')" }
+	>
+		@LucideIcon(icon, "w-3.5 h-3.5")
+		{ label }
+	</button>
 }
 
 // userMenuLogoutForm is the hidden POST /logout form the Sign-out button

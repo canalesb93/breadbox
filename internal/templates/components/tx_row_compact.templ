@@ -37,10 +37,10 @@ templ txRowCompactBody(tx service.AdminTransactionRow, hideDate bool) {
 		<!-- Name + meta line -->
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-1.5 min-w-0">
-				<span class="text-sm font-medium truncate">{ tx.Name }</span>
+				<span data-private="merchant" class="text-sm font-medium truncate">{ tx.Name }</span>
 			</div>
 			<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
-				<span class="truncate shrink min-w-0">{ tx.AccountName }</span>
+				<span data-private="account" class="truncate shrink min-w-0">{ tx.AccountName }</span>
 				if tx.CategoryDisplayName != nil {
 					<span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
 					<!-- Container shrinks (not shrink-0) so the category can take

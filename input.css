@@ -333,6 +333,21 @@
   [data-theme="dark"] svg.brand-github path,
   [data-theme="dark"] svg.brand-anthropic path { fill: #fff; }
 
+  /* `brand-onbtn`: the GitHub mark sitting on a solid-tone button
+   * (btn-primary) must track the *button's* text color, not the page
+   * background. primary inverts against the surface in both themes
+   * (dark button / light text in light mode, and the reverse in dark),
+   * while the baked-fill flip above keys off the page theme — so the
+   * unmodified mark renders black-on-black in light mode and
+   * white-on-white in dark. Opt into currentColor to follow
+   * primary-content instead. Mirrors the base / media / data-theme
+   * shape above so it wins on specificity + source order, no !important. */
+  svg.brand-github.brand-onbtn path { fill: currentColor; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) svg.brand-github.brand-onbtn path { fill: currentColor; }
+  }
+  [data-theme="dark"] svg.brand-github.brand-onbtn path { fill: currentColor; }
+
   /*
    * Pre-hydration size for Lucide placeholders.
    *
@@ -1284,6 +1299,30 @@
   /* ── Amount formatting ── */
   .bb-amount {
     @apply text-right tabular-nums;
+  }
+
+  /* ── Privacy mode ──
+   *
+   * Client-side presentation layer (see static/js/admin/privacy.js). Sensitive
+   * financial values carry `data-private="<kind>"`; the active mode lives on
+   * `<html data-privacy="obfuscate|hide">`.
+   *   - hide:      blur the real text via CSS — no JS rewrite.
+   *   - obfuscate: privacy.js swaps the text for a matrix/hex glitch; a subtle
+   *                monospace finish makes it read as synthetic at a glance.
+   * `.privacy-pending` is set pre-paint (base.html) and dropped once privacy.js
+   * runs its first pass, so obfuscate never flashes real values before the
+   * rewrite. `user-select: none` keeps the real (blurred) text from being
+   * casually selected/copied; pointer-events stay on so links still work. */
+  html[data-privacy="hide"] [data-private],
+  html.privacy-pending [data-private] {
+    filter: blur(0.4rem);
+    user-select: none;
+  }
+
+  html[data-privacy="obfuscate"]:not(.privacy-pending) [data-private] {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 0.02em;
+    opacity: 0.92;
   }
 
   /* ── Sparkline (inline mini charts in summary pills) ── */

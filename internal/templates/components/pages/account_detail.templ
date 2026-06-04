@@ -52,11 +52,12 @@ templ AccountDetail(p AccountDetailProps) {
 
 templ acctHeader(p AccountDetailProps) {
 	@components.EntityHeader(components.EntityHeaderProps{
-		Title:    acctDisplayLabel(p.Account),
-		Icon:     acctTypeIcon(p.Account.Type),
-		IconTone: components.IconToneNeutral,
-		Badges:   acctHeaderBadges(p),
-		Meta:     acctHeaderMeta(p),
+		Title:            acctDisplayLabel(p.Account),
+		TitlePrivateKind: "account",
+		Icon:             acctTypeIcon(p.Account.Type),
+		IconTone:         components.IconToneNeutral,
+		Badges:           acctHeaderBadges(p),
+		Meta:             acctHeaderMeta(p),
 	})
 }
 
@@ -92,7 +93,7 @@ templ acctHeaderMeta(p AccountDetailProps) {
 	}
 	if p.Account.Mask != nil && *p.Account.Mask != "" {
 		<span class="text-base-content/20">·</span>
-		<span>{ "••••" + *p.Account.Mask }</span>
+		<span data-private="mask">{ "••••" + *p.Account.Mask }</span>
 	}
 }
 
@@ -196,7 +197,7 @@ templ acctSettings(p AccountDetailProps) {
 					</div>
 					<div>
 						<p class="text-xs text-base-content/40 mb-1">Connection</p>
-						<a href={ templ.SafeURL("/connections/" + p.Account.ConnectionID) } class="text-sm font-medium hover:text-primary transition-colors no-underline">{ p.Account.InstitutionName }</a>
+						<a data-private="institution" href={ templ.SafeURL("/connections/" + p.Account.ConnectionID) } class="text-sm font-medium hover:text-primary transition-colors no-underline">{ p.Account.InstitutionName }</a>
 					</div>
 					if p.Account.UserName != "" {
 						<div>

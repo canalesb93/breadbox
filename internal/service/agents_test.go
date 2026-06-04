@@ -156,6 +156,47 @@ func TestUpdateAgentDefinition_PatchSemantics(t *testing.T) {
 	}
 }
 
+// TestUpdateAgentDefinition_MaxTurnsZeroFallsBackToDefault guards the
+// create/update symmetry: an update that clears or zeroes max_turns must
+// normalize to DefaultAgentMaxTurns, never persist 0. A stored 0 flows
+// through AssembleJobSpec and the sidecar rejects it (spec_invalid: maxTurns
+// must be > 0), failing every run of that workflow.
+func TestUpdateAgentDefinition_MaxTurnsZeroFallsBackToDefault(t *testing.T) {
+	svc, _, _ := newService(t)
+	def := mustCreateAgentDefinition(t, svc, "svc-maxturns-zero", false)
+
+	zero := 0
+	updated, err := svc.UpdateAgentDefinition(context.Background(), def.Slug, service.UpdateAgentDefinitionParams{
+		MaxTurns: &zero,
+	})
+	if err != nil {
+		t.Fatalf("update with max_turns=0: %v", err)
+	}
+	if updated.MaxTurns != service.DefaultAgentMaxTurns {
+		t.Errorf("MaxTurns after zero update = %d, want %d", updated.MaxTurns, service.DefaultAgentMaxTurns)
+	}
+	// Confirm it persisted, not just the returned struct.
+	got, err := svc.GetAgentDefinition(context.Background(), def.Slug)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.MaxTurns != service.DefaultAgentMaxTurns {
+		t.Errorf("persisted MaxTurns = %d, want %d", got.MaxTurns, service.DefaultAgentMaxTurns)
+	}
+
+	// A positive value still passes through unchanged (no over-clamping).
+	twentyFive := 25
+	again, err := svc.UpdateAgentDefinition(context.Background(), def.Slug, service.UpdateAgentDefinitionParams{
+		MaxTurns: &twentyFive,
+	})
+	if err != nil {
+		t.Fatalf("update with max_turns=25: %v", err)
+	}
+	if again.MaxTurns != 25 {
+		t.Errorf("MaxTurns after positive update = %d, want 25", again.MaxTurns)
+	}
+}
+
 func TestSetAgentDefinitionEnabled_Toggle(t *testing.T) {
 	svc, _, _ := newService(t)
 	def := mustCreateAgentDefinition(t, svc, "svc-toggle", false)

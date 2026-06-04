@@ -22,7 +22,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			Title:                "Recurring",
 			Subtitle:             "Recurring charges Breadbox has detected — subscriptions, bills, and more — plus the candidates waiting on your call.",
 			SubtitleHideOnMobile: true,
-			SecondaryAction:      subscriptionsBetaBadge(),
+			TitleBadge:           subscriptionsBetaBadge(),
 			Action:               components.PageHeaderAction(templ.SafeURL("/recurring/new"), "plus", "New series"),
 		})
 		<!-- Stat row: Active · Monthly-equivalent · Due in 30 days · Needs review -->
@@ -172,7 +172,7 @@ templ subscriptionCandidateCard(s SubscriptionRow) {
 		<div class="flex items-start justify-between gap-4">
 			<div class="min-w-0 flex-1">
 				<div class="flex items-center gap-2 flex-wrap">
-					<a href={ templ.SafeURL("/recurring/" + s.ShortID) } class="text-sm font-semibold text-base-content truncate hover:underline">{ s.Name }</a>
+					<a data-private="merchant" href={ templ.SafeURL("/recurring/" + s.ShortID) } class="text-sm font-semibold text-base-content truncate hover:underline">{ s.Name }</a>
 					@components.SeriesTypeChip(s.TypeLabel, "xs")
 				</div>
 				<!-- Detection strength reads with the rationale, not as a second
@@ -307,7 +307,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 				</div>
 				<div class="min-w-0">
 					<div class="flex items-center gap-2 min-w-0">
-						<span class="text-sm font-medium truncate text-base-content">{ s.Name }</span>
+						<span data-private="merchant" class="text-sm font-medium truncate text-base-content">{ s.Name }</span>
 						@components.SeriesTypeChip(s.TypeLabel, "xs")
 					</div>
 					if s.CategoryName != "" {
@@ -352,7 +352,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 
 // subscriptionsBetaBadge marks Recurring as a v1/beta feature.
 templ subscriptionsBetaBadge() {
-	<span class="badge badge-soft badge-info badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
+	<span class="badge badge-soft badge-warning badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
 }
 
 func intPtr(n int) *int { return &n }

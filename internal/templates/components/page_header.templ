@@ -12,6 +12,11 @@ package components
 //               an agent's DiceBear avatar on /agents/<slug>. Takes
 //               precedence over the inline Icon visually; pass one or the
 //               other, not both.
+//   - TitleBadge: optional templ.Component rendered inline immediately
+//               to the RIGHT of the title text (e.g. a "Beta" badge).
+//               Vertically centred with the title; sits above the
+//               subtitle. Use for status/qualifier chips that belong to
+//               the title, not the trailing action cluster.
 //   - Action:   optional templ.Component for the page's PRIMARY action
 //               (typically a btn-primary). Right-aligned.
 //   - SecondaryAction: optional templ.Component for one secondary action
@@ -49,6 +54,9 @@ type PageHeaderProps struct {
 	// title block (e.g. an identity avatar). Nil keeps the classic
 	// title-only layout.
 	Leading templ.Component
+	// TitleBadge is an optional chip rendered inline to the right of the
+	// title text (e.g. a "Beta" badge). Nil keeps the title bare.
+	TitleBadge templ.Component
 	// SecondaryAction is rendered before Action in the trailing slot.
 	// Convention: secondary-styled button (use PageHeaderSecondaryAction).
 	SecondaryAction templ.Component
@@ -86,14 +94,19 @@ templ PageHeader(p PageHeaderProps) {
 // drift apart.
 templ pageHeaderTitleBlock(p PageHeaderProps) {
 	<div class="min-w-0">
-		if p.Icon != "" {
-			<h1 class="bb-page-title flex items-center gap-2">
-				@LucideIcon(p.Icon, "w-6 h-6 text-primary shrink-0")
-				<span>{ p.Title }</span>
-			</h1>
-		} else {
-			<h1 class="bb-page-title">{ p.Title }</h1>
-		}
+		<div class="flex items-center gap-2 min-w-0">
+			if p.Icon != "" {
+				<h1 class="bb-page-title flex items-center gap-2">
+					@LucideIcon(p.Icon, "w-6 h-6 text-primary shrink-0")
+					<span>{ p.Title }</span>
+				</h1>
+			} else {
+				<h1 class="bb-page-title">{ p.Title }</h1>
+			}
+			if p.TitleBadge != nil {
+				@p.TitleBadge
+			}
+		</div>
 		if p.Subtitle != "" {
 			if p.SubtitleHideOnMobile {
 				<p class="text-sm text-base-content/50 mt-1 hidden sm:block">{ p.Subtitle }</p>
