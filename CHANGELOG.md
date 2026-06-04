@@ -4,6 +4,37 @@ All notable changes to Breadbox will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-06-04
+
+> **Pre-1.0.** Still on `0.x` — minor releases may include breaking changes.
+> This release is additive over 0.1.0 (no schema or API breaks); the notes
+> below are relative to 0.1.0.
+
+### Added
+
+- **Privacy mode** — a client-side toggle that obfuscates or hides sensitive financial data (amounts, balances, merchants, account names) directly in the browser, with a same-shape matrix/hex glitch so the layout stays legible. Covers stat tiles and feed rows, animates between states, and is reachable from the command palette. Nothing leaves the server — purely a render-time mask. (#1717, #1718, #1723)
+- **Developer Mode reporter** — an opt-in, settings-gated floating widget for filing bug/task reports straight to GitHub, with a redacted screenshot of the current viewport attached. Financial values are glitch-obfuscated and everything else is masked before capture, so reports are safe to send to a public destination. (#1701, #1711, #1722, #1727)
+- **Multi-channel notifications** — notifications now fan out to multiple destinations with native formatting for Slack, Discord, and Google Chat (alongside ntfy), a per-event priority floor, and automatic retries. A dedicated Notifications settings page configures it all. (#1687, #1699)
+- **Workflow run controls** — cancel an in-flight run, and unlimited turns is now the default. One-off (on-demand) runs gained live spinners, toasts, and deep-links; each workflow can carry its own editable name and avatar. (#1724, #1694, #1689, #1684)
+- **Inline activity pagination** — "Load older activity" appends in place on the feed instead of navigating away, and every agent report renders as its own comment-bubble row. (#1712, #1704)
+
+### Changed
+
+- **MCP settings** redesigned as a Providers-style directory with per-entry edit drawers. (#1726)
+- **Provider settings** moved into per-provider drawers, with CSV split into its own section and a Test button in the drawer footer. (#1686, #1690)
+- **Getting Started** reworked into a guided setup journey with inline per-step stats. (#1691, #1692, #1688)
+- **Navigation chrome** simplified — the topbar is now the single breadcrumb; in-page breadcrumbs are gone. Logs are hidden from the sidebar, command palette, and go-to shortcuts. (#1685, #1721)
+- **Workflows polish** — redesigned configure-drawer Advanced section, single-status run-detail header, and the Rule Foundation step now frames its mode as create+backfill vs create-only. Cron schedule shortcuts respect the user's local timezone. (#1697, #1695, #1705, #1682)
+- **Transactions** Grouped/List switch is now a daisy segmented control. (#1693)
+
+### Fixed
+
+- **Login over plain HTTP** — the session cookie's `Secure` flag is now set per request, so LAN / non-TLS installs can log in. (#1714)
+- **Installer** turns a stale-Postgres-volume `28P01` auth failure into actionable guidance, drains buffered input before prompts, and prints the LAN URL. (#1715, #1713)
+- **Agents** — agent report prose no longer shows over-escaped unicode, and non-positive `max_turns` is clamped so runs pass spec validation. (#1719, #1716)
+- **UI polish** — settings rail stays pinned and rides overscroll during nav fades, the side-drawer scrim dims the sidebar too, OverflowMenu grows to fit its longest label, and comment/report card seams are gone. (#1702, #1678, #1706, #1683, #1698)
+- **CI** pulls the Postgres test image from the ECR Public mirror instead of Docker Hub. (#1709)
+
 ## [0.1.0] - 2026-06-01
 
 > **Pre-1.0.** Breadbox follows SemVer — while we're on `0.x`, minor releases may
