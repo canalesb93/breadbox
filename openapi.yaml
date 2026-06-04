@@ -2782,13 +2782,12 @@ paths:
         sync, in addition to any cron schedule).
 
 
-        Optionally includes `connectors`: an array of custom HTTP MCP
-        servers this workflow mounts alongside the built-in breadbox MCP
-        (e.g. a remote Gmail MCP). Each entry is
-        `{name, url, header_name, secret}` — `secret` is the plaintext
-        header value, stored AES-256-GCM-encrypted at rest and never
-        returned (responses report `has_secret` only). **Requires
-        `full_access` scope.**
+        Optionally includes `connectors`: an array of custom MCP connector
+        NAMES to enable on this workflow (mounted alongside the built-in
+        breadbox MCP — e.g. a remote Gmail MCP). The connector definitions +
+        credentials live in the global connector library, managed from the
+        Workflows settings page; this field only references them by name.
+        **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -2914,10 +2913,9 @@ paths:
       tags: [Workflows]
       summary: Partial update of an agent definition
       description: |
-        Omitted fields are unchanged. Omitting `connectors` leaves the
-        stored connectors untouched; sending the key replaces the full
-        set. A connector whose `secret` is blank keeps its previously
-        stored encrypted value (matched by `name`). **Requires
+        Omitted fields are unchanged. `connectors` is the list of enabled
+        connector NAMES (from the global connector library); omitting the key
+        leaves the set untouched, sending it replaces the set. **Requires
         `full_access` scope.**
       requestBody:
         required: true

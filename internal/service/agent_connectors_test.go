@@ -7,144 +7,65 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"breadbox/internal/agent"
 )
 
 // testEncKey is a deterministic 32-byte AES-256 key for connector crypto tests.
 var testEncKey = []byte("0123456789abcdef0123456789abcdef")
 
-func TestBuildStoredConnectors_EncryptsAndValidates(t *testing.T) {
-	in := []ConnectorInput{{
-		Name:       "gmail",
-		URL:        "https://gmail-mcp.example.com/mcp",
-		HeaderName: "Authorization",
-		Secret:     "Bearer sk-secret-123",
-	}}
-	b, err := buildStoredConnectors(in, nil, testEncKey)
-	if err != nil {
-		t.Fatalf("buildStoredConnectors: %v", err)
+func TestValidateConnectorFields(t *testing.T) {
+	if _, _, err := validateConnectorFields("gmail", "https://x/mcp"); err != nil {
+		t.Fatalf("valid connector rejected: %v", err)
 	}
-	if strings.Contains(string(b), "Bearer sk-secret-123") {
-		t.Fatalf("stored connectors contain plaintext secret: %s", b)
-	}
-	stored := storedConnectorsFromBytes(b)
-	if len(stored) != 1 || stored[0].Name != "gmail" || stored[0].URL != "https://gmail-mcp.example.com/mcp" {
-		t.Fatalf("unexpected stored connector: %+v", stored)
-	}
-	if stored[0].Secret == "" {
-		t.Fatalf("expected encrypted secret to be stored")
-	}
-}
-
-func TestBuildStoredConnectors_Rejects(t *testing.T) {
-	cases := map[string][]ConnectorInput{
-		"bad name":       {{Name: "Gmail!", URL: "https://x/mcp"}},
-		"reserved name":  {{Name: "breadbox", URL: "https://x/mcp"}},
-		"bad url":        {{Name: "gmail", URL: "ftp://nope"}},
-		"secret no head": {{Name: "gmail", URL: "https://x/mcp", Secret: "tok"}},
-		"duplicate": {
-			{Name: "gmail", URL: "https://x/mcp"},
-			{Name: "gmail", URL: "https://y/mcp"},
-		},
+	cases := map[string][2]string{
+		"bad name":      {"Gmail!", "https://x/mcp"},
+		"reserved name": {"breadbox", "https://x/mcp"},
+		"bad scheme":    {"gmail", "ftp://nope"},
+		"no host":       {"gmail", "https://"},
 	}
 	for name, in := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := buildStoredConnectors(in, nil, testEncKey); !errors.Is(err, ErrInvalidParameter) {
+			if _, _, err := validateConnectorFields(in[0], in[1]); !errors.Is(err, ErrInvalidParameter) {
 				t.Fatalf("want ErrInvalidParameter, got %v", err)
 			}
 		})
 	}
 }
 
-func TestBuildStoredConnectors_CarryForwardAndReplace(t *testing.T) {
-	existing, err := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://x/mcp", HeaderName: "Authorization", Secret: "old-token",
-	}}, nil, testEncKey)
+func TestEncryptConnectorSecret(t *testing.T) {
+	if got, err := encryptConnectorSecret("", testEncKey); err != nil || got != "" {
+		t.Fatalf("empty plaintext: got %q err %v", got, err)
+	}
+	if _, err := encryptConnectorSecret("tok", nil); !errors.Is(err, ErrInvalidParameter) {
+		t.Fatalf("want ErrInvalidParameter with no key, got %v", err)
+	}
+	ct, err := encryptConnectorSecret("Bearer xyz", testEncKey)
 	if err != nil {
-		t.Fatalf("seed: %v", err)
+		t.Fatalf("encrypt: %v", err)
 	}
-	oldCipher := storedConnectorsFromBytes(existing)[0].Secret
-
-	// Blank secret on edit → carry the stored ciphertext forward unchanged.
-	kept, err := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://x/mcp", HeaderName: "Authorization", Secret: "",
-	}}, existing, testEncKey)
-	if err != nil {
-		t.Fatalf("carry-forward: %v", err)
-	}
-	if got := storedConnectorsFromBytes(kept)[0].Secret; got != oldCipher {
-		t.Fatalf("expected secret carried forward, got %q want %q", got, oldCipher)
-	}
-
-	// New secret → re-encrypted; ciphertext differs and decrypts to the new value.
-	replaced, err := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://x/mcp", HeaderName: "Authorization", Secret: "new-token",
-	}}, existing, testEncKey)
-	if err != nil {
-		t.Fatalf("replace: %v", err)
-	}
-	newCipher := storedConnectorsFromBytes(replaced)[0].Secret
-	if newCipher == oldCipher {
-		t.Fatalf("expected re-encrypted secret to differ from old ciphertext")
+	if ct == "" || strings.Contains(ct, "Bearer xyz") {
+		t.Fatalf("ciphertext leaks plaintext or is empty: %q", ct)
 	}
 }
 
-func TestBuildStoredConnectors_SecretNeedsEncKey(t *testing.T) {
-	_, err := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://x/mcp", HeaderName: "Authorization", Secret: "tok",
-	}}, nil, nil)
-	if !errors.Is(err, ErrInvalidParameter) {
-		t.Fatalf("want ErrInvalidParameter when encKey missing, got %v", err)
-	}
-	// A connector with no secret stores fine without a key.
-	if _, err := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://x/mcp",
-	}}, nil, nil); err != nil {
-		t.Fatalf("no-secret connector should not need encKey: %v", err)
-	}
-}
-
-func TestConnectorViewsFromBytes_NoSecretLeak(t *testing.T) {
-	b, _ := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://x/mcp", HeaderName: "Authorization", Secret: "tok",
-	}}, nil, testEncKey)
-	views := connectorViewsFromBytes(b)
-	if len(views) != 1 {
-		t.Fatalf("want 1 view, got %d", len(views))
-	}
-	if !views[0].HasSecret {
-		t.Fatalf("expected HasSecret=true")
-	}
-	// The view struct carries only has_secret — confirm neither the ciphertext
-	// key nor the secret value escapes. (has_secret legitimately contains the
-	// substring "secret", so we ban the value + the ciphertext key, not it.)
-	out, _ := json.Marshal(views[0])
-	for _, banned := range []string{"ciphertext", "secret_ciphertext", "tok"} {
-		if strings.Contains(string(out), banned) {
-			t.Fatalf("connector view leaked %q: %s", banned, out)
-		}
-	}
-}
-
-func TestConnectorServersFromBytes_DecryptsToHTTP(t *testing.T) {
-	b, _ := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://gmail/mcp", HeaderName: "Authorization", Secret: "Bearer xyz",
-	}}, nil, testEncKey)
-	servers, tools, err := connectorServersFromBytes(b, testEncKey)
+func TestEnabledConnectorNamesRoundTrip(t *testing.T) {
+	b, err := enabledConnectorNamesToBytes([]string{"gmail", "gmail", " calendar ", ""})
 	if err != nil {
-		t.Fatalf("connectorServersFromBytes: %v", err)
+		t.Fatalf("to bytes: %v", err)
 	}
-	cfg, ok := servers["gmail"]
-	if !ok {
-		t.Fatalf("missing gmail server")
+	names := enabledConnectorNamesFromBytes(b)
+	if len(names) != 2 || names[0] != "gmail" || names[1] != "calendar" {
+		t.Fatalf("dedup/trim failed: %v", names)
 	}
-	if cfg.Type != "http" || cfg.URL != "https://gmail/mcp" {
-		t.Fatalf("unexpected server cfg: %+v", cfg)
+	// Empty → "[]".
+	empty, _ := enabledConnectorNamesToBytes(nil)
+	if string(empty) != "[]" {
+		t.Fatalf("empty names should encode []: %s", empty)
 	}
-	if cfg.Headers["Authorization"] != "Bearer xyz" {
-		t.Fatalf("header not decrypted: %+v", cfg.Headers)
-	}
-	if len(tools) != 1 || tools[0] != "mcp__gmail" {
-		t.Fatalf("unexpected tools: %v", tools)
+	// Invalid name rejected.
+	if _, err := enabledConnectorNamesToBytes([]string{"Bad Name"}); !errors.Is(err, ErrInvalidParameter) {
+		t.Fatalf("want ErrInvalidParameter for bad name, got %v", err)
 	}
 }
 
@@ -152,11 +73,8 @@ func TestConnectorServersFromBytes_DecryptsToHTTP(t *testing.T) {
 // connector must not serialize an empty "command", or the sidecar's zod union
 // would match it against the stdio variant.
 func TestConnectorMCPServerJSON_OmitsCommand(t *testing.T) {
-	b, _ := buildStoredConnectors([]ConnectorInput{{
-		Name: "gmail", URL: "https://gmail/mcp", HeaderName: "Authorization", Secret: "tok",
-	}}, nil, testEncKey)
-	servers, _, _ := connectorServersFromBytes(b, testEncKey)
-	out, _ := json.Marshal(servers["gmail"])
+	cfg := agent.MCPServerConfig{Type: "http", URL: "https://gmail/mcp", Headers: map[string]string{"Authorization": "Bearer x"}}
+	out, _ := json.Marshal(cfg)
 	if strings.Contains(string(out), "\"command\"") {
 		t.Fatalf("http connector serialized a command key: %s", out)
 	}

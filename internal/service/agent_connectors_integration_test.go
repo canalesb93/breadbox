@@ -9,84 +9,75 @@ import (
 	"breadbox/internal/service"
 )
 
-// TestConnectors_CRUDAndAssembly exercises the full custom-connector path:
-// create with a secret → masked read → blank-secret edit carries the secret
-// forward → AssembleJobSpec mounts the decrypted HTTP server → clearing the set.
-func TestConnectors_CRUDAndAssembly(t *testing.T) {
+// TestConnectorLibrary_CRUDEnableAssemble exercises the global-library +
+// per-workflow-enablement model end-to-end: create a library connector with a
+// secret → masked read → enable it on a workflow → AssembleJobSpec mounts the
+// decrypted HTTP server → blank-secret edit carries the secret forward →
+// delete removes it from assembly.
+func TestConnectorLibrary_CRUDEnableAssemble(t *testing.T) {
 	svc, _, _ := newService(t)
 	svc.EncryptionKey = devEncKey
 	ctx := context.Background()
 
+	// 1. Create a library connector with a secret.
+	view, err := svc.CreateConnector(ctx, service.ConnectorLibraryInput{
+		Name:       "gmail",
+		URL:        "https://gmail-mcp.example.com/mcp",
+		HeaderName: "Authorization",
+		Secret:     "Bearer super-secret-token",
+	})
+	if err != nil {
+		t.Fatalf("create connector: %v", err)
+	}
+	if view.ShortID == "" || !view.HasSecret || view.Name != "gmail" {
+		t.Fatalf("unexpected create view: %+v", view)
+	}
+
+	// Duplicate name rejected.
+	if _, err := svc.CreateConnector(ctx, service.ConnectorLibraryInput{Name: "gmail", URL: "https://x/mcp"}); err == nil {
+		t.Fatalf("expected conflict on duplicate connector name")
+	}
+
+	// List returns it, masked.
+	list, err := svc.ListConnectors(ctx)
+	if err != nil || len(list) != 1 || !list[0].HasSecret {
+		t.Fatalf("list connectors: %v (%+v)", err, list)
+	}
+
+	// 2. Create a workflow that enables it (+ a non-existent name to prove
+	// assembly skips unknown connectors).
 	def, err := svc.CreateAgentDefinition(ctx, service.CreateAgentDefinitionParams{
-		Name:      "Connector agent",
-		Slug:      "conn-agent",
-		Prompt:    "Look up receipts in Gmail to enrich transactions.",
-		ToolScope: "read_write",
-		Model:     "claude-opus-4-7",
-		MaxTurns:  10,
-		Connectors: []service.ConnectorInput{{
-			Name:       "gmail",
-			URL:        "https://gmail-mcp.example.com/mcp",
-			HeaderName: "Authorization",
-			Secret:     "Bearer super-secret-token",
-		}},
+		Name:       "Connector agent",
+		Slug:       "conn-agent",
+		Prompt:     "Look up receipts in Gmail.",
+		ToolScope:  "read_write",
+		Model:      "claude-opus-4-7",
+		MaxTurns:   10,
+		Connectors: []string{"gmail", "ghost"},
 	})
 	if err != nil {
-		t.Fatalf("create: %v", err)
+		t.Fatalf("create workflow: %v", err)
 	}
-	if len(def.Connectors) != 1 {
-		t.Fatalf("want 1 connector, got %d", len(def.Connectors))
-	}
-	c := def.Connectors[0]
-	if c.Name != "gmail" || c.URL != "https://gmail-mcp.example.com/mcp" || c.HeaderName != "Authorization" {
-		t.Fatalf("unexpected connector view: %+v", c)
-	}
-	if !c.HasSecret {
-		t.Fatalf("expected HasSecret=true on create")
+	if len(def.Connectors) != 2 {
+		t.Fatalf("want 2 enabled names, got %+v", def.Connectors)
 	}
 
-	// Read-back is masked (no secret field exists on the view).
-	got, err := svc.GetAgentDefinition(ctx, "conn-agent")
-	if err != nil {
-		t.Fatalf("get: %v", err)
-	}
-	if len(got.Connectors) != 1 || !got.Connectors[0].HasSecret {
-		t.Fatalf("read-back connector missing/!HasSecret: %+v", got.Connectors)
-	}
-
-	// Edit with a blank secret → the stored secret must carry forward.
-	updated, err := svc.UpdateAgentDefinition(ctx, "conn-agent", service.UpdateAgentDefinitionParams{
-		Connectors: &[]service.ConnectorInput{{
-			Name:       "gmail",
-			URL:        "https://gmail-mcp.example.com/mcp",
-			HeaderName: "Authorization",
-			Secret:     "", // keep existing
-		}},
-	})
-	if err != nil {
-		t.Fatalf("update carry-forward: %v", err)
-	}
-	if len(updated.Connectors) != 1 || !updated.Connectors[0].HasSecret {
-		t.Fatalf("carry-forward lost the secret: %+v", updated.Connectors)
-	}
-
-	// AssembleJobSpec must mount the connector as an HTTP server with the
-	// decrypted header and allow-list its tools.
+	// 3. AssembleJobSpec mounts gmail (decrypted) but skips the unknown "ghost".
 	seedSubscriptionAuth(t, svc)
-	run := &service.AgentRunResponse{ID: updated.ID}
-	spec, err := svc.AssembleJobSpec(ctx, updated, run, "bb_test_key", devEncKey)
+	run := &service.AgentRunResponse{ID: def.ID}
+	spec, err := svc.AssembleJobSpec(ctx, def, run, "bb_test_key", devEncKey)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
 	gmail, ok := spec.MCPServers["gmail"]
 	if !ok {
-		t.Fatalf("gmail server not mounted: %+v", spec.MCPServers)
+		t.Fatalf("gmail not mounted: %+v", spec.MCPServers)
 	}
-	if gmail.Type != "http" || gmail.URL != "https://gmail-mcp.example.com/mcp" {
-		t.Fatalf("unexpected gmail server: %+v", gmail)
+	if gmail.Type != "http" || gmail.Headers["Authorization"] != "Bearer super-secret-token" {
+		t.Fatalf("gmail server wrong: %+v", gmail)
 	}
-	if gmail.Headers["Authorization"] != "Bearer super-secret-token" {
-		t.Fatalf("header not decrypted at assembly: %+v", gmail.Headers)
+	if _, ok := spec.MCPServers["ghost"]; ok {
+		t.Fatalf("unknown connector should be skipped")
 	}
 	if _, ok := spec.MCPServers["breadbox"]; !ok {
 		t.Fatalf("breadbox server should still be present")
@@ -95,24 +86,35 @@ func TestConnectors_CRUDAndAssembly(t *testing.T) {
 		t.Fatalf("allowedTools missing mcp__gmail: %v", spec.AllowedTools)
 	}
 
-	// Clearing the set (present-but-empty) removes all connectors.
-	cleared, err := svc.UpdateAgentDefinition(ctx, "conn-agent", service.UpdateAgentDefinitionParams{
-		Connectors: &[]service.ConnectorInput{},
-	})
-	if err != nil {
-		t.Fatalf("clear: %v", err)
+	// 4. Edit the connector with a blank secret → carries forward; assembly
+	// still decrypts to the original value.
+	if _, err := svc.UpdateConnector(ctx, view.ShortID, service.ConnectorLibraryInput{
+		Name:       "gmail",
+		URL:        "https://gmail-mcp.example.com/v2/mcp",
+		HeaderName: "Authorization",
+		Secret:     "", // keep
+	}); err != nil {
+		t.Fatalf("update connector: %v", err)
 	}
-	if len(cleared.Connectors) != 0 {
-		t.Fatalf("expected connectors cleared, got %+v", cleared.Connectors)
+	spec2, err := svc.AssembleJobSpec(ctx, def, run, "bb_test_key", devEncKey)
+	if err != nil {
+		t.Fatalf("assemble after edit: %v", err)
+	}
+	if got := spec2.MCPServers["gmail"]; got.URL != "https://gmail-mcp.example.com/v2/mcp" || got.Headers["Authorization"] != "Bearer super-secret-token" {
+		t.Fatalf("carry-forward failed: %+v", got)
 	}
 
-	// Omitting connectors on a later edit must leave them untouched (still 0).
-	noTouch, err := svc.UpdateAgentDefinition(ctx, "conn-agent", service.UpdateAgentDefinitionParams{})
-	if err != nil {
-		t.Fatalf("no-touch update: %v", err)
+	// 5. Delete the connector → assembly no longer mounts it (stale enabled
+	// name is harmlessly skipped).
+	if err := svc.DeleteConnector(ctx, view.ShortID); err != nil {
+		t.Fatalf("delete connector: %v", err)
 	}
-	if len(noTouch.Connectors) != 0 {
-		t.Fatalf("omitting connectors changed the set: %+v", noTouch.Connectors)
+	spec3, err := svc.AssembleJobSpec(ctx, def, run, "bb_test_key", devEncKey)
+	if err != nil {
+		t.Fatalf("assemble after delete: %v", err)
+	}
+	if _, ok := spec3.MCPServers["gmail"]; ok {
+		t.Fatalf("deleted connector should not mount")
 	}
 }
 

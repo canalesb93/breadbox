@@ -645,6 +645,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/notify-test", NotifyTestAdminHandler(svc))
 			r.Post("/workflows/cleanup", AgentCleanupAdminHandler(a, svc))
 
+			// Connector library CRUD (admin-only — connector secrets are
+			// sensitive). Posts come from the Workflows settings page.
+			r.Post("/workflows/connectors", CreateConnectorAdminHandler(svc, sm))
+			r.Post("/workflows/connectors/{id}/update", UpdateConnectorAdminHandler(svc, sm))
+			r.Post("/workflows/connectors/{id}/delete", DeleteConnectorAdminHandler(svc, sm))
+
 			// Notifications tab "Send test" button. Canonical home for the
 			// test-delivery endpoint now that the sink lives on its own page;
 			// /-/workflows/notify-test stays as a back-compat alias.

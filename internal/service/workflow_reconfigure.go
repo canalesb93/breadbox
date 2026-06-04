@@ -67,6 +67,17 @@ type WorkflowConfig struct {
 	AdditionalInstructions string `json:"additional_instructions"`
 	// Options carries every preset option with its currently-selected value.
 	Options []WorkflowConfigOption `json:"options"`
+	// Connectors lists every library connector with whether this workflow has
+	// it enabled — drives the drawer's connector toggles.
+	Connectors []WorkflowConfigConnector `json:"connectors"`
+}
+
+// WorkflowConfigConnector is one library connector + whether this workflow
+// enables it. URL is shown as a subtitle in the drawer toggle.
+type WorkflowConfigConnector struct {
+	Name    string `json:"name"`
+	URL     string `json:"url"`
+	Enabled bool   `json:"enabled"`
 }
 
 // UpdateWorkflowConfigParams carries the reconfigure-drawer fields for an
@@ -105,6 +116,9 @@ type UpdateWorkflowConfigParams struct {
 	// (empty string clears it back to slug-seeded). The slug itself is never
 	// touched — it's the stable identity baked into run keys and routes.
 	AvatarSeed *string
+	// Connectors, when non-nil, replaces the workflow's enabled library
+	// connectors (by name); nil leaves them untouched.
+	Connectors *[]string
 }
 
 // presetForEnabledWorkflow resolves an enabled workflow by slug and returns
@@ -207,6 +221,23 @@ func (s *Service) GetWorkflowConfig(ctx context.Context, slug string) (*Workflow
 		}
 		cfg.Options = append(cfg.Options, co)
 	}
+
+	// Connector toggles: every library connector, flagged with whether this
+	// workflow enables it. Best-effort — a library read hiccup just yields no
+	// toggles rather than failing the drawer.
+	if lib, lerr := s.ListConnectors(ctx); lerr == nil {
+		enabled := make(map[string]bool, len(def.Connectors))
+		for _, n := range def.Connectors {
+			enabled[n] = true
+		}
+		for _, c := range lib {
+			cfg.Connectors = append(cfg.Connectors, WorkflowConfigConnector{
+				Name:    c.Name,
+				URL:     c.URL,
+				Enabled: enabled[c.Name],
+			})
+		}
+	}
 	return cfg, nil
 }
 
@@ -306,6 +337,9 @@ func (s *Service) UpdateWorkflowConfig(ctx context.Context, slug string, params 
 	}
 	if params.MaxBudgetUSD != nil {
 		update.MaxBudgetUSD = params.MaxBudgetUSD
+	}
+	if params.Connectors != nil {
+		update.Connectors = params.Connectors
 	}
 
 	return s.UpdateAgentDefinition(ctx, slug, update)

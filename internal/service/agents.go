@@ -68,12 +68,12 @@ type AgentDefinitionResponse struct {
 	ScheduleCron    *string  `json:"schedule_cron,omitempty"`
 	ToolScope       string   `json:"tool_scope"`
 	AllowedTools    []string `json:"allowed_tools"`
-	// Connectors are custom MCP servers this workflow mounts alongside the
-	// built-in breadbox MCP. Secrets are never serialized — each view only
-	// reports has_secret.
-	Connectors      []ConnectorView `json:"connectors"`
-	Model           string          `json:"model"`
-	MaxTurns        int             `json:"max_turns"`
+	// Connectors lists the library connector NAMES enabled on this workflow
+	// (mounted alongside the built-in breadbox MCP at run time). Definitions +
+	// secrets live in the global connector library, not here.
+	Connectors      []string `json:"connectors"`
+	Model           string   `json:"model"`
+	MaxTurns        int      `json:"max_turns"`
 	MaxBudgetUSD    *float64 `json:"max_budget_usd,omitempty"`
 	Enabled         bool     `json:"enabled"`
 	QuietHoursStart *string  `json:"quiet_hours_start,omitempty"`
@@ -226,10 +226,9 @@ type CreateAgentDefinitionParams struct {
 	QuietHoursEnd         *string
 	TriggerOnSyncComplete bool    // fire after each successful sync completes
 	SourceTemplate        *string // preset slug this was instantiated from; nil = hand-authored
-	// Connectors are custom MCP servers to mount. Secrets must already be
-	// encrypted (SecretCiphertext) by the caller; the service never sees
-	// plaintext. nil/empty = no connectors.
-	Connectors []ConnectorInput
+	// Connectors lists library connector names to enable on this workflow.
+	// nil/empty = none.
+	Connectors []string
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
@@ -254,10 +253,9 @@ type UpdateAgentDefinitionParams struct {
 	// untouched; a non-empty value replaces it; an empty string clears it
 	// back to slug-seeded.
 	AvatarSeed *string
-	// Connectors replaces the full connector set when non-nil; nil leaves the
-	// existing connectors untouched. A connector whose SecretCiphertext is
-	// empty keeps its previously-stored secret (matched by name).
-	Connectors *[]ConnectorInput
+	// Connectors replaces the enabled-connector-name set when non-nil; nil
+	// leaves it untouched.
+	Connectors *[]string
 }
 
 // RecentErroredAgentRun is one entry in the admin run-failed banner
@@ -469,7 +467,7 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 	if err := validateQuietHours(p.QuietHoursStart, p.QuietHoursEnd); err != nil {
 		return nil, err
 	}
-	connectorsJSON, err := buildStoredConnectors(p.Connectors, nil, s.EncryptionKey)
+	connectorsJSON, err := enabledConnectorNamesToBytes(p.Connectors)
 	if err != nil {
 		return nil, err
 	}
@@ -577,14 +575,11 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		merged.MaxTurns = DefaultAgentMaxTurns
 	}
 
-	// Connectors are handled outside `merged` deliberately: the merged response
-	// carries ConnectorView (no ciphertext), so writing it back would wipe the
-	// stored secrets. When the patch omits connectors we persist the existing
-	// JSONB verbatim; when it sets them we rebuild against the RAW existing
-	// bytes so blank-secret edits carry the prior ciphertext forward.
+	// Connectors hold only enabled library-connector NAMES (no secrets), so a
+	// plain replace is safe. Omitting the field leaves the set untouched.
 	connectorsJSON := existing.Connectors
 	if p.Connectors != nil {
-		connectorsJSON, err = buildStoredConnectors(*p.Connectors, existing.Connectors, s.EncryptionKey)
+		connectorsJSON, err = enabledConnectorNamesToBytes(*p.Connectors)
 		if err != nil {
 			return nil, err
 		}
@@ -1256,17 +1251,14 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		},
 	}
 
-	// Merge custom connectors (Phase 1: HTTP MCP servers the operator added,
-	// e.g. a remote Gmail MCP for receipt lookups). def carries only
-	// ConnectorView (has_secret), never the ciphertext, so refetch the raw row
-	// to decrypt the per-connector header secrets here, where encKey is in hand.
+	// Merge the workflow's enabled connectors (Phase 1: HTTP MCP servers from
+	// the global library, e.g. a remote Gmail MCP for receipt lookups). def
+	// carries the enabled names; the library holds URL + encrypted secret,
+	// decrypted here where encKey is in hand. Names with no library row (e.g. a
+	// since-deleted connector) are skipped.
 	var connectorTools []string
 	if len(def.Connectors) > 0 {
-		row, rErr := s.resolveAgentDefinition(ctx, def.ID)
-		if rErr != nil {
-			return nil, fmt.Errorf("resolve connectors for run: %w", rErr)
-		}
-		servers, tools, cErr := connectorServersFromBytes(row.Connectors, encKey)
+		servers, tools, cErr := s.resolveEnabledConnectorServers(ctx, def.Connectors, encKey)
 		if cErr != nil {
 			return nil, fmt.Errorf("assemble connectors: %w", cErr)
 		}
@@ -1510,7 +1502,7 @@ func agentDefinitionFromRow(row db.Workflow, lastRun *AgentRunSummary) AgentDefi
 		ScheduleCron:          pgconv.TextPtr(row.ScheduleCron),
 		ToolScope:             row.ToolScope,
 		AllowedTools:          agentAllowedToolsFromBytes(row.AllowedTools),
-		Connectors:            connectorViewsFromBytes(row.Connectors),
+		Connectors:            enabledConnectorNamesFromBytes(row.Connectors),
 		Model:                 row.Model,
 		MaxTurns:              int(row.MaxTurns),
 		MaxBudgetUSD:          agentFloatFromNumeric(row.MaxBudgetUsd),

@@ -76,11 +76,21 @@ func ReconfigureWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 		// declared options and falls back to the default for unknown keys.
 		// Same control-key set as the enable handler, minus enable-only
 		// fields (enabled/consent) that don't apply to a reconfigure.
+		// Connector toggles: the drawer renders a checkbox per library
+		// connector and a hidden marker so an all-unchecked submit still
+		// replaces (clears) rather than leaving the set untouched.
+		if _, ok := r.Form["connectors_present"]; ok {
+			names := append([]string{}, r.Form["connector"]...)
+			params.Connectors = &names
+		}
+
 		control := map[string]bool{
 			"additional_instructions": true,
 			"name":                    true,
 			"avatar_seed":             true,
 			"_csrf":                   true,
+			"connector":               true,
+			"connectors_present":      true,
 		}
 		for k := range cfgControl {
 			control[k] = true

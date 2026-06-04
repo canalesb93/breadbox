@@ -35,6 +35,7 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 		<div class="space-y-6">
 			@agentSDKStatusSection(p.Status)
 			@agentSDKConfigSection(p)
+			@agentSDKConnectorsSection(p)
 			@agentSDKDiagnosticsSection(p.CSRFToken)
 		</div>
 	</div>
@@ -292,6 +293,85 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 			<p class="text-xs text-error">{ fieldErr }</p>
 		}
 	</div>
+}
+
+// ---------------------------------------------------------------------
+// Connectors (global custom-MCP library)
+// ---------------------------------------------------------------------
+templ agentSDKConnectorsSection(p AgentSDKSettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "plug",
+		Title:   "Connectors",
+		Caption: "Custom MCP servers your workflows can use — e.g. a remote Gmail MCP for receipt lookups. Configure once here, then enable per workflow.",
+	}) {
+		if len(p.Connectors) == 0 {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<p class="text-xs text-base-content/50 italic">No connectors yet. Add one below, then enable it from a workflow's reconfigure panel.</p>
+			}
+		}
+		for _, c := range p.Connectors {
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				@agentSDKConnectorRow(c, p.CSRFToken)
+			}
+		}
+		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+			@agentSDKConnectorAddForm(p.CSRFToken)
+		}
+	}
+}
+
+// agentSDKConnectorRow is the edit+delete affordance for one stored connector.
+// The secret input is masked: a stored secret shows as a placeholder hint and
+// an empty submit keeps it (mirrors the auth-token pattern).
+templ agentSDKConnectorRow(c AgentSDKConnector, csrf string) {
+	<div class="rounded-xl ring-1 ring-base-content/10 p-3 space-y-2">
+		<form method="POST" action={ connectorActionURL(c.ShortID, "update") } class="space-y-2">
+			<input type="hidden" name="_csrf" value={ csrf }/>
+			<div class="flex items-center gap-2">
+				<input type="text" name="name" value={ c.Name } placeholder="gmail" class="bb-form-input font-mono text-sm flex-1" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="31"/>
+				<button type="submit" class="btn btn-primary btn-xs">Save</button>
+			</div>
+			<input type="url" name="url" value={ c.URL } placeholder="https://gmail-mcp.example.com/mcp" class="bb-form-input font-mono text-sm w-full" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="2000"/>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+				<input type="text" name="header_name" value={ c.HeaderName } placeholder="Authorization" class="bb-form-input font-mono text-sm" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="120"/>
+				<input type="password" name="secret" autocomplete="off" placeholder={ agentSDKSecretPlaceholder(c.HasSecret) } class="bb-form-input font-mono text-sm" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="4000"/>
+			</div>
+		</form>
+		<form method="POST" action={ connectorActionURL(c.ShortID, "delete") } class="flex justify-end">
+			<input type="hidden" name="_csrf" value={ csrf }/>
+			<button type="submit" class="btn btn-ghost btn-xs text-error gap-1">
+				@components.LucideIcon("trash-2", "w-3.5 h-3.5")
+				Delete
+			</button>
+		</form>
+	</div>
+}
+
+templ agentSDKConnectorAddForm(csrf string) {
+	<form method="POST" action="/-/workflows/connectors" class="rounded-xl border border-dashed border-base-content/20 p-3 space-y-2">
+		<input type="hidden" name="_csrf" value={ csrf }/>
+		<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Add connector</div>
+		<div class="flex items-center gap-2">
+			<input type="text" name="name" placeholder="gmail" class="bb-form-input font-mono text-sm flex-1" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="31" required/>
+			<button type="submit" class="btn btn-secondary btn-xs gap-1">
+				@components.LucideIcon("plus", "w-3.5 h-3.5")
+				Add
+			</button>
+		</div>
+		<input type="url" name="url" placeholder="https://gmail-mcp.example.com/mcp" class="bb-form-input font-mono text-sm w-full" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="2000" required/>
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+			<input type="text" name="header_name" value="Authorization" placeholder="Authorization" class="bb-form-input font-mono text-sm" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="120"/>
+			<input type="password" name="secret" autocomplete="off" placeholder="Header value, e.g. Bearer …" class="bb-form-input font-mono text-sm" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="4000"/>
+		</div>
+		<p class="text-xs text-base-content/40">HTTP transport. The secret is the full header value (e.g. <code>Bearer sk-…</code>) and is stored encrypted.</p>
+	</form>
+}
+
+func agentSDKSecretPlaceholder(hasSecret bool) string {
+	if hasSecret {
+		return "•••• stored (blank = keep)"
+	}
+	return "Header value, e.g. Bearer …"
 }
 
 // ---------------------------------------------------------------------

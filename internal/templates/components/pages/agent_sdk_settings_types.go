@@ -2,6 +2,8 @@
 
 package pages
 
+import "github.com/a-h/templ"
+
 // AgentSDKSettingsProps drives the v1 admin "Agents settings" page —
 // distinct from the existing AgentsSettings ("MCP Settings") page. This
 // one is for the Claude Agent SDK runner: authentication credentials,
@@ -23,6 +25,28 @@ type AgentSDKSettingsProps struct {
 	// workflow runs, formatted for the spend-ceiling section (e.g. "$2.13
 	// of $20.00" when a ceiling is set, or "$2.13" with no cap).
 	HouseholdSpend30dStr string
+	// Connectors is the global custom-MCP connector library shown in the
+	// Connectors section. Secrets are masked to HasSecret.
+	Connectors []AgentSDKConnector
+}
+
+// AgentSDKConnector is the settings-page view of one library connector. The
+// secret is never sent to the browser — HasSecret only signals whether one is
+// stored, so the edit form can show a "leave blank to keep" affordance.
+type AgentSDKConnector struct {
+	ShortID    string
+	Name       string
+	URL        string
+	HeaderName string
+	HasSecret  bool
+}
+
+// connectorActionURL builds the POST action for a connector mutation. Kept as a
+// Go helper (not an inline templ.SafeURL literal) so the admin-routes drift
+// test — which only validates literal URLs against GET routes — doesn't flag
+// these POST-only form actions.
+func connectorActionURL(shortID, verb string) templ.SafeURL {
+	return templ.SafeURL("/-/workflows/connectors/" + shortID + "/" + verb)
 }
 
 // AgentSDKSettingsFormFields mirrors the writable settings exposed by
