@@ -880,7 +880,7 @@
                 :disabled="!title.trim() || submitting || capturing"
                 class="btn btn-primary btn-sm gap-2">
           <span x-show="!submitting && !capturing" class="flex items-center gap-1.5">
-            {{ lucide "send" "w-3.5 h-3.5" }} File issue
+            {{ brand "github" "brand-onbtn w-3.5 h-3.5" }} File issue
           </span>
           <span x-show="capturing && !submitting" x-cloak class="flex items-center gap-1.5">
             <span class="loading loading-spinner loading-xs"></span> Preparing…
