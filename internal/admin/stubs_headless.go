@@ -50,7 +50,7 @@ func (*TemplateRenderer) SetAppConfigReader(any) {}
 // NewSessionManager mirrors the real signature. Returns a real (empty)
 // scs.SessionManager so chi middleware that handles it as an interface
 // continues to type-check.
-func NewSessionManager(_ *pgxpool.Pool, _ bool) *scs.SessionManager {
+func NewSessionManager(_ *pgxpool.Pool) *scs.SessionManager {
 	return scs.New()
 }
 

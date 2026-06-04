@@ -11,6 +11,14 @@ type Config struct {
 	Environment   string
 	LogLevel      string // LOG_LEVEL: debug, info, warn, error
 
+	// SecureCookies controls the Secure attribute on the session cookie:
+	// "always", "never", or "auto" (default). In "auto" the Secure flag
+	// follows the actual request scheme (direct HTTPS, or a trusted proxy's
+	// X-Forwarded-Proto=https), so a plain-HTTP LAN/localhost install can
+	// still log in while HTTPS deployments stay hardened. From SECURE_COOKIES;
+	// applied per request by middleware.SecureSessionCookie.
+	SecureCookies string
+
 	// DataDir is the root directory for persistent runtime data (agent
 	// transcripts, scheduled pg_dump backups, future cached blobs).
 	// Sourced from BB_DATA_DIR; defaults to "/var/lib/breadbox" when

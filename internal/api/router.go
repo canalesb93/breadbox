@@ -61,8 +61,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 	// behaves exactly as before — API-key / Bearer only.
 	var sm *scs.SessionManager
 	if !a.Config.NoDashboard {
-		isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
-		sm = admin.NewSessionManager(a.DB, isSecure)
+		sm = admin.NewSessionManager(a.DB)
 	}
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -72,6 +71,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 		// and are intentionally not rate-limited (cheap, used by load
 		// balancers / monitoring).
 		if sm != nil {
+			// Stamp Secure on the session cookie per request — must wrap the
+			// writer scs sets the cookie on, so it goes before LoadAndSave.
+			r.Use(mw.SecureSessionCookie(a.Config.SecureCookies, sm.Cookie.Name))
 			r.Use(sm.LoadAndSave)
 		}
 		r.Use(sessionOrAPIKeyAuth(svc, sm))

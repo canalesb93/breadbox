@@ -7,6 +7,7 @@ import (
 
 	"breadbox/internal/app"
 	breadboxmcp "breadbox/internal/mcp"
+	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -18,6 +19,10 @@ import (
 // (dashboard, connections, users, admin API).
 func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service, mcpServer *breadboxmcp.MCPServer) chi.Router {
 	r := chi.NewRouter()
+
+	// Stamp Secure on the session cookie per request — must wrap the writer
+	// scs sets the cookie on, so it goes before LoadAndSave.
+	r.Use(mw.SecureSessionCookie(a.Config.SecureCookies, sm.Cookie.Name))
 
 	// Session middleware wraps everything so session data is available.
 	r.Use(sm.LoadAndSave)

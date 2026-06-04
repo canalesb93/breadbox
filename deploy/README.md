@@ -253,6 +253,7 @@ rm -rf ~/.breadbox
 | `ENCRYPTION_KEY` | Yes* | — | 64-char hex key for encrypting bank credentials |
 | `SERVER_PORT` | No | `8080` | HTTP listen port |
 | `ENVIRONMENT` | No | `docker` | Runtime environment (`local`, `docker`) |
+| `SECURE_COOKIES` | No | `auto` | Session-cookie `Secure` policy: `auto` (follows request scheme), `always`, `never`. `auto` lets plain-HTTP LAN/localhost installs log in while HTTPS deployments stay hardened. |
 | `LOG_LEVEL` | No | `info` | Log level (`debug`, `info`, `warn`, `error`) |
 | `POSTGRES_USER` | Yes | `breadbox` | PostgreSQL user (used by db service) |
 | `POSTGRES_PASSWORD` | Yes | — | PostgreSQL password (used by db service) |
