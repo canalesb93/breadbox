@@ -110,7 +110,23 @@ func Load() (*Config, error) {
 	// Dashboard gate. Truthy values: "1", "true", "yes", "on" (case-insensitive).
 	cfg.NoDashboard = parseBool(os.Getenv("BREADBOX_NO_DASHBOARD"))
 
+	// Session-cookie Secure policy: "always" | "never" | "auto" (default).
+	cfg.SecureCookies = parseSecureCookieMode(os.Getenv("SECURE_COOKIES"))
+
 	return cfg, nil
+}
+
+// parseSecureCookieMode maps SECURE_COOKIES to "always" | "never" | "auto".
+// Unset or unrecognized → "auto" (the Secure flag follows the request scheme).
+func parseSecureCookieMode(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "yes", "on", "always", "secure":
+		return "always"
+	case "0", "false", "no", "off", "never", "insecure":
+		return "never"
+	default:
+		return "auto"
+	}
 }
 
 // parseBool returns true for "1", "true", "yes", "on" (case-insensitive); false otherwise.
