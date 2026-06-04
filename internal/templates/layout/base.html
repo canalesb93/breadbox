@@ -2111,7 +2111,8 @@
         { id: 'sys-users', shortcutId: 'global.go.f', group: 'System', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/household', keywords: 'people family members' },
         { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'API Keys', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/settings/api-keys', keywords: 'tokens authentication api keys oauth connector claude access' },
         { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/settings/providers', keywords: 'plaid teller csv bank setup' },
-        { id: 'sys-logs', shortcutId: 'global.go.v', group: 'System', title: 'Logs', desc: 'Sync logs, webhook events, agent sessions', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events sessions activity' },
+        // Logs is hidden from quick-nav for now (route still live, reachable via feed deep links);
+        // restore this entry + the g-chord below to re-list it as a top-level page.
         { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/settings/backups', keywords: 'backup restore database dump export' },
         { id: 'sys-settings', shortcutId: 'global.go.s', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
         { id: 'sys-design', shortcutId: 'global.go.d', group: 'System', title: 'Design system', desc: 'DaisyUI + bb-* component sandbox', icon: 'palette', href: '/design', keywords: 'sandbox gallery components ui daisyui tailwind preview' },
@@ -2779,8 +2780,7 @@
         r: { path: '/reviews',            label: 'Go to Reviews' },
         u: { path: '/rules',              label: 'Go to Rules' },
         a: { path: '/categories',         label: 'Go to Categories' },
-        v: { path: '/logs',               label: 'Go to Logs' },
-        l: { path: '/logs',               label: 'Go to Logs' },
+        // g+v / g+l → /logs disabled while Logs is hidden from top-level nav; restore with the sidebar link.
         b: { path: '/settings/backups',   label: 'Go to Backups' },
         s: { path: '/settings',           label: 'Go to Settings' },
         p: { path: '/settings/providers', label: 'Go to Providers' },
