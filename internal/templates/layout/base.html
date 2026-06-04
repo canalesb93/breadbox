@@ -2130,6 +2130,17 @@
         { id: 'act-theme-light', group: 'Quick Actions', title: 'Light theme', desc: 'Always use the light theme', icon: 'sun', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('light'); }, keywords: 'theme light mode appearance bright day color scheme set' },
         { id: 'act-theme-dark', group: 'Quick Actions', title: 'Dark theme', desc: 'Always use the dark theme', icon: 'moon', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('dark'); }, keywords: 'theme dark mode appearance night color scheme set' },
         { id: 'act-theme-system', group: 'Quick Actions', title: 'System theme', desc: 'Match your OS appearance', icon: 'monitor', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('system'); }, keywords: 'theme system auto os appearance default color scheme automatic set' },
+        // Privacy actions (no href) — drive $store.privacy directly, mirroring
+        // the theme block above. `act-privacy` is the smart cycle
+        // (real → obfuscate → hide); its shortcutId links to the 'shift+p'
+        // binding in seedRegistry() so the palette row shows the same keycap
+        // hint as the help modal. The three explicit actions jump straight to a
+        // specific mode (the palette is the only place you can land directly on
+        // Hide without cycling).
+        { id: 'act-privacy', shortcutId: 'global.privacy.cycle', group: 'Quick Actions', title: 'Toggle privacy mode', desc: 'Cycle real → obfuscate → hide', icon: 'shield', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').cycle(); }, keywords: 'privacy obfuscate hide blur censor mask redact conceal sensitive screenshot demo screen share shoulder surf fake matrix hex' },
+        { id: 'act-privacy-real', group: 'Quick Actions', title: 'Show real data', desc: 'Turn privacy mode off', icon: 'eye', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').set('real'); }, keywords: 'privacy real show reveal unmask actual disable off normal clear' },
+        { id: 'act-privacy-obfuscate', group: 'Quick Actions', title: 'Obfuscate data', desc: 'Replace values with obvious fakes', icon: 'venetian-mask', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').set('obfuscate'); }, keywords: 'privacy obfuscate fake matrix hex scramble mask demo screenshot sensitive glitch' },
+        { id: 'act-privacy-hide', group: 'Quick Actions', title: 'Hide data', desc: 'Blur out sensitive values', icon: 'eye-off', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').set('hide'); }, keywords: 'privacy hide blur censor redact conceal hidden sensitive screenshot' },
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
