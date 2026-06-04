@@ -829,7 +829,14 @@ printf "\n"
 # Detect the leftover volume and force the user to choose: drop it (lose
 # data, get a clean install) or abort and recover the old password from
 # their previous .env backup.
-PROJECT_NAME=$(basename "$INSTALL_DIR")
+# Match the project name Docker Compose will actually use: COMPOSE_PROJECT_NAME
+# if set, otherwise the install-dir basename lowercased with characters outside
+# [a-z0-9_-] removed and leading non-alphanumerics stripped. The naive basename
+# missed user installs in ~/.breadbox — Compose normalizes that to project
+# "breadbox" (volume "breadbox_postgres_data", no leading dot), so the old
+# "^.breadbox_postgres_data$" grep never matched and the warning never fired.
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(basename "$INSTALL_DIR" \
+    | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-' | sed 's/^[^a-z0-9]*//')}"
 EXISTING_PG_VOLUME=$(docker volume ls --format '{{.Name}}' 2>/dev/null \
     | grep -E "^${PROJECT_NAME}_postgres_data$" | head -1 || true)
 
@@ -1058,9 +1065,34 @@ else
     # POSTGRES_PASSWORD was generated for this install just a moment ago —
     # we don't want it landing in scrollback / CI captures / shell history.
     # shellcheck disable=SC2086
-    docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 30 breadbox 2>&1 \
-        | sed -E 's#(://[^:@/]+:)[^@]+@#\1REDACTED@#g' \
-        || true
+    bb_logs=$(docker compose $CADDY_PROFILE -f "$COMPOSE_FILE" logs --tail 30 breadbox 2>&1 \
+        | sed -E 's#(://[^:@/]+:)[^@]+@#\1REDACTED@#g' || true)
+    printf "%s\n" "$bb_logs" >&2
+
+    # Postgres rejected the credentials (SQLSTATE 28P01). Almost always the
+    # postgres volume was initialized with a DIFFERENT password than the
+    # current .env — a leftover volume from an earlier attempt, or a
+    # regenerated .env. The image only applies POSTGRES_PASSWORD on the first
+    # boot of an empty data dir, so the old password sticks. The proactive
+    # check above only catches this when generating a fresh .env; catch the
+    # rest here and turn the cryptic 28P01 into an actionable fix.
+    case "$bb_logs" in
+        *"password authentication failed"*|*28P01*)
+            error ""
+            error "→ Postgres rejected the password (SQLSTATE 28P01)."
+            error "  The postgres volume holds a different password than your .env —"
+            error "  Postgres only sets POSTGRES_PASSWORD on the first boot of an empty"
+            error "  data dir, so a leftover volume keeps the old one."
+            error ""
+            error "  Reset it (DESTROYS data in that volume — safe on a fresh install):"
+            error "    cd ${INSTALL_DIR}"
+            error "    docker compose -f ${COMPOSE_FILE} down -v"
+            error "    docker compose -f ${COMPOSE_FILE} up -d"
+            error ""
+            error "  To KEEP existing data instead, restore the matching password into"
+            error "  POSTGRES_PASSWORD and DATABASE_URL in ${INSTALL_DIR}/.env, then re-run."
+            ;;
+    esac
     error ""
     error "Full logs: cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs"
     exit 1
