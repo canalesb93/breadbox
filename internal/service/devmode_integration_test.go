@@ -21,25 +21,20 @@ func TestDevModeSettings_RoundTrip(t *testing.T) {
 	if got.Enabled {
 		t.Error("expected developer mode off by default")
 	}
-	if got.IssueLabel != "dev-report" {
-		t.Errorf("default label = %q, want dev-report", got.IssueLabel)
-	}
 	if got.GithubRepo != "canalesb93/breadbox" {
 		t.Errorf("default repo = %q, want canalesb93/breadbox", got.GithubRepo)
 	}
 
 	enabled := true
 	repo := "acme/widgets"
-	label := "internal-report"
 	updated, err := svc.UpdateDevModeSettings(ctx, service.UpdateDevModeSettingsParams{
 		Enabled:    &enabled,
 		GithubRepo: &repo,
-		IssueLabel: &label,
 	})
 	if err != nil {
 		t.Fatalf("UpdateDevModeSettings: %v", err)
 	}
-	if !updated.Enabled || updated.GithubRepo != repo || updated.IssueLabel != label {
+	if !updated.Enabled || updated.GithubRepo != repo {
 		t.Errorf("unexpected updated settings: %+v", updated)
 	}
 	if !svc.DevModeEnabled(ctx) {
@@ -82,5 +77,10 @@ func TestCreateDevReport_BuildsDraft(t *testing.T) {
 	}
 	if !strings.Contains(res.DraftURL, "Task") {
 		t.Errorf("draft URL should carry the [Task] title: %q", res.DraftURL)
+	}
+	// Every draft carries the type tag + the fixed filed-via-bug marker
+	// (URL-encoded as task%2Cfiled-via-bug in the labels param).
+	if !strings.Contains(res.DraftURL, "filed-via-bug") || !strings.Contains(res.DraftURL, "task") {
+		t.Errorf("draft URL should carry task + filed-via-bug labels: %q", res.DraftURL)
 	}
 }

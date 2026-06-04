@@ -57,15 +57,16 @@ func TestIssueTitle(t *testing.T) {
 	}
 }
 
-func TestDedupeLabels(t *testing.T) {
-	if got := dedupeLabels("dev-report", "bug"); strings.Join(got, ",") != "dev-report,bug" {
-		t.Errorf("got %v", got)
+func TestReportLabels(t *testing.T) {
+	if got := reportLabels("bug"); strings.Join(got, ",") != "bug,filed-via-bug" {
+		t.Errorf("bug labels = %v", got)
 	}
-	if got := dedupeLabels("bug", "bug"); strings.Join(got, ",") != "bug" {
-		t.Errorf("got %v", got)
+	if got := reportLabels("task"); strings.Join(got, ",") != "task,filed-via-bug" {
+		t.Errorf("task labels = %v", got)
 	}
-	if got := dedupeLabels("", "task"); strings.Join(got, ",") != "task" {
-		t.Errorf("got %v", got)
+	// The marker is never duplicated even if the type happens to match it.
+	if got := reportLabels(devModeFiledLabel); strings.Join(got, ",") != devModeFiledLabel {
+		t.Errorf("dedup labels = %v", got)
 	}
 }
 

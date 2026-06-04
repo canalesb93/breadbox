@@ -17,5 +17,4 @@ type DeveloperSettingsProps struct {
 type DeveloperSettingsFormFields struct {
 	Enabled    bool
 	GithubRepo string
-	IssueLabel string
 }

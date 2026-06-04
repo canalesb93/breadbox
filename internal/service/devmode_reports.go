@@ -14,6 +14,12 @@ import (
 const (
 	devReportTypeBug  = "bug"
 	devReportTypeTask = "task"
+
+	// devModeFiledLabel is a fixed marker applied to every issue filed through
+	// Developer Mode, alongside the type tag (bug/task). It lets the household
+	// find or triage everything that came in via the in-app reporter. The label
+	// must already exist on the target repo for GitHub to apply it on submit.
+	devModeFiledLabel = "filed-via-bug"
 )
 
 // CreateDevReportInput is the decoded payload from the floating reporter. The
@@ -51,7 +57,6 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput) 
 	}
 
 	repo := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo)
-	label := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeIssueLabel, appconfig.DevModeDefaultLabel)
 
 	var imageURL, htmlURL string
 	if len(in.ScreenshotData) > 0 {
@@ -66,7 +71,7 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput) 
 	}
 
 	body := buildDevReportIssueBody(rtype, in, imageURL, htmlURL)
-	draftURL := buildDraftURL(repo, issueTitle(rtype, title), body, dedupeLabels(label, rtype))
+	draftURL := buildDraftURL(repo, issueTitle(rtype, title), body, reportLabels(rtype))
 	if draftURL == "" {
 		return nil, fmt.Errorf("%w: invalid GitHub repository", ErrInvalidParameter)
 	}
@@ -90,11 +95,12 @@ func issueTitle(rtype, title string) string {
 	return prefix + " " + title
 }
 
-// dedupeLabels returns [flow, type] minus any empty/duplicate entries.
-func dedupeLabels(flow, rtype string) []string {
+// reportLabels returns the labels for a filed issue: the type tag (bug/task)
+// plus the fixed filed-via-bug marker, de-duplicated and never empty.
+func reportLabels(rtype string) []string {
 	seen := map[string]bool{}
 	var out []string
-	for _, l := range []string{strings.TrimSpace(flow), rtype} {
+	for _, l := range []string{strings.TrimSpace(rtype), devModeFiledLabel} {
 		if l == "" || seen[l] {
 			continue
 		}
