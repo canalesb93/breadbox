@@ -78,6 +78,27 @@ type FeedProps struct {
 	// pagination contract.
 }
 
+// FeedRowsProps drives the partial-render endpoint behind the inline "Load
+// older activity" pagination (GET /-/feed/rows). It renders only the rail
+// <li> rows — day separators + feed rows — for one older window so the client
+// can append them to the existing timeline without a full reload. Mirrors the
+// transaction-detail TimelineRows pattern.
+type FeedRowsProps struct {
+	// Days is the day-bucketed chunk to render, newest-first. Each FeedDay's
+	// items are already ordered newest-first within the day.
+	Days []FeedDay
+
+	// Now is the request-level time anchor for relative-time helpers, shared
+	// with the page render so labels never disagree across midnight.
+	Now time.Time
+
+	// OmitLeadingDayKey suppresses the first day's separator when it equals
+	// the day key already at the tail of the client's timeline — the appended
+	// rows then continue under the existing day heading instead of repeating
+	// it. Empty means always render the leading separator.
+	OmitLeadingDayKey string
+}
+
 // FeedHero powers the at-a-glance band above the feed rail.
 type FeedHero struct {
 	Generated            string
