@@ -200,11 +200,34 @@ check_command() {
 #
 # Per-read redirection avoids dash's quirk where `exec 3</dev/tty` exits
 # the shell on open failure even inside a conditional.
+#
+# Drain any input already sitting in the buffer before we prompt, so
+# stray keystrokes from a slow preceding step (e.g. Enters mashed while
+# the first `docker info` was still negotiating with the daemon) can't
+# silently auto-answer the next prompt. Best-effort: only bash's `read`
+# supports the sub-second timeout this needs without blocking, so it's a
+# no-op under dash/posix sh (the status quo there — no regression).
+_bb_flush_input() {
+    [ -n "${BASH_VERSION:-}" ] || return 0
+    if [ "$1" = "tty" ]; then
+        # Subshell + stderr redirect so a missing controlling terminal
+        # (headless CI, `ssh -T`) stays silent — `2>/dev/null` on the bare
+        # `read` does not suppress the /dev/tty open-failure message on
+        # macOS, but redirecting the whole subshell's stderr does.
+        ( while read -r -t 0.05 _ </dev/tty; do :; done ) 2>/dev/null
+    else
+        while read -r -t 0.05 _ 2>/dev/null; do :; done
+    fi
+    return 0
+}
+
 _bb_read_line() {
     if [ -t 0 ]; then
+        _bb_flush_input stdin
         read -r ans
         return $?
     fi
+    _bb_flush_input tty
     if read -r ans </dev/tty 2>/dev/null; then
         return 0
     fi
@@ -257,6 +280,32 @@ prompt_value() {
         ans="$default"
     fi
     printf "%s" "${ans:-$default}"
+}
+
+# Best-effort primary LAN IPv4 of this host. The common self-host case is
+# a headless box (Raspberry Pi, NUC, home VM) reached from a *different*
+# device, so headlining "localhost" alone is misleading — we surface the
+# network address too. Empty string when it can't be determined.
+detect_lan_ip() {
+    ip=""
+    # Primary egress IPv4 first — robust even when docker/bridge
+    # interfaces add extra 172.x addresses to `hostname -I`.
+    if check_command ip; then
+        ip=$(ip -4 route get 1.1.1.1 2>/dev/null \
+            | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -1)
+    fi
+    if [ -z "$ip" ] && check_command hostname; then
+        ip=$(hostname -I 2>/dev/null | tr ' ' '\n' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+    fi
+    if [ -z "$ip" ] && check_command ipconfig; then
+        # macOS: resolve the interface backing the default route rather
+        # than guessing en0/en1 (Wi-Fi vs Ethernet vs VPN vary by host).
+        iface=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+        [ -n "$iface" ] && ip=$(ipconfig getifaddr "$iface" 2>/dev/null)
+        [ -z "$ip" ] && ip=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+    fi
+    printf "%s" "$ip"
 }
 
 # Detect the host's external HTTPS URL when running on a known VM
@@ -930,12 +979,14 @@ if [ "$healthy" -eq 1 ]; then
     # closes the loop on VM platforms (exe.dev) where the script can
     # derive the real public URL — no more "or visit your public URL"
     # guessing.
+    LAN_IP=""
     if [ -n "$DOMAIN_VALUE" ]; then
         SETUP_URL="https://${DOMAIN_VALUE}/setup"
     elif [ -n "$EXTERNAL_URL" ]; then
         SETUP_URL="${EXTERNAL_URL}/setup"
     else
         SETUP_URL="http://localhost:${PORT}/setup"
+        LAN_IP=$(detect_lan_ip)
     fi
 
     # Compose-command shortcuts for the footer hints. Both variants are
@@ -957,6 +1008,11 @@ if [ "$healthy" -eq 1 ]; then
     # Only show the "or your public URL" hint when we genuinely don't
     # know the public URL (no --domain and no platform detection).
     if [ -z "$DOMAIN_VALUE" ] && [ -z "$EXTERNAL_URL" ]; then
+        # Headless installs are almost always reached from another device,
+        # so the LAN address is the URL the user actually needs.
+        if [ -n "$LAN_IP" ]; then
+            printf "    ${BOLD}→ From another device:${NC} ${BOLD}http://${LAN_IP}:${PORT}/setup${NC}\n"
+        fi
         printf "    ${DIM}(or your public URL if this host is behind a reverse proxy on port ${PORT})${NC}\n"
     fi
     # Platform-reachability warning. Breadbox is healthy locally; if
