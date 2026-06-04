@@ -552,6 +552,13 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		def := DefaultAgentMaxBudgetUSD
 		budget = &def
 	}
+	// Mirror CreateAgentDefinition: a cleared or zeroed max_turns falls back to
+	// the default. validateAgentDefinitionFields permits 0 (documented as
+	// "0 falls back to the default"), so without this an update could persist
+	// max_turns=0 — which AssembleJobSpec would forward and the sidecar reject.
+	if merged.MaxTurns <= 0 {
+		merged.MaxTurns = DefaultAgentMaxTurns
+	}
 
 	row, err := s.Queries.UpdateAgentDefinition(ctx, db.UpdateAgentDefinitionParams{
 		ID:                    existing.ID,
@@ -1243,6 +1250,17 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		maxBudget = *def.MaxBudgetUSD
 	}
 
+	// Clamp max_turns to a positive value. The sidecar's spec schema requires
+	// maxTurns > 0 (z.number().int().positive()); a definition holding 0 — e.g.
+	// a pre-fix row, or a max_turns:0 edit that slipped past validation — would
+	// otherwise forward maxTurns:0 and fail the run with spec_invalid before it
+	// even starts. Last line of defense before the sidecar; mirrors the
+	// create-path default so any non-positive value resolves to the default.
+	maxTurns := def.MaxTurns
+	if maxTurns <= 0 {
+		maxTurns = DefaultAgentMaxTurns
+	}
+
 	// SystemPrompt: caller-defined override wins; otherwise the breadbox
 	// baseline is injected. Without this fallback the SDK silently uses
 	// its built-in "Claude Code"-style persona, which is optimized for
@@ -1258,7 +1276,7 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		Prompt:            def.Prompt,
 		SystemPrompt:      systemPrompt,
 		Model:             def.Model,
-		MaxTurns:          def.MaxTurns,
+		MaxTurns:          maxTurns,
 		MaxBudgetUsd:      maxBudget,
 		ToolScope:         def.ToolScope,
 		AllowedTools:      allowedTools,
